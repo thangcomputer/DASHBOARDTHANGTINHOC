@@ -89,12 +89,20 @@ function normalizeTransferText(s) {
     .replace(/[^a-z0-9]/g, '');
 }
 
+/** Lấy mọi mã TTH##### từ chuỗi / object webhook */
+function extractTthCodes(...parts) {
+  const blob = parts
+    .map((p) => (typeof p === 'string' ? p : p != null ? JSON.stringify(p) : ''))
+    .join(' ');
+  const found = blob.match(/tth\d{4,}/gi) || [];
+  return [...new Set(found.map((c) => c.toUpperCase()))];
+}
+
 function contentMatchesRef(content, ref) {
   const c = normalizeTransferText(content);
   const r = normalizeTransferText(ref);
   if (!c || !r) return false;
   if (c.includes(r) || r.includes(c)) return true;
-  // Ngân hàng đôi khi cắt ngắn / chen khoảng trắng — khớp theo mã HV TTH#####
   const code = (ref.match(/TTH\d{4,}/i) || [])[0];
   if (code && c.includes(normalizeTransferText(code))) return true;
   return false;
@@ -175,45 +183,74 @@ router.get('/payment-status', handleCheckSession);
 // ── POST /api/webhooks/sepay ── SePay Webhook (HMAC verified) ──────────────────
 router.post('/sepay', verifySepaySignature, async (req, res) => {
   try {
-    const body = req.body;
-    logger.info('[SEPAY WEBHOOK]', JSON.stringify(body, null, 2));
+    const body = req.body || {};
+    // Pino: object trước, message sau — để thấy đủ payload trong log
+    logger.info({ sepay: body }, '[SEPAY WEBHOOK]');
 
-    // SePay / ngân hàng có thể gửi nội dung ở nhiều field khác nhau
-    const content = [
+    if (body.transferType && String(body.transferType).toLowerCase() === 'out') {
+      return res.json({ success: true, matched: false, skipped: 'transferType=out' });
+    }
+
+    const contentParts = [
       body.content,
       body.description,
       body.remark,
-      body.referenceCode,
       body.code,
+      body.subAccount,
+      body.referenceCode,
       body.transactionContent,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-      .trim();
-    const amount  = Number(body.transferAmount || body.amount || 0);
+    ].filter((v) => v != null && String(v).trim() !== '');
 
-    if (!content || amount <= 0) {
-      logger.warn('[SEPAY] Thiếu content/amount', { content, amount, keys: Object.keys(body || {}) });
+    const content = contentParts.join(' ').toLowerCase().trim();
+    const amount = Number(body.transferAmount || body.amount || 0);
+    const webhookCodes = extractTthCodes(content, body);
+
+    if (amount <= 0) {
+      logger.warn({ content, amount, keys: Object.keys(body) }, '[SEPAY] Thiếu amount');
       return res.json({ success: false, message: 'Thiếu thông tin giao dịch' });
     }
 
     let matched = false;
 
-    // ── 1. Kiểm tra payment sessions (đăng ký mới) ───────────────────────────
-    // Ưu tiên khớp mã TTH##### (ổn định nhất), rồi mới khớp full ref đã normalize
-    const pendingSessions = await PaymentSession.find({ status: 'pending' });
+    // Pending + expired gần đây (CK trễ sau khi UI hết giờ)
+    const lookback = new Date(Date.now() - SESSION_TTL_MS * 2);
+    const pendingSessions = await PaymentSession.find({
+      status: { $in: ['pending', 'expired'] },
+      createdAt: { $gte: lookback },
+    }).sort({ createdAt: -1 });
+
     let pendingSession = null;
-    const contentNorm = normalizeTransferText(content);
-    for (const sess of pendingSessions) {
-      const codeMatch = (sess.ref.match(/tth\d{4,}/i) || [])[0];
-      if (codeMatch && contentNorm.includes(normalizeTransferText(codeMatch))) {
-        pendingSession = sess;
-        break;
+
+    if (webhookCodes.length) {
+      for (const sess of pendingSessions) {
+        const sessCodes = extractTthCodes(sess.ref);
+        if (sessCodes.some((c) => webhookCodes.includes(c))) {
+          pendingSession = sess;
+          break;
+        }
       }
-      if (contentMatchesRef(content, sess.ref)) {
-        pendingSession = sess;
-        break;
+    }
+
+    if (!pendingSession && content) {
+      for (const sess of pendingSessions) {
+        if (contentMatchesRef(content, sess.ref)) {
+          pendingSession = sess;
+          break;
+        }
+      }
+    }
+
+    // Fallback: đúng 1 session pending cùng số tiền
+    if (!pendingSession) {
+      const sameAmount = pendingSessions.filter(
+        (s) => s.status === 'pending' && Number(s.amount) === amount
+      );
+      if (sameAmount.length === 1) {
+        pendingSession = sameAmount[0];
+        logger.info(
+          { sessionId: pendingSession.sessionId, amount },
+          '[SEPAY] Match theo amount (duy nhất 1 session pending)'
+        );
       }
     }
 
@@ -221,11 +258,13 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
       pendingSession.status = 'paid';
       pendingSession.paidAmount = amount;
       await pendingSession.save();
-
-      logger.info(`[SEPAY] ✅ Session ${pendingSession.sessionId} khớp ref="${pendingSession.ref}" — đã thanh toán ${amount}đ`);
       matched = true;
 
-      // Emit socket cho frontend đang chờ
+      logger.info(
+        { sessionId: pendingSession.sessionId, ref: pendingSession.ref, amount, webhookCodes },
+        '[SEPAY] ✅ Session paid'
+      );
+
       const io = req.app.get('io');
       if (io) {
         io.emit('tuition:paid', {
@@ -236,13 +275,14 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
       }
     }
 
-    // ── 2. Kiểm tra học viên hiện có trong DB ────────────────────────────────
     if (!matched) {
       const students = await Student.find({ paid: false }).lean();
       for (const s of students) {
         const code = (s.studentCode || String(s._id).slice(-6)).toLowerCase();
         const name = (s.name || '').toLowerCase().replace(/\s+/g, '');
-        if (contentMatchesRef(content, code) || contentMatchesRef(content, name)) {
+        const studentCodes = extractTthCodes(code, s.studentCode);
+        const codeHit = studentCodes.length && studentCodes.some((c) => webhookCodes.includes(c));
+        if (codeHit || contentMatchesRef(content, code) || contentMatchesRef(content, name)) {
           await Student.findByIdAndUpdate(s._id, {
             paid: true,
             paidAmount: amount,
@@ -259,20 +299,31 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
               message: `✅ ${s.name} đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
             });
           }
-          logger.info(`[SEPAY] ✅ Học viên ${s.name} đã thanh toán ${amount}đ`);
+          logger.info({ name: s.name, amount }, '[SEPAY] ✅ Học viên paid');
           break;
         }
       }
     }
 
     if (!matched) {
-      logger.warn('[SEPAY] Không match được — nội dung:', content);
+      logger.warn(
+        {
+          content,
+          amount,
+          webhookCodes,
+          pendingRefs: pendingSessions.map((s) => ({
+            ref: s.ref,
+            amount: s.amount,
+            status: s.status,
+          })),
+        },
+        '[SEPAY] Không match được'
+      );
     }
 
-    return res.json({ success: true, matched });
-
+    return res.json({ success: true, matched, codes: webhookCodes });
   } catch (err) {
-    logger.error('[SEPAY WEBHOOK ERROR]', err);
+    logger.error({ err }, '[SEPAY WEBHOOK ERROR]');
     return res.json({ success: false, message: 'Lỗi server: ' + err.message });
   }
 });

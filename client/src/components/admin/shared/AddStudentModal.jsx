@@ -91,10 +91,9 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
   const pollRef                     = React.useRef(null);
   const timerRef                    = React.useRef(null);
 
-  const [studentCode] = useState(() => `TTH${Date.now().toString().slice(-5)}`);
-  const ckContent = useMemo(() => {
-    return `${form.name.replace(/\s+/g,'').slice(0,8) || 'HV'} ${studentCode} Nop hoc phi`.trim();
-  }, [form.name, studentCode]);
+  // Mã ngắn ASCII — ngân hàng hay cắt/bỏ dấu nội dung CK dài
+  const [studentCode] = useState(() => `TTH${Date.now().toString().slice(-6)}`);
+  const ckContent = useMemo(() => studentCode, [studentCode]);
 
   // Fetch bank + create session khi vào step qr
   useEffect(() => {
