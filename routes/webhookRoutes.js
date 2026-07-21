@@ -134,8 +134,8 @@ const handleCreateSession = async (req, res) => {
   }
 };
 
-router.post('/payment-session', authMiddleware, handleCreateSession);
-router.post('/create-session', authMiddleware, handleCreateSession);
+router.post('/payment-session', handleCreateSession);
+router.post('/create-session', handleCreateSession);
 
 // ── GET /api/webhooks/payment-session/:id & /api/webhooks/payment-status ── Polling
 const handleCheckSession = async (req, res) => {

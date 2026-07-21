@@ -108,26 +108,48 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       .then(res => { if (res.success) setBankInfo(res.data); })
       .catch(() => {});
 
-    // 2) Create payment session (apiFetch = đúng token + CSRF)
+    // 2) Tạo payment session — luôn gửi kèm Authorization nếu có
     const selectedBranch = branches.find(b => String(b._id) === String(form.branchId || (selectedBranchId !== 'all' ? selectedBranchId : '')));
     const branchCode = selectedBranch?.code || '';
 
-    apiFetch('/webhooks/create-session', {
-      method: 'POST',
-      body: JSON.stringify({
-        amount: form.price,
-        content: ckContent,
-        studentName: form.name,
-        courseName: form.course,
-        branchCode: branchCode,
-      }),
-    })
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.sessionId) setSessionId(res.sessionId);
-        else toast.error(res.message || 'Không tạo được phiên thanh toán');
-      })
-      .catch(() => toast.error('Không tạo được phiên thanh toán'));
+    const createBody = {
+      amount: form.price,
+      content: ckContent,
+      studentName: form.name,
+      courseName: form.course,
+      branchCode: branchCode,
+    };
+
+    const tryCreate = () =>
+      apiFetch('/webhooks/create-session', {
+        method: 'POST',
+        body: JSON.stringify(createBody),
+      }).then(async (r) => {
+        const res = await r.json().catch(() => ({}));
+        if (!r.ok || !res.sessionId) {
+          throw new Error(res.message || `HTTP ${r.status}`);
+        }
+        return res;
+      });
+
+    tryCreate()
+      .then((res) => setSessionId(res.sessionId))
+      .catch(async (err1) => {
+        // Fallback raw fetch (tránh lỗi token/CSRF làm mất session)
+        try {
+          const r = await fetch(`${API}/api/webhooks/create-session`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(createBody),
+          });
+          const res = await r.json().catch(() => ({}));
+          if (res.sessionId) setSessionId(res.sessionId);
+          else toast.error(res.message || err1.message || 'Không tạo được phiên thanh toán');
+        } catch {
+          toast.error('Không tạo được phiên thanh toán — tải lại trang');
+        }
+      });
 
     // Countdown
     timerRef.current = setInterval(() => {
