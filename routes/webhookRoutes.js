@@ -259,20 +259,6 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
       }
     }
 
-    // Fallback: đúng 1 session pending cùng số tiền
-    if (!pendingSession) {
-      const sameAmount = pendingSessions.filter(
-        (s) => s.status === 'pending' && Number(s.amount) === amount
-      );
-      if (sameAmount.length === 1) {
-        pendingSession = sameAmount[0];
-        logger.info(
-          { sessionId: pendingSession.sessionId, amount },
-          '[SEPAY] Match theo amount (duy nhất 1 session pending)'
-        );
-      }
-    }
-
     if (pendingSession) {
       pendingSession.status = 'paid';
       pendingSession.paidAmount = amount;
