@@ -79,6 +79,27 @@ function verifySepaySignature(req, res, next) {
 
 const SESSION_TTL_MS = 15 * 60 * 1000; // 15 phút
 
+/** Chuẩn hoá nội dung CK: bỏ dấu, khoảng trắng, ký tự đặc biệt — khớp với tin nhắn ngân hàng */
+function normalizeTransferText(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function contentMatchesRef(content, ref) {
+  const c = normalizeTransferText(content);
+  const r = normalizeTransferText(ref);
+  if (!c || !r) return false;
+  if (c.includes(r) || r.includes(c)) return true;
+  // Ngân hàng đôi khi cắt ngắn / chen khoảng trắng — khớp theo mã HV TTH#####
+  const code = (ref.match(/TTH\d{4,}/i) || [])[0];
+  if (code && c.includes(normalizeTransferText(code))) return true;
+  return false;
+}
+
 // ── POST /api/webhooks/payment-session & /api/webhooks/create-session ──
 const handleCreateSession = async (req, res) => {
   try {
@@ -171,7 +192,7 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
     const pendingSessions = await PaymentSession.find({ status: 'pending' });
     let pendingSession = null;
     for (const sess of pendingSessions) {
-      if (content.includes(sess.ref.toLowerCase())) {
+      if (contentMatchesRef(content, sess.ref)) {
         pendingSession = sess;
         break;
       }
@@ -202,7 +223,7 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
       for (const s of students) {
         const code = (s.studentCode || String(s._id).slice(-6)).toLowerCase();
         const name = (s.name || '').toLowerCase().replace(/\s+/g, '');
-        if (content.includes(code) || content.includes(name)) {
+        if (contentMatchesRef(content, code) || contentMatchesRef(content, name)) {
           await Student.findByIdAndUpdate(s._id, {
             paid: true,
             paidAmount: amount,
