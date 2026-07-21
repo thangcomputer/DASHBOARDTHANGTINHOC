@@ -3,7 +3,7 @@ import { useAdminTab } from '../AdminTabContext';
 import {
   BookOpen, Video, FileText, Download, ClipboardList, Trophy, Plus, HelpCircle,
   Edit3, Trash2, Save, Upload, Loader2, Star, CheckCircle2, X, PlayCircle,
-  GraduationCap, Search, Clock, Layers,
+  GraduationCap, Search, Clock, Layers, FileSpreadsheet,
 } from 'lucide-react';
 import AdminCourseBuilder from '../../AdminCourseBuilder';
 import RichTextEditor from '../shared/RichTextEditor';
