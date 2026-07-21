@@ -6,10 +6,11 @@ import {
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useSocket } from '../../../context/SocketContext';
+import { apiFetch } from '../../../services/api';
 
 export default function AddStudentModal({ onAdd, onClose, teachers }) {
   const toast    = useToast();
-  const API      = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
+  const API = import.meta.env.VITE_API_URL || "";
   const TOTAL_PAYMENT_SECS = 900; // 15 phút
 
   const { isSuperAdmin, branches, selectedBranchId } = useBranch();
@@ -107,22 +108,26 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       .then(res => { if (res.success) setBankInfo(res.data); })
       .catch(() => {});
 
-    // 2) Create payment session
-    const token = (() => { try { return JSON.parse(localStorage.getItem('admin_user') || '{}').token || ''; } catch { return ''; } })();
+    // 2) Create payment session (apiFetch = đúng token + CSRF)
     const selectedBranch = branches.find(b => String(b._id) === String(form.branchId || (selectedBranchId !== 'all' ? selectedBranchId : '')));
     const branchCode = selectedBranch?.code || '';
 
-    fetch(`${API}/api/webhooks/create-session`, {
+    apiFetch('/webhooks/create-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ 
-        amount: form.price, 
+      body: JSON.stringify({
+        amount: form.price,
         content: ckContent,
         studentName: form.name,
         courseName: form.course,
-        branchCode: branchCode
+        branchCode: branchCode,
       }),
-    }).then(r => r.json()).then(res => { if (res.sessionId) setSessionId(res.sessionId); }).catch(() => {});
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.sessionId) setSessionId(res.sessionId);
+        else toast.error(res.message || 'Không tạo được phiên thanh toán');
+      })
+      .catch(() => toast.error('Không tạo được phiên thanh toán'));
 
     // Countdown
     timerRef.current = setInterval(() => {
@@ -140,45 +145,50 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
     if (step !== 'qr' || pollStatus === 'paid' || !socket) return;
     
     const handlePaid = (data) => {
-      if (data.sessionId === sessionId || (data.content && data.content.toLowerCase().includes(ckContent.toLowerCase()))) {
-        clearInterval(pollRef.current);
-        clearInterval(timerRef.current);
-        setPollStatus('paid');
-        setStep('success'); // Show success screen (blue check)
-        
-        // Wait 2 seconds before closing and adding student
-        setTimeout(() => {
-          onAdd({ ...form, age: Number(form.age), id: Date.now(), paid: true, studentCode });
-          onClose();
-        }, 2500);
-      }
+      const sameSession = sessionId && data.sessionId === sessionId;
+      // Khi sessionId chưa kịp set — vẫn nhận nếu chỉ có 1 event paid gần đây
+      const acceptAny = !sessionId && data.sessionId;
+      if (!sameSession && !acceptAny) return;
+      clearInterval(pollRef.current);
+      clearInterval(timerRef.current);
+      setPollStatus('paid');
+      setStep('success');
+      setTimeout(() => {
+        onAdd({ ...form, age: Number(form.age), id: Date.now(), paid: true, studentCode });
+        onClose();
+      }, 2500);
     };
 
     socket.on('tuition:paid', handlePaid);
     return () => socket.off('tuition:paid', handlePaid);
   }, [step, sessionId, pollStatus, socket, ckContent]);
 
-  // Polling mỗi 3s (Fallback)
+  // Polling mỗi 3s (Fallback) — luôn gửi content/TTH để tìm session kể cả khi chưa có sessionId
   useEffect(() => {
     if (step !== 'qr' || pollStatus === 'paid') return;
     const sid = sessionId;
-    pollRef.current = setInterval(async () => {
-      if (!sid && !ckContent) return;
+    const code = ckContent;
+    const tick = async () => {
+      if (!sid && !code) return;
       try {
-        const r = await fetch(`${API}/api/webhooks/payment-status?sessionId=${sid || ''}&content=${encodeURIComponent(ckContent)}`).then(x => x.json());
+        const qs = new URLSearchParams();
+        if (sid) qs.set('sessionId', sid);
+        if (code) qs.set('content', code);
+        const r = await fetch(`${API}/api/webhooks/payment-status?${qs}`).then((x) => x.json());
         if (r.paid || r.status === 'paid') {
           clearInterval(pollRef.current);
           clearInterval(timerRef.current);
           setPollStatus('paid');
-          setStep('success'); // Show success screen
-          
+          setStep('success');
           setTimeout(() => {
             onAdd({ ...form, age: Number(form.age), id: Date.now(), paid: true, studentCode });
-            onClose(); 
+            onClose();
           }, 2500);
         }
-      } catch {}
-    }, 3000);
+      } catch { /* ignore */ }
+    };
+    tick(); // check ngay, không đợi 3s
+    pollRef.current = setInterval(tick, 3000);
     return () => clearInterval(pollRef.current);
   }, [step, sessionId, pollStatus, ckContent]);
 

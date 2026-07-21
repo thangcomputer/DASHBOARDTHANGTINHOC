@@ -141,11 +141,30 @@ router.post('/create-session', authMiddleware, handleCreateSession);
 const handleCheckSession = async (req, res) => {
   try {
     const sessionId = req.params.id || req.query.sessionId;
-    if (!sessionId) {
-       return res.status(400).json({ success: false, message: 'Missing sessionId' });
+    const contentQ = (req.query.content || req.query.ref || '').trim();
+
+    let session = null;
+    if (sessionId) {
+      session = await PaymentSession.findOne({ sessionId });
+    }
+    // Fallback: tìm theo mã TTH / nội dung CK (khi create-session chậm hoặc mất sessionId)
+    if (!session && contentQ) {
+      const codes = extractTthCodes(contentQ);
+      if (codes.length) {
+        const re = new RegExp(codes[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        session = await PaymentSession.findOne({ ref: re }).sort({ createdAt: -1 });
+      }
+      if (!session) {
+        session = await PaymentSession.findOne({
+          ref: contentQ.toLowerCase(),
+        }).sort({ createdAt: -1 });
+      }
     }
 
-    const session = await PaymentSession.findOne({ sessionId });
+    if (!sessionId && !contentQ) {
+      return res.status(400).json({ success: false, message: 'Missing sessionId or content' });
+    }
+
     if (!session) {
       return res.json({ success: true, status: 'not_found', paid: false });
     }
