@@ -144,11 +144,16 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
   useEffect(() => {
     if (step !== 'qr' || pollStatus === 'paid' || !socket) return;
     
-    const handlePaid = (data) => {
-      const sameSession = sessionId && data.sessionId === sessionId;
-      // Khi sessionId chưa kịp set — vẫn nhận nếu chỉ có 1 event paid gần đây
-      const acceptAny = !sessionId && data.sessionId;
-      if (!sameSession && !acceptAny) return;
+    const handlePaid = async () => {
+      try {
+        const qs = new URLSearchParams();
+        if (sessionId) qs.set('sessionId', sessionId);
+        if (ckContent) qs.set('content', ckContent);
+        const r = await fetch(`${API}/api/webhooks/payment-status?${qs}`).then((x) => x.json());
+        if (!(r.paid || r.status === 'paid')) return;
+      } catch {
+        return;
+      }
       clearInterval(pollRef.current);
       clearInterval(timerRef.current);
       setPollStatus('paid');
