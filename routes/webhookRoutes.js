@@ -274,6 +274,7 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
       if (io) {
         io.emit('tuition:paid', {
           sessionId: pendingSession.sessionId,
+          ref: pendingSession.ref,
           amount,
           message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
         });

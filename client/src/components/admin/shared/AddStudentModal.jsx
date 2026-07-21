@@ -159,14 +159,21 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       });
     }, 1000);
 
-    return () => { clearInterval(timerRef.current); clearInterval(pollRef.current); };
+    return () => { clearInterval(timerRef.current); };
   }, [step]);
 
   // Real-time Socket.io listener
   useEffect(() => {
     if (step !== 'qr' || pollStatus === 'paid' || !socket) return;
-    
-    const handlePaid = async () => {
+
+    const handlePaid = async (data) => {
+      const ref = String(data?.ref || '').toLowerCase();
+      const code = String(ckContent || '').toLowerCase();
+      const sameSession = sessionId && data?.sessionId === sessionId;
+      const sameRef = ref && code && (ref === code || ref.includes(code) || code.includes(ref));
+      if (!sameSession && !sameRef) {
+        // Vẫn xác nhận lại bằng API (tránh miss khi sessionId chưa kịp set)
+      }
       try {
         const qs = new URLSearchParams();
         if (sessionId) qs.set('sessionId', sessionId);
@@ -190,19 +197,21 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
     return () => socket.off('tuition:paid', handlePaid);
   }, [step, sessionId, pollStatus, socket, ckContent]);
 
-  // Polling mỗi 3s (Fallback) — luôn gửi content/TTH để tìm session kể cả khi chưa có sessionId
+  // Polling 1.5s — không phụ thuộc sessionId
   useEffect(() => {
     if (step !== 'qr' || pollStatus === 'paid') return;
     const sid = sessionId;
     const code = ckContent;
+    let stopped = false;
     const tick = async () => {
-      if (!sid && !code) return;
+      if (stopped || (!sid && !code)) return;
       try {
         const qs = new URLSearchParams();
         if (sid) qs.set('sessionId', sid);
         if (code) qs.set('content', code);
         const r = await fetch(`${API}/api/webhooks/payment-status?${qs}`).then((x) => x.json());
         if (r.paid || r.status === 'paid') {
+          stopped = true;
           clearInterval(pollRef.current);
           clearInterval(timerRef.current);
           setPollStatus('paid');
@@ -214,9 +223,12 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
         }
       } catch { /* ignore */ }
     };
-    tick(); // check ngay, không đợi 3s
-    pollRef.current = setInterval(tick, 3000);
-    return () => clearInterval(pollRef.current);
+    tick();
+    pollRef.current = setInterval(tick, 1500);
+    return () => {
+      stopped = true;
+      clearInterval(pollRef.current);
+    };
   }, [step, sessionId, pollStatus, ckContent]);
 
   const handleSubmitForm = () => {
@@ -340,9 +352,14 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                 </div>
 
                 {/* Polling indicator */}
-                <div className="flex items-center gap-2 text-xs text-gray-400 justify-center">
-                  <Loader2 size={12} className="animate-spin text-emerald-500" />
-                  Đang kiểm tra thanh toán tự động mỗi 3 giây...
+                <div className="flex flex-col items-center gap-1 text-xs text-gray-400 justify-center">
+                  <div className="flex items-center gap-2">
+                    <Loader2 size={12} className="animate-spin text-emerald-500" />
+                    Đang kiểm tra thanh toán tự động...
+                  </div>
+                  <span className={sessionId ? 'text-emerald-600' : 'text-amber-600'}>
+                    {sessionId ? `Phiên: ${sessionId.slice(0, 18)}…` : 'Đang tạo phiên thanh toán…'}
+                  </span>
                 </div>
 
                 <button onClick={onClose} className="w-full py-2 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition">
