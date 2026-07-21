@@ -178,20 +178,39 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
     const body = req.body;
     logger.info('[SEPAY WEBHOOK]', JSON.stringify(body, null, 2));
 
-    const content = (body.content || body.description || '').toLowerCase().trim();
+    // SePay / ngân hàng có thể gửi nội dung ở nhiều field khác nhau
+    const content = [
+      body.content,
+      body.description,
+      body.remark,
+      body.referenceCode,
+      body.code,
+      body.transactionContent,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .trim();
     const amount  = Number(body.transferAmount || body.amount || 0);
 
     if (!content || amount <= 0) {
+      logger.warn('[SEPAY] Thiếu content/amount', { content, amount, keys: Object.keys(body || {}) });
       return res.json({ success: false, message: 'Thiếu thông tin giao dịch' });
     }
 
     let matched = false;
 
     // ── 1. Kiểm tra payment sessions (đăng ký mới) ───────────────────────────
-    // Lấy tất cả session đang pending và kiểm tra xem nội dung CK có chứa ref không
+    // Ưu tiên khớp mã TTH##### (ổn định nhất), rồi mới khớp full ref đã normalize
     const pendingSessions = await PaymentSession.find({ status: 'pending' });
     let pendingSession = null;
+    const contentNorm = normalizeTransferText(content);
     for (const sess of pendingSessions) {
+      const codeMatch = (sess.ref.match(/tth\d{4,}/i) || [])[0];
+      if (codeMatch && contentNorm.includes(normalizeTransferText(codeMatch))) {
+        pendingSession = sess;
+        break;
+      }
       if (contentMatchesRef(content, sess.ref)) {
         pendingSession = sess;
         break;
