@@ -1,0 +1,435 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ShieldCheck, Lock, User, Eye, EyeOff, AlertTriangle, ChevronRight, Fingerprint, Activity, MonitorX } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { setTokens, clearOtherRoleSessions, SOCKET_BASE, apiFetch } from '../services/api';
+import { unlockAudio } from '../utils/sound';
+import { getDeviceFingerprint } from '../utils/deviceFingerprint';
+
+const AdminLoginPage = ({ onLogin }) => {
+  const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [deviceConflict, setDeviceConflict] = useState(false);
+  const [pendingForce, setPendingForce] = useState(false);
+  const [mfaToken, setMfaToken] = useState(null);
+  const [mfaCode, setMfaCode] = useState('');
+
+  /** Base gốc API (domain backend hoặc '' để dùng proxy Vite /api) */
+  const API = SOCKET_BASE;
+  const [dynamicLogo, setDynamicLogo] = useState('');
+
+  // Fetch dynamic logo from web settings
+  React.useEffect(() => {
+    fetch(`${API}/api/settings/web`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.success && res.data?.logoUrl) {
+          const url = res.data.logoUrl;
+          setDynamicLogo(url.startsWith('http') ? url : `${API}${url}`);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const [captcha, setCaptcha] = useState('');
+  const [userInputCaptcha, setUserInputCaptcha] = useState('');
+  const [captchaCode, setCaptchaCode] = useState('');
+
+  // Hàm tạo mã bảo vệ ngẫu nhiên
+  const generateCaptcha = () => {
+    const chars = '23456789abcdefghkmnpqrstuvwxyzABCDEFGHKLMNPQRSTUVWXYZ';
+    const code = Array.from({ length: 6 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+    setCaptchaCode(code);
+  };
+
+  React.useEffect(() => {
+    generateCaptcha();
+  }, []);
+
+  const handleLogin = async (e, forceDevice = false) => {
+    if (e?.preventDefault) e.preventDefault();
+    
+    // 1. Kiểm tra trường trống
+    if (!username || !password) {
+      setError('VUI LÒNG NHẬP TÀI KHOẢN VÀ MẬT KHẨU');
+      toast.error('Cảnh báo: Thông tin trống');
+      return;
+    }
+
+    // 2. Kiểm tra mã CAPTCHA
+    if (userInputCaptcha.toLowerCase() !== captchaCode.toLowerCase()) {
+      setError('MÃ BẢO VỆ KHÔNG CHÍNH XÁC');
+      toast.error('Mã bảo vệ sai!');
+      generateCaptcha();
+      setUserInputCaptcha('');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const fp = getDeviceFingerprint();
+      const response = await apiFetch('/auth/login', {
+        method: 'POST',
+        skipAuth: true,
+        body: JSON.stringify({ identifier: username, password, deviceFingerprint: fp, force: forceDevice }),
+      });
+
+      const raw = await response.text();
+      let data;
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error('INVALID_JSON');
+      }
+
+      if (response.status === 409 && data.code === 'DEVICE_CONFLICT') {
+        setDeviceConflict(true);
+        setLoading(false);
+        return;
+      }
+
+      if (data.success && (data.mfaRequired || data.data?.mfaRequired)) {
+        setMfaToken(data.mfaToken || data.data?.mfaToken);
+        setMfaCode('');
+        setLoading(false);
+        toast.success('Nhập mã OTP từ ứng dụng Authenticator');
+        return;
+      }
+
+      if (data.success) {
+        finishLogin(data);
+      } else {
+        setError(data.message?.toUpperCase() || 'TÀI KHOẢN HOẶC MẬT KHẨU KHÔNG ĐÚNG');
+        toast.error('Truy cập bị từ chối!');
+        setPassword('');
+      }
+    } catch (err) {
+      console.error('[AdminLogin]', err);
+      setError(
+        err?.message === 'INVALID_JSON'
+          ? 'MÁY CHỦ TRẢ VỀ DỮ LIỆU KHÔNG HỢP LỆ (KIỂM TRA API ĐANG CHẠY VÀ PROXY VITE)'
+          : 'LỖI KẾT NỐI HỆ THỐNG BẢO MẬT',
+      );
+      toast.error('Không kết nối được máy chủ — chạy backend (port 5000) và npm run dev client');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const finishLogin = (data) => {
+    setDeviceConflict(false);
+    setMfaToken(null);
+    const actualUser = data.data.user || data.data;
+    const accessToken = data.data.accessToken || actualUser.token || actualUser.accessToken;
+    const refreshToken = data.data.refreshToken || actualUser.refreshToken;
+    const role = actualUser.adminRole === 'STAFF' ? 'staff' : (actualUser.role || 'admin');
+    const finalUserObj = {
+      ...actualUser,
+      id: actualUser.id || actualUser._id,
+      role,
+      token: accessToken,
+      refreshToken,
+    };
+    clearOtherRoleSessions(role);
+    localStorage.setItem(`${role}_user`, JSON.stringify(finalUserObj));
+    setTokens(accessToken, refreshToken, role);
+    unlockAudio();
+    onLogin(finalUserObj);
+    toast.success(`Hệ thống đã sẵn sàng, chào mừng ${actualUser.name}!`);
+    navigate(role === 'student' ? '/student' : '/admin');
+  };
+
+  const handleMfaVerify = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!mfaCode.trim() || !mfaToken) {
+      setError('NHẬP MÃ OTP 6 SỐ');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiFetch('/auth/mfa/verify', {
+        method: 'POST',
+        skipAuth: true,
+        body: JSON.stringify({ mfaToken, code: mfaCode.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (data.success && data.data?.accessToken) {
+        finishLogin(data);
+      } else {
+        setError(data.message?.toUpperCase() || 'MÃ OTP KHÔNG ĐÚNG');
+        toast.error(data.message || 'Mã OTP không đúng');
+      }
+    } catch {
+      setError('LỖI KẾT NỐI');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#020617] flex items-center justify-center p-0 font-sans overflow-hidden selection:bg-red-500/30">
+      
+      {/* Background Decor - Cyber Dots */}
+      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
+      <div className="w-full h-screen flex flex-col md:flex-row relative z-10">
+        
+        {/* LEFT COLUMN: CYBER COMMAND CENTER */}
+        <div className="hidden md:flex md:w-[60%] bg-transparent p-20 flex-col justify-center relative border-r border-white/5">
+          <div className="relative z-10 space-y-12 animate-in fade-in slide-in-from-left-20 duration-1000">
+            <div className="inline-flex items-center gap-3 bg-red-600/10 border border-red-500/20 px-4 py-2 rounded-xl">
+               <ShieldCheck size={18} className="text-red-500" />
+               <span className="text-xs font-black text-red-500 uppercase tracking-[0.3em]">Hệ thống quản trị tối cao</span>
+            </div>
+
+            <div className="space-y-4">
+               <h1 className="text-6xl lg:text-8xl font-black text-white leading-none tracking-tighter">
+                CMS <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-800">CENTRAL</span>
+              </h1>
+              <p className="text-slate-400 text-xl font-medium max-w-xl leading-relaxed">
+                Trung tâm điều hành nền tảng Đào tạo Tin học văn phòng. 
+                Kiểm soát dữ liệu, phân quyền giảng viên và theo dõi tăng trưởng doanh thu theo thời gian thực.
+              </p>
+            </div>
+
+            {/* Quick Stats Grid - Premium Feel */}
+            <div className="grid grid-cols-2 gap-6 max-w-lg pt-10">
+               <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[32px] group hover:border-red-500/50 transition-all duration-500">
+                  <Activity size={24} className="text-red-500 mb-4 group-hover:scale-110 transition-transform" />
+                  <p className="text-3xl font-black text-white">99.9%</p>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mt-1">Uptime System</p>
+               </div>
+               <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[32px] group hover:border-red-500/50 transition-all duration-500">
+                  <Fingerprint size={24} className="text-red-500 mb-4 group-hover:scale-110 transition-transform" />
+                  <p className="text-3xl font-black text-white">AES-256</p>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mt-1">Data Security</p>
+               </div>
+            </div>
+          </div>
+
+          {/* Glowing Orbs */}
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-[120px] animate-pulse" />
+          <div className="absolute bottom-1/4 right-0 w-64 h-64 bg-blue-600/5 rounded-full blur-[100px]" />
+        </div>
+
+        {/* RIGHT COLUMN: ADMIN GATEWAY */}
+        <div className="w-full md:w-[40%] flex items-center justify-center px-[15px] py-8 sm:p-8 lg:p-14 relative bg-[#020617]/50 backdrop-blur-3xl min-w-0 overflow-y-auto">
+          
+          <div className="w-full max-w-md space-y-12 z-10">
+            <div className="text-center space-y-6 animate-in fade-in zoom-in duration-700">
+              <div className="relative inline-block">
+                <div className="absolute inset-0 bg-red-600 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+                <img src={dynamicLogo || "/logo-thang-tin-hoc.png"} alt="Logo" className="h-20 relative z-10 object-contain" onError={(e) => { if (!dynamicLogo) e.target.src = 'https://i.ibb.co/68H8LzG/logo.png'; }} />
+              </div>
+              
+              <div className="space-y-3">
+                <h2 className="text-4xl font-black text-white tracking-tight">Cổng Admin</h2>
+                <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.4em]">Xác thực quyền truy cập hệ thống</p>
+              </div>
+            </div>
+
+            <form onSubmit={mfaToken ? handleMfaVerify : handleLogin} className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
+              {error && (
+                <div className="bg-[#1a0505] border-l-4 border-red-600 p-5 rounded-2xl flex items-center gap-4 text-red-500 text-[11px] font-black tracking-widest animate-bounce-horizontal shadow-2xl">
+                  <AlertTriangle size={20} className="flex-shrink-0" />
+                  <span>{error}</span>
+                  <style>{`
+                    @keyframes bounce-horizontal {
+                      0%, 100% { transform: translateX(0); }
+                      25% { transform: translateX(-5px); }
+                      75% { transform: translateX(5px); }
+                    }
+                    .animate-bounce-horizontal {
+                      animation: bounce-horizontal 0.4s ease-in-out;
+                    }
+                  `}</style>
+                </div>
+              )}
+
+              {mfaToken ? (
+                <div className="space-y-4">
+                  <p className="text-slate-400 text-sm font-medium">Nhập mã 6 số từ Google Authenticator / Authy</p>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full bg-white/[0.03] border-2 border-white/5 rounded-3xl px-5 py-5 text-white text-center text-2xl font-black tracking-[0.4em] outline-none focus:border-red-600/50"
+                    placeholder="000000"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setMfaToken(null); setMfaCode(''); setError(null); }}
+                    className="text-xs font-bold text-slate-500 hover:text-white underline"
+                  >
+                    Quay lại đăng nhập
+                  </button>
+                </div>
+              ) : (
+              <>
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">Username / Identifier</label>
+                <div className="relative group">
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-red-500 transition-colors">
+                    <User size={20} />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full bg-white/[0.03] border-2 border-white/5 rounded-3xl pl-14 pr-5 py-5 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-700 shadow-inner"
+                    placeholder="Nhập tài khoản quản trị"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">Master Password</label>
+                <div className="relative group">
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-red-500 transition-colors">
+                    <Lock size={20} />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-white/[0.03] border-2 border-white/5 rounded-3xl pl-14 pr-5 py-5 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-700 shadow-inner"
+                    placeholder="••••••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-600 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">Mã bảo vệ</label>
+                <div className="flex gap-3">
+                  <div className="flex-1 bg-white/5 border-2 border-white/5 rounded-3xl p-4 flex items-center justify-center relative overflow-hidden h-16 select-none shadow-inner">
+                    {/* Captcha Noise Strokes */}
+                    <div className="absolute inset-x-0 top-1/2 h-[1px] bg-red-500/30 -rotate-3" />
+                    <div className="absolute inset-x-0 top-1/3 h-[1px] bg-blue-500/30 rotate-2" />
+                    
+                    <span className="text-2xl font-black tracking-[0.4em] italic text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.4)]">
+                      {captchaCode}
+                    </span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={generateCaptcha}
+                    className="w-16 h-16 rounded-3xl bg-white/5 border-2 border-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-all hover:bg-white/10 active:scale-95"
+                  >
+                    <Activity size={24} className={loading ? 'animate-pulse' : ''} />
+                  </button>
+                </div>
+                
+                <input
+                  type="text"
+                  required={!mfaToken}
+                  value={userInputCaptcha}
+                  onChange={(e) => setUserInputCaptcha(e.target.value)}
+                  className="w-full bg-white/[0.03] border-2 border-white/5 rounded-2xl px-5 py-4 text-white text-center text-xs font-black outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all placeholder:text-slate-700 uppercase tracking-widest"
+                  placeholder="Nhập mã hiển thị ở trên"
+                />
+              </div>
+              </>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="group w-full bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-3xl py-5 font-black uppercase tracking-[0.2em] shadow-2xl shadow-red-900/40 hover:from-red-700 hover:to-rose-800 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-4 border border-white/10"
+              >
+                {loading ? (
+                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    {mfaToken ? 'Xác thực OTP' : 'Khởi tạo truy cập'}
+                    <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Terminal Style Footer */}
+            <div className="text-center pt-10 animate-in fade-in duration-1000 delay-500">
+               <div className="bg-slate-900/50 border border-white/5 rounded-2xl p-4 inline-block">
+                  <p className="text-xs font-mono text-slate-600">
+                    TERMINAL ID: <span className="text-red-500/70">ADMIN-01X8</span> <br />
+                    LOCATION: <span className="text-slate-400">VIETNAM CENTRAL HUB</span>
+                  </p>
+               </div>
+            </div>
+          </div>
+
+          <div className="absolute bottom-6 text-[9px] font-black text-slate-700 uppercase tracking-[0.5em]">
+            Authorized Personnel Only © 2026
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ DIALOG: CẢNH BÁO THIẾT BỊ KHÁC ═══ */}
+      {deviceConflict && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] rounded-3xl w-full max-w-sm border border-amber-500/30 shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-5 flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <MonitorX size={20} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-white font-black text-lg">Phát hiện đăng nhập khác</h3>
+                <p className="text-white/70 text-xs font-medium">Tài khoản đang hoạt động trên thiết bị khác</p>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
+                <p className="text-amber-300 text-sm font-bold leading-relaxed">
+                  ⚠️ Tài khoản <strong className="text-white">{username}</strong> hiện đang đăng nhập trên máy tính khác.
+                </p>
+                <p className="text-gray-400 text-xs mt-2">
+                  Nếu tiếp tục, phiên quản trị trên máy kia sẽ bị đăng xuất ngay lập tức.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeviceConflict(false)}
+                  className="flex-1 py-3 border-2 border-white/10 text-gray-400 font-bold rounded-xl hover:border-white/20 transition text-sm"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={() => { setDeviceConflict(false); handleLogin(null, true); }}
+                  disabled={loading}
+                  className="flex-[2] py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black rounded-xl hover:from-amber-600 disabled:opacity-50 transition text-sm flex items-center justify-center gap-2"
+                >
+                  {loading
+                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <><MonitorX size={15} /> Đăng nhập, đăng xuất máy kia</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AdminLoginPage;

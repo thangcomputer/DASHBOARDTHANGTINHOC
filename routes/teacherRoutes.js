@@ -1,0 +1,845 @@
+const express  = require('express');
+const mongoose = require('mongoose');
+const multer   = require('multer');
+const path     = require('path');
+const fs       = require('fs');
+
+const Teacher  = require('../models/Teacher');
+const Schedule = require('../models/Schedule');
+const Transaction = require('../models/Transaction');
+const { authMiddleware, isAdmin, isTeacher, branchFilter } = require('../middleware/auth');
+const { sanitizeRegex } = require('../middleware/sanitizeRegex');
+const logger = require('../config/logger');
+
+const router = express.Router();
+
+// Tự động tạo thư mục uploads/practical nếu chưa có
+const uploadDir = path.join(__dirname, '..', 'uploads', 'practical');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const ALLOWED_PRACTICAL_EXT = new Set([
+  '.zip', '.rar', '.tar', '.7z',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.mp4',
+]);
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) { cb(null, uploadDir); },
+  filename: function (req, file, cb) {
+    const rawExt = path.extname(file.originalname || '').toLowerCase();
+    const ext = ALLOWED_PRACTICAL_EXT.has(rawExt) ? rawExt : '';
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `practical-${uniqueSuffix}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (!ALLOWED_PRACTICAL_EXT.has(ext)) {
+      return cb(new Error('Định dạng file không được phép. Chỉ hỗ trợ ZIP/RAR/PDF/DOC/XLS/PPT/MP4.'));
+    }
+    const mime = String(file.mimetype || '').toLowerCase();
+    const okMime = /^(application\/(zip|x-(rar|7z)-compressed|x-tar|pdf|msword|vnd\.|octet-stream)|video\/mp4)/.test(mime);
+    if (!okMime) {
+      return cb(new Error('MIME type không khớp định dạng cho phép.'));
+    }
+    cb(null, true);
+  }
+});
+
+// ─── POST /api/teachers/upload-practical ──────────────────────────────────────
+router.post('/upload-practical', [authMiddleware, isTeacher], upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Chưa chọn file để tải lên' });
+    }
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/practical/${req.file.filename}`;
+    return res.json({ success: true, fileUrl, message: 'Tải file bài thực hành lên thành công!' });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Lỗi server khi tải file thực hành' });
+  }
+});
+
+// ⭐ RBAC Guard: Chặn STAFF thực hiện thao tác ghi trên teachers
+// STAFF chỉ được GET (xem), KHÔNG được POST/PUT/DELETE
+const superAdminOnlyTeacher = async (req, res, next) => {
+  if (!req.user) return res.status(401).json({ success: false, message: 'Chưa xác thực' });
+  if (req.user.id === 'admin') return next(); // Hardcoded admin
+  const user = await Teacher.findById(req.user.id).select('adminRole').lean();
+  if (user?.adminRole === 'SUPER_ADMIN') return next();
+  return res.status(403).json({
+    success: false,
+    message: '403 Forbidden — Bạn không có quyền thực hiện thao tác này. Chỉ Super Admin mới được thêm/sửa/xóa giảng viên.',
+  });
+};
+
+// ─── POST /api/teachers ───────────────────────────────────────────────────────
+// Chỉ Super Admin được tạo giảng viên
+router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], async (req, res) => {
+  try {
+    const { name, phone, specialty, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
+    }
+    const exists = await Teacher.findOne({ phone });
+    if (exists) {
+      return res.status(409).json({ success: false, message: 'Số điện thoại này đã được đăng ký' });
+    }
+    if (!password && phone.length < 6) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại làm mật khẩu mặc định phải ít nhất 6 ký tự' });
+    }
+
+    // ⭐ Xác định branchId:
+    //   - STAFF → bắt buộc dùng branchId của chính họ (không được chọn chi nhánh khác)
+    //   - SUPER_ADMIN → dùng branchId từ request body (dropdown chọn), hoặc null
+    let finalBranchId   = null;
+    let finalBranchCode = '';
+    if (req.userBranchId) {
+      // STAFF → ép branchId
+      finalBranchId   = req.userBranchId;
+      finalBranchCode = req.userBranchCode || '';
+    } else if (reqBranchId) {
+      // SUPER_ADMIN chọn chi nhánh
+      finalBranchId   = reqBranchId;
+      finalBranchCode = reqBranchCode || '';
+    }
+
+    // Auto-Approve Logic: Nếu Admin gán chi nhánh ngay từ lúc tạo, tự động duyệt
+    
+    const teacher = await Teacher.create({
+      name,
+      phone,
+      email: email || undefined,
+      specialty: specialty || '',
+      startDate: startDate || Date.now(),
+      address:   address   || '',
+      password:  password  || phone,
+      status:    status || 'inactive',
+      testStatus: null,
+      role: 'teacher',
+      branchId:   finalBranchId,
+      branchCode: finalBranchCode,
+    });
+
+    // Emit socket cho Admin thấy real-time
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('teacher:new', {
+        teacherId: teacher._id,
+        name: teacher.name,
+        branchCode: teacher.branchCode,
+        message: `Giảng viên mới: ${teacher.name} — Chi nhánh: ${teacher.branchCode || 'Chưa phân'}`,
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `Đã tạo giảng viên ${teacher.name}`,
+      data: { ...teacher.toObject(), password: undefined },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Số điện thoại đã tồn tại' });
+    }
+    logger.error('[TEACHERS] Create error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+  }
+});
+
+// ─── GET /api/teachers ────────────────────────────────────────────────────────
+// Lấy danh sách giảng viên (Admin/Staff only — Teacher bị chặn)
+router.get('/', [authMiddleware, branchFilter], async (req, res) => {
+  try {
+    // ⭐ Chỉ Admin/Staff được xem danh sách GV — Teacher chỉ được xem profile của mình
+    if (req.user.role === 'teacher' || req.user.role === 'student') {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem danh sách giảng viên' });
+    }
+
+    const { status, search } = req.query;
+    const filter = { ...req.branchFilter };
+    filter.role = { $in: ['teacher'] };
+    if (status) filter.status = status;
+    if (search) {
+      const s = sanitizeRegex(search);
+      filter.$or = [
+        { name:      { $regex: s, $options: 'i' } },
+        { phone:     { $regex: s, $options: 'i' } },
+        { specialty: { $regex: s, $options: 'i' } },
+      ];
+    }
+
+    const Evaluation = require('../models/Evaluation');
+    const evals = await Evaluation.find({ type: 'teacher_rating' }).lean();
+
+    let teachers = await Teacher.find(filter)
+      .select('-password -refreshToken')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    teachers = teachers.map(t => {
+      const myRatings = evals.filter(e => String(e.targetTeacherId) === String(t._id));
+      return { ...t, ratings: myRatings, id: t._id };
+    });
+
+    return res.json({ success: true, count: teachers.length, data: teachers });
+  } catch (error) {
+    logger.error('[TEACHERS] Get all error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── GET /api/teachers/stats/summary ──────────────────────────────────────────
+router.get('/stats/summary', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+  try {
+    const bf = { ...req.branchFilter };
+    const { branch_id } = req.query;
+    if (branch_id && branch_id !== 'all' && !req.userBranchId) {
+      bf.branchId = branch_id;
+    }
+
+    const total   = await Teacher.countDocuments({ ...bf, role: 'teacher' });
+    const active  = await Teacher.countDocuments({ ...bf, role: 'teacher', status: { $in: ['active', 'Active'] } });
+    const pending = await Teacher.countDocuments({ ...bf, role: 'teacher', status: 'pending' });
+    const suspended = await Teacher.countDocuments({ ...bf, role: 'teacher', status: 'suspended' });
+
+    return res.json({
+      success: true,
+      data: { total, active, pending, suspended },
+    });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── GET /api/teachers/:id ────────────────────────────────────────────────────
+router.get('/:id', [authMiddleware, branchFilter], async (req, res) => {
+  try {
+    // Teacher chỉ xem profile của chính mình
+    if (req.user.role === 'teacher' && req.user.id !== req.params.id) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem thông tin này' });
+    }
+    // Student không được xem GV
+    if (req.user.role === 'student') {
+      return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
+    }
+
+    const teacher = await Teacher.findById(req.params.id)
+      .select('-password -refreshToken');
+
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    // ⭐ STAFF cross-branch guard: STAFF chỉ xem GV cùng chi nhánh
+    if (req.userBranchId && teacher.branchId
+        && String(teacher.branchId) !== String(req.userBranchId)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem giảng viên chi nhánh khác' });
+    }
+
+    // Lấy thống kê buổi dạy
+    const completedSessions = await Schedule.countDocuments({
+      teacherId: req.params.id,
+      status: 'completed',
+    });
+
+    return res.json({
+      success: true,
+      data: { ...teacher.toObject(), completedSessionsFromDB: completedSessions },
+    });
+  } catch (error) {
+    logger.error('[TEACHERS] Get by ID error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── PUT /api/teachers/:id ────────────────────────────────────────────────────
+// Cập nhật thông tin cơ bản giảng viên (STAFF bị chặn, teacher tự sửa được)
+router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
+  try {
+    // Teacher sửa chính mình → cho phép
+    const isSelfEdit = req.user.id === req.params.id && req.user.role === 'teacher';
+    // STAFF → chặn (chỉ Super Admin mới được sửa GV)
+    if (!isSelfEdit && req.user.role !== 'admin' && req.user.role !== 'staff') {
+      return res.status(403).json({ success: false, message: 'Không có quyền' });
+    }
+    if (!isSelfEdit && (req.user.role === 'admin' || req.user.role === 'staff')) {
+      if (req.user.id !== 'admin') {
+        const me = await Teacher.findById(req.user.id).select('adminRole permissions').lean();
+        const canTraining = Array.isArray(me?.permissions) && me.permissions.includes('manage_training');
+        if (me?.adminRole !== 'SUPER_ADMIN' && !canTraining) {
+          return res.status(403).json({
+            success: false,
+            message: '403 Forbidden — Chỉ Super Admin hoặc tài khoản có quyền Đào tạo (manage_training) mới được sửa thông tin giảng viên.',
+          });
+        }
+      }
+    }
+
+    // ⭐ STAFF cross-branch guard
+    if (req.userBranchId) {
+      const target = await Teacher.findById(req.params.id).select('branchId').lean();
+      if (target?.branchId && String(target.branchId) !== String(req.userBranchId)) {
+        return res.status(403).json({ success: false, message: 'Không có quyền chỉnh sửa giảng viên chi nhánh khác' });
+      }
+    }
+
+    const isAdminRole = (req.user.role === 'admin' || req.user.role === 'staff');
+    const allowedFields = isAdminRole 
+      ? [
+          'name', 'phone', 'zalo', 'email', 'specialty', 'bio', 'startDate', 'address',
+          'bankAccount', 'avatar', 'status', 'baseSalaryPerSession',
+          'assignedClasses', 'assignedStudents',
+          'testScore', 'testStatus', 'testDate', 'testNotes',
+          'lockReason', 'practicalFile', 'practicalStatus',
+          'branchId', 'branchCode',
+        ]
+      : [
+          'zalo', 'email', 'specialty', 'bio', 'bankAccount', 'avatar', 'address',
+          'testScore', 'testStatus', 'testDate', 'status', 'lockReason',
+          'practicalFile', 'practicalStatus'
+        ];
+
+    const updates = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    // Luôn có ngày/giờ thi khi ghi nhận đạt/trượt trắc nghiệm (tránh cột "Ngày thi" N/A trên admin)
+    if (
+      (updates.testStatus === 'passed' || updates.testStatus === 'failed') &&
+      (updates.testDate === undefined || updates.testDate === null)
+    ) {
+      updates.testDate = new Date();
+    }
+
+    // Security check: teacher cannot set their own status to 'active'
+    if (req.user.role === 'teacher' && updates.status === 'active') {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền tự kích hoạt tài khoản chính thức' });
+    }
+
+    // Auto-Approve Logic: Nếu Admin gán chi nhánh hoặc xếp lớp, tự động duyệt
+    if (isAdminRole) {
+      const isAssigningStudents = updates.assignedClasses?.length > 0 || updates.assignedStudents?.length > 0;
+      
+      if (isAssigningStudents) {
+        updates.status = 'active';
+        // Remove test exemption here if they want strict testing, or keep it if assigning students implies exemption
+        // updates.testStatus = 'exempt'; 
+      }
+    }
+
+    const teacher = await Teacher.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+      runValidators: true,
+    }).select('-password -refreshToken');
+
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('data:refresh', { type: 'teacher', id: teacher._id });
+    }
+
+    return res.json({
+      success: true,
+      message: `Đã cập nhật giảng viên ${teacher.name}`,
+      data: teacher,
+    });
+  } catch (error) {
+    logger.error('[TEACHERS] Update error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── PUT /api/teachers/:id/score ──────────────────────────────────────────────
+// Admin nhập điểm bài test Onboarding cho giảng viên
+router.put('/:id/score', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const { testScore, testNotes } = req.body;
+
+    if (testScore === undefined || testScore === null) {
+      return res.status(400).json({ success: false, message: 'Thiếu testScore' });
+    }
+    if (testScore < 0 || testScore > 100) {
+      return res.status(400).json({ success: false, message: 'Điểm phải trong khoảng 0-100' });
+    }
+
+    const newStatus = testScore >= 80 ? 'tested_passed' : 'tested_failed';
+
+    const teacher = await Teacher.findByIdAndUpdate(
+      req.params.id,
+      {
+        testScore,
+        testNotes: testNotes || '',
+        testDate:  new Date(),
+        status:    newStatus,
+      },
+      { new: true }
+    ).select('-password -refreshToken');
+
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    // Thông báo real-time cho giảng viên
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('teacher:scored', {
+        teacherId:  teacher._id.toString(),
+        testScore,
+        passed:     testScore >= 80,
+        message:    testScore >= 80
+          ? `🎉 Chúc mừng! Bạn đạt ${testScore}/100 điểm. Đã qua bài test!`
+          : `❌ Bạn đạt ${testScore}/100 điểm. Chưa đạt yêu cầu (>=80). Vui lòng liên hệ Admin.`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Đã lưu điểm ${testScore}/100 cho ${teacher.name}`,
+      data: teacher,
+    });
+  } catch (error) {
+    logger.error('[TEACHERS] Score error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── PUT /api/teachers/:id/approve ────────────────────────────────────────────
+// Admin duyệt giảng viên — STRICT: chỉ khi testScore >= 80
+router.put('/:id/approve', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const teacherCheck = await Teacher.findById(req.params.id);
+    if (!teacherCheck) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    // STRICT LOGIC (Workflow 1): Không thể approve nếu điểm < 80
+    if (teacherCheck.testScore < 80) {
+      return res.status(403).json({
+        success: false,
+        message: `Không thể cấp quyền! Điểm bài test: ${teacherCheck.testScore}/100 (yêu cầu ≥ 80).`,
+      });
+    }
+
+    const teacher = await Teacher.findByIdAndUpdate(
+      req.params.id,
+      { status: 'active', approvedAt: new Date() },
+      { new: true }
+    ).select('-password -refreshToken');
+
+    // Thông báo real-time
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('teacher:approved', {
+        teacherId: teacher._id.toString(),
+        name:      teacher.name,
+        message:   '🎊 Tài khoản của bạn đã được Admin phê duyệt! Bạn có thể bắt đầu giảng dạy.',
+      });
+    }
+
+    try {
+      const workflowService = require('../services/workflowService');
+      await workflowService.completeOpenForEntity('teacher_approval', teacher._id, {
+        action: 'approve',
+        user: req.user,
+        note: 'Duyệt từ API teachers/approve',
+      });
+    } catch (wfErr) {
+      logger.warn({ err: wfErr.message }, '[TEACHERS] workflow sync');
+    }
+
+    return res.json({
+      success: true,
+      message: `Đã phê duyệt giảng viên ${teacher.name}`,
+      data: teacher,
+    });
+  } catch (error) {
+    logger.error('[TEACHERS] Approve error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── POST /api/teachers/:id/submit-practical ──────────────────────────────────
+// Giảng viên nộp file thực hành (Workflow 1 Phase 2)
+router.post('/:id/submit-practical', authMiddleware, isTeacher, async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({ success: false, message: 'Bạn không thể nộp giùm người khác' });
+    }
+    const { fileUrl } = req.body;
+    if (!fileUrl) {
+      return res.status(400).json({ success: false, message: 'Thiếu fileUrl' });
+    }
+
+    const teacher = await Teacher.findByIdAndUpdate(
+      req.params.id,
+      {
+        practicalFileUrl: fileUrl,
+        status: 'practical_submitted',
+      },
+      { new: true }
+    ).select('-password');
+
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    // Thông báo Admin có file mới
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('teacher:practical_submitted', {
+        teacherId:   teacher._id.toString(),
+        teacherName: teacher.name,
+        fileUrl,
+        message: `📁 Giảng viên ${teacher.name} đã nộp bài thực hành`,
+      });
+    }
+
+    try {
+      const workflowService = require('../services/workflowService');
+      await workflowService.start({
+        definitionKey: 'teacher_approval',
+        entityId: teacher._id,
+        entityLabel: teacher.name,
+        title: 'Duyệt GV: ' + teacher.name,
+        payload: { testScore: teacher.testScore, practicalFileUrl: fileUrl },
+        createdBy: String(req.user.id || ''),
+      });
+    } catch (wfErr) {
+      logger.warn({ err: wfErr.message }, '[TEACHERS] workflow start');
+    }
+
+    return res.json({ success: true, data: teacher });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── PUT /api/teachers/:id/reject ─────────────────────────────────────────────
+// Admin từ chối / tạm dừng giảng viên
+router.put('/:id/reject', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const { reason } = req.body;
+
+    const teacher = await Teacher.findByIdAndUpdate(
+      req.params.id,
+      {
+        status: 'suspended',
+        rejectedReason: reason || '',
+        rejectedAt: new Date(),
+      },
+      { new: true }
+    ).select('-password -refreshToken');
+
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    try {
+      const workflowService = require('../services/workflowService');
+      await workflowService.completeOpenForEntity('teacher_approval', teacher._id, {
+        action: 'reject',
+        user: req.user,
+        note: reason || 'Từ chối từ API teachers/reject',
+      });
+    } catch (wfErr) {
+      logger.warn({ err: wfErr.message }, '[TEACHERS] workflow reject sync');
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('teacher:rejected', {
+        teacherId: teacher._id.toString(),
+        reason,
+        message: `❌ Tài khoản bị từ chối. Lý do: ${reason || 'Không đáp ứng yêu cầu'}`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Đã từ chối giảng viên ${teacher.name}`,
+      data: teacher,
+    });
+  } catch (error) {
+    logger.error('[TEACHERS] Reject error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── DELETE /api/teachers/:id ─────────────────────────────────────────────────
+// Admin xóa giảng viên (STAFF bị chặn)
+router.delete('/:id', [authMiddleware, isAdmin, superAdminOnlyTeacher], async (req, res) => {
+  try {
+    const teacher = await Teacher.findByIdAndDelete(req.params.id);
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+    return res.json({
+      success: true,
+      message: `Đã xóa giảng viên ${teacher.name}`,
+    });
+  } catch (error) {
+    logger.error('[TEACHERS] Delete error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── GET /api/teachers/:id/finance ──────────────────────────────────────────────
+router.get('/:id/finance', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền truy cập thông tin này' });
+    }
+
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
+
+    // Tổng buổi đã dạy (Trạng thái completed)
+    const totalSessions = await Schedule.countDocuments({
+      teacherId: req.params.id,
+      status: 'completed',
+    });
+
+    // Buổi đã dạy nhưng chưa thanh toán
+    const pendingSessionsCount = await Schedule.countDocuments({
+      teacherId: req.params.id,
+      status: 'completed',
+      is_paid_to_teacher: { $ne: true }
+    });
+
+    // Chưa nhận = pendingSessionsCount * salary_per_session
+    const salaryPerSession = teacher.baseSalaryPerSession || 0;
+    const unpaidAmount = pendingSessionsCount * salaryPerSession;
+
+    // Tổng đã nhận = Tổng tiền từ các giao dịch thành công của giảng viên
+    const transactionsContext = await Transaction.aggregate([
+      { $match: { 
+          teacherId: new mongoose.Types.ObjectId(req.params.id), 
+          status: 'confirmed' 
+      }},
+      { $group: { _id: null, totalString: { $sum: "$amount" } }}
+    ]);
+    const paidAmount = transactionsContext.length > 0 ? transactionsContext[0].totalString : 0;
+
+    return res.json({
+      success: true,
+      data: {
+        totalSessions,
+        unpaidAmount,
+        paidAmount,
+        salaryPerSession
+      }
+    });
+  } catch (error) {
+    logger.error('[FINANCE] Get stats error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── GET /api/teachers/:id/finance/pending ──────────────────────────────────────
+// Lấy số buổi còn nợ thanh toán (cho modal Step 1)
+router.get('/:id/finance/pending', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
+
+    const pendingSessionsCount = await Schedule.countDocuments({
+      teacherId: req.params.id,
+      status: 'completed',
+      is_paid_to_teacher: { $ne: true }
+    });
+
+    const salaryPerSession = teacher.baseSalaryPerSession || 0;
+    const unpaidAmount = pendingSessionsCount * salaryPerSession;
+
+    return res.json({
+      success: true,
+      data: {
+        pendingSessionsCount,
+        salaryPerSession,
+        unpaidAmount,
+        bankInfo: {
+          bankName: teacher.bankAccount?.bankName || '',
+          accountNumber: teacher.bankAccount?.accountNumber || '',
+          accountHolder: teacher.bankAccount?.accountHolder || teacher.name || '',
+          bankCode: teacher.bankAccount?.bankCode || '',
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('[FINANCE] Get pending error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── PUT /api/teachers/:id/finance/pay-flexible ──────────────────────────────────
+// Thanh toán linh hoạt: Admin tự chọn số buổi và số tiền, FIFO (cũ nhất trước)
+router.put('/:id/finance/pay-flexible', [authMiddleware, isAdmin, superAdminOnlyTeacher], async (req, res) => {
+  try {
+    const { sessionsCount, amount, note } = req.body;
+
+    if (!sessionsCount || Number(sessionsCount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Số buổi thanh toán phải lớn hơn 0' });
+    }
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Số tiền thanh toán phải lớn hơn 0' });
+    }
+    if (Number(amount) > 500000000) {
+      return res.status(400).json({ success: false, message: `Số tiền vượt giới hạn 500 triệu/lần` });
+    }
+
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
+
+    // Tìm buổi chưa thanh toán theo FIFO (chỉ tính các buổi đã hoàn thành - completed)
+    // Nếu không có → vẫn tạo giao dịch (thanh toán thủ công do Admin nhập)
+    const pendingSessions = await Schedule.find({
+      teacherId: req.params.id,
+      status: 'completed',
+      is_paid_to_teacher: { $ne: true }
+    }).sort({ date: 1, createdAt: 1 }).limit(Number(sessionsCount));
+
+    const actualCount = pendingSessions.length;
+    const sessionIds = pendingSessions.map(s => s._id);
+
+    // Đánh dấu FIFO nếu có session nào tìm được
+    if (sessionIds.length > 0) {
+      await Schedule.updateMany(
+        { _id: { $in: sessionIds } },
+        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+      );
+    }
+
+    // Luôn tạo giao dịch với số tiền và số buổi Admin đã nhập (kể cả thanh toán thủ công)
+    const now = new Date();
+    const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
+    const paidCount = Number(sessionsCount); // dùng số Admin nhập, không phải số session tìm được
+    const transaction = await Transaction.create({
+      teacherId: req.params.id,
+      teacherName: teacher.name,
+      teacherPhone: teacher.phone || '',
+      amount: Number(amount),
+      description: note || `Thù lao ${paidCount} buổi dạy`,
+      month: monthLabel,
+      status: 'confirmed',
+      confirmedBy: req.user?.name || 'Admin',
+      confirmedAt: now,
+      bankName: teacher.bankAccount?.bankName || '',
+      bankAccount: teacher.bankAccount?.accountNumber || '',
+      note: note || '',
+    });
+
+    // Real-time notify
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('teacher:financeUpdated', {
+        teacherId: req.params.id,
+        message: `Admin đã thanh toán ${Number(amount).toLocaleString('vi-VN')}đ cho ${paidCount} buổi.`
+      });
+      io.emit('transactions:new', transaction);
+    }
+
+    return res.json({
+      success: true,
+      message: `Thanh toán thành công ${paidCount} buổi`,
+      data: {
+        paidSessions: paidCount,
+        markedSessions: actualCount, // số session thực tế được đánh dấu trong DB
+        totalAmount: Number(amount),
+        transaction,
+      }
+
+    });
+  } catch (error) {
+    logger.error('[FINANCE] Flexible pay error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server: ' + error.message });
+  }
+});
+
+// ─── PUT /api/teachers/:id/finance/pay-all ──────────────────────────────────────
+router.put('/:id/finance/pay-all', [authMiddleware, isAdmin, superAdminOnlyTeacher], async (req, res) => {
+  try {
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
+
+    // Tìm các buổi chưa thanh toán
+    const pendingSessionsCount = await Schedule.countDocuments({
+      teacherId: req.params.id,
+      status: 'completed',
+      is_paid_to_teacher: { $ne: true }
+    });
+
+    if (pendingSessionsCount === 0) {
+      return res.status(400).json({ success: false, message: 'Không có buổi dạy nào cần thanh toán' });
+    }
+
+    const salaryPerSession = teacher.baseSalaryPerSession || 0;
+    const totalAmount = pendingSessionsCount * salaryPerSession;
+
+    // Validation: Không cho phép thanh toán 0đ hoặc số phi lý (> 500 triệu/lần)
+    if (totalAmount <= 0) {
+      return res.status(400).json({ success: false, message: `Giảng viên chưa được cấu hình mức lương/buổi. Vui lòng Admin cập nhật trường "Lương/buổi" trước khi thanh toán.` });
+    }
+    if (totalAmount > 500000000) {
+      return res.status(400).json({ success: false, message: `Số tiền thanh toán (${totalAmount.toLocaleString('vi-VN')}đ) vượt quá giới hạn 500 triệu. Vui lòng kiểm tra lại mức lương/buổi.` });
+    }
+
+    // Đánh dấu các buổi này là đã thanh toán
+    await Schedule.updateMany(
+      { 
+        teacherId: req.params.id, 
+        status: 'completed', 
+        is_paid_to_teacher: { $ne: true } 
+      },
+      { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+    );
+
+    // Tạo giao dịch thanh toán
+    const now = new Date();
+    const transaction = await Transaction.create({
+      teacherId: req.params.id,
+      teacherName: teacher.name,
+      teacherPhone: teacher.phone,
+      amount: totalAmount,
+      description: `Thanh toán thù lao ${pendingSessionsCount} buổi dạy`,
+      month: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
+      status: 'confirmed',
+      confirmedBy: req.user.name || 'Admin',
+      confirmedAt: now,
+      bankName: teacher.bankAccount?.bankName || '',
+      bankAccount: teacher.bankAccount?.accountNumber || ''
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('teacher:financeUpdated', {
+        teacherId: req.params.id,
+        message: `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${pendingSessionsCount} buổi dạy.`
+      });
+      io.emit('transactions:new', transaction);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Đã thanh toán thành công',
+      data: {
+        paidSessions: pendingSessionsCount,
+        totalAmount,
+        transaction
+      }
+    });
+  } catch (error) {
+    logger.error('[FINANCE] Pay error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+module.exports = router;

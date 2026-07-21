@@ -1,0 +1,29 @@
+const { NodeSSH } = require('node-ssh');
+const ssh = new NodeSSH();
+const { getVpsSshConfig, getVpsConnection } = require('./_vpsConnect.cjs');
+
+
+
+async function runMigration() {
+  try {
+    await ssh.connect(getVpsSshConfig());
+    console.log('Connected to VPS');
+
+    console.log('=== RUNNING MIGRATION ON VPS ===');
+    const result = await ssh.execCommand('cd /www/wwwroot/quanlycms && node migrate_ids.js');
+    console.log('STDOUT:', result.stdout);
+    console.log('STDERR:', result.stderr);
+
+    console.log('\n=== RESTARTING PM2 ===');
+    const restart = await ssh.execCommand('pm2 restart quanlycms');
+    console.log(restart.stdout);
+
+    console.log('\n✅ Migration and restart complete');
+    process.exit(0);
+  } catch (err) {
+    console.error('Error:', err.message);
+    process.exit(1);
+  }
+}
+
+runMigration();

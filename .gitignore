@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.deploy
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Uploads and temporary files
+uploads/
+temp/
+tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+client/dist/
+client_dist*.zip
+*.zip
+
+# Local k6 binary (download separately, see tests/load-test/README)
+tests/load-test/k6-bin/
+
+# Test artifacts
+tests/reports/
+tests/videos/
+
+# Editor
+.vscode/
+.idea/
+
+# Thư mục lồng nhau nhầm (bản copy utils) — không đưa lên Git
+/QUANLYCMS/
+
+# Deploy scripts with local credentials (use deploy/full_deploy.example.cjs)
+full_deploy.cjs
+deploy/full_deploy.cjs
+
+backups/
+
+# Local reports / env
+lint-report.json
+client/.env.development
+

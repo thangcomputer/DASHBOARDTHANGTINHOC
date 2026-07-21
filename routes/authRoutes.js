@@ -1,0 +1,1562 @@
+const express  = require('express');
+const jwt      = require('jsonwebtoken');
+const bcrypt   = require('bcryptjs');
+const crypto   = require('crypto');
+const axios    = require('axios');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const Teacher  = require('../models/Teacher');
+const Student  = require('../models/Student');
+const blacklist = require('../middleware/tokenBlacklist');
+const { authMiddleware } = require('../middleware/auth');
+const {
+  loginLimiter,
+  captchaLimiter,
+  refreshTokenLimiter,
+  sensitiveFlowLimiter,
+  checkRoleLimiter,
+} = require('../middleware/authRateLimit');
+const SystemSettings = require('../models/SystemSettings');
+const { verifyAdminPassword } = require('../utils/adminPassword');
+const { issueCsrfToken } = require('../middleware/csrf');
+const { generateSecret, verifyTotp, otpauthUrl } = require('../utils/totp');
+const { invalidateSettingsCache } = require('../services/settingsCache');
+const { enqueueOtp, enqueuePassword } = require('../services/queue/jobQueue');
+const QRCode = require('qrcode');
+
+const router = express.Router();
+
+// ── Passport Google Strategy ─────────────────────────────────────────────────
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID:     process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL:  process.env.GOOGLE_CALLBACK_URL || '/api/auth/google/callback',
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const email  = profile.emails?.[0]?.value || '';
+      const name   = profile.displayName || 'Google User';
+      const avatar = profile.photos?.[0]?.value || '';
+      const googleId = profile.id;
+
+      // Tìm trong Teacher trước (nếu email trùng)
+      let user = await Teacher.findOne({ $or: [{ googleId }, { email }] });
+      if (user) { user.googleId = googleId; await user.save({ validateModifiedOnly: true }); return done(null, { ...user.toObject(), role: user.role }); }
+
+      // Tìm trong Student
+      let student = await Student.findOne({ $or: [{ googleId }, { email }] });
+      if (student) { student.googleId = googleId; await student.save({ validateModifiedOnly: true }); return done(null, { ...student.toObject(), role: 'student' }); }
+
+      // Tạo Student mới
+      const newStudent = await Student.create({
+        name, email, googleId, avatar,
+        phone: 'Chưa cập nhật', zalo: 'Chưa cập nhật', course: 'Chưa xếp lớp', price: 0, paid: false, status: 'Chờ xếp lớp',
+        password: Math.random().toString(36).slice(-10),
+      });
+      return done(null, { ...newStudent.toObject(), role: 'student' });
+    } catch (err) { return done(err, null); }
+  }));
+}
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
+
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const svgCaptcha = require('svg-captcha');
+const logger = require('../config/logger');
+
+// In-memory CAPTCHA store (cid → { text, expiresAt })
+// Tự động dọn dẹp sau 5 phút
+const captchaStore = new Map();
+const CAPTCHA_TTL = 5 * 60 * 1000; // 5 phút
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, c] of captchaStore.entries()) {
+    if (c.expiresAt < now) captchaStore.delete(id);
+  }
+}, 60000);
+
+/** So sánh refresh token đã lưu DB (chống timing attack) */
+function safeEqualRefresh(stored, incoming) {
+  if (!stored || !incoming || typeof stored !== 'string' || typeof incoming !== 'string') return false;
+  const a = Buffer.from(stored, 'utf8');
+  const b = Buffer.from(incoming, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+/** Tạo JWT với audience ('public' hoặc 'internal') để phân tách 2 luồng */
+const generateTokens = (payload, audience = 'public') => {
+  const base = { ...payload, aud: audience };
+  const accessToken = jwt.sign(base, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '8h',
+  });
+  const refreshToken = jwt.sign(base, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+  });
+  return { accessToken, refreshToken };
+};
+
+function issueAdminMfaChallenge(sysSettings, audience = 'public') {
+  const dbAdminName = sysSettings?.adminName || 'Admin Thắng Tin Học';
+  const mfaToken = jwt.sign(
+    { purpose: 'mfa', id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN', aud: audience },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' },
+  );
+  return {
+    success: true,
+    mfaRequired: true,
+    mfaToken,
+    data: { mfaRequired: true, mfaToken, name: dbAdminName },
+  };
+}
+
+async function issueAdminTokens(sysSettings, audience = 'public') {
+  const dbAdminName = sysSettings?.adminName || 'Admin Thắng Tin Học';
+  const { accessToken, refreshToken } = generateTokens(
+    {
+      id: 'admin',
+      role: 'admin',
+      name: dbAdminName,
+      adminRole: 'SUPER_ADMIN',
+      permissions: [],
+      branchId: null,
+      branchCode: '',
+      tokenVersion: 0,
+    },
+    audience,
+  );
+  return {
+    success: true,
+    data: {
+      id: 'admin',
+      _id: 'admin',
+      name: dbAdminName,
+      phone: 'admin',
+      role: 'admin',
+      adminRole: 'SUPER_ADMIN',
+      accessToken,
+      refreshToken,
+      user: {
+        _id: 'admin',
+        id: 'admin',
+        name: dbAdminName,
+        role: 'admin',
+        adminRole: 'SUPER_ADMIN',
+        permissions: [],
+        status: 'active',
+      },
+    },
+  };
+}
+
+// ─── GET /api/auth/csrf-token ────────────────────────────────────────────────
+router.get('/csrf-token', (req, res) => {
+  const token = issueCsrfToken(res);
+  res.json({ success: true, csrfToken: token });
+});
+
+// ─── GET /api/auth/captcha  — Sinh CAPTCHA mới ────────────────────────────────
+router.get('/captcha', captchaLimiter, (req, res) => {
+  const captcha = svgCaptcha.create({
+    size:        5,
+    ignoreChars: '0oOlI1',
+    noise:       2,
+    color:       true,
+    background:  '#1e293b',
+    fontSize:    48,
+    width:       140,
+    height:      50,
+  });
+  const cid = `c_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  captchaStore.set(cid, { text: captcha.text.toLowerCase(), expiresAt: Date.now() + CAPTCHA_TTL });
+  res.json({ success: true, cid, svg: captcha.data });
+});
+
+// ─── POST /api/auth/captcha/verify  — Xác thực CAPTCHA (nội bộ) ───────────────
+function verifyCaptcha(cid, input) {
+  const record = captchaStore.get(cid);
+  if (!record) return { ok: false, reason: 'Mã bảo vệ hết hạn. Vui lòng làm mới.' };
+  if (record.expiresAt < Date.now()) { captchaStore.delete(cid); return { ok: false, reason: 'Mã bảo vệ đã hết hạn. Vui lòng làm mới.' }; }
+  if (record.text !== (input || '').toLowerCase().trim()) return { ok: false, reason: 'Mã bảo vệ không đúng. Vui lòng thử lại.' };
+  captchaStore.delete(cid); // Dùng 1 lần
+  return { ok: true };
+}
+
+// ─── POST /api/auth/refresh — xoay refresh token + blacklist bản cũ ───────────
+router.post('/refresh', refreshTokenLimiter, async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ success: false, message: 'Thiếu refreshToken' });
+
+    if (await blacklist.isBlacklisted(refreshToken)) {
+      return res.status(401).json({ success: false, message: 'Phiên không hợp lệ.' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    } catch {
+      return res.status(401).json({ success: false, message: 'refreshToken không hợp lệ hoặc đã hết hạn' });
+    }
+
+    const aud = decoded.aud || 'public';
+    const id = decoded.id;
+    const expSec = decoded.exp ? Math.max(1, decoded.exp - Math.floor(Date.now() / 1000)) : 86400 * 30;
+
+    const tokenPayload = {
+      id:           decoded.id,
+      role:         decoded.role,
+      name:         decoded.name,
+      adminRole:    decoded.adminRole   || null,
+      permissions:  decoded.permissions || [],
+      branchId:     decoded.branchId    || null,
+      branchCode:   decoded.branchCode  || '',
+      tokenVersion: decoded.tokenVersion,
+    };
+
+    // Tài khoản admin cứng — không lưu refresh trong DB, chỉ ký JWT
+    if (id === 'admin') {
+      await blacklist.add(refreshToken, expSec);
+      const { accessToken, refreshToken: newRefresh } = generateTokens({
+        id: 'admin',
+        role: 'admin',
+        name: decoded.name || 'Admin',
+        adminRole: 'SUPER_ADMIN',
+        tokenVersion: decoded.tokenVersion,
+      }, aud);
+      return res.json({ success: true, accessToken, refreshToken: newRefresh });
+    }
+
+    const role = decoded.role;
+    let dbUser = null;
+    if (role === 'student') {
+      dbUser = await Student.findById(id).select('+refreshToken tokenVersion');
+    } else {
+      dbUser = await Teacher.findById(id).select('+refreshToken tokenVersion');
+    }
+
+    if (!dbUser || !dbUser.refreshToken) {
+      return res.status(401).json({ success: false, message: 'Phiên đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+
+    if (!safeEqualRefresh(dbUser.refreshToken, refreshToken)) {
+      const bump = (dbUser.tokenVersion || 0) + 1000;
+      if (role === 'student') {
+        await Student.findByIdAndUpdate(id, { $unset: { refreshToken: 1 }, $set: { tokenVersion: bump } });
+      } else {
+        await Teacher.findByIdAndUpdate(id, { $unset: { refreshToken: 1 }, $set: { tokenVersion: bump } });
+      }
+      await blacklist.add(refreshToken, Math.min(expSec, 86400));
+      return res.status(401).json({
+        success: false,
+        code: 'REFRESH_REUSE',
+        message: 'Phát hiện tái sử dụng refresh token. Vui lòng đăng nhập lại.',
+      });
+    }
+
+    if (
+      dbUser.tokenVersion !== undefined &&
+      decoded.tokenVersion !== undefined &&
+      dbUser.tokenVersion !== decoded.tokenVersion
+    ) {
+      return res.status(401).json({ success: false, code: 'TOKEN_VERSION_MISMATCH', message: 'Phiên đã vô hiệu.' });
+    }
+
+    await blacklist.add(refreshToken, expSec);
+    const { accessToken, refreshToken: newRefresh } = generateTokens(tokenPayload, aud);
+
+    if (role === 'student') {
+      await Student.findByIdAndUpdate(id, { refreshToken: newRefresh });
+    } else {
+      await Teacher.findByIdAndUpdate(id, { refreshToken: newRefresh });
+    }
+
+    return res.json({ success: true, accessToken, refreshToken: newRefresh });
+  } catch (err) {
+    logger.error('[AUTH] refresh', err);
+    return res.status(401).json({ success: false, message: 'refreshToken không hợp lệ hoặc đã hết hạn' });
+  }
+});
+
+// ─── POST /api/auth/check-role ────────────────────────────────────────────────
+// Nhận identifier (phone/email), trả về role để hiện badge UI
+router.post('/check-role', checkRoleLimiter, async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier) return res.json({ success: true, data: null });
+
+    const isEmail = identifier.includes('@');
+
+    // Tìm trong Teacher/Admin/Staff trước
+    const teacher = await Teacher.findOne(isEmail ? { email: identifier } : { phone: identifier })
+      .select('name role adminRole status');
+    if (teacher) {
+      const labelMap = { admin: 'Quản trị viên', staff: 'Nhân viên', teacher: 'Giảng viên' };
+      return res.json({ success: true, data: {
+        role:      teacher.role,
+        adminRole: teacher.adminRole || null,
+        label:     teacher.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : (labelMap[teacher.role] || 'Nội bộ'),
+        color:     teacher.role === 'admin' ? 'black' : teacher.role === 'staff' ? 'indigo' : 'blue',
+      }});
+    }
+
+    // Tìm trong Student
+    const student = await Student.findOne(isEmail ? { email: identifier } : { $or: [{ phone: identifier }, { zalo: identifier }] })
+      .select('name role status');
+    if (student) {
+      return res.json({ success: true, data: { role: 'student', label: 'Học viên', color: 'red' } });
+    }
+
+    return res.json({ success: true, data: null }); // Không tìm thấy
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── GET /api/auth/google ─────────────────────────────────────────────────────
+router.get('/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+// ─── GET /api/auth/google/callback ───────────────────────────────────────────
+router.get('/google/callback',
+  passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || ''}/login?error=google_failed` }),
+  async (req, res) => {
+    const clientUrl = process.env.CLIENT_URL || '';
+    try {
+      const user = req.user;
+      const userRole = user.role || 'student';
+      const tid = user._id;
+      const doc = userRole === 'student'
+        ? await Student.findById(tid).select('tokenVersion branchId branchCode')
+        : await Teacher.findById(tid).select('tokenVersion branchId branchCode adminRole permissions');
+      const tv = doc?.tokenVersion ?? user.tokenVersion ?? 0;
+      const { accessToken, refreshToken } = generateTokens({
+        id: tid,
+        role: userRole,
+        name: user.name,
+        adminRole: user.adminRole || doc?.adminRole || null,
+        permissions: user.permissions || doc?.permissions || [],
+        branchId: user.branchId || doc?.branchId || null,
+        branchCode: user.branchCode || doc?.branchCode || '',
+        tokenVersion: tv,
+      });
+      if (userRole === 'student') {
+        await Student.findByIdAndUpdate(tid, { refreshToken });
+      } else {
+        await Teacher.findByIdAndUpdate(tid, { refreshToken });
+      }
+      res.redirect(`${clientUrl}/login?socialToken=${accessToken}&socialRefresh=${refreshToken}&socialRole=${userRole}&socialName=${encodeURIComponent(user.name)}&socialId=${tid}`);
+    } catch (err) {
+      logger.error('[AUTH] Google callback', err);
+      res.redirect(`${clientUrl}/login?error=token_failed`);
+    }
+  }
+);
+
+// ─── GET /api/auth/zalo ───────────────────────────────────────────────────────
+// Redirect về Zalo OAuth dialog
+router.get('/zalo', (req, res) => {
+  const appId    = process.env.ZALO_APP_ID || '';
+  const callback = encodeURIComponent(process.env.ZALO_CALLBACK_URL || '');
+  if (!appId) return res.redirect(`${process.env.CLIENT_URL || ''}/login?error=zalo_not_configured`);
+  const state = crypto.randomBytes(16).toString('hex');
+  res.cookie('oauth_z', state, { signed: true, httpOnly: true, sameSite: 'lax', maxAge: 600000, path: '/' });
+  res.redirect(`https://oauth.zaloapp.com/v4/permission?app_id=${appId}&redirect_uri=${callback}&state=${encodeURIComponent(state)}`);
+});
+
+// ─── GET /api/auth/zalo/callback ──────────────────────────────────────────────
+router.get('/zalo/callback', async (req, res) => {
+  const clientUrl = process.env.CLIENT_URL || '';
+  try {
+    if (!req.signedCookies.oauth_z || req.signedCookies.oauth_z !== req.query.state) {
+      return res.redirect(`${clientUrl}/login?error=oauth_state`);
+    }
+    res.clearCookie('oauth_z', { path: '/' });
+
+    const { code } = req.query;
+    if (!code) return res.redirect(`${clientUrl}/login?error=zalo_no_code`);
+
+    // Lấy access token từ Zalo
+    const tokenRes = await axios.post('https://oauth.zaloapp.com/v4/access_token', {
+      app_id:       process.env.ZALO_APP_ID,
+      app_secret:   process.env.ZALO_APP_SECRET,
+      code,
+      grant_type:   'authorization_code',
+    });
+    const zaloAccessToken = tokenRes.data?.access_token;
+    if (!zaloAccessToken) return res.redirect(`${clientUrl}/login?error=zalo_token_failed`);
+
+    // Lấy profile Zalo
+    const profileRes = await axios.get('https://graph.zalo.me/v2.0/me?fields=id,name,picture', {
+      headers: { access_token: zaloAccessToken },
+    });
+    const zProfile = profileRes.data;
+    const zaloId = zProfile.id;
+    const zName  = zProfile.name || 'Zalo User';
+    const zAvatar= zProfile.picture?.data?.url || '';
+
+    // Tìm hoặc tạo user
+    let student = await Student.findOne({ zaloId });
+    if (!student) {
+      student = await Student.create({
+        name: zName, zaloId, avatar: zAvatar,
+        phone: 'Chưa cập nhật', zalo: 'Chưa cập nhật', course: 'Chưa xếp lớp', price: 0, paid: false, status: 'Chờ xếp lớp',
+        password: Math.random().toString(36).slice(-10),
+      });
+    }
+
+    const tv = student.tokenVersion ?? 0;
+    const { accessToken, refreshToken } = generateTokens({
+      id: student._id,
+      role: 'student',
+      name: student.name,
+      tokenVersion: tv,
+    });
+    await Student.findByIdAndUpdate(student._id, { refreshToken });
+    res.redirect(`${clientUrl}/login?socialToken=${accessToken}&socialRefresh=${refreshToken}&socialRole=student&socialName=${encodeURIComponent(student.name)}&socialId=${student._id}`);
+  } catch (err) {
+    logger.error('[ZALO OAuth]', err.message);
+    res.redirect(`${clientUrl}/login?error=zalo_server_error`);
+  }
+});
+
+// ─── POST /api/auth/login ─────────────────────────────────────────────────────
+/**
+ * @route   POST /api/auth/login
+ * @desc    Đăng nhập bằng Số điện thoại + Mật khẩu
+ * @access  Public
+ *
+ * Body: { phone: "0935758462", password: "123456", role: "teacher"|"admin"|"student" }
+ */
+router.post('/login', loginLimiter, async (req, res) => {
+  try {
+    // Hỗ trợ cả 'identifier' (mới) lẫn 'phone' (cũ) để tương thích ngược
+    const { identifier, phone: legacyPhone, password, role = 'teacher' } = req.body;
+    const rawId = (identifier || legacyPhone || '').trim();
+
+    if (!rawId || !password) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập tài khoản và mật khẩu' });
+    }
+
+    // Detect: có @ → email, chỉ số → phone
+    const isEmail = rawId.includes('@');
+
+    // ── Hardcoded admin ────────────────────────────────────────────
+    if (rawId === 'admin') {
+      const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
+      const adminPasswordMatch = await verifyAdminPassword(password, sysSettings);
+      if (!adminPasswordMatch) {
+        return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+      }
+      if (sysSettings?.adminMfaEnabled && sysSettings?.adminMfaSecret) {
+        return res.json(issueAdminMfaChallenge(sysSettings, 'public'));
+      }
+      return res.json(await issueAdminTokens(sysSettings, 'public'));
+    }
+
+    // ── Tìm user theo identifier ───────────────────────────────────
+    let user = null;
+    let userRole = role;
+
+    // Tìm trong Teacher/Admin/Staff trước
+    const teacherQuery = isEmail ? { email: rawId } : { phone: rawId };
+    user = await Teacher.findOne(teacherQuery).select('+password +refreshToken');
+
+    if (user) {
+      userRole = user.role; // 'teacher', 'admin', 'staff'
+
+      if (user.isLocked) {
+        const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
+        return res.status(423).json({ success: false, message: `Tài khoản bị khóa tạm thời. Thử lại sau ${minutesLeft} phút.` });
+      }
+      const sStatus = String(user.status || '').toLowerCase();
+      if (sStatus === 'inactive')  return res.status(403).json({ success: false, isBan: true, message: 'Tài khoản chưa được cấp quyền đăng nhập.' });
+      if (sStatus === 'suspended') return res.status(403).json({ success: false, message: 'Tài khoản đã bị vô hiệu hóa.' });
+      if (user.status === 'Locked') return res.status(403).json({ success: false, isBan: true, message: 'Tài khoản bị khóa do không qua bài thi.' });
+      if (user.status === 'Pending' && user.practicalStatus === 'submitted') {
+        return res.status(403).json({ success: false, isBan: true, message: 'Bạn đã hoàn thành bài thi. Vui lòng chờ Admin chấm điểm.' });
+      }
+    } else {
+      // Tìm trong Student
+      const studentQuery = isEmail
+        ? { email: rawId }
+        : { $or: [{ phone: rawId }, { zalo: rawId }] };
+      user = await Student.findOne(studentQuery).select('+password');
+
+      if (!user) {
+        return res.status(401).json({ success: false, message: 'Tài khoản chưa được đăng ký trong hệ thống' });
+      }
+      if (!user.password) {
+        return res.status(403).json({ success: false, message: 'Tài khoản học viên chưa được tạo mật khẩu. Vui lòng liên hệ trung tâm.' });
+      }
+      userRole = 'student';
+    }
+
+    // ── Kiểm tra mật khẩu ─────────────────────────────────────────
+    const isMatch = await user.comparePassword(password);
+
+    if (!isMatch) {
+      // Tăng login attempts nếu là giảng viên
+      if (user.incLoginAttempts) await user.incLoginAttempts();
+      return res.status(401).json({
+        success: false,
+        message: 'Mật khẩu không đúng',
+      });
+    }
+
+    // ⭐ Kiểm tra Device Fingerprint (── 1 máy / 1 tài khoản ──)
+    // Chỉ chặn khi vẫn còn refreshToken (phiên thật sự đang mở). Sau logout đã xóa FP + refresh → không báo oan.
+    const { deviceFingerprint: fp1, force: force1 } = req.body;
+    const storedFp1 = await (userRole === 'student' ? Student : Teacher)
+      .findById(user._id).select('+refreshToken +deviceFingerprint').lean();
+    if (
+      fp1 &&
+      storedFp1?.refreshToken &&
+      storedFp1?.deviceFingerprint &&
+      storedFp1.deviceFingerprint !== fp1 &&
+      !force1
+    ) {
+      return res.status(409).json({
+        success: false,
+        code: 'DEVICE_CONFLICT',
+        message: 'Tài khoản đang đăng nhập trên máy tính khác. Đăng nhập sẽ đăng xuất phiên đó. Bạn có muốn tiếp tục không?',
+      });
+    }
+    if (fp1) user.deviceFingerprint = fp1;
+
+    // ⭐ Fix 1: Increment tokenVersion → vô hiệu token cũ trên thiết bị khác
+    const newTokenVersion = (user.tokenVersion || 0) + 1;
+    user.tokenVersion = newTokenVersion;
+
+    // ── Tạo tokens ────────────────────────────────────────────────
+    const tokenPayload = {
+      id:           user._id,
+      role:         userRole,
+      name:         user.name,
+      adminRole:    user.adminRole  || null,
+      permissions:  user.permissions || [],
+      branchId:     user.branchId   || null,
+      branchCode:   user.branchCode || '',
+      tokenVersion: newTokenVersion,                // ⭐ Embed version in JWT
+    };
+
+    const { accessToken, refreshToken } = generateTokens(tokenPayload);
+
+    // Lưu refresh token + tokenVersion vào DB
+    user.refreshToken    = refreshToken;
+    user.lastLogin       = new Date();
+    user.loginAttempts   = 0;
+    if (user.lockUntil) user.lockUntil = undefined;
+    user.markModified('tokenVersion');  // Force Mongoose to persist new field
+    await user.save({ validateModifiedOnly: true });
+
+    // ── Chuẩn bị response data (không trả password) ───────────────
+    const userData = {
+      _id:         user._id,
+      name:        user.name,
+      phone:       user.phone || user.zalo,
+      role:        userRole,
+      adminRole:   user.adminRole  || null,
+      permissions: user.permissions || [],
+      branchId:    user.branchId   || null,
+      branchCode:  user.branchCode || '',
+      status:      user.status,
+      ...(userRole === 'teacher' || userRole === 'admin' || userRole === 'staff'
+        ? {
+            testScore:       user.testScore,
+            assignedClasses: user.assignedClasses,
+            avatar:          user.avatar,
+            isFirstLogin:    !!user.isFirstLogin,
+          }
+        : {
+            course:            user.course,
+            remainingSessions: user.remainingSessions,
+            grade:             user.grade,
+            isFirstLogin:      !!user.isFirstLogin,
+          }),
+    };
+
+    // ── Trả về response ───────────────────────────────────────────
+    return res.status(200).json({
+      success: true,
+      message: `Đăng nhập thành công! Chào ${user.name}`,
+      data: {
+        user: userData,
+        accessToken,
+        refreshToken,
+        expiresIn: process.env.JWT_EXPIRES_IN || '8h',
+      },
+    });
+
+  } catch (error) {
+    logger.error('[AUTH] Login error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi server. Vui lòng thử lại sau.',
+    });
+  }
+});
+
+// ─── Helper: Lookup user bằng identifier ─────────────────────────────────────
+async function lookupUser(rawId, requestedRole = null) {
+  const isEmail = rawId.includes('@');
+  const isAdminHardcoded = rawId === 'admin';
+
+  if (isAdminHardcoded && (!requestedRole || requestedRole === 'admin')) return { type: 'hardcoded', role: 'admin' };
+
+  // Teacher/Admin/Staff
+  if (!requestedRole || requestedRole === 'teacher' || requestedRole === 'admin' || requestedRole === 'staff') {
+    const teacherQ = isEmail ? { email: rawId } : { phone: rawId };
+    const teacher = await Teacher.findOne(teacherQ).select('+password +refreshToken');
+    if (teacher) return { type: 'teacher', user: teacher, role: teacher.role };
+  }
+
+  // Student
+  if (!requestedRole || requestedRole === 'student') {
+    const studentQ = isEmail ? { email: rawId } : { $or: [{ phone: rawId }, { zalo: rawId }] };
+    const student = await Student.findOne(studentQ).select('+password');
+    if (student) return { type: 'student', user: student, role: 'student' };
+  }
+
+  return null;
+}
+
+// ─── POST /api/auth/login/public ─────────────────────────────────────────────
+// Cổng đăng nhập dành cho HỌC VIÊN & GIẢNG VIÊN (Social Login hợp lệ với route này)
+router.post('/login/public', loginLimiter, async (req, res) => {
+  try {
+    const { identifier, password, role } = req.body;
+    const rawId = (identifier || '').trim();
+    if (!rawId || !password) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập tài khoản và mật khẩu' });
+    }
+
+    const found = await lookupUser(rawId, role);
+    if (!found) {
+      return res.status(401).json({ success: false, message: 'Tài khoản chưa được đăng ký trong hệ thống' });
+    }
+
+    // Chặn Admin/Staff dùng cổng public
+    if (['admin', 'staff'].includes(found.role) || found.type === 'hardcoded') {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản này thuộc nhóm Nhân Viên/Quản Trị. Vui lòng chuyển sang Cổng nội bộ (Admin) để đăng nhập!',
+        redirect: '/admin/login',
+      });
+    }
+
+    const { user, role: userRole } = found;
+
+    // ⭐ Chặn đăng nhập nếu trạng thái không hợp lệ (Case-insensitive)
+    const sStatus = String(user.status || '').toLowerCase();
+    if (userRole === 'teacher') {
+      if (sStatus === 'inactive')  return res.status(403).json({ success: false, isBan: true, message: 'Tài khoản chưa được cấp quyền đăng nhập. Vui lòng liên hệ trung tâm.' });
+      if (sStatus === 'suspended') return res.status(403).json({ success: false, message: 'Tài khoản đã bị tạm vắng / vô hiệu hóa.' });
+      if (sStatus === 'locked')    return res.status(403).json({ success: false, isBan: true, message: 'Tài khoản đã bị khóa do không vượt qua bài thi thực tế.' });
+      
+      // Nếu là pending nhưng đã nộp bài → chờ chấm
+      if (sStatus === 'pending' && user.practicalStatus === 'submitted') {
+         return res.status(403).json({ success: false, isBan: true, message: 'Bạn đã hoàn thành bài thi. Vui lòng chờ Admin chấm điểm.' });
+      }
+    }
+
+    // Xác thực mật khẩu
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      if (user.incLoginAttempts) await user.incLoginAttempts();
+      return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+    }
+
+    // ⭐ Kiểm tra Device Fingerprint
+    const { deviceFingerprint: fp2, force: force2 } = req.body;
+    const storedFp2 = await (userRole === 'student' ? Student : Teacher)
+      .findById(user._id).select('+refreshToken +deviceFingerprint').lean();
+    if (
+      fp2 &&
+      storedFp2?.refreshToken &&
+      storedFp2?.deviceFingerprint &&
+      storedFp2.deviceFingerprint !== fp2 &&
+      !force2
+    ) {
+      return res.status(409).json({
+        success: false,
+        code: 'DEVICE_CONFLICT',
+        message: 'Tài khoản đang đăng nhập trên máy tính khác. Đăng nhập sẽ đăng xuất phiên đó. Bạn có muốn tiếp tục không?',
+      });
+    }
+    if (fp2) user.deviceFingerprint = fp2;
+
+    // ⭐ Fix 1: tokenVersion
+    const newTokenVersion = (user.tokenVersion || 0) + 1;
+    user.tokenVersion = newTokenVersion;
+
+    const tokenPayload = {
+      id: user._id, role: userRole, name: user.name,
+      adminRole: null, permissions: [], branchId: null, branchCode: '',
+      tokenVersion: newTokenVersion,
+    };
+    const { accessToken, refreshToken } = generateTokens(tokenPayload, 'public');
+
+    user.refreshToken = refreshToken; user.lastLogin = new Date();
+    user.loginAttempts = 0;
+    user.markModified('tokenVersion');
+    await user.save({ validateModifiedOnly: true });
+
+    return res.json({
+      success: true,
+      message: `Chào mừng ${user.name}!`,
+      data: {
+        user: { _id: user._id, name: user.name, role: userRole, phone: user.phone || user.zalo || '', status: user.status, course: user.course, remainingSessions: user.remainingSessions, isFirstLogin: !!user.isFirstLogin },
+        accessToken, refreshToken,
+      },
+    });
+  } catch (err) {
+    logger.error('[AUTH] login/public error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi server. Vui lòng thử lại.' });
+  }
+});
+
+// ─── POST /api/auth/login/internal ───────────────────────────────────────────
+// Cổng đăng nhập nội bộ — CHỈ ADMIN & STAFF — yêu cầu CAPTCHA
+router.post('/login/internal', loginLimiter, async (req, res) => {
+  try {
+    const { identifier, password, captchaId, captchaAnswer } = req.body;
+    const rawId = (identifier || '').trim();
+
+    // Bước 1: Xác thực CAPTCHA
+    const captchaResult = verifyCaptcha(captchaId, captchaAnswer);
+    if (!captchaResult.ok) {
+      return res.status(400).json({ success: false, message: captchaResult.reason, captchaError: true });
+    }
+
+    if (!rawId || !password) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập tài khoản và mật khẩu' });
+    }
+
+    // Bước 2: Hardcoded admin
+    if (rawId === 'admin') {
+      const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
+      const adminPasswordMatch = await verifyAdminPassword(password, sysSettings);
+      if (!adminPasswordMatch) {
+        return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+      }
+      if (sysSettings?.adminMfaEnabled && sysSettings?.adminMfaSecret) {
+        return res.json(issueAdminMfaChallenge(sysSettings, 'internal'));
+      }
+      const tokens = await issueAdminTokens(sysSettings, 'internal');
+      return res.json({
+        success: true,
+        data: {
+          user: tokens.data.user,
+          accessToken: tokens.data.accessToken,
+          refreshToken: tokens.data.refreshToken,
+        },
+      });
+    }
+
+    // Bước 3: Tìm user
+    const found = await lookupUser(rawId);
+    if (!found || found.type === 'student') {
+      // Student/Teacher không được vào cổng nội bộ
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền truy cập khu vực quản trị.' });
+    }
+
+    const { user, role: userRole } = found;
+
+    // Chỉ admin/staff được vào
+    if (!['admin', 'staff'].includes(userRole)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền truy cập khu vực quản trị.' });
+    }
+
+    // Kiểm tra trạng thái tài khoản
+    if (user.isLocked) {
+      const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
+      return res.status(423).json({ success: false, message: `Tài khoản bị khóa tạm thời. Thử lại sau ${minutesLeft} phút.` });
+    }
+    const sStatus = String(user.status || '').toLowerCase();
+    if (sStatus === 'inactive' || sStatus === 'suspended') {
+      return res.status(403).json({ success: false, isBan: true, message: 'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị.' });
+    }
+
+    // Bước 4: Xác thực mật khẩu
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      if (user.incLoginAttempts) await user.incLoginAttempts();
+      return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+    }
+
+    // ⭐ Kiểm tra Device Fingerprint (internal/admin)
+    const { deviceFingerprint: fp3, force: force3 } = req.body;
+    const storedFp3 = await Teacher.findById(user._id).select('+refreshToken +deviceFingerprint').lean();
+    if (
+      fp3 &&
+      storedFp3?.refreshToken &&
+      storedFp3?.deviceFingerprint &&
+      storedFp3.deviceFingerprint !== fp3 &&
+      !force3
+    ) {
+      return res.status(409).json({
+        success: false,
+        code: 'DEVICE_CONFLICT',
+        message: 'Tài khoản đang đăng nhập trên máy tính khác. Đăng nhập sẽ đăng xuất phiên đó. Bạn có muốn tiếp tục không?',
+      });
+    }
+    if (fp3) user.deviceFingerprint = fp3;
+
+    // ⭐ Fix 1: tokenVersion
+    const newTokenVersion = (user.tokenVersion || 0) + 1;
+    user.tokenVersion = newTokenVersion;
+
+    const tokenPayload = {
+      id: user._id, role: userRole, name: user.name,
+      adminRole:   user.adminRole  || null,
+      permissions: user.permissions || [],
+      branchId:    user.branchId   || null,
+      branchCode:  user.branchCode || '',
+      tokenVersion: newTokenVersion,
+    };
+    const { accessToken, refreshToken } = generateTokens(tokenPayload, 'internal');
+
+    user.refreshToken = refreshToken; user.lastLogin = new Date();
+    user.loginAttempts = 0;
+    user.markModified('tokenVersion');
+    await user.save({ validateModifiedOnly: true });
+
+    return res.json({
+      success: true,
+      message: `Chào mừng ${user.name} — ${userRole === 'admin' ? 'Quản trị viên' : 'Nhân viên'}`,
+      data: {
+        user: {
+          _id: user._id, name: user.name, role: userRole,
+          adminRole:   user.adminRole  || null,
+          permissions: user.permissions || [],
+          branchId:    user.branchId   || null,
+          branchCode:  user.branchCode || '',
+          status:      user.status,
+        },
+        accessToken, refreshToken,
+      },
+    });
+  } catch (err) {
+    logger.error('[AUTH] login/internal error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi server. Vui lòng thử lại.' });
+  }
+});
+
+// ─── MFA (Super Admin TOTP) ───────────────────────────────────────────────────
+
+/** Xác thực mã MFA sau bước mật khẩu */
+router.post('/mfa/verify', loginLimiter, async (req, res) => {
+  try {
+    const { mfaToken, code } = req.body || {};
+    if (!mfaToken || !code) {
+      return res.status(400).json({ success: false, message: 'Thiếu mfaToken hoặc mã OTP' });
+    }
+    let decoded;
+    try {
+      decoded = jwt.verify(mfaToken, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ success: false, message: 'Phiên MFA hết hạn. Đăng nhập lại.' });
+    }
+    if (decoded.purpose !== 'mfa' || decoded.id !== 'admin') {
+      return res.status(401).json({ success: false, message: 'Token MFA không hợp lệ' });
+    }
+    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
+    if (!sysSettings?.adminMfaEnabled || !sysSettings.adminMfaSecret) {
+      return res.status(400).json({ success: false, message: 'MFA chưa được bật' });
+    }
+    if (!verifyTotp(sysSettings.adminMfaSecret, code)) {
+      return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
+    }
+    const audience = decoded.aud === 'internal' ? 'internal' : 'public';
+    const tokens = await issueAdminTokens(sysSettings, audience);
+    if (audience === 'internal') {
+      return res.json({
+        success: true,
+        data: {
+          user: tokens.data.user,
+          accessToken: tokens.data.accessToken,
+          refreshToken: tokens.data.refreshToken,
+        },
+      });
+    }
+    return res.json(tokens);
+  } catch (err) {
+    logger.error('[AUTH] mfa/verify error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+/** Bắt đầu setup MFA — trả secret + QR (chưa bật) */
+router.post('/mfa/setup', authMiddleware, async (req, res) => {
+  try {
+    if (req.user?.id !== 'admin' || req.user?.adminRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Chỉ Super Admin mới cấu hình MFA' });
+    }
+    const secret = generateSecret();
+    const sysSettings = await SystemSettings.findOneAndUpdate(
+      { _key: 'main' },
+      { $set: { adminMfaPendingSecret: secret } },
+      { upsert: true, new: true },
+    );
+    const account = sysSettings.adminName || 'admin';
+    const uri = otpauthUrl(secret, account, 'QUANLYCMS');
+    const qrDataUrl = await QRCode.toDataURL(uri, { margin: 1, width: 220 });
+    res.json({
+      success: true,
+      data: { secret, otpauthUrl: uri, qrDataUrl },
+    });
+  } catch (err) {
+    logger.error('[AUTH] mfa/setup error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+/** Xác nhận enable MFA bằng mã OTP từ app authenticator */
+router.post('/mfa/enable', authMiddleware, async (req, res) => {
+  try {
+    if (req.user?.id !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Chỉ Super Admin' });
+    }
+    const { code } = req.body || {};
+    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaPendingSecret +adminMfaSecret');
+    const pending = sysSettings?.adminMfaPendingSecret;
+    if (!pending) {
+      return res.status(400).json({ success: false, message: 'Chưa gọi /mfa/setup' });
+    }
+    if (!verifyTotp(pending, code)) {
+      return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
+    }
+    sysSettings.adminMfaSecret = pending;
+    sysSettings.adminMfaEnabled = true;
+    sysSettings.adminMfaPendingSecret = '';
+    await sysSettings.save();
+    await invalidateSettingsCache();
+    res.json({ success: true, message: 'Đã bật MFA cho Super Admin' });
+  } catch (err) {
+    logger.error('[AUTH] mfa/enable error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+/** Tắt MFA — cần mật khẩu + OTP hiện tại */
+router.post('/mfa/disable', authMiddleware, async (req, res) => {
+  try {
+    if (req.user?.id !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Chỉ Super Admin' });
+    }
+    const { password, code } = req.body || {};
+    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
+    const pwOk = await verifyAdminPassword(password, sysSettings);
+    if (!pwOk) return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+    if (sysSettings?.adminMfaEnabled && sysSettings.adminMfaSecret) {
+      if (!verifyTotp(sysSettings.adminMfaSecret, code)) {
+        return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
+      }
+    }
+    sysSettings.adminMfaEnabled = false;
+    sysSettings.adminMfaSecret = '';
+    sysSettings.adminMfaPendingSecret = '';
+    await sysSettings.save();
+    await invalidateSettingsCache();
+    res.json({ success: true, message: 'Đã tắt MFA' });
+  } catch (err) {
+    logger.error('[AUTH] mfa/disable error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+router.get('/mfa/status', authMiddleware, async (req, res) => {
+  if (req.user?.id !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Chỉ Super Admin' });
+  }
+  const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
+  res.json({ success: true, data: { enabled: !!sysSettings?.adminMfaEnabled } });
+});
+
+// ─── POST /api/auth/logout ────────────────────────────────────────────────────
+/**
+ * @route   POST /api/auth/logout
+ * @desc    Đăng xuất — blacklist token + xóa refreshToken khỏi DB
+ * @access  Protected
+ */
+router.post('/logout', authMiddleware, async (req, res) => {
+  try {
+    const { role } = req.user;
+    const userId = req.user.id;
+
+    if (req.accessToken) {
+      try {
+        const decoded = jwt.decode(req.accessToken);
+        if (decoded?.exp) {
+          const remainingSeconds = decoded.exp - Math.floor(Date.now() / 1000);
+          if (remainingSeconds > 0) {
+            await blacklist.add(req.accessToken, remainingSeconds);
+          }
+        } else {
+          await blacklist.add(req.accessToken, 28800);
+        }
+      } catch {
+        await blacklist.add(req.accessToken, 28800);
+      }
+    }
+
+    const bodyRefresh = req.body?.refreshToken;
+    if (bodyRefresh) {
+      try {
+        const dec = jwt.decode(bodyRefresh);
+        const ttl = dec?.exp ? Math.max(1, dec.exp - Math.floor(Date.now() / 1000)) : 86400 * 30;
+        await blacklist.add(bodyRefresh, ttl);
+      } catch {
+        await blacklist.add(bodyRefresh, 86400);
+      }
+    }
+
+    if (userId && userId !== 'admin') {
+      if (role === 'student') {
+        await Student.findByIdAndUpdate(userId, { $unset: { refreshToken: 1, deviceFingerprint: 1 } });
+      } else {
+        await Teacher.findByIdAndUpdate(userId, { $unset: { refreshToken: 1, deviceFingerprint: 1 } });
+      }
+    }
+
+    return res.status(200).json({ success: true, message: 'Đăng xuất thành công' });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── POST /api/auth/register-teacher ─────────────────────────────────────────
+/**
+ * @route   POST /api/auth/register-teacher
+ * @desc    Đăng ký tài khoản giảng viên (chờ Admin duyệt)
+ * @access  Public
+ */
+router.post('/register-teacher', sensitiveFlowLimiter, async (req, res) => {
+  try {
+    const { name, phone, password, password2, specialty } = req.body;
+
+    if (!name || !phone || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập đầy đủ: Tên, Số điện thoại, Mật khẩu',
+      });
+    }
+
+    if (password !== password2) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu xác nhận không khớp' });
+    }
+
+    const exists = await Teacher.findOne({ phone });
+    if (exists) {
+      return res.status(409).json({
+        success: false,
+        message: 'Số điện thoại này đã được đăng ký',
+      });
+    }
+
+    const teacher = await Teacher.create({
+      name,
+      phone,
+      password, // sẽ được hash bởi pre-save hook
+      specialty: specialty || '',
+      status: 'pending',
+      role: 'teacher',
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Đăng ký thành công! Tài khoản đang chờ Admin Thắng Tin Học phê duyệt.',
+      data: {
+        _id: teacher._id,
+        name: teacher.name,
+        phone: teacher.phone,
+        status: teacher.status,
+      },
+    });
+
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Số điện thoại đã tồn tại' });
+    }
+    logger.error('[AUTH] Register error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+  }
+});
+
+// ─── POST /api/auth/change-password ──────────────────────────────────────────
+/**
+ * @route   POST /api/auth/change-password
+ * @desc    Đổi mật khẩu
+ * @access  Protected (cần accessToken)
+ */
+router.post('/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const { id: userId, role } = req.user;
+
+    if (!newPassword) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập mật khẩu mới' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu mới phải ít nhất 6 ký tự' });
+    }
+
+    const Model = role === 'student' ? Student : Teacher;
+    const user  = await Model.findById(userId).select('+password');
+
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+
+    if (!user.isFirstLogin) {
+      if (!oldPassword) {
+        return res.status(400).json({ success: false, message: 'Vui lòng nhập mật khẩu cũ' });
+      }
+      const isMatch = await user.comparePassword(oldPassword);
+      if (!isMatch) return res.status(401).json({ success: false, message: 'Mật khẩu cũ không đúng' });
+    }
+
+    user.password = newPassword;
+    if (user.isFirstLogin) {
+      user.isFirstLogin = false;
+    }
+    await user.save({ validateModifiedOnly: true });
+
+    return res.status(200).json({ success: true, message: 'Đổi mật khẩu thành công' });
+
+  } catch (error) {
+    logger.error('[AUTH] Change password error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── GET /api/auth/me ─────────────────────────────────────────────────────────
+/**
+ * @route   GET /api/auth/me
+ * @desc    Xác minh token + trả về thông tin user hiện tại (dùng khi reload trang)
+ * @access  Protected
+ */
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const decoded = req.user; // Đã được verify bởi authMiddleware
+
+    // Lấy thông tin mới nhất từ DB
+    let user = null;
+
+    if (decoded.id === 'admin') {
+      // Hardcoded admin — lấy tên từ DB nếu đã đổi
+      const sysSettings = await SystemSettings.findOne({ _key: 'main' });
+      const dbAdminName = sysSettings?.adminName || 'Admin Thắng Tin Học';
+      return res.json({
+        success: true,
+        data: {
+          _id:    'admin',
+          id:     'admin',
+          name:   dbAdminName,
+          phone:  'admin',
+          role:   'admin',
+          status: 'active',
+          avatar: '',
+        },
+      });
+    }
+
+    if (decoded.role === 'student') {
+      user = await Student.findById(decoded.id).select('-password');
+    } else {
+      user = await Teacher.findById(decoded.id).select('-password -refreshToken');
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Tài khoản không tồn tại' });
+    }
+
+    // ⭐ Fix: Kiểm tra tokenVersion nếu user có đổi mật khẩu/đăng xuất thiết bị khác
+    if (decoded.tokenVersion !== undefined && user.tokenVersion !== undefined && decoded.tokenVersion < user.tokenVersion) {
+      return res.status(401).json({ success: false, message: 'Phiên đăng nhập đã hết hạn (đã đăng nhập ở máy khác hoặc đổi mật khẩu)' });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        _id:         user._id,
+        id:          user._id,
+        name:        user.name,
+        phone:       user.phone || user.zalo,
+        role:        decoded.role,
+        adminRole:   user.adminRole  || null,
+        permissions: user.permissions || [],
+        branchId:    user.branchId   || null,
+        branchCode:  user.branchCode || '',
+        status:      user.status,
+        avatar:      user.avatar || '',
+        isFirstLogin: !!user.isFirstLogin,
+        ...(decoded.role === 'teacher' || decoded.role === 'admin' || decoded.role === 'staff' ? {
+          testScore:       user.testScore,
+          assignedClasses: user.assignedClasses,
+          specialty:       user.specialty,
+        } : {}),
+        ...(decoded.role === 'student' ? {
+          course:              user.course,
+          remainingSessions:   user.remainingSessions,
+          studentExamUnlocked: user.studentExamUnlocked,
+          grade:               user.grade,
+        } : {}),
+      },
+    });
+  } catch (error) {
+    logger.error('[AUTH] /me error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── OTP Store (in-memory, key = phone+role) ─────────────────────────────────
+const otpStore = new Map(); // "phone:role" → { otp, expiresAt, userId, userName }
+
+// ─── POST /api/auth/forgot-password/request ───────────────────────────────────
+/**
+ * @route   POST /api/auth/forgot-password/request
+ * @desc    Bước 1: Gửi OTP về Zalo để cấp lại mật khẩu
+ * @access  Public
+ */
+router.post('/forgot-password/request', sensitiveFlowLimiter, async (req, res) => {
+  try {
+    const { phone, role } = req.body;
+    if (!phone) return res.status(400).json({ success: false, message: 'Vui lòng nhập số điện thoại' });
+
+    let user = null;
+    if (role === 'teacher') {
+      user = await Teacher.findOne({ $or: [{ phone: phone.trim() }, { zalo: phone.trim() }] });
+    } else {
+      user = await Student.findOne({ $or: [{ phone: phone.trim() }, { zalo: phone.trim() }] });
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản với số điện thoại này' });
+    }
+
+    // Tạo thông báo cho Admin
+    try {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        type: 'SYSTEM',
+        title: 'Yêu cầu cấp lại mật khẩu',
+        content: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${phone}) đang yêu cầu cấp lại mật khẩu. Vui lòng sinh mã OTP và gửi qua Zalo cho người này.`,
+        receivers: ['ALL_ADMIN'], // Chỉ admin nhận được
+        payload: { userId: user._id, role: role, action: 'RESET_PASSWORD', userName: user.name }
+      });
+      // Phát sự kiện socket nếu cần (tùy thuộc vào implement socket hiện tại, thường frontend sẽ poll hoặc dùng socket io global)
+      if (global.io) {
+        global.io.emit('new-notification');
+      }
+    } catch (err) {
+      logger.warn('[AUTH] Cannot create notification:', err.message);
+    }
+
+    // Che một phần số điện thoại
+    const masked = phone.trim().replace(/(\d{3})\d+(\d{3})/, '$1****$2');
+
+    return res.json({
+      success: true,
+      message: `Hệ thống đã gửi thông báo đến Admin. Vui lòng liên hệ Admin để nhận mã OTP.`,
+      data: { masked, name: user.name }
+    });
+  } catch (error) {
+    logger.error('[AUTH] forgot-password/request error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── POST /api/auth/forgot-password/verify ────────────────────────────────────
+/**
+ * @route   POST /api/auth/forgot-password/verify
+ * @desc    Bước 2: Xác minh OTP và cấp mật khẩu mới
+ * @access  Public
+ */
+router.post('/forgot-password/verify', sensitiveFlowLimiter, async (req, res) => {
+  try {
+    const { phone, otp, role } = req.body;
+    if (!phone || !otp) return res.status(400).json({ success: false, message: 'Thiếu thông tin' });
+
+    const key = `${phone.trim()}:${role || 'student'}`;
+    const record = otpStore.get(key);
+
+    if (!record) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu lại.' });
+    }
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(key);
+      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn (60 giây). Vui lòng yêu cầu lại.' });
+    }
+    if (record.otp !== otp.trim()) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không đúng. Vui lòng kiểm tra lại.' });
+    }
+
+    // OTP đúng → đặt lại mật khẩu
+    otpStore.delete(key);
+    // TRƯỚC ĐÂY: Sinh mật khẩu ngẫu nhiên và trả về client (KÉM AN TOÀN)
+    // HIỆN TẠI: Chỉ đánh dấu OTP đã verify, cho phép client POST sang 1 route reset password thật sự hoặc yêu cầu Admin xử lý.
+    // Để đơn giản và nhanh, ta vẫn sinh pass nhưng KHÔNG trả về client nếu ở môi trường prod (giả định).
+    // Ở đây ta sẽ giữ nguyên logic sinh pass nhưng khuyến cáo đổi sang link reset.
+    const newPassword = Math.floor(100000 + Math.random() * 900000).toString();
+
+    let user = null;
+    if (record.role === 'teacher') {
+      user = await Teacher.findById(record.userId).select('+password name phone zalo email');
+    } else {
+      user = await Student.findById(record.userId).select('+password name phone zalo email');
+    }
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+
+    user.password = newPassword;
+    user.isFirstLogin = true;
+    await user.save({ validateModifiedOnly: true });
+
+    // Gửi mật khẩu mới qua queue (Zalo OA / email) — không trả password về client
+    const destPhone = (user.zalo || user.phone || phone || '').trim();
+    await enqueuePassword({
+      phone: destPhone || undefined,
+      email: user.email || undefined,
+      password: newPassword,
+      userName: user.name,
+    }).catch((err) => logger.warn('[AUTH] enqueuePassword:', err.message));
+
+    return res.json({
+      success: true,
+      message: 'Cấp lại mật khẩu thành công! Mật khẩu mới đã được gửi qua Zalo/email (nếu đã cấu hình).',
+      data: { name: user.name },
+    });
+  } catch (error) {
+    logger.error('[AUTH] forgot-password/verify error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── POST /api/auth/admin/generate-otp ───────────────────────────────────────
+/**
+ * @route   POST /api/auth/admin/generate-otp
+ * @desc    Admin sinh OTP 120s cho học viên/giảng viên. Admin tự gửi qua Zalo.
+ * @access  Admin only
+ */
+router.post('/admin/generate-otp', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+      return res.status(403).json({ success: false, message: 'Không có quyền' });
+    }
+    const { userId, userRole } = req.body;
+    if (!userId) return res.status(400).json({ success: false, message: 'Thiếu userId' });
+
+    let user = null;
+    if (userRole === 'teacher') {
+      user = await Teacher.findById(userId).select('name phone zalo email');
+    } else {
+      user = await Student.findById(userId).select('name phone zalo email');
+    }
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+
+    const phone = (user.phone || user.zalo || '').trim();
+    if (!phone) return res.status(400).json({ success: false, message: 'Người dùng chưa có số điện thoại' });
+
+    // Tạo OTP 6 số, hiệu lực 120 giây
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const key = `${phone}:${userRole || 'student'}`;
+    otpStore.set(key, {
+      otp, expiresAt: Date.now() + 120000,
+      userId: user._id.toString(), userName: user.name, role: userRole || 'student'
+    });
+    setTimeout(() => otpStore.delete(key), 125000);
+
+    // Gửi OTP qua queue (Zalo OA / email) — admin vẫn nhận OTP trên UI để gửi tay nếu cần
+    const job = await enqueueOtp({
+      phone: (user.zalo || phone).trim(),
+      email: user.email || undefined,
+      otp,
+      userName: user.name,
+    }).catch((err) => {
+      logger.warn('[AUTH] enqueueOtp:', err.message);
+      return null;
+    });
+
+    logger.info(`[ADMIN OTP] Sinh OTP cho ${user.name} (${phone}) - 120s job=${job?.id || 'n/a'}`);
+
+    return res.json({
+      success: true,
+      data: {
+        otp,
+        phone,
+        zalo: user.zalo || phone,
+        name: user.name,
+        expiresIn: 120,
+        queued: Boolean(job),
+        queueMode: job?.mode,
+      },
+    });
+  } catch (error) {
+    logger.error('[AUTH] admin/generate-otp error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+
+// ─── POST /api/auth/reset-password-request (backward compat - DISABLED FOR SECURITY) ─────────────────
+router.post('/reset-password-request', sensitiveFlowLimiter, async (req, res) => {
+  return res.status(410).json({ success: false, message: 'Phương thức này đã bị gỡ bỏ vì lý do bảo mật. Vui lòng dùng luồng Quên mật khẩu chính thức.' });
+});
+
+
+// ─── POST /api/auth/admin/reset-password ─────────────────────────────────────
+/**
+ * @route   POST /api/auth/admin/reset-password
+ * @desc    Admin cấp lại mật khẩu cho giảng viên/học viên
+ * @access  Admin only
+ */
+router.post('/admin/reset-password', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+      return res.status(403).json({ success: false, message: 'Không có quyền thực hiện' });
+    }
+
+    const { userId, userRole, newPassword } = req.body;
+
+    if (!userId || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Thiếu userId hoặc mật khẩu mới' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu mới phải ít nhất 6 ký tự' });
+    }
+
+    const Model = userRole === 'student' ? Student : Teacher;
+    const user = await Model.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+    }
+
+    user.password = newPassword;
+    user.isFirstLogin = true;
+    await user.save({ validateModifiedOnly: true });
+
+    return res.json({
+      success: true,
+      message: `Đã cấp lại mật khẩu cho ${user.name}`,
+      data: { name: user.name }
+    });
+
+  } catch (error) {
+    logger.error('[AUTH] Admin reset password error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── PUT /api/auth/admin/profile ─────────────────────────────────────────────
+/**
+ * @route   PUT /api/auth/admin/profile
+ * @desc    Admin đổi tên hiển thị và/hoặc mật khẩu
+ * @access  Admin only
+ */
+router.put('/admin/profile', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Chỉ Admin mới được thay đổi' });
+    }
+
+    const { name, oldPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    // Hardcoded admin — lưu vào SystemSettings
+    if (userId === 'admin') {
+      let sysSettings = await SystemSettings.findOne({ _key: 'main' });
+      if (!sysSettings) sysSettings = new SystemSettings({ _key: 'main' });
+
+      let changed = false;
+
+      // Đổi tên
+      if (name && name.trim()) {
+        sysSettings.adminName = name.trim();
+        changed = true;
+      }
+
+      // Đổi mật khẩu
+      if (newPassword) {
+        if (!oldPassword) {
+          return res.status(400).json({ success: false, message: 'Vui lòng nhập mật khẩu hiện tại' });
+        }
+        if (newPassword.length < 6) {
+          return res.status(400).json({ success: false, message: 'Mật khẩu mới phải ít nhất 6 ký tự' });
+        }
+
+        // Xác thực mật khẩu cũ
+        const oldPwMatch = await verifyAdminPassword(oldPassword, sysSettings);
+
+        if (!oldPwMatch) {
+          return res.status(401).json({ success: false, message: 'Mật khẩu hiện tại không đúng' });
+        }
+
+        // Hash và lưu mật khẩu mới
+        const salt = await bcrypt.genSalt(10);
+        sysSettings.adminPasswordHash = await bcrypt.hash(newPassword, salt);
+        changed = true;
+      }
+
+      if (!changed) {
+        return res.status(400).json({ success: false, message: 'Vui lòng nhập thông tin cần thay đổi' });
+      }
+
+      sysSettings.markModified('adminPasswordHash');
+      sysSettings.markModified('adminName');
+      await sysSettings.save();
+      await invalidateSettingsCache();
+
+      return res.json({
+        success: true,
+        message: 'Cập nhật thông tin Admin thành công!',
+        data: { name: sysSettings.adminName || 'Admin Thắng Tin Học' }
+      });
+    }
+
+    const user = await Teacher.findById(userId).select('+password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+    }
+
+    // Đổi tên
+    if (name && name.trim()) {
+      user.name = name.trim();
+    }
+
+    // Đổi mật khẩu (yêu cầu mật khẩu cũ)
+    if (newPassword) {
+      if (!oldPassword) {
+        return res.status(400).json({ success: false, message: 'Vui lòng nhập mật khẩu hiện tại' });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ success: false, message: 'Mật khẩu mới phải ít nhất 6 ký tự' });
+      }
+      const isMatch = await user.comparePassword(oldPassword);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Mật khẩu hiện tại không đúng' });
+      }
+      user.password = newPassword;
+    }
+
+    await user.save({ validateModifiedOnly: true });
+
+    return res.json({
+      success: true,
+      message: 'Cập nhật thông tin thành công',
+      data: { name: user.name }
+    });
+
+  } catch (error) {
+    logger.error('[AUTH] Admin profile update error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+module.exports = router;
+
