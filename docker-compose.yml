@@ -1,0 +1,59 @@
+# Local / staging stack: Mongo + Redis + API
+# Usage:
+#   cp .env.example .env   # fill JWT secrets
+#   docker compose up -d --build
+#   curl http://localhost:5000/healthz
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/quanlycms
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+      MASTER_ADMIN_PASSWORD: ${MASTER_ADMIN_PASSWORD:-}
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-1}
+    volumes:
+      - api_uploads:/app/uploads
+      - api_backups:/app/backups
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
+  api_uploads:
+  api_backups:

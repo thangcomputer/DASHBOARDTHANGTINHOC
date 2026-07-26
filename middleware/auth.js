@@ -1,0 +1,288 @@
+const jwt       = require('jsonwebtoken');
+const Teacher   = require('../models/Teacher');
+const Student   = require('../models/Student');
+const blacklist = require('./tokenBlacklist');
+const logger = require('../config/logger');
+
+// ── authMiddleware: Xác thực JWT + Token Blacklist + Token Version ─────────────
+const authMiddleware = async (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'Không có token, truy cập bị từ chối',
+    });
+  }
+
+  // ⭐ Fix 3: Kiểm tra Token Blacklist (token đã bị đăng xuất)
+  if (await blacklist.isBlacklisted(token)) {
+    return res.status(401).json({
+      success: false,
+      code: 'TOKEN_REVOKED',
+      message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    req.accessToken = token; // Lưu token gốc để dùng khi logout
+    req.tokenAudience = decoded.aud || 'legacy'; // 'public' | 'internal' | 'legacy'
+
+    // ⭐ Fix 1: Kiểm tra tokenVersion (chống chia sẻ tài khoản)
+    // Chỉ áp dụng cho user có ID thực (không phải hardcoded admin)
+    if (decoded.id && decoded.id !== 'admin' && decoded.tokenVersion !== undefined) {
+      let dbUser = null;
+      if (decoded.role === 'student') {
+        dbUser = await Student.findById(decoded.id).select('tokenVersion').lean();
+      } else {
+        dbUser = await Teacher.findById(decoded.id).select('tokenVersion').lean();
+      }
+
+      if (dbUser && dbUser.tokenVersion !== undefined && dbUser.tokenVersion !== decoded.tokenVersion) {
+        return res.status(401).json({
+          success: false,
+          code: 'TOKEN_VERSION_MISMATCH',
+          message: 'Tài khoản đã đăng nhập ở thiết bị khác. Phiên này đã bị vô hiệu.',
+        });
+      }
+    }
+
+    next();
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        code: 'TOKEN_EXPIRED',
+        message: 'Token đã hết hạn. Vui lòng đăng nhập lại.',
+      });
+    }
+    res.status(401).json({
+      success: false,
+      message: 'Token không hợp lệ hoặc đã hết hạn',
+    });
+  }
+};
+
+// ── isAdmin: Chỉ cho phép role 'admin' ────────────────────────────────────────
+const isAdmin = (req, res, next) => {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'staff')) {
+    next();
+  } else {
+    res.status(403).json({
+      success: false,
+      message: 'Quyền truy cập bị từ chối: Yêu cầu quyền Admin',
+    });
+  }
+};
+
+// ── isTeacher: Cho phép role 'teacher' hoặc 'admin' ──────────────────────────
+const isTeacher = (req, res, next) => {
+  if (req.user && (req.user.role === 'teacher' || req.user.role === 'admin' || req.user.role === 'staff')) {
+    next();
+  } else {
+    res.status(403).json({
+      success: false,
+      message: 'Quyền truy cập bị từ chối: Yêu cầu quyền Giảng viên',
+    });
+  }
+};
+
+// ── isSuperAdmin: Chỉ hardcoded admin hoặc SUPER_ADMIN ───────────────────────
+const isSuperAdmin = (req, res, next) => {
+  if (req.user && req.user.id === 'admin') {
+    return next(); // hardcoded admin: toàn quyền
+  }
+  if (req.user && req.user.adminRole === 'SUPER_ADMIN') {
+    return next();
+  }
+  res.status(403).json({
+    success: false,
+    message: 'Quyền truy cập bị từ chối: Chỉ Super Admin mới có quyền này',
+  });
+};
+
+/**
+ * checkPermission(requiredPermission)
+ *
+ * Middleware factory kiểm tra quyền cụ thể.
+ * - Hardcoded admin ('admin'): toàn quyền
+ * - SUPER_ADMIN: toàn quyền
+ * - STAFF: chỉ được truy cập nếu permissions[] chứa requiredPermission
+ *
+ * Lưu ý: permissions được fetch từ DB mỗi lần request để đảm bảo
+ * phản ánh thay đổi real-time (không stale cache từ JWT)
+ */
+const checkPermission = (requiredPermission) => {
+  return async (req, res, next) => {
+    try {
+      // Hardcoded admin: bỏ qua tất cả
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Chưa xác thực' });
+      }
+
+      if (req.user.id === 'admin') return next();
+
+      if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+        return res.status(403).json({
+          success: false,
+          message: `403 Forbidden: Cần quyền "${requiredPermission}"`,
+        });
+      }
+
+      // Fetch từ DB để lấy adminRole + permissions real-time
+      const user = await Teacher.findById(req.user.id).select('adminRole permissions role').lean();
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'Tài khoản không tồn tại' });
+      }
+
+      // SUPER_ADMIN: toàn quyền
+      if (user.adminRole === 'SUPER_ADMIN') return next();
+
+      // STAFF: kiểm tra mảng permissions
+      if (!user.permissions || !user.permissions.includes(requiredPermission)) {
+        return res.status(403).json({
+          success: false,
+          message: `403 Forbidden: Bạn không có quyền "${requiredPermission}". Liên hệ Super Admin để được cấp quyền.`,
+        });
+      }
+
+      // Gắn permissions vào req để các route tiếp theo dùng nếu cần
+      req.user.adminRole   = user.adminRole;
+      req.user.permissions = user.permissions;
+      next();
+    } catch (err) {
+      logger.error('[checkPermission] error:', err);
+      res.status(500).json({ success: false, message: 'Lỗi server khi kiểm tra quyền' });
+    }
+  };
+};
+
+/**
+ * branchFilter — Middleware tự động giới hạn dữ liệu theo chi nhánh
+ *
+ * Gắn req.branchFilter vào request:
+ * - SUPER_ADMIN / hardcoded admin: {}  (không lọc → toàn bộ dữ liệu)
+ * - STAFF: { branchId: <ID chi nhánh của nhân viên> }
+ *
+ * Các route dùng: Student.find({ ...req.branchFilter, ... })
+ */
+// ── branchFilter — Middleware tự động giới hạn dữ liệu theo chi nhánh
+// Phase 15–16: Super Admin co the gui X-Tenant-Id / tenant_id de gioi han theo tenant
+const branchFilter = async (req, res, next) => {
+  try {
+    // Hardcoded admin
+    if (!req.user || req.user.id === 'admin') {
+      const qBranch = req.query.branch_id;
+      if (qBranch && qBranch !== 'all' && qBranch !== '') {
+        req.branchFilter = { branchId: qBranch };
+      } else {
+        req.branchFilter = {};
+      }
+      await applyTenantScopeIfAny(req);
+      return next();
+    }
+
+    if (req.user.role === 'admin' || req.user.role === 'staff') {
+      const user = await Teacher.findById(req.user.id)
+        .select('adminRole branchId branchCode')
+        .lean();
+
+      if (!user) {
+        req.branchFilter = {};
+        await applyTenantScopeIfAny(req);
+        return next();
+      }
+
+      // 🛡️ SECURITY FIX: Chỉ thực sự là SUPER_ADMIN mới được xem toàn bộ.
+      // Nếu không có branchId mà cũng KHÔNG phải SUPER_ADMIN, ép về branchId=null (không thấy gì hoặc lỗi)
+      const isActuallySuper = user.adminRole === 'SUPER_ADMIN';
+
+      if (isActuallySuper || !user.branchId) {
+        const qBranch = req.query.branch_id;
+        if (qBranch && qBranch !== 'all' && qBranch !== '' && isActuallySuper) {
+          req.branchFilter = { branchId: qBranch };
+        } else if (isActuallySuper) {
+          req.branchFilter = {};
+        } else {
+          // Admin nhưng không có branchId và không phải Super Admin? Giới hạn về null để an toàn
+          req.branchFilter = { branchId: null };
+        }
+      } else {
+        // STAFF / Regular Admin with branch
+        req.branchFilter = { branchId: user.branchId };
+        req.userBranchId   = user.branchId;
+        req.userBranchCode = user.branchCode || '';
+      }
+    } else {
+      req.branchFilter = {};
+    }
+    await applyTenantScopeIfAny(req);
+    next();
+  } catch (err) {
+    logger.error('[branchFilter] error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi xác thực phạm vi chi nhánh. Thử lại sau.' });
+  }
+};
+
+async function applyTenantScopeIfAny(req) {
+  const isPlatformAdmin =
+    req.user?.id === 'admin' || req.user?.adminRole === 'SUPER_ADMIN';
+  if (!isPlatformAdmin) return;
+
+  const raw =
+    req.headers['x-tenant-id'] ||
+    req.query.tenant_id ||
+    req.query.tenantId ||
+    '';
+  if (!raw || raw === 'all') {
+    req.tenant = null;
+    req.tenantScope = null;
+    return;
+  }
+
+  const Tenant = require('../models/Tenant');
+  const tenantService = require('../services/tenantService');
+  const tenant = await Tenant.findById(raw).lean();
+  if (!tenant || tenant.status === 'suspended') {
+    req.branchFilter = { branchId: null };
+    req.tenant = tenant || null;
+    req.tenantScope = { tenantId: raw, branchIds: [] };
+    return;
+  }
+
+  const branchIds = await tenantService.resolveBranchIdsForTenant(tenant._id);
+  req.tenant = tenant;
+  req.tenantScope = { tenantId: tenant._id, branchIds };
+
+  const idStrs = branchIds.map((id) => String(id));
+  if (!req.branchFilter) req.branchFilter = {};
+
+  if (req.branchFilter.branchId && !req.branchFilter.branchId.$in) {
+    if (!idStrs.includes(String(req.branchFilter.branchId))) {
+      req.branchFilter = { branchId: null };
+    }
+  } else if (!req.branchFilter.branchId) {
+    req.branchFilter = {
+      branchId: { $in: branchIds.length ? branchIds : [null] },
+    };
+  }
+}
+
+/**
+ * requireInternalToken — Chặn token public truy cập API quản trị
+ * Áp dụng sau authMiddleware trên các route nhạy cảm (staff/admin routes)
+ */
+const requireInternalToken = (req, res, next) => {
+  // Legacy token (không có aud) hoặc hardcoded admin → cho qua để tương thích ngược
+  if (!req.tokenAudience || req.tokenAudience === 'legacy' || req.tokenAudience === 'internal') return next();
+  if (req.user?.id === 'admin') return next();
+  // Token có aud='public' → chặn
+  return res.status(403).json({
+    success: false,
+    message: 'Token không hợp lệ cho khu vực quản trị. Vui lòng đăng nhập qua cổng nội bộ (/admin/login).',
+  });
+};
+
+module.exports = { authMiddleware, isAdmin, isTeacher, isSuperAdmin, checkPermission, branchFilter, requireInternalToken };
