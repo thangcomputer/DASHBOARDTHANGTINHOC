@@ -8,7 +8,6 @@ import TuitionPaymentModal from './TuitionPaymentModal';
 import StudentProfileUpdateModal from './StudentProfileUpdateModal';
 import api from '../services/api';
 import { useSocket } from '../context/SocketContext';
-import { useModal } from '../utils/Modal.jsx';
 import {
   getClientEnrollments, scopeStudentToEnrollment, filterSchedulesByCourse,
   filterStudentTrainingFiles,
@@ -30,7 +29,6 @@ const StudentDashboard = ({ onNavigate }) => {
   const [activeCourseName, setActiveCourseName] = useState('');
   const [evaluatingCourseId, setEvaluatingCourseId] = useState(null);
   const [noteModalSched, setNoteModalSched] = useState(null);
-  const { showModal } = useModal();
   const session = JSON.parse(localStorage.getItem('student_user') || '{}');
   const STUDENT_ID = session.id || 101;
   const { students, teachers, materials, schedules, getNotifications, getConversations, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, studentQuestions, examSubjectsCatalog } = useData();

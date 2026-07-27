@@ -260,7 +260,6 @@ export default function StudentOverviewTab({
                 </div>
               </div>
             </div>
-          </>
     </>
   );
 }
