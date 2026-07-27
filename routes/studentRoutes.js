@@ -1122,16 +1122,54 @@ router.put('/:id/assign-teacher', authMiddleware, isAdmin, async (req, res) => {
     }
 
     if (!isUnassign && teacherDoc && targetCourse) {
-      const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
-      const teacherSubs = resolveTeacherSubjectIds(teacherDoc);
       const courseName = String(targetCourse || '').toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
       const specialty = String(teacherDoc.specialty || '').toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
+
+      const courseFocus = (() => {
+        if (courseName.includes('thvp') || courseName.includes('van phong') || courseName.includes('tin hoc van phong') || courseName.includes('microsoft office')) {
+          return ['thvp'];
+        }
+        if (courseName.includes('canva') && (courseName.includes('powerpoint') || courseName.includes('ppt'))) return ['powerpoint', 'canva'];
+        if (courseName.includes('canva')) return ['canva'];
+        if (courseName.includes('excel')) return ['excel'];
+        if (courseName.includes('word')) return ['word'];
+        if (courseName.includes('powerpoint') || courseName.includes('ppt')) return ['powerpoint'];
+        if (Array.isArray(targetExamSubjects) && targetExamSubjects.length) {
+          const office = ['coban', 'word', 'excel', 'powerpoint'];
+          const hits = targetExamSubjects.map(String).filter((id) => office.includes(id) && id !== 'coban');
+          if (hits.length >= 3) return ['thvp'];
+          return [...new Set(targetExamSubjects.map(String).filter((id) => id !== 'coban'))];
+        }
+        return [];
+      })();
+
+      const teacherFocus = (() => {
+        if (specialty.includes('thvp') || specialty.includes('van phong') || specialty.includes('tin hoc van phong') || specialty.includes('microsoft office')) {
+          return ['thvp'];
+        }
+        const focuses = new Set();
+        if (specialty.includes('excel')) focuses.add('excel');
+        if (specialty.includes('word')) focuses.add('word');
+        if (specialty.includes('powerpoint') || specialty.includes('ppt')) focuses.add('powerpoint');
+        if (specialty.includes('canva')) focuses.add('canva');
+        const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
+        const teacherSubs = resolveTeacherSubjectIds(teacherDoc).map(String);
+        const office = ['coban', 'word', 'excel', 'powerpoint'];
+        const nonCoban = teacherSubs.filter((id) => office.includes(id) && id !== 'coban');
+        if (nonCoban.length >= 3 && !teacherSubs.includes('canva') && !focuses.size) return ['thvp'];
+        teacherSubs.forEach((id) => {
+          if (id === 'coban') return;
+          if (office.includes(id) || id === 'canva') focuses.add(id);
+        });
+        return [...focuses];
+      })();
+
       let matched = false;
-      if (Array.isArray(targetExamSubjects) && targetExamSubjects.length && teacherSubs.length) {
-        const set = new Set(teacherSubs.map(String));
-        matched = targetExamSubjects.some((id) => set.has(String(id)));
+      if (courseFocus.length && teacherFocus.length) {
+        const set = new Set(teacherFocus);
+        matched = courseFocus.some((f) => set.has(f));
       }
       if (!matched && specialty && courseName) {
         matched = specialty.includes(courseName) || courseName.includes(specialty)
@@ -1139,19 +1177,6 @@ router.put('/:id/assign-teacher', authMiddleware, isAdmin, async (req, res) => {
             const part = p.trim();
             return part.length >= 3 && (courseName.includes(part) || part.includes(courseName));
           });
-      }
-      if (!matched && teacherSubs.length) {
-        matched = teacherSubs.some((id) => {
-          const idn = String(id || '').toLowerCase();
-          return idn && courseName.includes(idn);
-        });
-      }
-      // Office / Canva ↔ keywords trong tên khóa
-      if (!matched) {
-        const isOfficeCourse = /van phong|thvp|tin hoc van phong|microsoft office|excel|word|powerpoint|ppt|coban|may vi tinh|canva/.test(courseName);
-        const isOfficeTeacher = teacherSubs.some((id) => ['coban', 'word', 'excel', 'powerpoint', 'canva'].includes(String(id)))
-          || /van phong|office|excel|word|powerpoint|coban|canva/.test(specialty);
-        if (isOfficeCourse && isOfficeTeacher) matched = true;
       }
       if (!matched) {
         return res.status(400).json({

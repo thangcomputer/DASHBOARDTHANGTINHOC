@@ -184,7 +184,7 @@ export default function CmsSelect({
               onClick={() => pick(opt.value, opt.disabled)}
               className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-sm transition-colors ${
                 opt.disabled
-                  ? 'text-gray-300 cursor-not-allowed opacity-70'
+                  ? 'text-slate-300 bg-slate-50 cursor-not-allowed opacity-60 line-through decoration-slate-300'
                   : isSelected
                     ? 'bg-blue-600 text-white font-semibold'
                     : 'text-gray-700 font-medium hover:bg-blue-50'

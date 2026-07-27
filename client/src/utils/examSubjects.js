@@ -121,7 +121,7 @@ export function mapCourseToExamSubjectIdsStrict(courseName, catalog) {
   return loose;
 }
 
-/** Khớp mờ tên khóa ↔ specialty / label môn của GV */
+/** Khớp mờ tên khóa ↔ specialty / label môn của GV (chỉ khi chưa có focus rõ) */
 function fuzzyCourseTeacherMatch(courseName, teacher, catalog) {
   const courseKey = normalizeCourseKey(courseName);
   if (!courseKey) return false;
@@ -132,25 +132,14 @@ function fuzzyCourseTeacherMatch(courseName, teacher, catalog) {
       if (part.length >= 3 && (courseKey.includes(part) || part.includes(courseKey))) return true;
     }
   }
-  const teacherIds = resolveTeacherSubjectIds(teacher, catalog);
-  for (const id of teacherIds) {
-    const meta = getExamSubjectMeta(id, catalog);
-    const label = normalizeCourseKey(meta.label || id);
-    if (label && label.length >= 3 && (courseKey.includes(label) || label.includes(courseKey))) return true;
-    const idn = normalizeCourseKey(id);
-    if (idn && courseKey.includes(idn)) return true;
-  }
   return false;
 }
 
 /**
- * GV có thể dạy khóa này không?
- * - Trùng subjectIds với khóa (enrollment.examSubjects hoặc map từ tên khóa)
- * - hoặc specialty/tên môn khớp mờ với tên khóa
- * GV chưa khai báo môn / lệch môn → UI làm mờ và không cho chọn.
+ * Focus giảng dạy của khóa — không gộp THVP thành mọi môn Office.
+ * Excel-only ≠ THVP; THVP teacher không match Excel-only và ngược lại.
  */
-export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
-  if (!teacher) return false;
+export function getCourseTeachingFocus(courseOrEnrollment, catalog) {
   const cat = catalog || BUILTIN_EXAM_SUBJECTS;
   const courseName = typeof courseOrEnrollment === 'string'
     ? courseOrEnrollment
@@ -158,16 +147,97 @@ export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
   const enrollmentSubjects = Array.isArray(courseOrEnrollment?.examSubjects)
     ? courseOrEnrollment.examSubjects.filter(Boolean)
     : [];
+  const n = normalizeCourseKey(courseName);
 
-  const teacherIds = resolveTeacherSubjectIds(teacher, cat);
-  const courseIds = enrollmentSubjects.length
-    ? enrollmentSubjects.filter((id) => cat[id] || true)
-    : mapCourseToExamSubjectIdsStrict(courseName, cat);
-
-  if (teacherIds.length && courseIds.length) {
-    const set = new Set(teacherIds.map(String));
-    if (courseIds.some((id) => set.has(String(id)))) return true;
+  if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) {
+    return ['thvp'];
   }
+  if (n.includes('canva') && (n.includes('powerpoint') || n.includes('ppt'))) return ['powerpoint', 'canva'];
+  if (n.includes('canva')) return ['canva'];
+  if (n.includes('excel')) return ['excel'];
+  if (n.includes('word')) return ['word'];
+  if (n.includes('powerpoint') || n.includes('ppt')) return ['powerpoint'];
+  if (n.includes('coban') || n.includes('may vi tinh') || n.includes('co ban')) return ['coban'];
+
+  if (enrollmentSubjects.length) {
+    const officeHits = enrollmentSubjects.filter((id) => OFFICE_EXAM_IDS.includes(String(id)));
+    const nonCobanOffice = officeHits.filter((id) => id !== 'coban');
+    if (nonCobanOffice.length >= 3) return ['thvp'];
+    const focuses = [];
+    enrollmentSubjects.forEach((id) => {
+      const sid = String(id);
+      if (sid === 'coban') return;
+      if (OFFICE_EXAM_IDS.includes(sid) || cat[sid] || sid === 'canva') focuses.push(sid);
+    });
+    if (focuses.length) return [...new Set(focuses)];
+  }
+
+  return mapCourseToExamSubjectIdsStrict(courseName, cat).filter((id) => id !== 'coban');
+}
+
+/** Focus chuyên môn GV từ specialty / subjectIds */
+export function getTeacherTeachingFocus(teacher, catalog) {
+  const cat = catalog || BUILTIN_EXAM_SUBJECTS;
+  const specialtyKey = normalizeCourseKey(teacher?.specialty || '');
+  if (
+    specialtyKey.includes('thvp')
+    || specialtyKey.includes('van phong')
+    || specialtyKey.includes('tin hoc van phong')
+    || specialtyKey.includes('microsoft office')
+  ) {
+    return ['thvp'];
+  }
+
+  const focuses = new Set();
+  if (specialtyKey.includes('excel')) focuses.add('excel');
+  if (specialtyKey.includes('word')) focuses.add('word');
+  if (specialtyKey.includes('powerpoint') || specialtyKey.includes('ppt')) focuses.add('powerpoint');
+  if (specialtyKey.includes('canva')) focuses.add('canva');
+  if (specialtyKey.includes('coban') || specialtyKey.includes('may vi tinh') || specialtyKey.includes('co ban')) {
+    focuses.add('coban');
+  }
+
+  const ids = resolveTeacherSubjectIds(teacher, cat).map(String);
+  const officeHits = ids.filter((id) => OFFICE_EXAM_IDS.includes(id));
+  const nonCobanOffice = officeHits.filter((id) => id !== 'coban');
+  // subjectIds đủ bộ Office (do parse specialty THVP) → coi là focus THVP
+  if (nonCobanOffice.length >= 3 && !ids.includes('canva') && !focuses.size) {
+    return ['thvp'];
+  }
+
+  ids.forEach((id) => {
+    if (id === 'coban') return;
+    if (id === 'canva' || OFFICE_EXAM_IDS.includes(id) || cat[id]) focuses.add(id);
+  });
+
+  return [...focuses];
+}
+
+/**
+ * GV có thể dạy khóa này không?
+ * Khớp theo focus chuyên môn (Excel / Word / THVP / Canva…), không dùng giao subjectIds
+ * quá rộng khiến GV THVP bị coi là dạy được Excel-only.
+ * Lệch môn → UI làm mờ và không cho chọn.
+ */
+export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
+  if (!teacher) return false;
+  const cat = catalog || BUILTIN_EXAM_SUBJECTS;
+  const courseName = typeof courseOrEnrollment === 'string'
+    ? courseOrEnrollment
+    : (courseOrEnrollment?.courseName || courseOrEnrollment?.name || '');
+
+  const courseFocus = getCourseTeachingFocus(courseOrEnrollment, cat);
+  const teacherFocus = getTeacherTeachingFocus(teacher, cat);
+
+  if (courseFocus.length && teacherFocus.length) {
+    const set = new Set(teacherFocus.map(String));
+    if (courseFocus.some((f) => set.has(String(f)))) return true;
+    // THVP teacher chỉ khớp khóa THVP/văn phòng, không khớp Excel/Word đơn lẻ
+    // (đã tách focus ở trên)
+  }
+
+  // Chưa khai báo môn → không khớp
+  if (!teacherFocus.length && !String(teacher?.specialty || '').trim()) return false;
 
   return fuzzyCourseTeacherMatch(courseName, teacher, cat);
 }
