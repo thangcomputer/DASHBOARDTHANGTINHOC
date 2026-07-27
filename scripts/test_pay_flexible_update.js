@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Schedule = require('../models/Schedule');
 
-mongoose.connect('mongodb://127.0.0.1:27017/quanlycms').then(async () => {
+mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc').then(async () => {
     try {
         const pendingSessions = await Schedule.find({
             teacherId: '69db90490641d2af0eeb0e8e',

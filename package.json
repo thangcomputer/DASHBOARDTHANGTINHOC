@@ -1,10 +1,11 @@
 {
-  "name": "quanlycms",
+  "name": "dashboardthangtinhoc",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "worker": "node worker.js",
     "dev": "node --watch server.js",
     "local": "powershell -ExecutionPolicy Bypass -File scripts/run-local.ps1",
     "test": "node tests/run.js",
@@ -26,6 +27,7 @@
   "type": "commonjs",
   "dependencies": {
     "@google/genai": "^2.10.0",
+    "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.15.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.79.2",

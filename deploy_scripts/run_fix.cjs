@@ -6,7 +6,7 @@ const { getVpsSshConfig, getVpsConnection } = require('./_vpsConnect.cjs');
 async function runFix() {
   await ssh.connect(getVpsSshConfig());
 
-  const projectPath = '/www/wwwroot/quanlycms';
+  const projectPath = '/www/wwwroot/dashboardthangtinhoc';
   
   await ssh.execCommand('git pull origin main 2>&1', { cwd: projectPath });
 

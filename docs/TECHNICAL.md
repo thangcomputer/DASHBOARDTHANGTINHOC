@@ -1,4 +1,4 @@
-# QUANLYCMS — Tài liệu kỹ thuật
+# DashboardThangTinHoc — Tài liệu kỹ thuật
 
 Tài liệu này dành cho đội kỹ thuật bảo trì lâu dài. Phần cài đặt nhanh và biến môi trường xem [README.md](../README.md).
 
@@ -59,7 +59,7 @@ Services layer (`services/`): notification, file, backup, monitoring, AI, BI, wo
 ## 2. Cấu trúc thư mục
 
 ```
-QUANLYCMS/
+dashboardthangtinhoc/
 ├── server.js                 # Entry backend: Express, Socket.io, mount routes
 ├── config/
 │   ├── db.js                 # Kết nối MongoDB
@@ -486,7 +486,7 @@ Client lắng nghe: `SocketContext.jsx` + `DataContext.jsx`.
 ### 13.1 Local (Windows)
 
 ```powershell
-cd QUANLYCMS
+cd dashboardthangtinhoc
 cp .env.example .env   # điền JWT_SECRET, MONGODB_URI
 
 npm install --legacy-peer-deps
@@ -504,13 +504,13 @@ Hoặc: `.\scripts\run-local.ps1` (mở 2 cửa sổ PowerShell).
 ```bash
 cd client && npm run build && cd ..
 NODE_ENV=production node server.js
-# hoặc: pm2 restart quanlycms
+# hoặc: pm2 restart dashboardthangtinhoc
 ```
 
 ### 13.3 Deploy VPS (quy trình chuẩn)
 
 ```bash
-cd /www/wwwroot/quanlycms   # đường dẫn thực tế trên server
+cd /www/wwwroot/dashboardthangtinhoc   # đường dẫn thực tế trên server
 git pull origin main
 cd client && npm install --legacy-peer-deps && npm run build && cd ..
 pm2 restart all
@@ -590,4 +590,4 @@ Khi thêm module mới:
 
 ---
 
-*Tài liệu bảo trì bởi đội kỹ thuật QUANLYCMS. Câu hỏi vận hành nhanh: xem [README.md](../README.md).*
+*Tài liệu bảo trì bởi đội kỹ thuật DashboardThangTinHoc. Câu hỏi vận hành nhanh: xem [README.md](../README.md).*

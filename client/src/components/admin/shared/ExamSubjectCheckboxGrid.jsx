@@ -9,8 +9,14 @@ export default function ExamSubjectCheckboxGrid({
 }) {
   const options = getExamSubjectOptions(catalog);
   const selected = Array.isArray(value) ? value : [];
-  const ring = accent === 'purple' ? 'border-purple-500 bg-purple-50' : 'border-green-500 bg-green-50';
-  const dot = accent === 'purple' ? 'text-purple-700' : 'text-green-700';
+  const ring =
+    accent === 'purple' ? 'border-purple-500 bg-purple-50'
+      : accent === 'blue' ? 'border-blue-500 bg-blue-50'
+        : 'border-green-500 bg-green-50';
+  const dot =
+    accent === 'purple' ? 'text-purple-700'
+      : accent === 'blue' ? 'text-blue-700'
+        : 'text-green-700';
 
   const toggle = (id) => {
     const next = selected.includes(id)

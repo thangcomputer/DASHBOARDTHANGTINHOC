@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import {
   X, CheckCircle2, CreditCard, AlertCircle, MapPin, Loader2,
   Plus, Share2, DollarSign,
@@ -377,12 +378,12 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
               {isSuperAdmin && (
               <div>
                 <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Cơ sở (Chi nhánh)</label>
-                <select name="branchId" value={form.branchId || ''} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm appearance-none cursor-pointer">
+                <CmsSelect name="branchId" value={form.branchId || ''} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm appearance-none cursor-pointer">
                   <option value="">-- Chọn cơ sở đào tạo --</option>
                   {branches.map(b => (
                     <option key={b._id} value={b._id}>{b.name}</option>
                   ))}
-                </select>
+                </CmsSelect>
               </div>
               )}
 
@@ -409,12 +410,12 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
               <div>
                 <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Khóa học & Học phí</label>
                 {dbCourses.length > 0 ? (
-                  <select name="courseId" value={form.courseId} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm cursor-pointer">
+                  <CmsSelect name="courseId" value={form.courseId} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm cursor-pointer">
                     {dbCourses.map(c => {
                       const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
                       return <option key={c._id} value={c._id}>{c.name} — {ep.toLocaleString('vi-VN')}đ</option>;
                     })}
-                  </select>
+                  </CmsSelect>
                 ) : (
                   <div className="p-4 bg-gray-50 rounded-[20px] text-gray-400 text-xs font-bold animate-pulse">Đang tải dữ liệu khóa học...</div>
                 )}
@@ -428,12 +429,12 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
 
               <div>
                 <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Giảng viên hướng dẫn</label>
-                <select name="teacherId" value={form.teacherId} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm cursor-pointer">
+                <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm cursor-pointer">
                   <option value="">-- Chọn sau (Không bắt buộc) --</option>
                   {(teachers || []).filter(Boolean).filter(t => String(t.status || '').toLowerCase() === 'active').map(t => (
                     <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.phone ? ` — ${t.phone}` : ''}</option>
                   ))}
-                </select>
+                </CmsSelect>
                 {(teachers || []).filter(Boolean).filter(t => String(t.status || '').toLowerCase() === 'active').length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">⚠️ Chưa có giảng viên chính thức (Active) để phân công.</p>
                 )}

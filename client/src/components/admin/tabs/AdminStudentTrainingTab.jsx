@@ -1,4 +1,5 @@
 import React from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
   BookOpen, Video, Download, HelpCircle, Trophy, Plus, Clock, Trash2,
@@ -150,7 +151,7 @@ export default function AdminStudentTrainingTab() {
                       <>
                         <div>
                           <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Khóa học <span className="text-red-500">*</span></label>
-                          <select
+                          <CmsSelect
                             value={sTrainingForm.courseId || ''}
                             onChange={(e) => {
                               const cid = e.target.value;
@@ -167,7 +168,7 @@ export default function AdminStudentTrainingTab() {
                             {documentCourseOptions.map((c) => (
                               <option key={c.id} value={c.id}>{c.title}</option>
                             ))}
-                          </select>
+                          </CmsSelect>
                           {!documentCourseOptions.length && (
                             <p className="text-xs text-amber-600 mt-1">
                               Chưa có khóa học. Tạo khóa tại <strong>Cài đặt hệ thống → Học phí khóa học</strong>, hoặc tab Quản lý Khóa học (video LMS).
@@ -662,7 +663,7 @@ export default function AdminStudentTrainingTab() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Học viên</label>
-                      <select
+                      <CmsSelect
                         value={erForm.studentId || ''}
                         onChange={e => {
                           const s = safeStudentsList.find(x => String(x.id) === e.target.value || String(x._id) === e.target.value);
@@ -674,11 +675,11 @@ export default function AdminStudentTrainingTab() {
                         {safeStudentsList.map(s => (
                           <option key={s.id || s._id} value={s.id || s._id}>{s.name}</option>
                         ))}
-                      </select>
+                      </CmsSelect>
                     </div>
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Môn / Khóa học thi</label>
-                      <select value={erForm.subject || ''} onChange={e => setErForm({ ...erForm, subject: e.target.value })}
+                      <CmsSelect value={erForm.subject || ''} onChange={e => setErForm({ ...erForm, subject: e.target.value })}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-amber-500 outline-none text-sm font-bold">
                         <option value="THVP NÂNG CAO (12 BUỔI)">THVP NÂNG CAO (12 BUỔI)</option>
                         <option value="MOS EXCEL CHUYÊN SÂU (10 BUỔI)">MOS EXCEL CHUYÊN SÂU (10 BUỔI)</option>
@@ -686,7 +687,7 @@ export default function AdminStudentTrainingTab() {
                         <option value="AUTOCAD 2D - 3D (15 BUỔI)">AUTOCAD 2D - 3D (15 BUỔI)</option>
                         <option value="LẬP TRÌNH PYTHON CƠ BẢN">LẬP TRÌNH PYTHON CƠ BẢN</option>
                         <option value="Khác">Khác</option>
-                      </select>
+                      </CmsSelect>
                     </div>
                   </div>
 

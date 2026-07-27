@@ -69,15 +69,102 @@ export function mapCourseToExamSubjectIds(courseName, catalog) {
   const cat = catalog || BUILTIN_EXAM_SUBJECTS;
   const n = normalizeCourseKey(courseName);
   const pick = (ids) => ids.filter((id) => cat[id]);
+  if (!n) return [];
   if (n.includes('canva')) return pick(['canva']);
   if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) return pick([...OFFICE_EXAM_IDS]);
   if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
   if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
   if (n.includes('powerpoint') || n.includes('ppt')) return pick(['coban', 'powerpoint']);
+  // Đồ họa — không mặc định sang tin học văn phòng
+  if (n.includes('photoshop') || n.includes('illustrator') || n.includes('do hoa') || n.includes('thiet ke')) {
+    for (const sub of Object.values(cat)) {
+      const ln = normalizeCourseKey(sub.label || '');
+      const idn = normalizeCourseKey(sub.id || '');
+      if (n.includes(idn) || n.includes(ln) || ln.includes(n) || idn.includes('photoshop')) return [sub.id];
+    }
+    return [];
+  }
   for (const sub of Object.values(cat)) {
     if (n.includes(sub.id) || n.includes(normalizeCourseKey(sub.label))) return [sub.id];
   }
   return pick([...OFFICE_EXAM_IDS]);
+}
+
+/**
+ * Map khóa → subjectIds nhưng KHÔNG fallback sang Office khi không nhận ra tên khóa.
+ * Dùng khi lọc giảng viên phù hợp môn.
+ */
+export function mapCourseToExamSubjectIdsStrict(courseName, catalog) {
+  const cat = catalog || BUILTIN_EXAM_SUBJECTS;
+  const n = normalizeCourseKey(courseName);
+  if (!n) return [];
+  const loose = mapCourseToExamSubjectIds(courseName, cat);
+  const looksOffice =
+    n.includes('thvp')
+    || n.includes('van phong')
+    || n.includes('tin hoc van phong')
+    || n.includes('microsoft office')
+    || n.includes('excel')
+    || n.includes('word')
+    || n.includes('powerpoint')
+    || n.includes('ppt')
+    || n.includes('coban')
+    || n.includes('may vi tinh')
+    || n.includes('co ban');
+  const allOffice = loose.length > 0 && loose.every((id) => OFFICE_EXAM_IDS.includes(id));
+  if (allOffice && !looksOffice) return [];
+  return loose;
+}
+
+/** Khớp mờ tên khóa ↔ specialty / label môn của GV */
+function fuzzyCourseTeacherMatch(courseName, teacher, catalog) {
+  const courseKey = normalizeCourseKey(courseName);
+  if (!courseKey) return false;
+  const specialtyKey = normalizeCourseKey(teacher?.specialty || '');
+  if (specialtyKey) {
+    if (specialtyKey.includes(courseKey) || courseKey.includes(specialtyKey)) return true;
+    for (const part of specialtyKey.split(/[,;|/]+/).map((s) => s.trim()).filter(Boolean)) {
+      if (part.length >= 3 && (courseKey.includes(part) || part.includes(courseKey))) return true;
+    }
+  }
+  const teacherIds = resolveTeacherSubjectIds(teacher, catalog);
+  for (const id of teacherIds) {
+    const meta = getExamSubjectMeta(id, catalog);
+    const label = normalizeCourseKey(meta.label || id);
+    if (label && label.length >= 3 && (courseKey.includes(label) || label.includes(courseKey))) return true;
+    const idn = normalizeCourseKey(id);
+    if (idn && courseKey.includes(idn)) return true;
+  }
+  return false;
+}
+
+/**
+ * GV có thể dạy khóa này không?
+ * - Trùng subjectIds với khóa (enrollment.examSubjects hoặc map từ tên khóa)
+ * - hoặc specialty/tên môn khớp mờ với tên khóa
+ * GV chưa khai báo môn → không khớp (bị làm mờ khi phân công).
+ */
+export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
+  if (!teacher) return false;
+  const cat = catalog || BUILTIN_EXAM_SUBJECTS;
+  const courseName = typeof courseOrEnrollment === 'string'
+    ? courseOrEnrollment
+    : (courseOrEnrollment?.courseName || courseOrEnrollment?.name || '');
+  const enrollmentSubjects = Array.isArray(courseOrEnrollment?.examSubjects)
+    ? courseOrEnrollment.examSubjects.filter(Boolean)
+    : [];
+
+  const teacherIds = resolveTeacherSubjectIds(teacher, cat);
+  const courseIds = enrollmentSubjects.length
+    ? enrollmentSubjects.filter((id) => cat[id] || true)
+    : mapCourseToExamSubjectIdsStrict(courseName, cat);
+
+  if (teacherIds.length && courseIds.length) {
+    const set = new Set(teacherIds.map(String));
+    if (courseIds.some((id) => set.has(String(id)))) return true;
+  }
+
+  return fuzzyCourseTeacherMatch(courseName, teacher, cat);
 }
 
 export function getSubjectIdsForEnrollment(enrollment, catalog) {

@@ -711,7 +711,7 @@ if (process.argv.includes('--fix-mojibake')) {
   }
 
   (async () => {
-    const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/quanlycms';
+    const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/dashboardthangtinhoc';
     await mongoose.connect(uri);
     const FileAsset = require('../models/FileAsset');
     const Message = require('../models/Message');

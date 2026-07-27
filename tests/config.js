@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  QUANLYCMS — Test Configuration
+ *  dashboardthangtinhoc — Test Configuration
  *  Cấu hình chung cho Load Test & E2E Test
  * ═══════════════════════════════════════════════════════════════════════
  */

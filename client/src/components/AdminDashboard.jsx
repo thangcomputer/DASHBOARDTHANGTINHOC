@@ -24,9 +24,10 @@ import AddTeacherModal from './admin/shared/AddTeacherModal';
 import EditTeacherModal from './admin/shared/EditTeacherModal';
 import ResetPasswordOtpModal from './admin/shared/ResetPasswordOtpModal';
 import StudentDetailModal from './StudentDetailModal';
-import StudentImportModal from './StudentImportModal';
 import { useAdminDashboardState } from './admin/hooks/useAdminDashboardState';
 import { formatSubjectIdsAsSpecialty, resolveTeacherSubjectIds } from '../utils/examSubjects';
+
+const StudentImportModal = React.lazy(() => import('./StudentImportModal'));
 
 const AdminDashboard = () => {
   const s = useAdminDashboardState();
@@ -271,10 +272,12 @@ const AdminDashboard = () => {
       )}
 
       {showImportModal && (
-        <StudentImportModal
-          onClose={() => setShowImportModal(false)}
-          branchId={selectedBranchId}
-        />
+        <React.Suspense fallback={null}>
+          <StudentImportModal
+            onClose={() => setShowImportModal(false)}
+            branchId={selectedBranchId}
+          />
+        </React.Suspense>
       )}
 
       {resetPwModal && (

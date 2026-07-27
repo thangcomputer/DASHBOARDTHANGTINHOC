@@ -137,7 +137,7 @@ export function useDataAdminCrud({
     }
   }, [teachers, setTeachers, triggerBackgroundSync]);
 
-  const updateStudent = useCallback(async (studentId, updates) => {
+  const updateStudent = useCallback(async (studentId, updates, options = {}) => {
     const previousStudents = [...students];
     const { courseName, ...rest } = updates;
     const payload = courseName ? { ...rest, courseName } : rest;
@@ -151,6 +151,9 @@ export function useDataAdminCrud({
       }
       return next;
     }));
+    if (options.localOnly) {
+      return { success: true };
+    }
     try {
       const res = await api.students?.update(studentId, payload);
       if (res && res.success === false) throw new Error(res.message);
@@ -165,26 +168,56 @@ export function useDataAdminCrud({
   const assignTeacher = useCallback(async (studentId, teacherId, enrollmentId) => {
     // 1. Unassign logic
     if (!teacherId || teacherId === '') {
+      const previousStudents = [...students];
       setStudents(prev => prev.map(s => {
         if (String(s.id) !== String(studentId) && String(s._id) !== String(studentId)) return s;
-        const next = { ...s, teacherId: null, teacherName: '', status: 'Chưa phân công' };
-        if (enrollmentId && Array.isArray(s.enrollments)) {
-          next.enrollments = s.enrollments.map((e) =>
-            String(e._id) === String(enrollmentId) ? { ...e, teacherId: null, teacherName: '' } : e
-          );
+        const next = { ...s, teacherId: null, teacherName: '' };
+
+        const clearEnr = (e) => ({ ...e, teacherId: null, teacherName: '' });
+        if (Array.isArray(s.enrollments) && s.enrollments.length) {
+          if (enrollmentId) {
+            next.enrollments = s.enrollments.map((e) =>
+              String(e._id) === String(enrollmentId) ? clearEnr(e) : e
+            );
+            const target = s.enrollments.find((e) => String(e._id) === String(enrollmentId));
+            const isPrimary = target?.isPrimary || s.enrollments.length === 1;
+            if (isPrimary) {
+              next.teacherId = null;
+              next.teacherName = '';
+            }
+          } else {
+            const primaryIdx = s.enrollments.findIndex((e) => e.isPrimary);
+            const idx = primaryIdx >= 0 ? primaryIdx : 0;
+            next.enrollments = s.enrollments.map((e, i) => (i === idx ? clearEnr(e) : e));
+          }
+        }
+        if (Array.isArray(s.courses) && s.courses.length) {
+          if (enrollmentId) {
+            next.courses = s.courses.map((c) =>
+              String(c._id || c.id || c.enrollmentId) === String(enrollmentId) ? clearEnr(c) : c
+            );
+          } else {
+            next.courses = s.courses.map((c, i) => (i === 0 || c.isPrimary ? clearEnr(c) : c));
+          }
         }
         return next;
       }));
       try {
-        await api.students?.assignTeacher(studentId, null, enrollmentId);
+        const res = await api.students?.assignTeacher(studentId, null, enrollmentId);
+        if (!res?.success) {
+          setStudents(previousStudents);
+          throw new Error(res?.message || 'Không bỏ phân công được');
+        }
         triggerBackgroundSync();
         if (currentUser?.role === 'admin' || currentUser?.role === 'staff') {
           fetchStudentsPaginated({ page: studentsPagination.currentPage });
         }
+        return res;
       } catch (err) {
         console.error('Unassign teacher error:', err);
+        setStudents(previousStudents);
+        throw err;
       }
-      return;
     }
 
     // 2. Assign logic
@@ -199,6 +232,10 @@ export function useDataAdminCrud({
         next.enrollments = s.enrollments.map((e) =>
           String(e._id) === String(enrollmentId) ? { ...e, teacherId, teacherName } : e
         );
+      } else if (Array.isArray(s.enrollments) && s.enrollments.length) {
+        const primaryIdx = s.enrollments.findIndex((e) => e.isPrimary);
+        const idx = primaryIdx >= 0 ? primaryIdx : 0;
+        next.enrollments = s.enrollments.map((e, i) => (i === idx ? { ...e, teacherId, teacherName } : e));
       }
       return next;
     }));
@@ -212,11 +249,11 @@ export function useDataAdminCrud({
         }
         const student = students.find(s => String(s.id) === String(studentId) || String(s._id) === String(studentId));
         addNotification(teacherId, 'teacher', `Admin phân công học viên ${student?.name || 'mới'} cho bạn`);
-      } else {
-        // Rollback
-        setStudents(previousStudents);
-        throw new Error(res?.message || 'Lỗi phân công');
+        return res;
       }
+      // Rollback
+      setStudents(previousStudents);
+      throw new Error(res?.message || 'Lỗi phân công');
     } catch (err) {
       console.error('Assign teacher error:', err);
       // Rollback

@@ -12,7 +12,7 @@ const ssh = new NodeSSH();
 
 const VPS_DIR = process.env.VPS_APP_DIR || '/www/wwwroot/dashboard.giasutinhoc24h.com';
 const REPO_ZIP = process.env.GITHUB_REPO_ZIP_URL
-  || 'https://github.com/thangcomputer/QUANLYCMS/archive/refs/heads/main.zip';
+  || 'https://github.com/thangcomputer/dashboardthangtinhoc/archive/refs/heads/main.zip';
 
 function requireEnv(name) {
   const val = process.env[name];
@@ -43,7 +43,7 @@ async function run() {
 
   console.log('[1/4] Tải source code từ GitHub...');
   await ssh.execCommand(`rm -rf ${VPS_DIR}/client/src ${VPS_DIR}/models ${VPS_DIR}/routes ${VPS_DIR}/server.js ${VPS_DIR}/package.json ${VPS_DIR}/package-lock.json`);
-  await ssh.execCommand(`cd /tmp && rm -f quanlycms.zip && wget -q -O quanlycms.zip "${REPO_ZIP}" && unzip -q -o quanlycms.zip && cp -Rf QUANLYCMS-main/. ${VPS_DIR}/ && rm -rf QUANLYCMS-main quanlycms.zip`);
+  await ssh.execCommand(`cd /tmp && rm -f dashboardthangtinhoc.zip && wget -q -O dashboardthangtinhoc.zip "${REPO_ZIP}" && unzip -q -o dashboardthangtinhoc.zip && cp -Rf dashboardthangtinhoc-main/. ${VPS_DIR}/ && rm -rf dashboardthangtinhoc-main dashboardthangtinhoc.zip`);
 
   console.log('[2/4] Giữ nguyên .env trên server (không ghi đè từ script)...');
 
@@ -52,9 +52,9 @@ async function run() {
   await ssh.execCommand(`cd ${VPS_DIR}/client && npm install --legacy-peer-deps && npm run build`);
 
   console.log('[4/4] Restart PM2...');
-  await ssh.execCommand(`cd ${VPS_DIR} && pm2 restart quanlycms --update-env`);
+  await ssh.execCommand(`cd ${VPS_DIR} && pm2 restart dashboardthangtinhoc --update-env`);
 
-  const logs = await ssh.execCommand('pm2 logs quanlycms --lines 8 --nostream');
+  const logs = await ssh.execCommand('pm2 logs dashboardthangtinhoc --lines 8 --nostream');
   console.log('\n📋 PM2 Logs (last 8 lines):');
   console.log(logs.stdout);
 

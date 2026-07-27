@@ -78,7 +78,13 @@ export default function AdminTeachersTab() {
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         {/* Left info */}
                         <div className="flex items-start gap-4 flex-1 min-w-0">
-                          <Avatar initials={t.name?.substring(0, 2).toUpperCase() || 'GV'} color={t.status === 'Active' ? 'bg-green-500' : (t.testScore || 0) >= 80 ? 'bg-yellow-500' : 'bg-red-400'} />
+                          <Avatar
+                            initials={t.name?.substring(0, 2).toUpperCase() || 'GV'}
+                            name={t.name}
+                            role="teacher"
+                            src={t.avatar}
+                            color={t.status === 'Active' ? 'bg-green-500' : (t.testScore || 0) >= 80 ? 'bg-yellow-500' : 'bg-red-400'}
+                          />
                           <div className="flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-bold text-gray-800">{t.name}</p>
@@ -349,7 +355,7 @@ export default function AdminTeachersTab() {
                 <div className="px-8 pb-8 space-y-6">
                   {/* User Card */}
                   <div className="bg-slate-50 rounded-[20px] p-5 flex items-center gap-4 border border-slate-100">
-                    <Avatar initials={approveModal.name?.substring(0, 2).toUpperCase() || 'GV'} color="bg-emerald-500" />
+                    <Avatar initials={approveModal.name?.substring(0, 2).toUpperCase() || 'GV'} name={approveModal.name} role="teacher" src={approveModal.avatar} color="bg-emerald-500" />
                     <div>
                       <p className="font-bold text-lg text-slate-900 leading-none">{approveModal.name}</p>
                       <p className="text-[13px] font-bold text-slate-500 flex items-center gap-1.5 mt-1.5">

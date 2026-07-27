@@ -1,4 +1,5 @@
 import React from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import { useData } from '../../../context/DataContext';
 import {
@@ -281,7 +282,7 @@ export default function StudentQuestionBankPanel() {
             <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
               Môn thi
             </label>
-            <select
+            <CmsSelect
               value={sqSection}
               onChange={(e) => setSqSection(e.target.value)}
               className="w-full border-2 border-green-200 rounded-xl px-3 py-2.5 text-sm font-bold text-green-900 bg-green-50/40 outline-none focus:border-green-500"
@@ -289,7 +290,7 @@ export default function StudentQuestionBankPanel() {
               {subjectOpts.map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
-            </select>
+            </CmsSelect>
           </div>
           <div className="w-28">
             <label className="text-[11px] font-bold uppercase tracking-wide text-amber-700 block mb-1.5">
@@ -493,7 +494,7 @@ export default function StudentQuestionBankPanel() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Môn</label>
-                  <select
+                  <CmsSelect
                     value={sqForm.section || sqSection}
                     onChange={(e) => setSqForm({ ...sqForm, section: e.target.value })}
                     className="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold outline-none focus:border-blue-400"
@@ -501,11 +502,11 @@ export default function StudentQuestionBankPanel() {
                     {subjectOpts.map((s) => (
                       <option key={s.id} value={s.id}>{s.label}</option>
                     ))}
-                  </select>
+                  </CmsSelect>
                 </div>
                 <div>
                   <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Độ khó</label>
-                  <select
+                  <CmsSelect
                     value={sqForm.difficulty}
                     onChange={(e) => setSqForm({ ...sqForm, difficulty: e.target.value })}
                     className="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold outline-none focus:border-blue-400"
@@ -513,7 +514,7 @@ export default function StudentQuestionBankPanel() {
                     <option value="easy">Cơ bản</option>
                     <option value="medium">Trung bình</option>
                     <option value="hard">Nâng cao</option>
-                  </select>
+                  </CmsSelect>
                 </div>
               </div>
 

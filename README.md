@@ -1,4 +1,4 @@
-# QUANLYCMS
+# DashboardThangTinHoc
 
 Full-stack CMS cho trung tâm đào tạo: **Express 5 + MongoDB + Socket.io**, frontend **React (Vite) + Tailwind**.
 
@@ -105,7 +105,7 @@ docker compose up -d
 ```bash
 NODE_ENV=production node server.js
 # hoặc:
-pm2 start server.js --name quanlycms --env production
+pm2 start server.js --name dashboardthangtinhoc --env production
 ```
 
 Đặt `TRUST_PROXY=1`, kết thúc TLS ở reverse proxy. Server hỗ trợ **graceful shutdown** trên `SIGTERM`/`SIGINT` (đóng HTTP, Mongo, Redis blacklist).

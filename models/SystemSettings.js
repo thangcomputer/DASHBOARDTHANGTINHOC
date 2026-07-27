@@ -24,8 +24,10 @@ const systemSettingsSchema = new mongoose.Schema({
     default: 'all',
   },
 
-  // ── Cài đặt Web (Logo, Loading, Staff Popup) ─────────────────────
+  // ── Cài đặt Web (Logo, Favicon, Loading, Staff Popup) ─────────────────────
   logoUrl:      { type: String, default: '' },                 // URL logo thương hiệu
+  faviconUrl:   { type: String, default: '' },                 // Favicon trang public / HV / GV
+  faviconAdminUrl: { type: String, default: '' },              // Favicon khu vực Admin
   loadingStyle: { type: Number, default: 1, min: 1, max: 4 }, // 1-4 kiểu loading screen
 
   // Staff Announcement Popup

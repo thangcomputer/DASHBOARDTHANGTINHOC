@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import { 
   X, FileSpreadsheet, Upload, Download, AlertCircle, 
   CheckCircle2, Loader2, Info, ChevronRight, Table
@@ -21,8 +20,9 @@ export default function StudentImportModal({ onClose, branchId }) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
+        const XLSX = await import('xlsx');
         const bstr = evt.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
@@ -75,7 +75,8 @@ export default function StudentImportModal({ onClose, branchId }) {
     }
   };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx');
     const template = [
       { 'Họ tên': 'NGUYỄN VĂN A', 'Số điện thoại': '0912345678', 'Zalo': '0912345678', 'Khóa học': 'THVP NÂNG CAO', 'Học phí': 1500000, 'Đã đóng': 'x', 'Hình thức': 'OFFLINE', 'Địa chỉ': 'Hà Nội' },
       { 'Họ tên': 'TRẦN THỊ B', 'Số điện thoại': '0987654321', 'Zalo': '0987654321', 'Khóa học': 'MOS EXCEL', 'Học phí': 1200000, 'Đã đóng': '', 'Hình thức': 'ONLINE', 'Địa chỉ': 'Hồ Chí Minh' },

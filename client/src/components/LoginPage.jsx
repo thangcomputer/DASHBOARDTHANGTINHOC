@@ -122,7 +122,7 @@ const LoginPage = ({ onLogin }) => {
       // Gọi forgot-password/request để kiểm tra phone tồn tại (OTP sinh bởi admin)
       // Ở đây chỉ cần check xem số này có trong DB không
       const csrf = await ensureCsrfToken();
-      const res = await fetch(`${API}/api/auth/forgot-password/request`, {
+      const res = await fetch(`${API_BASE}/auth/forgot-password/request`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -162,7 +162,7 @@ const LoginPage = ({ onLogin }) => {
     setForgotLoading(true); setForgotError('');
     try {
       const csrf = await ensureCsrfToken();
-      const res = await fetch(`${API}/api/auth/forgot-password/verify`, {
+      const res = await fetch(`${API_BASE}/auth/forgot-password/verify`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -174,8 +174,23 @@ const LoginPage = ({ onLogin }) => {
       const data = await res.json();
       if (data.success) {
         clearInterval(countdownRef.current);
-        setNewPasswordResult({ password: data.data.newPassword, name: data.data.name });
-        toast.success('Xác minh thành công!');
+        const pw = String(
+          data.data?.newPassword
+          || data.data?.tempPassword
+          || data.data?.password
+          || data.newPassword
+          || '',
+        ).trim();
+        setNewPasswordResult({
+          password: pw,
+          name: data.data?.name || forgotPhone.trim(),
+          phone: data.data?.phone || forgotPhone.trim(),
+        });
+        if (!pw) {
+          toast.error('Không nhận được mật khẩu mới từ máy chủ — thử lại hoặc liên hệ Admin');
+        } else {
+          toast.success('Xác minh thành công!');
+        }
       } else {
         setForgotError(data.message || 'Mã OTP không đúng hoặc đã hết hạn');
       }
@@ -191,101 +206,100 @@ const LoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-0 font-sans overflow-hidden">
-      <div className="w-full h-screen flex flex-col md:flex-row shadow-2xl overflow-hidden">
+    <div className="min-h-[100dvh] bg-[#0f172a] flex items-center justify-center p-0 font-sans overflow-x-clip overflow-y-auto">
+      <div className="w-full min-h-[100dvh] md:h-[100dvh] flex flex-col md:flex-row shadow-2xl overflow-x-clip md:overflow-hidden">
 
         {/* CỘT TRÁI */}
-        <div className="hidden md:flex md:w-1/2 bg-gradient-to-b from-[#1e293b] to-[#0f172a] p-16 flex-col justify-center relative">
+        <div className="hidden md:flex md:w-1/2 bg-gradient-to-b from-[#1e293b] to-[#0f172a] p-10 lg:p-16 flex-col justify-center relative min-w-0">
           <div className="absolute top-10 left-10">
             <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
-               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-               <span className="text-xs font-black text-gray-300 uppercase tracking-widest">Hệ thống quản lý trực tuyến</span>
+               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
+               <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Hệ thống quản lý trực tuyến</span>
             </div>
           </div>
           <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-left-10 duration-1000">
-            <h1 className="text-display font-black text-white">
+            <h1 className="text-display font-black text-white break-anywhere">
               Nền tảng <span className="text-red-500 block md:inline">Học Tin Học</span> <br />Văn Phòng Chuyên Nghiệp
             </h1>
-            <p className="text-gray-400 text-lg leading-relaxed max-w-lg">Tổ chức đào tạo, thi cử và cấp chứng nhận tin học văn phòng với công nghệ hiện đại.</p>
+            <p className="text-slate-400 text-lg leading-relaxed max-w-lg">Tổ chức đào tạo, thi cử và cấp chứng nhận tin học văn phòng với công nghệ hiện đại.</p>
             <div className="flex flex-wrap gap-4 pt-4">
               {[{ label: 'Word', icon: BookOpen }, { label: 'Excel', icon: Database }, { label: 'PowerPoint', icon: Monitor }].map((item, idx) => (
                 <div key={idx} className="flex items-center gap-3 bg-white/5 border border-white/10 px-6 py-4 rounded-2xl hover:bg-white/10 transition-all cursor-default group">
-                  <item.icon size={18} className="text-red-500 group-hover:scale-110 transition-transform" />
+                  <item.icon size={18} className="text-red-500 group-hover:scale-110 transition-transform" aria-hidden="true" />
                   <span className="text-sm font-bold text-gray-200">{item.label}</span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-red-600/10 rounded-full blur-[120px]" />
+          <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-red-600/10 rounded-full blur-[120px]" aria-hidden="true" />
         </div>
 
         {/* CỘT PHẢI */}
         <div className="w-full md:w-1/2 flex items-center justify-center px-[15px] py-8 sm:p-8 lg:p-20 relative bg-[#0f172a] min-w-0 overflow-y-auto">
           <div className="w-full max-w-md space-y-8 sm:space-y-10 z-10">
             <div className="text-center md:text-left flex flex-col items-center md:items-start animate-in fade-in zoom-in duration-700">
-              <img src={dynamicLogo || "/logo-thang-tin-hoc.png"} alt="Logo" className="h-14 sm:h-16 mb-6 sm:mb-8 max-w-full brightness-110 object-contain"
-                onError={(e) => { if (!dynamicLogo) e.target.src = 'https://i.ibb.co/68H8LzG/logo.png'; }} />
-              <div className="space-y-4">
-                <div className="inline-flex bg-white/5 p-1 rounded-2xl border border-white/10 mb-2">
-                  <button onClick={() => setRole('student')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${role === 'student' ? 'bg-red-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Học viên</button>
-                  <button onClick={() => setRole('teacher')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${role === 'teacher' ? 'bg-red-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Giảng viên</button>
+              <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-14 sm:h-16 mb-6 sm:mb-8 max-w-[min(100%,220px)] brightness-110 object-contain" />
+              <div className="space-y-4 w-full">
+                <div className="inline-flex bg-white/5 p-1 rounded-2xl border border-white/10 mb-2 max-w-full" role="tablist" aria-label="Chọn vai trò đăng nhập">
+                  <button type="button" role="tab" aria-selected={role === 'student'} onClick={() => setRole('student')} className={`px-4 xs:px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${role === 'student' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Học viên</button>
+                  <button type="button" role="tab" aria-selected={role === 'teacher'} onClick={() => setRole('teacher')} className={`px-4 xs:px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${role === 'teacher' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Giảng viên</button>
                 </div>
                 <h2 className="text-fluid-2xl font-black text-white">Đăng nhập tài khoản</h2>
-                <p className="text-gray-400 font-medium">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
+                <p className="text-slate-400 font-medium">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
               </div>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200">
+            <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200" noValidate>
               {inactivityMsg && (
-                <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center gap-3 text-amber-400 text-sm font-bold">
-                  <Clock size={18} /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
+                <div role="status" className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center gap-3 text-amber-300 text-sm font-bold">
+                  <Clock size={18} aria-hidden="true" /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
                 </div>
               )}
-              {error && <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-500 text-sm font-bold"><AlertCircle size={18} /> {error}</div>}
+              {error && <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 text-sm font-bold"><AlertCircle size={18} aria-hidden="true" /> {error}</div>}
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-400 block ml-1">{role === 'student' ? 'SỐ ĐIỆN THOẠI HOẶC EMAIL' : 'TÀI KHOẢN GIẢNG VIÊN'}</label>
+                  <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">{role === 'student' ? 'SỐ ĐIỆN THOẠI HOẶC EMAIL' : 'TÀI KHOẢN GIẢNG VIÊN'}</label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User size={18} className="text-gray-500 group-focus-within:text-red-500 transition-colors" /></div>
-                    <input type="text" required value={phone} onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-[#1e293b]/50 border-2 border-white/5 rounded-2xl pl-11 pr-5 py-4 text-white outline-none focus:border-red-600 focus:bg-[#1e293b] transition-all font-bold placeholder:text-gray-600"
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User size={18} className="text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" /></div>
+                    <input id="login-identifier" type="text" required value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="username"
+                      className="w-full bg-[#1e293b]/50 border-2 border-white/10 rounded-2xl pl-11 pr-5 py-4 text-white outline-none focus:border-red-600 focus:bg-[#1e293b] transition-all font-bold placeholder:text-slate-400"
                       placeholder="Nhập thông tin tài khoản..." />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-400 block ml-1">MẬT KHẨU</label>
+                  <label htmlFor="login-password" className="text-xs font-bold text-slate-400 block ml-1">MẬT KHẨU</label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Lock size={18} className="text-gray-500 group-focus-within:text-red-500 transition-colors" /></div>
-                    <input type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-[#1e293b]/50 border-2 border-white/5 rounded-2xl pl-11 pr-12 py-4 text-white outline-none focus:border-red-600 focus:bg-[#1e293b] transition-all font-bold placeholder:text-gray-600"
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Lock size={18} className="text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" /></div>
+                    <input id="login-password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
+                      className="w-full bg-[#1e293b]/50 border-2 border-white/10 rounded-2xl pl-11 pr-12 py-4 text-white outline-none focus:border-red-600 focus:bg-[#1e293b] transition-all font-bold placeholder:text-slate-400"
                       placeholder="••••••••" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors">
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-white transition-colors">
+                      {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                     </button>
                   </div>
                 </div>
               </div>
               <div className="flex justify-end -mt-2">
                 <button type="button" onClick={() => { setShowForgot(true); setForgotRole(role); setForgotStep(1); }}
-                  className="text-xs font-bold text-gray-400 hover:text-red-400 transition-colors flex items-center gap-1">
-                  <KeyRound size={12} /> Quên mật khẩu?
+                  className="text-xs font-bold text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1">
+                  <KeyRound size={12} aria-hidden="true" /> Quên mật khẩu?
                 </button>
               </div>
               <button type="submit" disabled={loading}
                 className="w-full btn-primary rounded-2xl py-4 font-black uppercase tracking-[0.1em] shadow-xl shadow-red-900/20 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-3">
-                {loading ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" /> : 'Đăng nhập ngay'}
+                {loading ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" /> : 'Đăng nhập ngay'}
               </button>
             </form>
 
             <div className="text-center pt-8 animate-in fade-in duration-1000 delay-500">
-              <p className="text-gray-400 text-sm font-medium">Chưa có tài khoản? <button type="button" onClick={() => window.open('https://zalo.me/0935758462', '_blank')} className="text-white font-black hover:text-red-500 transition-colors ml-1">Liên hệ Admin</button></p>
+              <p className="text-slate-400 text-sm font-medium">Chưa có tài khoản? <button type="button" onClick={() => window.open('https://zalo.me/0935758462', '_blank', 'noopener,noreferrer')} className="text-white font-black hover:text-red-500 transition-colors ml-1">Liên hệ Admin</button></p>
               <div className="mt-10 flex flex-col items-center gap-2">
-                <p className="text-xs font-black text-gray-600 uppercase tracking-widest">Hỗ trợ kỹ thuật</p>
-                <p className="text-xs font-bold text-gray-400">Hotline: 093 5758 462</p>
+                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Hỗ trợ kỹ thuật</p>
+                <p className="text-xs font-bold text-slate-400">Hotline: 093 5758 462</p>
               </div>
             </div>
           </div>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full blur-[120px]" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full blur-[120px]" aria-hidden="true" />
         </div>
       </div>
 
@@ -328,7 +342,7 @@ const LoginPage = ({ onLogin }) => {
                       <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                       <input type="text" value={forgotPhone} onChange={e => setForgotPhone(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleCheckPhone()}
-                        className="w-full bg-[#0f172a] border-2 border-white/10 rounded-xl pl-11 pr-4 py-3 text-white text-sm font-bold outline-none focus:border-red-500 transition placeholder:text-gray-600"
+                        className="w-full bg-[#0f172a] border-2 border-white/10 rounded-xl pl-11 pr-4 py-3 text-white text-sm font-bold outline-none focus:border-red-500 transition placeholder:text-slate-400"
                         placeholder="VD: 0935758462" />
                     </div>
                   </div>
@@ -396,30 +410,48 @@ const LoginPage = ({ onLogin }) => {
                   <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto"><CheckCircle2 size={32} className="text-emerald-400" /></div>
                   <div>
                     <p className="text-white font-bold text-lg">Đặt lại mật khẩu thành công!</p>
-                    <p className="text-gray-400 text-sm mt-1">Tài khoản: <strong className="text-white">{newPasswordResult.name}</strong></p>
+                    <p className="text-gray-400 text-sm mt-1">Tài khoản: <strong className="text-white">{newPasswordResult.name || newPasswordResult.phone}</strong></p>
                   </div>
-                  <style>{`
-                    @keyframes glow-border {
-                      0% { border-color: rgba(16,185,129,0.3); box-shadow: 0 0 5px rgba(16,185,129,0.1); }
-                      50% { border-color: rgba(16,185,129,1); box-shadow: 0 0 30px rgba(16,185,129,0.9), inset 0 0 15px rgba(16,185,129,0.5); }
-                      100% { border-color: rgba(16,185,129,0.3); box-shadow: 0 0 5px rgba(16,185,129,0.1); }
-                    }
-                    .animate-glow-border {
-                      animation: glow-border 1.2s ease-in-out infinite;
-                    }
-                  `}</style>
-                  <div className="bg-[#0f172a] border-2 rounded-2xl p-5 animate-glow-border relative z-10">
-                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Mật khẩu mới</p>
-                    <div className="flex items-center justify-center gap-3">
-                      <span className="text-3xl font-black text-emerald-400 tracking-[0.3em] font-mono">{newPasswordResult.password}</span>
-                      <button onClick={() => { navigator.clipboard.writeText(newPasswordResult.password); setCopied(true); toast.success('Đã sao chép!'); setTimeout(() => setCopied(false), 2000); }}
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${copied ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
-                        {copied ? <Check size={16} /> : <Copy size={16} />}
-                      </button>
-                    </div>
+                  <div className="bg-[#0f172a] border-2 border-emerald-500/40 rounded-2xl p-5 relative z-10 space-y-4">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Mật khẩu mới</p>
+                    {newPasswordResult.password ? (
+                      <p
+                        className="text-4xl sm:text-5xl font-black text-emerald-400 tracking-[0.35em] font-mono select-all break-all"
+                        aria-live="polite"
+                      >
+                        {newPasswordResult.password}
+                      </p>
+                    ) : (
+                      <p className="text-sm font-bold text-red-400">Không nhận được mật khẩu — đóng và thử lại.</p>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!newPasswordResult.password}
+                      onClick={() => {
+                        const pw = newPasswordResult.password;
+                        if (!pw) {
+                          toast.error('Chưa có mật khẩu để sao chép');
+                          return;
+                        }
+                        navigator.clipboard.writeText(pw).then(() => {
+                          setCopied(true);
+                          toast.success('Đã sao chép mật khẩu!');
+                          setTimeout(() => setCopied(false), 2000);
+                        }).catch(() => toast.error('Không sao chép được — hãy bôi đen mật khẩu và Ctrl+C'));
+                      }}
+                      className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-40 ${
+                        copied
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25'
+                      }`}
+                      aria-label="Sao chép mật khẩu mới"
+                    >
+                      {copied ? <Check size={18} /> : <Copy size={18} />}
+                      {copied ? 'Đã sao chép' : 'Sao chép mật khẩu'}
+                    </button>
                   </div>
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
-                    <p className="text-amber-400 text-xs font-bold">⚠️ Hãy copy mã code này và đăng nhập cũng như đổi mật khẩu.</p>
+                    <p className="text-amber-400 text-xs font-bold">⚠️ Hãy copy mã này, đăng nhập rồi đổi mật khẩu ngay.</p>
                   </div>
                   <button onClick={closeForgotModal} className="w-full py-3 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white/10 transition">Đóng & Đăng nhập</button>
                 </div>

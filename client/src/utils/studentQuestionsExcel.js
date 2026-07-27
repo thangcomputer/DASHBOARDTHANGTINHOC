@@ -1,5 +1,11 @@
-import * as XLSX from 'xlsx';
 import { questionMatchesExamSubject } from './htmlContent';
+
+let _xlsx = null;
+async function getXLSX() {
+  if (_xlsx) return _xlsx;
+  _xlsx = await import('xlsx');
+  return _xlsx;
+}
 
 export const STUDENT_QUESTIONS_TEMPLATE_HEADERS = [
   'Loại',
@@ -111,7 +117,8 @@ function parseCorrectIndex(raw) {
   return null;
 }
 
-function buildWorkbook(kind, subjectLabel, questionType) {
+async function buildWorkbook(kind, subjectLabel, questionType) {
+  const XLSX = await getXLSX();
   const isTeacher = kind === 'teacher';
   const sectionLabel = subjectLabel || 'Excel';
   const mcSection = sectionLabel;
@@ -178,25 +185,25 @@ function buildWorkbook(kind, subjectLabel, questionType) {
     [isTeacher ? 'File: Mau_NganHang_CauHoi_GiangVien.xlsx' : 'File: Mau_NganHang_CauHoi_HocVien.xlsx'],
   ]);
   XLSX.utils.book_append_sheet(wb, wsHuongDan, 'Huong dan');
-  return wb;
+  return { XLSX, wb };
 }
 
-export function downloadStudentQuestionsExcelTemplate(subjectId, subjectLabel, questionType = 'both') {
+export async function downloadStudentQuestionsExcelTemplate(subjectId, subjectLabel, questionType = 'both') {
   const label = subjectLabel || subjectId || 'Mon';
-  const wb = buildWorkbook('student', label, questionType);
+  const { XLSX, wb } = await buildWorkbook('student', label, questionType);
   const suffix = questionType === 'essay' ? 'TuLuan' : questionType === 'multiple' ? 'TracNghiem' : 'DayDu';
   const safe = String(label).replace(/[^\w\u00C0-\u024F]+/g, '_').slice(0, 40);
   XLSX.writeFile(wb, `Mau_${suffix}_${safe}.xlsx`);
 }
 
 /** @deprecated use downloadStudentQuestionsExcelTemplate */
-export function downloadStudentQuestionsExcelTemplateLegacy() {
-  downloadStudentQuestionsExcelTemplate('excel', 'Excel', 'both');
+export async function downloadStudentQuestionsExcelTemplateLegacy() {
+  await downloadStudentQuestionsExcelTemplate('excel', 'Excel', 'both');
 }
 
-export function downloadTeacherQuestionsExcelTemplate(sectionId = 'excel', sectionLabel = 'Excel', questionType = 'both') {
+export async function downloadTeacherQuestionsExcelTemplate(sectionId = 'excel', sectionLabel = 'Excel', questionType = 'both') {
   const label = sectionLabel || sectionId || 'Excel';
-  const wb = buildWorkbook('teacher', label, questionType);
+  const { XLSX, wb } = await buildWorkbook('teacher', label, questionType);
   const suffix = questionType === 'essay' ? 'TuLuan' : questionType === 'multiple' ? 'TracNghiem' : 'DayDu';
   const safe = String(sectionLabel || sectionId || 'GV').replace(/[^\w\u00C0-\u024F]+/g, '_').slice(0, 40);
   XLSX.writeFile(wb, `Mau_GV_${suffix}_${safe}.xlsx`);
@@ -219,7 +226,8 @@ function questionRowToExcel(q, subjectLabel) {
   };
 }
 
-export function exportStudentQuestionsExcel(questions, subjectId, subjectLabel, questionType = 'both') {
+export async function exportStudentQuestionsExcel(questions, subjectId, subjectLabel, questionType = 'both') {
+  const XLSX = await getXLSX();
   const label = subjectLabel || subjectId || 'Mon';
   const filtered = (questions || []).filter((q) => {
     if (!questionMatchesExamSubject(q.section, subjectId)) return false;
@@ -239,11 +247,12 @@ export function exportStudentQuestionsExcel(questions, subjectId, subjectLabel, 
 }
 
 /** Cung format cot voi hoc vien — dung chung parser. */
-export function parseQuestionBankExcel(bstr) {
+export async function parseQuestionBankExcel(bstr) {
   return parseStudentQuestionsExcel(bstr);
 }
 
-export function parseStudentQuestionsExcel(bstr) {
+export async function parseStudentQuestionsExcel(bstr) {
+  const XLSX = await getXLSX();
   const errors = [];
   const questions = [];
   let skipped = 0;

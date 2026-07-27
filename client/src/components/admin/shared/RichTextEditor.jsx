@@ -1,4 +1,5 @@
 import React from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 
 export default function RichTextEditor({ value, onChange, placeholder }) {
@@ -6,6 +7,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
   const hasInitialized = React.useRef(false);
   const [showLinkInput, setShowLinkInput] = React.useState(false);
   const [linkUrl, setLinkUrl] = React.useState('');
+  const [headingPick, setHeadingPick] = React.useState('');
   const savedSelection = React.useRef(null);
 
   React.useEffect(() => {
@@ -101,16 +103,29 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-gray-50 border-b border-gray-200"
         onMouseDown={e => e.preventDefault()}>
-        <select
+        <CmsSelect
+          value={headingPick}
           onMouseDown={e => { e.stopPropagation(); saveSelection(); }}
-          onChange={e => { if (e.target.value) { editorRef.current?.focus(); restoreSelection(); document.execCommand('formatBlock', false, e.target.value); saveSelection(); handleInput(); } e.target.selectedIndex = 0; }}
-          className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white mr-1 cursor-pointer" defaultValue="">
+          onChange={e => {
+            const v = e.target.value;
+            if (v) {
+              editorRef.current?.focus();
+              restoreSelection();
+              document.execCommand('formatBlock', false, v);
+              saveSelection();
+              handleInput();
+            }
+            setHeadingPick('');
+          }}
+          className="text-xs border border-gray-200 rounded-lg px-1.5 py-1 bg-white mr-1 min-h-0 !py-1 !px-1.5 !rounded-lg"
+          wrapperClassName="inline-block w-auto"
+        >
           <option value="" disabled>Heading</option>
           <option value="h1">Tiêu đề 1</option>
           <option value="h2">Tiêu đề 2</option>
           <option value="h3">Tiêu đề 3</option>
           <option value="p">Bình thường</option>
-        </select>
+        </CmsSelect>
         <div className="w-px h-5 bg-gray-200 mx-1" />
 
         {/* Text formatting */}

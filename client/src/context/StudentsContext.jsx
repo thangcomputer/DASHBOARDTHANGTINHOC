@@ -39,7 +39,7 @@ async function fetchStudents([, scope, arg]) {
     };
   }
   if (scope === 'teacher') {
-    const res = await api.students.getAll({ limit: 1000 });
+    const res = await api.students.getAll({ limit: 300 });
     return {
       students: res?.success ? res.data.map(mapStudent) : [],
       pagination: EMPTY_PAGINATION,

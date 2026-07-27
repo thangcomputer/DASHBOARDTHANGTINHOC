@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
 import api from '../services/api';
 import { mapSchedule } from '../lib/entityMaps';
@@ -18,7 +18,7 @@ async function fetchSchedules([, role, userId]) {
     const res = await api.schedules.getByStudent(userId);
     return res?.success ? res.data.map(mapSchedule) : [];
   }
-  const res = await api.schedules.getAll();
+  const res = await api.schedules.getAll({ limit: 500 });
   return res?.success ? res.data.map(mapSchedule) : [];
 }
 
@@ -29,11 +29,19 @@ export function ScheduleProvider({ user, children }) {
     { revalidateOnFocus: false, dedupingInterval: 45_000 }
   );
 
+  const setSchedulesLocal = useCallback((updater) => {
+    mutate((current = []) => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      return Array.isArray(next) ? next : current;
+    }, { revalidate: false });
+  }, [mutate]);
+
   const value = useMemo(() => ({
     schedules: data,
     refreshSchedules: mutate,
+    setSchedulesLocal,
     isSchedulesLoading: isValidating,
-  }), [data, mutate, isValidating]);
+  }), [data, mutate, setSchedulesLocal, isValidating]);
 
   return (
     <ScheduleContext.Provider value={value}>
@@ -45,7 +53,7 @@ export function ScheduleProvider({ user, children }) {
 export function useScheduleContext() {
   const ctx = useContext(ScheduleContext);
   if (!ctx) {
-    return { schedules: [], refreshSchedules: async () => {}, isSchedulesLoading: false };
+    return { schedules: [], refreshSchedules: async () => {}, setSchedulesLocal: () => {}, isSchedulesLoading: false };
   }
   return ctx;
 }

@@ -206,6 +206,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
 
   const updateExamProgress = useCallback((changes) => {
     if (!student || !updateStudent) return;
+    const id = student._id || student.id;
     const progress = student.examProgress || [];
     const idx = progress.findIndex(s => s.id === subjectId);
     let newProgress = [...progress];
@@ -214,7 +215,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     } else {
       newProgress.push({ id: subjectId, ...changes });
     }
-    updateStudent(student._id || student.id, { examProgress: newProgress });
+    // Optimistic UI + API riêng (không ghi examProgress qua PUT generic)
+    updateStudent(id, { examProgress: newProgress }, { localOnly: true });
+    api.students.updateExamProgress(id, { subjectId, changes }).catch((err) => {
+      console.error('[exam-progress]', err);
+    });
   }, [student, updateStudent, subjectId]);
 
   // ── Tải ngân hàng câu hỏi từ server (học viên có thể vào thi trước khi sync xong) ──

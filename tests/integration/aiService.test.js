@@ -20,15 +20,15 @@ test('generateQuiz fallback returns questions', async () => {
   assert.ok(r.questions[0].options.length >= 2);
 });
 
-test('draftNotification fallback', async () => {
+test('draftNotification local fallback', async () => {
   const r = await aiService.draftNotification({ purpose: 'Nhac dong hoc phi', audience: 'HV' });
-  assert.equal(r.source, 'fallback');
+  assert.equal(r.source, 'local');
   assert.ok(r.title);
   assert.ok(r.content);
 });
 
-test('summarize fallback truncates', async () => {
+test('summarize local fallback truncates', async () => {
   const r = await aiService.summarizeText({ text: 'mot hai ba bon nam sau bay' });
-  assert.equal(r.source, 'fallback');
+  assert.equal(r.source, 'local');
   assert.ok(r.summary.length > 0);
 });

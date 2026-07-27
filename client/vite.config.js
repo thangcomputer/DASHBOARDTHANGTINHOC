@@ -43,7 +43,14 @@ export default defineConfig({
             if (id.includes('recharts')) {
               return 'vendor-chart';
             }
-            return 'vendor'; // tất cả các dependencies khác
+            // Heavy libs — chỉ tải khi user xuất Excel/PDF
+            if (id.includes('node_modules/xlsx')) {
+              return 'vendor-xlsx';
+            }
+            if (id.includes('node_modules/jspdf') || id.includes('node_modules/html2canvas')) {
+              return 'vendor-pdf';
+            }
+            return 'vendor';
           }
         }
       },

@@ -89,15 +89,28 @@ const isTeacher = (req, res, next) => {
   }
 };
 
-// ── isSuperAdmin: Chỉ hardcoded admin hoặc SUPER_ADMIN ───────────────────────
-const isSuperAdmin = (req, res, next) => {
+// ── isSuperAdmin: Chỉ hardcoded admin hoặc SUPER_ADMIN (đọc từ DB) ────────────
+const isSuperAdmin = async (req, res, next) => {
   if (req.user && req.user.id === 'admin') {
-    return next(); // hardcoded admin: toàn quyền
-  }
-  if (req.user && req.user.adminRole === 'SUPER_ADMIN') {
     return next();
   }
-  res.status(403).json({
+  try {
+    if (!req.user?.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Quyền truy cập bị từ chối: Chỉ Super Admin mới có quyền này',
+      });
+    }
+    const user = await Teacher.findById(req.user.id).select('adminRole').lean();
+    if (user?.adminRole === 'SUPER_ADMIN') {
+      req.user.adminRole = 'SUPER_ADMIN';
+      return next();
+    }
+  } catch (err) {
+    logger.error('[isSuperAdmin] error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi xác thực Super Admin' });
+  }
+  return res.status(403).json({
     success: false,
     message: 'Quyền truy cập bị từ chối: Chỉ Super Admin mới có quyền này',
   });
@@ -221,6 +234,9 @@ const branchFilter = async (req, res, next) => {
     await applyTenantScopeIfAny(req);
     next();
   } catch (err) {
+    if (err?.code === 'INVALID_TENANT' || err?.message === 'INVALID_TENANT') {
+      return res.status(400).json({ success: false, message: 'X-Tenant-Id / tenant_id không hợp lệ hoặc đã bị khóa' });
+    }
     logger.error('[branchFilter] error:', err);
     return res.status(500).json({ success: false, message: 'Lỗi xác thực phạm vi chi nhánh. Thử lại sau.' });
   }
@@ -242,14 +258,20 @@ async function applyTenantScopeIfAny(req) {
     return;
   }
 
+  const mongoose = require('mongoose');
+  if (!mongoose.Types.ObjectId.isValid(String(raw))) {
+    const err = new Error('INVALID_TENANT');
+    err.code = 'INVALID_TENANT';
+    throw err;
+  }
+
   const Tenant = require('../models/Tenant');
   const tenantService = require('../services/tenantService');
   const tenant = await Tenant.findById(raw).lean();
   if (!tenant || tenant.status === 'suspended') {
-    req.branchFilter = { branchId: null };
-    req.tenant = tenant || null;
-    req.tenantScope = { tenantId: raw, branchIds: [] };
-    return;
+    const err = new Error('INVALID_TENANT');
+    err.code = 'INVALID_TENANT';
+    throw err;
   }
 
   const branchIds = await tenantService.resolveBranchIdsForTenant(tenant._id);
@@ -275,12 +297,12 @@ async function applyTenantScopeIfAny(req) {
  * Áp dụng sau authMiddleware trên các route nhạy cảm (staff/admin routes)
  */
 const requireInternalToken = (req, res, next) => {
-  // Legacy token (không có aud) hoặc hardcoded admin → cho qua để tương thích ngược
-  if (!req.tokenAudience || req.tokenAudience === 'legacy' || req.tokenAudience === 'internal') return next();
-  if (req.user?.id === 'admin') return next();
-  // Token có aud='public' → chặn
+  // Chỉ token cấp bởi /api/auth/login/internal mới vào được khu quản trị.
+  // Token 'public' và token legacy (ký trước khi có claim aud) đều bị chặn.
+  if (req.tokenAudience === 'internal') return next();
   return res.status(403).json({
     success: false,
+    code: 'INTERNAL_TOKEN_REQUIRED',
     message: 'Token không hợp lệ cho khu vực quản trị. Vui lòng đăng nhập qua cổng nội bộ (/admin/login).',
   });
 };

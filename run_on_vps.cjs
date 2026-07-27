@@ -6,7 +6,7 @@ const { NodeSSH } = require('node-ssh');
 const { getVpsSshConfig } = require('./deploy_scripts/_vpsConnect.cjs');
 
 const ssh = new NodeSSH();
-const APP_DIR = process.env.VPS_APP_DIR || '/www/wwwroot/quanlycms';
+const APP_DIR = process.env.VPS_APP_DIR || '/www/wwwroot/dashboardthangtinhoc';
 
 async function run() {
   console.log('Connecting to VPS...');
@@ -21,7 +21,7 @@ async function run() {
 
   const commands = [
     `cd ${APP_DIR} && git pull origin main`,
-    'pm2 restart quanlycms',
+    'pm2 restart dashboardthangtinhoc',
     'pm2 list',
   ];
 
@@ -41,7 +41,7 @@ function printManualInstructions() {
 Manual steps on VPS:
   cd ${APP_DIR}
   git pull origin main
-  pm2 restart quanlycms
+  pm2 restart dashboardthangtinhoc
   pm2 list
 `);
 }

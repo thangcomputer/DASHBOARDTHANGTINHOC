@@ -72,7 +72,7 @@ function verifyTotp(secret, token, window = 1) {
   return false;
 }
 
-function otpauthUrl(secret, accountName, issuer = 'QUANLYCMS') {
+function otpauthUrl(secret, accountName, issuer = 'DashboardThangTinHoc') {
   const label = encodeURIComponent(`${issuer}:${accountName}`);
   const q = new URLSearchParams({
     secret,

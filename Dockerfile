@@ -1,4 +1,4 @@
-# QUANLYCMS — production API image
+# dashboardthangtinhoc — production API image
 FROM node:22-bookworm-slim
 
 WORKDIR /app

@@ -1,6 +1,10 @@
 import { Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useState, useEffect, useCallback, lazy, Suspense }  from 'react';
 import { SocketProvider }                    from './context/SocketContext';
+import { StudentsProvider }                  from './context/StudentsContext';
+import { TeachersProvider }                  from './context/TeachersContext';
+import { ScheduleProvider }                  from './context/ScheduleContext';
+import { FinanceProvider }                   from './context/FinanceContext';
 import { DataProvider, useData }             from './context/DataContext';
 import { ToastProvider }                     from './utils/toast.jsx';
 import ErrorBoundary                         from './components/ErrorBoundary';
@@ -25,6 +29,7 @@ const WorkflowCenterPage = lazy(() => import('./components/WorkflowCenterPage'))
 const FormReportBuilderPage = lazy(() => import('./components/FormReportBuilderPage'));
 const TenantManagementPage = lazy(() => import('./components/TenantManagementPage'));
 const PublicPaymentPage = lazy(() => import('./components/PublicPaymentPage'));
+const FeedBoard = lazy(() => import('./components/FeedBoard'));
 import DashboardLayout                       from './components/DashboardLayout';
 import api, { clearTokens, getRolePrefix } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
@@ -33,6 +38,7 @@ import LoadingScreen                         from './components/LoadingScreen';
 import StaffPopup                            from './components/StaffPopup';
 import { ModalProvider, useModal }           from './utils/Modal.jsx';
 import SecurityGuard                         from './components/SecurityGuard';
+import FaviconSwitcher                       from './components/FaviconSwitcher';
 import { useInactivityTimer }                from './utils/useInactivityTimer';
 import { unlockAudio }                       from './utils/sound';
 import { getMessagingRole }                  from './lib/messagingRoles';
@@ -257,6 +263,9 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
             />
           </ErrorBoundary>
         } />
+        <Route path="/admin/feed" element={
+          <ErrorBoundary inline><FeedBoard session={session} role="admin" /></ErrorBoundary>
+        } />
       </Route>
 
       {/* ═══ Teacher ═══ */}
@@ -274,6 +283,9 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
           <ErrorBoundary inline>
             <Inbox currentUserId={session?.id} currentUserName={session?.name} currentUserRole={getMessagingRole(session)} onNavigate={go} />
           </ErrorBoundary>
+        } />
+        <Route path="/teacher/feed" element={
+          <ErrorBoundary inline><FeedBoard session={session} role="teacher" /></ErrorBoundary>
         } />
         <Route path="/teacher/test"    element={
           <ErrorBoundary>
@@ -297,6 +309,9 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
           <ErrorBoundary inline>
             <Inbox currentUserId={session?.id} currentUserName={session?.name} currentUserRole={getMessagingRole(session)} onNavigate={go} />
           </ErrorBoundary>
+        } />
+        <Route path="/student/feed" element={
+          <ErrorBoundary inline><FeedBoard session={session} role="student" /></ErrorBoundary>
         } />
       </Route>
 
@@ -491,6 +506,11 @@ function App() {
         >
           <ModalProvider>
             <SecurityGuard />
+            <FaviconSwitcher />
+            <StudentsProvider user={session}>
+            <TeachersProvider user={session}>
+            <ScheduleProvider user={session}>
+            <FinanceProvider user={session}>
             <DataProvider key={session?.id || 'guest'} user={session} onLogout={handleLogout}>
                 <BranchProvider session={session}>
                 <ToastProvider>
@@ -506,6 +526,10 @@ function App() {
                 </ToastProvider>
                 </BranchProvider>
             </DataProvider>
+            </FinanceProvider>
+            </ScheduleProvider>
+            </TeachersProvider>
+            </StudentsProvider>
           </ModalProvider>
         </SocketProvider>
     </ErrorBoundary>

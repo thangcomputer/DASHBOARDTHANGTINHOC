@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   Building2, Loader2, Plus, RefreshCw, Users, GraduationCap, Calendar,
 } from 'lucide-react';
@@ -158,14 +159,14 @@ export default function TenantManagementPage() {
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase">Gán chi nhánh</label>
-                  <select value={assignBranchId} onChange={(e) => setAssignBranchId(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold mt-1">
+                  <CmsSelect value={assignBranchId} onChange={(e) => setAssignBranchId(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold mt-1">
                     <option value="">Chọn...</option>
                     {branches.map((b) => (
                       <option key={b._id} value={b._id}>
                         {b.code} — {b.name}{b.tenantId && String(b.tenantId) !== String(selected._id) ? ' (tenant khác)' : ''}
                       </option>
                     ))}
-                  </select>
+                  </CmsSelect>
                 </div>
                 <button type="button" onClick={assign} disabled={!assignBranchId} className="px-3 py-2 rounded-xl bg-violet-600 text-white text-xs font-bold disabled:opacity-40">Gán</button>
               </div>

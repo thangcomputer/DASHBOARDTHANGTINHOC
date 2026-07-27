@@ -4,11 +4,13 @@ import {
   Trophy, FileText, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown,
   GraduationCap, Users, DollarSign, ClipboardList, Menu, X,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
+  HelpCircle, Newspaper,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { isSoundMuted, setSoundMuted } from '../utils/sound';
 import { PERMISSIONS } from '../constants/permissions';
+import { resolveAvatarUrl } from '../utils/defaultAvatars';
 
 const formatTime = (date) => {
   if (!date) return '';
@@ -27,6 +29,7 @@ const MENU_CONFIG = {
     brand: { label: 'HỌC VIÊN', color: 'from-slate-900 to-indigo-950' },
     items: [
       { key: 'dashboard',  icon: LayoutDashboard, label: 'Tổng quan',      path: '/student' },
+      { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',       path: '/student/feed' },
       { key: 'exam',       icon: Trophy,           label: 'Phòng Thi',      path: '/student/exam' },
       { key: 'schedule',   icon: Calendar,         label: 'Lịch học',       path: '/student', hash: 'schedule' },
       { key: 'materials',  icon: BookOpen,          label: 'Tài liệu',      path: '/student', hash: 'materials' },
@@ -34,6 +37,7 @@ const MENU_CONFIG = {
       { key: 'evaluation', icon: Star,              label: 'Đánh giá',      path: '/student', hash: 'evaluation' },
     ],
     bottomItems: [
+      { key: 'help', icon: HelpCircle, label: 'Trợ giúp', isHelp: true },
       { key: 'profile',   icon: User,    label: 'Hồ sơ',      path: '/student', hash: 'profile' },
       { key: 'changepassword', icon: Lock, label: 'Đổi mật khẩu', isChangePassword: true },
       { key: 'logout',    icon: LogOut,  label: 'Đăng xuất',  isLogout: true },
@@ -45,6 +49,7 @@ const MENU_CONFIG = {
     brand: { label: 'GIẢNG VIÊN', color: 'from-slate-900 to-indigo-950' },
     items: [
       { key: 'dashboard',  icon: LayoutDashboard, label: 'Tổng quan',      path: '/teacher' },
+      { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',       path: '/teacher/feed' },
       { key: 'students',   icon: Users,            label: 'Quản lý học viên', path: '/teacher', hash: 'students' },
       { key: 'schedule',   icon: Calendar,         label: 'Lịch dạy',      path: '/teacher', hash: 'schedule' },
       { key: 'test',       icon: ClipboardList,    label: 'Bài Test',       path: '/teacher/test' },
@@ -53,6 +58,7 @@ const MENU_CONFIG = {
       { key: 'inbox',      icon: MessageSquare,    label: 'Hộp thư',        path: '/teacher/inbox' },
     ],
     bottomItems: [
+      { key: 'help', icon: HelpCircle, label: 'Trợ giúp', isHelp: true },
       { key: 'profile', icon: User,   label: 'Hồ sơ cá nhân', path: '/teacher', hash: 'profile' },
       { key: 'changepassword', icon: Lock, label: 'Đổi mật khẩu', isChangePassword: true },
       { key: 'logout',  icon: LogOut, label: 'Đăng xuất',      isLogout: true },
@@ -64,6 +70,7 @@ const MENU_CONFIG = {
     brand: { label: 'QUẢN TRỊ', color: 'from-slate-900 to-indigo-950' },
     items: [
       { key: 'dashboard',        icon: LayoutDashboard, label: 'Tổng quan',        path: '/admin', hash: 'dashboard'                                                         },
+      { key: 'feed',             icon: Newspaper,     label: 'Bảng tin',           path: '/admin/feed'                                                                      },
       { key: 'students',         icon: Users,         label: 'Học Viên',           path: '/admin', hash: 'students',            permission: PERMISSIONS.MANAGE_STUDENTS  },
       { key: 'teachers',         icon: GraduationCap, label: 'Giảng Viên',         path: '/admin', hash: 'teachers',            permission: PERMISSIONS.VIEW_TEACHERS                          },
       { key: 'evaluations',      icon: AlertTriangle, label: 'Đánh giá nội bộ',    path: '/admin', hash: 'evaluations',         permission: PERMISSIONS.VIEW_EVALUATIONS },
@@ -118,6 +125,18 @@ const AppSidebar = ({
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Tour hướng dẫn cần thấy đủ menu (mở mobile / bỏ thu gọn)
+  useEffect(() => {
+    const openForGuide = () => {
+      setCollapsed(false);
+      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
+        setMobileOpen(true);
+      }
+    };
+    window.addEventListener('lms-guide-open-nav', openForGuide);
+    return () => window.removeEventListener('lms-guide-open-nav', openForGuide);
+  }, []);
   const [openGroups, setOpenGroups] = useState(() => {
     try {
       const saved = localStorage.getItem('cms_sidebar_groups');
@@ -142,7 +161,14 @@ const AppSidebar = ({
       return;
     }
     document.body.classList.add('cms-menu-open');
-    return () => document.body.classList.remove('cms-menu-open');
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setMobileOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.classList.remove('cms-menu-open');
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [mobileOpen]);
 
   // Fetch dynamic logo from web settings
@@ -224,6 +250,13 @@ const AppSidebar = ({
 
   const handleClick = (item) => {
     if (item.isLogout) { onLogout?.(); return; }
+    if (item.isHelp) {
+      try {
+        window.dispatchEvent(new CustomEvent('lms-guide-open', { detail: { mode: 'menu' } }));
+      } catch { /* ignore */ }
+      setMobileOpen(false);
+      return;
+    }
     if (item.isChangePassword) { 
       window.dispatchEvent(new CustomEvent('open-change-password-modal'));
       setMobileOpen(false);
@@ -255,41 +288,51 @@ const AppSidebar = ({
   };
 
   const initials = userName ? userName.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase() : 'HV';
+  const avatarUrl = resolveAvatarUrl({
+    avatar: userAvatar,
+    role,
+    adminRole: session?.id === 'admin' ? 'SUPER_ADMIN' : adminRole,
+  });
 
   // Trả về element (không khai báo component con) — tránh unmount/remount mỗi lần data refresh → sidebar nhảy cuộn
   const renderSidebarContent = () => (
     <div className={`flex flex-col h-full bg-gradient-to-b ${config.brand.color} text-white overflow-x-hidden`}>
 
       {/* ── Logo + Collapse button ── */}
-      {/* ── Logo + Collapse button ── */}
-      <div className={`flex items-center justify-between border-b border-white/10 ${(collapsed && !mobileOpen) ? 'px-3 py-4' : 'px-5 py-4'}`}>
+      <div className={`flex items-center justify-between border-b border-white/10 ${(collapsed && !mobileOpen) ? 'px-3 py-4' : 'px-5 py-4 pr-12 lg:pr-5'}`}>
         {(!collapsed || mobileOpen) && (
-          <div 
-            className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity" 
+          <button
+            type="button"
+            className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
             onClick={() => {
               navigate(config.items[0].path);
               triggerBackgroundSync();
             }}
             title="Làm mới bảng điều khiển"
+            aria-label="Về trang tổng quan"
           >
-            <img src={dynamicLogo || '/logo-thang-tin-hoc.svg'} alt="Logo" className="h-8 max-w-full flex-shrink-0 object-contain" style={dynamicLogo ? { maxHeight: '32px' } : { filter: 'brightness(0) invert(1)' }} />
-          </div>
+            <img src={dynamicLogo || '/logo-thang-tin-hoc.svg'} alt="Thắng Tin Học" className="h-8 max-w-full flex-shrink-0 object-contain" style={dynamicLogo ? { maxHeight: '32px' } : { filter: 'brightness(0) invert(1)' }} />
+          </button>
         )}
         <button
+          type="button"
           onClick={() => setCollapsed(c => !c)}
+          aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
           className="hidden lg:flex w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 items-center justify-center flex-shrink-0 transition-all"
         >
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {collapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
         </button>
       </div>
 
       {/* ── User info ── */}
       {(!collapsed || mobileOpen) && (
-        <div className="px-5 pt-8 pb-6 border-b border-white/10">
+        <div data-guide-key="welcome" className="px-5 pt-8 pb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-full ${config.accentColor} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-              {initials}
-            </div>
+            <img
+              src={avatarUrl}
+              alt={userName || initials}
+              className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-white/40 bg-white shadow-sm"
+            />
             <div className="min-w-0">
               <p className="text-white font-bold text-sm truncate">{userName || 'Người dùng'}</p>
               <p className="text-white/50 text-xs">{config.brand.label}</p>
@@ -298,7 +341,7 @@ const AppSidebar = ({
         </div>
       )}
 
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto overscroll-contain" style={{ overflowAnchor: 'none' }}>
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
       {filterItems(config.items)
         .filter(item => {
           // Ẩn mục 'Bài Test' khi GV đã được kích hoạt giảng dạy
@@ -309,32 +352,35 @@ const AppSidebar = ({
           const renderNavButton = (navItem, { nested = false } = {}) => {
             const Icon = navItem.icon;
             const active = isActive(navItem);
-            const isLocked = teacherPending && navItem.key !== 'test';
+            const isLocked = teacherPending && navItem.key !== 'test' && navItem.key !== 'feed';
             return (
-              <div key={navItem.key} className="relative group/nav">
+              <div key={navItem.key} className="relative group/nav" data-guide-key={navItem.key}>
                 <button
+                  type="button"
                   onClick={() => !isLocked && handleClick(navItem)}
-                  title={isLocked ? '🔒 Bạn chưa phải là giáo viên chính thức nên chưa được mở' : (collapsed && !mobileOpen ? navItem.label : undefined)}
-                  className={`w-full flex items-center gap-3 rounded-xl transition-all
+                  disabled={isLocked}
+                  aria-current={active ? 'page' : undefined}
+                  title={isLocked ? 'Bạn chưa phải là giáo viên chính thức nên chưa được mở' : (collapsed && !mobileOpen ? navItem.label : undefined)}
+                  className={`w-full flex items-center gap-3 rounded-xl transition-all min-w-0
                     ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-3' : nested ? 'px-4 py-2.5 pl-9' : 'px-4 py-3'}
                     ${isLocked
-                      ? 'text-white/30 cursor-not-allowed'
-                      : active ? config.activeClass : 'text-white/60 hover:text-white hover:bg-white/10'
+                      ? 'text-white/40 cursor-not-allowed'
+                      : active ? config.activeClass : 'text-white/70 hover:text-white hover:bg-white/10'
                     }
                   `}
                 >
-                  <Icon size={nested ? 16 : 18} className="flex-shrink-0" />
-                  {(!collapsed || mobileOpen) && <span className={`font-medium ${nested ? 'text-[13px]' : 'text-sm'}`}>{navItem.label}</span>}
+                  <Icon size={nested ? 16 : 18} className="flex-shrink-0" aria-hidden="true" />
+                  {(!collapsed || mobileOpen) && <span className={`font-medium truncate ${nested ? 'text-[13px]' : 'text-sm'}`}>{navItem.label}</span>}
                   {(!collapsed || mobileOpen) && isLocked && (
-                    <Lock size={13} className="ml-auto text-white/30 flex-shrink-0" />
+                    <Lock size={13} className="ml-auto text-white/40 flex-shrink-0" aria-hidden="true" />
                   )}
                   {(!collapsed || mobileOpen) && !isLocked && getBadgeCount(navItem.key) > 0 && (
-                    <span className="ml-auto px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none drop-shadow-md shadow-red-500/50">
+                    <span className="ml-auto px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none drop-shadow-md shadow-red-500/50" aria-label={`${getBadgeCount(navItem.key)} thông báo`}>
                       {getBadgeCount(navItem.key) > 99 ? '99+' : getBadgeCount(navItem.key)}
                     </span>
                   )}
                   {(collapsed && !mobileOpen) && !isLocked && getBadgeCount(navItem.key) > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-white" />
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-white" aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -395,16 +441,19 @@ const AppSidebar = ({
       <div className="px-3 pb-4 space-y-1 border-t border-white/10 pt-3">
         {config.bottomItems.map(item => {
           const Icon = item.icon;
-          const active = !item.isLogout && isActive(item);
+          const active = !item.isLogout && !item.isHelp && isActive(item);
           return (
             <button
               key={item.key}
+              data-guide-key={item.key}
               onClick={() => handleClick(item)}
               className={`w-full flex items-center gap-3 rounded-xl transition-all
                 ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-3' : 'px-4 py-3'}
                 ${item.isLogout
                   ? 'text-white/50 hover:text-red-400 hover:bg-red-500/10'
-                  : active ? config.activeClass : 'text-white/60 hover:text-white hover:bg-white/10'}
+                  : item.isHelp
+                    ? 'text-amber-200 hover:text-white hover:bg-amber-500/20 border border-amber-400/30'
+                    : active ? config.activeClass : 'text-white/60 hover:text-white hover:bg-white/10'}
               `}
               title={(collapsed && !mobileOpen) ? item.label : undefined}
             >

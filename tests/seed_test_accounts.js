@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  QUANLYCMS — Seed Test Accounts
+ *  dashboardthangtinhoc — Seed Test Accounts
  *  Tạo 20 tài khoản test vào MongoDB: 10 HV + 5 GV + 5 Admin chi nhánh
  *  Chạy: node tests/seed_test_accounts.js
  * ═══════════════════════════════════════════════════════════════════════
@@ -15,7 +15,7 @@ const { TEST_ACCOUNTS } = require('./config');
 
 async function seed() {
   console.log('═══════════════════════════════════════════════');
-  console.log('  🌱 SEED TEST ACCOUNTS — QUANLYCMS');
+  console.log('  🌱 SEED TEST ACCOUNTS — dashboardthangtinhoc');
   console.log('═══════════════════════════════════════════════');
 
   await mongoose.connect(process.env.MONGODB_URI);

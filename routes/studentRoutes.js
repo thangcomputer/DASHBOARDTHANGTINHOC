@@ -252,6 +252,13 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) 
       return res.status(403).json({ success: false, message: 'Không có quyền truy cập dữ liệu học viên cơ sở khác' });
     }
 
+    const isSelf = req.user.role === 'student' && req.user.id === student._id.toString();
+    const isMyTeacher = req.user.role === 'teacher' && studentMatchesTeacher(student, req.user.id);
+    const isAdminOrStaff = req.user.role === 'admin' || req.user.role === 'staff';
+    if (!isAdminOrStaff && !isSelf && !isMyTeacher) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem thông tin này' });
+    }
+
     // 1. Lịch sử điểm danh/học tập
     const schedules = await Schedule.find({ studentId: req.params.id }).sort({ date: -1 });
 
@@ -449,7 +456,8 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
       if (req.user.id !== req.params.id) {
         return res.status(403).json({ success: false, message: 'Bạn chỉ có thể cập nhật hồ sơ của chính mình' });
       }
-      const allowedKeys = ['email', 'zalo', 'address', 'password', 'avatar', 'examProgress'];
+      // examProgress: dùng PUT /:id/exam-progress (state machine server-side)
+      const allowedKeys = ['email', 'zalo', 'address', 'password', 'avatar'];
       Object.keys(safeBody).forEach(key => {
         if (!allowedKeys.includes(key)) {
           delete safeBody[key];
@@ -561,10 +569,62 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
   }
 });
 
+// ─── PUT /api/students/:id/exam-progress ───────────────────────────────────────
+// Học viên cập nhật tiến độ thi 1 môn (server merge + validate)
+router.put('/:id/exam-progress', [authMiddleware, branchFilter, assertStudentBranchAccess], async (req, res) => {
+  try {
+    const { applyStudentExamProgress } = require('../services/examProgressService');
+    const isSelf = req.user.role === 'student' && String(req.user.id) === String(req.params.id);
+    const isStaff = req.user.role === 'admin' || req.user.role === 'staff';
+    if (!isSelf && !isStaff) {
+      return res.status(403).json({ success: false, message: 'Không có quyền cập nhật tiến độ thi' });
+    }
+
+    const { subjectId, changes } = req.body || {};
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+
+    if (isSelf) {
+      const unlocked = Boolean(student.studentExamUnlocked || student.examApproved);
+      const hasActive = (student.examProgress || []).some((e) => e && e.status === 'dang_thi');
+      if (!unlocked && !hasActive) {
+        return res.status(403).json({ success: false, message: 'Chưa được mở khóa phòng thi' });
+      }
+    }
+
+    let progress;
+    let entry;
+    try {
+      ({ progress, entry } = applyStudentExamProgress(student, subjectId, changes || {}));
+    } catch (verr) {
+      return res.status(verr.status || 400).json({ success: false, message: verr.message });
+    }
+
+    student.examProgress = progress;
+    await student.save({ validateModifiedOnly: true });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('student:updated', student._id);
+      io.emit('data:refresh', { type: 'student', id: student._id });
+    }
+
+    return res.json({
+      success: true,
+      data: { examProgress: student.examProgress, entry },
+    });
+  } catch (error) {
+    logger.error('[STUDENTS] exam-progress error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ─── PATCH /api/students/:id/price ────────────────────────────────────────────
 // Admin điều chỉnh học phí riêng cho 1 học viên cụ thể (ghi đè price snapshot)
 // Dùng khi: học viên xin giảm học phí, có mã giảm giá, hoặc Admin muốn áp giá mới
-router.patch('/:id/price', authMiddleware, isAdmin, async (req, res) => {
+router.patch('/:id/price', [authMiddleware, isAdmin, branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const { newPrice, reason = '' } = req.body;
     if (!newPrice || isNaN(newPrice) || Number(newPrice) < 0) {
@@ -605,7 +665,7 @@ router.patch('/:id/price', authMiddleware, isAdmin, async (req, res) => {
 
 // ─── PUT /api/students/:id/pay ─────────────────────────────────────────────────
 // Workflow 4: Admin xác nhận thu học phí → tạo hóa đơn tự động
-router.put('/:id/pay', authMiddleware, isAdmin, async (req, res) => {
+router.put('/:id/pay', [authMiddleware, isAdmin, branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const { paymentMethod = 'transfer', note = '' } = req.body;
 
@@ -671,7 +731,7 @@ router.put('/:id/pay', authMiddleware, isAdmin, async (req, res) => {
 
 // ─── PUT /api/students/:id/unlock-exam ────────────────────────────────────────
 // Workflow 2: Admin mở khóa phòng thi thủ công
-router.put('/:id/unlock-exam', authMiddleware, isAdmin, async (req, res) => {
+router.put('/:id/unlock-exam', [authMiddleware, isAdmin, branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const student = await Student.findByIdAndUpdate(
       req.params.id,
@@ -943,26 +1003,114 @@ router.put('/:id/assign-teacher', authMiddleware, isAdmin, async (req, res) => {
     }
 
     let teacherName = '';
+    let teacherDoc = null;
+    // Validate ObjectId khi gán GV
     if (!isUnassign && teacherId) {
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(teacherId)) {
+        return res.status(400).json({ success: false, message: 'ID giảng viên không hợp lệ' });
+      }
       const Teacher = require('../models/Teacher');
-      const t = await Teacher.findById(teacherId).select('name').lean();
-      teacherName = t?.name || 'Giảng viên';
+      const t = await Teacher.findById(teacherId).select('name status role specialty subjectIds').lean();
+      if (!t || t.role !== 'teacher') {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+      }
+      if (String(t.status || '').toLowerCase() !== 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Giảng viên chưa được cấp quyền giảng dạy (Active). Duyệt GV trước khi phân công.',
+        });
+      }
+      teacherDoc = t;
+      teacherName = t.name || 'Giảng viên';
     }
 
+    // Khớp môn: khóa học HV ↔ chuyên môn GV
     let targetCourse = student.course;
+    let targetExamSubjects = [];
     if (enrollmentId && student.enrollments?.length) {
+      const idxPreview = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
+      if (idxPreview >= 0) {
+        targetCourse = student.enrollments[idxPreview].courseName || targetCourse;
+        targetExamSubjects = student.enrollments[idxPreview].examSubjects || [];
+      }
+    } else if (student.enrollments?.length) {
+      const primaryIdx = student.enrollments.findIndex((e) => e.isPrimary);
+      const idx = primaryIdx >= 0 ? primaryIdx : 0;
+      targetCourse = student.enrollments[idx]?.courseName || targetCourse;
+      targetExamSubjects = student.enrollments[idx]?.examSubjects || [];
+    }
+
+    if (!isUnassign && teacherDoc && targetCourse) {
+      const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
+      const teacherSubs = resolveTeacherSubjectIds(teacherDoc);
+      const courseName = String(targetCourse || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
+      const specialty = String(teacherDoc.specialty || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
+      let matched = false;
+      if (Array.isArray(targetExamSubjects) && targetExamSubjects.length && teacherSubs.length) {
+        const set = new Set(teacherSubs.map(String));
+        matched = targetExamSubjects.some((id) => set.has(String(id)));
+      }
+      if (!matched && specialty && courseName) {
+        matched = specialty.includes(courseName) || courseName.includes(specialty)
+          || specialty.split(/[,;|/]+/).some((p) => {
+            const part = p.trim();
+            return part.length >= 3 && (courseName.includes(part) || part.includes(courseName));
+          });
+      }
+      if (!matched && teacherSubs.length) {
+        matched = teacherSubs.some((id) => {
+          const idn = String(id || '').toLowerCase();
+          return idn && courseName.includes(idn);
+        });
+      }
+      // Office ↔ office keywords
+      if (!matched) {
+        const isOfficeCourse = /van phong|thvp|tin hoc van phong|microsoft office|excel|word|powerpoint|ppt|coban|may vi tinh/.test(courseName);
+        const isOfficeTeacher = teacherSubs.some((id) => ['coban', 'word', 'excel', 'powerpoint'].includes(String(id)))
+          || /van phong|office|excel|word|powerpoint|coban/.test(specialty);
+        if (isOfficeCourse && isOfficeTeacher) matched = true;
+      }
+      if (!matched) {
+        return res.status(400).json({
+          success: false,
+          message: `Giảng viên "${teacherName}" không phụ trách môn "${targetCourse}". Chọn GV đúng chuyên môn.`,
+        });
+      }
+    }
+
+    const mongoose = require('mongoose');
+    const hasValidEnrollmentId = enrollmentId
+      && enrollmentId !== 'main'
+      && mongoose.Types.ObjectId.isValid(String(enrollmentId));
+
+    if (hasValidEnrollmentId && student.enrollments?.length) {
       const idx = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
       if (idx < 0) {
         return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
       }
+      const prevEnrTeacher = student.enrollments[idx].teacherId;
       student.enrollments[idx].teacherId = isUnassign ? null : teacherId;
       student.enrollments[idx].teacherName = teacherName;
       targetCourse = student.enrollments[idx].courseName;
-      if (student.enrollments[idx].isPrimary) {
-        student.teacherId = isUnassign ? null : teacherId;
+      const isPrimary = !!student.enrollments[idx].isPrimary || student.enrollments.length === 1;
+      if (isUnassign) {
+        // Bỏ phân công: luôn xóa teacherId cấp HV nếu là khóa chính / khóa duy nhất
+        // hoặc teacherId cấp HV đang trùng GV của khóa này
+        const topTid = student.teacherId?._id || student.teacherId;
+        if (isPrimary || String(topTid || '') === String(prevEnrTeacher || '')) {
+          student.teacherId = null;
+          student.teacherName = '';
+        }
+      } else if (isPrimary) {
+        student.teacherId = teacherId;
+        student.teacherName = teacherName;
       }
     } else {
       student.teacherId = isUnassign ? null : teacherId;
+      student.teacherName = isUnassign ? '' : teacherName;
       const primaryIdx = student.enrollments?.findIndex((e) => e.isPrimary);
       const idx = primaryIdx >= 0 ? primaryIdx : 0;
       if (student.enrollments?.[idx]) {
@@ -970,6 +1118,11 @@ router.put('/:id/assign-teacher', authMiddleware, isAdmin, async (req, res) => {
         student.enrollments[idx].teacherName = teacherName;
         targetCourse = student.enrollments[idx].courseName;
       }
+    }
+
+    // Mark enrollments modified for Mongoose subdocument arrays
+    if (student.enrollments?.length) {
+      student.markModified('enrollments');
     }
 
     if (student.status === 'Chờ xếp lớp' && !isUnassign) {
@@ -1010,6 +1163,9 @@ router.put('/:id/assign-teacher', authMiddleware, isAdmin, async (req, res) => {
         io.to(teacherId.toString()).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId });
         io.emit('student:assigned', { teacherId: teacherId.toString(), studentId: student._id.toString() });
+        io.emit('data:refresh', { type: 'student', id: student._id });
+      } else if (io && isUnassign) {
+        io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId: null });
         io.emit('data:refresh', { type: 'student', id: student._id });
       }
     } catch (notifErr) {
@@ -1149,7 +1305,7 @@ router.post('/:id/reset-history', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // ─── PUT /api/students/:id/pay-teacher (THANH TOÁN LƯƠNG TRÊN TỪNG HỌC VIÊN) ───
-router.put('/:id/pay-teacher', authMiddleware, isAdmin, async (req, res) => {
+router.put('/:id/pay-teacher', [authMiddleware, isAdmin, branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const { action } = req.body; // 'PARTIAL' (thanh toán cộng dồn) hoặc 'PAID_IN_ADVANCE' (trả trước trọn gói)
     const studentId = req.params.id;

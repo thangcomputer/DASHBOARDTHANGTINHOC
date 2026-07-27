@@ -27,9 +27,21 @@ export default {
         'fluid-2xl': ['clamp(1.25rem, 1.1rem + 1vw, 1.5rem)', { lineHeight: '1.25' }],
         'fluid-3xl': ['clamp(1.5rem, 1.2rem + 1.5vw, 1.875rem)', { lineHeight: '1.2' }],
       },
+      borderRadius: {
+        cms: '1rem',
+        'cms-lg': '1.25rem',
+        'cms-xl': '1.5rem',
+      },
+      boxShadow: {
+        cms: '0 4px 20px rgba(15, 23, 42, 0.04)',
+        'cms-md': '0 8px 28px rgba(15, 23, 42, 0.08)',
+        'cms-lg': '0 16px 40px rgba(15, 23, 42, 0.12)',
+      },
       spacing: {
         'safe-b': 'env(safe-area-inset-bottom, 0px)',
         'safe-r': 'env(safe-area-inset-right, 0px)',
+        'safe-l': 'env(safe-area-inset-left, 0px)',
+        'safe-t': 'env(safe-area-inset-top, 0px)',
       },
       colors: {
         brand: {
@@ -40,7 +52,10 @@ export default {
           zalo: '#0068FF',
           shell: '#0f172a',
         }
-      }
+      },
+      transitionTimingFunction: {
+        cms: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
     },
   },
   plugins: [],

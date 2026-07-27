@@ -44,7 +44,7 @@ tests/videos/
 .idea/
 
 # Thư mục lồng nhau nhầm (bản copy utils) — không đưa lên Git
-/QUANLYCMS/
+/dashboardthangtinhoc/
 
 # Deploy scripts with local credentials (use deploy/full_deploy.example.cjs)
 full_deploy.cjs

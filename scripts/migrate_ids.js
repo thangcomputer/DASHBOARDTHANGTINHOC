@@ -13,7 +13,7 @@ const MessageSchema = new mongoose.Schema({
 const Message = mongoose.model('Message', MessageSchema);
 
 async function migrate() {
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/quanlycms');
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dashboardthangtinhoc');
   console.log('Connected to MongoDB');
 
   const messages = await Message.find({});

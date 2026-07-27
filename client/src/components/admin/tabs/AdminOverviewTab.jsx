@@ -65,7 +65,7 @@ export default function AdminOverviewTab({
               {filteredStudents.slice(0, 5).map((s) => (
                 <div key={s.id || s._id} className="group flex flex-col gap-3 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between p-4 rounded-2xl hover:bg-red-50/50 transition-all border border-transparent hover:border-red-100 min-w-0">
                   <div className="flex items-center gap-4 min-w-0">
-                    <Avatar initials={(s.name || '?').charAt(0).toUpperCase()} color={s.paid ? 'bg-red-600' : 'bg-slate-400'} />
+                    <Avatar initials={(s.name || '?').charAt(0).toUpperCase()} name={s.name} role="student" src={s.avatar} color={s.paid ? 'bg-red-600' : 'bg-slate-400'} />
                     <div>
                       <p className="text-sm font-black text-gray-800 group-hover:text-red-700 transition-colors uppercase tracking-tight">{s.name}</p>
                       <p className="text-xs text-gray-400 font-bold">{s.course || 'Chưa chọn khóa'}</p>
@@ -99,7 +99,7 @@ export default function AdminOverviewTab({
               {safeTeachers.slice(0, 5).map((t) => (
                 <div key={t.id || t._id} className="group flex flex-col gap-3 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 min-w-0">
                   <div className="flex items-center gap-4 min-w-0">
-                    <Avatar initials={(t.name || '?').substring(0, 2).toUpperCase()} color={['Active', 'active'].includes(t.status) ? 'bg-red-600' : 'bg-amber-500'} />
+                    <Avatar initials={(t.name || '?').substring(0, 2).toUpperCase()} name={t.name} role="teacher" src={t.avatar} color={['Active', 'active'].includes(t.status) ? 'bg-red-600' : 'bg-amber-500'} />
                     <div>
                       <p className="text-sm font-black text-gray-800 uppercase tracking-tight">{t.name}</p>
                       <p className="text-xs text-gray-400 font-bold uppercase">{t.phone} {t.branchCode ? `· ${t.branchCode}` : ''}</p>

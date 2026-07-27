@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { X, BookOpen, Loader2, Plus } from 'lucide-react';
 import { useToast } from '../../../utils/toast';
+import { teacherMatchesCourse } from '../../../utils/examSubjects';
 
 function courseEffectivePrice(c) {
   return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
@@ -103,7 +105,7 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5 block">Khóa học</label>
-            <select
+            <CmsSelect
               value={form.courseId}
               onChange={(e) => handleCourseChange(e.target.value)}
               className="w-full py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-400"
@@ -113,23 +115,37 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
               {dbCourses.map((c) => (
                 <option key={c._id} value={c._id}>{c.name}</option>
               ))}
-            </select>
+            </CmsSelect>
           </div>
 
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5 block">Giảng viên</label>
-            <select
+            <CmsSelect
               value={form.teacherId}
               onChange={(e) => setForm((f) => ({ ...f, teacherId: e.target.value }))}
               className="w-full py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-400"
             >
               <option value="">Chưa phân công</option>
-              {(teachers || [])
-                .filter((t) => t.status === 'Active' || t.status === 'active')
-                .map((t) => (
-                  <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
-                ))}
-            </select>
+              {(() => {
+                const active = (teachers || []).filter((t) => String(t.status || '').toLowerCase() === 'active');
+                const matched = [];
+                const other = [];
+                for (const t of active) {
+                  if (teacherMatchesCourse(t, form.courseName)) matched.push(t);
+                  else other.push(t);
+                }
+                return (
+                  <>
+                    {matched.map((t) => (
+                      <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                    ))}
+                    {other.map((t) => (
+                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
+                    ))}
+                  </>
+                );
+              })()}
+            </CmsSelect>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

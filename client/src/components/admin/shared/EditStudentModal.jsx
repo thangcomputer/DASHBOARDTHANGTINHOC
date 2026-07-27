@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { X, Save, KeyRound, Edit3, Loader2 } from 'lucide-react';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
@@ -185,12 +186,12 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
               {isSuperAdmin && (
                 <div>
                   <label className="text-sm font-semibold text-gray-700 block mb-1.5">Cơ sở đăng ký</label>
-                  <select name="branchId" value={form.branchId || ''} onChange={handleChange} className="w-full border-2 border-gray-200 rounded-xl p-3.5 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition text-sm font-bold text-gray-800 bg-gray-50 cursor-pointer">
+                  <CmsSelect name="branchId" value={form.branchId || ''} onChange={handleChange} className="w-full border-2 border-gray-200 rounded-xl p-3.5 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition text-sm font-bold text-gray-800 bg-gray-50 cursor-pointer">
                     <option value="">-- Chọn cơ sở --</option>
                     {branches.map((b) => (
                       <option key={b._id} value={b._id}>{b.name}</option>
                     ))}
-                  </select>
+                  </CmsSelect>
                 </div>
               )}
 
@@ -213,7 +214,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
               <div>
                 <label className="text-sm font-semibold text-gray-700 block mb-1.5">Khóa học đăng ký</label>
                 {dbCourses.length > 0 ? (
-                  <select
+                  <CmsSelect
                     name="courseId"
                     value={selectCourseId}
                     onChange={handleCourseSelect}
@@ -228,7 +229,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
                         </option>
                       );
                     })}
-                  </select>
+                  </CmsSelect>
                 ) : (
                   <div className="flex items-center gap-2 border-2 border-gray-200 rounded-xl p-3.5 text-gray-400 text-sm bg-gray-50">
                     <Loader2 size={16} className="animate-spin" /> Đang tải dữ liệu...
@@ -265,7 +266,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
 
               <div>
                 <label className="text-sm font-semibold text-gray-700 block mb-1.5">Giảng viên hướng dẫn <span className="text-gray-400 font-normal">(Tùy chọn)</span></label>
-                <select name="teacherId" value={form.teacherId} onChange={handleChange} className="w-full border-2 border-gray-200 rounded-xl p-3.5 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition text-sm bg-gray-50 cursor-pointer">
+                <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="w-full border-2 border-gray-200 rounded-xl p-3.5 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition text-sm bg-gray-50 cursor-pointer">
                   <option value="">-- Có thể chọn sau --</option>
                   {(teachers || []).filter(Boolean).filter((t) => {
                     const s = (t.status || '').toLowerCase();
@@ -273,7 +274,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
                   }).map((t) => (
                     <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.phone ? ` — ${t.phone}` : ''}</option>
                   ))}
-                </select>
+                </CmsSelect>
               </div>
             </div>
           </div>

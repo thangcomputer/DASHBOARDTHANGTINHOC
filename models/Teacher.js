@@ -144,6 +144,11 @@ const TeacherSchema = new mongoose.Schema(
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login → vô hiệu token cũ
     isFirstLogin: { type: Boolean, default: true },
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập
+
+    // ── MFA (TOTP) — dành cho tài khoản nội bộ admin/staff ────────
+    mfaEnabled: { type: Boolean, default: false },
+    mfaSecret: { type: String, default: '', select: false },
+    mfaPendingSecret: { type: String, default: '', select: false },
   },
   {
     timestamps: true,

@@ -4,7 +4,7 @@ const Student = require('../models/Student');
 
 async function check() {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/quanlycms');
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dashboardthangtinhoc');
     console.log('✅ Connected to MongoDB');
 
     const beTho = await Student.findOne({ name: /BÉ THỎ/i }).lean();

@@ -1,25 +1,12 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import api from '../services/api';
-import { loadState } from './dataStorage';
 
 /**
- * Schedules state and attendance for DataProvider.
+ * Schedule mutations and attendance (schedules list owned by ScheduleContext / SWR).
  */
-export function useDataSchedule({ students, teachers, setStudents, triggerBackgroundSync, addNotification }) {
-  const [schedules, setSchedules] = useState(() => loadState('thvp_schedules', []));
-
-  // Strip null entries that may exist in legacy localStorage caches
-  useEffect(() => {
-    setSchedules((prev) => {
-      if (!Array.isArray(prev)) return prev;
-      const next = prev.filter(Boolean);
-      return next.length === prev.length ? prev : next;
-    });
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('thvp_schedules', JSON.stringify(schedules));
-  }, [schedules]);
+export function useDataSchedule({
+  schedules, setSchedules, students, teachers, setStudents, triggerBackgroundSync, addNotification,
+}) {
 
   // Điểm danh (GV)
   const markAttendance = useCallback(async (studentId, note, grade, courseName) => {

@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 const c = `export function normalizeTeacherStatus(status) {
   return String(status || "").toLowerCase();
 }
@@ -32,4 +33,4 @@ export function getTeacherStatusLabel(status) {
   return TEACHER_STATUS_LABELS[key] || status || "Ch\u01b0a c\u1ea5p quy\u1ec1n";
 }
 `;
-fs.writeFileSync("d:/QUANLYCMS/client/src/constants/teacherStatus.js", c, "utf8");
+fs.writeFileSync(path.join(__dirname, "..", "client", "src", "constants", "teacherStatus.js"), c, "utf8");

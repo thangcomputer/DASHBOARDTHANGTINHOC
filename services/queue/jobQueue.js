@@ -49,8 +49,13 @@ async function runInline(kind, name, data) {
 
 /**
  * Khoi dong queue + workers. Goi 1 lan sau khi server boot.
+ * opts.workers === false → chi producer (API). Worker process goi opts.workers === true.
  */
-async function initJobQueue() {
+async function initJobQueue(opts = {}) {
+  const wantWorkers =
+    opts.workers === true ||
+    (opts.workers !== false && process.env.QUEUE_PRODUCER_ONLY !== '1' && process.env.RUN_QUEUE_WORKERS !== '0');
+
   if (!process.env.REDIS_URL) {
     mode = 'inline';
     logger.info('Job queue: inline mode (no REDIS_URL)');
@@ -62,34 +67,40 @@ async function initJobQueue() {
     const base = parseRedisUrl(process.env.REDIS_URL);
 
     const qConn = { ...base };
-    const wNotifyConn = { ...base };
-    const wPdfConn = { ...base };
-    connections.push(qConn, wNotifyConn, wPdfConn);
+    connections.push(qConn);
 
     notifyQueue = new Queue(QUEUE_NOTIFY, { connection: qConn });
     pdfQueue = new Queue(QUEUE_PDF, { connection: { ...base } });
 
-    const notifyWorker = new Worker(
-      QUEUE_NOTIFY,
-      async (job) => processNotifyJob(job.name, job.data),
-      { connection: wNotifyConn, concurrency: 3 },
-    );
-    const pdfWorker = new Worker(
-      QUEUE_PDF,
-      async (job) => processPdfJob(job.name, job.data),
-      { connection: wPdfConn, concurrency: 2 },
-    );
+    if (wantWorkers) {
+      const wNotifyConn = { ...base };
+      const wPdfConn = { ...base };
+      connections.push(wNotifyConn, wPdfConn);
 
-    for (const w of [notifyWorker, pdfWorker]) {
-      w.on('failed', (job, err) => {
-        logger.warn({ job: job?.name, id: job?.id, err: err.message }, '[Queue] job failed');
-      });
-      workers.push(w);
+      const notifyWorker = new Worker(
+        QUEUE_NOTIFY,
+        async (job) => processNotifyJob(job.name, job.data),
+        { connection: wNotifyConn, concurrency: 3 },
+      );
+      const pdfWorker = new Worker(
+        QUEUE_PDF,
+        async (job) => processPdfJob(job.name, job.data),
+        { connection: wPdfConn, concurrency: 2 },
+      );
+
+      for (const w of [notifyWorker, pdfWorker]) {
+        w.on('failed', (job, err) => {
+          logger.warn({ job: job?.name, id: job?.id, err: err.message }, '[Queue] job failed');
+        });
+        workers.push(w);
+      }
+      logger.info('Job queue: BullMQ mode (with workers)');
+    } else {
+      logger.info('Job queue: BullMQ producer-only (no workers in this process)');
     }
 
     mode = 'bullmq';
-    logger.info('Job queue: BullMQ mode');
-    return { mode };
+    return { mode, workers: wantWorkers };
   } catch (err) {
     mode = 'inline';
     notifyQueue = null;

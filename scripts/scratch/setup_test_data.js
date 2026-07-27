@@ -1,8 +1,8 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 async function setup() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/quanlycms');
+  await mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc');
   const Teacher = mongoose.models.Teacher || mongoose.model('Teacher', new mongoose.Schema({ phone: String, branchCode: String, branchId: mongoose.Schema.Types.ObjectId, role: String, adminRole: String }, {strict: false}));
   const Student = mongoose.models.Student || mongoose.model('Student', new mongoose.Schema({ phone: String, branchCode: String, branchId: mongoose.Schema.Types.ObjectId, password: String, role: String, name: String }, {strict: false}));
   const Branch = mongoose.models.Branch || mongoose.model('Branch', new mongoose.Schema({ code: String, name: String }, {strict: false}));

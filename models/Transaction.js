@@ -56,6 +56,9 @@ const transactionSchema = new mongoose.Schema({
   // Ghi chú
   note: { type: String, default: '' },
 
+  // Idempotency (tránh double-pay khi retry)
+  idempotencyKey: { type: String, default: null },
+
   // Chi nhánh
   branchId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -72,5 +75,9 @@ transactionSchema.index({ teacherId: 1, status: 1 });
 transactionSchema.index({ createdAt: -1 });
 transactionSchema.index({ status: 1, createdAt: -1 });
 transactionSchema.index({ branchId: 1, status: 1 });
+transactionSchema.index(
+  { idempotencyKey: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
+);
 
 module.exports = mongoose.model('Transaction', transactionSchema);

@@ -15,7 +15,7 @@ async function fixSSL() {
 # ─── HTTPS (SSL) ───
 <VirtualHost *:443>
     ServerAdmin webmaster@example.com
-    DocumentRoot "/www/wwwroot/quanlycms/client/dist"
+    DocumentRoot "/www/wwwroot/dashboardthangtinhoc/client/dist"
     ServerName dashboard.giasutinhoc24h.com
 
     SSLEngine on
@@ -43,7 +43,7 @@ async function fixSSL() {
         ProxyPassReverse /uploads/ http://127.0.0.1:5000/uploads/
     </IfModule>
 
-    <Directory "/www/wwwroot/quanlycms/client/dist">
+    <Directory "/www/wwwroot/dashboardthangtinhoc/client/dist">
         Options FollowSymLinks
         AllowOverride All
         Require all granted

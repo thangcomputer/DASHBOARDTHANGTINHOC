@@ -7,13 +7,13 @@ async function fix() {
 
   // 1. Kill any process on port 5000
   console.log('=== 1. KILL PORT 5000 PROCESSES ===');
-  const kill = await ssh.execCommand('pm2 delete quanlycms 2>/dev/null; fuser -k 5000/tcp 2>/dev/null; sleep 1; echo "Done killing port 5000"');
+  const kill = await ssh.execCommand('pm2 delete dashboardthangtinhoc 2>/dev/null; fuser -k 5000/tcp 2>/dev/null; sleep 1; echo "Done killing port 5000"');
   console.log(kill.stdout || kill.stderr);
 
   // 2. Fix .env file - add missing MONGODB_URI and other essential vars
   console.log('\n=== 2. FIX .ENV FILE ===');
   const envContent = `PORT=5000
-MONGODB_URI=mongodb://127.0.0.1:27017/quanlycms
+MONGODB_URI=mongodb://127.0.0.1:27017/dashboardthangtinhoc
 JWT_SECRET=thangTinHoc_secret_key_2026
 JWT_REFRESH_SECRET=thangTinHoc_refresh_secret_key_2026
 JWT_EXPIRES_IN=8h
@@ -42,14 +42,14 @@ ACCOUNT_NO=4628686
 ACCOUNT_NAME=PHI VAN THANG
 `;
 
-  const writeEnv = await ssh.execCommand(`cat > /www/wwwroot/quanlycms/.env << 'ENVEOF'
+  const writeEnv = await ssh.execCommand(`cat > /www/wwwroot/dashboardthangtinhoc/.env << 'ENVEOF'
 ${envContent}
 ENVEOF`);
   console.log(writeEnv.stdout || writeEnv.stderr || 'ENV file written successfully');
 
   // 3. Verify .env
   console.log('\n=== 3. VERIFY .ENV ===');
-  const verify = await ssh.execCommand('cat /www/wwwroot/quanlycms/.env');
+  const verify = await ssh.execCommand('cat /www/wwwroot/dashboardthangtinhoc/.env');
   console.log(verify.stdout);
 
   // 4. Check MongoDB is running
@@ -57,9 +57,9 @@ ENVEOF`);
   const mongo = await ssh.execCommand('mongosh --eval "db.adminCommand({ping:1})" 2>/dev/null || mongosh --eval "db.runCommand({ping:1})" 2>/dev/null || echo "Checking mongod..." && systemctl status mongod --no-pager -l 2>/dev/null | head -5');
   console.log(mongo.stdout || mongo.stderr);
 
-  // 5. Start quanlycms with PM2
-  console.log('\n=== 5. START QUANLYCMS ===');
-  const start = await ssh.execCommand('cd /www/wwwroot/quanlycms && NODE_ENV=production pm2 start server.js --name quanlycms');
+  // 5. Start dashboardthangtinhoc with PM2
+  console.log('\n=== 5. START dashboardthangtinhoc ===');
+  const start = await ssh.execCommand('cd /www/wwwroot/dashboardthangtinhoc && NODE_ENV=production pm2 start server.js --name dashboardthangtinhoc');
   console.log(start.stdout || start.stderr);
 
   // 6. Wait and check
@@ -70,7 +70,7 @@ ENVEOF`);
   console.log(status.stdout);
 
   console.log('\n=== 7. PM2 LOGS ===');
-  const logs = await ssh.execCommand('pm2 logs quanlycms --lines 15 --nostream');
+  const logs = await ssh.execCommand('pm2 logs dashboardthangtinhoc --lines 15 --nostream');
   console.log(logs.stdout || logs.stderr);
 
   console.log('\n=== 8. PORT 5000 CHECK ===');

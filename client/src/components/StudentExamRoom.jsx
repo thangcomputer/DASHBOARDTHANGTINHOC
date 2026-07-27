@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   Award, Bell, ChevronRight, Clock, FileText, Monitor,
   CheckCircle, XCircle, Lock, Trophy, User, LogOut,
@@ -427,7 +428,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">Khóa học</label>
-              <select
+              <CmsSelect
                 value={filterCourse}
                 onChange={(e) => setFilterCourse(e.target.value)}
                 className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
@@ -435,11 +436,11 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
                 {courseOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
-              </select>
+              </CmsSelect>
             </div>
             <div>
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">Môn thi</label>
-              <select
+              <CmsSelect
                 value={filterSubject}
                 onChange={(e) => setFilterSubject(e.target.value)}
                 className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
@@ -448,11 +449,11 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
                 {subjectFilterOptions.map((s) => (
                   <option key={s.id} value={s.id}>{s.label}</option>
                 ))}
-              </select>
+              </CmsSelect>
             </div>
             <div>
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">Trạng thái</label>
-              <select
+              <CmsSelect
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
@@ -460,7 +461,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
                 {STATUS_FILTERS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
-              </select>
+              </CmsSelect>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 pt-1">

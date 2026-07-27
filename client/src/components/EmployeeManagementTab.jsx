@@ -4,6 +4,7 @@
  * Tab 2: Trả lương (thanh toán + VietQR + lịch sử)
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   Users, Plus, Edit3, Trash2, DollarSign, Search, RefreshCw,
   CheckCircle2, XCircle, Calendar, Building2, ClipboardList,
@@ -376,11 +377,11 @@ export default function EmployeeManagementTab() {
                 <input type="text" placeholder="Tìm nhân viên..." value={search} onChange={e => setSearch(e.target.value)}
                   className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-300 w-52" />
               </div>
-              <select value={posFilter} onChange={e => setPosFilter(e.target.value)}
+              <CmsSelect value={posFilter} onChange={e => setPosFilter(e.target.value)}
                 className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none bg-white">
                 <option value="all">Tất cả chức vụ</option>
                 {POSITIONS.map(p => <option key={p.value} value={p.value}>{p.emoji} {p.label}</option>)}
-              </select>
+              </CmsSelect>
             </div>
             <button onClick={openAdd}
               className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-purple-500 text-white px-4 py-2.5 rounded-xl text-sm font-black shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all active:scale-95">
@@ -592,10 +593,10 @@ export default function EmployeeManagementTab() {
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-500 block mb-1">Chức vụ</label>
-                    <select value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
+                    <CmsSelect value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none bg-white">
                       {POSITIONS.map(p => <option key={p.value} value={p.value}>{p.emoji} {p.label}</option>)}
-                    </select>
+                    </CmsSelect>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-500 block mb-1">Mức lương (VNĐ/tháng)</label>
@@ -610,14 +611,14 @@ export default function EmployeeManagementTab() {
                   {isSuperAdmin && (
                     <div className="col-span-2">
                       <label className="text-xs font-bold text-gray-500 block mb-1">Chi nhánh</label>
-                      <select value={form.branchId} onChange={e => {
+                      <CmsSelect value={form.branchId} onChange={e => {
                         const br = branches.find(b => String(b._id) === e.target.value);
                         setForm(f => ({ ...f, branchId: e.target.value, branchCode: br?.code || br?.name || '' }));
                       }}
                         className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none bg-white">
                         <option value="">— Chọn chi nhánh —</option>
                         {branches.map(b => <option key={b._id} value={b._id}>🏢 {b.name} ({b.code})</option>)}
-                      </select>
+                      </CmsSelect>
                     </div>
                   )}
                 </div>
@@ -631,11 +632,11 @@ export default function EmployeeManagementTab() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
                     <label className="text-xs font-bold text-gray-500 block mb-1">Ngân hàng</label>
-                    <select value={form.bankCode} onChange={e => setForm(f => ({ ...f, bankCode: e.target.value }))}
+                    <CmsSelect value={form.bankCode} onChange={e => setForm(f => ({ ...f, bankCode: e.target.value }))}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none bg-white">
                       <option value="">— Chọn ngân hàng —</option>
                       {VN_BANKS.map(b => <option key={`${b.code}-${b.shortName}`} value={b.code}>🏦 {b.shortName} — {b.name}</option>)}
-                    </select>
+                    </CmsSelect>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-500 block mb-1">Số tài khoản</label>

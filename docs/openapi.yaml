@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: QUANLYCMS API
+  title: DashboardThangTinHoc API
   version: "1.0.0"
   description: |
-    API backend QUANLYCMS (Express + MongoDB).
+    API backend dashboardthangtinhoc (Express + MongoDB).
     Auth: Bearer JWT. Mutating requests: CSRF cookie `csrf_token` + header `X-CSRF-Token`.
     Super Admin tenant scope: header `X-Tenant-Id`.
 servers:

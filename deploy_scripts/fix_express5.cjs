@@ -8,7 +8,7 @@ async function fixExpress5() {
   const patchCmd = `
 cat << 'EOF' > patch2.js
 const fs = require('fs');
-let code = fs.readFileSync('/www/wwwroot/quanlycms/server.js', 'utf8');
+let code = fs.readFileSync('/www/wwwroot/dashboardthangtinhoc/server.js', 'utf8');
 
 // Remove the old buggy static code
 const oldBuggyCode = \`app.get('*', (req, res) => {
@@ -30,10 +30,10 @@ app.use((req, res, next) => {
 
 code = code.replace(/\\/\\/ ==========================================\\r?\\n\\/\\/ ERROR HANDLING/, newStaticCode + '\\n\\n// ==========================================\\n// ERROR HANDLING');
 
-fs.writeFileSync('/www/wwwroot/quanlycms/server.js', code);
+fs.writeFileSync('/www/wwwroot/dashboardthangtinhoc/server.js', code);
 EOF
 node patch2.js
-pm2 restart quanlycms
+pm2 restart dashboardthangtinhoc
 `;
 
   await ssh.execCommand(patchCmd);

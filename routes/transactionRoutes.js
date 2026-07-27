@@ -14,7 +14,7 @@ const logger = require('../config/logger');
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
 router.get('/', [authMiddleware, branchFilter], async (req, res) => {
   try {
-    const { status, teacherId, month, branchId: queryBranch } = req.query;
+    const { status, teacherId, month, branchId: queryBranch, page, limit } = req.query;
     const filter = { ...req.branchFilter };
 
     if (queryBranch && queryBranch !== 'all' && !filter.branchId) filter.branchId = queryBranch;
@@ -22,11 +22,27 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
     if (teacherId) filter.teacherId = teacherId;
     if (month)     filter.month     = { $regex: month, $options: 'i' };
 
-    const transactions = await Transaction.find(filter)
-      .populate('teacherId', 'name phone specialty bankAccount branchId branchCode')
-      .sort({ createdAt: -1 });
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(1000, Math.max(1, parseInt(limit, 10) || 200));
+    const skip = (pageNum - 1) * limitNum;
 
-    res.json({ success: true, count: transactions.length, data: transactions });
+    const [transactions, total] = await Promise.all([
+      Transaction.find(filter)
+        .populate('teacherId', 'name phone specialty bankAccount branchId branchCode')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum),
+      Transaction.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      count: transactions.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      data: transactions,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

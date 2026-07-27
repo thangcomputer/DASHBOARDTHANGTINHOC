@@ -416,13 +416,12 @@ router.get('/sync/:userId', async (req, res) => {
         { senderId: userId },
         { receiverId: userId },
         ...(isSuperAdminAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
-        // Tin nhắn nhóm: conversationId bắt đầu bằng "group_" và thuộc nhóm của user
         ...(groupIds.length > 0 ? [{ conversationId: { $in: groupIds.map(id => `group_${id}`) } }] : [])
       ],
       hiddenFor: { $ne: userId }
-    }).sort({ createdAt: 1 });
+    }).sort({ createdAt: -1 }).limit(500);
 
-    res.json({ success: true, data: sanitizeMessages(messages) });
+    res.json({ success: true, data: sanitizeMessages(messages.reverse()) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -495,6 +494,29 @@ router.post('/', async (req, res) => {
     const { receiverId, receiverName, receiverRole, content, isGroup, groupId, messageType, fileUrl, fileName } = req.body;
 
     const isBroadcast = receiverId === 'ALL_USERS' || receiverId === 'ALL_STUDENTS' || receiverId === 'ALL_TEACHERS';
+    if (isBroadcast && !(req.user.role === 'admin' || req.user.role === 'staff')) {
+      return res.status(403).json({ success: false, message: 'Chỉ admin/staff được gửi thông báo broadcast' });
+    }
+
+    if (isGroup && groupId) {
+      const group = await Group.findById(groupId).select('participants').lean();
+      if (!group) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm chat' });
+      }
+      const isMember = (group.participants || []).some((p) => String(p.userId) === String(senderId));
+      if (!isMember && !isSuperAdminAccount(req.user)) {
+        return res.status(403).json({ success: false, message: 'Bạn không thuộc nhóm chat này' });
+      }
+    }
+
+    // Enforce contacts matrix cho DM (không áp dụng broadcast/group)
+    if (!isBroadcast && !(isGroup && groupId)) {
+      const { assertCanDirectMessage } = require('../services/chatAccessService');
+      const access = await assertCanDirectMessage(req.user, receiverId, receiverRole);
+      if (!access.ok) {
+        return res.status(403).json({ success: false, message: access.message || 'Không được nhắn tin đến người này' });
+      }
+    }
 
     let conversationId;
     if (isGroup && groupId) {
@@ -863,6 +885,12 @@ router.post('/groups', async (req, res) => {
 // ── Lấy danh sách nhóm của user ──
 router.get('/groups/user/:userId', async (req, res) => {
   try {
+    const targetId = String(req.params.userId || '');
+    const isSelf = String(req.user.id) === targetId;
+    const isAdminOrStaff = req.user.role === 'admin' || req.user.role === 'staff';
+    if (!isSelf && !isAdminOrStaff) {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem nhóm của người khác' });
+    }
     const groups = await Group.find({ 'participants.userId': req.params.userId }).sort({ updatedAt: -1 });
     res.json({ success: true, data: groups });
   } catch (err) {

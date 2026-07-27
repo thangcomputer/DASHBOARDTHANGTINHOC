@@ -1,7 +1,7 @@
 # Phase 20 — Final Review
 
 Ngày review: 2026-07-04  
-Phạm vi: Roadmap Phase 1–20 (enterprise hardening QUANLYCMS)
+Phạm vi: Roadmap Phase 1–20 (enterprise hardening DashboardThangTinHoc)
 
 ## 1. Trạng thái roadmap
 

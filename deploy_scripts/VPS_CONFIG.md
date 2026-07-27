@@ -5,7 +5,7 @@
 ```apache
 <VirtualHost *:80>
     ServerAdmin webmaster@example.com
-    DocumentRoot "/www/wwwroot/quanlycms/client/dist"
+    DocumentRoot "/www/wwwroot/dashboardthangtinhoc/client/dist"
     ServerName dashboard.giasutinhoc24h.com
 
     <IfModule mod_rewrite.c>
@@ -37,7 +37,7 @@
     ErrorLog "/www/wwwlogs/dashboard.giasutinhoc24h.com-error_log"
     CustomLog "/www/wwwlogs/dashboard.giasutinhoc24h.com-access_log" combined
 
-    <Directory "/www/wwwroot/quanlycms/client/dist">
+    <Directory "/www/wwwroot/dashboardthangtinhoc/client/dist">
         Options FollowSymLinks
         AllowOverride All
         Require all granted
@@ -68,9 +68,9 @@
 
 - **IP VPS:** 103.124.92.238
 - **Domain:** dashboard.giasutinhoc24h.com
-- **Backend chạy tại:** `/www/wwwroot/quanlycms/` (port 5000)
-- **Frontend dist tại:** `/www/wwwroot/quanlycms/client/dist/`
-- **PM2 app name:** `quanlycms`
+- **Backend chạy tại:** `/www/wwwroot/dashboardthangtinhoc/` (port 5000)
+- **Frontend dist tại:** `/www/wwwroot/dashboardthangtinhoc/client/dist/`
+- **PM2 app name:** `dashboardthangtinhoc`
 - **Web server:** Apache (aaPanel) — không có Nginx
 - **Apache config include path:** `/www/server/panel/vhost/apache/*.conf`
 
@@ -78,13 +78,13 @@
 
 ```bash
 # Restart PM2
-pm2 restart quanlycms
+pm2 restart dashboardthangtinhoc
 
 # Restart Apache
 /etc/init.d/httpd restart
 
 # Xem log backend
-pm2 logs quanlycms --lines 50
+pm2 logs dashboardthangtinhoc --lines 50
 
 # Xem log Apache
 tail -50 /www/server/apache/logs/error_log

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Deploy local -> VPS. Copy to deploy/full_deploy.cjs + .env.deploy (gitignored).
  * Run: node deploy/full_deploy.cjs
  */
@@ -8,7 +8,7 @@ const { NodeSSH } = require('node-ssh');
 
 const host = process.env.DEPLOY_HOST;
 const username = process.env.DEPLOY_USER || 'root';
-const remoteRoot = process.env.DEPLOY_REMOTE_PATH || '/www/wwwroot/quanlycms';
+const remoteRoot = process.env.DEPLOY_REMOTE_PATH || '/www/wwwroot/dashboardthangtinhoc';
 const privateKeyPath = process.env.DEPLOY_SSH_KEY_PATH;
 const password = process.env.DEPLOY_SSH_PASSWORD;
 
@@ -40,7 +40,7 @@ async function fullDeploy() {
     );
     console.log(build.stdout || build.stderr);
 
-    const restart = await ssh.execCommand(`cd ${remoteRoot} && pm2 restart quanlycms --update-env`);
+    const restart = await ssh.execCommand(`cd ${remoteRoot} && pm2 restart dashboardthangtinhoc --update-env`);
     console.log(restart.stdout || restart.stderr);
     await ssh.execCommand('pm2 save');
 

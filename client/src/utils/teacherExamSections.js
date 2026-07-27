@@ -7,6 +7,15 @@ export const TEACHER_EXAM_SECTIONS = [
   { id: 'other', label: 'Ki\u1ebfn th\u1ee9c Kh\u00e1c' },
 ];
 
+const LEGACY_TEACHER_SECTIONS = new Set([
+  'computer', 'situation', 'other', 'supham', 'su-pham', 'ppt', 'pp', 'maytinh',
+]);
+
+/** Section cũ trong DB — vẫn hiện để admin sửa/xóa */
+export function isLegacyTeacherExamSection(section) {
+  return LEGACY_TEACHER_SECTIONS.has(String(section || '').toLowerCase().trim());
+}
+
 export const DEFAULT_TEACHER_EXAM_MINUTES = Object.fromEntries(
   TEACHER_EXAM_SECTIONS.map((s) => [s.id, 90]),
 );

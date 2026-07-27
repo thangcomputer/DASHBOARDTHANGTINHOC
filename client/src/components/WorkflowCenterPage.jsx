@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   GitBranch, Loader2, RefreshCw, CheckCircle2, XCircle, Filter,
 } from 'lucide-react';
@@ -86,18 +87,18 @@ export default function WorkflowCenterPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <Filter size={14} className="text-gray-400" />
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white">
+        <CmsSelect value={status} onChange={(e) => setStatus(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white">
           <option value="open">Đang mở</option>
           <option value="completed">Hoàn thành</option>
           <option value="rejected">Từ chối</option>
           <option value="all">Tất cả</option>
-        </select>
-        <select value={definitionKey} onChange={(e) => setDefinitionKey(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white">
+        </CmsSelect>
+        <CmsSelect value={definitionKey} onChange={(e) => setDefinitionKey(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white">
           <option value="">Mọi loại</option>
           {definitions.map((d) => (
             <option key={d.key} value={d.key}>{d.name}</option>
           ))}
-        </select>
+        </CmsSelect>
       </div>
 
       {status === 'open' && (

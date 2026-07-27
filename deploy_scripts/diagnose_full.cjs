@@ -21,27 +21,27 @@ async function diagnose() {
 
   // ── 1. KIỂM TRA GIT ────────────────────────────────────────
   await run(
-    'cd /www/wwwroot/quanlycms && git status 2>&1',
+    'cd /www/wwwroot/dashboardthangtinhoc && git status 2>&1',
     '1. GIT STATUS (working tree có gì không?)'
   );
 
   await run(
-    'cd /www/wwwroot/quanlycms && git log --oneline -5 2>&1',
+    'cd /www/wwwroot/dashboardthangtinhoc && git log --oneline -5 2>&1',
     '2. GIT LOG - 5 commit gần nhất trên VPS'
   );
 
   await run(
-    'cd /www/wwwroot/quanlycms && git remote -v 2>&1',
+    'cd /www/wwwroot/dashboardthangtinhoc && git remote -v 2>&1',
     '3. GIT REMOTE (origin trỏ đúng GitHub chưa?)'
   );
 
   await run(
-    'cd /www/wwwroot/quanlycms && git fetch origin 2>&1 && git log --oneline origin/main -5 2>&1',
+    'cd /www/wwwroot/dashboardthangtinhoc && git fetch origin 2>&1 && git log --oneline origin/main -5 2>&1',
     '4. GIT FETCH - so sánh với origin/main (có bị behind không?)'
   );
 
   await run(
-    'cd /www/wwwroot/quanlycms && git pull origin main 2>&1',
+    'cd /www/wwwroot/dashboardthangtinhoc && git pull origin main 2>&1',
     '5. GIT PULL origin main'
   );
 
@@ -73,13 +73,13 @@ async function diagnose() {
   );
 
   await run(
-    'pm2 logs quanlycms --lines 30 --nostream 2>&1',
-    '11. PM2 LOGS quanlycms (30 dòng cuối)'
+    'pm2 logs dashboardthangtinhoc --lines 30 --nostream 2>&1',
+    '11. PM2 LOGS dashboardthangtinhoc (30 dòng cuối)'
   );
 
   // ── 4. KIỂM TRA .ENV TRÊN VPS ─────────────────────────────
   await run(
-    'cat /www/wwwroot/quanlycms/.env 2>&1',
+    'cat /www/wwwroot/dashboardthangtinhoc/.env 2>&1',
     '12. FILE .ENV trên VPS'
   );
 

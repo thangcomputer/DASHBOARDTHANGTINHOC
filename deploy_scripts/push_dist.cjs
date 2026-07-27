@@ -9,8 +9,8 @@ async function uploadDist() {
     await ssh.connect(getVpsSshConfig());
     
     console.log('📁 Uploading latest dist build...');
-    const localDir = path.join(__dirname, 'QUANLYCMS/client/dist');
-    const remoteDir = '/www/wwwroot/quanlycms/client/dist';
+    const localDir = path.join(__dirname, '..', 'client', 'dist');
+    const remoteDir = '/www/wwwroot/dashboardthangtinhoc/client/dist';
     
     await ssh.execCommand(`rm -rf ${remoteDir} && mkdir -p ${remoteDir}`);
     

@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   ShieldCheck, UserPlus, Edit2, Trash2, Save, X, Loader2,
   CheckSquare, Square, Key, Phone, User, Shield, Users,
@@ -14,6 +15,7 @@ import {
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
 import { ALL_PERMISSIONS } from '../constants/permissions';
+import { resolveAvatarUrl } from '../utils/defaultAvatars';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 
@@ -126,186 +128,248 @@ function StaffModal({ staff, onClose, onSaved }) {
 
   const isStaff = form.adminRole === 'STAFF';
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+  const fieldClass =
+    'w-full bg-gray-50 border-2 border-transparent focus:border-gray-800 focus:bg-white rounded-[20px] p-4 font-bold text-gray-800 outline-none transition-all shadow-sm';
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-              <ShieldCheck size={18} />
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+    >
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col">
+        {/* Header giống kiểu modal học viên */}
+        <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-8 py-6 flex items-center justify-between">
+          <h3 className="text-white font-black text-2xl flex items-center gap-4">
+            <div className="p-2 bg-white/20 rounded-2xl backdrop-blur-md">
+              <UserPlus size={28} />
             </div>
-            <h3 className="font-black text-lg">{isEdit ? 'Chỉnh sửa quyền' : 'Tạo tài khoản nội bộ'}</h3>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition">
-            <X size={15} />
+            {isEdit ? 'Chỉnh sửa quyền' : 'Tạo tài khoản nội bộ'}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center text-white transition-all cursor-pointer"
+          >
+            <X size={20} />
           </button>
         </div>
 
-        <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
-          {/* Thông tin cơ bản */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Họ tên *</label>
-              <div className="flex items-center border-2 border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-gray-700 transition gap-2">
-                <User size={14} className="text-gray-400" />
-                <input type="text" value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="flex-1 text-sm outline-none" placeholder="Nguyễn Văn A" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Số điện thoại *</label>
-              <div className="flex items-center border-2 border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-gray-700 transition gap-2">
-                <Phone size={14} className="text-gray-400" />
-                <input type="text" value={form.phone}
-                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                  className="flex-1 text-sm font-mono outline-none" placeholder="09xxxxxxxx"
-                  readOnly={isEdit} />
-              </div>
-            </div>
-          </div>
+        <div className="p-10 max-h-[75vh] overflow-y-auto w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {/* Cột trái */}
+            <div className="space-y-6 md:border-r border-gray-100 md:pr-10">
+              <h4 className="font-black text-gray-400 text-xs mb-6 flex items-center gap-2 uppercase tracking-[0.2em]">
+                <span className="w-6 h-6 rounded-lg bg-gray-800 text-white flex items-center justify-center text-xs shadow-lg shadow-slate-200">1</span>
+                Thông tin tài khoản
+              </h4>
 
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
-              {isEdit ? 'Mật khẩu mới (để trống = giữ nguyên)' : 'Mật khẩu *'}
-            </label>
-            <div className="flex items-center border-2 border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-gray-700 transition gap-2">
-              <Key size={14} className="text-gray-400" />
-              <input type="password" value={form.password}
-                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                className="flex-1 text-sm outline-none" placeholder={isEdit ? "••••••" : "Tối thiểu 6 ký tự"} />
-            </div>
-          </div>
-
-          {/* Vai trò */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Vai trò</label>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { val: 'SUPER_ADMIN', label: 'Super Admin', desc: 'Toàn quyền hệ thống', icon: Crown,   color: 'amber' },
-                { val: 'STAFF',       label: 'Nhân viên',   desc: 'Quyền theo cấu hình + chi nhánh', icon: UserCog, color: 'blue'  },
-              ].map(({ val, label, desc, icon: Icon, color }) => (
-                <button key={val}
-                  onClick={() => setForm(f => ({ ...f, adminRole: val, permissions: val === 'SUPER_ADMIN' ? [] : f.permissions, branchId: val === 'SUPER_ADMIN' ? '' : f.branchId }))}
-                  className={`p-3 rounded-xl border-2 text-left transition ${
-                    form.adminRole === val
-                      ? color === 'amber' ? 'border-amber-400 bg-amber-50' : 'border-blue-400 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}>
-                  <Icon size={16} className={form.adminRole === val ? (color === 'amber' ? 'text-amber-600' : 'text-blue-600') : 'text-gray-400'} />
-                  <p className="font-bold text-sm mt-1">{label}</p>
-                  <p className="text-[11px] text-gray-400">{desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Chi nhánh — chỉ hiện và bắt buộc khi STAFF ── */}
-          {isStaff && (
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5 flex items-center gap-1">
-                <Building2 size={12} />
-                Chi nhánh quản lý <span className="text-red-500">*</span>
-              </label>
-              {branchLoading ? (
-                <div className="flex items-center gap-2 border-2 border-gray-200 rounded-xl px-3 py-2.5 text-gray-400 text-sm">
-                  <Loader2 size={14} className="animate-spin" /> Đang tải chi nhánh...
+              <div>
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
+                  Họ tên <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    className={`${fieldClass} pl-11`}
+                    placeholder="Nguyễn Văn A"
+                  />
                 </div>
-              ) : branches.length === 0 ? (
-                <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-3 text-xs text-amber-700 flex items-center gap-2">
-                  <AlertTriangle size={14} /> Chưa có chi nhánh nào. Vui lòng tạo chi nhánh trong Cài đặt trước.
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
+                  Số điện thoại <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={form.phone}
+                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    className={`${fieldClass} pl-11 font-mono`}
+                    placeholder="09xxxxxxxx"
+                    readOnly={isEdit}
+                  />
                 </div>
-              ) : (
-                <>
-                  <select
-                    value={form.branchId}
-                    onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))}
-                    className={`w-full border-2 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none transition ${
-                      !form.branchId ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-emerald-300 bg-emerald-50 focus:border-emerald-500 text-emerald-800'
-                    }`}
-                  >
-                    <option value="">-- Chọn chi nhánh (bắt buộc) --</option>
-                    {branches.filter(b => b.isActive !== false).map(b => (
-                      <option key={b._id} value={b._id}>
-                        🏢 {b.name} {b.code ? `[${b.code}]` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {!form.branchId && (
-                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                      <AlertTriangle size={11} /> Bắt buộc chọn chi nhánh cho nhân viên
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
+                  {isEdit ? 'Mật khẩu mới (để trống = giữ nguyên)' : <>Mật khẩu <span className="text-red-500">*</span></>}
+                </label>
+                <div className="relative">
+                  <Key size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    className={`${fieldClass} pl-11`}
+                    placeholder={isEdit ? '••••••' : 'Tối thiểu 6 ký tự'}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-3">Vai trò</label>
+                <div className="flex gap-4">
+                  {[
+                    { val: 'SUPER_ADMIN', label: 'Super Admin', desc: 'Toàn quyền hệ thống', icon: Crown, active: 'border-amber-500 bg-amber-50 shadow-md shadow-amber-100', iconCls: 'text-amber-600' },
+                    { val: 'STAFF', label: 'Nhân viên', desc: 'Quyền theo cấu hình + chi nhánh', icon: UserCog, active: 'border-blue-600 bg-blue-50 shadow-md shadow-blue-100', iconCls: 'text-blue-600' },
+                  ].map(({ val, label, desc, icon: Icon, active, iconCls }) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setForm((f) => ({
+                        ...f,
+                        adminRole: val,
+                        permissions: val === 'SUPER_ADMIN' ? [] : f.permissions,
+                        branchId: val === 'SUPER_ADMIN' ? '' : f.branchId,
+                      }))}
+                      className={`flex-1 flex flex-col gap-1 cursor-pointer border-2 p-4 rounded-2xl transition-all text-left ${
+                        form.adminRole === val ? active : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
+                      }`}
+                    >
+                      <Icon size={18} className={form.adminRole === val ? iconCls : 'text-gray-400'} />
+                      <span className={`font-black text-sm ${form.adminRole === val ? 'text-gray-900' : ''}`}>{label}</span>
+                      <span className="text-[11px] text-gray-400 font-medium leading-snug">{desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {!isStaff && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-700 flex items-start gap-2">
+                  <Crown size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <span>Super Admin quản lý <strong>toàn bộ hệ thống</strong>, không bị giới hạn theo chi nhánh.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Cột phải */}
+            <div className="space-y-6 md:pl-2">
+              <h4 className="font-black text-gray-400 text-xs mb-6 flex items-center gap-2 uppercase tracking-[0.2em]">
+                <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs shadow-lg shadow-blue-200">2</span>
+                {isStaff ? 'Chi nhánh & Phân quyền' : 'Phạm vi quản lý'}
+              </h4>
+
+              {isStaff && (
+                <div>
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2 flex items-center gap-1.5">
+                    <Building2 size={12} />
+                    Chi nhánh quản lý <span className="text-red-500">*</span>
+                  </label>
+                  {branchLoading ? (
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-[20px] p-4 text-gray-400 text-sm font-bold">
+                      <Loader2 size={14} className="animate-spin" /> Đang tải chi nhánh...
+                    </div>
+                  ) : branches.length === 0 ? (
+                    <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 text-xs text-amber-700 flex items-center gap-2">
+                      <AlertTriangle size={14} /> Chưa có chi nhánh nào. Vui lòng tạo chi nhánh trong Cài đặt trước.
+                    </div>
+                  ) : (
+                    <>
+                      <CmsSelect
+                        value={form.branchId}
+                        onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value }))}
+                        className={`w-full rounded-[20px] p-4 text-sm font-black outline-none transition shadow-sm cursor-pointer ${
+                          !form.branchId
+                            ? 'border-2 border-red-300 bg-red-50'
+                            : 'border-2 border-emerald-300 bg-emerald-50 text-emerald-800'
+                        }`}
+                      >
+                        <option value="">-- Chọn chi nhánh (bắt buộc) --</option>
+                        {branches.filter((b) => b.isActive !== false).map((b) => (
+                          <option key={b._id} value={b._id}>
+                            {b.name}{b.code ? ` [${b.code}]` : ''}
+                          </option>
+                        ))}
+                      </CmsSelect>
+                      {!form.branchId && (
+                        <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1 font-semibold">
+                          <AlertTriangle size={11} /> Bắt buộc chọn chi nhánh cho nhân viên
+                        </p>
+                      )}
+                      {form.branchId && (() => {
+                        const b = branches.find((x) => String(x._id) === String(form.branchId));
+                        return b ? (
+                          <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1 font-semibold">
+                            <CheckCircle2 size={11} /> Gán vào: <strong>{b.name}</strong>
+                            {b.code ? ` (mã QR: ${b.code})` : ''}
+                          </p>
+                        ) : null;
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {isStaff && (
+                <div>
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-3">
+                    Phân quyền module ({form.permissions.length}/{ALL_PERMISSIONS.length} quyền)
+                  </label>
+                  <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                    {ALL_PERMISSIONS.map(({ key, label, desc }) => {
+                      const checked = form.permissions.includes(key);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => togglePerm(key)}
+                          className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border-2 text-left transition ${
+                            checked ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-white hover:border-gray-200'
+                          }`}
+                        >
+                          {checked
+                            ? <CheckSquare size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                            : <Square size={18} className="text-gray-300 flex-shrink-0 mt-0.5" />}
+                          <div>
+                            <p className={`text-sm font-bold ${checked ? 'text-blue-800' : 'text-gray-700'}`}>{label}</p>
+                            <p className="text-[11px] text-gray-400">{desc}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.permissions.length === 0 && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1 mt-2 font-semibold">
+                      <AlertTriangle size={12} /> Nhân viên chưa có quyền nào — sẽ không thấy menu sau khi đăng nhập
                     </p>
                   )}
-                  {form.branchId && (() => {
-                    const b = branches.find(x => x._id === form.branchId);
-                    return b ? (
-                      <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                        <CheckCircle2 size={11} /> Gán vào: <strong>{b.name}</strong> (mã QR prefix: {b.code})
-                      </p>
-                    ) : null;
-                  })()}
-                </>
+                </div>
+              )}
+
+              {!isStaff && (
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-sm text-gray-500 font-medium leading-relaxed">
+                  Tài khoản Super Admin không cần gán chi nhánh hay tick quyền module — mặc định toàn quyền.
+                </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* SUPER_ADMIN note */}
-          {!isStaff && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 flex items-center gap-2">
-              <Crown size={13} className="text-amber-600 flex-shrink-0" />
-              Super Admin quản lý <strong>toàn bộ hệ thống</strong>, không bị giới hạn theo chi nhánh.
+          {/* Footer giống modal học viên */}
+          <div className="mt-12 pt-10 border-t border-gray-100 flex flex-col md:flex-row items-center justify-end gap-4 bg-gray-50/50 -mx-10 -mb-10 px-10 pb-10 pt-8 rounded-b-[40px]">
+            <div className="flex gap-4 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-10 py-4 bg-white border-2 border-gray-100 rounded-[22px] text-xs font-black text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all uppercase"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={saving}
+                className="flex-1 md:flex-none px-12 py-4 bg-gradient-to-r from-gray-800 to-gray-900 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-slate-300 hover:-translate-y-1 transition-all flex items-center justify-center gap-3 uppercase active:scale-95 disabled:opacity-50"
+              >
+                {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật quyền' : 'Tạo tài khoản')}
+              </button>
             </div>
-          )}
-
-          {/* Permissions — chỉ hiện nếu STAFF */}
-          {isStaff && (
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-2">
-                Phân quyền module ({form.permissions.length}/{ALL_PERMISSIONS.length} quyền)
-              </label>
-              <div className="space-y-2">
-                {ALL_PERMISSIONS.map(({ key, label, desc }) => {
-                  const checked = form.permissions.includes(key);
-                  return (
-                    <button key={key}
-                      onClick={() => togglePerm(key)}
-                      className={`w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition ${
-                        checked ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'
-                      }`}>
-                      {checked
-                        ? <CheckSquare size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                        : <Square     size={18} className="text-gray-300 flex-shrink-0 mt-0.5" />
-                      }
-                      <div>
-                        <p className={`text-sm font-bold ${checked ? 'text-blue-800' : 'text-gray-700'}`}>{label}</p>
-                        <p className="text-[11px] text-gray-400">{desc}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              {form.permissions.length === 0 && (
-                <p className="text-xs text-amber-600 flex items-center gap-1 mt-2">
-                  <AlertTriangle size={12} /> Nhân viên chưa có quyền nào — sẽ không thấy menu nào sau khi đăng nhập
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-1">
-            <button onClick={onClose}
-              className="flex-1 border-2 border-gray-200 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-50 transition">
-              Hủy
-            </button>
-            <button onClick={handleSubmit} disabled={saving}
-              className="flex-1 bg-gradient-to-r from-gray-800 to-gray-900 text-white font-bold py-3 rounded-xl hover:from-gray-700 transition flex items-center justify-center gap-2 disabled:opacity-50">
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật quyền' : 'Tạo tài khoản')}
-            </button>
           </div>
         </div>
       </div>
@@ -414,11 +478,15 @@ export default function StaffManagementTab() {
             <div key={s._id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-gray-200 transition">
               <div className="flex items-start gap-4">
                 {/* Avatar */}
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white font-black text-lg flex-shrink-0 ${
-                  s.adminRole === 'SUPER_ADMIN' ? 'bg-gradient-to-br from-amber-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                }`}>
-                  {s.name?.charAt(0) || '?'}
-                </div>
+                <img
+                  src={resolveAvatarUrl({
+                    avatar: s.avatar,
+                    role: 'admin',
+                    adminRole: s.adminRole,
+                  })}
+                  alt={s.name}
+                  className="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-gray-100 shadow-sm bg-white"
+                />
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">

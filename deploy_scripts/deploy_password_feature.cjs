@@ -6,15 +6,15 @@ const { getVpsSshConfig, getVpsConnection } = require('./_vpsConnect.cjs');
 async function deploy() {
   await ssh.connect(getVpsSshConfig());
 
-  const localDist = path.join(__dirname, 'QUANLYCMS', 'client', 'dist');
+  const localDist = path.join(__dirname, '..', 'client', 'dist');
 
   // 1. Remove old dist
   console.log('=== 1. REMOVE OLD DIST ===');
-  await ssh.execCommand('rm -rf /www/wwwroot/quanlycms/client/dist');
+  await ssh.execCommand('rm -rf /www/wwwroot/dashboardthangtinhoc/client/dist');
 
   // 2. Upload new dist
   console.log('=== 2. UPLOAD NEW DIST ===');
-  const status = await ssh.putDirectory(localDist, '/www/wwwroot/quanlycms/client/dist', {
+  const status = await ssh.putDirectory(localDist, '/www/wwwroot/dashboardthangtinhoc/client/dist', {
     recursive: true, concurrency: 5,
     tick: (lp, rp, err) => console.log(err ? `  ❌ ${path.basename(lp)}` : `  ✅ ${path.basename(lp)}`)
   });
@@ -22,12 +22,12 @@ async function deploy() {
 
   // 3. Git pull (sync source code including backend changes)
   console.log('\n=== 3. GIT PULL ===');
-  const pull = await ssh.execCommand('cd /www/wwwroot/quanlycms && git pull origin main 2>&1');
+  const pull = await ssh.execCommand('cd /www/wwwroot/dashboardthangtinhoc && git pull origin main 2>&1');
   console.log(pull.stdout || pull.stderr);
 
   // 4. Restart backend (needed because authRoutes.js changed)
   console.log('\n=== 4. RESTART PM2 ===');
-  const restart = await ssh.execCommand('pm2 restart quanlycms && pm2 save');
+  const restart = await ssh.execCommand('pm2 restart dashboardthangtinhoc && pm2 save');
   console.log(restart.stdout || restart.stderr);
 
   // 5. Wait and verify

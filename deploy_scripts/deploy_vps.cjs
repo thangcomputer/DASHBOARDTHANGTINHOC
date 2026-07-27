@@ -9,11 +9,11 @@ async function deploy() {
     console.log('🔗 Connecting to VPS...');
     await ssh.connect(getVpsSshConfig());
     
-    const projectPath = '/www/wwwroot/quanlycms';
-    const repoUrl = 'https://github.com/thangcomputer/QUANLYCMS.git';
+    const projectPath = '/www/wwwroot/dashboardthangtinhoc';
+    const repoUrl = 'https://github.com/thangcomputer/dashboardthangtinhoc.git';
 
     console.log('🗑️ Cleaning and Cloning...');
-    const tempPath = '/tmp/quanlycms_clone_temp';
+    const tempPath = '/tmp/dashboardthangtinhoc_clone_temp';
     await ssh.execCommand(`rm -rf ${tempPath}`);
     const cloneRes = await ssh.execCommand(`git clone ${repoUrl} ${tempPath}`);
     if (cloneRes.stderr) console.log('Git Clone Log:', cloneRes.stderr);
@@ -29,7 +29,7 @@ async function deploy() {
 
     console.log('🔑 Setting up .env...');
     const envContent = `PORT=5000
-MONGODB_URI=mongodb://127.0.0.1:27017/quanlycms
+MONGODB_URI=mongodb://127.0.0.1:27017/dashboardthangtinhoc
 JWT_SECRET=thangTinHoc_secret_key_2026
 JWT_REFRESH_SECRET=thangTinHoc_refresh_secret_key_2026
 JWT_EXPIRES_IN=8h
@@ -61,9 +61,9 @@ EOF`);
     console.log(buildRes.stdout || buildRes.stderr);
 
     console.log('♻️ Restarting application with PM2...');
-    await ssh.execCommand('pm2 stop quanlycms || true', { cwd: projectPath });
-    await ssh.execCommand('pm2 delete quanlycms || true', { cwd: projectPath });
-    await ssh.execCommand('pm2 start server.js --name "quanlycms"', { cwd: projectPath });
+    await ssh.execCommand('pm2 stop dashboardthangtinhoc || true', { cwd: projectPath });
+    await ssh.execCommand('pm2 delete dashboardthangtinhoc || true', { cwd: projectPath });
+    await ssh.execCommand('pm2 start server.js --name "dashboardthangtinhoc"', { cwd: projectPath });
     await ssh.execCommand('pm2 save', { cwd: projectPath });
 
     console.log('✅ DEPLOYMENT COMPLETED SUCCESSFULLY!');

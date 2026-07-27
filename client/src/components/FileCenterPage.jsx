@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   FileText, HardDrive, Loader2, RefreshCw, Search, Trash2,
   UploadCloud, Filter, ChevronLeft, ChevronRight,
@@ -171,7 +172,7 @@ export default function FileCenterPage() {
       <div className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="text-[10px] font-black text-gray-400 uppercase">Category upload</label>
-          <select
+          <CmsSelect
             value={uploadCat}
             onChange={(e) => setUploadCat(e.target.value)}
             className="block mt-1 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
@@ -179,7 +180,7 @@ export default function FileCenterPage() {
             {(categories.length ? categories : [{ key: 'general' }]).map((c) => (
               <option key={c.key} value={c.key}>{c.key}{c.maxLabel ? ` (${c.maxLabel})` : ''}</option>
             ))}
-          </select>
+          </CmsSelect>
         </div>
         <button
           type="button"
@@ -195,7 +196,7 @@ export default function FileCenterPage() {
 
       <form onSubmit={onSearch} className="flex flex-wrap gap-2 items-center">
         <Filter size={14} className="text-gray-400" />
-        <select
+        <CmsSelect
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white"
@@ -204,7 +205,7 @@ export default function FileCenterPage() {
           {(categories.length ? categories : Object.keys({})).map((c) => (
             <option key={c.key || c} value={c.key || c}>{c.key || c}</option>
           ))}
-        </select>
+        </CmsSelect>
         <div className="flex-1 min-w-[160px] flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white">
           <Search size={14} className="text-gray-400" />
           <input

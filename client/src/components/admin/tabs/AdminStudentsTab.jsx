@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
-  BookOpen, Search, Download, FileSpreadsheet, Plus, Users, CheckCircle2, AlertTriangle,
+  BookOpen, Search, Download, FileSpreadsheet, Plus, Users, AlertTriangle,
   MoreHorizontal, ClipboardList, Edit3, Bell, Unlock, Lock, Camera, Printer, Trash2,
   ChevronLeft, ChevronRight, Loader2, MapPin,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
 import { getClientEnrollments } from '../../../utils/enrollments';
+import { isTeacherActive } from '../../../constants/teacherStatus';
+import { teacherMatchesCourse } from '../../../utils/examSubjects';
+import { apiFetch } from '../../../services/api';
 
 export default function AdminStudentsTab() {
   const {
@@ -17,7 +21,85 @@ export default function AdminStudentsTab() {
     setEnrollmentModalStudent,
     sendDebtReminder, approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
     handlePrintInvoice, removeStudent, currentPage, setCurrentPage,
+    examSubjectsCatalog,
   } = useAdminTab();
+
+  const [dbCourses, setDbCourses] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch('/courses');
+        const json = await res.json();
+        if (!cancelled && json?.success && Array.isArray(json.data)) {
+          setDbCourses(json.data);
+        }
+      } catch {
+        /* ignore — giữ dropdown rỗng */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const courseFilterOptions = useMemo(() => {
+    const list = (dbCourses || [])
+      .filter((c) => c && c.name && String(c.status || 'published') !== 'archived')
+      .slice()
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+    // Khử trùng tên khóa (nếu có bản nháp/published cùng tên)
+    const seen = new Set();
+    return list.filter((c) => {
+      const key = String(c.name).trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [dbCourses]);
+
+  useEffect(() => {
+    if (filterCourse === 'all' || !filterCourse) return;
+    if (!courseFilterOptions.length) return;
+    const ok = courseFilterOptions.some(
+      (c) => String(c.name).toLowerCase() === String(filterCourse).toLowerCase()
+        || String(c._id) === String(filterCourse),
+    );
+    if (!ok) setFilterCourse('all');
+  }, [courseFilterOptions, filterCourse, setFilterCourse]);
+
+  const assignableTeachers = (safeTeachers || []).filter(
+    (t) => t && (t.role == null || t.role === 'teacher') && isTeacherActive(t.status),
+  );
+
+  const teachersForCourse = (courseOrEnrollment, currentTeacherId = '') => {
+    const matched = [];
+    const other = [];
+    const cur = String(currentTeacherId || '');
+    for (const t of assignableTeachers) {
+      const tid = String(t.id || t._id);
+      // GV đang được gán vẫn hiện bình thường (kể cả lệch môn) để không mất lựa chọn hiện tại
+      if (teacherMatchesCourse(t, courseOrEnrollment, examSubjectsCatalog) || (cur && tid === cur)) {
+        matched.push(t);
+      } else {
+        other.push(t);
+      }
+    }
+    return { matched, other };
+  };
+
+  const handleAssignTeacher = async (studentId, teacherId, enrollmentId) => {
+    const sid = studentId;
+    if (!sid) {
+      toast.error('Không xác định được học viên');
+      return;
+    }
+    try {
+      await assignTeacher(sid, teacherId, enrollmentId);
+      toast.success(teacherId ? 'Đã phân công giảng viên' : 'Đã bỏ phân công');
+    } catch (err) {
+      toast.error(err?.message || 'Không phân công được giảng viên');
+    }
+  };
 
   return (
             <div className="bg-white rounded-2xl sm:rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -42,19 +124,17 @@ export default function AdminStudentsTab() {
                       />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0 2xl:w-auto 2xl:max-w-xl 2xl:grid-cols-2">
-                      <select
+                      <CmsSelect
                         value={filterCourse}
                         onChange={e => setFilterCourse(e.target.value)}
                         className="w-full min-w-0 py-2.5 px-4 bg-gray-50 border-2 border-transparent rounded-2xl text-xs font-black uppercase focus:border-red-600 outline-none cursor-pointer transition-all shadow-sm"
                       >
                         <option value="all">Tất cả khóa học</option>
-                        <option value="THVP">THVP Nâng Cao</option>
-                        <option value="MOS">MOS Excel</option>
-                        <option value="THIET KE">Thiết Kế Đồ Họa</option>
-                        <option value="AUTOCAD">AutoCAD</option>
-                        <option value="PYTHON">Lập trình Python</option>
-                      </select>
-                      <select
+                        {courseFilterOptions.map((c) => (
+                          <option key={c._id} value={c.name}>{c.name}</option>
+                        ))}
+                      </CmsSelect>
+                      <CmsSelect
                         value={filterPaid}
                         onChange={e => setFilterPaid(e.target.value)}
                         className="w-full min-w-0 py-2.5 px-4 bg-gray-50 border-2 border-transparent rounded-2xl text-xs font-black uppercase focus:border-red-600 outline-none cursor-pointer transition-all shadow-sm"
@@ -62,7 +142,7 @@ export default function AdminStudentsTab() {
                         <option value="all">Tất cả trạng thái</option>
                         <option value="paid">✅ Đã đóng phí</option>
                         <option value="unpaid">❌ Chưa đóng phí</option>
-                      </select>
+                      </CmsSelect>
                     </div>
                     <div className="flex flex-wrap gap-2 sm:gap-3 w-full 2xl:w-auto 2xl:justify-end">
                       <button
@@ -97,12 +177,12 @@ export default function AdminStudentsTab() {
                 <table className="w-full text-left border-collapse min-w-[900px]">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/60">
-                      <th className="px-6 py-3.5 text-xs font-black text-gray-400 uppercase tracking-widest">Học viên</th>
-                      <th className="px-5 py-3.5 text-xs font-black text-gray-400 uppercase tracking-widest">Khóa học</th>
-                      <th className="px-5 py-3.5 text-xs font-black text-gray-400 uppercase tracking-widest">Giáo viên</th>
-                      <th className="px-5 py-3.5 text-xs font-black text-gray-400 uppercase tracking-widest">Học phí</th>
-                      <th className="px-5 py-3.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Trạng thái</th>
-                      <th className="px-4 py-3.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center w-16"></th>
+                      <th className="px-6 py-3.5 text-xs font-black text-slate-500 uppercase tracking-widest">Học viên</th>
+                      <th className="px-5 py-3.5 text-xs font-black text-slate-500 uppercase tracking-widest">Khóa học</th>
+                      <th className="px-5 py-3.5 text-xs font-black text-slate-500 uppercase tracking-widest">Giáo viên</th>
+                      <th className="px-5 py-3.5 text-xs font-black text-slate-500 uppercase tracking-widest">Học phí</th>
+                      <th className="px-5 py-3.5 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Trạng thái</th>
+                      <th className="px-4 py-3.5 text-xs font-black text-slate-500 uppercase tracking-widest text-center w-16"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -120,16 +200,27 @@ export default function AdminStudentsTab() {
                       const enrollments = getClientEnrollments(s);
                       const hasMultiCourse = enrollments.length > 1;
                       const primaryEnr = enrollments.find((e) => e.isPrimary) || enrollments[0];
-                      const teacherVal = (typeof s.teacherId === 'object' && s.teacherId !== null)
-                        ? s.teacherId._id
-                        : (s.teacherId || primaryEnr?.teacherId || '');
+                      const teacherVal = (() => {
+                        const fromEnr = primaryEnr?.teacherId || '';
+                        if (fromEnr) return String(fromEnr);
+                        if (typeof s.teacherId === 'object' && s.teacherId !== null) {
+                          return String(s.teacherId._id || s.teacherId.id || '');
+                        }
+                        return s.teacherId ? String(s.teacherId) : '';
+                      })();
                       const regDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString('vi-VN') : '';
                       return (
                         <tr key={s.id} className="group hover:bg-slate-50/80 transition-colors">
                           {/* Cột Học viên */}
                           <td className="px-6 py-3.5">
                             <div className="flex items-center gap-3">
-                              <Avatar initials={s.name?.substring(0, 2).toUpperCase() || 'HV'} color={s.paid ? 'bg-indigo-500' : 'bg-rose-500'} />
+                              <Avatar
+                                initials={s.name?.substring(0, 2).toUpperCase() || 'HV'}
+                                name={s.name}
+                                role="student"
+                                src={s.avatar}
+                                color={s.paid ? 'bg-indigo-500' : 'bg-rose-500'}
+                              />
                               <div className="min-w-0">
                                 <p className="font-black text-slate-900 text-[13px] group-hover:text-blue-600 transition-colors leading-none mb-0.5 uppercase tracking-tight truncate max-w-[180px]">{s.name}</p>
                                 <p className="text-xs text-gray-400 font-medium">{regDate}{s.phone ? ` · ${s.phone}` : ''}</p>
@@ -164,45 +255,63 @@ export default function AdminStudentsTab() {
                           {/* Cột Giáo viên */}
                           <td className="px-5 py-3.5">
                             {hasMultiCourse ? (
-                              <div className="space-y-2 max-w-[200px]">
+                              <div className="space-y-2 min-w-[180px] max-w-[260px]">
                                 {enrollments.map((enr) => {
                                   const enrTeacherVal = enr.teacherId || '';
                                   const enrId = enr.enrollmentId || enr.id;
+                                  const { matched, other } = teachersForCourse(enr, enrTeacherVal);
                                   return (
                                     <div key={enrId} className="space-y-0.5">
                                       <p className="text-[10px] font-bold text-blue-600 truncate">{enr.courseName || enr.name}</p>
-                                      <select
+                                      <CmsSelect
                                         value={enrTeacherVal}
-                                        onChange={(e) => { e.stopPropagation(); assignTeacher(s.id, e.target.value, enrId !== 'main' ? enrId : undefined); }}
+                                        onChange={(e) => {
+                                          e?.stopPropagation?.();
+                                          handleAssignTeacher(s.id || s._id, e.target.value || null, enrId !== 'main' ? enrId : undefined);
+                                        }}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg py-1 px-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer"
+                                        className="w-full min-w-[160px] bg-gray-50 border border-gray-200 rounded-lg py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer"
                                       >
                                         <option value="">Chưa phân công</option>
-                                        {safeTeachers
-                                          .filter(t => t.status === 'Active' || t.status === 'active')
-                                          .map(t => (
-                                            <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
-                                          ))}
-                                      </select>
+                                        {matched.map(t => (
+                                          <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                                        ))}
+                                        {other.map(t => (
+                                          <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
+                                            {t.name} (khác môn)
+                                          </option>
+                                        ))}
+                                      </CmsSelect>
                                     </div>
                                   );
                                 })}
                               </div>
                             ) : (
-                              <select
-                                value={teacherVal}
-                                onChange={(e) => { e.stopPropagation(); assignTeacher(s.id, e.target.value, primaryEnr?.enrollmentId !== 'main' ? primaryEnr?.enrollmentId : undefined); }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full max-w-[150px] bg-gray-50 border border-gray-200 rounded-lg py-1.5 px-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all cursor-pointer"
-                              >
-                                <option value="">Chưa phân công</option>
-                                {safeTeachers
-                                  .filter(t => t.status === 'Active' || t.status === 'active')
-                                  .map(t => (
-                                    <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
-                                  ))
-                                }
-                              </select>
+                              (() => {
+                                const courseRef = primaryEnr || s.course;
+                                const { matched, other } = teachersForCourse(courseRef, teacherVal);
+                                return (
+                                  <CmsSelect
+                                    value={teacherVal ? String(teacherVal) : ''}
+                                    onChange={(e) => {
+                                      e?.stopPropagation?.();
+                                      handleAssignTeacher(s.id || s._id, e.target.value || null, primaryEnr?.enrollmentId !== 'main' ? primaryEnr?.enrollmentId : undefined);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full min-w-[160px] max-w-[240px] bg-gray-50 border border-gray-200 rounded-lg py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all cursor-pointer"
+                                  >
+                                    <option value="">Chưa phân công</option>
+                                    {matched.map(t => (
+                                      <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                                    ))}
+                                    {other.map(t => (
+                                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
+                                        {t.name} (khác môn)
+                                      </option>
+                                    ))}
+                                  </CmsSelect>
+                                );
+                              })()
                             )}
                           </td>
                           {/* Cột Học phí */}
@@ -217,7 +326,7 @@ export default function AdminStudentsTab() {
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : 'bg-rose-50 text-rose-600 border border-rose-200'
                             }`}>
-                              {s.paid ? <><CheckCircle2 size={11} /> Hoàn tất</> : <><AlertTriangle size={11} /> Chưa nộp</>}
+                              {s.paid ? 'Hoàn tất' : <><AlertTriangle size={11} /> Chưa nộp</>}
                             </span>
                           </td>
                           {/* Cột Thao tác: 3-dot menu */}

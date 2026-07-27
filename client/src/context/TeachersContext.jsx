@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
 import api from '../services/api';
 import { mapTeacher } from '../lib/entityMaps';
@@ -30,11 +30,19 @@ export function TeachersProvider({ user, children }) {
     { revalidateOnFocus: false, dedupingInterval: 60_000 }
   );
 
+  const setTeachersLocal = useCallback((updater) => {
+    mutate((current = []) => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      return Array.isArray(next) ? next : current;
+    }, { revalidate: false });
+  }, [mutate]);
+
   const value = useMemo(() => ({
     teachers: data,
     refreshTeachers: mutate,
+    setTeachersLocal,
     isTeachersLoading: isValidating,
-  }), [data, mutate, isValidating]);
+  }), [data, mutate, setTeachersLocal, isValidating]);
 
   return (
     <TeachersContext.Provider value={value}>
@@ -46,7 +54,7 @@ export function TeachersProvider({ user, children }) {
 export function useTeachersContext() {
   const ctx = useContext(TeachersContext);
   if (!ctx) {
-    return { teachers: [], refreshTeachers: async () => {}, isTeachersLoading: false };
+    return { teachers: [], refreshTeachers: async () => {}, setTeachersLocal: () => {}, isTeachersLoading: false };
   }
   return ctx;
 }

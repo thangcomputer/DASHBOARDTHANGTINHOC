@@ -19,7 +19,7 @@ async function fixWebSocket() {
   // 3. Ghi vhost mới với WebSocket support đầy đủ
   const vhostConfig = `<VirtualHost *:80>
     ServerAdmin webmaster@example.com
-    DocumentRoot "/www/wwwroot/quanlycms/client/dist"
+    DocumentRoot "/www/wwwroot/dashboardthangtinhoc/client/dist"
     ServerName dashboard.giasutinhoc24h.com
 
     <IfModule mod_rewrite.c>
@@ -51,7 +51,7 @@ async function fixWebSocket() {
     ErrorLog "/www/wwwlogs/dashboard.giasutinhoc24h.com-error_log"
     CustomLog "/www/wwwlogs/dashboard.giasutinhoc24h.com-access_log" combined
 
-    <Directory "/www/wwwroot/quanlycms/client/dist">
+    <Directory "/www/wwwroot/dashboardthangtinhoc/client/dist">
         Options FollowSymLinks
         AllowOverride All
         Require all granted

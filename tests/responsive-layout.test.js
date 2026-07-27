@@ -42,7 +42,7 @@ test('Admin tabs: học viên / tài chính / GV có breakpoints linh hoạt', a
 
 test('TeacherDashboard StudentCard: header không ép một flex-row cứng', async () => {
   const src = await fs.readFile(
-    path.resolve(__dirname, '../client/src/components/TeacherDashboard.jsx'),
+    path.resolve(__dirname, '../client/src/components/teacher/TeacherStudentCard.jsx'),
     'utf8'
   );
   assert.ok(src.includes('min-[440px]:flex-row'), 'Card HV GV: chồng layout rồi ngang >=440px');

@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const CS1_ID   = '69d8a756f4ca0577c0d6a81e';  // Co so 1
 const CS1_CODE = 'CS1';
 
-mongoose.connect('mongodb://127.0.0.1:27017/quanlycms').then(async () => {
+mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc').then(async () => {
   const Student = require('../models/Student');
 
   const res = await Student.updateMany(

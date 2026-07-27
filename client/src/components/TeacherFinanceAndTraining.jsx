@@ -5,8 +5,6 @@ import {
   CheckCircle2, FileText, Video,
   BookOpen, AlertCircle, BarChart, FileSpreadsheet, FileBox
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { useLocation } from 'react-router-dom';
 import { useModal } from '../utils/Modal.jsx';
 import api, { getRolePrefix } from '../services/api';
@@ -148,6 +146,10 @@ const TeacherFinanceAndTraining = () => {
     el.className = "bg-white p-8 w-[1000px] h-max"; // Fixed width to ensure standard capturing
     
     try {
+        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+          import('html2canvas'),
+          import('jspdf'),
+        ]);
         const canvas = await html2canvas(el, { scale: 2 });
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');

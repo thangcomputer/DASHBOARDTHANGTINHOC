@@ -54,7 +54,30 @@ const io = new Server(server, {
   },
 });
 
-const onlineUsers = new Map();
+const { attachSocketIoAdapter } = require('./config/socketIoAdapter');
+const presenceStore = require('./config/presenceStore');
+
+/** Compat Map-like view cho authRoutes / legacy */
+const onlineUsers = {
+  has(key) { return Boolean(presenceStore.getPresence(key)); },
+  get(key) { return presenceStore.getPresence(key); },
+  values() {
+    const arr = presenceStore.listPresence();
+    return {
+      [Symbol.iterator]: function* () { yield* arr; },
+    };
+  },
+  entries() {
+    const arr = presenceStore.listPresence();
+    return {
+      [Symbol.iterator]: function* () {
+        for (const u of arr) yield [`${u.role}_${u.userId}`, u];
+      },
+    };
+  },
+  get size() { return presenceStore.listPresence().length; },
+};
+
 const lastSeenMap = new Map();
 const LAST_SEEN_MAX = 5000;
 
@@ -216,13 +239,56 @@ function trimLastSeenMap() {
   }
 }
 
+function mapOnlineUser(u) {
+  return {
+    userId: u.userId,
+    role: u.role,
+    name: u.name,
+    branchId: u.branchId,
+    connectedAt: u.connectedAt,
+  };
+}
+
+/** Presence theo chi nhánh — Super Admin nhận full list qua ALL_ADMIN */
+function broadcastOnlinePresence() {
+  const all = presenceStore.listPresence();
+  const full = all.map(mapOnlineUser);
+  io.to('ALL_ADMIN').emit('users:online', full);
+
+  const byBranch = new Map();
+  for (const u of all) {
+    const bid = u.branchId ? String(u.branchId) : '_none';
+    if (!byBranch.has(bid)) byBranch.set(bid, []);
+    byBranch.get(bid).push(u);
+  }
+
+  for (const [bid, users] of byBranch.entries()) {
+    const room = bid === '_none' ? 'presence_none' : `presence_${bid}`;
+    const admins = full.filter((x) => x.role === 'admin' || x.userId === 'admin');
+    const localRows = users.map(mapOnlineUser);
+    const seen = new Set();
+    const payload = [];
+    for (const row of [...localRows, ...admins]) {
+      const k = `${row.role}_${row.userId}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      payload.push(row);
+    }
+    io.to(room).emit('users:online', payload);
+  }
+}
+
+presenceStore.onPresenceChange(() => {
+  try { broadcastOnlinePresence(); } catch { /* ignore */ }
+});
+
 io.use(socketAuthMiddleware);
 
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
 
   // Đăng ký user online — CHẶN SPOOFING: lấy ID/Role từ JWT thay vì tin client 100%
-  socket.on('register', ({ branchId, branchCode }) => {
+  socket.on('register', async ({ branchId, branchCode }) => {
     if (!socket.user) return;
 
     const userId = socketUserId(socket.user);
@@ -232,7 +298,7 @@ io.on('connection', (socket) => {
     const resolvedBranchId = socket.user.branchId || branchId;
     const resolvedBranchCode = socket.user.branchCode || branchCode || '';
 
-    onlineUsers.set(key, {
+    await presenceStore.upsertPresence(key, {
       socketId: socket.id,
       userId,
       role: messagingRole,
@@ -247,6 +313,7 @@ io.on('connection', (socket) => {
     // Join rooms for Centralized Notification Service
     socket.join(userId);           // Unique user room
     socket.join('GLOBAL');          // Global room
+    socket.join('feed_room');       // Bang tin hoi bai (realtime)
     
     if (messagingRole) {
       const uRole = messagingRole.toUpperCase();
@@ -261,7 +328,10 @@ io.on('connection', (socket) => {
 
       if (resolvedBranchId) {
         const bid = resolvedBranchId;
-        socket.join(`ALL_${uRole}_${bid}`); 
+        socket.join(`ALL_${uRole}_${bid}`);
+        socket.join(`presence_${bid}`);
+      } else {
+        socket.join('presence_none');
       }
       
       if (resolvedBranchCode) {
@@ -270,14 +340,12 @@ io.on('connection', (socket) => {
       }
     }
 
-    // Broadcast danh sách online
-    io.emit('users:online', Array.from(onlineUsers.values()).map(u => ({
-      userId: u.userId, role: u.role, name: u.name, branchId: u.branchId, connectedAt: u.connectedAt
-    })));
+    // Broadcast danh sách online (scoped)
+    broadcastOnlinePresence();
   });
 
   // ── Nhắn tin 1-1 — luôn lấy người gửi từ JWT (socket.user), không tin client ──
-  socket.on('message:send', (data) => {
+  socket.on('message:send', async (data) => {
     if (!socket.user) return;
     const u = socket.user;
     const senderMessagingRole = getMessagingRole(u);
@@ -290,6 +358,23 @@ io.on('connection', (socket) => {
       senderName,
       senderRole: senderMessagingRole,
     };
+
+    const isBroadcast =
+      data.receiverId === 'ALL_USERS' ||
+      data.receiverId === 'ALL_STUDENTS' ||
+      data.receiverId === 'ALL_TEACHERS' ||
+      String(data.receiverId || '').startsWith('ALL_BRANCH_');
+
+    if (!isBroadcast && !data.isGroup) {
+      try {
+        const { assertCanDirectMessage } = require('./services/chatAccessService');
+        const access = await assertCanDirectMessage(u, data.receiverId, data.receiverRole);
+        if (!access.ok) return;
+      } catch {
+        return;
+      }
+    }
+
     // data = { senderId, senderName, senderRole, receiverId, receiverRole, content }
     // Tìm người nhận (Hỗ trợ linh hoạt cả prefix admin_ và staff_)
     let receiver = onlineUsers.get(`${data.receiverRole}_${data.receiverId}`);
@@ -372,9 +457,10 @@ io.on('connection', (socket) => {
       const bCode = data.receiverId.replace('ALL_BRANCH_', '');
       io.to(`ALL_STUDENT_${bCode}`).to(`ALL_TEACHER_${bCode}`).to(`ALL_STAFF_${bCode}`).emit('message:receive', msgPayload);
     }
-    // 2) Direct message: chỉ gửi đúng người nhận
-    else if (receiver && receiver.socketId) {
-      io.to(receiver.socketId).emit('message:receive', msgPayload);
+    // 2) Direct message: room theo userId (Redis adapter cross-instance)
+    else {
+      const rid = String(finalReceiverId || data.receiverId || '');
+      if (rid) io.to(rid).emit('message:receive', msgPayload);
     }
 
     // 5. Gửi confirm cho chính người gửi
@@ -471,6 +557,11 @@ io.on('connection', (socket) => {
     console.log(`🛡️  Admin joined admin_room`);
   });
 
+  socket.on('feed:join', () => {
+    if (!socket.user) return;
+    socket.join('feed_room');
+  });
+
   socket.on('group:join', async (groupId) => {
     if (!socket.user || !groupId) return;
     try {
@@ -492,20 +583,14 @@ io.on('connection', (socket) => {
   });
 
   // ── Disconnect ──
-  socket.on('disconnect', () => {
-    for (const [key, val] of onlineUsers.entries()) {
-      if (val.socketId === socket.id) {
-        // Lưu thời điểm offline để frontend tính "X phút trước"
-        lastSeenMap.set(String(val.userId), new Date().toISOString());
-        trimLastSeenMap();
-        onlineUsers.delete(key);
-        break;
-      }
+  socket.on('disconnect', async () => {
+    const hit = presenceStore.findPresenceBySocketId(socket.id);
+    if (hit) {
+      lastSeenMap.set(String(hit.user.userId), new Date().toISOString());
+      trimLastSeenMap();
+      await presenceStore.removePresence(hit.key);
     }
-    io.emit('users:online', Array.from(onlineUsers.values()).map(u => ({
-      userId: u.userId, role: u.role, name: u.name, connectedAt: u.connectedAt
-    })));
-    // Broadcast lastSeen map để frontend cập nhật
+    broadcastOnlinePresence();
     io.emit('users:lastSeen', Object.fromEntries(lastSeenMap));
     console.log(`❌ Socket disconnected: ${socket.id}`);
   });
@@ -541,11 +626,7 @@ app.notifyUser = (role, userId, eventName, data) => {
 
 // ── Broadcast cho tất cả user có role nhất định ──
 app.broadcastToRole = (role, eventName, data) => {
-  for (const [key, val] of onlineUsers.entries()) {
-    if (val.role === role) {
-      io.to(val.socketId).emit(eventName, data);
-    }
-  }
+  io.to(`ALL_${String(role || '').toUpperCase()}`).emit(eventName, data);
 };
 
 const studentRoutes      = require('./routes/studentRoutes');
@@ -577,6 +658,7 @@ const biRoutes           = require('./routes/biRoutes');
 const workflowRoutes     = require('./routes/workflowRoutes');
 const builderRoutes      = require('./routes/builderRoutes');
 const tenantRoutes       = require('./routes/tenantRoutes');
+const feedRoutes         = require('./routes/feedRoutes');
 
 app.use('/api/auth',         authRoutes);
 app.use('/api/students',     studentRoutes);
@@ -607,6 +689,7 @@ app.use('/api/bi',           biRoutes);
 app.use('/api/workflows',    workflowRoutes);
 app.use('/api/builder',      builderRoutes);
 app.use('/api/tenants',      tenantRoutes);
+app.use('/api/feed',         feedRoutes);
 
 
 
@@ -614,7 +697,7 @@ app.use('/api/tenants',      tenantRoutes);
 // Route mặc định
 app.get('/', (req, res) => {
   res.json({
-    message: 'QUANLYCMS API - Trung tam Thang Tin Hoc',
+    message: 'DashboardThangTinHoc API - Trung tam Thang Tin Hoc',
     version: '3.0.0',
     features: [
       'Socket.io Real-time',
@@ -818,9 +901,16 @@ const PORT = process.env.PORT || 5000;
 const tokenBlacklist = require('./middleware/tokenBlacklist');
 const { initJobQueue, closeJobQueue } = require('./services/queue/jobQueue');
 
-server.listen(PORT, () => {
-  logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'QUANLYCMS server listening');
-  initJobQueue().catch((err) => logger.warn({ err: err.message }, 'initJobQueue failed'));
+(async () => {
+  await attachSocketIoAdapter(io);
+  await presenceStore.initPresenceBus();
+  server.listen(PORT, () => {
+    logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'dashboardthangtinhoc server listening');
+    initJobQueue().catch((err) => logger.warn({ err: err.message }, 'initJobQueue failed'));
+  });
+})().catch((err) => {
+  logger.error({ err: err.message }, 'Server boot failed');
+  process.exit(1);
 });
 
 async function shutdown(signal) {
@@ -830,6 +920,7 @@ async function shutdown(signal) {
       server.close((err) => (err ? reject(err) : resolve()));
     });
     await closeJobQueue();
+    await presenceStore.closePresenceBus();
     await mongoose.connection.close(false);
     await tokenBlacklist.close();
     const { closeRedis } = require('./config/redis');

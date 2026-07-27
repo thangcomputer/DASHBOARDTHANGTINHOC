@@ -218,6 +218,8 @@ router.get('/web', async (req, res) => {
       success: true,
       data: {
         logoUrl:      settings.logoUrl      || '',
+        faviconUrl:   settings.faviconUrl   || '',
+        faviconAdminUrl: settings.faviconAdminUrl || '',
         loadingStyle: settings.loadingStyle || 1,
         staffPopup: {
           isActive:  settings.staffPopup?.isActive  || false,
@@ -239,9 +241,11 @@ router.get('/web', async (req, res) => {
 router.put('/web', authMiddleware, isAdmin, async (req, res) => {
   try {
     const updates = {};
-    const { logoUrl, loadingStyle, staffPopup } = req.body;
+    const { logoUrl, faviconUrl, faviconAdminUrl, loadingStyle, staffPopup } = req.body;
 
     if (logoUrl !== undefined)      updates.logoUrl = logoUrl;
+    if (faviconUrl !== undefined)   updates.faviconUrl = faviconUrl;
+    if (faviconAdminUrl !== undefined) updates.faviconAdminUrl = faviconAdminUrl;
     if (loadingStyle !== undefined)  updates.loadingStyle = Math.max(1, Math.min(4, Number(loadingStyle) || 1));
 
     if (staffPopup) {
@@ -756,6 +760,47 @@ router.post('/upload-logo', authMiddleware, isAdmin, uploadLogo.single('logo'), 
     const logoUrl = `/uploads/logo/${req.file.filename}`;
     await updateMainSettings({ $set: { logoUrl } });
     return res.json({ success: true, logoUrl, message: 'Upload logo thành công' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── POST /api/settings/upload-favicon ── Upload favicon (public | admin) ─────
+const faviconDir = path.join(__dirname, '..', 'uploads', 'favicon');
+if (!fs.existsSync(faviconDir)) fs.mkdirSync(faviconDir, { recursive: true });
+
+const faviconStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, faviconDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    const kind = String(req.query?.kind || 'public').toLowerCase() === 'admin' ? 'admin' : 'public';
+    cb(null, `favicon_${kind}_${Date.now()}${ext}`);
+  },
+});
+const uploadFavicon = multer({
+  storage: faviconStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = file.mimetype.startsWith('image/') || file.mimetype === 'image/svg+xml' || file.mimetype === 'image/x-icon';
+    if (ok) cb(null, true);
+    else cb(new Error('Chỉ cho phép file ảnh (PNG, SVG, ICO, WEBP...)'));
+  },
+});
+
+router.post('/upload-favicon', authMiddleware, isAdmin, uploadFavicon.single('favicon'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
+    const kind = String(req.query?.kind || req.body?.kind || 'public').toLowerCase() === 'admin' ? 'admin' : 'public';
+    const faviconPath = `/uploads/favicon/${req.file.filename}`;
+    const field = kind === 'admin' ? 'faviconAdminUrl' : 'faviconUrl';
+    await updateMainSettings({ $set: { [field]: faviconPath } });
+    return res.json({
+      success: true,
+      kind,
+      faviconUrl: faviconPath,
+      [field]: faviconPath,
+      message: kind === 'admin' ? 'Upload favicon Admin thành công' : 'Upload favicon thành công',
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

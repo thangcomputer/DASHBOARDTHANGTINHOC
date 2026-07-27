@@ -1,8 +1,8 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 async function setup() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/quanlycms');
+  await mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc');
   const Teacher = mongoose.connection.collection('teachers');
   const hash = await bcrypt.hash('123456', 10);
   await Teacher.updateOne({phone: '0393703659'}, {$set: {password: hash}});

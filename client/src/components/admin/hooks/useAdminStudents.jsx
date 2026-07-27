@@ -189,7 +189,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
   };
 
   const assignTeacher = (studentId, teacherId, enrollmentId) => {
-    ctxAssignTeacher(studentId, teacherId, enrollmentId);
+    return ctxAssignTeacher(studentId, teacherId, enrollmentId);
   };
 
   const addEnrollment = async (student, payload) => {
@@ -297,9 +297,9 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
       return;
     }
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
-        const { questions, errors, skipped } = parseQuestionBankExcel(evt.target.result);
+        const { questions, errors, skipped } = await parseQuestionBankExcel(evt.target.result);
         if (!questions.length) {
           toast.error(errors[0] || 'Không có câu hỏi hợp lệ trong file.');
           errors.slice(1, 5).forEach((m) => toast.error(m));

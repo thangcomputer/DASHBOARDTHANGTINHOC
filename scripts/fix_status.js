@@ -4,7 +4,7 @@ const Student = require('../models/Student');
 
 async function fixStatuses() {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/quanlycms');
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dashboardthangtinhoc');
     console.log('✅ Connected to MongoDB');
 
     const studentsToUpdate = await Student.find({

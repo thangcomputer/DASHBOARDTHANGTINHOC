@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const Message = require('../models/Message');
 
 async function check() {
-  await mongoose.connect('mongodb://localhost:27017/quanlycms');
+  await mongoose.connect('mongodb://localhost:27017/dashboardthangtinhoc');
   const staffId = '0393703659';
   const messages = await Message.find({
     $or: [{ senderId: staffId }, { receiverId: staffId }]

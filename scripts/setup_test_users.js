@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
-const uri = 'mongodb://127.0.0.1:27017/quanlycms';
+const uri = 'mongodb://127.0.0.1:27017/dashboardthangtinhoc';
 
 async function setup() {
   await mongoose.connect(uri);

@@ -16,7 +16,7 @@ async function fix() {
   // Tạo Apache VirtualHost cho IP 103.124.92.238 proxy đến port 5000
   const apacheConf = `<VirtualHost *:80>
     ServerName 103.124.92.238
-    ServerAlias quanlycms.giasutinhoc24h.com
+    ServerAlias dashboardthangtinhoc.giasutinhoc24h.com
 
     # Enable proxy modules
     ProxyPreserveHost On
@@ -30,8 +30,8 @@ async function fix() {
     ProxyPassReverse /socket.io http://127.0.0.1:5000/socket.io
 
     # Serve React static files directly
-    DocumentRoot /www/wwwroot/quanlycms/client/dist
-    <Directory /www/wwwroot/quanlycms/client/dist>
+    DocumentRoot /www/wwwroot/dashboardthangtinhoc/client/dist
+    <Directory /www/wwwroot/dashboardthangtinhoc/client/dist>
         Options -Indexes
         AllowOverride All
         Require all granted
@@ -40,8 +40,8 @@ async function fix() {
     # SPA fallback - redirect 404 to index.html
     FallbackResource /index.html
 
-    ErrorLog /www/wwwlogs/quanlycms_error.log
-    CustomLog /www/wwwlogs/quanlycms_access.log combined
+    ErrorLog /www/wwwlogs/dashboardthangtinhoc_error.log
+    CustomLog /www/wwwlogs/dashboardthangtinhoc_access.log combined
 </VirtualHost>`;
 
   await ssh.execCommand(`cat > /www/server/panel/vhost/apache/103.124.92.238.conf << 'APACHEEOF'\n${apacheConf}\nAPACHEEOF`);

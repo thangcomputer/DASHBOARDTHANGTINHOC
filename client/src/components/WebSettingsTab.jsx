@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Globe, Upload, Loader2, Save, Image, Monitor, MessageSquare,
-  ToggleLeft, ToggleRight, AlertCircle, Check, X, Eye
+  ToggleLeft, ToggleRight, AlertCircle, Check, X, Eye, Shield,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
 import { useToast } from '../utils/toast';
@@ -43,10 +43,15 @@ export default function WebSettingsTab() {
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(null); // 'public' | 'admin' | null
   const logoInputRef = useRef(null);
+  const faviconPublicRef = useRef(null);
+  const faviconAdminRef = useRef(null);
 
   const [config, setConfig] = useState({
     logoUrl: '',
+    faviconUrl: '',
+    faviconAdminUrl: '',
     loadingStyle: 1,
     staffPopup: { isActive: false, title: '', content: '' },
   });
@@ -62,6 +67,8 @@ export default function WebSettingsTab() {
           setConfig(prev => ({
             ...prev,
             logoUrl: res.data.logoUrl || '',
+            faviconUrl: res.data.faviconUrl || '',
+            faviconAdminUrl: res.data.faviconAdminUrl || '',
             loadingStyle: res.data.loadingStyle || 1,
             staffPopup: {
               isActive: res.data.staffPopup?.isActive || false,
@@ -94,6 +101,29 @@ export default function WebSettingsTab() {
     }
   };
 
+  const handleFaviconUpload = async (file, kind) => {
+    if (!file) return;
+    setUploadingFavicon(kind);
+    try {
+      const res = await api.settings.uploadFavicon(file, kind);
+      if (res.success) {
+        const url = res.faviconUrl || res.faviconAdminUrl || '';
+        setConfig((prev) => ({
+          ...prev,
+          ...(kind === 'admin' ? { faviconAdminUrl: url } : { faviconUrl: url }),
+        }));
+        toast.success(kind === 'admin' ? 'Upload favicon Admin thành công' : 'Upload favicon thành công');
+        window.dispatchEvent(new Event('web-settings-changed'));
+      } else {
+        toast.error(res.message || 'Upload favicon thất bại');
+      }
+    } catch {
+      toast.error('Lỗi upload favicon');
+    } finally {
+      setUploadingFavicon(null);
+    }
+  };
+
   // Save all web settings
   const handleSave = async () => {
     setSaving(true);
@@ -105,6 +135,8 @@ export default function WebSettingsTab() {
           setConfig(prev => ({
             ...prev,
             logoUrl: res.data.logoUrl ?? prev.logoUrl,
+            faviconUrl: res.data.faviconUrl ?? prev.faviconUrl,
+            faviconAdminUrl: res.data.faviconAdminUrl ?? prev.faviconAdminUrl,
             loadingStyle: res.data.loadingStyle ?? prev.loadingStyle,
             staffPopup: {
               isActive: res.data.staffPopup?.isActive ?? prev.staffPopup.isActive,
@@ -212,6 +244,115 @@ export default function WebSettingsTab() {
               <button onClick={() => setConfig(prev => ({ ...prev, logoUrl: '' }))}
                 className="text-xs text-red-500 hover:underline flex items-center gap-1">
                 <X size={12} /> Xóa logo
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════ PHẦN 1b: FAVICON ══════════════ */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <Shield size={16} className="text-rose-600" />
+          <h3 className="font-bold text-gray-800">Favicon (icon tab trình duyệt)</h3>
+        </div>
+        <p className="text-xs text-gray-400">
+          Tải ảnh PNG / SVG / ICO / WEBP (tối đa 2MB). Để trống sẽ dùng icon mặc định của hệ thống.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Favicon public */}
+          <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/50 p-4">
+            <p className="text-xs font-black text-slate-600 uppercase tracking-widest">Favicon chung (HV / GV / Public)</p>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-white rounded-xl border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
+                <img
+                  src={resolveMediaUrl(config.faviconUrl) || config.faviconUrl || '/favicon.svg'}
+                  alt="Favicon"
+                  className="w-10 h-10 object-contain"
+                />
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                <input
+                  ref={faviconPublicRef}
+                  type="file"
+                  accept="image/*,.ico,.svg"
+                  className="hidden"
+                  onChange={(e) => handleFaviconUpload(e.target.files?.[0], 'public')}
+                />
+                <button
+                  type="button"
+                  onClick={() => faviconPublicRef.current?.click()}
+                  disabled={uploadingFavicon === 'public'}
+                  className="w-full border-2 border-dashed border-slate-300 rounded-xl py-2.5 text-slate-600 hover:bg-white flex items-center justify-center gap-2 font-medium text-xs transition disabled:opacity-50"
+                >
+                  {uploadingFavicon === 'public' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {uploadingFavicon === 'public' ? 'Đang upload...' : 'Tải favicon lên'}
+                </button>
+              </div>
+            </div>
+            <input
+              type="url"
+              value={config.faviconUrl}
+              onChange={(e) => setConfig((prev) => ({ ...prev, faviconUrl: e.target.value }))}
+              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-xs font-mono focus:border-blue-400 outline-none bg-white"
+              placeholder="Hoặc nhập URL favicon..."
+            />
+            {config.faviconUrl && (
+              <button
+                type="button"
+                onClick={() => setConfig((prev) => ({ ...prev, faviconUrl: '' }))}
+                className="text-xs text-red-500 hover:underline flex items-center gap-1"
+              >
+                <X size={12} /> Xóa — dùng mặc định
+              </button>
+            )}
+          </div>
+
+          {/* Favicon admin */}
+          <div className="space-y-3 rounded-2xl border border-rose-100 bg-rose-50/40 p-4">
+            <p className="text-xs font-black text-rose-700 uppercase tracking-widest">Favicon Admin</p>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-white rounded-xl border border-rose-100 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
+                <img
+                  src={resolveMediaUrl(config.faviconAdminUrl) || config.faviconAdminUrl || '/favicon-admin.svg'}
+                  alt="Favicon Admin"
+                  className="w-10 h-10 object-contain"
+                />
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                <input
+                  ref={faviconAdminRef}
+                  type="file"
+                  accept="image/*,.ico,.svg"
+                  className="hidden"
+                  onChange={(e) => handleFaviconUpload(e.target.files?.[0], 'admin')}
+                />
+                <button
+                  type="button"
+                  onClick={() => faviconAdminRef.current?.click()}
+                  disabled={uploadingFavicon === 'admin'}
+                  className="w-full border-2 border-dashed border-rose-300 rounded-xl py-2.5 text-rose-700 hover:bg-white flex items-center justify-center gap-2 font-medium text-xs transition disabled:opacity-50"
+                >
+                  {uploadingFavicon === 'admin' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {uploadingFavicon === 'admin' ? 'Đang upload...' : 'Tải favicon Admin lên'}
+                </button>
+              </div>
+            </div>
+            <input
+              type="url"
+              value={config.faviconAdminUrl}
+              onChange={(e) => setConfig((prev) => ({ ...prev, faviconAdminUrl: e.target.value }))}
+              className="w-full border-2 border-rose-100 rounded-xl px-3 py-2 text-xs font-mono focus:border-rose-400 outline-none bg-white"
+              placeholder="Hoặc nhập URL favicon Admin..."
+            />
+            {config.faviconAdminUrl && (
+              <button
+                type="button"
+                onClick={() => setConfig((prev) => ({ ...prev, faviconAdminUrl: '' }))}
+                className="text-xs text-red-500 hover:underline flex items-center gap-1"
+              >
+                <X size={12} /> Xóa — dùng mặc định Admin
               </button>
             )}
           </div>

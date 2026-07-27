@@ -9,7 +9,7 @@ export default function StatCard({ icon: Icon, label, value, sub, color, trend }
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <p className="text-xs text-gray-400 font-black uppercase tracking-widest">{label}</p>
+          <p className="text-xs text-slate-500 font-black uppercase tracking-widest">{label}</p>
           {trend != null && (
             <span className={`text-xs font-black px-2 py-0.5 rounded-full ${trend > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
               {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
@@ -17,7 +17,7 @@ export default function StatCard({ icon: Icon, label, value, sub, color, trend }
           )}
         </div>
         <p className="text-xl sm:text-2xl font-black text-gray-900 leading-tight truncate">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-1 font-bold italic">{sub}</p>}
+        {sub && <p className="text-xs text-slate-500 mt-1 font-bold italic">{sub}</p>}
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const Notification = require('../../models/Notification');
 
 async function check() {
   try {
-    await mongoose.connect('mongodb://127.0.0.1:27017/quanlycms');
+    await mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc');
     console.log('Connected to MongoDB');
     
     const notifs = await Notification.find({ path: { $regex: /admin/ } })

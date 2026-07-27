@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { Edit3, X, Save, KeyRound, CreditCard, MapPin } from 'lucide-react';
 import { BankSelect } from '../../BankSelect';
 import TeacherScheduleHistoryPanel from '../../TeacherScheduleHistoryPanel';
@@ -104,13 +105,13 @@ export default function EditTeacherModal({
                 <div className="space-y-4">
                    <div>
                     <label className="text-xs font-extrabold text-slate-500 uppercase block mb-1.5 tracking-wider">Trạng thái duyệt</label>
-                    <select value={String(editTeacher.status || 'inactive').toLowerCase()} onChange={e => setEditTeacher(p => ({ ...p, status: e.target.value }))}
+                    <CmsSelect value={String(editTeacher.status || 'inactive').toLowerCase()} onChange={e => setEditTeacher(p => ({ ...p, status: e.target.value }))}
                       className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all font-bold text-slate-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%207l5%205%205-5%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:calc(100%-1rem)_center]">
                       <option value="inactive">🔒 Chưa cấp quyền</option>
                       <option value="pending">🕒 Cấp quyền thi (Chờ làm bài)</option>
                       <option value="active">🟢 Đã cấp quyền (Active)</option>
                       <option value="locked">🚫 Đã khóa</option>
-                    </select>
+                    </CmsSelect>
                   </div>
                   <div>
                     <label className="text-xs font-extrabold text-slate-500 uppercase block mb-1.5 tracking-wider">Lương / buổi (VNĐ)</label>
@@ -129,7 +130,7 @@ export default function EditTeacherModal({
                     return (
                       <div>
                         <label className="text-xs font-extrabold text-slate-500 uppercase block mb-1.5 tracking-wider">Điều chuyển chi nhánh</label>
-                        <select
+                        <CmsSelect
                           value={editTeacher.branchId || ''}
                           onChange={e => {
                             const opt = e.target.selectedOptions[0];
@@ -141,7 +142,7 @@ export default function EditTeacherModal({
                           {(JSON.parse(localStorage.getItem('thvp_branches') || '[]')).map(b => (
                             <option key={b._id} value={b._id} data-code={b.code}>{b.name} ({b.code})</option>
                           ))}
-                        </select>
+                        </CmsSelect>
                         {editTeacher.branchCode && (
                           <p className="text-xs text-amber-700 font-bold mt-1.5 flex items-center gap-1"><MapPin size={12}/> Hiện tại: {editTeacher.branchCode}</p>
                         )}

@@ -15,6 +15,7 @@ const AdminLoginPage = ({ onLogin }) => {
   const [error, setError] = useState(null);
   const [deviceConflict, setDeviceConflict] = useState(false);
   const [pendingForce, setPendingForce] = useState(false);
+  const [forceTicket, setForceTicket] = useState(null);
   const [mfaToken, setMfaToken] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
 
@@ -35,20 +36,29 @@ const AdminLoginPage = ({ onLogin }) => {
       .catch(() => {});
   }, []);
 
-  const [captcha, setCaptcha] = useState('');
   const [userInputCaptcha, setUserInputCaptcha] = useState('');
-  const [captchaCode, setCaptchaCode] = useState('');
+  const [captchaId, setCaptchaId] = useState('');
+  const [captchaSvg, setCaptchaSvg] = useState('');
 
-  // Hàm tạo mã bảo vệ ngẫu nhiên
-  const generateCaptcha = () => {
-    const chars = '23456789abcdefghkmnpqrstuvwxyzABCDEFGHKLMNPQRSTUVWXYZ';
-    const code = Array.from({ length: 6 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
-    setCaptchaCode(code);
-  };
+  // CAPTCHA do server sinh — dùng 1 lần, phải làm mới sau mỗi lần gửi
+  const generateCaptcha = React.useCallback(async () => {
+    setUserInputCaptcha('');
+    try {
+      const res = await fetch(`${API_BASE}/auth/captcha`, { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) {
+        setCaptchaId(data.cid);
+        // Bọc trong data-URI để trình duyệt render SVG trong sandbox của <img>
+        setCaptchaSvg(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.svg)}`);
+      }
+    } catch {
+      setCaptchaSvg('');
+    }
+  }, []);
 
   React.useEffect(() => {
     generateCaptcha();
-  }, []);
+  }, [generateCaptcha]);
 
   const handleLogin = async (e, forceDevice = false) => {
     if (e?.preventDefault) e.preventDefault();
@@ -60,12 +70,10 @@ const AdminLoginPage = ({ onLogin }) => {
       return;
     }
 
-    // 2. Kiểm tra mã CAPTCHA
-    if (userInputCaptcha.toLowerCase() !== captchaCode.toLowerCase()) {
-      setError('MÃ BẢO VỆ KHÔNG CHÍNH XÁC');
-      toast.error('Mã bảo vệ sai!');
-      generateCaptcha();
-      setUserInputCaptcha('');
+    // 2. Kiểm tra mã CAPTCHA (server xác thực, client chỉ chặn trường trống)
+    if (!userInputCaptcha.trim()) {
+      setError('VUI LÒNG NHẬP MÃ BẢO VỆ');
+      toast.error('Chưa nhập mã bảo vệ');
       return;
     }
 
@@ -75,14 +83,22 @@ const AdminLoginPage = ({ onLogin }) => {
     try {
       const csrf = await ensureCsrfToken();
       const fp = getDeviceFingerprint();
-      const response = await fetch(`${API_BASE}/auth/login`, {
+      const response = await fetch(`${API_BASE}/auth/login/internal`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         },
-        body: JSON.stringify({ identifier: username, password, deviceFingerprint: fp, force: forceDevice }),
+        body: JSON.stringify({
+          identifier: username,
+          password,
+          captchaId,
+          captchaAnswer: userInputCaptcha.trim(),
+          deviceFingerprint: fp,
+          force: forceDevice,
+          ...(forceDevice && forceTicket ? { forceTicket } : {}),
+        }),
       });
 
       const raw = await response.text();
@@ -94,6 +110,7 @@ const AdminLoginPage = ({ onLogin }) => {
       }
 
       if (response.status === 409 && data.code === 'DEVICE_CONFLICT') {
+        setForceTicket(data.forceTicket || null);
         setDeviceConflict(true);
         setLoading(false);
         return;
@@ -113,6 +130,7 @@ const AdminLoginPage = ({ onLogin }) => {
         setError(data.message?.toUpperCase() || 'TÀI KHOẢN HOẶC MẬT KHẨU KHÔNG ĐÚNG');
         toast.error('Truy cập bị từ chối!');
         setPassword('');
+        generateCaptcha(); // CAPTCHA dùng 1 lần — cấp mã mới cho lần thử tiếp theo
       }
     } catch (err) {
       console.error('[AdminLogin]', err);
@@ -129,6 +147,7 @@ const AdminLoginPage = ({ onLogin }) => {
 
   const finishLogin = (data) => {
     setDeviceConflict(false);
+    setForceTicket(null);
     setMfaToken(null);
     const actualUser = data.data.user || data.data;
     const accessToken = data.data.accessToken || actualUser.token || actualUser.accessToken;
@@ -184,27 +203,27 @@ const AdminLoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] flex items-center justify-center p-0 font-sans overflow-hidden selection:bg-red-500/30">
+    <div className="min-h-[100dvh] bg-[#020617] flex items-center justify-center p-0 font-sans overflow-x-clip overflow-y-auto selection:bg-red-500/30 relative">
       
       {/* Background Decor - Cyber Dots */}
-      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+      <div className="absolute inset-0 opacity-20 pointer-events-none" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
 
-      <div className="w-full h-screen flex flex-col md:flex-row relative z-10">
+      <div className="w-full min-h-[100dvh] md:h-[100dvh] flex flex-col md:flex-row relative z-10 overflow-x-clip md:overflow-hidden">
         
         {/* LEFT COLUMN: CYBER COMMAND CENTER */}
-        <div className="hidden md:flex md:w-[60%] bg-transparent p-20 flex-col justify-center relative border-r border-white/5">
+        <div className="hidden md:flex md:w-[60%] bg-transparent p-10 lg:p-20 flex-col justify-center relative border-r border-white/5 min-w-0">
           <div className="relative z-10 space-y-12 animate-in fade-in slide-in-from-left-20 duration-1000">
             <div className="inline-flex items-center gap-3 bg-red-600/10 border border-red-500/20 px-4 py-2 rounded-xl">
-               <ShieldCheck size={18} className="text-red-500" />
-               <span className="text-xs font-black text-red-500 uppercase tracking-[0.3em]">Hệ thống quản trị tối cao</span>
+               <ShieldCheck size={18} className="text-red-500" aria-hidden="true" />
+               <span className="text-xs font-black text-red-400 uppercase tracking-[0.3em]">Hệ thống quản trị tối cao</span>
             </div>
 
             <div className="space-y-4">
-               <h1 className="text-6xl lg:text-8xl font-black text-white leading-none tracking-tighter">
+               <h1 className="text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-none tracking-tighter break-anywhere">
                 CMS <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-800">CENTRAL</span>
               </h1>
-              <p className="text-slate-400 text-xl font-medium max-w-xl leading-relaxed">
+              <p className="text-slate-400 text-lg lg:text-xl font-medium max-w-xl leading-relaxed">
                 Trung tâm điều hành nền tảng Đào tạo Tin học văn phòng. 
                 Kiểm soát dữ liệu, phân quyền giảng viên và theo dõi tăng trưởng doanh thu theo thời gian thực.
               </p>
@@ -237,30 +256,20 @@ const AdminLoginPage = ({ onLogin }) => {
             <div className="text-center space-y-6 animate-in fade-in zoom-in duration-700">
               <div className="relative inline-block">
                 <div className="absolute inset-0 bg-red-600 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-                <img src={dynamicLogo || "/logo-thang-tin-hoc.png"} alt="Logo" className="h-20 relative z-10 object-contain" onError={(e) => { if (!dynamicLogo) e.target.src = 'https://i.ibb.co/68H8LzG/logo.png'; }} />
+                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-16 sm:h-20 max-w-[min(100%,200px)] relative z-10 object-contain mx-auto" />
               </div>
               
               <div className="space-y-3">
-                <h2 className="text-4xl font-black text-white tracking-tight">Cổng Admin</h2>
-                <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.4em]">Xác thực quyền truy cập hệ thống</p>
+                <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">Cổng Admin</h2>
+                <p className="text-slate-400 font-bold uppercase text-xs tracking-[0.2em] sm:tracking-[0.4em]">Xác thực quyền truy cập hệ thống</p>
               </div>
             </div>
 
             <form onSubmit={mfaToken ? handleMfaVerify : handleLogin} className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
               {error && (
-                <div className="bg-[#1a0505] border-l-4 border-red-600 p-5 rounded-2xl flex items-center gap-4 text-red-500 text-[11px] font-black tracking-widest animate-bounce-horizontal shadow-2xl">
-                  <AlertTriangle size={20} className="flex-shrink-0" />
-                  <span>{error}</span>
-                  <style>{`
-                    @keyframes bounce-horizontal {
-                      0%, 100% { transform: translateX(0); }
-                      25% { transform: translateX(-5px); }
-                      75% { transform: translateX(5px); }
-                    }
-                    .animate-bounce-horizontal {
-                      animation: bounce-horizontal 0.4s ease-in-out;
-                    }
-                  `}</style>
+                <div role="alert" className="bg-[#1a0505] border-l-4 border-red-600 p-5 rounded-2xl flex items-center gap-4 text-red-400 text-[11px] font-black tracking-widest shadow-2xl">
+                  <AlertTriangle size={20} className="flex-shrink-0" aria-hidden="true" />
+                  <span className="break-anywhere">{error}</span>
                 </div>
               )}
 
@@ -274,14 +283,15 @@ const AdminLoginPage = ({ onLogin }) => {
                     maxLength={6}
                     value={mfaCode}
                     onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full bg-white/[0.03] border-2 border-white/5 rounded-3xl px-5 py-5 text-white text-center text-2xl font-black tracking-[0.4em] outline-none focus:border-red-600/50"
+                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl px-5 py-5 text-white text-center text-2xl font-black tracking-[0.4em] outline-none focus:border-red-600/50 placeholder:text-slate-500"
                     placeholder="000000"
                     autoFocus
+                    aria-label="Mã xác thực 2 bước"
                   />
                   <button
                     type="button"
                     onClick={() => { setMfaToken(null); setMfaCode(''); setError(null); }}
-                    className="text-xs font-bold text-slate-500 hover:text-white underline"
+                    className="text-xs font-bold text-slate-400 hover:text-white underline"
                   >
                     Quay lại đăng nhập
                   </button>
@@ -289,42 +299,47 @@ const AdminLoginPage = ({ onLogin }) => {
               ) : (
               <>
               <div className="space-y-3">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">Username / Identifier</label>
+                <label htmlFor="admin-username" className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] block ml-1">Username / Identifier</label>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-red-500 transition-colors">
-                    <User size={20} />
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors">
+                    <User size={20} aria-hidden="true" />
                   </div>
                   <input
+                    id="admin-username"
                     type="text"
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-white/[0.03] border-2 border-white/5 rounded-3xl pl-14 pr-5 py-5 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-700 shadow-inner"
+                    autoComplete="username"
+                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-5 py-4 sm:py-5 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
                     placeholder="Nhập tài khoản quản trị"
                   />
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">Master Password</label>
+                <label htmlFor="admin-password" className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] block ml-1">Master Password</label>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-red-500 transition-colors">
-                    <Lock size={20} />
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors">
+                    <Lock size={20} aria-hidden="true" />
                   </div>
                   <input
+                    id="admin-password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-white/[0.03] border-2 border-white/5 rounded-3xl pl-14 pr-5 py-5 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-700 shadow-inner"
+                    autoComplete="current-password"
+                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-14 py-4 sm:py-5 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
                     placeholder="••••••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-600 hover:text-white transition-colors"
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
                   >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    {showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
                   </button>
                 </div>
               </div>
@@ -333,13 +348,11 @@ const AdminLoginPage = ({ onLogin }) => {
                 <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">Mã bảo vệ</label>
                 <div className="flex gap-3">
                   <div className="flex-1 bg-white/5 border-2 border-white/5 rounded-3xl p-4 flex items-center justify-center relative overflow-hidden h-16 select-none shadow-inner">
-                    {/* Captcha Noise Strokes */}
-                    <div className="absolute inset-x-0 top-1/2 h-[1px] bg-red-500/30 -rotate-3" />
-                    <div className="absolute inset-x-0 top-1/3 h-[1px] bg-blue-500/30 rotate-2" />
-                    
-                    <span className="text-2xl font-black tracking-[0.4em] italic text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.4)]">
-                      {captchaCode}
-                    </span>
+                    {captchaSvg ? (
+                      <img src={captchaSvg} alt="Mã bảo vệ" className="h-12 w-auto rounded-lg" />
+                    ) : (
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Đang tải mã…</span>
+                    )}
                   </div>
                   <button 
                     type="button" 
@@ -419,7 +432,7 @@ const AdminLoginPage = ({ onLogin }) => {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => setDeviceConflict(false)}
+                  onClick={() => { setDeviceConflict(false); setForceTicket(null); generateCaptcha(); }}
                   className="flex-1 py-3 border-2 border-white/10 text-gray-400 font-bold rounded-xl hover:border-white/20 transition text-sm"
                 >
                   Hủy bỏ

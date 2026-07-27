@@ -10,7 +10,7 @@ async function diagnose() {
   console.log(pm2.stdout || pm2.stderr);
 
   console.log('\n=== 2. PM2 LOGS (last 30 lines) ===');
-  const logs = await ssh.execCommand('pm2 logs quanlycms --lines 30 --nostream');
+  const logs = await ssh.execCommand('pm2 logs dashboardthangtinhoc --lines 30 --nostream');
   console.log(logs.stdout || logs.stderr);
 
   console.log('\n=== 3. APACHE STATUS ===');

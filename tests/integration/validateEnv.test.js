@@ -44,7 +44,18 @@ test('validateEnv: passes with strong distinct secrets and CLIENT_URL', () => {
   process.env.JWT_REFRESH_SECRET = STRONG2;
   process.env.CLIENT_URL = 'https://example.com';
   process.env.SEPAY_API_KEY = 'test-sepay-key';
+  process.env.REDIS_URL = 'redis://127.0.0.1:6379';
   assert.doesNotThrow(() => freshValidateEnv()());
+});
+
+test('validateEnv: requires REDIS_URL in production', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.JWT_SECRET = STRONG;
+  process.env.JWT_REFRESH_SECRET = STRONG2;
+  process.env.CLIENT_URL = 'https://example.com';
+  process.env.SEPAY_API_KEY = 'test-sepay-key';
+  delete process.env.REDIS_URL;
+  assert.throws(() => freshValidateEnv()(), /REDIS_URL is required/);
 });
 
 test('validateEnv: requires SePay key in production', () => {
@@ -52,6 +63,7 @@ test('validateEnv: requires SePay key in production', () => {
   process.env.JWT_SECRET = STRONG;
   process.env.JWT_REFRESH_SECRET = STRONG2;
   process.env.CLIENT_URL = 'https://example.com';
+  process.env.REDIS_URL = 'redis://127.0.0.1:6379';
   delete process.env.SEPAY_API_KEY;
   delete process.env.SEPAY_SECRET_KEY;
   assert.throws(() => freshValidateEnv()(), /SEPAY_API_KEY or SEPAY_SECRET_KEY/);

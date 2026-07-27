@@ -15,8 +15,21 @@ router.get('/', authMiddleware, async (req, res) => {
       filter.studentId = req.user.id;
     }
 
-    const results = await ExamResult.find(filter).sort({ createdAt: -1 });
-    res.json({ success: true, data: results });
+    const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitNum = Math.min(1000, Math.max(1, parseInt(req.query.limit, 10) || 200));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [results, total] = await Promise.all([
+      ExamResult.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+      ExamResult.countDocuments(filter),
+    ]);
+    res.json({
+      success: true,
+      data: results,
+      total,
+      page: pageNum,
+      limit: limitNum,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import { Plus, Clipboard, FileText, Download, CheckCircle, Clock, XCircle, Search } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import api, { resolveMediaUrl, buildMediaDownloadUrl } from '../services/api';
@@ -127,13 +128,13 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
           <span className="flex items-center gap-2"><Clipboard size={20} className="text-purple-600" /> Bài tập của:</span>
-          <select 
+          <CmsSelect 
             value={selectedCourse} 
             onChange={(e) => setSelectedCourse(e.target.value)}
             className="border-2 border-purple-200 focus:border-purple-500 rounded-xl px-3 py-1.5 outline-none font-black text-blue-700 bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer text-sm"
           >
             {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          </CmsSelect>
         </h2>
         <button 
           onClick={() => setShowCreateModal(true)}

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/quanlycms').then(async () => {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/dashboardthangtinhoc').then(async () => {
   const Student = require('../models/Student');
 
   // Xóa student tên test

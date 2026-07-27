@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  QUANLYCMS — Cleanup Test Accounts
+ *  dashboardthangtinhoc — Cleanup Test Accounts
  *  Xóa tất cả tài khoản test khỏi DB sau khi kiểm thử xong
  *  Chạy: node tests/cleanup_test_accounts.js
  * ═══════════════════════════════════════════════════════════════════════

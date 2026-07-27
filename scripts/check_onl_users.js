@@ -4,7 +4,7 @@ const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 
 async function check() {
-  await mongoose.connect('mongodb://localhost:27017/quanlycms');
+  await mongoose.connect('mongodb://localhost:27017/dashboardthangtinhoc');
   const branchId = '69d93103fc94ddf67c87f7ff'; // ONL branch
   
   const students = await Student.find({ branchId }).select('name').lean();

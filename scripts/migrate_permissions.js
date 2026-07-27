@@ -24,7 +24,7 @@ const OLD_TO_NEW = {
 };
 
 async function migrate() {
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/quanlycms');
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dashboardthangtinhoc');
   const staffList = await Teacher.find({
     role: { $in: ['staff','admin'] },
     permissions: { $exists: true },

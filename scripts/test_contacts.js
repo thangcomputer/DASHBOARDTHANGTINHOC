@@ -1,5 +1,5 @@
-﻿const mongoose = require('mongoose');
-mongoose.connect('mongodb://127.0.0.1:27017/quanlycms').then(async () => {
+const mongoose = require('mongoose');
+mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc').then(async () => {
     const Student = mongoose.connection.collection('students');
     const Teacher = mongoose.connection.collection('teachers');
     const students = await Student.find({}).toArray();

@@ -42,6 +42,13 @@ function queueStatus() {
   return { mode: getQueueMode() };
 }
 
+function socketAdapterStatus() {
+  return {
+    mode: process.env.__SOCKET_ADAPTER_MODE || (process.env.REDIS_URL ? 'redis-pending' : 'memory'),
+    presence: process.env.REDIS_URL ? 'redis' : 'memory',
+  };
+}
+
 /**
  * Public-ish health (dung cho /healthz va monitoring/health).
  */
@@ -49,6 +56,7 @@ function getHealth() {
   const db = dbStatus();
   const redis = redisStatus();
   const queue = queueStatus();
+  const socketAdapter = socketAdapterStatus();
   const mem = memSnapshot();
   const ok = db.status === 'up';
   return {
@@ -61,6 +69,7 @@ function getHealth() {
     db,
     redis,
     queue,
+    socketAdapter,
     memory: mem,
     timestamp: new Date().toISOString(),
   };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   CreditCard, User, Phone, BookOpen, GraduationCap, CheckCircle,
   Printer, Download, LayoutDashboard, ArrowLeft, Loader2, AlertCircle,
@@ -457,7 +458,7 @@ const RegistrationForm = ({ onNavigate }) => {
                       <Loader2 size={14} className="animate-spin" /> Đang tải khóa học...
                     </div>
                   ) : (
-                    <select name="courseId" value={formData.courseId} onChange={handleChange}
+                    <CmsSelect name="courseId" value={formData.courseId} onChange={handleChange}
                       className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold text-blue-800 bg-white transition-all">
                       {dbCourses.map(c => {
                         const ep = calcEff(c.price, c.discountPercent);
@@ -468,7 +469,7 @@ const RegistrationForm = ({ onNavigate }) => {
                           </option>
                         );
                       })}
-                    </select>
+                    </CmsSelect>
                   )}
                 </div>
 
@@ -478,7 +479,7 @@ const RegistrationForm = ({ onNavigate }) => {
                     <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
                       🏢 Cơ sở đăng ký học
                     </label>
-                    <select
+                    <CmsSelect
                       value={formData.branchId}
                       onChange={e => {
                         const b = branches.find(x => x._id === e.target.value);
@@ -488,7 +489,7 @@ const RegistrationForm = ({ onNavigate }) => {
                       {branches.map(b => (
                         <option key={b._id} value={b._id}>{b.name} ({b.code})</option>
                       ))}
-                    </select>
+                    </CmsSelect>
                   </div>
                 )}
 

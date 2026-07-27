@@ -8,17 +8,17 @@ const { getVpsSshConfig, getVpsConnection } = require('./_vpsConnect.cjs');
 async function deploy() {
   await ssh.connect(getVpsSshConfig());
 
-  const localDist = path.join(__dirname, 'QUANLYCMS', 'client', 'dist');
+  const localDist = path.join(__dirname, '..', 'client', 'dist');
 
   // ══════════════════════════════════════════════════════════
-  // PART 1: Upload new QUANLYCMS dist
+  // PART 1: Upload new dashboardthangtinhoc dist
   // ══════════════════════════════════════════════════════════
   console.log('=== 1. REMOVE OLD DIST ===');
-  await ssh.execCommand('rm -rf /www/wwwroot/quanlycms/client/dist');
+  await ssh.execCommand('rm -rf /www/wwwroot/dashboardthangtinhoc/client/dist');
   console.log('Done');
 
   console.log('\n=== 2. UPLOAD NEW DIST ===');
-  const status = await ssh.putDirectory(localDist, '/www/wwwroot/quanlycms/client/dist', {
+  const status = await ssh.putDirectory(localDist, '/www/wwwroot/dashboardthangtinhoc/client/dist', {
     recursive: true,
     concurrency: 5,
     tick: (localPath, remotePath, error) => {
@@ -47,7 +47,7 @@ async function deploy() {
   console.log(pm2.stdout);
 
   // Fix the giasutinhoc24h.com Apache config to serve static dist files
-  // and proxy API to GiasuAI's own backend port (not 5000 which is quanlycms)
+  // and proxy API to GiasuAI's own backend port (not 5000 which is dashboardthangtinhoc)
   console.log('\n=== 5. FIX GIASUTINHOC24H.COM VHOST ===');
 
   const newConfig = `<VirtualHost *:80>

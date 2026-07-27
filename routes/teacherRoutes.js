@@ -196,6 +196,12 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
         { branchId: { $in: bf.branchId.$in } },
         { branchId: null },
       ];
+    } else if (bf.branchId != null && bf.branchId !== '') {
+      // Lọc 1 chi nhánh: gồm GV thuộc chi nhánh đó + GV chưa gán chi nhánh (để vẫn phân công được)
+      filter.$or = [
+        { branchId: bf.branchId },
+        { branchId: null },
+      ];
     } else {
       Object.assign(filter, bf);
     }
@@ -424,19 +430,20 @@ router.put('/:id/score', authMiddleware, isAdmin, async (req, res) => {
   try {
     const { testScore, testNotes } = req.body;
 
-    if (testScore === undefined || testScore === null) {
+    if (testScore === undefined || testScore === null || !Number.isFinite(Number(testScore))) {
       return res.status(400).json({ success: false, message: 'Thiếu testScore' });
     }
-    if (testScore < 0 || testScore > 100) {
+    const scoreNum = Number(testScore);
+    if (scoreNum < 0 || scoreNum > 100) {
       return res.status(400).json({ success: false, message: 'Điểm phải trong khoảng 0-100' });
     }
 
-    const newStatus = testScore >= 80 ? 'tested_passed' : 'tested_failed';
+    const newStatus = scoreNum >= 80 ? 'tested_passed' : 'tested_failed';
 
     const teacher = await Teacher.findByIdAndUpdate(
       req.params.id,
       {
-        testScore,
+        testScore: scoreNum,
         testNotes: testNotes || '',
         testDate:  new Date(),
         status:    newStatus,
@@ -453,17 +460,17 @@ router.put('/:id/score', authMiddleware, isAdmin, async (req, res) => {
     if (io) {
       io.emit('teacher:scored', {
         teacherId:  teacher._id.toString(),
-        testScore,
-        passed:     testScore >= 80,
-        message:    testScore >= 80
-          ? `🎉 Chúc mừng! Bạn đạt ${testScore}/100 điểm. Đã qua bài test!`
-          : `❌ Bạn đạt ${testScore}/100 điểm. Chưa đạt yêu cầu (>=80). Vui lòng liên hệ Admin.`,
+        testScore: scoreNum,
+        passed:     scoreNum >= 80,
+        message:    scoreNum >= 80
+          ? `🎉 Chúc mừng! Bạn đạt ${scoreNum}/100 điểm. Đã qua bài test!`
+          : `❌ Bạn đạt ${scoreNum}/100 điểm. Chưa đạt yêu cầu (>=80). Vui lòng liên hệ Admin.`,
       });
     }
 
     return res.json({
       success: true,
-      message: `Đã lưu điểm ${testScore}/100 cho ${teacher.name}`,
+      message: `Đã lưu điểm ${scoreNum}/100 cho ${teacher.name}`,
       data: teacher,
     });
   } catch (error) {
@@ -482,7 +489,7 @@ router.put('/:id/approve', authMiddleware, isAdmin, async (req, res) => {
     }
 
     // STRICT LOGIC (Workflow 1): Không thể approve nếu điểm < 80
-    if (teacherCheck.testScore < 80) {
+    if (!Number.isFinite(Number(teacherCheck.testScore)) || Number(teacherCheck.testScore) < 80) {
       return res.status(403).json({
         success: false,
         message: `Không thể cấp quyền! Điểm bài test: ${teacherCheck.testScore}/100 (yêu cầu ≥ 80).`,
@@ -745,6 +752,9 @@ router.get('/:id/finance/pending', authMiddleware, isAdmin, async (req, res) => 
 router.put('/:id/finance/pay-flexible', [authMiddleware, isAdmin, superAdminOnlyTeacher], async (req, res) => {
   try {
     const { sessionsCount, amount, note } = req.body;
+    const idempotencyKey = String(
+      req.headers['idempotency-key'] || req.body.idempotencyKey || ''
+    ).trim() || null;
 
     if (!sessionsCount || Number(sessionsCount) <= 0) {
       return res.status(400).json({ success: false, message: 'Số buổi thanh toán phải lớn hơn 0' });
@@ -756,48 +766,89 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, isAdmin, superAdminOnly
       return res.status(400).json({ success: false, message: `Số tiền vượt giới hạn 500 triệu/lần` });
     }
 
+    if (idempotencyKey) {
+      const existing = await Transaction.findOne({ idempotencyKey }).lean();
+      if (existing) {
+        return res.json({
+          success: true,
+          message: 'Giao dịch đã tồn tại (idempotent)',
+          data: {
+            paidSessions: Number(sessionsCount),
+            markedSessions: 0,
+            totalAmount: existing.amount,
+            transaction: existing,
+            idempotent: true,
+          },
+        });
+      }
+    }
+
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
 
     // Tìm buổi chưa thanh toán theo FIFO (chỉ tính các buổi đã hoàn thành - completed)
-    // Nếu không có → vẫn tạo giao dịch (thanh toán thủ công do Admin nhập)
     const pendingSessions = await Schedule.find({
       teacherId: req.params.id,
       status: 'completed',
       is_paid_to_teacher: { $ne: true }
     }).sort({ date: 1, createdAt: 1 }).limit(Number(sessionsCount));
 
-    const actualCount = pendingSessions.length;
     const sessionIds = pendingSessions.map(s => s._id);
 
-    // Đánh dấu FIFO nếu có session nào tìm được
+    // Atomic claim: chỉ đánh dấu buổi còn unpaid
+    let actualCount = 0;
     if (sessionIds.length > 0) {
-      await Schedule.updateMany(
-        { _id: { $in: sessionIds } },
+      const claim = await Schedule.updateMany(
+        {
+          _id: { $in: sessionIds },
+          status: 'completed',
+          is_paid_to_teacher: { $ne: true },
+        },
         { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
       );
+      actualCount = claim.modifiedCount || 0;
     }
 
-    // Luôn tạo giao dịch với số tiền và số buổi Admin đã nhập (kể cả thanh toán thủ công)
     const now = new Date();
     const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
-    const paidCount = Number(sessionsCount); // dùng số Admin nhập, không phải số session tìm được
-    const transaction = await Transaction.create({
-      teacherId: req.params.id,
-      teacherName: teacher.name,
-      teacherPhone: teacher.phone || '',
-      amount: Number(amount),
-      description: note || `Thù lao ${paidCount} buổi dạy`,
-      month: monthLabel,
-      status: 'confirmed',
-      confirmedBy: req.user?.name || 'Admin',
-      confirmedAt: now,
-      bankName: teacher.bankAccount?.bankName || '',
-      bankAccount: teacher.bankAccount?.accountNumber || '',
-      note: note || '',
-    });
+    const paidCount = Number(sessionsCount);
+    let transaction;
+    try {
+      transaction = await Transaction.create({
+        teacherId: req.params.id,
+        teacherName: teacher.name,
+        teacherPhone: teacher.phone || '',
+        amount: Number(amount),
+        description: note || `Thù lao ${paidCount} buổi dạy`,
+        month: monthLabel,
+        status: 'confirmed',
+        confirmedBy: req.user?.name || 'Admin',
+        confirmedAt: now,
+        bankName: teacher.bankAccount?.bankName || '',
+        bankAccount: teacher.bankAccount?.accountNumber || '',
+        note: note || '',
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      });
+    } catch (createErr) {
+      if (createErr?.code === 11000 && idempotencyKey) {
+        const existing = await Transaction.findOne({ idempotencyKey }).lean();
+        if (existing) {
+          return res.json({
+            success: true,
+            message: 'Giao dịch đã tồn tại (idempotent)',
+            data: {
+              paidSessions: paidCount,
+              markedSessions: actualCount,
+              totalAmount: existing.amount,
+              transaction: existing,
+              idempotent: true,
+            },
+          });
+        }
+      }
+      throw createErr;
+    }
 
-    // Real-time notify
     const io = req.app.get('io');
     if (io) {
       io.emit('teacher:financeUpdated', {
@@ -812,11 +863,10 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, isAdmin, superAdminOnly
       message: `Thanh toán thành công ${paidCount} buổi`,
       data: {
         paidSessions: paidCount,
-        markedSessions: actualCount, // số session thực tế được đánh dấu trong DB
+        markedSessions: actualCount,
         totalAmount: Number(amount),
         transaction,
       }
-
     });
   } catch (error) {
     logger.error('[FINANCE] Flexible pay error:', error);
@@ -842,25 +892,32 @@ router.put('/:id/finance/pay-all', [authMiddleware, isAdmin, superAdminOnlyTeach
     }
 
     const salaryPerSession = teacher.baseSalaryPerSession || 0;
-    const totalAmount = pendingSessionsCount * salaryPerSession;
+    const estimatedAmount = pendingSessionsCount * salaryPerSession;
 
     // Validation: Không cho phép thanh toán 0đ hoặc số phi lý (> 500 triệu/lần)
-    if (totalAmount <= 0) {
+    if (estimatedAmount <= 0) {
       return res.status(400).json({ success: false, message: `Giảng viên chưa được cấu hình mức lương/buổi. Vui lòng Admin cập nhật trường "Lương/buổi" trước khi thanh toán.` });
     }
-    if (totalAmount > 500000000) {
-      return res.status(400).json({ success: false, message: `Số tiền thanh toán (${totalAmount.toLocaleString('vi-VN')}đ) vượt quá giới hạn 500 triệu. Vui lòng kiểm tra lại mức lương/buổi.` });
+    if (estimatedAmount > 500000000) {
+      return res.status(400).json({ success: false, message: `Số tiền thanh toán (${estimatedAmount.toLocaleString('vi-VN')}đ) vượt quá giới hạn 500 triệu. Vui lòng kiểm tra lại mức lương/buổi.` });
     }
 
-    // Đánh dấu các buổi này là đã thanh toán
-    await Schedule.updateMany(
-      { 
-        teacherId: req.params.id, 
-        status: 'completed', 
-        is_paid_to_teacher: { $ne: true } 
+    // Đánh dấu atomic các buổi chưa thanh toán rồi tính theo modifiedCount
+    const claim = await Schedule.updateMany(
+      {
+        teacherId: req.params.id,
+        status: 'completed',
+        is_paid_to_teacher: { $ne: true }
       },
       { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
     );
+
+    const paidCount = claim.modifiedCount || 0;
+    if (paidCount === 0) {
+      return res.status(409).json({ success: false, message: 'Các buổi đã được thanh toán bởi yêu cầu khác' });
+    }
+
+    const totalAmount = paidCount * salaryPerSession;
 
     // Tạo giao dịch thanh toán
     const now = new Date();
@@ -869,7 +926,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, isAdmin, superAdminOnlyTeach
       teacherName: teacher.name,
       teacherPhone: teacher.phone,
       amount: totalAmount,
-      description: `Thanh toán thù lao ${pendingSessionsCount} buổi dạy`,
+      description: `Thanh toán thù lao ${paidCount} buổi dạy`,
       month: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
       status: 'confirmed',
       confirmedBy: req.user.name || 'Admin',
@@ -882,7 +939,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, isAdmin, superAdminOnlyTeach
     if (io) {
       io.emit('teacher:financeUpdated', {
         teacherId: req.params.id,
-        message: `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${pendingSessionsCount} buổi dạy.`
+        message: `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${paidCount} buổi dạy.`
       });
       io.emit('transactions:new', transaction);
     }
@@ -891,7 +948,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, isAdmin, superAdminOnlyTeach
       success: true,
       message: 'Đã thanh toán thành công',
       data: {
-        paidSessions: pendingSessionsCount,
+        paidSessions: paidCount,
         totalAmount,
         transaction
       }

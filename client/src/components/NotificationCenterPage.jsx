@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, CheckCheck, ChevronLeft, ChevronRight, Filter, Loader2,
@@ -219,7 +220,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             rows={3}
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-300"
           />
-          <select
+          <CmsSelect
             value={bcReceivers}
             onChange={(e) => setBcReceivers(e.target.value)}
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
@@ -227,7 +228,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             {RECEIVER_OPTS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
-          </select>
+          </CmsSelect>
           <button
             type="button"
             onClick={onBroadcast}
@@ -242,7 +243,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
 
       <div className="flex flex-wrap items-center gap-2">
         <Filter size={14} className="text-gray-400" />
-        <select
+        <CmsSelect
           value={type}
           onChange={(e) => setType(e.target.value)}
           className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white"
@@ -250,7 +251,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
           {TYPES.map((t) => (
             <option key={t.value || 'all'} value={t.value}>{t.label}</option>
           ))}
-        </select>
+        </CmsSelect>
         <label className="flex items-center gap-2 text-xs font-bold text-gray-600 cursor-pointer">
           <input
             type="checkbox"

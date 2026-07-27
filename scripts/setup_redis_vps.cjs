@@ -85,9 +85,9 @@ async function run() {
 
   await exec('npm install (redis deps)', `cd ${VPS_DIR} && npm install --legacy-peer-deps`);
 
-  await exec('Restart PM2', `cd ${VPS_DIR} && pm2 restart quanlycms --update-env`);
+  await exec('Restart PM2', `cd ${VPS_DIR} && pm2 restart dashboardthangtinhoc --update-env`);
 
-  const logs = await ssh.execCommand('pm2 logs quanlycms --lines 12 --nostream');
+  const logs = await ssh.execCommand('pm2 logs dashboardthangtinhoc --lines 12 --nostream');
   console.log('\n📋 PM2 Logs (last 12 lines):');
   console.log(logs.stdout);
 

@@ -1,4 +1,5 @@
 const fs=require("fs");
+const path=require("path");
 const c=`/** sync utils/messagingRoles.js */
 export function getMessagingRole(user) {
   user = user || {};
@@ -25,5 +26,5 @@ export function isMessageFromSelf(data, user) {
   return false;
 }
 `;
-fs.writeFileSync("d:/QUANLYCMS/client/src/lib/messagingRoles.js", c, "utf8");
+fs.writeFileSync(path.join(__dirname, "..", "client", "src", "lib", "messagingRoles.js"), c, "utf8");
 console.log("wrote messagingRoles.js");

@@ -1,4 +1,4 @@
-# AI_RULES.md — Luật làm việc với codebase QUANLYCMS
+# AI_RULES.md — Luật làm việc với codebase DashboardThangTinHoc
 
 Mọi agent/Cursor khi sửa code **phải** tuân thủ file này. Mục tiêu: tiến dần enterprise, không đập đi xây lại.
 

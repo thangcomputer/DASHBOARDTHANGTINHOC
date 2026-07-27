@@ -1,10 +1,12 @@
-import { getExamSubjectMeta } from './examSubjects';
+import { getExamSubjectMeta, resolveTeacherSubjectIds } from './examSubjects';
 import {
   questionMatchesExamSubject,
   isStudentEssayQuestion,
   getEssayQuestionFile,
   getStudentEssayQuestionsForExam,
+  isValidMcQuestion,
 } from './htmlContent';
+export { isLegacyTeacherExamSection } from './teacherExamSections';
 
 const DEFAULT_SUBJECT_ORDER = ['coban', 'word', 'excel', 'powerpoint', 'canva'];
 
@@ -25,6 +27,101 @@ export function getQuestionSubjectId(q, subjectIds) {
     if (questionMatchesExamSubject(q?.section, sid)) return sid;
   }
   return String(q?.section || '').toLowerCase();
+}
+
+/** Lọc pool câu hỏi GV: bỏ MC thiếu đáp án/options */
+export function filterTeacherExamQuestionPool(pool) {
+  return (pool || []).filter((q) => {
+    if (!q) return false;
+    if (isStudentEssayQuestion(q)) return true;
+    return isValidMcQuestion(q);
+  });
+}
+
+export function resolveTeacherExamSubjectIds(teacher, catalog) {
+  return orderTeacherExamSubjectIds(resolveTeacherSubjectIds(teacher, catalog));
+}
+
+function resolveMinutesForSubject(minutesMap, subjectId, fallback = 90) {
+  const direct = Number(minutesMap?.[subjectId]);
+  if (Number.isFinite(direct) && direct >= 1) return Math.round(direct);
+
+  const aliasGroups = [
+    ['coban', 'computer', 'maytinh'],
+    ['powerpoint', 'ppt', 'pp'],
+    ['situation', 'supham', 'su-pham'],
+  ];
+  const sid = String(subjectId || '').toLowerCase();
+  for (const group of aliasGroups) {
+    if (!group.includes(sid) && !group.includes(subjectId)) continue;
+    for (const key of group) {
+      const v = Number(minutesMap?.[key]);
+      if (Number.isFinite(v) && v >= 1) return Math.round(v);
+    }
+  }
+  return fallback;
+}
+
+/** Tổng phút TN theo các môn có câu trắc nghiệm trong bộ đề */
+export function computeTeacherMcExamTotalMinutesBySubjects(questions, subjectIds, minutesMap) {
+  const ordered = orderTeacherExamSubjectIds(subjectIds);
+  let total = 0;
+  let any = false;
+  for (const sid of ordered) {
+    const hasMc = (questions || []).some(
+      (q) => !isStudentEssayQuestion(q) && (
+        getQuestionSubjectId(q, ordered) === sid || questionMatchesExamSubject(q?.section, sid)
+      ),
+    );
+    if (!hasMc) continue;
+    any = true;
+    total += resolveMinutesForSubject(minutesMap, sid, 90);
+  }
+  return any ? total : null;
+}
+
+/** Tổng phút TN + TL theo môn (giữ export cho import cũ) */
+export function computeTeacherExamTotalMinutesBySubjects(questions, subjectIds, mcMinutesMap, essayMinutesMap) {
+  const mc = computeTeacherMcExamTotalMinutesBySubjects(questions, subjectIds, mcMinutesMap) || 0;
+  const ordered = orderTeacherExamSubjectIds(subjectIds);
+  let essayTotal = 0;
+  for (const sid of ordered) {
+    const hasEssay = (questions || []).some(
+      (q) => isStudentEssayQuestion(q) && (
+        getQuestionSubjectId(q, ordered) === sid || questionMatchesExamSubject(q?.section, sid)
+      ),
+    );
+    if (!hasEssay) continue;
+    essayTotal += resolveMinutesForSubject(essayMinutesMap, sid, 60);
+  }
+  const total = mc + essayTotal;
+  return total > 0 ? total : null;
+}
+
+/** Tổng phút thực hành/tự luận theo môn có file đề */
+export function computeTeacherPracticalTotalMinutes(practiceFilesBySubject, essayMinutes) {
+  let total = 0;
+  let any = false;
+  for (const group of practiceFilesBySubject || []) {
+    if (!group?.files?.length) continue;
+    any = true;
+    total += resolveMinutesForSubject(essayMinutes, group.subjectId, 60);
+  }
+  return any ? total : null;
+}
+
+/** Lịch đề theo môn: số câu TN/TL + phút cấu hình */
+export function buildTeacherExamScheduleBySubject(pool, subjectIds, examMinutes, essayMinutes, catalog) {
+  return countTeacherQuestionsBySubject(pool, subjectIds)
+    .filter((s) => s.total > 0)
+    .map((s) => ({
+      subjectId: s.subjectId,
+      label: getExamSubjectMeta(s.subjectId, catalog).label,
+      mc: s.mc,
+      essay: s.essay,
+      tnMinutes: s.mc > 0 ? resolveMinutesForSubject(examMinutes, s.subjectId, 90) : 0,
+      tlMinutes: s.essay > 0 ? resolveMinutesForSubject(essayMinutes, s.subjectId, 60) : 0,
+    }));
 }
 
 /** Gom cau theo mon GV: trac nghiem xao trong tung mon, tu luan cuoi moi phan */

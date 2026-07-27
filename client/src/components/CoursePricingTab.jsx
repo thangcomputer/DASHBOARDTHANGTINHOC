@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   Plus, Edit2, Trash2, Save, X, Loader2, AlertCircle,
   DollarSign, Percent, Tag, BookOpen, CheckCircle2
@@ -164,278 +165,305 @@ function CourseModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
-
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-              <BookOpen size={18} />
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}
+    >
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[min(92vh,920px)]">
+        {/* Header lớn — cùng kiểu modal học viên */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 flex items-center justify-between flex-shrink-0">
+          <h3 className="text-white font-black text-xl sm:text-2xl flex items-center gap-4">
+            <div className="p-2 bg-white/20 rounded-2xl backdrop-blur-md">
+              <BookOpen size={28} />
             </div>
-            <h3 className="font-black text-lg">{isEdit ? 'Sửa khóa học' : 'Thêm khóa học mới'}</h3>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition">
-            <X size={15} />
+            {isEdit ? 'Sửa khóa học' : 'Thêm khóa học mới'}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center text-white transition-all"
+          >
+            <X size={20} />
           </button>
         </div>
 
-        <div className="p-6 space-y-4 overflow-y-auto">
-          {/* Tên khóa học */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Tên khóa học *</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-blue-400 outline-none transition"
-              placeholder="VD: THVP Nâng Cao (12 Buổi)"
-            />
-          </div>
+        <div className="p-6 sm:p-10 overflow-y-auto w-full flex-1 min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
+            {/* Cột trái: Thông tin & học phí */}
+            <div className="space-y-5 md:border-r border-gray-100 md:pr-10">
+              <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">
+                <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs shadow-lg shadow-blue-200">1</span>
+                Thông tin khóa học
+              </h4>
 
-          {/* Số buổi + giá — lưới 2 cột gọn */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Số buổi học</label>
-              <input
-                type="number"
-                value={form.totalSessions}
-                onChange={e => setForm(f => ({ ...f, totalSessions: e.target.value }))}
-                className="w-full border-2 border-gray-200 rounded-xl px-3 py-3 text-sm focus:border-blue-400 outline-none transition"
-                min="1"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Giảm giá (%)</label>
-              <div className="flex items-center border-2 border-gray-200 rounded-xl px-3 py-3 focus-within:border-red-400 transition gap-1">
-                <Percent size={14} className="text-red-400 flex-shrink-0" />
+              <div>
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
+                  Tên khóa học <span className="text-red-500">*</span>
+                </label>
                 <input
-                  type="number"
-                  value={form.discountPercent}
-                  onChange={e => setForm(f => ({ ...f, discountPercent: Math.max(0, Math.min(100, Number(e.target.value))) }))}
-                  className="flex-1 text-sm font-mono outline-none bg-transparent min-w-0"
-                  placeholder="0"
-                  min="0"
-                  max="100"
+                  type="text"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-[20px] p-4 font-bold text-gray-800 outline-none transition-all shadow-sm"
+                  placeholder="VD: THVP Nâng Cao (12 Buổi)"
                 />
               </div>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Giá gốc (VNĐ) *</label>
-              <div className="flex items-center border-2 border-gray-200 rounded-xl px-3 py-3 focus-within:border-blue-400 transition gap-1">
-                <DollarSign size={14} className="text-gray-400 flex-shrink-0" />
-                <input
-                  type="number"
-                  value={form.price}
-                  onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-                  className="flex-1 text-sm font-mono outline-none bg-transparent min-w-0"
-                  placeholder="2699000"
-                  min="0"
-                  step="10000"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Giá thu thực tế</label>
-              <div className={`rounded-xl px-3 py-2.5 border-2 min-h-[46px] flex flex-col justify-center transition ${
-                hasDiscount ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-gray-50'
-              }`}>
-                {hasDiscount ? (
-                  <>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="line-through text-gray-400 text-[11px]">{fmt(form.price)}đ</span>
-                      <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                        -{form.discountPercent}%
-                      </span>
-                    </div>
-                    <span className="text-base font-black text-red-600 leading-tight">{fmt(effective)}đ</span>
-                  </>
-                ) : (
-                  <span className="text-base font-black text-blue-700 leading-tight">
-                    {form.price ? `${fmt(Number(form.price))}đ` : '—'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          {hasDiscount && form.price && (
-            <p className="text-[11px] text-red-500 -mt-2">
-              Tiết kiệm: {fmt(Number(form.price) - effective)}đ
-            </p>
-          )}
 
-          {/* Môn thi gắn với khóa */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
-              Môn thi trong Phòng Thi ({selectedCount})
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {examOptions.map(({ id, label }) => {
-                const selected = Array.isArray(form.examSubjects) ? form.examSubjects : [];
-                const checked = selected.includes(id);
-                return (
-                  <label
-                    key={id}
-                    className={`flex items-center gap-2 border-2 rounded-xl px-3 py-2.5 cursor-pointer transition ${
-                      checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Số buổi học</label>
+                  <input
+                    type="number"
+                    value={form.totalSessions}
+                    onChange={e => setForm(f => ({ ...f, totalSessions: e.target.value }))}
+                    className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-[20px] px-4 py-4 text-sm font-bold outline-none transition-all shadow-sm"
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Giảm giá (%)</label>
+                  <div className="flex items-center bg-gray-50 border-2 border-transparent focus-within:border-red-400 focus-within:bg-white rounded-[20px] px-4 py-4 transition-all shadow-sm gap-1">
+                    <Percent size={14} className="text-red-400 flex-shrink-0" />
                     <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        setForm((f) => {
-                          const current = Array.isArray(f.examSubjects) ? f.examSubjects : [];
-                          const next = checked
-                            ? current.filter((x) => x !== id)
-                            : [...current, id];
-                          return { ...f, examSubjects: next };
-                        });
-                      }}
-                      className="rounded border-gray-300 text-blue-600"
+                      type="number"
+                      value={form.discountPercent}
+                      onChange={e => setForm(f => ({ ...f, discountPercent: Math.max(0, Math.min(100, Number(e.target.value))) }))}
+                      className="flex-1 text-sm font-mono outline-none bg-transparent min-w-0 font-bold"
+                      placeholder="0"
+                      min="0"
+                      max="100"
                     />
-                    <span className="text-sm font-semibold text-gray-700">{label}</span>
-                    {examSubjectsCatalog?.[id]?.custom && (
-                      <span className="ml-auto text-[9px] font-black uppercase text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Mới</span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-
-            {otherCourses.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-dashed border-gray-200 space-y-2">
-                <p className="text-[11px] font-bold text-gray-500 uppercase">Gộp môn từ khóa học khác</p>
-                <div className="flex gap-2">
-                  <select
-                    value={importCourseId}
-                    onChange={(e) => setImportCourseId(e.target.value)}
-                    className="flex-1 min-w-0 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold text-gray-800 bg-gray-50 focus:border-blue-400 outline-none"
-                  >
-                    <option value="">Chọn khóa học...</option>
-                    {otherCourses.map((c) => {
-                      const n = getCourseExamSubjectIds(c, examSubjectsCatalog).length;
-                      return (
-                        <option key={c._id} value={c._id}>
-                          {c.name} ({n} môn)
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <button
-                    type="button"
-                    disabled={!importCourseId}
-                    onClick={() => {
-                      const src = otherCourses.find((c) => String(c._id) === String(importCourseId));
-                      mergeExamSubjectsFromCourse(src);
-                    }}
-                    className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    title="Thêm môn thi từ khóa đã chọn"
-                  >
-                    <Plus size={18} />
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {otherCourses.slice(0, 6).map((c) => (
-                    <button
-                      key={c._id}
-                      type="button"
-                      onClick={() => mergeExamSubjectsFromCourse(c)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 transition"
-                      title={`Gộp môn thi từ ${c.name}`}
-                    >
-                      <Plus size={12} />
-                      {c.name}
-                    </button>
-                  ))}
+                  </div>
                 </div>
               </div>
-            )}
 
-            <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
-              {!showNewSubject ? (
-                <button
-                  type="button"
-                  onClick={() => setShowNewSubject(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl hover:bg-emerald-100 transition"
-                >
-                  <Plus size={14} /> Thêm môn thi mới vào hệ thống
-                </button>
-              ) : (
-                <div className="space-y-2 bg-emerald-50/60 border border-emerald-100 rounded-xl p-3">
-                  <p className="text-[11px] font-bold text-emerald-800 uppercase">Tạo môn thi mới</p>
-                  <input
-                    type="text"
-                    value={newSubjectLabel}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setNewSubjectLabel(v);
-                      setNewSubjectId(slugifyExamSubjectId(v));
-                    }}
-                    className="w-full border-2 border-emerald-100 rounded-xl px-3 py-2 text-sm focus:border-emerald-400 outline-none bg-white"
-                    placeholder="VD: Adobe Photoshop, AutoCAD..."
-                  />
-                  <input
-                    type="text"
-                    value={newSubjectId}
-                    onChange={(e) => setNewSubjectId(slugifyExamSubjectId(e.target.value))}
-                    className="w-full border-2 border-emerald-100 rounded-xl px-3 py-2 text-xs font-mono focus:border-emerald-400 outline-none bg-white"
-                    placeholder="Mã môn (tự động): adobe-photoshop"
-                  />
-                  {newSubjectLabel.trim() && (
-                    <p className="text-[10px] text-emerald-700">
-                      Mã sẽ lưu: <strong>{resolveExamSubjectId(newSubjectId.trim(), newSubjectLabel.trim()) || '—'}</strong>
-                    </p>
-                  )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
+                    Giá gốc (VNĐ) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center bg-gray-50 border-2 border-transparent focus-within:border-blue-600 focus-within:bg-white rounded-[20px] px-4 py-4 transition-all shadow-sm gap-1">
+                    <DollarSign size={14} className="text-gray-400 flex-shrink-0" />
+                    <input
+                      type="number"
+                      value={form.price}
+                      onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
+                      className="flex-1 text-sm font-mono outline-none bg-transparent min-w-0 font-bold"
+                      placeholder="2699000"
+                      min="0"
+                      step="10000"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Giá thu thực tế</label>
+                  <div className={`rounded-[20px] px-4 py-3 border-2 min-h-[56px] flex flex-col justify-center shadow-sm transition ${
+                    hasDiscount ? 'border-red-200 bg-red-50' : 'border-transparent bg-gray-50'
+                  }`}>
+                    {hasDiscount ? (
+                      <>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="line-through text-gray-400 text-[11px]">{fmt(form.price)}đ</span>
+                          <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                            -{form.discountPercent}%
+                          </span>
+                        </div>
+                        <span className="text-base font-black text-red-600 leading-tight">{fmt(effective)}đ</span>
+                      </>
+                    ) : (
+                      <span className="text-base font-black text-blue-700 leading-tight">
+                        {form.price ? `${fmt(Number(form.price))}đ` : '—'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {hasDiscount && form.price && (
+                <p className="text-[11px] text-red-500 font-bold -mt-2">
+                  Tiết kiệm: {fmt(Number(form.price) - effective)}đ
+                </p>
+              )}
+
+              <div>
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Mô tả ngắn (tùy chọn)</label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  rows={4}
+                  className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-[20px] px-4 py-3 text-sm font-medium outline-none resize-none transition-all shadow-sm"
+                  placeholder="Mô tả ngắn về khóa học..."
+                />
+              </div>
+            </div>
+
+            {/* Cột phải: Môn thi */}
+            <div className="space-y-5 md:pl-2">
+              <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">
+                <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shadow-lg shadow-indigo-200">2</span>
+                Môn thi trong Phòng Thi ({selectedCount})
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {examOptions.map(({ id, label }) => {
+                  const selected = Array.isArray(form.examSubjects) ? form.examSubjects : [];
+                  const checked = selected.includes(id);
+                  return (
+                    <label
+                      key={id}
+                      className={`flex items-center gap-2 border-2 rounded-2xl px-3 py-2.5 cursor-pointer transition ${
+                        checked ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setForm((f) => {
+                            const current = Array.isArray(f.examSubjects) ? f.examSubjects : [];
+                            const next = checked
+                              ? current.filter((x) => x !== id)
+                              : [...current, id];
+                            return { ...f, examSubjects: next };
+                          });
+                        }}
+                        className="rounded border-gray-300 text-blue-600"
+                      />
+                      <span className="text-sm font-semibold text-gray-700">{label}</span>
+                      {examSubjectsCatalog?.[id]?.custom && (
+                        <span className="ml-auto text-[9px] font-black uppercase text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Mới</span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+
+              {otherCourses.length > 0 && (
+                <div className="pt-3 border-t border-dashed border-gray-200 space-y-2">
+                  <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">Gộp môn từ khóa học khác</p>
                   <div className="flex gap-2">
+                    <CmsSelect
+                      value={importCourseId}
+                      onChange={(e) => setImportCourseId(e.target.value)}
+                      className="flex-1 min-w-0 border-2 border-gray-100 rounded-2xl px-3 py-2.5 text-sm font-semibold text-gray-800 bg-gray-50 focus:border-blue-400 outline-none"
+                    >
+                      <option value="">Chọn khóa học...</option>
+                      {otherCourses.map((c) => {
+                        const n = getCourseExamSubjectIds(c, examSubjectsCatalog).length;
+                        return (
+                          <option key={c._id} value={c._id}>
+                            {c.name} ({n} môn)
+                          </option>
+                        );
+                      })}
+                    </CmsSelect>
                     <button
                       type="button"
-                      onClick={() => { setShowNewSubject(false); setNewSubjectLabel(''); setNewSubjectId(''); }}
-                      className="flex-1 py-2 text-xs font-bold text-gray-500 border border-gray-200 rounded-xl hover:bg-white"
+                      disabled={!importCourseId}
+                      onClick={() => {
+                        const src = otherCourses.find((c) => String(c._id) === String(importCourseId));
+                        mergeExamSubjectsFromCourse(src);
+                      }}
+                      className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-2xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      title="Thêm môn thi từ khóa đã chọn"
                     >
-                      Hủy
+                      <Plus size={18} />
                     </button>
-                    <button
-                      type="button"
-                      disabled={addingSubject}
-                      onClick={handleAddNewExamSubject}
-                      className="flex-1 py-2 text-xs font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center justify-center gap-1"
-                    >
-                      {addingSubject ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                      Lưu & chọn
-                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {otherCourses.slice(0, 6).map((c) => (
+                      <button
+                        key={c._id}
+                        type="button"
+                        onClick={() => mergeExamSubjectsFromCourse(c)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 transition"
+                        title={`Gộp môn thi từ ${c.name}`}
+                      >
+                        <Plus size={12} />
+                        {c.name}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
+
+              <div className="pt-3 border-t border-dashed border-gray-200">
+                {!showNewSubject ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowNewSubject(true)}
+                    className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-3 rounded-2xl hover:bg-emerald-100 transition"
+                  >
+                    <Plus size={14} /> Thêm môn thi mới vào hệ thống
+                  </button>
+                ) : (
+                  <div className="space-y-2 bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3">
+                    <p className="text-[11px] font-bold text-emerald-800 uppercase">Tạo môn thi mới</p>
+                    <input
+                      type="text"
+                      value={newSubjectLabel}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setNewSubjectLabel(v);
+                        setNewSubjectId(slugifyExamSubjectId(v));
+                      }}
+                      className="w-full border-2 border-emerald-100 rounded-xl px-3 py-2 text-sm focus:border-emerald-400 outline-none bg-white"
+                      placeholder="VD: Adobe Photoshop, AutoCAD..."
+                    />
+                    <input
+                      type="text"
+                      value={newSubjectId}
+                      onChange={(e) => setNewSubjectId(slugifyExamSubjectId(e.target.value))}
+                      className="w-full border-2 border-emerald-100 rounded-xl px-3 py-2 text-xs font-mono focus:border-emerald-400 outline-none bg-white"
+                      placeholder="Mã môn (tự động): adobe-photoshop"
+                    />
+                    {newSubjectLabel.trim() && (
+                      <p className="text-[10px] text-emerald-700">
+                        Mã sẽ lưu: <strong>{resolveExamSubjectId(newSubjectId.trim(), newSubjectLabel.trim()) || '—'}</strong>
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewSubject(false); setNewSubjectLabel(''); setNewSubjectId(''); }}
+                        className="flex-1 py-2 text-xs font-bold text-gray-500 border border-gray-200 rounded-xl hover:bg-white"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        disabled={addingSubject}
+                        onClick={handleAddNewExamSubject}
+                        className="flex-1 py-2 text-xs font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center justify-center gap-1"
+                      >
+                        {addingSubject ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                        Lưu & chọn
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[11px] text-gray-400 font-medium">
+                Học viên đăng ký khóa này sẽ chỉ thấy các môn thi đã chọn trong Phòng Thi.
+              </p>
             </div>
-
-            <p className="text-[11px] text-gray-400 mt-1.5">
-              Học viên đăng ký khóa này sẽ chỉ thấy các môn thi đã chọn trong Phòng Thi.
-            </p>
           </div>
 
-          {/* Mô tả */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Mô tả ngắn (tùy chọn)</label>
-            <textarea
-              value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              rows={2}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-blue-400 outline-none resize-none transition"
-              placeholder="Mô tả ngắn về khóa học..."
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-1">
-            <button onClick={onClose} className="flex-1 border-2 border-gray-200 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-50 transition">
+          {/* Footer */}
+          <div className="mt-10 pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 bg-gray-50/50 -mx-6 sm:-mx-10 -mb-6 sm:-mb-10 px-6 sm:px-10 pb-6 sm:pb-10 pt-8 rounded-b-3xl">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-10 py-4 bg-white border-2 border-gray-100 rounded-[22px] text-xs font-black text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all"
+            >
               Hủy
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-xl hover:from-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="px-12 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-blue-200 hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 uppercase active:scale-95 disabled:opacity-50"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật' : 'Thêm khóa học')}

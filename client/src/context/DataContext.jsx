@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { loadState, applyDataVersionReset } from './dataStorage';
+import { useStudentsContext } from './StudentsContext';
+import { useTeachersContext } from './TeachersContext';
+import { useScheduleContext } from './ScheduleContext';
+import { useFinanceContext } from './FinanceContext';
 import { useDataTraining } from './useDataTraining';
 import { useDataMessaging } from './useDataMessaging';
 import { useDataNotifications } from './useDataNotifications';
@@ -12,11 +16,9 @@ import { useDataSync } from './useDataSync';
 
 export { buildConversationId } from '../utils/chatConversationId';
 
-const INITIAL_STUDENTS = [];
-const INITIAL_TEACHERS = [];
-const INITIAL_TRANSACTIONS = [];
-
 const DataContext = createContext(null);
+const DataStateContext = createContext(null);
+const DataActionsContext = createContext(null);
 
 export const DataProvider = ({ children, user, onLogout }) => {
   const [currentUser, setCurrentUser] = useState(user || null);
@@ -46,25 +48,26 @@ export const DataProvider = ({ children, user, onLogout }) => {
     }
   }, []);
 
-  const [students, setStudents] = useState(() => loadState('thvp_students', INITIAL_STUDENTS));
-  const [teachers, setTeachers] = useState(() => loadState('thvp_teachers', INITIAL_TEACHERS));
-  const [transactions, setTransactions] = useState(() => loadState('thvp_transactions', INITIAL_TRANSACTIONS));
+  const {
+    students,
+    studentsPagination,
+    fetchStudentsPaginated,
+    setStudentsLocal: setStudents,
+  } = useStudentsContext();
+  const { teachers, setTeachersLocal: setTeachers } = useTeachersContext();
+  const { schedules, setSchedulesLocal: setSchedules } = useScheduleContext();
+  const { transactions, setTransactionsLocal: setTransactions } = useFinanceContext();
+
   const [staffs, setStaffs] = useState(() => loadState('thvp_staffs', []));
 
   useEffect(() => {
-    const stripNulls = (setter) => setter((prev) => {
+    setStaffs((prev) => {
       if (!Array.isArray(prev)) return prev;
       const next = prev.filter(Boolean);
       return next.length === prev.length ? prev : next;
     });
-    stripNulls(setStudents);
-    stripNulls(setTeachers);
-    stripNulls(setStaffs);
   }, []);
 
-  useEffect(() => { localStorage.setItem('thvp_students', JSON.stringify(students)); }, [students]);
-  useEffect(() => { localStorage.setItem('thvp_teachers', JSON.stringify(teachers)); }, [teachers]);
-  useEffect(() => { localStorage.setItem('thvp_transactions', JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem('thvp_staffs', JSON.stringify(staffs)); }, [staffs]);
 
   const {
@@ -115,7 +118,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
   });
 
   const {
-    isRefetching, studentsPagination, fetchStudentsPaginated,
+    isRefetching,
     triggerBackgroundSync, systemLogs, addSystemLog,
   } = useDataSync({
     currentUser, onLogout,
@@ -127,6 +130,8 @@ export const DataProvider = ({ children, user, onLogout }) => {
   });
   triggerBackgroundSyncRef.current = triggerBackgroundSync;
 
+  // Messages: vẫn useDataMessaging (staffs / SUPER_ADMIN mailbox / onReadAck).
+  // MessagesContext chưa mount ở App — tránh double socket/SWR cho đến khi migrate đủ API.
   const {
     messages, setMessages, groups, setGroups,
     sendMessage, syncMessages, toggleMessageReaction, recallMessage,
@@ -136,10 +141,11 @@ export const DataProvider = ({ children, user, onLogout }) => {
   setGroupsRef.current = setGroups;
 
   const {
-    schedules, setSchedules,
     addSchedule, updateSchedule, cancelSchedule,
     markAttendance, getSchedulesByTeacher, getSchedulesByStudent,
-  } = useDataSchedule({ students, teachers, setStudents, triggerBackgroundSync, addNotification });
+  } = useDataSchedule({
+    schedules, setSchedules, students, teachers, setStudents, triggerBackgroundSync, addNotification,
+  });
   setSchedulesRef.current = setSchedules;
 
   const {
@@ -157,123 +163,130 @@ export const DataProvider = ({ children, user, onLogout }) => {
   });
   setExamResultsRef.current = setExamResults;
 
-  const value = useMemo(() => ({
-    examResults, addExamResult, updateExamResult, removeExamResult,
-    students, teachers, staffs, transactions, schedules, notifications: socketNotifications, messages, materials,
-    currentUser, setCurrentUser,
+  const stateValue = useMemo(() => ({
+    examResults,
+    students, teachers, staffs, transactions, schedules,
+    notifications: socketNotifications,
+    messages, materials, groups,
+    currentUser,
+    studentsPagination,
+    privateEvaluations,
+    trainingData,
+    studentTrainingData,
+    questions,
+    teacherExamTimeLimitMinutes,
+    teacherExamMinutes,
+    teacherEssayExamMinutes,
+    studentQuestions,
+    studentExamMinutes,
+    studentEssayExamMinutes,
+    studentExamFiles,
+    examSubjectsCatalog,
+    systemLogs,
+    isRefetching,
+    RATING_CRITERIA,
+  }), [
+    examResults,
+    students, teachers, staffs, transactions, schedules,
+    socketNotifications, messages, materials, groups,
+    currentUser, studentsPagination, privateEvaluations,
+    trainingData, studentTrainingData, questions,
+    teacherExamTimeLimitMinutes, teacherExamMinutes, teacherEssayExamMinutes,
+    studentQuestions, studentExamMinutes, studentEssayExamMinutes,
+    studentExamFiles, examSubjectsCatalog, systemLogs, isRefetching, RATING_CRITERIA,
+  ]);
 
-    addStudent, addTeacher, removeTeacher, updateTeacher, updateStudent, assignTeacher, approveTeacher, rejectTeacher, payTeacher, removeStudent, grantPending,
-    markStudentPaid,
-    getAdminStats,
-    studentsPagination, fetchStudentsPaginated,
-
+  const actionsValue = useMemo(() => ({
+    setCurrentUser,
+    addExamResult, updateExamResult, removeExamResult,
+    addStudent, addTeacher, removeTeacher, updateTeacher, updateStudent, assignTeacher,
+    approveTeacher, rejectTeacher, payTeacher, removeStudent, grantPending,
+    markStudentPaid, getAdminStats, fetchStudentsPaginated,
     markAttendance, updateStudentLink, updateStudentSchedule,
     submitTestResult, submitPracticalFile,
     getStudentsByTeacher, getTeacherStats, getSchedulesByTeacher, getTransactionsByTeacher,
-
     getSchedulesByStudent,
-
     approveStudentExam, revokeStudentExam, failStudentExam, saveExamResult,
-
     sendMessage, syncMessages, markMessagesRead, getConversations, getMessages,
-    groups, recallMessage, softDeleteMessage, createChatGroup, deleteChatGroup,
-
-    addNotification, markNotificationRead, dismissNotificationLocal, getNotifications,
-
-    addSchedule, updateSchedule, cancelSchedule,
-
-    addMaterial, removeMaterial, getMaterialsByCourse, getMaterialsByCategory,
-
-    rateTeacher, getTeacherRating, RATING_CRITERIA,
-
-    submitPrivateEvaluation, getPrivateEvaluationsForAdmin, markEvaluationRead, privateEvaluations,
-
-    trainingData,
-    studentTrainingData,
-    addStudentTrainingItem,
-    updateStudentTrainingItem,
-    removeStudentTrainingItem,
-    addTrainingItem,
-    updateTrainingItem,
-    removeTrainingItem,
-
-    questions,
-    addQuestion,
-    addQuestionsBulk,
-    updateQuestion,
-    removeQuestion,
-    resetQuestions,
-    replaceTeacherQuestionsForSubject,
-    teacherExamTimeLimitMinutes,
-    setTeacherExamTimeLimitMinutes,
-    teacherExamMinutes,
-    updateTeacherExamMinutes,
-    teacherEssayExamMinutes,
-    updateTeacherEssayExamMinutes,
-
-    studentQuestions,
-    addStudentQuestion,
-    addStudentQuestionsBulk,
-    replaceStudentQuestionsForSubject,
-    updateStudentQuestion,
-    removeStudentQuestion,
-    resetStudentQuestions,
-    copyTeacherQuestionBankToStudents,
-    studentExamMinutes,
-    updateStudentExamMinutes,
-    studentEssayExamMinutes,
-    updateStudentEssayExamMinutes,
-    studentExamFiles,
-    setStudentExamFile,
-    examSubjectsCatalog,
-    addCustomExamSubject,
-
-    systemLogs,
-    addSystemLog,
-
-    isRefetching,
-    triggerBackgroundSync,
-    currentUser,
-    setCurrentUser,
-    toggleMessageReaction,
-  }), [
-    examResults, addExamResult, updateExamResult, removeExamResult,
-    students, teachers, staffs, transactions, schedules, socketNotifications, messages, materials,
-    currentUser, setCurrentUser,
-    addStudent, addTeacher, removeTeacher, updateTeacher, updateStudent, assignTeacher, approveTeacher, rejectTeacher, payTeacher, removeStudent, grantPending,
-    markStudentPaid, getAdminStats, studentsPagination, fetchStudentsPaginated,
-    markAttendance, updateStudentLink, updateStudentSchedule, submitTestResult, submitPracticalFile,
-    getStudentsByTeacher, getTeacherStats, getSchedulesByTeacher, getTransactionsByTeacher,
-    getSchedulesByStudent, approveStudentExam, revokeStudentExam, saveExamResult,
-    sendMessage, syncMessages, markMessagesRead, getConversations, getMessages,
-    groups, recallMessage, softDeleteMessage, createChatGroup, deleteChatGroup,
+    recallMessage, softDeleteMessage, createChatGroup, deleteChatGroup,
     addNotification, markNotificationRead, dismissNotificationLocal, getNotifications,
     addSchedule, updateSchedule, cancelSchedule,
     addMaterial, removeMaterial, getMaterialsByCourse, getMaterialsByCategory,
-    rateTeacher, getTeacherRating, RATING_CRITERIA,
-    submitPrivateEvaluation, getPrivateEvaluationsForAdmin, markEvaluationRead, privateEvaluations,
-    trainingData, studentTrainingData,
+    rateTeacher, getTeacherRating,
+    submitPrivateEvaluation, getPrivateEvaluationsForAdmin, markEvaluationRead,
     addStudentTrainingItem, updateStudentTrainingItem, removeStudentTrainingItem,
     addTrainingItem, updateTrainingItem, removeTrainingItem,
-    questions, addQuestion, addQuestionsBulk, updateQuestion, removeQuestion, resetQuestions,
-    teacherExamTimeLimitMinutes, setTeacherExamTimeLimitMinutes,
-    teacherExamMinutes, updateTeacherExamMinutes,
-    teacherEssayExamMinutes, updateTeacherEssayExamMinutes,
-    studentQuestions, addStudentQuestion, addStudentQuestionsBulk, replaceStudentQuestionsForSubject, updateStudentQuestion,
-    removeStudentQuestion, resetStudentQuestions, copyTeacherQuestionBankToStudents,
-    studentExamMinutes, updateStudentExamMinutes,
-    studentEssayExamMinutes, updateStudentEssayExamMinutes,
-    studentExamFiles, setStudentExamFile, examSubjectsCatalog, addCustomExamSubject,
-    systemLogs, addSystemLog,
-    isRefetching, triggerBackgroundSync, toggleMessageReaction,
+    addQuestion, addQuestionsBulk, updateQuestion, removeQuestion, resetQuestions,
+    replaceTeacherQuestionsForSubject,
+    setTeacherExamTimeLimitMinutes, updateTeacherExamMinutes, updateTeacherEssayExamMinutes,
+    addStudentQuestion, addStudentQuestionsBulk, replaceStudentQuestionsForSubject,
+    updateStudentQuestion, removeStudentQuestion, resetStudentQuestions,
+    copyTeacherQuestionBankToStudents,
+    updateStudentExamMinutes, updateStudentEssayExamMinutes,
+    setStudentExamFile, addCustomExamSubject,
+    addSystemLog, triggerBackgroundSync, toggleMessageReaction,
+  }), [
+    setCurrentUser,
+    addExamResult, updateExamResult, removeExamResult,
+    addStudent, addTeacher, removeTeacher, updateTeacher, updateStudent, assignTeacher,
+    approveTeacher, rejectTeacher, payTeacher, removeStudent, grantPending,
+    markStudentPaid, getAdminStats, fetchStudentsPaginated,
+    markAttendance, updateStudentLink, updateStudentSchedule,
+    submitTestResult, submitPracticalFile,
+    getStudentsByTeacher, getTeacherStats, getSchedulesByTeacher, getTransactionsByTeacher,
+    getSchedulesByStudent,
+    approveStudentExam, revokeStudentExam, failStudentExam, saveExamResult,
+    sendMessage, syncMessages, markMessagesRead, getConversations, getMessages,
+    recallMessage, softDeleteMessage, createChatGroup, deleteChatGroup,
+    addNotification, markNotificationRead, dismissNotificationLocal, getNotifications,
+    addSchedule, updateSchedule, cancelSchedule,
+    addMaterial, removeMaterial, getMaterialsByCourse, getMaterialsByCategory,
+    rateTeacher, getTeacherRating,
+    submitPrivateEvaluation, getPrivateEvaluationsForAdmin, markEvaluationRead,
+    addStudentTrainingItem, updateStudentTrainingItem, removeStudentTrainingItem,
+    addTrainingItem, updateTrainingItem, removeTrainingItem,
+    addQuestion, addQuestionsBulk, updateQuestion, removeQuestion, resetQuestions,
+    replaceTeacherQuestionsForSubject,
+    setTeacherExamTimeLimitMinutes, updateTeacherExamMinutes, updateTeacherEssayExamMinutes,
+    addStudentQuestion, addStudentQuestionsBulk, replaceStudentQuestionsForSubject,
+    updateStudentQuestion, removeStudentQuestion, resetStudentQuestions,
+    copyTeacherQuestionBankToStudents,
+    updateStudentExamMinutes, updateStudentEssayExamMinutes,
+    setStudentExamFile, addCustomExamSubject,
+    addSystemLog, triggerBackgroundSync, toggleMessageReaction,
   ]);
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  const value = useMemo(
+    () => ({ ...stateValue, ...actionsValue }),
+    [stateValue, actionsValue],
+  );
+
+  return (
+    <DataStateContext.Provider value={stateValue}>
+      <DataActionsContext.Provider value={actionsValue}>
+        <DataContext.Provider value={value}>{children}</DataContext.Provider>
+      </DataActionsContext.Provider>
+    </DataStateContext.Provider>
+  );
 };
 
 export const useData = () => {
   const ctx = useContext(DataContext);
   if (!ctx) throw new Error('useData must be inside DataProvider');
+  return ctx;
+};
+
+/** Chỉ subscribe state (students/schedules/…) — actions ổn định hơn qua useDataActions */
+export const useDataState = () => {
+  const ctx = useContext(DataStateContext);
+  if (!ctx) throw new Error('useDataState must be inside DataProvider');
+  return ctx;
+};
+
+/** Chỉ subscribe actions — ít re-render hơn khi chỉ data list đổi */
+export const useDataActions = () => {
+  const ctx = useContext(DataActionsContext);
+  if (!ctx) throw new Error('useDataActions must be inside DataProvider');
   return ctx;
 };
 

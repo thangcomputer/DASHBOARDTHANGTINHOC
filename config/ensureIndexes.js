@@ -30,6 +30,8 @@ const FormDefinition = require('../models/FormDefinition');
 const FormSubmission = require('../models/FormSubmission');
 const ReportDefinition = require('../models/ReportDefinition');
 const Tenant = require('../models/Tenant');
+const FeedPost = require('../models/FeedPost');
+const SepayWebhookEvent = require('../models/SepayWebhookEvent');
 
 async function ensureIndexes() {
   try {
@@ -63,6 +65,8 @@ async function ensureIndexes() {
       FormSubmission.syncIndexes(),
       ReportDefinition.syncIndexes(),
       Tenant.syncIndexes(),
+      FeedPost.syncIndexes(),
+      SepayWebhookEvent.syncIndexes(),
     ]);
     console.log('✅ MongoDB indexes đã đồng bộ');
   } catch (err) {

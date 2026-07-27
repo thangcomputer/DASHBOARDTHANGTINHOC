@@ -9,7 +9,7 @@ async function run() {
 
   console.log('[1/3] Pulling latest vite.config.js...');
   const pull = await ssh.execCommand(
-    `cd ${VPS_DIR} && wget -q -O /tmp/vite_config.js https://raw.githubusercontent.com/thangcomputer/QUANLYCMS/main/client/vite.config.js && cp /tmp/vite_config.js ${VPS_DIR}/client/vite.config.js`
+    `cd ${VPS_DIR} && wget -q -O /tmp/vite_config.js https://raw.githubusercontent.com/thangcomputer/dashboardthangtinhoc/main/client/vite.config.js && cp /tmp/vite_config.js ${VPS_DIR}/client/vite.config.js`
   );
   if (pull.stderr) console.log('Pull stderr:', pull.stderr);
   console.log('  vite.config.js updated');

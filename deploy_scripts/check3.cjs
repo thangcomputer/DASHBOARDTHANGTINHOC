@@ -7,7 +7,7 @@ async function checkServer() {
   const res = await ssh.execCommand('cat /www/server/panel/vhost/nginx/*.conf');
   console.log(res.stdout || res.stderr);
   
-  const res2 = await ssh.execCommand('grep "app.get(" /www/wwwroot/quanlycms/server.js');
+  const res2 = await ssh.execCommand('grep "app.get(" /www/wwwroot/dashboardthangtinhoc/server.js');
   console.log(res2.stdout || res2.stderr);
   process.exit(0);
 }

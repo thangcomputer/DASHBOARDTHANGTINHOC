@@ -8,7 +8,7 @@ async function fixExpress5() {
   const patchCmd = `
 cat << 'EOF' > patch3.js
 const fs = require('fs');
-let code = fs.readFileSync('/www/wwwroot/quanlycms/server.js', 'utf8');
+let code = fs.readFileSync('/www/wwwroot/dashboardthangtinhoc/server.js', 'utf8');
 
 const oldCode = \`app.use((req, res, next) => {
   if(req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/socket.io')) {
@@ -26,10 +26,10 @@ const newStaticCode = \`app.use((req, res, next) => {
 });\`;
 
 code = code.replace(oldCode, newStaticCode);
-fs.writeFileSync('/www/wwwroot/quanlycms/server.js', code);
+fs.writeFileSync('/www/wwwroot/dashboardthangtinhoc/server.js', code);
 EOF
 node patch3.js
-pm2 restart quanlycms
+pm2 restart dashboardthangtinhoc
 `;
 
   await ssh.execCommand(patchCmd);

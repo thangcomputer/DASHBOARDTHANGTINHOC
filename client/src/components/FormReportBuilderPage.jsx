@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import {
   FormInput, FileSpreadsheet, Loader2, Plus, Trash2, RefreshCw,
   Download, Eye, Check, X,
@@ -225,11 +226,11 @@ export default function FormReportBuilderPage() {
               <p className="text-sm font-black text-gray-800">{editing === 'new' ? 'Tạo form' : 'Sửa form'}</p>
               <input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Tên form" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold" />
               <textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Mô tả" rows={2} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" />
-              <select value={formStatus} onChange={(e) => setFormStatus(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold">
+              <CmsSelect value={formStatus} onChange={(e) => setFormStatus(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold">
                 <option value="draft">draft</option>
                 <option value="published">published</option>
                 <option value="archived">archived</option>
-              </select>
+              </CmsSelect>
 
               <div className="space-y-2">
                 <p className="text-[10px] font-black text-gray-400 uppercase">Fields</p>
@@ -241,13 +242,13 @@ export default function FormReportBuilderPage() {
                         next[i] = { ...f, label: e.target.value, key: f.key || e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_') };
                         setFields(next);
                       }} placeholder="Label" className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold" />
-                      <select value={f.type} onChange={(e) => {
+                      <CmsSelect value={f.type} onChange={(e) => {
                         const next = [...fields];
                         next[i] = { ...f, type: e.target.value };
                         setFields(next);
                       }} className="border border-gray-200 rounded-lg px-2 py-1 text-xs">
                         {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
+                      </CmsSelect>
                       <label className="flex items-center gap-1 text-[10px] font-bold text-gray-500">
                         <input type="checkbox" checked={f.required} onChange={(e) => {
                           const next = [...fields];
@@ -292,7 +293,7 @@ export default function FormReportBuilderPage() {
           <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3 shadow-sm">
             <p className="text-sm font-black text-gray-800 flex items-center gap-2"><FileSpreadsheet size={16} /> Tạo báo cáo</p>
             <input value={repName} onChange={(e) => setRepName(e.target.value)} placeholder="Tên báo cáo" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold" />
-            <select
+            <CmsSelect
               value={repSource}
               onChange={(e) => { setRepSource(e.target.value); setRepColumns([]); }}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold"
@@ -303,7 +304,7 @@ export default function FormReportBuilderPage() {
               {formsForReport.map((f) => (
                 <option key={f._id} value={`form:${f._id}`}>Form: {f.name}</option>
               ))}
-            </select>
+            </CmsSelect>
             <div className="flex flex-wrap gap-2">
               {availableColumns.map((col) => (
                 <button

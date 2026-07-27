@@ -22,11 +22,12 @@ const logger = require('../config/logger');
 // 2. HMAC: x-sepay-token = HMAC-SHA256(body, SECRET_KEY)
 // Nếu chưa cấu hình → cho qua (backward compat)
 function verifySepaySignature(req, res, next) {
-  logger.info('[SEPAY] Incoming webhook headers:', JSON.stringify({
-    authorization: req.headers['authorization'],
-    'x-sepay-token': req.headers['x-sepay-token'],
-    'x-api-key': req.headers['x-api-key'],
-  }));
+  // Không log full Authorization / HMAC token (tránh leak secret vào log)
+  logger.info('[SEPAY] Incoming webhook', {
+    hasAuthorization: Boolean(req.headers['authorization']),
+    hasSepayToken: Boolean(req.headers['x-sepay-token']),
+    hasApiKeyHeader: Boolean(req.headers['x-api-key']),
+  });
 
   const apiKey = process.env.SEPAY_API_KEY;
   const hmacSecret = process.env.SEPAY_SECRET_KEY;
@@ -147,86 +148,138 @@ const handleCheckSession = async (req, res) => {
   }
 };
 
-router.get('/payment-session/:id', handleCheckSession);
-router.get('/payment-status', handleCheckSession);
+router.get('/payment-session/:id', authMiddleware, handleCheckSession);
+router.get('/payment-status', authMiddleware, handleCheckSession);
 
 
 // ── POST /api/webhooks/sepay ── SePay Webhook (HMAC verified) ──────────────────
 router.post('/sepay', verifySepaySignature, async (req, res) => {
   try {
+    const SepayWebhookEvent = require('../models/SepayWebhookEvent');
     const body = req.body;
-    logger.info('[SEPAY WEBHOOK]', JSON.stringify(body, null, 2));
-
     const content = (body.content || body.description || '').toLowerCase().trim();
     const amount  = Number(body.transferAmount || body.amount || 0);
+    const gatewayTxnId = String(
+      body.id || body.transactionID || body.transaction_id || body.referenceCode || body.transferId || ''
+    ).trim();
+
+    logger.info('[SEPAY WEBHOOK]', {
+      amount,
+      contentLen: content.length,
+      gatewayTxnId: gatewayTxnId || null,
+    });
 
     if (!content || amount <= 0) {
       return res.json({ success: false, message: 'Thiếu thông tin giao dịch' });
     }
 
-    let matched = false;
+    // Idempotency theo mã giao dịch cổng
+    if (gatewayTxnId) {
+      try {
+        await SepayWebhookEvent.create({
+          gatewayTxnId,
+          amount,
+          content: content.slice(0, 500),
+          rawSummary: JSON.stringify({
+            transferType: body.transferType,
+            accountNumber: body.accountNumber,
+          }).slice(0, 300),
+        });
+      } catch (dupErr) {
+        if (dupErr?.code === 11000) {
+          return res.json({ success: true, matched: false, duplicate: true });
+        }
+        throw dupErr;
+      }
+    }
 
-    // ── 1. Kiểm tra payment sessions (đăng ký mới) ───────────────────────────
-    // Lấy tất cả session đang pending và kiểm tra xem nội dung CK có chứa ref không
-    const pendingSessions = await PaymentSession.find({ status: 'pending' });
+    let matched = false;
+    let matchedRef = '';
+
+    // ── 1. Payment sessions: khớp ref + số tiền ───────────────────────────────
+    const pendingSessions = await PaymentSession.find({ status: 'pending' }).limit(200);
     let pendingSession = null;
     for (const sess of pendingSessions) {
-      if (content.includes(sess.ref.toLowerCase())) {
-        pendingSession = sess;
-        break;
-      }
+      const ref = String(sess.ref || '').toLowerCase();
+      if (!ref || !content.includes(ref)) continue;
+      if (sess.amount > 0 && Math.abs(Number(sess.amount) - amount) > 1) continue;
+      pendingSession = sess;
+      break;
     }
 
     if (pendingSession) {
-      pendingSession.status = 'paid';
-      pendingSession.paidAmount = amount;
-      await pendingSession.save();
+      const claimed = await PaymentSession.findOneAndUpdate(
+        { _id: pendingSession._id, status: 'pending' },
+        { $set: { status: 'paid', paidAmount: amount } },
+        { returnDocument: 'after' }
+      );
 
-      logger.info(`[SEPAY] ✅ Session ${pendingSession.sessionId} khớp ref="${pendingSession.ref}" — đã thanh toán ${amount}đ`);
-      matched = true;
+      if (claimed) {
+        matched = true;
+        matchedRef = claimed.ref;
+        logger.info(`[SEPAY] Session ${claimed.sessionId} khớp ref="${claimed.ref}" — ${amount}đ`);
 
-      // Emit socket cho frontend đang chờ
-      const io = req.app.get('io');
-      if (io) {
-        io.emit('tuition:paid', {
-          sessionId: pendingSession.sessionId,
-          amount,
-          message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
-        });
-      }
-    }
-
-    // ── 2. Kiểm tra học viên hiện có trong DB ────────────────────────────────
-    if (!matched) {
-      const students = await Student.find({ paid: false }).lean();
-      for (const s of students) {
-        const code = (s.studentCode || String(s._id).slice(-6)).toLowerCase();
-        const name = (s.name || '').toLowerCase().replace(/\s+/g, '');
-        if (content.includes(code) || content.includes(name)) {
-          await Student.findByIdAndUpdate(s._id, {
-            paid: true,
-            paidAmount: amount,
-            paidAt: new Date(),
-            paidNote: body.content || '',
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('tuition:paid', {
+            sessionId: claimed.sessionId,
+            amount,
+            message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
           });
-          matched = true;
-
-          const io = req.app.get('io');
-          if (io) {
-            io.emit('tuition:paid', {
-              studentId: String(s._id),
-              amount,
-              message: `✅ ${s.name} đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
-            });
-          }
-          logger.info(`[SEPAY] ✅ Học viên ${s.name} đã thanh toán ${amount}đ`);
-          break;
         }
       }
     }
 
+    // ── 2. Học viên hiện có: chỉ khớp studentCode (không fuzzy theo tên) ───────
     if (!matched) {
-      logger.warn('[SEPAY] Không match được — nội dung:', content);
+      const unpaid = await Student.find({ paid: false })
+        .select('studentCode name price paid')
+        .limit(2000)
+        .lean();
+      for (const s of unpaid) {
+        const code = String(s.studentCode || '').toLowerCase().trim();
+        if (!code || code.length < 4) continue;
+        if (!content.includes(code)) continue;
+        if (s.price > 0 && Math.abs(Number(s.price) - amount) > 1) continue;
+
+        const updated = await Student.findOneAndUpdate(
+          { _id: s._id, paid: false },
+          {
+            $set: {
+              paid: true,
+              paidAmount: amount,
+              paidAt: new Date(),
+              paidNote: String(body.content || '').slice(0, 300),
+            },
+          },
+          { returnDocument: 'after' }
+        );
+        if (!updated) continue;
+
+        matched = true;
+        matchedRef = code;
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('tuition:paid', {
+            studentId: String(s._id),
+            amount,
+            message: `✅ ${s.name} đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
+          });
+        }
+        logger.info(`[SEPAY] Học viên ${s.name} đã thanh toán ${amount}đ`);
+        break;
+      }
+    }
+
+    if (gatewayTxnId && matched) {
+      await SepayWebhookEvent.updateOne(
+        { gatewayTxnId },
+        { $set: { matched: true, matchedRef } }
+      );
+    }
+
+    if (!matched) {
+      logger.warn('[SEPAY] Không match được — contentLen=', content.length);
     }
 
     return res.json({ success: true, matched });
@@ -240,7 +293,14 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
 // ── GET /api/webhooks/payment-status/:studentId ── Polling HV đã có tài khoản ─
 router.get('/payment-status/:studentId', authMiddleware, async (req, res) => {
   try {
-    const student = await Student.findById(req.params.studentId).lean();
+    const sid = String(req.params.studentId);
+    const isSelf = req.user.role === 'student' && String(req.user.id) === sid;
+    const isStaff = req.user.role === 'admin' || req.user.role === 'staff';
+    if (!isSelf && !isStaff) {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem trạng thái thanh toán' });
+    }
+
+    const student = await Student.findById(sid).select('paid paidAmount paidAt').lean();
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     return res.json({
       success: true,

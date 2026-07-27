@@ -8,7 +8,7 @@ async function patchServer() {
   const patchCmd = `
 cat << 'EOF' > patch.js
 const fs = require('fs');
-let code = fs.readFileSync('/www/wwwroot/quanlycms/server.js', 'utf8');
+let code = fs.readFileSync('/www/wwwroot/dashboardthangtinhoc/server.js', 'utf8');
 
 // Change root route to /api/info
 code = code.replace(/app\\.get\\('\\/', \\(req, res\\) => \\{/, "app.get('/api/info', (req, res) => {");
@@ -26,10 +26,10 @@ app.get('*', (req, res) => {
 
 code = code.replace(/\\/\\/ ==========================================\\r?\\n\\/\\/ ERROR HANDLING/, staticCode + '\\n\\n// ==========================================\\n// ERROR HANDLING');
 
-fs.writeFileSync('/www/wwwroot/quanlycms/server.js', code);
+fs.writeFileSync('/www/wwwroot/dashboardthangtinhoc/server.js', code);
 EOF
 node patch.js
-pm2 restart quanlycms
+pm2 restart dashboardthangtinhoc
 `;
 
   await ssh.execCommand(patchCmd);

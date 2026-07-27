@@ -241,7 +241,7 @@ export default function SystemSettingsTab() {
     try {
       const res = await api.auth.mfaEnable(mfaCode.trim());
       if (res.success) {
-        toast.success('Đã bật MFA cho Super Admin');
+        toast.success(res.message || 'Đã bật MFA');
         setMfaEnabled(true);
         setMfaSetup(null);
         setMfaCode('');
@@ -378,25 +378,35 @@ export default function SystemSettingsTab() {
         </button>
       </div>
 
-      {/* Sub-tabs */}
-      <div className="border-b border-gray-100 pb-0 overflow-x-auto">
-        <div className="flex gap-2 min-w-max">
-          {TABS.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setActiveSubTab(t.key)}
-              className={`flex items-center gap-2 px-4 sm:px-5 py-3 text-sm font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-                activeSubTab === t.key
-                  ? 'text-violet-700 border-violet-600 bg-violet-50'
-                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <t.icon size={15} /> {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Sub-nav dọc + nội dung */}
+      <div className="flex flex-col md:flex-row gap-4 md:gap-5 items-stretch">
+        <nav
+          aria-label="Mục cài đặt"
+          className="md:w-56 lg:w-60 flex-shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-2 md:sticky md:top-4 md:self-start"
+        >
+          <div className="flex flex-col gap-0.5">
+            {TABS.map(t => {
+              const active = activeSubTab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setActiveSubTab(t.key)}
+                  className={`flex items-center gap-2.5 w-full text-left px-3.5 py-2.5 text-sm font-bold rounded-xl transition ${
+                    active
+                      ? 'text-violet-700 bg-violet-50 ring-1 ring-violet-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <t.icon size={15} className={`flex-shrink-0 ${active ? 'text-violet-600' : 'text-gray-400'}`} />
+                  <span className="leading-snug">{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
 
+        <div className="flex-1 min-w-0">
       {/* ── TAB 1: NGÂN HÀNG ───────────────────────────────────────────── */}
       {activeSubTab === 'bank' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 max-w-2xl">
@@ -840,7 +850,7 @@ export default function SystemSettingsTab() {
                 )}
               </div>
               <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 rounded-xl p-3">
-                Dùng Google Authenticator / Authy. Sau khi bật, đăng nhập Super Admin cần thêm mã OTP 6 số.
+                Dùng Google Authenticator / Authy. Sau khi bật, đăng nhập tài khoản này qua cổng nội bộ cần thêm mã OTP 6 số.
               </p>
 
               {!mfaEnabled && !mfaSetup && (
@@ -926,6 +936,9 @@ export default function SystemSettingsTab() {
           )}
         </div>
       )}
+
+        </div>
+      </div>
 
       {/* DANGER ZONE MODAL */}
       {showResetModal && (

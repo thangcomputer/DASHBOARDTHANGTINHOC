@@ -2,33 +2,53 @@ import React, { useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import BranchFilterDropdown from './BranchFilterDropdown';
+import { LmsGuideHost } from './LmsGuideTour';
 import { useData } from '../context/DataContext';
-import { useBranch } from '../context/BranchContext';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
-  Bell, LogOut, CheckCircle2, Clock, X, ChevronRight, Lock,
-  Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Activity, MessageSquare, Building2,
+  Bell, LogOut, CheckCircle2, Clock, X, Lock,
+  Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, MessageSquare,
 } from 'lucide-react';
 
-function TenantSwitcher() {
-  const { isSuperAdmin, tenants, selectedTenantId, setSelectedTenant } = useBranch();
-  if (!isSuperAdmin || !tenants?.length) return null;
-  return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-violet-50 border border-violet-100 rounded-xl">
-      <Building2 size={14} className="text-violet-600 flex-shrink-0" />
-      <select
-        value={selectedTenantId || 'all'}
-        onChange={(e) => setSelectedTenant(e.target.value)}
-        className="text-xs font-bold text-violet-800 bg-transparent outline-none max-w-[140px]"
-        title="Tenant"
-      >
-        <option value="all">Tất cả tenant</option>
-        {tenants.map((t) => (
-          <option key={t._id} value={t._id}>{t.code} — {t.name}</option>
-        ))}
-      </select>
-    </div>
-  );
+const PAGE_TITLES = {
+  dashboard: 'Tổng quan',
+  students: 'Học viên',
+  teachers: 'Giảng viên',
+  evaluations: 'Đánh giá',
+  finance: 'Tài chính',
+  training: 'Đào tạo GV',
+  'student-training': 'Đào tạo HV',
+  staff: 'Phân quyền',
+  hr: 'Nhân sự',
+  analytics: 'Doanh thu',
+  settings: 'Cài đặt',
+  logs: 'Nhật ký',
+  schedule: 'Lịch học',
+  materials: 'Tài liệu',
+  evaluation: 'Đánh giá',
+  profile: 'Hồ sơ',
+};
+
+function resolvePageTitle(role, pathname, hash) {
+  const key = (hash || '').replace('#', '');
+  if (key && PAGE_TITLES[key]) return PAGE_TITLES[key];
+  if (pathname.includes('/inbox')) return 'Hộp thư';
+  if (pathname.includes('/feed')) return 'Bảng tin';
+  if (pathname.includes('/notifications')) return 'Thông báo';
+  if (pathname.includes('/bi')) return 'BI Dashboard';
+  if (pathname.includes('/files')) return 'Quản lý file';
+  if (pathname.includes('/backups')) return 'Sao lưu';
+  if (pathname.includes('/monitoring')) return 'Monitoring';
+  if (pathname.includes('/ai')) return 'AI Center';
+  if (pathname.includes('/workflows')) return 'Workflow';
+  if (pathname.includes('/builder')) return 'Form & Report';
+  if (pathname.includes('/tenants')) return 'Multi-tenant';
+  if (pathname.includes('/exam')) return 'Phòng thi';
+  if (pathname.includes('/test')) return 'Bài test';
+  if (pathname.includes('/finance')) return 'Tài chính';
+  if (role === 'admin') return 'Quản trị';
+  if (role === 'teacher') return 'Giảng dạy';
+  return 'Học tập';
 }
 
 const getNotifStyle = (type) => {
@@ -150,14 +170,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }
   }, [currentTeacher?.status, session?.status, role, session?.id, navigate, isRefetching]);
 
+  // Admin/staff lần đầu: mở đổi MK ngay.
+  // HV/GV: chờ hoàn thành hướng dẫn (LmsGuideHost) rồi mới mở.
   useEffect(() => {
-    if (session?.isFirstLogin === true) {
-      const timer = setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('open-change-password-modal'));
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [session?.isFirstLogin]);
+    if (session?.isFirstLogin !== true) return;
+    if (role === 'student' || role === 'teacher') return;
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-change-password-modal'));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [session?.isFirstLogin, role]);
 
   const handleLogout = () => onLogout?.();
 
@@ -205,97 +227,80 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     triggerBackgroundSync();
   }, [triggerBackgroundSync]);
 
+  const displayName = role === 'teacher'
+    ? (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name)
+        ? currentTeacher.name
+        : currentTeacher?.email || currentTeacher?.phone || session?.name || 'Giảng viên')
+    : (session?.name || 'Admin');
+  const pageTitle = resolvePageTitle(role, location.pathname, location.hash);
+
   return (
-    <div className="flex h-screen bg-[#f8fafc] relative font-sans overflow-hidden">
-      {isRefetching && (
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 z-[9999] animate-[gradient_2s_linear_infinite]" style={{ backgroundSize: '200% 100%' }}>
-          <style>{`
-            @keyframes gradient {
-              0% { background-position: 100% 0; }
-              100% { background-position: -100% 0; }
-            }
-          `}</style>
+    <div className="flex h-[100dvh] max-h-[100dvh] bg-[#f8fafc] relative font-sans overflow-hidden">
+      {isRefetching ? (
+        <div className="sr-only" role="status" aria-live="polite">
+          Đang đồng bộ dữ liệu
         </div>
-      )}
+      ) : null}
 
       <AppSidebar
         session={session}
         role={role}
-        userName={
-          role === 'teacher' 
-            ? (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name) ? currentTeacher.name : currentTeacher?.email || currentTeacher?.phone || session?.name || 'Giảng viên')
-            : (session?.name || 'Admin')
-        }
+        userName={displayName}
+        userAvatar={session?.avatar || session?.avatarUrl || ''}
         onLogout={handleLogout}
         teacherPending={isTeacherPending}
         adminRole={session?.adminRole || null}
         userPermissions={session?.permissions || []}
       />
 
-      <main className="flex-1 min-w-0 flex flex-col h-screen">
-        <header className={`min-h-14 flex flex-col gap-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-2 md:min-h-16 lg:min-h-[5rem] lg:py-0 bg-white/80 border-b border-gray-100 pl-[4.25rem] sm:pl-20 lg:pl-8 pr-[15px] sm:pr-5 md:pr-8 flex-shrink-0 z-40 backdrop-blur-xl ${
+      <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
+        <header className={`min-h-14 sm:h-16 py-2 sm:py-0 flex flex-col sm:flex-row sm:items-center flex-wrap gap-2 sm:gap-3 bg-white border-b border-slate-100 pl-[4.25rem] sm:pl-20 lg:pl-6 pr-3 sm:pr-5 flex-shrink-0 z-40 ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1 overflow-hidden">
-            <div className="flex items-center gap-1 md:gap-3 flex-shrink-0 min-w-0">
-              <nav className="flex flex-wrap items-center gap-x-1 gap-y-1 md:gap-2 text-xs font-black uppercase tracking-widest text-gray-400 min-w-0 cms-min-text-xs">
-                 <span className="hidden lg:inline hover:text-red-600 transition-colors cursor-pointer">Dashboard</span>
-                 <ChevronRight size={12} className="hidden lg:block opacity-50" />
-                 <span className="text-red-600">
-                    {role === 'admin' ? 'Hệ thống' : role === 'teacher' ? 'Giảng dạy' : 'Học tập'}
-                 </span>
-                 {location.hash && (
-                   <>
-                     <ChevronRight size={12} className="opacity-50" />
-                     <span className="text-white bg-red-600 px-1.5 md:px-2 py-0.5 rounded shadow-sm text-xs cms-min-text-xs">
-                       {location.hash.replace('#','').toUpperCase()}
-                     </span>
-                   </>
-                 )}
-              </nav>
-            </div>
-            <div className="w-px h-6 bg-gray-100 mx-2 hidden xl:block"></div>
-            <h1 className="text-xs sm:text-sm font-black text-gray-800 hidden sm:block min-w-0 animate-in fade-in slide-in-from-left-4 duration-500 truncate md:max-w-[min(18rem,42vw)] xl:max-w-[min(36rem,52vw)]">
-              <span className={`px-2 py-0.5 rounded-lg text-xs uppercase tracking-widest font-black text-white shadow-sm cms-min-text-xs ${
-                role === 'admin' ? 'bg-slate-900' : role === 'teacher' ? 'bg-red-600' : 'bg-blue-600'
-              }`}>
-                {role === 'admin' ? 'Hệ thống' : role === 'teacher' ? 'Giảng viên' : 'Học viên'}
-              </span>
-              <span className="text-red-600 font-black ml-2">
-                {role === 'teacher' 
-                  ? (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name) ? currentTeacher.name : currentTeacher?.email || currentTeacher?.phone || session?.name || 'Giảng viên') 
-                  : session?.name || 'Admin'}
-              </span>
-            </h1>
+          <div className="min-w-0 sm:flex-1">
+            <h1 className="text-sm sm:text-base font-bold text-slate-900 truncate leading-tight">{pageTitle}</h1>
+            <p className="text-[11px] sm:text-xs text-slate-500 truncate hidden xs:block">{displayName}</p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 md:gap-3 flex-shrink-0 w-full sm:w-auto min-w-0">
+          <div className="flex items-center flex-wrap justify-end gap-1.5 sm:gap-2 min-w-0">
             {role === 'admin' && (
-              <div className="min-w-0 max-w-full sm:max-w-[min(240px,72vw)] md:max-w-none flex flex-wrap items-center gap-2">
-                <TenantSwitcher />
-                <BranchFilterDropdown />
-              </div>
+              <BranchFilterDropdown />
+            )}
+
+            {(role === 'student' || role === 'teacher') && (
+              <LmsGuideHost
+                role={role}
+                userId={session?.id || session?._id || ''}
+                pathname={location.pathname}
+                hash={location.hash}
+                hideButton
+                isFirstLogin={session?.isFirstLogin === true}
+              />
             )}
 
             <div className="relative">
               <button 
                 ref={bellRef}
+                type="button"
                 onClick={() => { setShowNotif(!showNotif); setNotifLimit(5); }}
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${showNotif ? 'bg-red-600 text-white shadow-xl shadow-red-200' : 'bg-gray-50 text-gray-400 hover:text-red-600 hover:bg-red-50'}`}
+                aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
+                aria-expanded={showNotif}
+                aria-haspopup="true"
+                className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors ${showNotif ? 'bg-red-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
               >
-                <Bell size={20} />
+                <Bell size={18} aria-hidden="true" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 text-white text-[11px] font-black rounded-full flex items-center justify-center border-4 border-white animate-bounce shadow-lg">
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white" aria-hidden="true">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
 
               {showNotif && (
-                  <div ref={notifRef} className="absolute right-0 mt-4 w-[min(24rem,calc(100vw-1.25rem))] max-w-[calc(100vw-1rem)] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-gray-100 z-[70] overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
-                    <div className="p-6 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+                  <div ref={notifRef} role="dialog" aria-label="Danh sách thông báo" className="absolute right-0 mt-4 w-[min(24rem,calc(100vw-1.25rem))] max-w-[calc(100vw-1rem)] bg-white rounded-3xl shadow-cms-lg border border-gray-100 z-[70] overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
+                    <div className="p-4 sm:p-6 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between gap-2">
                       <h3 className="font-black text-gray-800 text-base">Thông báo mới</h3>
-                      <button onClick={() => setShowNotif(false)} className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 hover:text-red-600 shadow-sm transition-all"><X size={16}/></button>
+                      <button type="button" onClick={() => setShowNotif(false)} aria-label="Đóng thông báo" className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-500 hover:text-red-600 shadow-sm transition-all"><X size={16} aria-hidden="true"/></button>
                     </div>
                     <div className="max-h-[450px] overflow-y-auto">
                       {myNotifications.length === 0 ? (
@@ -337,26 +342,25 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                                       targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
                                     }
                                     
-                                    console.log('🔔 Navigating to notification path:', targetPath);
                                     navigate(targetPath); 
                                   }
                                   setShowNotif(false); 
                                 }}
-                                className={`p-5 hover:bg-gray-50 transition-all cursor-pointer flex gap-4 border-l-4 ${!n.read ? `bg-white ${style.border.replace('border-', 'border-l-')}` : 'bg-white border-l-transparent opacity-80'}`}
+                                className={`p-4 sm:p-5 hover:bg-gray-50 transition-all cursor-pointer flex gap-3 sm:gap-4 border-l-4 min-w-0 ${!n.read ? `bg-white ${style.border.replace('border-', 'border-l-')}` : 'bg-white border-l-transparent opacity-80'}`}
                               >
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
-                                  <Icon size={20} />
+                                <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
+                                  <Icon size={20} aria-hidden="true" />
                                   {!n.read && (
-                                    <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${style.bg.replace('bg-', 'bg-')}`} style={{backgroundColor: 'currentColor'}} />
+                                    <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${style.bg.replace('bg-', 'bg-')}`} style={{backgroundColor: 'currentColor'}} aria-hidden="true" />
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className={`text-[9px] font-black uppercase tracking-widest ${style.color}`}>{style.label}</span>
-                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <span className={`text-[10px] font-black uppercase tracking-widest ${style.color}`}>{style.label}</span>
+                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
                                   </div>
-                                  {n.title && <h4 className={`text-sm font-bold mb-0.5 ${!n.read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</h4>}
-                                  <p className={`text-[13px] leading-relaxed ${!n.read && !n.title ? 'text-gray-900 font-bold' : !n.read ? 'text-gray-700 font-semibold' : 'text-gray-500 font-medium'}`}>{n.text || n.message || n.content}</p>
+                                  {n.title && <h4 className={`text-sm font-bold mb-0.5 break-anywhere ${!n.read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</h4>}
+                                  <p className={`text-[13px] leading-relaxed break-anywhere ${!n.read && !n.title ? 'text-gray-900 font-bold' : !n.read ? 'text-gray-700 font-semibold' : 'text-gray-500 font-medium'}`}>{n.text || n.message || n.content}</p>
                                 </div>
                               </div>
                             );
@@ -384,8 +388,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
             <div className="h-10 w-px bg-gray-100 mx-1 hidden sm:block" />
 
-            <button onClick={handleLogout} className="px-3 md:px-5 py-2.5 md:py-3 bg-red-600 text-white rounded-xl md:rounded-2xl text-xs font-black hover:bg-red-700 transition shadow-lg shadow-red-200 active:scale-95 flex items-center gap-2 md:gap-3 min-h-[2.75rem] sm:min-h-0">
-              <LogOut size={16} /> <span className="hidden sm:inline">ĐĂNG XUẤT</span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Đăng xuất"
+              className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+            >
+              <LogOut size={15} aria-hidden="true" />
+              <span className="hidden md:inline">Đăng xuất</span>
             </button>
           </div>
         </header>
@@ -394,7 +404,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           className={
             role === 'teacher' && location.pathname === '/teacher/test'
               ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-              : 'flex-1 min-h-0 p-[15px] sm:p-6 md:p-10 w-full overflow-x-hidden overflow-y-auto hide-scrollbar'
+              : 'flex-1 min-h-0 p-[15px] sm:p-6 md:p-10 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar'
           }
         >
           <div
@@ -414,11 +424,13 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       {/* FAB - Inbox (Admin/Teacher) */}
       {role !== 'student' && (
         <button
+          type="button"
           onClick={() => navigate(`/${role}/inbox`)}
-          className="cms-fab bg-blue-600 hover:bg-blue-700 text-white p-4"
+          className="cms-fab bg-blue-600 hover:bg-blue-700 text-white p-3.5 sm:p-4 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2"
           title="Nhắn tin"
+          aria-label="Mở hộp thư"
         >
-          <MessageSquare size={24} />
+          <MessageSquare size={24} aria-hidden="true" />
         </button>
       )}
     </div>
@@ -445,6 +457,15 @@ const ChangePasswordModal = ({ session, role }) => {
     };
     window.addEventListener('open-change-password-modal', handleOpen);
     return () => window.removeEventListener('open-change-password-modal', handleOpen);
+  }, []);
+
+  // Đang xem hướng dẫn thì không chồng popup đổi MK lên menu
+  React.useEffect(() => {
+    const onGuide = (e) => {
+      if (e?.detail?.open) setIsOpen(false);
+    };
+    window.addEventListener('lms-guide-visibility', onGuide);
+    return () => window.removeEventListener('lms-guide-visibility', onGuide);
   }, []);
 
   if (!isOpen) return null;
@@ -483,45 +504,45 @@ const ChangePasswordModal = ({ session, role }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
+    <div className="cms-modal-shell" role="dialog" aria-modal="true" aria-labelledby="change-password-title">
+      <div className="cms-modal-panel max-w-sm">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex items-center justify-between">
-          <h3 className="text-white font-black text-lg flex items-center gap-2">
-            <Lock size={20} /> {session?.isFirstLogin === true ? 'Tạo mật khẩu cá nhân' : 'Đổi mật khẩu'}
+          <h3 id="change-password-title" className="text-white font-black text-lg flex items-center gap-2">
+            <Lock size={20} aria-hidden="true" /> {session?.isFirstLogin === true ? 'Tạo mật khẩu cá nhân' : 'Đổi mật khẩu'}
           </h3>
-          <button onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white transition"><X size={20} /></button>
+          <button type="button" onClick={() => setIsOpen(false)} aria-label="Đóng" className="text-white/80 hover:text-white transition"><X size={20} aria-hidden="true" /></button>
         </div>
         <div className="p-6">
           {success ? (
             <div className="text-center py-6">
               <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 size={32} className="text-emerald-500" />
+                <CheckCircle2 size={32} className="text-emerald-600" aria-hidden="true" />
               </div>
               <p className="font-bold text-gray-800 text-lg">Đổi mật khẩu thành công!</p>
-              <p className="text-gray-500 text-sm mt-1">Sử dụng mật khẩu mới cho lần đăng nhập sau.</p>
+              <p className="text-gray-600 text-sm mt-1">Sử dụng mật khẩu mới cho lần đăng nhập sau.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && <div className="bg-red-50 text-red-600 text-xs font-bold p-3 rounded-xl border border-red-100">{error}</div>}
+              {error && <div role="alert" className="bg-red-50 text-red-700 text-xs font-bold p-3 rounded-xl border border-red-100">{error}</div>}
               {session?.isFirstLogin !== true && (
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Mật khẩu hiện tại</label>
-                  <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition" />
+                  <label htmlFor="cms-old-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Mật khẩu hiện tại</label>
+                  <input id="cms-old-password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} autoComplete="current-password"
+                    className="input-field" />
                 </div>
               )}
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Mật khẩu mới</label>
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition" />
+                <label htmlFor="cms-new-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Mật khẩu mới</label>
+                <input id="cms-new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password"
+                  className="input-field" />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nhập lại mật khẩu mới</label>
-                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition" />
+                <label htmlFor="cms-confirm-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Nhập lại mật khẩu mới</label>
+                <input id="cms-confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password"
+                  className="input-field" />
               </div>
               <button type="submit" disabled={loading}
-                className="w-full bg-blue-600 text-white font-black py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50 mt-2">
+                className="w-full btn-primary-blue py-3">
                 {loading ? 'Đang xử lý...' : 'Xác nhận đổi'}
               </button>
             </form>

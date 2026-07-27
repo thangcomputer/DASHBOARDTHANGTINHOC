@@ -4,7 +4,7 @@ const ConversationVisibility = require('../models/ConversationVisibility');
 require('dotenv').config();
 
 async function cleanup() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/quanlycms');
+  await mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc');
   
   const result1 = await Message.deleteMany({ conversationId: { $regex: /^temp_/ } });
   console.log('Deleted temp messages:', result1.deletedCount);

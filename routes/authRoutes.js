@@ -149,10 +149,18 @@ async function checkDeviceConflict(Model, userId, fp, force, req) {
   };
 }
 
-function issueAdminMfaChallenge(sysSettings, audience = 'public') {
+/** Admin & Staff chỉ được đăng nhập qua cổng nội bộ (có CAPTCHA, cấp token aud='internal') */
+const INTERNAL_PORTAL_REQUIRED = {
+  success: false,
+  code: 'INTERNAL_PORTAL_REQUIRED',
+  message: 'Tài khoản này thuộc nhóm Nhân Viên/Quản Trị. Vui lòng đăng nhập qua Cổng nội bộ (Admin).',
+  redirect: '/admin/login',
+};
+
+function issueAdminMfaChallenge(sysSettings, audience = 'internal', deviceFingerprint = null) {
   const dbAdminName = sysSettings?.adminName || 'Admin Thắng Tin Học';
   const mfaToken = jwt.sign(
-    { purpose: 'mfa', id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN', aud: audience },
+    { purpose: 'mfa', id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN', aud: audience, fp: deviceFingerprint || undefined },
     process.env.JWT_SECRET,
     { expiresIn: '5m' },
   );
@@ -161,6 +169,76 @@ function issueAdminMfaChallenge(sysSettings, audience = 'public') {
     mfaRequired: true,
     mfaToken,
     data: { mfaRequired: true, mfaToken, name: dbAdminName },
+  };
+}
+
+/** Thử thách MFA cho tài khoản admin/staff trong DB — chưa cấp access token */
+function issueUserMfaChallenge(user, deviceFingerprint = null) {
+  const mfaToken = jwt.sign(
+    {
+      purpose: 'mfa',
+      id: String(user._id),
+      role: user.role,
+      adminRole: user.adminRole || null,
+      aud: 'internal',
+      fp: deviceFingerprint || undefined,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' },
+  );
+  return {
+    success: true,
+    mfaRequired: true,
+    mfaToken,
+    data: { mfaRequired: true, mfaToken, name: user.name },
+  };
+}
+
+/**
+ * Hoàn tất đăng nhập nội bộ cho tài khoản DB: gắn fingerprint, tăng tokenVersion,
+ * ký token aud='internal' và lưu refresh token.
+ * Dùng chung bởi /login/internal và /mfa/verify.
+ */
+async function completeInternalLogin(user, userRole, deviceFingerprint) {
+  if (deviceFingerprint) user.deviceFingerprint = deviceFingerprint;
+
+  const newTokenVersion = (user.tokenVersion || 0) + 1;
+  user.tokenVersion = newTokenVersion;
+
+  const tokenPayload = {
+    id: user._id, role: userRole, name: user.name,
+    adminRole:   user.adminRole  || null,
+    permissions: user.permissions || [],
+    branchId:    user.branchId   || null,
+    branchCode:  user.branchCode || '',
+    tokenVersion: newTokenVersion,
+  };
+  const { accessToken, refreshToken } = generateTokens(tokenPayload, 'internal');
+
+  user.refreshToken = refreshToken;
+  user.lastLogin = new Date();
+  user.loginAttempts = 0;
+  if (user.lockUntil) user.lockUntil = undefined;
+  user.markModified('tokenVersion');
+  await user.save({ validateModifiedOnly: true });
+
+  return {
+    success: true,
+    message: `Chào mừng ${user.name} — ${userRole === 'admin' ? 'Quản trị viên' : 'Nhân viên'}`,
+    data: {
+      user: {
+        _id: user._id, name: user.name, role: userRole,
+        phone:       user.phone || '',
+        avatar:      user.avatar || '',
+        adminRole:   user.adminRole  || null,
+        permissions: user.permissions || [],
+        branchId:    user.branchId   || null,
+        branchCode:  user.branchCode || '',
+        status:      user.status,
+        isFirstLogin: !!user.isFirstLogin,
+      },
+      accessToken, refreshToken,
+    },
   };
 }
 
@@ -497,17 +575,9 @@ router.post('/login', loginLimiter, async (req, res) => {
     // Detect: có @ → email, chỉ số → phone
     const isEmail = rawId.includes('@');
 
-    // ── Hardcoded admin ────────────────────────────────────────────
+    // ── Tài khoản quản trị cứng: bắt buộc đi cổng nội bộ ───────────
     if (rawId === 'admin') {
-      const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
-      const adminPasswordMatch = await verifyAdminPassword(password, sysSettings);
-      if (!adminPasswordMatch) {
-        return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
-      }
-      if (sysSettings?.adminMfaEnabled && sysSettings?.adminMfaSecret) {
-        return res.json(issueAdminMfaChallenge(sysSettings, 'public'));
-      }
-      return res.json(await issueAdminTokens(sysSettings, 'public'));
+      return res.status(403).json(INTERNAL_PORTAL_REQUIRED);
     }
 
     // ── Tìm user theo identifier ───────────────────────────────────
@@ -520,6 +590,11 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     if (user) {
       userRole = user.role; // 'teacher', 'admin', 'staff'
+
+      // Admin/Staff không được dùng cổng này — thiếu CAPTCHA và cấp token 'public'
+      if (userRole === 'admin' || userRole === 'staff') {
+        return res.status(403).json(INTERNAL_PORTAL_REQUIRED);
+      }
 
       if (user.isLocked) {
         const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
@@ -656,7 +731,7 @@ async function lookupUser(rawId, requestedRole = null) {
   // Teacher/Admin/Staff
   if (!requestedRole || requestedRole === 'teacher' || requestedRole === 'admin' || requestedRole === 'staff') {
     const teacherQ = isEmail ? { email: rawId } : { phone: rawId };
-    const teacher = await Teacher.findOne(teacherQ).select('+password +refreshToken');
+    const teacher = await Teacher.findOne(teacherQ).select('+password +refreshToken +mfaSecret');
     if (teacher) return { type: 'teacher', user: teacher, role: teacher.role };
   }
 
@@ -757,13 +832,25 @@ router.post('/login/public', loginLimiter, async (req, res) => {
 // Cổng đăng nhập nội bộ — CHỈ ADMIN & STAFF — yêu cầu CAPTCHA
 router.post('/login/internal', loginLimiter, async (req, res) => {
   try {
-    const { identifier, password, captchaId, captchaAnswer } = req.body;
+    const { identifier, password, captchaId, captchaAnswer, forceTicket } = req.body;
     const rawId = (identifier || '').trim();
 
+    // Vé cấp sau khi đã qua CAPTCHA + mật khẩu ở lần gọi trước, dùng cho thao tác
+    // "đăng nhập và đăng xuất máy kia" — CAPTCHA chỉ dùng được 1 lần nên không gửi lại được.
+    let forceFromTicket = false;
+    if (forceTicket) {
+      try {
+        const t = jwt.verify(forceTicket, process.env.JWT_SECRET);
+        forceFromTicket = t.purpose === 'device_force' && t.identifier === rawId;
+      } catch { /* vé hỏng/hết hạn → bắt nhập lại CAPTCHA */ }
+    }
+
     // Bước 1: Xác thực CAPTCHA
-    const captchaResult = verifyCaptcha(captchaId, captchaAnswer);
-    if (!captchaResult.ok) {
-      return res.status(400).json({ success: false, message: captchaResult.reason, captchaError: true });
+    if (!forceFromTicket) {
+      const captchaResult = verifyCaptcha(captchaId, captchaAnswer);
+      if (!captchaResult.ok) {
+        return res.status(400).json({ success: false, message: captchaResult.reason, captchaError: true });
+      }
     }
 
     if (!rawId || !password) {
@@ -824,44 +911,24 @@ router.post('/login/internal', loginLimiter, async (req, res) => {
 
     // ⭐ Kiểm tra Device Fingerprint (internal/admin)
     const { deviceFingerprint: fp3, force: force3 } = req.body;
-    const conflict3 = await checkDeviceConflict(Teacher, user._id, fp3, force3, req);
-    if (conflict3) return res.status(409).json(conflict3);
-    if (fp3) user.deviceFingerprint = fp3;
+    const conflict3 = await checkDeviceConflict(Teacher, user._id, fp3, force3 || forceFromTicket, req);
+    if (conflict3) {
+      return res.status(409).json({
+        ...conflict3,
+        forceTicket: jwt.sign(
+          { purpose: 'device_force', identifier: rawId },
+          process.env.JWT_SECRET,
+          { expiresIn: '3m' },
+        ),
+      });
+    }
 
-    // ⭐ Fix 1: tokenVersion
-    const newTokenVersion = (user.tokenVersion || 0) + 1;
-    user.tokenVersion = newTokenVersion;
+    // Bước 5: MFA — nếu tài khoản đã bật TOTP thì dừng ở đây, chưa cấp token
+    if (user.mfaEnabled && user.mfaSecret) {
+      return res.json(issueUserMfaChallenge(user, fp3));
+    }
 
-    const tokenPayload = {
-      id: user._id, role: userRole, name: user.name,
-      adminRole:   user.adminRole  || null,
-      permissions: user.permissions || [],
-      branchId:    user.branchId   || null,
-      branchCode:  user.branchCode || '',
-      tokenVersion: newTokenVersion,
-    };
-    const { accessToken, refreshToken } = generateTokens(tokenPayload, 'internal');
-
-    user.refreshToken = refreshToken; user.lastLogin = new Date();
-    user.loginAttempts = 0;
-    user.markModified('tokenVersion');
-    await user.save({ validateModifiedOnly: true });
-
-    return res.json({
-      success: true,
-      message: `Chào mừng ${user.name} — ${userRole === 'admin' ? 'Quản trị viên' : 'Nhân viên'}`,
-      data: {
-        user: {
-          _id: user._id, name: user.name, role: userRole,
-          adminRole:   user.adminRole  || null,
-          permissions: user.permissions || [],
-          branchId:    user.branchId   || null,
-          branchCode:  user.branchCode || '',
-          status:      user.status,
-        },
-        accessToken, refreshToken,
-      },
-    });
+    return res.json(await completeInternalLogin(user, userRole, fp3));
   } catch (err) {
     logger.error('[AUTH] login/internal error:', err);
     res.status(500).json({ success: false, message: 'Lỗi server. Vui lòng thử lại.' });
@@ -883,9 +950,26 @@ router.post('/mfa/verify', loginLimiter, async (req, res) => {
     } catch {
       return res.status(401).json({ success: false, message: 'Phiên MFA hết hạn. Đăng nhập lại.' });
     }
-    if (decoded.purpose !== 'mfa' || decoded.id !== 'admin') {
+    if (decoded.purpose !== 'mfa') {
       return res.status(401).json({ success: false, message: 'Token MFA không hợp lệ' });
     }
+
+    // Tài khoản admin/staff trong DB
+    if (decoded.id !== 'admin') {
+      const user = await Teacher.findById(decoded.id).select('+refreshToken +mfaSecret');
+      if (!user || !user.mfaEnabled || !user.mfaSecret) {
+        return res.status(400).json({ success: false, message: 'MFA chưa được bật cho tài khoản này' });
+      }
+      if (!['admin', 'staff'].includes(user.role)) {
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền truy cập khu vực quản trị.' });
+      }
+      if (!verifyTotp(user.mfaSecret, code)) {
+        if (user.incLoginAttempts) await user.incLoginAttempts();
+        return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
+      }
+      return res.json(await completeInternalLogin(user, user.role, decoded.fp || null));
+    }
+
     const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
     if (!sysSettings?.adminMfaEnabled || !sysSettings.adminMfaSecret) {
       return res.status(400).json({ success: false, message: 'MFA chưa được bật' });
@@ -912,12 +996,34 @@ router.post('/mfa/verify', loginLimiter, async (req, res) => {
   }
 });
 
+/**
+ * Nạp tài khoản nội bộ (admin/staff) đang thao tác MFA.
+ * Trả về null nếu là admin cứng (dùng SystemSettings) hoặc không đủ quyền.
+ */
+async function loadInternalMfaUser(req, extraSelect = '') {
+  if (req.user?.id === 'admin') return null;
+  if (!['admin', 'staff'].includes(req.user?.role)) return null;
+  return Teacher.findById(req.user.id).select(`+mfaSecret +mfaPendingSecret ${extraSelect}`.trim());
+}
+
 /** Bắt đầu setup MFA — trả secret + QR (chưa bật) */
 router.post('/mfa/setup', authMiddleware, async (req, res) => {
   try {
-    if (req.user?.id !== 'admin' || req.user?.adminRole !== 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Chỉ Super Admin mới cấu hình MFA' });
+    if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
     }
+
+    // Tài khoản admin/staff trong DB — secret lưu trên chính user
+    const dbUser = await loadInternalMfaUser(req);
+    if (dbUser) {
+      const secret = generateSecret();
+      dbUser.mfaPendingSecret = secret;
+      await dbUser.save({ validateModifiedOnly: true });
+      const uri = otpauthUrl(secret, dbUser.email || dbUser.phone || dbUser.name, 'DashboardThangTinHoc');
+      const qrDataUrl = await QRCode.toDataURL(uri, { margin: 1, width: 220 });
+      return res.json({ success: true, data: { secret, otpauthUrl: uri, qrDataUrl } });
+    }
+
     const secret = generateSecret();
     const sysSettings = await SystemSettings.findOneAndUpdate(
       { _key: 'main' },
@@ -925,7 +1031,7 @@ router.post('/mfa/setup', authMiddleware, async (req, res) => {
       { upsert: true, returnDocument: 'after' },
     );
     const account = sysSettings.adminName || 'admin';
-    const uri = otpauthUrl(secret, account, 'QUANLYCMS');
+    const uri = otpauthUrl(secret, account, 'DashboardThangTinHoc');
     const qrDataUrl = await QRCode.toDataURL(uri, { margin: 1, width: 220 });
     res.json({
       success: true,
@@ -940,10 +1046,26 @@ router.post('/mfa/setup', authMiddleware, async (req, res) => {
 /** Xác nhận enable MFA bằng mã OTP từ app authenticator */
 router.post('/mfa/enable', authMiddleware, async (req, res) => {
   try {
-    if (req.user?.id !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Chỉ Super Admin' });
+    if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
     }
     const { code } = req.body || {};
+
+    const dbUser = await loadInternalMfaUser(req);
+    if (dbUser) {
+      if (!dbUser.mfaPendingSecret) {
+        return res.status(400).json({ success: false, message: 'Chưa gọi /mfa/setup' });
+      }
+      if (!verifyTotp(dbUser.mfaPendingSecret, code)) {
+        return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
+      }
+      dbUser.mfaSecret = dbUser.mfaPendingSecret;
+      dbUser.mfaEnabled = true;
+      dbUser.mfaPendingSecret = '';
+      await dbUser.save({ validateModifiedOnly: true });
+      return res.json({ success: true, message: 'Đã bật MFA cho tài khoản này' });
+    }
+
     const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaPendingSecret +adminMfaSecret');
     const pending = sysSettings?.adminMfaPendingSecret;
     if (!pending) {
@@ -967,10 +1089,25 @@ router.post('/mfa/enable', authMiddleware, async (req, res) => {
 /** Tắt MFA — cần mật khẩu + OTP hiện tại */
 router.post('/mfa/disable', authMiddleware, async (req, res) => {
   try {
-    if (req.user?.id !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Chỉ Super Admin' });
+    if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
     }
     const { password, code } = req.body || {};
+
+    const dbUser = await loadInternalMfaUser(req, '+password');
+    if (dbUser) {
+      const pwMatch = await dbUser.comparePassword(password || '');
+      if (!pwMatch) return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+      if (dbUser.mfaEnabled && dbUser.mfaSecret && !verifyTotp(dbUser.mfaSecret, code)) {
+        return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
+      }
+      dbUser.mfaEnabled = false;
+      dbUser.mfaSecret = '';
+      dbUser.mfaPendingSecret = '';
+      await dbUser.save({ validateModifiedOnly: true });
+      return res.json({ success: true, message: 'Đã tắt MFA' });
+    }
+
     const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
     const pwOk = await verifyAdminPassword(password, sysSettings);
     if (!pwOk) return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
@@ -992,8 +1129,12 @@ router.post('/mfa/disable', authMiddleware, async (req, res) => {
 });
 
 router.get('/mfa/status', authMiddleware, async (req, res) => {
+  if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
+    return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
+  }
   if (req.user?.id !== 'admin') {
-    return res.status(403).json({ success: false, message: 'Chỉ Super Admin' });
+    const dbUser = await Teacher.findById(req.user.id).select('mfaEnabled').lean();
+    return res.json({ success: true, data: { enabled: !!dbUser?.mfaEnabled } });
   }
   const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
   res.json({ success: true, data: { enabled: !!sysSettings?.adminMfaEnabled } });
@@ -1011,30 +1152,43 @@ router.post('/logout', async (req, res) => {
     let userId = null;
     let role = null;
     let accessToken = null;
+    let verifiedIdentity = false;
 
     const authHeader = req.headers.authorization || '';
     if (authHeader.startsWith('Bearer ')) {
       accessToken = authHeader.slice(7);
       try {
-        const decoded = jwt.decode(accessToken);
+        const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
         if (decoded?.id) {
           userId = decoded.id;
           role = decoded.role;
+          verifiedIdentity = true;
         }
-      } catch { /* ignore */ }
+      } catch {
+        // Access token hết hạn: vẫn blacklist theo decode nhưng KHÔNG xóa session DB theo id giả
+        try {
+          const decoded = jwt.decode(accessToken);
+          if (decoded?.id) {
+            userId = decoded.id;
+            role = decoded.role;
+          }
+        } catch { /* ignore */ }
+      }
     }
 
     const bodyRefresh = req.body?.refreshToken;
     if (bodyRefresh) {
       try {
-        const dec = jwt.decode(bodyRefresh);
+        const dec = jwt.verify(bodyRefresh, process.env.JWT_SECRET);
         if (dec?.id) {
-          userId = userId || dec.id;
-          role = role || dec.role;
+          userId = String(dec.id);
+          role = dec.role || role;
+          verifiedIdentity = true;
         }
         const ttl = dec?.exp ? Math.max(1, dec.exp - Math.floor(Date.now() / 1000)) : 86400 * 30;
         await blacklist.add(bodyRefresh, ttl);
       } catch {
+        // Refresh không hợp lệ: blacklist chuỗi thô, không tin id trong payload
         await blacklist.add(bodyRefresh, 86400);
       }
     }
@@ -1053,7 +1207,8 @@ router.post('/logout', async (req, res) => {
       }
     }
 
-    if (userId && userId !== 'admin') {
+    // Chỉ xóa refreshToken trong DB khi đã verify chữ ký JWT (tránh logout giả mạo)
+    if (verifiedIdentity && userId && userId !== 'admin') {
       const unset = { $unset: { refreshToken: 1, deviceFingerprint: 1 } };
       const uid = String(userId);
       if (role === 'student') {
@@ -1369,8 +1524,15 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, async (req, res) =>
 
     return res.json({
       success: true,
-      message: 'Cấp lại mật khẩu thành công! Mật khẩu mới đã được gửi qua Zalo/email (nếu đã cấu hình).',
-      data: { name: user.name },
+      message: 'Cấp lại mật khẩu thành công! Hãy đăng nhập rồi đổi mật khẩu ngay.',
+      data: {
+        name: user.name,
+        phone: destPhone || phone,
+        // Trả nhiều alias để client luôn lấy được mật khẩu tạm
+        newPassword,
+        tempPassword: newPassword,
+        password: newPassword,
+      },
     });
   } catch (error) {
     logger.error('[AUTH] forgot-password/verify error:', error);

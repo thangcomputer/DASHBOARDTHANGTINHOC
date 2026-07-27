@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
   BookOpen, Video, FileText, Download, ClipboardList, Trophy, Plus, HelpCircle,
@@ -10,10 +11,6 @@ import TeacherQuestionBankPanel from './TeacherQuestionBankPanel';
 import RichTextEditor from '../shared/RichTextEditor';
 import { resolveTeacherExamDate, isTeacherExamDateApproximate, resolvePracticalFileUrl, practicalFileDisplayName, practicalFileDownloadUrl, practicalFileViewUrl } from '../utils/teacherExam';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
-import {
-  downloadTeacherQuestionsExcelTemplate,
-  parseQuestionBankExcel,
-} from '../../../utils/studentQuestionsExcel';
 import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 
@@ -405,21 +402,21 @@ export default function AdminTrainingTab() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Giảng viên</label>
-                      <select value={erGvForm.teacherId || ''}
+                      <CmsSelect value={erGvForm.teacherId || ''}
                         onChange={e => { const t = safeTeachersList.find(x => String(x.id) === e.target.value || String(x._id) === e.target.value); setErGvForm({ ...erGvForm, teacherId: e.target.value, teacherName: t?.name || '' }); }}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm font-bold">
                         <option value="">-- Chọn giảng viên --</option>
                         {safeTeachersList.map(t => (<option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>))}
-                      </select>
+                      </CmsSelect>
                     </div>
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Bài / Môn thi</label>
-                      <select value={erGvForm.subject || ''} onChange={e => setErGvForm({ ...erGvForm, subject: e.target.value })}
+                      <CmsSelect value={erGvForm.subject || ''} onChange={e => setErGvForm({ ...erGvForm, subject: e.target.value })}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm font-bold">
                         <option value="BÀI TEST GIẢNG VIÊN">BÀI TEST GIẢNG VIÊN</option>
                         <option value="THỰC HÀNH GIẢNG DẠY">THỰC HÀNH GIẢNG DẠY</option>
                         <option value="Khác">Khác</option>
-                      </select>
+                      </CmsSelect>
                     </div>
                   </div>
                   <div className="bg-blue-50 rounded-2xl p-4 space-y-3 border border-blue-100">

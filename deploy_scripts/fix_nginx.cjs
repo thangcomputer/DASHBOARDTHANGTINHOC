@@ -7,9 +7,9 @@ async function fixNginx() {
   
   const conf = `server {
     listen 80;
-    server_name 103.124.92.238 quanlycms.giasutinhoc24h.com;
+    server_name 103.124.92.238 dashboardthangtinhoc.giasutinhoc24h.com;
     
-    root /www/wwwroot/quanlycms/client/dist;
+    root /www/wwwroot/dashboardthangtinhoc/client/dist;
     index index.html index.htm;
     
     # Frontend React App
@@ -19,7 +19,7 @@ async function fixNginx() {
     
     # Static files (uploads)
     location /uploads/ {
-        alias /www/wwwroot/quanlycms/uploads/;
+        alias /www/wwwroot/dashboardthangtinhoc/uploads/;
     }
 
     # Backend API and Socket.io

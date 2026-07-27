@@ -1,8 +1,8 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 async function run() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/quanlycms');
+  await mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc');
   
   // Define Schemas
   const branchSchema = new mongoose.Schema({ name: String, code: String });

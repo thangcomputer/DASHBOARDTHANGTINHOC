@@ -571,6 +571,13 @@ export const studentsAPI = {
     });
     return res.json();
   },
+  updateExamProgress: async (id, { subjectId, changes }) => {
+    const res = await apiFetch(`/students/${id}/exam-progress`, {
+      method: 'PUT',
+      body: JSON.stringify({ subjectId, changes }),
+    });
+    return res.json();
+  },
   remove: async (id) => {
     const res = await apiFetch(`/students/${id}`, { method: 'DELETE' });
     return res.json();
@@ -666,7 +673,7 @@ export const teachersAPI = {
     return res.json();
   },
   approve: async (id) => {
-    const res = await apiFetch(`/teachers/${id}/approve`, { method: 'POST' });
+    const res = await apiFetch(`/teachers/${id}/approve`, { method: 'PUT' });
     return res.json();
   },
   uploadPractical: async (file) => {
@@ -939,9 +946,13 @@ export const assignmentsAPI = {
 
 // ─── EXAM RESULTS API ───────────────────────────────────────────────────────
 export const examResultsAPI = {
-  getAll: async (type = '') => {
-    const q = type ? `?type=${type}` : '';
-    const res = await apiFetch(`/exam-results${q}`);
+  getAll: async (typeOrParams = '') => {
+    const params =
+      typeof typeOrParams === 'string'
+        ? (typeOrParams ? { type: typeOrParams } : {})
+        : (typeOrParams || {});
+    const q = new URLSearchParams(params).toString();
+    const res = await apiFetch(`/exam-results${q ? `?${q}` : ''}`);
     const data = await res.json();
     return data.data || [];
   },
@@ -1000,6 +1011,13 @@ export const settingsAPI = {
     const fd = new FormData();
     fd.append('logo', file);
     return uploadWithAuth('/settings/upload-logo', fd);
+  },
+  uploadFavicon: async (file, kind = 'public') => {
+    const k = kind === 'admin' ? 'admin' : 'public';
+    const fd = new FormData();
+    fd.append('kind', k);
+    fd.append('favicon', file);
+    return uploadWithAuth(`/settings/upload-favicon?kind=${k}`, fd);
   },
   uploadPopupImage: async (file) => {
     const fd = new FormData();
@@ -1461,6 +1479,62 @@ export const trainingLmsAPI = {
   },
 };
 
+// ─── BANG TIN (hoi bai / trao doi) ───────────────────────────────────────────
+export const feedAPI = {
+  list: async (page = 1, limit = 20) => {
+    const res = await apiFetch(`/feed?page=${page}&limit=${limit}`);
+    return res.json();
+  },
+  create: async (payload) => {
+    const res = await apiFetch('/feed', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+  remove: async (id) => {
+    const res = await apiFetch(`/feed/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+  like: async (id, type = 'heart') => {
+    const res = await apiFetch(`/feed/${id}/like`, {
+      method: 'POST',
+      body: JSON.stringify({ type }),
+    });
+    return res.json();
+  },
+  react: async (id, type = 'heart') => {
+    const res = await apiFetch(`/feed/${id}/react`, {
+      method: 'POST',
+      body: JSON.stringify({ type }),
+    });
+    return res.json();
+  },
+  comment: async (id, payload) => {
+    const body = typeof payload === 'string'
+      ? { content: payload }
+      : {
+          content: payload?.content || '',
+          images: payload?.images || [],
+          parentId: payload?.parentId || null,
+        };
+    const res = await apiFetch(`/feed/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  },
+  removeComment: async (postId, commentId) => {
+    const res = await apiFetch(`/feed/${postId}/comments/${commentId}`, { method: 'DELETE' });
+    return res.json();
+  },
+  uploadImages: async (files) => {
+    const fd = new FormData();
+    (files || []).forEach((f) => fd.append('images', f));
+    return uploadWithAuth('/feed/upload', fd);
+  },
+};
+
 export default {
   auth:         authAPI,
   students:     studentsAPI,
@@ -1485,4 +1559,5 @@ export default {
   builder:       builderAPI,
   tenants:       tenantsAPI,
   trainingLms:   trainingLmsAPI,
+  feed:          feedAPI,
 };

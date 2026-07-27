@@ -1,33 +1,23 @@
 /**
- * BranchFilterDropdown.jsx — Dropdown chọn Chi nhánh toàn cục (Topbar)
- * Chỉ render khi user là SUPER_ADMIN VÀ đang ở module có phân vùng chi nhánh.
- * 
- * NHÓM 1 (HIỆN dropdown): Tổng quan, Học viên, Giảng viên, Đánh giá, Tài chính,
- *                          Nhật ký, Nhân sự & Lương, Báo cáo doanh thu.
- * NHÓM 2 (ẨN dropdown):   Đào tạo GV, Đào tạo HV, Phân quyền, Hộp thư, Cài đặt.
+ * BranchFilterDropdown.jsx — Dropdown chọn Chi nhánh (Topbar)
+ * Chỉ hiện khi SUPER_ADMIN / STAFF ở module có phân vùng chi nhánh.
  */
 import { Building2, ChevronDown, Check } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useBranch } from '../context/BranchContext';
 
-// ── Route config: Các hash/path ĐƯỢC PHÉP hiển thị dropdown ──────────────────
-// Hash-based tabs trên /admin#xxx
 const BRANCH_VISIBLE_HASHES = [
-  'dashboard',       // Tổng quan
-  'students',        // Học viên
-  'teachers',        // Giảng viên
-  'evaluations',     // Đánh giá nội bộ
-  'finance',         // Tài chính
-  'system-logs',     // Nhật ký hoạt động
-  'hr',              // Nhân sự & Lương
-  'analytics',       // Báo cáo doanh thu
-  'bi',              // BI Dashboard
+  'dashboard',
+  'students',
+  'teachers',
+  'evaluations',
+  'finance',
+  'system-logs',
+  'hr',
+  'analytics',
+  'bi',
 ];
-
-// Hash/path nhóm 2 — ẨN dropdown (toàn cục, không phân vùng)
-// training, student-training, staff-permissions, inbox, settings
-// → Mọi hash KHÔNG nằm trong BRANCH_VISIBLE_HASHES sẽ tự động ẩn.
 
 export default function BranchFilterDropdown() {
   const { selectedBranchId, selectedBranchName, branches, setSelectedBranch, isSuperAdmin, isStaff, isLoadingBranches } = useBranch();
@@ -35,31 +25,14 @@ export default function BranchFilterDropdown() {
   const ref = useRef(null);
   const location = useLocation();
 
-  // 🏥 ARCHITECTURAL UPGRADE: Staff thấy badge readonly, Super Admin thấy dropdown
-  if (isStaff) {
-    return (
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-xl text-blue-700 shadow-sm animate-in fade-in slide-in-from-right-2 duration-300">
-        <Building2 size={14} className="text-blue-500" />
-        <span className="text-xs font-black tracking-wide uppercase">{selectedBranchName}</span>
-        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-      </div>
-    );
-  }
-
-  if (!isSuperAdmin) return null;
-
-  // ── Xác định route hiện tại để ẩn/hiện ──
-  // Path-based routes mà ẨN dropdown (không phân vùng chi nhánh)
   const HIDDEN_PATHS = ['/admin/inbox', '/admin/settings'];
-  const isHiddenPath = HIDDEN_PATHS.some(p => location.pathname.startsWith(p));
-  
+  const isHiddenPath = HIDDEN_PATHS.some((p) => location.pathname.startsWith(p));
   const currentHash = location.hash?.replace('#', '') || (location.pathname === '/admin' ? 'dashboard' : '');
   const showDropdown = !isHiddenPath && (
     BRANCH_VISIBLE_HASHES.includes(currentHash) ||
     location.pathname.startsWith('/admin/bi')
   );
 
-  // Đóng khi click ngoài
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
@@ -68,144 +41,103 @@ export default function BranchFilterDropdown() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Nếu route hiện tại thuộc nhóm 2 → ẩn dropdown
-  if (!showDropdown) return null;
+  if (isStaff) {
+    return (
+      <div className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-slate-600 max-w-[9.5rem] sm:max-w-[11rem]">
+        <Building2 size={14} className="text-slate-400 flex-shrink-0" aria-hidden="true" />
+        <span className="text-xs font-semibold truncate">{selectedBranchName}</span>
+      </div>
+    );
+  }
+
+  if (!isSuperAdmin || !showDropdown) return null;
 
   const handleSelect = (id, name) => {
     setSelectedBranch(id, name);
     setOpen(false);
   };
 
-  const activeBranches = branches.filter(b => b && b.isActive !== false);
+  const activeBranches = branches.filter((b) => b && b.isActive !== false);
   const isFiltered = selectedBranchId && selectedBranchId !== 'all';
 
   return (
-    <div ref={ref} className="relative" style={{ zIndex: 50 }}>
+    <div ref={ref} className="relative max-w-full min-w-0 z-50">
       <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '6px 12px',
-          borderRadius: '10px',
-          border: isFiltered ? '1.5px solid #6366f1' : '1.5px solid #e2e8f0',
-          background: isFiltered ? '#f0f0ff' : '#fff',
-          color: isFiltered ? '#4f46e5' : '#475569',
-          fontSize: '13px',
-          fontWeight: 600,
-          cursor: 'pointer',
-          transition: 'all 0.15s',
-          whiteSpace: 'nowrap',
-          minWidth: '150px',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-        }}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label="Lọc theo chi nhánh"
+        className={`inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border text-xs font-semibold transition-colors min-w-0 max-w-[9.5rem] sm:max-w-[11rem] ${
+          isFiltered
+            ? 'border-slate-300 bg-slate-50 text-slate-800'
+            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+        }`}
       >
-        <Building2 size={14} style={{ color: isFiltered ? '#4f46e5' : '#94a3b8', flexShrink: 0 }} />
-        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <Building2 size={14} className="text-slate-400 flex-shrink-0" aria-hidden="true" />
+        <span className="flex-1 text-left truncate min-w-0">
           {isLoadingBranches ? 'Đang tải...' : selectedBranchName}
         </span>
-        <ChevronDown size={13} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+        <ChevronDown size={13} className={`flex-shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
 
       {open && (
-        <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 6px)',
-          right: 0,
-          minWidth: '200px',
-          background: '#fff',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-          overflow: 'hidden',
-          animation: 'fadeIn 0.15s ease',
-        }}>
-          {/* Header */}
-          <div style={{ padding: '10px 14px 6px', borderBottom: '1px solid #f1f5f9' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Lọc theo chi nhánh
-            </p>
-          </div>
+        <div
+          role="listbox"
+          aria-label="Danh sách chi nhánh"
+          className="absolute top-[calc(100%+6px)] right-0 w-[min(240px,calc(100vw-1.5rem))] bg-white rounded-xl border border-slate-200 shadow-cms-lg overflow-hidden z-50"
+        >
+          <p className="text-[11px] font-semibold text-slate-500 px-3.5 pt-2.5 pb-1.5 border-b border-slate-100">
+            Chi nhánh
+          </p>
 
-          {/* Tất cả */}
           <button
+            type="button"
             onClick={() => handleSelect('all', 'Tất cả chi nhánh')}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px',
-              padding: '9px 14px',
-              background: !isFiltered ? '#f8f7ff' : 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: !isFiltered ? '#4f46e5' : '#374151',
-              fontWeight: !isFiltered ? 700 : 500,
-              fontSize: '13px',
-              transition: 'background 0.1s',
-            }}
+            className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-[13px] transition-colors ${
+              !isFiltered ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50'
+            }`}
           >
-            <span>🏢 Tất cả chi nhánh</span>
-            {!isFiltered && <Check size={13} color="#4f46e5" />}
+            <span>Tất cả chi nhánh</span>
+            {!isFiltered && <Check size={13} className="text-slate-700" aria-hidden="true" />}
           </button>
 
-          {/* Chi nhánh list */}
           {activeBranches.length === 0 && (
-            <div style={{ padding: '10px 14px', color: '#94a3b8', fontSize: '12px', textAlign: 'center' }}>
-              Chưa có chi nhánh
-            </div>
+            <div className="px-3.5 py-2.5 text-xs text-slate-400 text-center">Chưa có chi nhánh</div>
           )}
-          {activeBranches.map(b => {
+
+          {activeBranches.map((b) => {
             const isSelected = selectedBranchId === b._id;
             return (
               <button
                 key={b._id}
+                type="button"
                 onClick={() => handleSelect(b._id, b.name)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  padding: '9px 14px',
-                  background: isSelected ? '#f8f7ff' : 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: isSelected ? '#4f46e5' : '#374151',
-                  fontWeight: isSelected ? 700 : 500,
-                  fontSize: '13px',
-                  transition: 'background 0.1s',
-                  borderTop: '1px solid #f8fafc',
-                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-[13px] border-t border-slate-50 transition-colors ${
+                  isSelected ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50'
+                }`}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  🏬 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span className="truncate">{b.name}</span>
                   {b.code && (
-                    <span style={{
-                      fontSize: '10px', fontWeight: 700, padding: '1px 6px',
-                      borderRadius: '99px', background: '#e0e7ff', color: '#4f46e5'
-                    }}>{b.code}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 flex-shrink-0">
+                      {b.code}
+                    </span>
                   )}
                 </span>
-                {isSelected && <Check size={13} color="#4f46e5" style={{ flexShrink: 0 }} />}
+                {isSelected && <Check size={13} className="text-slate-700 flex-shrink-0" aria-hidden="true" />}
               </button>
             );
           })}
 
-          {/* Badge filter active */}
           {isFiltered && (
-            <div style={{ borderTop: '1px solid #f1f5f9', padding: '8px 14px' }}>
+            <div className="border-t border-slate-100 p-2">
               <button
+                type="button"
                 onClick={() => handleSelect('all', 'Tất cả chi nhánh')}
-                style={{
-                  width: '100%', padding: '6px', borderRadius: '8px',
-                  background: '#fef2f2', color: '#ef4444', border: 'none',
-                  fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-                }}
+                className="w-full py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors"
               >
-                ✕ Xóa bộ lọc
+                Xóa bộ lọc
               </button>
             </div>
           )}

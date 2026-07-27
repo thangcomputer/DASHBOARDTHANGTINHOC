@@ -37,8 +37,10 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 5000
-      MONGODB_URI: mongodb://mongo:27017/quanlycms
+      MONGODB_URI: mongodb://mongo:27017/dashboardthangtinhoc
       REDIS_URL: redis://redis:6379
+      QUEUE_PRODUCER_ONLY: "1"
+      RUN_QUEUE_WORKERS: "0"
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
@@ -52,6 +54,33 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["node", "worker.js"]
+    healthcheck:
+      disable: true
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      MONGODB_URI: mongodb://mongo:27017/dashboardthangtinhoc
+      REDIS_URL: redis://redis:6379
+      RUN_QUEUE_WORKERS: "1"
+      QUEUE_PRODUCER_ONLY: "0"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+      MASTER_ADMIN_PASSWORD: ${MASTER_ADMIN_PASSWORD:-}
+    volumes:
+      - api_uploads:/app/uploads
+      - api_backups:/app/backups
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
 
 volumes:
   mongo_data:

@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import { useData } from '../../../context/DataContext';
 import {
@@ -13,7 +14,7 @@ import {
 } from '../../../utils/htmlContent';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import { getExamSubjectOptions } from '../../../utils/examSubjects';
-import { isLegacyTeacherExamSection } from '../../../utils/teacherExamQuestions';
+import { isLegacyTeacherExamSection } from '../../../utils/teacherExamSections';
 
 const DIFF_LABELS = { easy: 'Cơ bản', medium: 'TB', hard: 'Nâng cao' };
 
@@ -361,7 +362,7 @@ export default function TeacherQuestionBankPanel() {
             <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
               Môn thi
             </label>
-            <select
+            <CmsSelect
               value={qSection}
               onChange={(e) => setQSection(e.target.value)}
               className="w-full border-2 border-red-200 rounded-xl px-3 py-2.5 text-sm font-bold text-red-900 bg-red-50/40 outline-none focus:border-red-500"
@@ -369,7 +370,7 @@ export default function TeacherQuestionBankPanel() {
               {sectionOpts.map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
-            </select>
+            </CmsSelect>
             {isLegacyTeacherExamSection(qSection) && (
               <p className="mt-1.5 text-[11px] font-bold text-amber-700 leading-snug">
                 Phần cũ — không đưa vào đề thi GV. Chuyển câu sang môn chuyên môn hoặc xóa.
@@ -626,7 +627,7 @@ export default function TeacherQuestionBankPanel() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Môn</label>
-                  <select
+                  <CmsSelect
                     value={qForm.section || qSection}
                     onChange={(e) => setQForm({ ...qForm, section: e.target.value })}
                     className="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold outline-none focus:border-blue-400"
@@ -634,11 +635,11 @@ export default function TeacherQuestionBankPanel() {
                     {sectionOpts.map((s) => (
                       <option key={s.id} value={s.id}>{s.label}</option>
                     ))}
-                  </select>
+                  </CmsSelect>
                 </div>
                 <div>
                   <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Độ khó</label>
-                  <select
+                  <CmsSelect
                     value={qForm.difficulty}
                     onChange={(e) => setQForm({ ...qForm, difficulty: e.target.value })}
                     className="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold outline-none focus:border-blue-400"
@@ -646,7 +647,7 @@ export default function TeacherQuestionBankPanel() {
                     <option value="easy">Cơ bản</option>
                     <option value="medium">Trung bình</option>
                     <option value="hard">Nâng cao</option>
-                  </select>
+                  </CmsSelect>
                 </div>
               </div>
 

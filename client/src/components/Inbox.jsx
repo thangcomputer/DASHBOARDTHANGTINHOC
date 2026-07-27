@@ -11,6 +11,7 @@ import { useLocation } from 'react-router-dom';
 import { useToast } from '../utils/toast';
 import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { displayFileName } from '../utils/validators';
+import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
@@ -22,13 +23,6 @@ const formatTime = (date) => {
   if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)} phút`;
   if (diffMs < 86400000) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-};
-
-const roleBadge = (role) => {
-  const r = normalizeRole(String(role || '').toLowerCase());
-  if (r === 'admin') return { text: 'ADMIN', color: 'bg-red-100 text-red-700' };
-  if (r === 'teacher') return { text: 'GV', color: 'bg-blue-100 text-blue-700' };
-  return { text: 'HV', color: 'bg-green-100 text-green-700' };
 };
 
 const normalizeRole = (role) => (role === 'staff' ? 'admin' : role);
@@ -676,7 +670,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   }, [location.state?.selectUserId, conversations.length]);
 
   return (
-    <div className="h-[calc(100dvh-8rem)] min-h-[420px] sm:h-[calc(100vh-130px)] flex flex-col bg-gray-50 rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 overflow-hidden min-w-0 max-w-full">
+    <div className="h-[calc(100dvh-11rem)] sm:h-[calc(100dvh-9rem)] min-h-[360px] sm:min-h-[420px] flex flex-col bg-gray-50 rounded-2xl sm:rounded-3xl shadow-cms border border-gray-100 overflow-hidden min-w-0 max-w-full">
       <div className="pt-2"></div>
 
       {/* ═══════ MAIN AREA ═══════ */}
@@ -756,13 +750,38 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   }`}
                 >
                   <div className="relative flex-shrink-0">
-                    <div className={`w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-white text-sm font-black shadow-md relative z-10 ${
-                      isGroup ? 'bg-indigo-500' : conv.user.role === 'admin' ? 'bg-red-500' : conv.user.role === 'teacher' ? 'bg-blue-600' : 'bg-green-600'
+                    <div className={`w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-white text-sm font-black shadow-md relative z-10 overflow-hidden ${
+                      isGroup ? 'bg-indigo-500' : 'bg-white ring-2 ' + (
+                        conv.user.role === 'teacher' ? 'ring-amber-400/80'
+                          : conv.user.role === 'student' ? 'ring-sky-400/80'
+                            : conv.user.role === 'admin' ? 'ring-rose-400/80'
+                              : 'ring-slate-300'
+                      )
                     }`}>
-                      {isGroup ? <Users size={18} /> : (conv.user.avatar || (conv.user.name || '?')[0])}
+                      {isGroup ? (
+                        <Users size={18} />
+                      ) : (
+                        <img
+                          src={resolveAvatarUrl({ avatar: conv.user.avatar, role: conv.user.role })}
+                          alt={conv.user.name || ''}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
+                    {!isGroup && (
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 z-20 text-[8px] px-1 min-w-[18px] h-4 rounded-md font-black leading-none flex items-center justify-center shadow-sm border border-white ${
+                          conv.user.role === 'teacher' ? 'bg-amber-500 text-white'
+                            : conv.user.role === 'student' ? 'bg-sky-500 text-white'
+                              : conv.user.role === 'admin' ? 'bg-rose-600 text-white'
+                                : 'bg-slate-600 text-white'
+                        }`}
+                      >
+                        {conv.user.role === 'teacher' ? 'GV' : conv.user.role === 'student' ? 'HV' : conv.user.role === 'admin' ? 'AD' : 'NV'}
+                      </span>
+                    )}
                     {!isGroup && conv.user.online && (
-                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white z-20" />
+                      <span className="absolute bottom-0 left-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white z-20" />
                     )}
                   </div>
                   <div className="flex-1 text-left min-w-0 pr-1">
@@ -885,11 +904,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <ChevronLeft size={20} />
                   </button>
                   <div className="relative">
-                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                      activeConv.isGroup ? 'bg-indigo-500' :
-                      activeConv.user.role === 'admin' ? 'bg-red-500' : activeConv.user.role === 'teacher' ? 'bg-blue-500' : 'bg-green-500'
+                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white text-xs font-bold overflow-hidden ${
+                      activeConv.isGroup ? 'bg-indigo-500' : 'bg-white'
                     }`}>
-                      {activeConv.isGroup ? <Users size={16} /> : (activeConv.user.avatar || (activeConv.user.name || '?')[0])}
+                      {activeConv.isGroup ? (
+                        <Users size={16} />
+                      ) : (
+                        <img
+                          src={resolveAvatarUrl({ avatar: activeConv.user.avatar, role: activeConv.user.role })}
+                          alt={activeConv.user.name || ''}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
                     {!activeConv.isGroup && activeConv.user.online && (
                       <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-2 border-white" />

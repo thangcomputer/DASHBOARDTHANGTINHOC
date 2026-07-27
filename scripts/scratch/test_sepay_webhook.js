@@ -1,4 +1,4 @@
-﻿/**
+/**
  * test_sepay_webhook.js
  * Chạy: node scratch/test_sepay_webhook.js
  * 
@@ -20,7 +20,7 @@ async function getLatestPendingSession() {
 
     // Connect to MongoDB directly to get the latest pending session
     const mongoose = require('mongoose');
-    mongoose.connect('mongodb://127.0.0.1:27017/quanlycms').then(async () => {
+    mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc').then(async () => {
       const PaymentSession = require('./models/PaymentSession');
       const session = await PaymentSession.findOne({ status: 'pending' }).sort({ createdAt: -1 });
       if (!session) {

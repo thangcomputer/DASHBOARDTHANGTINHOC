@@ -180,9 +180,9 @@ export function useAdminTeachers({
       return;
     }
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
-        const { questions: imported, errors, skipped } = parseQuestionBankExcel(evt.target.result);
+        const { questions: imported, errors, skipped } = await parseQuestionBankExcel(evt.target.result);
         if (!imported.length) {
           toast.error(errors[0] || 'Không có câu hỏi hợp lệ trong file.');
           errors.slice(1, 5).forEach((m) => toast.error(m));

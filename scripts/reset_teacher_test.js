@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 const SystemSettings = require('../models/SystemSettings');
 const { invalidateSettingsCache } = require('../services/settingsCache');
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/quanlycms';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/dashboardthangtinhoc';
 
 async function seedExamMinutes() {
   await mongoose.connect(MONGODB_URI);

@@ -7,7 +7,7 @@
  *   DEPLOY_SSH_HOST=...
  *   DEPLOY_SSH_USER=root
  *   DEPLOY_SSH_PASSWORD=...   (hoặc dùng SSH key)
- *   DEPLOY_ENV_FILE=/www/wwwroot/quanlycms/.env
+ *   DEPLOY_ENV_FILE=/www/wwwroot/dashboardthangtinhoc/.env
  *
  * Usage: node deploy_scripts/set_zalo_token.cjs
  */
@@ -19,7 +19,7 @@ const APP_SECRET = (process.env.ZALO_APP_SECRET || '').trim();
 const SSH_HOST = (process.env.DEPLOY_SSH_HOST || '').trim();
 const SSH_USER = (process.env.DEPLOY_SSH_USER || 'root').trim();
 const SSH_PASSWORD = (process.env.DEPLOY_SSH_PASSWORD || '').trim();
-const ENV_FILE = (process.env.DEPLOY_ENV_FILE || '/www/wwwroot/quanlycms/.env').trim();
+const ENV_FILE = (process.env.DEPLOY_ENV_FILE || '/www/wwwroot/dashboardthangtinhoc/.env').trim();
 
 function requireEnv(name, value) {
   if (!value) {
@@ -57,7 +57,7 @@ ssh.connect({ host: SSH_HOST, username: SSH_USER, password: SSH_PASSWORD }).then
   console.log('Verify (masked):');
   console.log((v.stdout || '').replace(/(ZALO_APP_SECRET=).+/g, '$1***'));
 
-  await ssh.execCommand('pm2 restart quanlycms --update-env && pm2 save');
+  await ssh.execCommand('pm2 restart dashboardthangtinhoc --update-env && pm2 save');
   console.log('PM2 restarted.');
   process.exit(0);
 }).catch((e) => {

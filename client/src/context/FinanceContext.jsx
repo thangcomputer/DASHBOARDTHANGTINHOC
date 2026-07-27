@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
 import api from '../services/api';
 import { mapTransaction } from '../lib/entityMaps';
@@ -16,7 +16,7 @@ function financeKey(user) {
 async function fetchTransactions(key) {
   const [, scope, teacherId] = key;
   if (scope === 'admin') {
-    const res = await api.transactions.getAll();
+    const res = await api.transactions.getAll({ limit: 200 });
     return res?.success ? res.data.map(mapTransaction) : [];
   }
   const res = await api.transactions.getByTeacher(teacherId);
@@ -30,11 +30,19 @@ export function FinanceProvider({ user, children }) {
     { revalidateOnFocus: false, dedupingInterval: 45_000 }
   );
 
+  const setTransactionsLocal = useCallback((updater) => {
+    mutate((current = []) => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      return Array.isArray(next) ? next : current;
+    }, { revalidate: false });
+  }, [mutate]);
+
   const value = useMemo(() => ({
     transactions: data,
     refreshTransactions: mutate,
+    setTransactionsLocal,
     isTransactionsLoading: isValidating,
-  }), [data, mutate, isValidating]);
+  }), [data, mutate, setTransactionsLocal, isValidating]);
 
   return (
     <FinanceContext.Provider value={value}>
@@ -46,7 +54,7 @@ export function FinanceProvider({ user, children }) {
 export function useFinanceContext() {
   const ctx = useContext(FinanceContext);
   if (!ctx) {
-    return { transactions: [], refreshTransactions: async () => {}, isTransactionsLoading: false };
+    return { transactions: [], refreshTransactions: async () => {}, setTransactionsLocal: () => {}, isTransactionsLoading: false };
   }
   return ctx;
 }

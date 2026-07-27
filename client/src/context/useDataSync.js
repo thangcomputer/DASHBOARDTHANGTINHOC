@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import api from '../services/api';
-import { mapStudent } from '../lib/entityMaps';
+import { mapStudent, mapTeacher, mapTransaction, mapSchedule } from '../lib/entityMaps';
 import { useSocket } from './SocketContext';
 import { loadState } from './dataStorage';
 
 /**
- * Background sync, pagination, system logs, and attendance socket for DataProvider.
+ * Background sync, system logs for DataProvider.
+ * Entity lists (students/teachers/schedules/transactions) are updated via SWR context setters.
  */
 export function useDataSync({
   currentUser, onLogout,
@@ -15,38 +16,14 @@ export function useDataSync({
   applyStudentExamConfigFromServer,
   setPrivateEvaluations,
 }) {
-  const { onDataRefresh, socket } = useSocket();
+  const { onDataRefresh } = useSocket();
 
   const [isRefetching, setIsRefetching] = useState(false);
-  const [studentsPagination, setStudentsPagination] = useState({
-    totalRecords: 0, totalPages: 1, currentPage: 1,
-  });
   const [systemLogs, setSystemLogs] = useState(() => loadState('thvp_systemLogs', []));
 
   useEffect(() => {
     localStorage.setItem('thvp_systemLogs', JSON.stringify(systemLogs));
   }, [systemLogs]);
-
-  const fetchStudentsPaginated = useCallback(async ({ page = 1, limit = 10, search = '', paid, course, branch_id } = {}) => {
-    try {
-      const params = { page, limit };
-      if (search) params.search = search;
-      if (paid !== undefined && paid !== 'all') params.paid = paid === 'paid' ? 'true' : 'false';
-      if (course && course !== 'all') params.course = course;
-      if (branch_id && branch_id !== 'all') params.branch_id = branch_id;
-      const res = await api.students.getAll(params);
-      if (res?.success) {
-        setStudents((res.data || []).filter(Boolean).map(mapStudent));
-        setStudentsPagination({
-          totalRecords: res.totalRecords || 0,
-          totalPages: res.totalPages || 1,
-          currentPage: res.currentPage || 1,
-        });
-      }
-      return res;
-    } catch (err) {
-    }
-  }, [setStudents]);
 
   const triggerBackgroundSync = useCallback(async () => {
     if (!currentUser) return;
@@ -62,19 +39,19 @@ export function useDataSync({
       const promises = [];
 
       if (isAdmin) {
-        // Admin: students handled by fetchStudentsPaginated, skip here
-        promises.push(api.schedules.getAll().catch(() => ({ success: false })));
+        // Admin: students handled by StudentsContext.fetchStudentsPaginated, skip here
+        promises.push(api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })));
       } else if (isTeacher) {
-        // Teacher: cần tất cả học viên đã gán — truyền limit cao
-        promises.push(api.students.getAll({ limit: 1000 }).catch(() => ({ success: false })));
-        promises.push(api.schedules.getAll().catch(() => ({ success: false })));
+        // Teacher: can hoc vien da gan — gioi han de tranh payload lon
+        promises.push(api.students.getAll({ limit: 300 }).catch(() => ({ success: false })));
+        promises.push(api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })));
       }
 
       if (isAdmin) {
         promises.push(api.teachers.getAll().catch(() => ({ success: false })));
         promises.push(api.staff.getAll().catch(() => ({ success: false })));
-        promises.push(api.transactions.getAll().catch(() => ({ success: false })));
-        promises.push(api.examResults.getAll().catch(() => ({ success: false })));
+        promises.push(api.transactions.getAll({ limit: 200 }).catch(() => ({ success: false })));
+        promises.push(api.examResults.getAll({ limit: 200 }).catch(() => ({ success: false })));
         promises.push(api.evaluations.getPrivate().catch(() => ({ success: false })));
       } else if (isTeacher) {
         promises.push(api.transactions.getByTeacher(currentUser.id).catch(() => ({ success: false })));
@@ -98,30 +75,25 @@ export function useDataSync({
       const results = await Promise.all(promises);
       let idx = 0;
 
-      const mapSchedule = (sch) => ({
-        ...sch,
-        id: sch._id,
-        studentId: typeof sch.studentId === 'object' && sch.studentId ? String(sch.studentId._id || sch.studentId) : String(sch.studentId || ''),
-        teacherId: typeof sch.teacherId === 'object' && sch.teacherId ? String(sch.teacherId._id || sch.teacherId) : String(sch.teacherId || ''),
-      });
-
       if (isAdmin) {
         const schedulesRes = results[idx++];
         if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
       } else if (isTeacher) {
         const studentsRes = results[idx++];
-        if (studentsRes?.success) setStudents((studentsRes.data || []).filter(Boolean).map(mapStudent));
+        if (studentsRes?.success) {
+          setStudents((studentsRes.data || []).filter(Boolean).map(mapStudent));
+        }
         const schedulesRes = results[idx++];
         if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
       }
 
       if (isAdmin) {
         const teachersRes = results[idx++];
-        if (teachersRes?.success) setTeachers(teachersRes.data.map(t => ({ ...t, id: t._id })));
+        if (teachersRes?.success) setTeachers(teachersRes.data.map(mapTeacher));
         const staffRes = results[idx++];
         if (staffRes?.success) setStaffs(staffRes.data.map(st => ({ ...st, id: st._id })));
         const transactionsRes = results[idx++];
-        if (transactionsRes?.success) setTransactions(transactionsRes.data.map(tx => ({ ...tx, id: tx._id })));
+        if (transactionsRes?.success) setTransactions(transactionsRes.data.map(mapTransaction));
         const examResultsRes = results[idx++];
         if (Array.isArray(examResultsRes)) setExamResultsRef.current(examResultsRes.map(r => ({ ...r, id: r._id || r.id })));
         const evalsRes = results[idx++];
@@ -134,14 +106,14 @@ export function useDataSync({
         }
       } else if (isTeacher) {
         const transactionsRes = results[idx++];
-        if (transactionsRes?.success) setTransactions(transactionsRes.data.map(tx => ({ ...tx, id: tx._id })));
+        if (transactionsRes?.success) setTransactions(transactionsRes.data.map(mapTransaction));
         const teacherSelfRes = results[idx++];
-        if (teacherSelfRes?.success) setTeachers([{ ...teacherSelfRes.data, id: teacherSelfRes.data._id }]);
+        if (teacherSelfRes?.success) setTeachers([mapTeacher(teacherSelfRes.data)]);
       }
 
       if (isStudent) {
         const studentRes = results[idx++];
-        if (studentRes?.success) setStudents([ { ...studentRes.data, id: studentRes.data._id } ]);
+        if (studentRes?.success) setStudents([mapStudent(studentRes.data)]);
         const schedulesRes = results[idx++];
         if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
       }
@@ -199,10 +171,6 @@ export function useDataSync({
 
   // Background sync (multi-tab & window focus)
   useEffect(() => {
-    const handleStorage = (e) => {
-      if (e.key === 'thvp_transactions') setTransactions(JSON.parse(e.newValue || '[]'));
-    };
-
     const handleSync = () => {
       if (document.visibilityState === 'visible') {
         triggerBackgroundSync();
@@ -222,41 +190,16 @@ export function useDataSync({
       handleSync();
     }, 60000);
 
-    window.addEventListener('storage', handleStorage);
     document.addEventListener('visibilitychange', handleSync);
     window.addEventListener('focus', handleSync);
 
     return () => {
       clearInterval(interval);
       if (offDataRefresh) offDataRefresh();
-      window.removeEventListener('storage', handleStorage);
       document.removeEventListener('visibilitychange', handleSync);
       window.removeEventListener('focus', handleSync);
     };
-  }, [triggerBackgroundSync, onDataRefresh, setTransactions]);
-
-  // Attendance locked socket listener
-  useEffect(() => {
-    if (!socket) return;
-    const handleAttendanceLocked = (data) => {
-      setStudents(prev => prev.map(s => {
-        const sid = String(s._id || s.id);
-        if (sid === String(data.studentId)) {
-          return {
-            ...s,
-            can_check_in: false,
-            remaining_cooldown_hours: 12,
-            last_attendance_at: data.attendedAt,
-          };
-        }
-        return s;
-      }));
-    };
-    socket.on('attendance:locked', handleAttendanceLocked);
-    return () => {
-      socket.off('attendance:locked', handleAttendanceLocked);
-    };
-  }, [socket, setStudents]);
+  }, [triggerBackgroundSync, onDataRefresh]);
 
   const addSystemLog = useCallback((action, target, adminName = 'Admin', color = 'bg-blue-500 text-white') => {
     setSystemLogs(prev => {
@@ -274,8 +217,6 @@ export function useDataSync({
 
   return {
     isRefetching,
-    studentsPagination,
-    fetchStudentsPaginated,
     triggerBackgroundSync,
     systemLogs,
     addSystemLog,

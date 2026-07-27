@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb://127.0.0.1:27017/quanlycms', {}).then(async () => {
+mongoose.connect('mongodb://127.0.0.1:27017/dashboardthangtinhoc', {}).then(async () => {
     try {
         const Teacher = require('../models/Teacher');
         const Student = require('../models/Student');

@@ -90,7 +90,7 @@ async function runBackupJob(jobId) {
 
     const payload = {
       version: BACKUP_VERSION,
-      app: 'quanlycms',
+      app: 'dashboardthangtinhoc',
       createdAt: new Date().toISOString(),
       jobId: String(job._id),
       type: job.type,

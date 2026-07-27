@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  QUANLYCMS — K6 Load Test Script 
+ *  dashboardthangtinhoc — K6 Load Test Script 
  *  Kiểm thử sức chịu tải API thuần (không browser)
  *
  *  Cài đặt K6: https://k6.io/docs/get-started/installation/
@@ -223,7 +223,7 @@ function textSummary(data) {
 
   return `
 ╔══════════════════════════════════════════════════════════════╗
-║           📊 K6 LOAD TEST REPORT — QUANLYCMS               ║
+║           📊 K6 LOAD TEST REPORT — dashboardthangtinhoc               ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  ── HTTP Request Duration ──────────────────────────────    ║

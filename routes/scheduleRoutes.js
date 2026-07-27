@@ -117,7 +117,7 @@ async function checkAndUnlockExam(studentId, io) {
 // Admin/Staff: Lấy lịch học (STAFF chỉ thấy chi nhánh của mình)
 router.get('/', [authMiddleware, branchFilter], async (req, res) => {
   try {
-    const { status, date, teacherId, studentId } = req.query;
+    const { status, date, teacherId, studentId, page, limit } = req.query;
     const filter = { ...req.branchFilter }; // {} for admin, {branchId:...} for staff
 
     if (status)    filter.status    = status;
@@ -130,12 +130,28 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
       filter.date = { $gte: d, $lt: nextDay };
     }
 
-    const schedules = await Schedule.find(filter)
-      .populate('teacherId', 'name phone')
-      .populate('studentId', 'name course phone zalo')
-      .sort({ date: 1, startTime: 1 });
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(2000, Math.max(1, parseInt(limit, 10) || 500));
+    const skip = (pageNum - 1) * limitNum;
 
-    res.json({ success: true, count: schedules.length, data: schedules });
+    const [schedules, total] = await Promise.all([
+      Schedule.find(filter)
+        .populate('teacherId', 'name phone')
+        .populate('studentId', 'name course phone zalo')
+        .sort({ date: 1, startTime: 1 })
+        .skip(skip)
+        .limit(limitNum),
+      Schedule.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      count: schedules.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      data: schedules,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

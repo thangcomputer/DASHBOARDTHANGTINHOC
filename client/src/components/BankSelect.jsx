@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import CmsSelect from './ui/CmsSelect';
 import { Landmark, Loader2 } from 'lucide-react';
 
 // ── In-memory cache để không fetch lại mỗi lần mount ────────────────────────
@@ -84,14 +85,14 @@ export function BankSelect({ value, onChange, className = '', placeholder = '—
       {loading && (
         <Loader2 size={14} className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 animate-spin pointer-events-none z-10" />
       )}
-      <select
+      <CmsSelect
         value={value || ''}
         disabled={loading}
         onChange={e => {
           const bank = banks.find(b => b.bin === e.target.value);
           if (bank) onChange(bank);
         }}
-        className={`w-full pl-9 pr-8 py-3 bg-white rounded-xl border-2 border-emerald-200 focus:border-emerald-400 outline-none text-sm appearance-none cursor-pointer transition disabled:opacity-60 ${className}`}
+        className={`w-full pl-9 pr-8 py-3 bg-white rounded-xl border-2 border-emerald-200 focus:border-emerald-400 outline-none text-sm cursor-pointer transition disabled:opacity-60 ${className}`}
       >
         <option value="">{loading ? 'Đang tải danh sách ngân hàng...' : placeholder}</option>
         {banks.map(b => (
@@ -99,7 +100,7 @@ export function BankSelect({ value, onChange, className = '', placeholder = '—
             {b.shortName} — {b.name}
           </option>
         ))}
-      </select>
+      </CmsSelect>
     </div>
   );
 }

@@ -6,7 +6,7 @@ async function createProxy() {
   await ssh.connect(getVpsSshConfig());
   const conf = `server {
     listen 80;
-    server_name 103.124.92.238 quanlycms.giasutinhoc24h.com;
+    server_name 103.124.92.238 dashboardthangtinhoc.giasutinhoc24h.com;
     
     location / {
         proxy_pass http://127.0.0.1:5000;

@@ -31,6 +31,10 @@ function validateEnv() {
       'SEPAY_API_KEY or SEPAY_SECRET_KEY is required in production (webhook fail-closed)'
     );
   }
+
+  if (isProd && !(process.env.REDIS_URL || '').trim()) {
+    throw new Error('REDIS_URL is required when NODE_ENV=production (queue / cache)');
+  }
 }
 
 module.exports = validateEnv;

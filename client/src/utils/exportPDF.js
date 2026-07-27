@@ -1,10 +1,19 @@
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { toast } from 'react-hot-toast';
 
 const A5_W_MM = 210;
 const A5_H_MM = 148;
 const MM_TO_PX = 3.7795275591;
+
+let _pdfLibs = null;
+async function getPdfLibs() {
+  if (_pdfLibs) return _pdfLibs;
+  const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas'),
+  ]);
+  _pdfLibs = { jsPDF, html2canvas };
+  return _pdfLibs;
+}
 
 const captureWidthPx = () => Math.round(A5_W_MM * MM_TO_PX);
 const captureHeightPx = () => Math.round(A5_H_MM * MM_TO_PX);
@@ -132,6 +141,8 @@ const exportPDF = async (data = {}) => {
     const w = captureWidthPx();
     const h = captureHeightPx();
 
+    const { jsPDF, html2canvas } = await getPdfLibs();
+
     const canvas = await html2canvas(clone, {
       scale: 2,
       useCORS: true,
@@ -169,7 +180,7 @@ const exportPDF = async (data = {}) => {
       subject: 'Phiếu thu học phí',
       author: 'Trung Tâm Thắng Tin Học',
       keywords: 'hóa đơn, học phí, thắng tin học',
-      creator: 'QUANLYCMS v1.0',
+      creator: 'DashboardThangTinHoc v1.0',
     });
 
     const studentName = data.studentName || 'HocVien';

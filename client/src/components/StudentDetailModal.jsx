@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import CmsSelect from './ui/CmsSelect';
+import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import {
   X, User, BookOpen, Clock, DollarSign, Trophy, 
   MapPin, Phone, MessageSquare, Calendar, ChevronRight,
@@ -10,6 +12,7 @@ import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments } from '../utils/enrollments';
+import { teacherMatchesCourse } from '../utils/examSubjects';
 
 const fmt = (n) => n ? Number(n).toLocaleString('vi-VN') + 'đ' : '0đ';
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
@@ -201,12 +204,12 @@ export default function StudentDetailModal({ studentId, onClose }) {
 
                {/* Avatar & Basic Info */}
                <div className="relative group">
-                 <div className="w-24 h-24 rounded-[32px] bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100 border-4 border-white transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 overflow-hidden">
-                    {data.student?.avatar ? (
-                      <img src={data.student.avatar} className="w-full h-full object-cover" alt="avatar" />
-                    ) : (
-                      <span className="text-4xl font-black">{data.student.name?.charAt(0)}</span>
-                    )}
+                 <div className="w-24 h-24 rounded-[32px] bg-white flex items-center justify-center text-white shadow-xl shadow-indigo-100 border-4 border-white transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 overflow-hidden">
+                    <img
+                      src={resolveAvatarUrl({ avatar: data.student?.avatar, role: 'student' })}
+                      className="w-full h-full object-cover"
+                      alt={data.student?.name || 'avatar'}
+                    />
                  </div>
                  <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-1.5 rounded-xl border-4 border-white shadow-lg">
                     <ShieldCheck size={14} />
@@ -356,7 +359,16 @@ export default function StudentDetailModal({ studentId, onClose }) {
                           {(() => {
                             const enrollments = getClientEnrollments(data.student);
                             if (enrollments.length === 0) return null;
-                            const activeTeachers = (teachers || []).filter((t) => t.status === 'Active' || t.status === 'active');
+                            const activeTeachers = (teachers || []).filter((t) => String(t.status || '').toLowerCase() === 'active');
+                            const splitTeachers = (courseOrEnr) => {
+                              const matched = [];
+                              const other = [];
+                              for (const t of activeTeachers) {
+                                if (teacherMatchesCourse(t, courseOrEnr)) matched.push(t);
+                                else other.push(t);
+                              }
+                              return { matched, other };
+                            };
                             return (
                               <div className="pt-6 mt-4 border-t border-slate-100">
                                 <div className="flex items-center justify-between mb-4">
@@ -379,16 +391,26 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                       onChange={(e) => setNewEnr((f) => ({ ...f, courseName: e.target.value }))}
                                       className="py-2 px-3 rounded-xl border border-blue-200 text-sm font-bold"
                                     />
-                                    <select
+                                    <CmsSelect
                                       value={newEnr.teacherId}
                                       onChange={(e) => setNewEnr((f) => ({ ...f, teacherId: e.target.value }))}
                                       className="py-2 px-3 rounded-xl border border-blue-200 text-sm font-bold"
                                     >
                                       <option value="">Giảng viên</option>
-                                      {activeTeachers.map((t) => (
-                                        <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
-                                      ))}
-                                    </select>
+                                      {(() => {
+                                        const { matched, other } = splitTeachers(newEnr.courseName);
+                                        return (
+                                          <>
+                                            {matched.map((t) => (
+                                              <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                                            ))}
+                                            {other.map((t) => (
+                                              <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
+                                            ))}
+                                          </>
+                                        );
+                                      })()}
+                                    </CmsSelect>
                                     <input
                                       type="number"
                                       placeholder="Học phí"
@@ -429,16 +451,26 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                             {enr.completedSessions || 0}/{enr.totalSessions || 12} buổi · {progress}% · {fmt(enr.price)}
                                           </p>
                                         </div>
-                                        <select
+                                        <CmsSelect
                                           value={enr.teacherId || ''}
                                           onChange={(e) => handleAssignEnrollmentTeacher(enrId, e.target.value)}
                                           className="sm:w-44 py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
                                         >
                                           <option value="">Chưa phân công GV</option>
-                                          {activeTeachers.map((t) => (
-                                            <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
-                                          ))}
-                                        </select>
+                                          {(() => {
+                                            const { matched, other } = splitTeachers(enr);
+                                            return (
+                                              <>
+                                                {matched.map((t) => (
+                                                  <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                                                ))}
+                                                {other.map((t) => (
+                                                  <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
+                                                ))}
+                                              </>
+                                            );
+                                          })()}
+                                        </CmsSelect>
                                       </div>
                                     );
                                   })}

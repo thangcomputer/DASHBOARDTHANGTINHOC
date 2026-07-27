@@ -10,7 +10,7 @@ async function diagnose() {
   console.log(pm2.stdout);
   
   console.log('=== PM2 LOGS RECENT ===');
-  const logs = await ssh.execCommand('pm2 logs quanlycms --lines 30 --nostream');
+  const logs = await ssh.execCommand('pm2 logs dashboardthangtinhoc --lines 30 --nostream');
   console.log(logs.stdout);
   console.log(logs.stderr);
   
