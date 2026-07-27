@@ -8,6 +8,7 @@ import {
   Activity, Trash2, Ban, PlayCircle, Phone, Mail, Edit3, Shield
 } from 'lucide-react';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../services/api';
+import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../utils/Modal.jsx';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
