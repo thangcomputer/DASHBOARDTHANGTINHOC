@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, X, Ban, PlayCircle, CheckCircle, Video, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, X, Ban, PlayCircle, CheckCircle, Video, MessageSquare, Edit3, Trash2 } from 'lucide-react';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
 

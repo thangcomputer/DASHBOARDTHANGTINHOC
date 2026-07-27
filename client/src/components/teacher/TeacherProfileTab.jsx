@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   User, Phone, Mail, Building2, CreditCard, Landmark, Copy, Edit3, Shield, MapPin, Save, X, CheckCircle,
-  Calendar, Award, AlertCircle, Clock,
+  Calendar, Award, AlertCircle, Clock, DollarSign,
 } from 'lucide-react';
 import { BankSelect } from '../BankSelect';
 import { teachersAPI, csrfFetch, resolveMediaUrl } from '../../services/api';

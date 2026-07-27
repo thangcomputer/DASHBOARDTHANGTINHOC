@@ -5,7 +5,8 @@ import {
   GraduationCap, TrendingUp, Clock, Star, Link2, Upload,
   ChevronRight, BookOpen, Award, Zap, BarChart3, Users, Eye, X, XCircle,
   Search, Download, AlertCircle, Clipboard, Send, UserCheck, Check,
-  Activity, Trash2, Ban, PlayCircle, Phone, Mail, Edit3, Shield
+  Activity, Trash2, Ban, PlayCircle, Phone, Mail, Edit3, Shield,
+  Plus, Loader2,
 } from 'lucide-react';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
