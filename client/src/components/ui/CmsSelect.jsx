@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useMemo,
   Children,
+  Fragment,
   isValidElement,
 } from 'react';
 import { createPortal } from 'react-dom';
@@ -14,6 +15,11 @@ function flattenOptionElements(children) {
   const opts = [];
   Children.forEach(children, (child) => {
     if (!isValidElement(child)) return;
+    // React.Fragment / <>...</> — duyệt tiếp children bên trong
+    if (child.type === Fragment) {
+      flattenOptionElements(child.props?.children).forEach((o) => opts.push(o));
+      return;
+    }
     if (child.type === 'optgroup') {
       Children.forEach(child.props.children, (inner) => {
         if (!isValidElement(inner) || inner.type !== 'option') return;

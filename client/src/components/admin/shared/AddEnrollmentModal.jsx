@@ -126,25 +126,20 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
               className="w-full py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-400"
             >
               <option value="">Chưa phân công</option>
-              {(() => {
-                const active = (teachers || []).filter((t) => String(t.status || '').toLowerCase() === 'active');
-                const matched = [];
-                const other = [];
-                for (const t of active) {
-                  if (teacherMatchesCourse(t, form.courseName)) matched.push(t);
-                  else other.push(t);
-                }
-                return (
-                  <>
-                    {matched.map((t) => (
-                      <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-                    ))}
-                    {other.map((t) => (
-                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
-                    ))}
-                  </>
-                );
-              })()}
+              {(teachers || [])
+                .filter((t) => String(t.status || '').toLowerCase() === 'active')
+                .map((t) => {
+                  const match = teacherMatchesCourse(t, form.courseName);
+                  return (
+                    <option
+                      key={t.id || t._id}
+                      value={String(t.id || t._id)}
+                      disabled={!match}
+                    >
+                      {match ? t.name : `${t.name} (khác môn)`}
+                    </option>
+                  );
+                })}
             </CmsSelect>
           </div>
 

@@ -100,7 +100,7 @@ const AdminDashboard = () => {
       {enrollmentModalStudent && (
         <AddEnrollmentModal
           student={enrollmentModalStudent}
-          teachers={teachers}
+          teachers={(teachers?.length ? teachers : globalTeachers) || []}
           onClose={() => setEnrollmentModalStudent(null)}
           onSubmit={(payload) => addEnrollment(enrollmentModalStudent, payload)}
         />
