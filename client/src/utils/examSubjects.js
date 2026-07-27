@@ -114,7 +114,8 @@ export function mapCourseToExamSubjectIdsStrict(courseName, catalog) {
     || n.includes('ppt')
     || n.includes('coban')
     || n.includes('may vi tinh')
-    || n.includes('co ban');
+    || n.includes('co ban')
+    || n.includes('canva');
   const allOffice = loose.length > 0 && loose.every((id) => OFFICE_EXAM_IDS.includes(id));
   if (allOffice && !looksOffice) return [];
   return loose;
@@ -146,7 +147,7 @@ function fuzzyCourseTeacherMatch(courseName, teacher, catalog) {
  * GV có thể dạy khóa này không?
  * - Trùng subjectIds với khóa (enrollment.examSubjects hoặc map từ tên khóa)
  * - hoặc specialty/tên môn khớp mờ với tên khóa
- * Dùng để gợi ý UI (nhãn "khác môn") — không chặn phân công.
+ * GV chưa khai báo môn / lệch môn → UI làm mờ và không cho chọn.
  */
 export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
   if (!teacher) return false;

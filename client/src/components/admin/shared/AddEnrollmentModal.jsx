@@ -413,7 +413,11 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
                 .map((t) => {
                   const match = teacherMatchesCourse(t, form.courseName);
                   return (
-                    <option key={t.id || t._id} value={String(t.id || t._id)}>
+                    <option
+                      key={t.id || t._id}
+                      value={String(t.id || t._id)}
+                      disabled={!match}
+                    >
                       {match ? t.name : `${t.name} (khác môn)`}
                     </option>
                   );

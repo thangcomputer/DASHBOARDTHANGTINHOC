@@ -1105,10 +1105,62 @@ router.put('/:id/assign-teacher', authMiddleware, isAdmin, async (req, res) => {
       teacherName = t.name || 'Giảng viên';
     }
 
-    // Gợi ý khớp môn chỉ ở UI (nhãn "khác môn"). Admin vẫn được phân công GV active bất kỳ.
-    // Không chặn cứng trên server — tránh khóa phân công khi specialty/subjectIds chưa khai báo đủ.
-
+    // Khớp môn: khóa học HV ↔ chuyên môn GV — lệch môn thì từ chối phân công
     let targetCourse = student.course;
+    let targetExamSubjects = [];
+    if (enrollmentId && student.enrollments?.length) {
+      const idxPreview = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
+      if (idxPreview >= 0) {
+        targetCourse = student.enrollments[idxPreview].courseName || targetCourse;
+        targetExamSubjects = student.enrollments[idxPreview].examSubjects || [];
+      }
+    } else if (student.enrollments?.length) {
+      const primaryIdx = student.enrollments.findIndex((e) => e.isPrimary);
+      const idx = primaryIdx >= 0 ? primaryIdx : 0;
+      targetCourse = student.enrollments[idx]?.courseName || targetCourse;
+      targetExamSubjects = student.enrollments[idx]?.examSubjects || [];
+    }
+
+    if (!isUnassign && teacherDoc && targetCourse) {
+      const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
+      const teacherSubs = resolveTeacherSubjectIds(teacherDoc);
+      const courseName = String(targetCourse || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
+      const specialty = String(teacherDoc.specialty || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
+      let matched = false;
+      if (Array.isArray(targetExamSubjects) && targetExamSubjects.length && teacherSubs.length) {
+        const set = new Set(teacherSubs.map(String));
+        matched = targetExamSubjects.some((id) => set.has(String(id)));
+      }
+      if (!matched && specialty && courseName) {
+        matched = specialty.includes(courseName) || courseName.includes(specialty)
+          || specialty.split(/[,;|/]+/).some((p) => {
+            const part = p.trim();
+            return part.length >= 3 && (courseName.includes(part) || part.includes(courseName));
+          });
+      }
+      if (!matched && teacherSubs.length) {
+        matched = teacherSubs.some((id) => {
+          const idn = String(id || '').toLowerCase();
+          return idn && courseName.includes(idn);
+        });
+      }
+      // Office / Canva ↔ keywords trong tên khóa
+      if (!matched) {
+        const isOfficeCourse = /van phong|thvp|tin hoc van phong|microsoft office|excel|word|powerpoint|ppt|coban|may vi tinh|canva/.test(courseName);
+        const isOfficeTeacher = teacherSubs.some((id) => ['coban', 'word', 'excel', 'powerpoint', 'canva'].includes(String(id)))
+          || /van phong|office|excel|word|powerpoint|coban|canva/.test(specialty);
+        if (isOfficeCourse && isOfficeTeacher) matched = true;
+      }
+      if (!matched) {
+        return res.status(400).json({
+          success: false,
+          message: `Giảng viên "${teacherName}" không phụ trách môn "${targetCourse}". Chọn GV đúng chuyên môn.`,
+        });
+      }
+    }
+
     const mongoose = require('mongoose');
     const hasValidEnrollmentId = enrollmentId
       && enrollmentId !== 'main'

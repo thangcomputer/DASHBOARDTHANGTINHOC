@@ -277,7 +277,7 @@ export default function AdminStudentsTab() {
                                           <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
                                         ))}
                                         {other.map(t => (
-                                          <option key={t.id || t._id} value={String(t.id || t._id)}>
+                                          <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
                                             {t.name} (khác môn)
                                           </option>
                                         ))}
@@ -305,7 +305,7 @@ export default function AdminStudentsTab() {
                                       <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
                                     ))}
                                     {other.map(t => (
-                                      <option key={t.id || t._id} value={String(t.id || t._id)}>
+                                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
                                         {t.name} (khác môn)
                                       </option>
                                     ))}

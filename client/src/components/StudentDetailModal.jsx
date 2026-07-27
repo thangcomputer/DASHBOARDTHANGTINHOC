@@ -405,7 +405,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                               <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
                                             ))}
                                             {other.map((t) => (
-                                              <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name} (khác môn)</option>
+                                              <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
                                             ))}
                                           </>
                                         );
@@ -465,7 +465,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                                   <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
                                                 ))}
                                                 {other.map((t) => (
-                                                  <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name} (khác môn)</option>
+                                                  <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
                                                 ))}
                                               </>
                                             );
