@@ -977,7 +977,7 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
 // Admin thêm khóa học mới cho học viên (cùng tài khoản, khác môn / thầy)
 router.post('/:id/enrollments', authMiddleware, isAdmin, async (req, res) => {
   try {
-    const { courseName, courseId, teacherId, price, totalSessions } = req.body;
+    const { courseName, courseId, teacherId, price, totalSessions, paid } = req.body;
     if (!courseName?.trim() && !courseId) {
       return res.status(400).json({ success: false, message: 'Tên khóa học hoặc courseId là bắt buộc' });
     }
@@ -1017,6 +1017,8 @@ router.post('/:id/enrollments', authMiddleware, isAdmin, async (req, res) => {
     }
 
     const sessions = Number(totalSessions) > 0 ? Number(totalSessions) : (catalogCourse?.totalSessions || 12);
+    const resolvedPrice = Number(price) || catalogCourse?.discountPrice || catalogCourse?.price || 0;
+    const isPaid = paid === true || paid === 'true' || paid === 1 || paid === '1';
     const examSubjects = await resolveEnrollmentExamSubjects({
       courseName: resolvedName,
       courseId: catalogCourse?._id || courseId,
@@ -1028,8 +1030,9 @@ router.post('/:id/enrollments', authMiddleware, isAdmin, async (req, res) => {
       examSubjects,
       teacherId: teacherId || null,
       teacherName,
-      price: Number(price) || catalogCourse?.discountPrice || catalogCourse?.price || 0,
-      paid: false,
+      price: resolvedPrice,
+      paid: isPaid,
+      paidAt: isPaid ? new Date() : undefined,
       totalSessions: sessions,
       remainingSessions: sessions,
       completedSessions: 0,
@@ -1038,6 +1041,11 @@ router.post('/:id/enrollments', authMiddleware, isAdmin, async (req, res) => {
       isPrimary: false,
       registeredAt: new Date(),
     });
+
+    // Cộng doanh thu thực nhận khi khóa phụ được đánh dấu đã thanh toán
+    if (isPaid && resolvedPrice > 0) {
+      student.paidAmount = (Number(student.paidAmount) || 0) + resolvedPrice;
+    }
 
     await student.save();
 

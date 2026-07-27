@@ -316,18 +316,59 @@ export default function AdminStudentsTab() {
                           </td>
                           {/* Cột Học phí */}
                           <td className="px-5 py-3.5">
-                            <p className="text-[13px] font-black text-slate-800">{(s.price || 0).toLocaleString('vi-VN')}đ</p>
-                            <p className="text-xs cms-min-text-xs font-bold text-slate-400 mt-0.5">Tiến độ HV: {(s.completedSessions || 0)}/{(s.totalSessions || 12)} buổi</p>
+                            {hasMultiCourse ? (
+                              <div className="space-y-2 min-w-[120px]">
+                                {enrollments.map((enr) => {
+                                  const enrId = enr.enrollmentId || enr.id;
+                                  return (
+                                    <div key={enrId} className="space-y-0.5">
+                                      <p className="text-[13px] font-black text-slate-800">
+                                        {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
+                                      </p>
+                                      <p className="text-[10px] font-bold text-slate-400">
+                                        {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-[13px] font-black text-slate-800">{(s.price || 0).toLocaleString('vi-VN')}đ</p>
+                                <p className="text-xs cms-min-text-xs font-bold text-slate-400 mt-0.5">Tiến độ HV: {(s.completedSessions || 0)}/{(s.totalSessions || 12)} buổi</p>
+                              </>
+                            )}
                           </td>
                           {/* Cột Trạng thái */}
                           <td className="px-5 py-3.5 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-xs tracking-tight ${
-                              s.paid
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-rose-50 text-rose-600 border border-rose-200'
-                            }`}>
-                              {s.paid ? 'Hoàn tất' : <><AlertTriangle size={11} /> Chưa nộp</>}
-                            </span>
+                            {hasMultiCourse ? (
+                              <div className="space-y-2 flex flex-col items-center">
+                                {enrollments.map((enr) => {
+                                  const enrId = enr.enrollmentId || enr.id;
+                                  const enrPaid = !!enr.paid;
+                                  return (
+                                    <span
+                                      key={enrId}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-xs tracking-tight ${
+                                        enrPaid
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-rose-50 text-rose-600 border border-rose-200'
+                                      }`}
+                                    >
+                                      {enrPaid ? 'Hoàn tất' : <><AlertTriangle size={11} /> Chưa nộp</>}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-xs tracking-tight ${
+                                s.paid
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-rose-50 text-rose-600 border border-rose-200'
+                              }`}>
+                                {s.paid ? 'Hoàn tất' : <><AlertTriangle size={11} /> Chưa nộp</>}
+                              </span>
+                            )}
                           </td>
                           {/* Cột Thao tác: 3-dot menu */}
                           <td className="px-4 py-3.5 text-center">
