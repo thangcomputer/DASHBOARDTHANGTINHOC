@@ -70,6 +70,10 @@ export function mapCourseToExamSubjectIds(courseName, catalog) {
   const n = normalizeCourseKey(courseName);
   const pick = (ids) => ids.filter((id) => cat[id]);
   if (!n) return [];
+  // Combo Powerpoint + Canva trong cùng tên khóa
+  if (n.includes('canva') && (n.includes('powerpoint') || n.includes('ppt'))) {
+    return pick(['coban', 'powerpoint', 'canva']);
+  }
   if (n.includes('canva')) return pick(['canva']);
   if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) return pick([...OFFICE_EXAM_IDS]);
   if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
@@ -142,7 +146,7 @@ function fuzzyCourseTeacherMatch(courseName, teacher, catalog) {
  * GV có thể dạy khóa này không?
  * - Trùng subjectIds với khóa (enrollment.examSubjects hoặc map từ tên khóa)
  * - hoặc specialty/tên môn khớp mờ với tên khóa
- * GV chưa khai báo môn → không khớp (bị làm mờ khi phân công).
+ * Dùng để gợi ý UI (nhãn "khác môn") — không chặn phân công.
  */
 export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
   if (!teacher) return false;
