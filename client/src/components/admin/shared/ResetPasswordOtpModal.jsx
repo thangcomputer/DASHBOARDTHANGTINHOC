@@ -57,7 +57,7 @@ export default function ResetPasswordOtpModal({ modal, onClose }) {
   };
 
   const otpMessage = otpResult
-    ? `[THẮNG TIN HỌC] Mã OTP đặt lại mật khẩu: ${otpResult.otp}\n⏱ Hiệu lực 2 phút.\nVào: dashboard.giasutinhoc24h.com → Quên mật khẩu → Nhập OTP.`
+    ? `[THẮNG TIN HỌC] Mã OTP đặt lại mật khẩu: ${otpResult.otp}\n⏱ Hiệu lực 2 phút.\nVào: dashboard.thangtinhoc.edu.vn → Quên mật khẩu → Nhập OTP.`
     : '';
 
   return (

@@ -10,6 +10,7 @@
  * Usage:
  *   <PopupBanner role="student" />
  *   <PopupBanner role="teacher" />
+ *   <PopupBanner role="staff" />
  */
 
 import { useState, useEffect } from 'react';

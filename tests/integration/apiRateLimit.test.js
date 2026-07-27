@@ -31,6 +31,6 @@ test('apiRateLimitUnlessAuth: bypasses /api/webhooks/*', async () => {
 
 test('apiRateLimitUnlessAuth: applies limiter on regular routes', async () => {
   const r = await callMiddleware('/api/students');
-  // First hit must pass through (under default 400/15min budget) and call next()
+  // First hit must pass through (under default authenticated budget) and call next()
   assert.equal(r.called, true);
 });

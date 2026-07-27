@@ -13,7 +13,7 @@ import {
   Upload, Users, GraduationCap, ToggleLeft,
   ToggleRight, AlertCircle, Landmark, X,
   DollarSign, Building2, Lock, User, KeyRound, EyeOff, CheckCircle2, FileText,
-  ShieldCheck,
+  ShieldCheck, Briefcase,
 } from 'lucide-react';
 import { BankSelect } from './BankSelect';
 import api from '../services/api';
@@ -520,23 +520,25 @@ export default function SystemSettingsTab() {
           {!settings.popupIsActive && (
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center gap-2 text-sm text-gray-500">
               <AlertCircle size={14} />
-              Popup đang tắt — Học viên/Giảng viên sẽ không thấy popup khi đăng nhập.
+              Popup đang tắt — Học viên / Giảng viên / Nhân viên sẽ không thấy popup khi đăng nhập.
             </div>
           )}
 
           {/* Target Role */}
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Đối tượng hiển thị</label>
-            <div className="flex gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { v: 'all',     label: 'Tất cả',    Icon: Users },
                 { v: 'student', label: 'Học viên',   Icon: Users },
                 { v: 'teacher', label: 'Giảng viên', Icon: GraduationCap },
+                { v: 'staff',   label: 'Nhân viên',  Icon: Briefcase },
               ].map(({ v, label, Icon }) => (
                 <button
                   key={v}
+                  type="button"
                   onClick={() => setSettings(prev => ({ ...prev, popupTargetRole: v }))}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition border-2 ${
+                  className={`py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition border-2 ${
                     settings.popupTargetRole === v
                       ? 'border-violet-500 bg-violet-50 text-violet-700'
                       : 'border-gray-200 text-gray-500 hover:border-gray-300'
@@ -546,6 +548,9 @@ export default function SystemSettingsTab() {
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-gray-400 mt-2">
+              Chọn <strong>Nhân viên</strong> để gửi thông báo nội bộ cho Staff khi đăng nhập.
+            </p>
           </div>
 
           {/* Title */}

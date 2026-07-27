@@ -29,3 +29,10 @@ export const GlossyAlertProvider = () => {
     </div>
   );
 };
+
+export const getDisplayName = (person) => {
+  if (!person) return 'Không rõ';
+  const name = person.name || '';
+  if (name && !/^\d{5,}$/.test(name)) return name;
+  return person.email || person.phone || person.zalo || `HV-${String(person.id || person._id || '').slice(-4)}`;
+};

@@ -35,7 +35,7 @@ import api, { clearTokens, getRolePrefix } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
 import { BranchProvider }                    from './context/BranchContext';
 import LoadingScreen                         from './components/LoadingScreen';
-import StaffPopup                            from './components/StaffPopup';
+import PopupBanner                           from './components/PopupBanner';
 import { ModalProvider, useModal }           from './utils/Modal.jsx';
 import SecurityGuard                         from './components/SecurityGuard';
 import FaviconSwitcher                       from './components/FaviconSwitcher';
@@ -521,8 +521,8 @@ function App() {
                         onLogin={handleLogin}
                         onLogout={handleLogout}
                     />
-                    {/* Staff Popup — chỉ hiện cho nhân viên chi nhánh */}
-                    {session && <StaffPopup session={session} />}
+                    {/* Popup thông báo — Nhân viên (cùng cấu hình với tab Popup) */}
+                    {session?.role === 'staff' && <PopupBanner role="staff" />}
                 </ToastProvider>
                 </BranchProvider>
             </DataProvider>

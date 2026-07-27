@@ -13,24 +13,24 @@ const systemSettingsSchema = new mongoose.Schema({
   centerBankAccountNumber: { type: String, default: '' },
   centerBankAccountName: { type: String, default: '' }, // Tên chủ tài khoản
 
-  // ── Popup thông báo/quảng cáo (Student/Teacher) ─────────────────────
+  // ── Popup thông báo/quảng cáo (HV / GV / Nhân viên) ─────────────────────
   popupIsActive: { type: Boolean, default: false },
   popupTitle: { type: String, default: '' },
   popupContent: { type: String, default: '' },
   popupImageUrl: { type: String, default: '' },
   popupTargetRole: {
     type: String,
-    enum: ['all', 'student', 'teacher'],
+    enum: ['all', 'student', 'teacher', 'staff'],
     default: 'all',
   },
 
-  // ── Cài đặt Web (Logo, Favicon, Loading, Staff Popup) ─────────────────────
+  // ── Cài đặt Web (Logo, Favicon, Loading) ──────────────────────────────────
   logoUrl:      { type: String, default: '' },                 // URL logo thương hiệu
   faviconUrl:   { type: String, default: '' },                 // Favicon trang public / HV / GV
   faviconAdminUrl: { type: String, default: '' },              // Favicon khu vực Admin
   loadingStyle: { type: Number, default: 1, min: 1, max: 4 }, // 1-4 kiểu loading screen
 
-  // Staff Announcement Popup
+  // Legacy staffPopup — giữ schema để không lỗi dữ liệu cũ; UI dùng popupTargetRole=staff
   staffPopup: {
     isActive:  { type: Boolean, default: false },
     title:     { type: String, default: '' },

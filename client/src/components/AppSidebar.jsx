@@ -69,34 +69,58 @@ const MENU_CONFIG = {
   admin: {
     brand: { label: 'QUẢN TRỊ', color: 'from-slate-900 to-indigo-950' },
     items: [
-      { key: 'dashboard',        icon: LayoutDashboard, label: 'Tổng quan',        path: '/admin', hash: 'dashboard'                                                         },
-      { key: 'feed',             icon: Newspaper,     label: 'Bảng tin',           path: '/admin/feed'                                                                      },
-      { key: 'students',         icon: Users,         label: 'Học Viên',           path: '/admin', hash: 'students',            permission: PERMISSIONS.MANAGE_STUDENTS  },
-      { key: 'teachers',         icon: GraduationCap, label: 'Giảng Viên',         path: '/admin', hash: 'teachers',            permission: PERMISSIONS.VIEW_TEACHERS                          },
-      { key: 'evaluations',      icon: AlertTriangle, label: 'Đánh giá nội bộ',    path: '/admin', hash: 'evaluations',         permission: PERMISSIONS.VIEW_EVALUATIONS },
-      { key: 'finance',          icon: DollarSign,    label: 'Tài chính',           path: '/admin', hash: 'finance',             permission: PERMISSIONS.MANAGE_FINANCE   },
-      { key: 'training',         icon: BookOpen,      label: 'Đào tạo GV',          path: '/admin', hash: 'training',            permission: PERMISSIONS.MANAGE_TRAINING  },
-      { key: 'student-training', icon: BookOpen,      label: 'Đào tạo HV',          path: '/admin', hash: 'student-training',    permission: PERMISSIONS.MANAGE_STUDENT_TRAINING  },
-      { key: 'staff',            icon: Users,         label: 'Phân quyền NV',       path: '/admin', hash: 'staff',  superAdminOnly: true, permission: PERMISSIONS.MANAGE_STAFF },
-      { key: 'hr',               icon: ClipboardList, label: 'Nhân sự & Lương',     path: '/admin', hash: 'hr',                  permission: PERMISSIONS.MANAGE_HR    },
-      { key: 'analytics',        icon: BarChart3,     label: 'Báo cáo doanh thu',   path: '/admin', hash: 'analytics',           permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
-      { key: 'bi',               icon: BarChart3,     label: 'BI Dashboard',        path: '/admin/bi',              permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
-      { key: 'inbox',            icon: MessageSquare, label: 'Hộp thư',             path: '/admin/inbox'                                                                     },
+      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/admin', hash: 'dashboard' },
+      { key: 'feed',      icon: Newspaper,       label: 'Bảng tin',  path: '/admin/feed' },
+      { key: 'inbox',     icon: MessageSquare,   label: 'Hộp thư',   path: '/admin/inbox' },
+      {
+        key: 'people-group',
+        label: 'Quản lý',
+        icon: Users,
+        isGroup: true,
+        children: [
+          { key: 'students', icon: Users,         label: 'Học Viên',       path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
+          { key: 'teachers', icon: GraduationCap, label: 'Giảng Viên',     path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
+          { key: 'staff',    icon: Users,         label: 'Phân quyền NV',  path: '/admin', hash: 'staff',    superAdminOnly: true, permission: PERMISSIONS.MANAGE_STAFF },
+          { key: 'hr',       icon: ClipboardList, label: 'Nhân sự & Lương', path: '/admin', hash: 'hr',     permission: PERMISSIONS.MANAGE_HR },
+        ],
+      },
+      {
+        key: 'training-group',
+        label: 'Đào tạo',
+        icon: BookOpen,
+        isGroup: true,
+        children: [
+          { key: 'training',         icon: BookOpen,      label: 'Đào tạo GV',       path: '/admin', hash: 'training',         permission: PERMISSIONS.MANAGE_TRAINING },
+          { key: 'student-training', icon: BookOpen,      label: 'Đào tạo HV',       path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+          { key: 'evaluations',      icon: AlertTriangle, label: 'Đánh giá nội bộ',  path: '/admin', hash: 'evaluations',      permission: PERMISSIONS.VIEW_EVALUATIONS },
+        ],
+      },
+      {
+        key: 'finance-group',
+        label: 'Tài chính',
+        icon: DollarSign,
+        isGroup: true,
+        children: [
+          { key: 'finance',   icon: DollarSign, label: 'Tài chính',         path: '/admin', hash: 'finance', permission: PERMISSIONS.MANAGE_FINANCE },
+          { key: 'analytics', icon: BarChart3,  label: 'Báo cáo doanh thu', path: '/admin', hash: 'analytics', permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
+          { key: 'bi',        icon: BarChart3,  label: 'BI Dashboard',      path: '/admin/bi',              permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
+        ],
+      },
       {
         key: 'system-group',
         label: 'Hệ thống',
         icon: Settings,
         isGroup: true,
         children: [
-          { key: 'settings',   icon: Settings,      label: 'Cài đặt hệ thống', path: '/admin', hash: 'settings',      permission: PERMISSIONS.SYSTEM_SETTINGS },
-          { key: 'logs',       icon: Lock,          label: 'Nhật ký hệ thống', path: '/admin', hash: 'logs',          permission: PERMISSIONS.VIEW_LOGS },
-          { key: 'files',      icon: HardDrive,     label: 'Quản lý file',     path: '/admin/files',                  permission: PERMISSIONS.SYSTEM_SETTINGS },
-          { key: 'backups',    icon: Archive,       label: 'Sao lưu dữ liệu',  path: '/admin/backups',                superAdminOnly: true },
-          { key: 'monitoring', icon: Activity,      label: 'Monitoring',       path: '/admin/monitoring',             permission: PERMISSIONS.VIEW_LOGS },
-          { key: 'ai',         icon: Sparkles,      label: 'AI Center',        path: '/admin/ai',                     permission: PERMISSIONS.SYSTEM_SETTINGS },
-          { key: 'workflows',  icon: GitBranch,     label: 'Workflow',         path: '/admin/workflows',              permission: PERMISSIONS.MANAGE_STUDENTS },
-          { key: 'builder',    icon: FormInput,     label: 'Form & Report',    path: '/admin/builder',                permission: PERMISSIONS.SYSTEM_SETTINGS },
-          { key: 'tenants',    icon: Building2,     label: 'Multi-tenant',     path: '/admin/tenants',                superAdminOnly: true },
+          { key: 'settings',   icon: Settings,  label: 'Cài đặt hệ thống', path: '/admin', hash: 'settings', permission: PERMISSIONS.SYSTEM_SETTINGS },
+          { key: 'logs',       icon: Lock,      label: 'Nhật ký hệ thống', path: '/admin', hash: 'logs',     permission: PERMISSIONS.VIEW_LOGS },
+          { key: 'files',      icon: HardDrive, label: 'Quản lý file',     path: '/admin/files',             permission: PERMISSIONS.SYSTEM_SETTINGS },
+          { key: 'backups',    icon: Archive,   label: 'Sao lưu dữ liệu',  path: '/admin/backups',           superAdminOnly: true },
+          { key: 'monitoring', icon: Activity,  label: 'Monitoring',       path: '/admin/monitoring',        permission: PERMISSIONS.VIEW_LOGS },
+          { key: 'ai',         icon: Sparkles,  label: 'AI Center',        path: '/admin/ai',                permission: PERMISSIONS.SYSTEM_SETTINGS },
+          { key: 'workflows',  icon: GitBranch, label: 'Workflow',         path: '/admin/workflows',         permission: PERMISSIONS.MANAGE_STUDENTS },
+          { key: 'builder',    icon: FormInput, label: 'Form & Report',    path: '/admin/builder',           permission: PERMISSIONS.SYSTEM_SETTINGS },
+          { key: 'tenants',    icon: Building2, label: 'Multi-tenant',     path: '/admin/tenants',           superAdminOnly: true },
         ],
       },
     ],
@@ -138,11 +162,17 @@ const AppSidebar = ({
     return () => window.removeEventListener('lms-guide-open-nav', openForGuide);
   }, []);
   const [openGroups, setOpenGroups] = useState(() => {
+    const defaults = {
+      'people-group': false,
+      'training-group': false,
+      'finance-group': false,
+      'system-group': false,
+    };
     try {
       const saved = localStorage.getItem('cms_sidebar_groups');
-      return saved ? JSON.parse(saved) : { 'system-group': false };
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
     } catch {
-      return { 'system-group': false };
+      return defaults;
     }
   });
   const navigate = useNavigate();

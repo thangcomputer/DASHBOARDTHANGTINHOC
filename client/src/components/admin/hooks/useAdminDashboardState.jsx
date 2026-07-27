@@ -172,12 +172,9 @@ export function useAdminDashboardState() {
   const { data: branchStats } = useSWR(
     activeTab === 'dashboard' ? ['admin_stats', selectedBranchId] : null,
     statsFetcher,
-    { refreshInterval: 5000, revalidateOnFocus: true },
+    // Socket đã bump khi có thay đổi — không poll 5s (gây 429)
+    { refreshInterval: 60_000, revalidateOnFocus: false, dedupingInterval: 15_000 },
   );
-
-  useEffect(() => {
-    triggerBackgroundSync();
-  }, [activeTab, triggerBackgroundSync]);
 
   // System logs from DB
   const [dbLogs, setDbLogs] = useState([]);
@@ -209,7 +206,7 @@ export function useAdminDashboardState() {
   const { data: financeRes, isValidating: isLoadingFinance } = useSWR(
     activeTab === 'finance' ? ['admin_finance', selectedBranchId] : null,
     financeFetcher,
-    { refreshInterval: 5000, revalidateOnFocus: true },
+    { refreshInterval: 60_000, revalidateOnFocus: false, dedupingInterval: 20_000 },
   );
 
   const financialData = financeRes?.financialData || [];

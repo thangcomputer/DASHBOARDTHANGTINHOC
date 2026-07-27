@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { mapStudent, mapTeacher, mapTransaction, mapSchedule } from '../lib/entityMaps';
 import { useSocket } from './SocketContext';
@@ -8,6 +8,8 @@ import { loadState } from './dataStorage';
  * Background sync, system logs for DataProvider.
  * Entity lists (students/teachers/schedules/transactions) are updated via SWR context setters.
  */
+const MIN_SYNC_GAP_MS = 15_000;
+
 export function useDataSync({
   currentUser, onLogout,
   setStudents, setTeachers, setTransactions, setStaffs,
@@ -20,17 +22,27 @@ export function useDataSync({
 
   const [isRefetching, setIsRefetching] = useState(false);
   const [systemLogs, setSystemLogs] = useState(() => loadState('thvp_systemLogs', []));
+  const lastSyncAtRef = useRef(0);
+  const inFlightSyncRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('thvp_systemLogs', JSON.stringify(systemLogs));
   }, [systemLogs]);
 
-  const triggerBackgroundSync = useCallback(async () => {
+  const triggerBackgroundSync = useCallback(async (opts = {}) => {
     if (!currentUser) return;
     // HV/GV phải có token mới sync, Tránh gọi bị 401 khi chưa login xong
     if (currentUser.role !== 'admin' && !localStorage.getItem(`${currentUser.role}_access_token`)) return;
 
+    const force = opts === true || opts?.force === true;
+    const now = Date.now();
+    if (!force && now - lastSyncAtRef.current < MIN_SYNC_GAP_MS) return;
+    if (inFlightSyncRef.current) return inFlightSyncRef.current;
+
+    lastSyncAtRef.current = now;
     setIsRefetching(true);
+
+    inFlightSyncRef.current = (async () => {
     try {
       const isTeacher = currentUser.role === 'teacher';
       const isStudent = currentUser.role === 'student';
@@ -160,7 +172,11 @@ export function useDataSync({
       }
     } finally {
       setTimeout(() => setIsRefetching(false), 500);
+      inFlightSyncRef.current = null;
     }
+    })();
+
+    return inFlightSyncRef.current;
   }, [
     currentUser, onLogout, applyStudentExamConfigFromServer,
     setStudents, setTeachers, setTransactions, setStaffs,
@@ -169,7 +185,7 @@ export function useDataSync({
     setPrivateEvaluations,
   ]);
 
-  // Background sync (multi-tab & window focus)
+  // Background sync — interval dài hơn; focus/visibility bị debounce bởi MIN_SYNC_GAP_MS
   useEffect(() => {
     const handleSync = () => {
       if (document.visibilityState === 'visible') {
@@ -188,16 +204,15 @@ export function useDataSync({
 
     const interval = setInterval(() => {
       handleSync();
-    }, 60000);
+    }, 120_000);
 
     document.addEventListener('visibilitychange', handleSync);
-    window.addEventListener('focus', handleSync);
+    // Bỏ window focus — trùng visibilitychange và dễ spam khi Alt-Tab
 
     return () => {
       clearInterval(interval);
       if (offDataRefresh) offDataRefresh();
       document.removeEventListener('visibilitychange', handleSync);
-      window.removeEventListener('focus', handleSync);
     };
   }, [triggerBackgroundSync, onDataRefresh]);
 

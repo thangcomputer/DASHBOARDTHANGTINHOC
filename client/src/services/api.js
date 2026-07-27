@@ -404,6 +404,18 @@ export const apiFetch = async (endpoint, options = {}) => {
     }
   }
 
+  // Rate limit tạm thời → chờ Retry-After rồi thử lại tối đa 2 lần
+  if (res.status === 429 && (options._rateRetryCount || 0) < 2) {
+    const raw = parseInt(res.headers.get('Retry-After') || '', 10);
+    const waitSec = Number.isFinite(raw) && raw > 0 ? raw : 2 + (options._rateRetryCount || 0);
+    const waitMs = Math.min(Math.max(waitSec * 1000, 1000), 12000);
+    await new Promise((r) => setTimeout(r, waitMs));
+    return apiFetch(endpoint, {
+      ...options,
+      _rateRetryCount: (options._rateRetryCount || 0) + 1,
+    });
+  }
+
   if (res.status !== 401 || options.skipAuth || options._retried) {
     return res;
   }

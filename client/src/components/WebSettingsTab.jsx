@@ -1,11 +1,12 @@
 /**
- * WebSettingsTab.jsx — Cài đặt Web (Logo, Loading Screen, Staff Popup)
+ * WebSettingsTab.jsx — Cài đặt Web (Logo, Favicon, Loading Screen)
  * Chỉ Super Admin truy cập. Nằm trong SystemSettingsTab.
+ * Thông báo Nhân viên: dùng tab Popup thông báo (đối tượng = Nhân viên).
  */
 import { useState, useEffect, useRef } from 'react';
 import {
-  Globe, Upload, Loader2, Save, Image, Monitor, MessageSquare,
-  ToggleLeft, ToggleRight, AlertCircle, Check, X, Eye, Shield,
+  Globe, Upload, Loader2, Save, Image, Monitor,
+  Check, X, Eye, Shield,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
 import { useToast } from '../utils/toast';
@@ -53,7 +54,6 @@ export default function WebSettingsTab() {
     faviconUrl: '',
     faviconAdminUrl: '',
     loadingStyle: 1,
-    staffPopup: { isActive: false, title: '', content: '' },
   });
 
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -70,11 +70,6 @@ export default function WebSettingsTab() {
             faviconUrl: res.data.faviconUrl || '',
             faviconAdminUrl: res.data.faviconAdminUrl || '',
             loadingStyle: res.data.loadingStyle || 1,
-            staffPopup: {
-              isActive: res.data.staffPopup?.isActive || false,
-              title: res.data.staffPopup?.title || '',
-              content: res.data.staffPopup?.content || '',
-            },
           }));
         }
       })
@@ -138,11 +133,6 @@ export default function WebSettingsTab() {
             faviconUrl: res.data.faviconUrl ?? prev.faviconUrl,
             faviconAdminUrl: res.data.faviconAdminUrl ?? prev.faviconAdminUrl,
             loadingStyle: res.data.loadingStyle ?? prev.loadingStyle,
-            staffPopup: {
-              isActive: res.data.staffPopup?.isActive ?? prev.staffPopup.isActive,
-              title: res.data.staffPopup?.title ?? prev.staffPopup.title,
-              content: res.data.staffPopup?.content ?? prev.staffPopup.content,
-            },
           }));
         }
         window.dispatchEvent(new Event('web-settings-changed'));
@@ -397,69 +387,6 @@ export default function WebSettingsTab() {
               <p className="text-[10px] text-gray-400 mt-0.5">{ls.desc}</p>
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* ══════════════ PHẦN 3: STAFF POPUP ══════════════ */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageSquare size={16} className="text-amber-600" />
-            <h3 className="font-bold text-gray-800">Thông báo Nhân viên (Staff Popup)</h3>
-          </div>
-          <button
-            onClick={() => setConfig(prev => ({
-              ...prev,
-              staffPopup: { ...prev.staffPopup, isActive: !prev.staffPopup.isActive },
-            }))}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition ${
-              config.staffPopup.isActive
-                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-          >
-            {config.staffPopup.isActive
-              ? <><ToggleRight size={20} className="text-emerald-600" /> Đang bật</>
-              : <><ToggleLeft size={20} /> Đang tắt</>
-            }
-          </button>
-        </div>
-
-        <p className="text-xs text-gray-400">
-          Popup này chỉ hiện cho <strong>nhân viên chi nhánh (Staff)</strong> khi đăng nhập. Tự ẩn sau khi đọc, chỉ hiện lại khi bạn cập nhật nội dung mới.
-        </p>
-
-        {!config.staffPopup.isActive && (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center gap-2 text-sm text-gray-500">
-            <AlertCircle size={14} /> Popup đang tắt — Nhân viên sẽ không thấy thông báo.
-          </div>
-        )}
-
-        {/* Title */}
-        <div>
-          <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Tiêu đề</label>
-          <input type="text"
-            value={config.staffPopup.title}
-            onChange={e => setConfig(prev => ({
-              ...prev,
-              staffPopup: { ...prev.staffPopup, title: e.target.value },
-            }))}
-            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-amber-400 outline-none transition"
-            placeholder="VD: 📢 Thông báo nội bộ tháng 4" />
-        </div>
-
-        {/* Content */}
-        <div>
-          <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Nội dung thông báo</label>
-          <textarea
-            value={config.staffPopup.content}
-            onChange={e => setConfig(prev => ({
-              ...prev,
-              staffPopup: { ...prev.staffPopup, content: e.target.value },
-            }))}
-            rows={5}
-            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-amber-400 outline-none resize-none transition"
-            placeholder="Nhập nội dung thông báo cho nhân viên..." />
         </div>
       </div>
 
