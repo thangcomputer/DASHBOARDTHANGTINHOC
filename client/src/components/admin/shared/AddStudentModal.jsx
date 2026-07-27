@@ -413,16 +413,22 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                   <CmsSelect name="courseId" value={form.courseId} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm cursor-pointer">
                     {dbCourses.map(c => {
                       const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
-                      return <option key={c._id} value={c._id}>{c.name} — {ep.toLocaleString('vi-VN')}đ</option>;
+                      const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
+                      return <option key={c._id} value={c._id}>{c.name} — {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)</option>;
                     })}
                   </CmsSelect>
                 ) : (
                   <div className="p-4 bg-gray-50 rounded-[20px] text-gray-400 text-xs font-bold animate-pulse">Đang tải dữ liệu khóa học...</div>
                 )}
                 {form.price > 0 && (
-                  <div className="mt-3 flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 inline-flex shadow-sm">
-                    <DollarSign size={14} className="font-black" />
-                    <span className="text-xs font-black">HỌC PHÍ THỰC THU: {form.price.toLocaleString('vi-VN')}đ</span>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 shadow-sm">
+                      <DollarSign size={14} className="font-black" />
+                      <span className="text-xs font-black">HỌC PHÍ: {form.price.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-xl border border-blue-100 shadow-sm">
+                      <span className="text-xs font-black">SỐ BUỔI: {form.totalSessions}</span>
+                    </div>
                   </div>
                 )}
               </div>

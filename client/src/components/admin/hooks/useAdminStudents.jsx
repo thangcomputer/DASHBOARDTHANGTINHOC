@@ -118,7 +118,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         courseId: student.courseId,
         course: student.course,
         price: student.price,
-        totalSessions: 12,
+        totalSessions: Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12,
         paid: student.paid,
         learningMode: student.learningMode,
         teacherId: student.teacherId,

@@ -126,6 +126,10 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
       ...student,
       ...form,
       totalSessions: Number(form.totalSessions) || 12,
+      remainingSessions: Math.max(
+        0,
+        (Number(form.totalSessions) || 12) - (Number(student.completedSessions) || 0)
+      ),
       price: Number(form.price) || 0,
       studentExamUnlocked,
     });

@@ -355,6 +355,26 @@ router.post('/', [authMiddleware, branchFilter], async (req, res) => {
       req.body.branchCode = req.userBranchCode || '';
     }
 
+    // Đồng bộ số buổi / tên khóa từ catalog khi có courseId
+    if (req.body.courseId) {
+      const Course = require('../models/Course');
+      const catalog = await Course.findById(req.body.courseId)
+        .select('name totalSessions price discountPercent')
+        .lean();
+      if (catalog) {
+        if (!req.body.course) req.body.course = catalog.name;
+        const catalogSessions = Number(catalog.totalSessions) > 0 ? Number(catalog.totalSessions) : 12;
+        if (!(Number(req.body.totalSessions) > 0)) {
+          req.body.totalSessions = catalogSessions;
+        }
+      }
+    }
+    const sessions = Number(req.body.totalSessions) > 0 ? Number(req.body.totalSessions) : 12;
+    req.body.totalSessions = sessions;
+    if (req.body.remainingSessions == null || req.body.remainingSessions === '') {
+      req.body.remainingSessions = sessions;
+    }
+
     // Nếu lúc tạo có gán Giảng viên luôn thì chuyển trạng thái thành Đang học
     if (req.body.teacherId && (!req.body.status || req.body.status === 'Chờ xếp lớp')) {
       req.body.status = 'Đang học';
