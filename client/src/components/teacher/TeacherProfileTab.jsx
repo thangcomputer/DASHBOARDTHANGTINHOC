@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { BankSelect } from '../BankSelect';
 import { teachersAPI, csrfFetch, resolveMediaUrl } from '../../services/api';
+import { useData } from '../../context/DataContext';
 import { useToast } from '../../utils/toast';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { showGlossyAlert } from './TeacherShared';

@@ -10,6 +10,7 @@ import {
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../utils/Modal.jsx';
+import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
