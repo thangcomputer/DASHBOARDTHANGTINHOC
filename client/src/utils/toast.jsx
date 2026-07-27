@@ -57,7 +57,22 @@ export const ToastProvider = ({ children }) => {
     }
   }, []);
 
+  const recentMsgRef = useRef({ text: '', at: 0 });
+
   const show = useCallback((message, type = 'info', duration = 4000) => {
+    const text = String(message || '');
+    const now = Date.now();
+    // Chặn spam cùng một lỗi (vd. tenant invalid lặp nhiều lần)
+    if (
+      type === 'error' &&
+      text &&
+      text === recentMsgRef.current.text &&
+      now - recentMsgRef.current.at < 8000
+    ) {
+      return null;
+    }
+    recentMsgRef.current = { text, at: now };
+
     const id = ++toastId;
     setToasts(prev => [...prev, { id, message, type, leaving: false }]);
 

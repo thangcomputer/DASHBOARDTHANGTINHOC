@@ -51,7 +51,18 @@ export function BranchProvider({ session, children }) {
     }
   }, [isStaff, staffBranchId, branches]);
 
-  // Load tenants (Super Admin)
+  const setSelectedTenant = useCallback((id) => {
+    const next = id || 'all';
+    setSelectedTenantId(next);
+    try {
+      if (next === 'all') localStorage.removeItem('selected_tenant_id');
+      else localStorage.setItem('selected_tenant_id', next);
+    } catch { /* ignore */ }
+    setSelectedBranchId('all');
+    setSelectedBranchName('Tất cả chi nhánh');
+  }, []);
+
+  // Load tenants (Super Admin) + tự reset nếu ID trong localStorage không còn hợp lệ
   useEffect(() => {
     if (!isSuperAdmin) return;
     fetch(`${API}/api/tenants`, {
@@ -59,10 +70,23 @@ export function BranchProvider({ session, children }) {
     })
       .then((r) => r.json())
       .then((res) => {
-        if (res.success) setTenants(res.data || []);
+        const list = res.success ? (res.data || []) : [];
+        setTenants(list);
+        if (selectedTenantId && selectedTenantId !== 'all') {
+          const ok = list.some(
+            (t) => String(t._id || t.id) === String(selectedTenantId) && t.status !== 'suspended',
+          );
+          if (!ok) setSelectedTenant('all');
+        }
       })
       .catch(() => {});
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, selectedTenantId, setSelectedTenant]);
+
+  useEffect(() => {
+    const onCleared = () => setSelectedTenant('all');
+    window.addEventListener('cms:tenant-cleared', onCleared);
+    return () => window.removeEventListener('cms:tenant-cleared', onCleared);
+  }, [setSelectedTenant]);
 
   // Load branches khi mount / doi tenant
   useEffect(() => {
@@ -77,31 +101,19 @@ export function BranchProvider({ session, children }) {
         if (res.success) {
           setBranches(res.data || []);
           localStorage.setItem('thvp_branches', JSON.stringify(res.data || []));
+        } else if (String(res.message || '').includes('tenant')) {
+          setSelectedTenant('all');
         }
       })
       .catch(() => {})
       .finally(() => setIsLoadingBranches(false));
-  }, [selectedTenantId]);
+  }, [selectedTenantId, setSelectedTenant]);
 
   const setSelectedBranch = useCallback((id, name) => {
-    // Nếu là STAFF, không cho phép đổi chi nhánh
     if (isStaff) return;
-    
     setSelectedBranchId(id || 'all');
     setSelectedBranchName(name || 'Tất cả chi nhánh');
   }, [isStaff]);
-
-  const setSelectedTenant = useCallback((id) => {
-    const next = id || 'all';
-    setSelectedTenantId(next);
-    try {
-      if (next === 'all') localStorage.removeItem('selected_tenant_id');
-      else localStorage.setItem('selected_tenant_id', next);
-    } catch { /* ignore */ }
-    // Reset branch khi doi tenant
-    setSelectedBranchId('all');
-    setSelectedBranchName('Tất cả chi nhánh');
-  }, []);
 
   const branchQueryParam = selectedBranchId && selectedBranchId !== 'all'
     ? `branch_id=${selectedBranchId}`

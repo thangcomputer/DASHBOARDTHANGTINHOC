@@ -27,12 +27,14 @@ async function tenantContext(req, res, next) {
       return next();
     }
 
-    const tenant = await Tenant.findById(raw).lean();
+    const tenant = await Tenant.findById(raw).lean().catch(() => null);
     if (!tenant) {
-      return res.status(400).json({ success: false, message: 'Tenant khong hop le' });
+      logger.warn({ raw }, '[tenantContext] ignore missing tenant');
+      return next();
     }
     if (tenant.status === 'suspended') {
-      return res.status(403).json({ success: false, message: 'Tenant dang bi tam dung' });
+      logger.warn({ raw }, '[tenantContext] ignore suspended tenant');
+      return next();
     }
 
     const branchIds = await tenantService.resolveBranchIdsForTenant(tenant._id);

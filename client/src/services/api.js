@@ -341,6 +341,16 @@ const FATAL_AUTH_CODES = new Set([
   'DEVICE_CONFLICT',
 ]);
 
+/** Xóa tenant filter lỗi trên trình duyệt + báo UI reset về "Tất cả" */
+export function clearSelectedTenantId() {
+  try {
+    localStorage.removeItem('selected_tenant_id');
+  } catch { /* ignore */ }
+  try {
+    window.dispatchEvent(new CustomEvent('cms:tenant-cleared'));
+  } catch { /* ignore */ }
+}
+
 /**
  * CORE FETCH HELPER: Tự động đính kèm Auth Header và xử lý lỗi hệ thống.
  * Tự động refresh token khi nhận 401/TOKEN_EXPIRED và retry 1 lần.
@@ -372,6 +382,17 @@ export const apiFetch = async (endpoint, options = {}) => {
     credentials: 'include',
     headers: await buildHeaders(activeToken),
   });
+
+  // Tenant lưu localStorage không còn tồn tại / bị khóa → xóa để dừng spam 400
+  if (res.status === 400) {
+    try {
+      const body = await res.clone().json();
+      const msg = String(body?.message || '');
+      if (msg.includes('X-Tenant-Id') || msg.includes('tenant_id không hợp lệ')) {
+        clearSelectedTenantId();
+      }
+    } catch { /* ignore */ }
+  }
 
   // CSRF hết hạn / chưa có cookie → lấy token mới và thử lại 1 lần
   if (res.status === 403 && isMutatingMethod(method) && !options._csrfRetried) {
@@ -941,6 +962,22 @@ export const assignmentsAPI = {
       body: JSON.stringify(data),
     });
     return res.json();
+  },
+};
+
+// ─── PROCTOR AUDIT API (không gửi video/frame) ───────────────────────────────
+export const proctorAPI = {
+  postEvents: async (events) => {
+    const res = await apiFetch('/proctor/events', {
+      method: 'POST',
+      body: JSON.stringify({ events }),
+    });
+    return res.json();
+  },
+  getMyEvents: async (limit = 50) => {
+    const res = await apiFetch(`/proctor/events/me?limit=${limit}`);
+    const data = await res.json();
+    return data.data || [];
   },
 };
 

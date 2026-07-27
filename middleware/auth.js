@@ -259,19 +259,25 @@ async function applyTenantScopeIfAny(req) {
   }
 
   const mongoose = require('mongoose');
+  // Soft-ignore: tenant cũ trong localStorage / ID sai không được làm sập toàn bộ API (400 spam).
+  // Client sẽ tự xóa selected_tenant_id khi nhận header gợi ý.
   if (!mongoose.Types.ObjectId.isValid(String(raw))) {
-    const err = new Error('INVALID_TENANT');
-    err.code = 'INVALID_TENANT';
-    throw err;
+    logger.warn({ raw }, '[Tenant] ignore invalid X-Tenant-Id');
+    req.tenant = null;
+    req.tenantScope = null;
+    req.ignoredInvalidTenant = String(raw);
+    return;
   }
 
   const Tenant = require('../models/Tenant');
   const tenantService = require('../services/tenantService');
   const tenant = await Tenant.findById(raw).lean();
   if (!tenant || tenant.status === 'suspended') {
-    const err = new Error('INVALID_TENANT');
-    err.code = 'INVALID_TENANT';
-    throw err;
+    logger.warn({ raw, status: tenant?.status }, '[Tenant] ignore missing/suspended tenant');
+    req.tenant = null;
+    req.tenantScope = null;
+    req.ignoredInvalidTenant = String(raw);
+    return;
   }
 
   const branchIds = await tenantService.resolveBranchIdsForTenant(tenant._id);
