@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   DollarSign, PlayCircle, Download, Calendar as CalendarIcon,
   Clock, TrendingUp, CreditCard,
@@ -62,7 +62,7 @@ const TeacherFinanceAndTraining = () => {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [courseTab, setCourseTab] = useState('video');
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isTraining) {
       setIsLoadingFinance(true);
       Promise.all([

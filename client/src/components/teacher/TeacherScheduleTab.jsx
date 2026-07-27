@@ -9,11 +9,11 @@ export default function TeacherScheduleTab({
           <div className="px-4 md:px-8 py-6 md:py-8 space-y-6">
             <div className="cms-toolbar sm:flex-row sm:items-center sm:justify-between min-w-0">
               <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 min-w-0">
-                <Calendar size={20} className="text-blue-600 shrink-0" /> Lß╗ïch dß║íy
+                <Calendar size={20} className="text-blue-600 shrink-0" /> Lịch dạy
               </h2>
               <button onClick={() => { setEditingSchedule(null); setShowScheduleModal(true); }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center gap-2 w-full sm:w-auto shrink-0">
-                <Plus size={14} /> Xß║┐p lß╗ïch mß╗¢i
+                <Plus size={14} /> Xếp lịch mới
               </button>
             </div>
             <TeacherMonthlyCalendar
@@ -31,6 +31,5 @@ export default function TeacherScheduleTab({
               }}
             />
           </div>
-
   );
 }

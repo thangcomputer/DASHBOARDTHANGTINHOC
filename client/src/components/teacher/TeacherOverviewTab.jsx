@@ -13,7 +13,7 @@ export default function TeacherOverviewTab({
   return (
           <div className="px-4 md:px-8 py-6 md:py-8 space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
             
-            {/* ΓöÇΓöÇ HIGHLIGHT HERO SECTION ΓöÇΓöÇ */}
+            {/* ── HIGHLIGHT HERO SECTION ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                {/* Income & Performance Card */}
                <div className="md:col-span-2 xl:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 rounded-[40px] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-900/20">
@@ -21,24 +21,24 @@ export default function TeacherOverviewTab({
                   <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8 h-full">
                      <div className="space-y-4">
                         <div>
-                           <p className="text-blue-300 text-xs font-black uppercase tracking-widest mb-1">Thu nhß║¡p th├íng {new Date().getMonth()+1}</p>
-                           <h3 className="text-2xl sm:text-4xl font-black">{totalMonthlyIncome.toLocaleString('vi-VN')} <span className="text-lg sm:text-xl">─æ</span></h3>
+                           <p className="text-blue-300 text-xs font-black uppercase tracking-widest mb-1">Thu nhập tháng {new Date().getMonth()+1}</p>
+                           <h3 className="text-2xl sm:text-4xl font-black">{totalMonthlyIncome.toLocaleString('vi-VN')} <span className="text-lg sm:text-xl">đ</span></h3>
                         </div>
                         <div className="flex items-center gap-6">
                            <div className="flex flex-col">
-                              <span className="text-slate-400 text-xs font-black uppercase tracking-widest">Hß╗ìc vi├¬n ho├án th├ánh</span>
-                              <span className="text-2xl font-black text-emerald-400">{completed} <span className="text-xs text-slate-400">ng╞░ß╗¥i</span></span>
+                              <span className="text-slate-400 text-xs font-black uppercase tracking-widest">Học viên hoàn thành</span>
+                              <span className="text-2xl font-black text-emerald-400">{completed} <span className="text-xs text-slate-400">người</span></span>
                            </div>
                            <div className="w-[1px] h-10 bg-white/10" />
                            <div className="flex flex-col">
-                              <span className="text-slate-400 text-xs font-black uppercase tracking-widest">Buß╗òi dß║íy ─æ├ú xong</span>
-                              <span className="text-2xl font-black text-blue-400">{totalDone} <span className="text-xs text-slate-400">buß╗òi</span></span>
+                              <span className="text-slate-400 text-xs font-black uppercase tracking-widest">Buổi dạy đã xong</span>
+                              <span className="text-2xl font-black text-blue-400">{totalDone} <span className="text-xs text-slate-400">buổi</span></span>
                            </div>
                         </div>
                      </div>
                      <button onClick={() => navigate('/teacher/finance')} 
                         className="bg-white/10 hover:bg-white/20 border border-white/10 px-8 py-4 rounded-3xl text-sm font-black uppercase tracking-widest transition-all flex items-center gap-2 group">
-                        Chi tiß║┐t thu nhß║¡p <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                        Chi tiết thu nhập <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
                      </button>
                   </div>
                </div>
@@ -50,7 +50,7 @@ export default function TeacherOverviewTab({
                     {teacherName.substring(0, 2).toUpperCase()}
                   </div>
                   <h4 className="text-lg font-black text-gray-800 mb-1">{teacherName}</h4>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Giß║úng vi├¬n Chuy├¬n m├┤n</p>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Giảng viên Chuyên môn</p>
                   
                   {/* STAR RATING DISPLAY */}
                   <div className="bg-orange-50 px-6 py-4 rounded-[32px] border border-orange-100 w-full">
@@ -59,8 +59,8 @@ export default function TeacherOverviewTab({
                            <Star key={star} size={20} className={star <= Math.round(teacherRating.avg) ? "text-orange-500 fill-orange-500" : "text-gray-200"} />
                         ))}
                      </div>
-                     <p className="text-2xl font-black text-orange-600 leading-none">{teacherRating.avg || 'ΓÇö'}</p>
-                     <p className="text-xs font-black text-orange-400 uppercase tracking-widest mt-1">{teacherRating.count} l╞░ß╗út ─æ├ính gi├í tß╗½ hß╗ìc vi├¬n</p>
+                     <p className="text-2xl font-black text-orange-600 leading-none">{teacherRating.avg || '—'}</p>
+                     <p className="text-xs font-black text-orange-400 uppercase tracking-widest mt-1">{teacherRating.count} lượt đánh giá từ học viên</p>
                   </div>
                </div>
             </div>
@@ -68,10 +68,10 @@ export default function TeacherOverviewTab({
             {/* Stats Grid */}
             <div className="grid grid-cols-1 min-[576px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               {[
-                { icon: Users, label: '─Éang dß║íy', value: students.length, sub: 'hß╗ìc vi├¬n', color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50' },
-                { icon: BookOpen, label: 'Lß╗Ö tr├¼nh', value: `${totalDone}/${totalSess}`, sub: 'tß╗òng sß╗æ buß╗òi', color: 'from-purple-500 to-purple-600', bg: 'bg-purple-50' },
-                { icon: Award, label: '─Éiß╗âm TB', value: avgGrade, sub: '/ 10 ─æiß╗âm', color: 'from-amber-500 to-orange-500', bg: 'bg-orange-50' },
-                { icon: Star, label: 'Uy t├¡n', value: teacherRating.avg, sub: `${teacherRating.count} ─æ├ính gi├í`, color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
+                { icon: Users, label: 'Đang dạy', value: students.length, sub: 'học viên', color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50' },
+                { icon: BookOpen, label: 'Lộ trình', value: `${totalDone}/${totalSess}`, sub: 'tổng số buổi', color: 'from-purple-500 to-purple-600', bg: 'bg-purple-50' },
+                { icon: Award, label: 'Điểm TB', value: avgGrade, sub: '/ 10 điểm', color: 'from-amber-500 to-orange-500', bg: 'bg-orange-50' },
+                { icon: Star, label: 'Uy tín', value: teacherRating.avg, sub: `${teacherRating.count} đánh giá`, color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
               ].map(({ icon: Icon, label, value, sub, color, bg }) => (
                 <div key={label} className="bg-white rounded-2xl sm:rounded-[32px] p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:scale-[1.02] transition-all group overflow-hidden relative min-w-0">
                   <div className={`absolute -right-4 -bottom-4 w-20 h-20 ${bg} rounded-full opacity-50 group-hover:scale-150 transition-transform duration-700`} />
@@ -85,39 +85,39 @@ export default function TeacherOverviewTab({
               ))}
             </div>
 
-            {/* ΓöÇΓöÇ QUICK ACTIONS ΓöÇΓöÇ */}
+            {/* ── QUICK ACTIONS ── */}
             <div className="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 rounded-3xl p-6 text-white shadow-xl shadow-blue-900/20">
               <div className="flex items-center gap-2 mb-4">
                 <Zap size={18} className="text-yellow-300" />
-                <h3 className="font-black text-base">C├┤ng viß╗çc cß║ºn xß╗¡ l├╜ ngay</h3>
+                <h3 className="font-black text-base">Công việc cần xử lý ngay</h3>
               </div>
               <div className="grid grid-cols-1 min-[576px]:grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   {
                     icon: UserCheck,
-                    label: '─Éiß╗âm danh',
-                    sub: `${mySchedules.filter(s => s.status === 'scheduled' && new Date(s.date).toDateString() === new Date().toDateString()).length} buß╗òi h├┤m nay`,
+                    label: 'Điểm danh',
+                    sub: `${mySchedules.filter(s => s.status === 'scheduled' && new Date(s.date).toDateString() === new Date().toDateString()).length} buổi hôm nay`,
                     color: 'bg-green-500/20 hover:bg-green-500/30 border-green-400/30',
                     action: () => navigate('/teacher#students'),
                   },
                   {
                     icon: Clipboard,
-                    label: 'Chß║Ñm ─æiß╗âm',
-                    sub: `${students.filter(s => !s.lastGrade || s.lastGrade === 0).length} HV ch╞░a c├│ ─æiß╗âm`,
+                    label: 'Chấm điểm',
+                    sub: `${students.filter(s => !s.lastGrade || s.lastGrade === 0).length} HV chưa có điểm`,
                     color: 'bg-orange-500/20 hover:bg-orange-500/30 border-orange-400/30',
                     action: () => navigate('/teacher#students'),
                   },
                   {
                     icon: MessageSquare,
-                    label: 'Tin nhß║»n',
-                    sub: `${myNotifs} ch╞░a ─æß╗ìc`,
+                    label: 'Tin nhắn',
+                    sub: `${myNotifs} chưa đọc`,
                     color: 'bg-purple-500/20 hover:bg-purple-500/30 border-purple-400/30',
                     action: () => navigate('/teacher/inbox'),
                   },
                   {
                     icon: Calendar,
-                    label: 'Xß║┐p lß╗ïch',
-                    sub: 'Th├¬m buß╗òi dß║íy mß╗¢i',
+                    label: 'Xếp lịch',
+                    sub: 'Thêm buổi dạy mới',
                     color: 'bg-blue-500/20 hover:bg-blue-500/30 border-blue-400/30',
                     action: () => { navigate('/teacher#schedule'); },
                   },
@@ -140,7 +140,7 @@ export default function TeacherOverviewTab({
               <div className="lg:col-span-7 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                    <GraduationCap size={18} className="text-blue-600" /> Hß╗ìc vi├¬n ─æ╞░ß╗úc ph├ón c├┤ng
+                    <GraduationCap size={18} className="text-blue-600" /> Học viên được phân công
                   </h3>
                 </div>
                 {students.map(s => {
@@ -168,7 +168,7 @@ export default function TeacherOverviewTab({
                 })}
                 <button onClick={() => navigate('/teacher#students')}
                   className="w-full text-sm font-bold text-blue-600 bg-blue-50 py-3 rounded-xl hover:bg-blue-100 transition flex items-center justify-center gap-1">
-                  Quß║ún l├╜ chi tiß║┐t <ChevronRight size={14} />
+                  Quản lý chi tiết <ChevronRight size={14} />
                 </button>
               </div>
 
@@ -181,15 +181,15 @@ export default function TeacherOverviewTab({
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
                     <h4 className="font-bold text-gray-700 text-sm flex items-center gap-2">
-                      <Calendar size={14} className="text-blue-500" /> Lß╗ïch dß║íy sß║»p tß╗¢i
+                      <Calendar size={14} className="text-blue-500" /> Lịch dạy sắp tới
                     </h4>
                     <button onClick={() => navigate('/teacher#schedule')} className="text-xs text-blue-600 font-bold hover:underline">
-                      Xem tß║Ñt cß║ú ΓåÆ
+                      Xem tất cả →
                     </button>
                   </div>
                   <div className="divide-y divide-gray-50">
                     {mySchedules.filter(s => s.status === 'scheduled').slice(0, 3).length === 0 && (
-                      <p className="px-5 py-4 text-xs text-gray-400 text-center">Ch╞░a c├│ lß╗ïch dß║íy.</p>
+                      <p className="px-5 py-4 text-xs text-gray-400 text-center">Chưa có lịch dạy.</p>
                     )}
                     {mySchedules.filter(s => s.status === 'scheduled').slice(0, 3).map(s => (
                       <div key={s.id} className="px-5 py-3 flex items-center gap-3 hover:bg-blue-50/30 transition group">
@@ -199,7 +199,7 @@ export default function TeacherOverviewTab({
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-gray-800 truncate">{s.topic}</p>
-                          <p className="text-xs text-gray-400">{s.startTime} ΓÇó {s.studentName}</p>
+                          <p className="text-xs text-gray-400">{s.startTime} • {s.studentName}</p>
                         </div>
                         <span className="text-xs text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded-lg flex-shrink-0">{s.startTime}</span>
                       </div>
@@ -211,13 +211,13 @@ export default function TeacherOverviewTab({
                 <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 text-white">
                   <div className="flex items-center gap-2 mb-3">
                     <Activity size={16} className="text-blue-400" />
-                    <h4 className="font-bold text-sm">T├│m tß║»t hoß║ít ─æß╗Öng</h4>
+                    <h4 className="font-bold text-sm">Tóm tắt hoạt động</h4>
                   </div>
                   <div className="space-y-2">
                     {[
-                      { label: 'Tß╗òng buß╗òi dß║íy ─æ├ú ho├án th├ánh', value: mySchedules.filter(s => s.status === 'completed').length, color: 'text-green-400' },
-                      { label: '─É├ính gi├í trung b├¼nh', value: `${teacherRating?.avg || 'ΓÇö'} Γ¡É`, color: 'text-yellow-400' },
-                      { label: 'HV ─æ├ú ho├án th├ánh KH', value: completed, color: 'text-blue-400' },
+                      { label: 'Tổng buổi dạy đã hoàn thành', value: mySchedules.filter(s => s.status === 'completed').length, color: 'text-green-400' },
+                      { label: 'Đánh giá trung bình', value: `${teacherRating?.avg || '—'} ⭐`, color: 'text-yellow-400' },
+                      { label: 'HV đã hoàn thành KH', value: completed, color: 'text-blue-400' },
                     ].map(item => (
                       <div key={item.label} className="flex justify-between items-center text-xs">
                         <span className="text-slate-400">{item.label}</span>
@@ -229,6 +229,5 @@ export default function TeacherOverviewTab({
               </div>
             </div>
           </div>
-
   );
 }

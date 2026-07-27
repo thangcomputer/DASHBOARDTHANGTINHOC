@@ -11,7 +11,7 @@ export default function TeacherStudentsTab({
   return (
           <div className="px-4 md:px-8 py-6 min-h-[calc(100vh-120px)] xl:h-[calc(100vh-120px)] flex flex-col xl:flex-row gap-6 xl:overflow-hidden">
             
-            {/* Cß╗ÿT 1: DANH S├üCH Hß╗îC VI├èN (Sidebar) */}
+            {/* CỘT 1: DANH SÁCH HỌC VIÊN (Sidebar) */}
             <div className="w-full xl:w-80 h-[500px] xl:h-full flex flex-col bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex-shrink-0">
                <div className="p-4 border-b border-gray-50 bg-gray-50/30">
                   <div className="relative">
@@ -19,7 +19,7 @@ export default function TeacherStudentsTab({
                     <input
                       value={studentSearch}
                       onChange={e => setStudentSearch(e.target.value)}
-                      placeholder="T├¼m hß╗ìc vi├¬n..."
+                      placeholder="Tìm học viên..."
                       className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
@@ -49,7 +49,7 @@ export default function TeacherStudentsTab({
                               <img src={resolveAvatarUrl({ role: 'student' })} alt="" className="w-full h-full object-cover" />
                             </div>
                             {isOnline && (
-                              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full" title="─Éang hoß║ít ─æß╗Öng" />
+                              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full" title="Đang hoạt động" />
                             )}
                           </div>
                           
@@ -62,12 +62,12 @@ export default function TeacherStudentsTab({
                             )}
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {isOnline ? (
-                                <span className={`text-xs font-bold uppercase tracking-tighter ${isSelected ? 'text-blue-200' : 'text-green-500'}`}>─Éang online</span>
+                                <span className={`text-xs font-bold uppercase tracking-tighter ${isSelected ? 'text-blue-200' : 'text-green-500'}`}>Đang online</span>
                               ) : (
                                 <span className={`text-xs font-medium ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
                                   {lastSeenUsers[String(sId)]
                                     ? `${timeAgo(lastSeenUsers[String(sId)])}`
-                                    : 'Ch╞░a online'}
+                                    : 'Chưa online'}
                                 </span>
                               )}
                             </div>
@@ -91,20 +91,20 @@ export default function TeacherStudentsTab({
                   {students.length === 0 && (
                      <div className="text-center py-10 opacity-30">
                         <Users size={40} className="mx-auto mb-2" />
-                        <p className="text-sm font-bold">Ch╞░a c├│ hß╗ìc vi├¬n</p>
+                        <p className="text-sm font-bold">Chưa có học viên</p>
                      </div>
                   )}
                </div>
             </div>
 
-            {/* Cß╗ÿT 2: CHI TIß║╛T Hß╗îC VI├èN (Main Content) */}
+            {/* CỘT 2: CHI TIẾT HỌC VIÊN (Main Content) */}
             <div className="flex-1 xl:overflow-y-auto pr-1">
               {selectedEnrollmentKey ? (
                 (() => {
                   const student = students.find(s => String(s._enrollmentKey || s._id || s.id) === String(selectedEnrollmentKey));
-                  if (!student) return <div className="p-20 text-center text-gray-400">Kh├┤ng t├¼m thß║Ñy th├┤ng tin</div>;
+                  if (!student) return <div className="p-20 text-center text-gray-400">Không tìm thấy thông tin</div>;
 
-                  // ΓöÇΓöÇΓöÇ T├ìNH TO├üN Cß╗öNG ─ÉIß╗éM DANH (THEO Lß╗èCH + KH├ôA) ΓöÇΓöÇΓöÇ
+                  // ─── TÍNH TOÁN CỔNG ĐIỂM DANH (THEO LỊCH + KHÓA) ───
                   const now = new Date();
                   const y = now.getFullYear();
                   const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -147,11 +147,10 @@ export default function TeacherStudentsTab({
                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                       <GraduationCap size={40} />
                    </div>
-                   <p className="font-bold">Vui l├▓ng chß╗ìn hß╗ìc vi├¬n ß╗ƒ danh s├ích b├¬n tr├íi</p>
+                   <p className="font-bold">Vui lòng chọn học viên ở danh sách bên trái</p>
                 </div>
               )}
             </div>
           </div>
-
   );
 }
