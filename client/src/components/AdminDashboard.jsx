@@ -218,7 +218,10 @@ const AdminDashboard = () => {
               courseId: updatedForm.courseId,
               course: updatedForm.course,
               price: updatedForm.price,
-              totalSessions: updatedForm.totalSessions,
+              totalSessions: Number(updatedForm.totalSessions) > 0 ? Number(updatedForm.totalSessions) : 12,
+              remainingSessions: Number(updatedForm.remainingSessions) >= 0
+                ? Number(updatedForm.remainingSessions)
+                : Math.max(0, (Number(updatedForm.totalSessions) || 12) - (Number(editStudent.completedSessions) || 0)),
               paid: updatedForm.paid,
               studentExamUnlocked: updatedForm.studentExamUnlocked,
               teacherId: updatedForm.teacherId || null,

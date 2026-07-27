@@ -490,6 +490,17 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
       safeBody.online_meeting_url = safeBody.linkHoc || '';
     }
 
+    // Admin/staff đổi khóa học / số buổi → lấy từ catalog nếu thiếu
+    const isStaffOrAdmin = req.user.role === 'admin' || req.user.role === 'staff';
+    if (isStaffOrAdmin && safeBody.courseId && !(Number(safeBody.totalSessions) > 0)) {
+      const Course = require('../models/Course');
+      const catalog = await Course.findById(safeBody.courseId).select('name totalSessions').lean();
+      if (catalog) {
+        safeBody.totalSessions = Number(catalog.totalSessions) > 0 ? Number(catalog.totalSessions) : 12;
+        if (!safeBody.course) safeBody.course = catalog.name;
+      }
+    }
+
     const student = await Student.findByIdAndUpdate(req.params.id, safeBody, {
       returnDocument: 'after',
       runValidators: true,
@@ -497,6 +508,47 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
 
     if (!student) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+
+    // Đồng bộ enrollment chính — applyEnrollmentStats lấy totalSessions từ đây
+    if (isStaffOrAdmin) {
+      const touchCourse =
+        safeBody.totalSessions != null
+        || safeBody.course != null
+        || safeBody.courseId != null
+        || safeBody.price != null
+        || safeBody.teacherId !== undefined
+        || safeBody.paid != null;
+
+      if (touchCourse) {
+        const { legacyEnrollmentFromStudent } = require('../services/enrollmentService');
+        if (!student.enrollments?.length && (student.course || safeBody.course)) {
+          student.enrollments = [legacyEnrollmentFromStudent(student)];
+          student.enrollments[0].isPrimary = true;
+        }
+        if (student.enrollments?.length) {
+          let idx = student.enrollments.findIndex((e) => e.isPrimary);
+          if (idx < 0) idx = 0;
+          const enr = student.enrollments[idx];
+          if (safeBody.course != null) enr.courseName = safeBody.course;
+          if (safeBody.courseId != null) enr.courseId = safeBody.courseId;
+          if (safeBody.price != null) enr.price = Number(safeBody.price) || 0;
+          if (safeBody.paid != null) enr.paid = !!safeBody.paid;
+          if (safeBody.teacherId !== undefined) {
+            enr.teacherId = safeBody.teacherId || null;
+          }
+          if (safeBody.totalSessions != null) {
+            const ts = Number(safeBody.totalSessions) > 0 ? Number(safeBody.totalSessions) : 12;
+            const completed = Number(enr.completedSessions) || Number(student.completedSessions) || 0;
+            enr.totalSessions = ts;
+            enr.remainingSessions = Math.max(0, ts - completed);
+            student.totalSessions = ts;
+            student.remainingSessions = Math.max(0, ts - completed);
+          }
+          student.markModified('enrollments');
+          await student.save();
+        }
+      }
     }
 
     const io = req.app.get('io');

@@ -75,10 +75,13 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
         setForm((f) => {
           const matched = findCourse(res.data, f.courseId || f.course);
           if (!matched) return f;
+          // Đồng bộ học phí + số buổi theo catalog khi mở form (tránh giữ 12 buổi cũ)
           return {
             ...f,
             courseId: String(matched._id),
             course: matched.name,
+            price: courseEffectivePrice(matched),
+            totalSessions: courseDefaultSessions(matched),
           };
         });
       })
@@ -264,6 +267,18 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
                       onWheel={blockWheelOnNumber}
                       className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:border-blue-500 outline-none bg-blue-50 text-blue-700 font-bold"
                     />
+                    {!!selectCourseId && (
+                      <button
+                        type="button"
+                        className="mt-1 text-[11px] font-bold text-blue-600 hover:underline"
+                        onClick={() => {
+                          const c = findCourse(dbCourses, selectCourseId);
+                          if (c) applyCourse(c, true);
+                        }}
+                      >
+                        Đồng bộ từ khóa học ({courseDefaultSessions(findCourse(dbCourses, selectCourseId) || {})} buổi)
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
