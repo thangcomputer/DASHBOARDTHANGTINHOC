@@ -299,11 +299,12 @@ const StudentDashboard = ({ onNavigate }) => {
       const dateLabel = Number.isNaN(parsedDate.getTime())
         ? String(s.date)
         : parsedDate.toLocaleDateString('vi-VN');
+      const sessionGrade = s.sessionGrade != null ? Number(s.sessionGrade) : null;
       rawGrades.push({
         date: dateLabel,
         time: s.startTime || '',
         note: s.note || 'Đã điểm danh hoàn thành buổi học',
-        grade: 0,
+        grade: Number.isFinite(sessionGrade) ? sessionGrade : null,
         _fromSchedule: true,
       });
       keys.forEach((k) => gradeKeySet.add(k));

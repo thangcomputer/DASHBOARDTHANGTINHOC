@@ -91,17 +91,28 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const [linkSaved, setLinkSaved] = useState(false);
   const [gradeSaved, setGradeSaved] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
-  const [attForm, setAttForm] = useState({ note: 'Đã điểm danh hoàn thành buổi học', grade: student.avgGrade ?? student.lastGrade ?? 0 });
+  const [attForm, setAttForm] = useState({ note: 'Đã điểm danh hoàn thành buổi học', grade: '' });
 
   useEffect(() => {
     setGradeInput(student.avgGrade ?? student.lastGrade ?? '');
     setLinkInput(student.linkHoc);
     setNotesInput(student.notes || '');
-    setAttForm((prev) => ({
-      ...prev,
-      grade: student.avgGrade ?? student.lastGrade ?? 0,
-    }));
   }, [student._enrollmentKey, student.course, student.avgGrade, student.lastGrade, student.linkHoc, student.notes]);
+
+  const submitAttendance = () => {
+    const raw = attForm.grade;
+    if (raw === '' || raw === null || raw === undefined) {
+      showGlossyAlert('Vui lòng nhập điểm buổi học (0-10) trước khi điểm danh.');
+      return;
+    }
+    const gradeNum = Number(raw);
+    if (!Number.isFinite(gradeNum) || gradeNum < 0 || gradeNum > 10) {
+      showGlossyAlert('Điểm không hợp lệ. Nhập số từ 0 đến 10.');
+      return;
+    }
+    onAttendance((student._id || student.id), attForm.note || 'Đã điểm danh hoàn thành buổi học', gradeNum);
+    setShowAttendanceModal(false);
+  };
 
   // ASSIGNMENTS STATE
   const [courseAssignments, setCourseAssignments] = useState([]);
@@ -485,16 +496,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                      <button 
                        type="button"
                        onClick={() => {
-                         if (!canCheckIn && !isCompleted) return;
+                         if (isCompleted) return;
                          const tGrade = (student.grades || []).find(g => g.date === todayStr);
-                         setAttForm({ note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học', grade: tGrade?.grade ?? (student.lastGrade || 0) });
+                         setAttForm({
+                           note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học',
+                           grade: tGrade?.grade != null && tGrade.grade !== '' ? String(tGrade.grade) : '',
+                         });
                          setShowAttendanceModal(true);
                        }} 
-                       disabled={isCompleted || !canCheckIn || attendanceGate?.status === 'no_schedule'}
+                       disabled={isCompleted || attendanceGate?.status === 'no_schedule'}
                        title={
                          isCompleted ? 'Khóa học đã hoàn thành' :
                          attendanceGate?.status === 'no_schedule' ? 'Hôm nay chưa có lịch dạy' :
-                         !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
+                         !canCheckIn ? 'Đã điểm danh — bấm để cập nhật điểm/ghi chú' : 
                          'Bấm để điểm danh buổi học hôm nay'
                        }
                        className={`h-9 sm:h-auto sm:py-5 rounded-xl sm:rounded-3xl font-bold text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all ${
@@ -503,7 +517,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                          : attendanceGate?.status === 'no_schedule'
                            ? 'border border-slate-300 text-slate-700 bg-white cursor-not-allowed'
                          : !canCheckIn
-                           ? 'border border-slate-300 text-slate-500 bg-white cursor-not-allowed'
+                           ? 'border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100'
                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-[0.98]'
                        }`}
                      >
@@ -514,7 +528,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                            : attendanceGate?.status === 'no_schedule'
                              ? 'Chưa có lịch'
                              : !canCheckIn
-                               ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
+                               ? 'Cập nhật điểm'
                                : 'Điểm danh'}
                        </span>
                      </button>
@@ -876,10 +890,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                     Hủy
                   </button>
                   <button 
-                    onClick={() => {
-                      onAttendance((student._id || student.id), attForm.note, Number(attForm.grade));
-                      setShowAttendanceModal(false);
-                    }}
+                    onClick={submitAttendance}
                     className="flex-[2] py-4 text-white font-black text-xs uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg shadow-green-100 hover:shadow-green-200 transition-all active:scale-95"
                   >
                     Xác nhận Điểm danh
@@ -982,16 +993,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 </div>
               ) : (
                 <button onClick={() => {
-                    if (!canCheckIn && !isCompleted) return;
+                    if (isCompleted) return;
                     const tGrade = (student.grades || []).find(g => g.date === todayStr);
-                    setAttForm({ note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học', grade: tGrade?.grade ?? (student.lastGrade || 0) });
+                    setAttForm({
+                      note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học',
+                      grade: tGrade?.grade != null && tGrade.grade !== '' ? String(tGrade.grade) : '',
+                    });
                     setShowAttendanceModal(true);
                   }} 
-                  disabled={isCompleted || !canCheckIn || attendanceGate?.status === 'no_schedule'}
+                  disabled={isCompleted || attendanceGate?.status === 'no_schedule'}
                   title={
                     isCompleted ? 'Hoàn thành' :
                     attendanceGate?.status === 'no_schedule' ? 'Chưa có lịch dạy' :
-                    !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
+                    !canCheckIn ? 'Đã điểm danh — bấm để cập nhật điểm' : 
                     'Bấm để điểm danh'
                   }
                   className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${
@@ -1000,7 +1014,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                     : attendanceGate?.status === 'no_schedule'
                       ? 'bg-slate-100 text-slate-800 cursor-not-allowed border-2 border-slate-300'
                     : !canCheckIn
-                      ? 'bg-slate-50 text-slate-600 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200'
+                      ? 'bg-amber-50 text-amber-700 border-2 border-amber-300 hover:bg-amber-100'
                       : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
                   }`}>
                   <CheckCircle size={18} />
@@ -1010,7 +1024,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                       : attendanceGate?.status === 'no_schedule'
                         ? 'KHÔNG CÓ LỊCH'
                         : !canCheckIn
-                          ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
+                          ? 'CẬP NHẬT ĐIỂM'
                           : 'ĐIỂM DANH'}
                   </span>
                 </button>
@@ -1135,19 +1149,17 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
 
             <div className="bg-slate-50 px-8 py-6 flex gap-4 flex-shrink-0">
               <button 
-                onClick={closeModal}
+                onClick={() => setShowAttendanceModal(false)}
                 className="flex-[1] py-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition"
-                disabled={submitting}
               >
                 Hủy bỏ
               </button>
               <button 
-                onClick={handleSubmit}
-                disabled={submitting || (attForm._originalData?.status === 'completed' && !activeTab)}
-                className="flex-[2] py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                onClick={submitAttendance}
+                className="flex-[2] py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
               >
-                {submitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                {attForm._originalData?.status === 'completed' ? 'Cập nhật' : 'Xác nhận Điểm danh'}
+                <Save size={18} />
+                Xác nhận Điểm danh
               </button>
             </div>
           </div>

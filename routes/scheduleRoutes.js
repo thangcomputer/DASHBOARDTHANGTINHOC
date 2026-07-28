@@ -362,6 +362,9 @@ router.post('/', authMiddleware, async (req, res) => {
       status: status || 'scheduled',
       is_paid_to_teacher: finalPaidToTeacher,
       paymentStatus: paymentStatus,
+      sessionGrade: (req.body.grade !== undefined && req.body.grade !== null && req.body.grade !== '')
+        ? Math.max(0, Math.min(10, Number(req.body.grade)))
+        : null,
     });
 
     // Populate để trả về đầy đủ
@@ -376,13 +379,25 @@ router.post('/', authMiddleware, async (req, res) => {
       const NotificationService = require('../services/NotificationService');
       if (studentId) {
          const notifDate = new Date(date).toLocaleDateString('vi-VN');
-         NotificationService.send(io, {
-           type: 'SCHEDULE',
-           title: '📅 Lịch học mới',
-           content: `Lịch học mới vào ngày ${notifDate} lúc ${startTime} đã được thêm.`,
-           receivers: studentId.toString(),
-           link: '/student#schedule'
-         });
+         if (schedule.status === 'completed') {
+           const g = schedule.sessionGrade;
+           const gradeText = g != null && Number.isFinite(Number(g)) ? ` Điểm buổi học: ${Number(g)}/10.` : '';
+           NotificationService.send(io, {
+             type: 'SCHEDULE',
+             title: '✅ Điểm danh & chấm điểm',
+             content: `Giảng viên đã điểm danh buổi học ngày ${notifDate}.${gradeText}`,
+             receivers: studentId.toString(),
+             link: '/student#schedule'
+           });
+         } else {
+           NotificationService.send(io, {
+             type: 'SCHEDULE',
+             title: '📅 Lịch học mới',
+             content: `Lịch học mới vào ngày ${notifDate} lúc ${startTime} đã được thêm.`,
+             receivers: studentId.toString(),
+             link: '/student#schedule'
+           });
+         }
       }
       
       io.emit('schedule:new', {
@@ -413,7 +428,7 @@ router.post('/', authMiddleware, async (req, res) => {
           const changed = recordAttendanceGrade(student, {
             courseName: courseFinal,
             note: note || topic || 'Đã điểm danh hoàn thành buổi học',
-            grade: Number(req.body.grade) || 0,
+            grade: schedule.sessionGrade != null ? schedule.sessionGrade : (Number(req.body.grade) || 0),
             date: schedule.date || new Date(),
           });
           if (changed) {
@@ -518,6 +533,10 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
     if (date)      updates.date      = new Date(date);
     const noteVal = note !== undefined ? note : topic;
     if (noteVal !== undefined) updates.note = String(noteVal).trim();
+    if (req.body.grade !== undefined && req.body.grade !== null && req.body.grade !== '') {
+      const g = Number(req.body.grade);
+      if (Number.isFinite(g)) updates.sessionGrade = Math.max(0, Math.min(10, g));
+    }
     if ('studentNote' in req.body) {
       updates.studentNote = req.body.studentNote;
       updates.hasUnreadStudentNote = true; // Bật cờ có tin nhắn mới cho Giảng viên
@@ -556,10 +575,29 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
          io.emit('schedule:cancelled', { scheduleId: schedule._id.toString(), reason: cancelReason });
       }
       else if (status === 'completed' && schedule.status !== 'completed') {
+         const gradeNum = updates.sessionGrade != null
+           ? Number(updates.sessionGrade)
+           : (req.body.grade !== undefined ? Number(req.body.grade) : null);
+         const gradeText = Number.isFinite(gradeNum)
+           ? ` Điểm buổi học: ${gradeNum}/10.`
+           : '';
          NotificationService.send(io, {
            type: 'SCHEDULE',
-           title: '✅ Hệ thống đã điểm danh',
-           content: `Giảng viên đã điểm danh buổi học ngày ${notifDate}.`,
+           title: '✅ Điểm danh & chấm điểm',
+           content: `Giảng viên đã điểm danh buổi học ngày ${notifDate}.${gradeText}`,
+           receivers: schedule.studentId.toString(),
+           link: '/student#schedule'
+         });
+      }
+      else if (
+        schedule.status === 'completed'
+        && updates.sessionGrade != null
+        && Number(updates.sessionGrade) !== Number(schedule.sessionGrade)
+      ) {
+         NotificationService.send(io, {
+           type: 'SCHEDULE',
+           title: '📝 Cập nhật điểm buổi học',
+           content: `Giảng viên đã cập nhật điểm buổi ${notifDate}: ${Number(updates.sessionGrade)}/10.`,
            receivers: schedule.studentId.toString(),
            link: '/student#schedule'
          });
@@ -600,15 +638,21 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
 
         const attendanceNote = (updates.note !== undefined ? updates.note : schedule.note)
           || 'Đã điểm danh hoàn thành buổi học';
+        const gradeVal = updates.sessionGrade != null
+          ? updates.sessionGrade
+          : (req.body.grade !== undefined ? Number(req.body.grade) : 0);
         const changed = recordAttendanceGrade(student, {
           courseName: schedule.course,
           note: attendanceNote,
-          grade: Number(req.body.grade) || 0,
+          grade: Number.isFinite(Number(gradeVal)) ? Number(gradeVal) : 0,
           date: schedule.date || new Date(),
         });
         if (changed) {
           await student.save();
-          if (io) io.emit('student:updated', student._id);
+          if (io) {
+            io.emit('student:updated', student._id);
+            io.emit('data:refresh', { type: 'student', studentId: String(student._id) });
+          }
         }
       }
     }

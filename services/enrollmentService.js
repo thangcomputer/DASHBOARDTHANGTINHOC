@@ -113,7 +113,8 @@ function gradeDateKeys(raw) {
 }
 
 /**
- * Ghi nhật ký điểm danh vào enrollment + root grades (tránh HV không thấy log dù lịch đã completed).
+ * Ghi/cập nhật nhật ký điểm danh vào enrollment + root grades.
+ * Cùng ngày → cập nhật điểm/ghi chú (không bỏ qua khi đã có grade=0).
  */
 function recordAttendanceGrade(studentDoc, {
   courseName,
@@ -126,17 +127,33 @@ function recordAttendanceGrade(studentDoc, {
   const dateVN = Number.isNaN(dateObj.getTime())
     ? new Date().toLocaleDateString('vi-VN')
     : dateObj.toLocaleDateString('vi-VN');
+  const gradeNum = Number(grade);
   const entry = {
     date: dateVN,
     note: note || 'Đã điểm danh hoàn thành buổi học',
-    grade: Number(grade) || 0,
+    grade: Number.isFinite(gradeNum) ? gradeNum : 0,
   };
   const entryKeys = new Set(gradeDateKeys(dateVN).concat(gradeDateKeys(dateObj)));
 
-  const alreadyHas = (grades) => (grades || []).some((g) => {
-    const keys = gradeDateKeys(g.date);
-    return keys.some((k) => entryKeys.has(k));
-  });
+  const upsertGrades = (grades) => {
+    const list = Array.isArray(grades) ? [...grades] : [];
+    const idx = list.findIndex((g) => {
+      const keys = gradeDateKeys(g.date);
+      return keys.some((k) => entryKeys.has(k));
+    });
+    if (idx >= 0) {
+      const prev = list[idx];
+      const nextGrade = Number.isFinite(gradeNum) ? gradeNum : (Number(prev.grade) || 0);
+      const nextNote = note || prev.note || entry.note;
+      if (Number(prev.grade) === nextGrade && String(prev.note || '') === String(nextNote)) {
+        return { list, changed: false };
+      }
+      list[idx] = { ...prev, grade: nextGrade, note: nextNote, date: prev.date || dateVN };
+      return { list, changed: true };
+    }
+    list.unshift(entry);
+    return { list, changed: true };
+  };
 
   let changed = false;
   const courseKey = normCourseName(courseName);
@@ -150,36 +167,37 @@ function recordAttendanceGrade(studentDoc, {
     }
     if (idx < 0) idx = 0;
 
-    const enr = studentDoc.enrollments[idx];
-    const enrGrades = Array.isArray(enr.grades) ? [...enr.grades] : [];
-    if (!alreadyHas(enrGrades)) {
-      enrGrades.unshift(entry);
-      studentDoc.enrollments[idx].grades = enrGrades;
+    const enrResult = upsertGrades(studentDoc.enrollments[idx].grades);
+    if (enrResult.changed) {
+      studentDoc.enrollments[idx].grades = enrResult.list;
       changed = true;
     }
-    const valid = enrGrades.filter((g) => Number(g.grade) > 0);
+    const valid = enrResult.list.filter((g) => Number(g.grade) > 0);
     if (valid.length) {
       studentDoc.enrollments[idx].avgGrade = Math.round(
         (valid.reduce((s, g) => s + Number(g.grade), 0) / valid.length) * 10
       ) / 10;
     }
-    if (studentDoc.enrollments[idx].isPrimary || studentDoc.enrollments.length === 1) {
-      if (!alreadyHas(studentDoc.grades)) {
-        studentDoc.grades = [entry, ...(studentDoc.grades || [])];
-        changed = true;
-      }
-      if (entry.grade > 0) studentDoc.lastGrade = entry.grade;
-      const rootValid = (studentDoc.grades || []).filter((g) => Number(g.grade) > 0);
-      if (rootValid.length) {
-        studentDoc.avgGrade = Math.round(
-          (rootValid.reduce((s, g) => s + Number(g.grade), 0) / rootValid.length) * 10
-        ) / 10;
-      }
+    // Luôn đồng bộ root grades để HV đọc được
+    const rootResult = upsertGrades(studentDoc.grades);
+    if (rootResult.changed) {
+      studentDoc.grades = rootResult.list;
+      changed = true;
     }
-  } else if (!alreadyHas(studentDoc.grades)) {
-    studentDoc.grades = [entry, ...(studentDoc.grades || [])];
-    if (entry.grade > 0) studentDoc.lastGrade = entry.grade;
-    changed = true;
+    if (Number.isFinite(gradeNum) && gradeNum > 0) studentDoc.lastGrade = gradeNum;
+    const rootValid = (studentDoc.grades || []).filter((g) => Number(g.grade) > 0);
+    if (rootValid.length) {
+      studentDoc.avgGrade = Math.round(
+        (rootValid.reduce((s, g) => s + Number(g.grade), 0) / rootValid.length) * 10
+      ) / 10;
+    }
+  } else {
+    const rootResult = upsertGrades(studentDoc.grades);
+    if (rootResult.changed) {
+      studentDoc.grades = rootResult.list;
+      changed = true;
+    }
+    if (Number.isFinite(gradeNum) && gradeNum > 0) studentDoc.lastGrade = gradeNum;
   }
 
   if (changed && typeof studentDoc.markModified === 'function') {

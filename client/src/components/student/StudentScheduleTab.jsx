@@ -65,8 +65,14 @@ export default function StudentScheduleTab({
                           <p className="cms-sd-body text-slate-600 mt-1 break-words">{g.note}</p>
                         </div>
                         <div className="text-left sm:text-right shrink-0">
-                          <span className={`text-[15px] font-extrabold tabular-nums ${getGradeTextClasses(g.grade)}`}>
-                            {g.grade > 0 ? `${g.grade}/10` : '--'}
+                          <span className={`text-[15px] font-extrabold tabular-nums ${
+                            g.grade != null && g.grade !== '' && Number(g.grade) >= 0
+                              ? getGradeTextClasses(Number(g.grade))
+                              : 'text-slate-400'
+                          }`}>
+                            {g.grade != null && g.grade !== '' && !Number.isNaN(Number(g.grade))
+                              ? `${Number(g.grade)}/10`
+                              : '--'}
                           </span>
                         </div>
                       </div>
