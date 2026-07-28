@@ -270,6 +270,7 @@ StudentSchema.index({ paid: 1 });
 StudentSchema.index({ status: 1 });                    // Lọc "Chờ xếp lớp" / "Đang học"
 StudentSchema.index({ studentExamUnlocked: 1 });       // Kiểm tra phòng thi
 StudentSchema.index({ teacherId: 1, status: 1 });      // Bộ đôi hay dùng nhất
+StudentSchema.index({ 'enrollments.teacherId': 1 });    // GV xem HV qua enrollments
 StudentSchema.index({ paid: 1, updatedAt: -1 });     // SePay webhook — HV chưa TT gần đây
 StudentSchema.index({ studentCode: 1 }, { sparse: true }); // Match mã HV trong nội dung CK
 StudentSchema.index({ branchId: 1, status: 1 });

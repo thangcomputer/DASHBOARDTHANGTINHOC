@@ -450,6 +450,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const allowedMsgExt = /\.(jpe?g|png|gif|webp|pdf|docx?|xlsx?|pptx?|zip|rar|7z|txt|mp4|webm|mp3|wav)$/i;
+const allowedMsgMime = /^(image\/(jpeg|png|gif|webp)|application\/pdf|application\/zip|application\/x-zip-compressed|application\/x-rar-compressed|application\/vnd\.rar|application\/x-7z-compressed|application\/vnd\.|application\/msword|application\/octet-stream|text\/plain|video\/(mp4|webm)|audio\/(mpeg|mp3|wav|x-wav|wave))$/i;
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
@@ -462,9 +463,10 @@ const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const okMime = /^(image\/|application\/pdf|application\/zip|application\/vnd\.|text\/plain|video\/|audio\/)/.test(file.mimetype || '');
+    const okMime = allowedMsgMime.test(file.mimetype || '');
     const okExt = allowedMsgExt.test(file.originalname || '');
-    if (okMime || okExt) return cb(null, true);
+    // Bắt buộc cả mime và extension (chống spoof một phía)
+    if (okMime && okExt) return cb(null, true);
     cb(new Error('Định dạng file không được phép'));
   },
 });
@@ -474,6 +476,18 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file' });
     normalizeMulterFile(req.file);
+
+    const { validateUploadedFileMagic } = require('../utils/uploadSniff');
+    const sniff = validateUploadedFileMagic(req.file.path, req.file.originalname || req.file.filename);
+    if (!sniff.ok) {
+      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+      return res.status(400).json({
+        success: false,
+        message: 'Nội dung file không khớp định dạng khai báo',
+        code: 'MAGIC_MISMATCH',
+      });
+    }
+
     const fileUrl = `/${req.file.path.replace(/\\/g, '/')}`;
     // Đăng ký FileAsset (Phase 8) — không chặn response nếu registry lỗi
     try {

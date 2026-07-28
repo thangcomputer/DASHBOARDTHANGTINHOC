@@ -241,12 +241,35 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
       }
     }
 
-    // ── 2. Học viên hiện có: chỉ khớp studentCode (không fuzzy theo tên) ───────
+    // ── 2. Học viên hiện có: extract mã từ nội dung CK → query theo studentCode ─
     if (!matched) {
-      const unpaid = await Student.find({ paid: false })
-        .select('studentCode name price paid')
-        .limit(2000)
-        .lean();
+      const codeCandidates = new Set();
+      for (const m of content.matchAll(/\bhv[a-z0-9]{4,16}\b/g)) {
+        codeCandidates.add(m[0]);
+      }
+      // Token alphanumeric dài (mã HV / ref phụ) — giới hạn để tránh nhiễu
+      for (const m of content.matchAll(/[a-z0-9]{5,16}/g)) {
+        if (codeCandidates.size >= 40) break;
+        codeCandidates.add(m[0]);
+      }
+
+      const variants = new Set();
+      for (const t of codeCandidates) {
+        variants.add(t);
+        variants.add(t.toUpperCase());
+        if (t.startsWith('hv')) variants.add('HV' + t.slice(2));
+      }
+
+      const unpaid = variants.size
+        ? await Student.find({
+            paid: false,
+            studentCode: { $in: [...variants] },
+          })
+            .select('studentCode name price paid')
+            .limit(50)
+            .lean()
+        : [];
+
       for (const s of unpaid) {
         const code = String(s.studentCode || '').toLowerCase().trim();
         if (!code || code.length < 4) continue;
