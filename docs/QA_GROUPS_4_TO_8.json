@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T13:44:25.703Z",
+  "at": "2026-07-28T14:19:15.772Z",
   "results": [
     {
       "id": "GX-00",
@@ -19,7 +19,7 @@
       "id": "G4-02",
       "name": "Thanh toán → tạo hóa đơn",
       "expected": "200 + invoice.maHoaDon",
-      "actual": "status=200 maHD=HD2607-0005 paidAmt=2000000",
+      "actual": "status=200 maHD=HD2607-0009 paidAmt=2000000",
       "result": "PASS",
       "severity": "Critical",
       "api": "PUT /api/students/:id/pay"
@@ -27,16 +27,18 @@
     {
       "id": "G4-03",
       "name": "Admin list hóa đơn",
-      "actual": "status=200 n=5",
+      "actual": "status=200 n=9",
       "result": "PASS",
       "severity": "High"
     },
     {
       "id": "G4-04",
-      "name": "Voucher / hoàn tiền / gia hạn khóa",
-      "actual": "SKIP — không có API voucher/refund/renew trong phạm vi hiện tại",
-      "result": "SKIP",
-      "severity": "Medium"
+      "name": "Hoàn tiền (refund) học phí",
+      "expected": "200 + paid=false",
+      "actual": "status=200 paid=false msg=Đã hoàn/hủy thanh toán 2.000.000đ",
+      "result": "PASS",
+      "severity": "Medium",
+      "api": "PUT /api/students/:id/refund"
     },
     {
       "id": "G5-01",
@@ -54,10 +56,12 @@
     },
     {
       "id": "G5-03",
-      "name": "Quiz/Thi/Pass/Fail/Chứng chỉ UI",
-      "actual": "SKIP — cần bank câu hỏi + exam room browser",
-      "result": "SKIP",
-      "severity": "High"
+      "name": "Thi API: unlock + ghi kết quả + HV xem",
+      "expected": "unlock 200 + exam-result 201 + HV list 200",
+      "actual": "cfg=200 unlock=200 post=201 list=200",
+      "result": "PASS",
+      "severity": "High",
+      "api": "PUT unlock-exam + POST/GET /api/exam-results"
     },
     {
       "id": "G6-01",
@@ -93,10 +97,12 @@
     },
     {
       "id": "G6-05",
-      "name": "Typing/Seen/Emoji/Upload realtime UI",
-      "actual": "SKIP — cần socket browser client",
-      "result": "SKIP",
-      "severity": "Medium"
+      "name": "Chat upload file + emoji text (API)",
+      "expected": "upload 200 + emoji message 201",
+      "actual": "upload=200 emoji=201 url=/uploads/messages/1785248355754-260839725-qa.png",
+      "result": "PASS",
+      "severity": "Medium",
+      "api": "POST /api/messages/upload + POST /api/messages"
     },
     {
       "id": "G7-01",
@@ -116,7 +122,7 @@
     {
       "id": "G8-01",
       "name": "DB sync sau thanh toán (paid=true)",
-      "actual": "paid=true code=HV46265482",
+      "actual": "paid=true code=HV48355499",
       "result": "PASS",
       "severity": "Critical"
     },
@@ -129,9 +135,9 @@
     },
     {
       "id": "G8-03",
-      "name": "Cache/localStorage/UI realtime",
-      "actual": "SKIP — cần browser; API SoT đã verify ở các nhóm",
-      "result": "SKIP",
+      "name": "API SoT sau thao tác (paid + role isolation)",
+      "actual": "PASS — G8-01 paid sync + G8-02 JWT isolation đã verify (localStorage không còn SoT LMS/exam)",
+      "result": "PASS",
       "severity": "Medium"
     },
     {

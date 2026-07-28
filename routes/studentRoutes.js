@@ -879,6 +879,61 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
   }
 });
 
+// ─── PUT /api/students/:id/refund ─────────────────────────────────────────────
+// Admin hoàn học phí (đánh dấu chưa thanh toán + ghi chú) — không xóa hóa đơn lịch sử
+router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+  try {
+    const note = String(req.body?.note || 'Hoàn tiền / hủy xác nhận thanh toán').slice(0, 300);
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+    if (!student.paid) {
+      return res.status(409).json({ success: false, message: 'Học viên chưa thanh toán — không thể hoàn' });
+    }
+
+    const prevPaidAmount = Number(student.paidAmount) || Number(student.price) || 0;
+    student.paid = false;
+    student.paidAmount = 0;
+    student.paidAt = null;
+    student.paidNote = note;
+    student.paymentMethod = '';
+    await student.save({ validateModifiedOnly: true });
+
+    const io = req.app.get('io');
+    if (io) {
+      const NotificationService = require('../services/NotificationService');
+      NotificationService.notifyAdmins(
+        io,
+        '↩️ Hoàn học phí',
+        `Đã hoàn/hủy TT ${prevPaidAmount.toLocaleString('vi-VN')}đ của ${student.name}`,
+        { studentId: student._id },
+        '/admin/students',
+      ).catch(() => {});
+      NotificationService.send(io, {
+        type: 'FINANCE',
+        title: 'Hoàn học phí',
+        content: `Trạng thái thanh toán của bạn đã được cập nhật (hoàn/hủy). ${note}`,
+        receivers: String(student._id),
+        link: '/student#profile',
+      }).catch(() => {});
+      io.emit('data:refresh', { type: 'student', id: student._id });
+    }
+
+    const o = student.toObject();
+    delete o.password;
+    delete o.refreshToken;
+    return res.json({
+      success: true,
+      message: `Đã hoàn/hủy thanh toán ${prevPaidAmount.toLocaleString('vi-VN')}đ`,
+      data: { student: o, refundedAmount: prevPaidAmount },
+    });
+  } catch (error) {
+    logger.error('[STUDENTS] Refund error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ─── PUT /api/students/:id/unlock-exam ────────────────────────────────────────
 // Workflow 2: Admin mở khóa phòng thi thủ công
 router.put('/:id/unlock-exam', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {

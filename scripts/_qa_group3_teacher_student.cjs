@@ -271,11 +271,58 @@ async function main() {
     severity: 'Medium',
   });
 
+  // Assignment + exam + evaluation API (thay SKIP UI)
+  const asgCreate = await mut('POST', '/api/assignments', {
+    token: tTok,
+    body: {
+      courseId: 'Word',
+      studentId,
+      teacherId,
+      title: `QA BT ${Date.now().toString().slice(-6)}`,
+      description: 'QA nộp bài',
+      deadline: new Date(Date.now() + 7 * 86400000).toISOString(),
+    },
+  });
+  const asgId = asgCreate.json?.data?._id;
+  const submit = asgId
+    ? await mut('POST', `/api/assignments/${asgId}/submit`, {
+      token: sTok,
+      body: { studentId, teacherId, submittedFileUrl: '/uploads/assignments/qa-placeholder.txt' },
+    })
+    : { status: 0, json: {} };
+  const evalPost = await mut('POST', '/api/evaluations', {
+    token: sTok,
+    body: {
+      studentId,
+      targetTeacherId: teacherId,
+      type: 'teacher_rating',
+      content: 'QA đánh giá GV',
+      studentName: 'QA HV',
+      teacherName: 'QA GV',
+      courseName: 'Word',
+      criteria: { teaching: 5 },
+    },
+  });
+  const examPost = await mut('POST', '/api/exam-results', {
+    token: tTok,
+    body: {
+      type: 'student',
+      studentId,
+      subject: 'Word',
+      multipleChoiceCorrect: 9,
+      multipleChoiceTotal: 10,
+      passed: true,
+      date: new Date().toLocaleDateString('vi-VN'),
+    },
+  });
+  const lmsProg = await req('GET', '/api/training-lms/progress/me', { token: sTok });
   record({
-    id: 'G3-11', name: 'Video LMS / nộp bài / email điểm / đánh giá khóa',
-    expected: 'UI + LMS content fixtures',
-    actual: 'SKIP — cần dữ liệu LMS/assignment UI; không crash API core',
-    result: 'SKIP',
+    id: 'G3-11', name: 'Bài tập nộp + đánh giá GV + điểm thi + LMS progress API',
+    expected: 'assignment create/submit + evaluation + exam-result + progress không 500',
+    actual: `asg=${asgCreate.status} submit=${submit.status} eval=${evalPost.status} exam=${examPost.status} lms=${lmsProg.status}`,
+    result: asgCreate.status < 400 && submit.status < 400 && evalPost.status < 500
+      && examPost.status < 400 && lmsProg.status !== 500
+      ? 'PASS' : 'FAIL',
     severity: 'Medium',
   });
 

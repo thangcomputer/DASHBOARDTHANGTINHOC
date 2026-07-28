@@ -376,6 +376,32 @@ async function main() {
     });
   }
 
+  // Lịch + mở khóa thi API (trước khi khóa tài khoản)
+  {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 3);
+    const sch = await mut('POST', '/api/schedules', {
+      token: adminToken,
+      body: {
+        teacherId,
+        studentId,
+        date: tomorrow.toISOString(),
+        startTime: '14:00',
+        endTime: '15:30',
+        status: 'scheduled',
+      },
+    });
+    const hvSched = await req('GET', `/api/schedules?studentId=${studentId}`, { token: studentAccess });
+    const unlock = await mut('PUT', `/api/students/${studentId}/unlock-exam`, { token: adminToken, body: {} });
+    record({
+      id: 'G2-20', name: 'Đổi/lịch học + mở khóa phòng thi (API)',
+      expected: 'tạo lịch + HV xem + unlock-exam',
+      actual: `sch=${sch.status} hvSched=${hvSched.status} unlock=${unlock.status}`,
+      result: sch.status < 400 && hvSched.status === 200 && unlock.status === 200 ? 'PASS' : 'FAIL',
+      severity: 'Medium',
+    });
+  }
+
   // "Lock" student — try suspended / Ngừng học
   {
     const lock1 = await mut('PUT', `/api/students/${studentId}`, {
@@ -419,13 +445,6 @@ async function main() {
       await mut('DELETE', `/api/teachers/${teacherId}`, { token: adminToken });
     }
   }
-
-  record({
-    id: 'G2-20', name: 'Chứng chỉ / đổi lớp lịch / video UI',
-    expected: 'Covered deeper in G3–G5',
-    actual: 'SKIP — cần LMS content + schedule fixtures',
-    result: 'SKIP', severity: 'Medium',
-  });
 
   printSummary();
 }

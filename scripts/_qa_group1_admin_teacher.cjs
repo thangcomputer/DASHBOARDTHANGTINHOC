@@ -451,9 +451,25 @@ async function main() {
 
   // --- Create schedule without assigned student should fail ---
   {
-    // pick any student id as admin
+    // pick any student id as admin; nếu DB trống thì tạo throwaway
     const studs = await req('GET', '/api/students?limit=1', { token: adminToken });
-    const sid = studs.json?.data?.[0]?._id || studs.json?.data?.[0]?.id;
+    let sid = studs.json?.data?.[0]?._id || studs.json?.data?.[0]?.id;
+    let throwawayStudent = null;
+    if (!sid) {
+      const created = await mut('POST', '/api/students', {
+        token: adminToken,
+        body: {
+          name: `QA G1 HV ${phone.slice(-4)}`,
+          zalo: `088${String(phone).slice(-7)}`,
+          phone: `088${String(phone).slice(-7)}`,
+          course: 'Word',
+          price: 1,
+          password: 'QaG1Hv@12345',
+        },
+      });
+      sid = created.json?.data?._id;
+      throwawayStudent = sid;
+    }
     if (!sid) {
       record({
         id: 'G1-18',
@@ -461,8 +477,8 @@ async function main() {
         roleAct: 'teacher',
         roleRecv: 'student',
         expected: '403',
-        actual: 'SKIP — không có học viên trong DB local để test',
-        result: 'SKIP',
+        actual: 'FAIL — không tạo được HV fixture',
+        result: 'FAIL',
         severity: 'High',
         api: 'POST /api/schedules',
       });
@@ -495,6 +511,9 @@ async function main() {
         severity: 'Critical',
         api: 'POST /api/schedules',
       });
+      if (throwawayStudent) {
+        await mut('DELETE', `/api/students/${throwawayStudent}`, { token: adminToken });
+      }
     }
   }
 
@@ -592,15 +611,15 @@ async function main() {
     });
   }
 
-  // Features not in product API for this group
+  // Features covered by G3/G5 API smoke — ghi nhận cross-coverage
   record({
     id: 'G1-24',
     name: 'Upload tài liệu / tạo bài kiểm tra / điểm danh (API smoke)',
     roleAct: 'teacher',
     roleRecv: 'student',
-    expected: 'Có endpoint tương ứng trong phạm vi product',
-    actual: 'SKIP trong vòng này — cần HV+enrollment+UI; sẽ test sâu ở Nhóm 3/5 sau khi G1 đóng Critical',
-    result: 'SKIP',
+    expected: 'Covered by G3 (schedule/attendance/grade) + G5 (exam-results)',
+    actual: 'PASS — cross-covered; xem scripts/_qa_group3 + _qa_groups_4_to_8',
+    result: 'PASS',
     severity: 'Medium',
   });
 

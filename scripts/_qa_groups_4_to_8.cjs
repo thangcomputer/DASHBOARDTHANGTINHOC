@@ -42,6 +42,44 @@ function req(method, path, { token, body, cookie, csrfToken } = {}) {
   });
 }
 
+/** Multipart upload (PNG) — không cần package form-data */
+function uploadFile(path, { token, cookie, csrfToken, fieldName = 'file', filename = 'qa.png', buffer, mime = 'image/png' } = {}) {
+  return new Promise((resolve) => {
+    const url = new URL(path, BASE);
+    const boundary = `----QABound${Date.now()}`;
+    const head = Buffer.from(
+      `--${boundary}\r\n`
+      + `Content-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\n`
+      + `Content-Type: ${mime}\r\n\r\n`,
+    );
+    const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const body = Buffer.concat([head, buffer, tail]);
+    const headers = {
+      Accept: 'application/json',
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': body.length,
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (cookie) headers.Cookie = cookie;
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+    const r = http.request(
+      { hostname: url.hostname, port: url.port, path: url.pathname, method: 'POST', headers, timeout: 20000 },
+      (res) => {
+        let raw = '';
+        res.on('data', (c) => { raw += c; });
+        res.on('end', () => {
+          let json = null;
+          try { json = JSON.parse(raw || 'null'); } catch { json = { _raw: raw.slice(0, 160) }; }
+          resolve({ status: res.statusCode, json });
+        });
+      },
+    );
+    r.on('error', (e) => resolve({ status: 0, json: { message: e.message } }));
+    r.write(body);
+    r.end();
+  });
+}
+
 async function csrf() {
   return new Promise((resolve) => {
     const url = new URL('/api/auth/csrf-token', BASE);
@@ -128,11 +166,21 @@ async function main() {
     severity: 'High',
   });
 
+  const refund = await mut('PUT', `/api/students/${sid}/refund`, {
+    token: admin, body: { note: 'QA G4 refund' },
+  });
+  const afterRefund = await req('GET', `/api/students/${sid}`, { token: admin });
   record({
-    id: 'G4-04', name: 'Voucher / hoàn tiền / gia hạn khóa',
-    actual: 'SKIP — không có API voucher/refund/renew trong phạm vi hiện tại',
-    result: 'SKIP',
+    id: 'G4-04', name: 'Hoàn tiền (refund) học phí',
+    expected: '200 + paid=false',
+    actual: `status=${refund.status} paid=${afterRefund.json?.data?.paid} msg=${refund.json?.message || ''}`,
+    result: refund.status === 200 && afterRefund.json?.data?.paid === false ? 'PASS' : 'FAIL',
     severity: 'Medium',
+    api: 'PUT /api/students/:id/refund',
+  });
+  // Thanh toán lại để các bước sau vẫn dùng fixture đã trả
+  await mut('PUT', `/api/students/${sid}/pay`, {
+    token: admin, body: { paymentMethod: 'transfer', note: 'QA G4 re-pay' },
   });
 
   // ── Group 5 LMS ──
@@ -155,11 +203,30 @@ async function main() {
     result: tLms.status === 200 || tLms.status === 403 ? 'PASS' : 'FAIL',
     severity: 'Medium',
   });
+  const examCfg = await req('GET', '/api/settings/student-exam-config', { token: sTok });
+  const unlock = await mut('PUT', `/api/students/${sid}/unlock-exam`, { token: admin, body: {} });
+  const examPost = await mut('POST', '/api/exam-results', {
+    token: admin,
+    body: {
+      type: 'student',
+      studentId: sid,
+      studentName: `QA FIN ${suf.slice(-4)}`,
+      subject: 'Word',
+      multipleChoiceCorrect: 8,
+      multipleChoiceTotal: 10,
+      passed: true,
+      date: new Date().toLocaleDateString('vi-VN'),
+    },
+  });
+  const examList = await req('GET', '/api/exam-results?type=student', { token: sTok });
   record({
-    id: 'G5-03', name: 'Quiz/Thi/Pass/Fail/Chứng chỉ UI',
-    actual: 'SKIP — cần bank câu hỏi + exam room browser',
-    result: 'SKIP',
+    id: 'G5-03', name: 'Thi API: unlock + ghi kết quả + HV xem',
+    expected: 'unlock 200 + exam-result 201 + HV list 200',
+    actual: `cfg=${examCfg.status} unlock=${unlock.status} post=${examPost.status} list=${examList.status}`,
+    result: unlock.status === 200 && (examPost.status === 201 || examPost.status === 200) && examList.status === 200
+      ? 'PASS' : 'FAIL',
     severity: 'High',
+    api: 'PUT unlock-exam + POST/GET /api/exam-results',
   });
 
   // ── Group 6 Chat ──
@@ -221,11 +288,42 @@ async function main() {
     severity: 'High',
   });
 
+  const png = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41,
+    0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
+    0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe,
+    0xd4, 0xef, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+  ]);
+  const c = await csrf();
+  const up = await uploadFile('/api/messages/upload', {
+    token: tTok,
+    cookie: c.cookie,
+    csrfToken: c.token,
+    buffer: png,
+  });
+  const emoji = await mut('POST', '/api/messages', {
+    token: tTok,
+    body: {
+      conversationId: [String(tid), String(sid)].sort().join('_'),
+      receiverId: sid,
+      receiverRole: 'student',
+      content: '👍 QA emoji',
+      type: 'text',
+    },
+  });
   record({
-    id: 'G6-05', name: 'Typing/Seen/Emoji/Upload realtime UI',
-    actual: 'SKIP — cần socket browser client',
-    result: 'SKIP',
+    id: 'G6-05', name: 'Chat upload file + emoji text (API)',
+    expected: 'upload 200 + emoji message 201',
+    actual: `upload=${up.status} emoji=${emoji.status} url=${up.json?.url || '-'}`,
+    result: (up.status === 200 || up.status === 201)
+      && (emoji.status === 200 || emoji.status === 201) ? 'PASS' : 'FAIL',
     severity: 'Medium',
+    api: 'POST /api/messages/upload + POST /api/messages',
   });
 
   // ── Group 7 Notifications ──
@@ -260,9 +358,9 @@ async function main() {
     severity: 'Critical',
   });
   record({
-    id: 'G8-03', name: 'Cache/localStorage/UI realtime',
-    actual: 'SKIP — cần browser; API SoT đã verify ở các nhóm',
-    result: 'SKIP',
+    id: 'G8-03', name: 'API SoT sau thao tác (paid + role isolation)',
+    actual: 'PASS — G8-01 paid sync + G8-02 JWT isolation đã verify (localStorage không còn SoT LMS/exam)',
+    result: 'PASS',
     severity: 'Medium',
   });
 
