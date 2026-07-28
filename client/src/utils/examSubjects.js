@@ -251,17 +251,23 @@ export function getTeacherTeachingFocus(teacher, catalog) {
   }
 
   const ids = resolveTeacherSubjectIds(teacher, cat).map(String);
-  const officeHits = ids.filter((id) => OFFICE_EXAM_IDS.includes(id));
-  const nonCobanOffice = officeHits.filter((id) => id !== 'coban');
-  // subjectIds đủ bộ Office (do parse specialty THVP) → coi là focus THVP
-  if (nonCobanOffice.length >= 3 && !ids.includes('canva') && !focuses.size) {
-    return ['thvp'];
-  }
-
   ids.forEach((id) => {
     if (id === 'coban') return;
     if (id === 'canva' || OFFICE_EXAM_IDS.includes(id) || cat[id]) focuses.add(id);
   });
+
+  // Đủ Word + Excel + PowerPoint (specialty hoặc subjectIds) → focus THVP
+  // để khớp khóa "Tin học văn phòng". Giữ môn ngoài Office (MOS, Design, Sư phạm…).
+  // Trước đây điều kiện !focuses.size khiến GV liệt kê Word/Excel/PPT bị coi "khác môn".
+  const hasCanva = focuses.has('canva') || ids.includes('canva');
+  const hasFullOffice = ['word', 'excel', 'powerpoint'].every((id) => focuses.has(id));
+  if (hasFullOffice && !hasCanva) {
+    focuses.delete('word');
+    focuses.delete('excel');
+    focuses.delete('powerpoint');
+    focuses.delete('coban');
+    focuses.add('thvp');
+  }
 
   return [...focuses];
 }
