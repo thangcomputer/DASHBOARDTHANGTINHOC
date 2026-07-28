@@ -520,7 +520,7 @@ const AppSidebar = ({
       {/* ── Mobile: Hamburger button ── */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed z-50 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white rounded-xl shadow-lg border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform"
+        className="lg:hidden fixed z-[70] w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white rounded-xl shadow-lg border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform"
         style={{
           top: 'max(0.75rem, env(safe-area-inset-top, 0px))',
           left: 'max(0.75rem, env(safe-area-inset-left, 0px))',
@@ -531,9 +531,9 @@ const AppSidebar = ({
         <Menu size={20} />
       </button>
 
-      {/* ── Mobile: Overlay ── */}
+      {/* ── Mobile: Overlay (above header/branch dropdown) ── */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
+        <div className="lg:hidden fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
           <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={() => setMobileOpen(false)} />
           <div className="absolute left-0 top-0 h-full w-[min(85vw,280px)] max-w-[280px] animate-in slide-in-from-left duration-300">
             <div className="h-full relative shadow-2xl">
