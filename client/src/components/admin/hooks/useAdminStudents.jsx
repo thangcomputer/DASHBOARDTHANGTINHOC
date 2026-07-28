@@ -130,13 +130,15 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         showGlobalModal({
           title: 'HÓA ĐƠN THU HỌC PHÍ',
           content: (
-            <div className="flex flex-col items-center bg-gray-100 p-6 rounded-2xl w-full overflow-hidden">
+                <div className="flex flex-col items-center bg-gray-100 p-6 rounded-2xl w-full overflow-hidden">
               <div className="w-full flex justify-center overflow-hidden py-2">
                 <div
-                  className="shadow-2xl overflow-hidden flex-shrink-0 mx-auto"
-                  style={{ width: '168mm', height: '118.4mm' }}
+                      className="shadow-2xl overflow-hidden flex-shrink-0 mx-auto w-full max-w-[560px] aspect-[210/148] bg-white"
                 >
-                  <div style={{ transform: 'scale(0.8)', transformOrigin: 'top left', width: '210mm', height: '148mm' }}>
+                      <div
+                        className="origin-top-left scale-[0.8] md:scale-[0.7] transition-transform"
+                        style={{ width: '210mm', height: '148mm' }}
+                      >
                     <InvoiceTemplate data={{
                       studentName: student.name,
                       courseName: student.course,

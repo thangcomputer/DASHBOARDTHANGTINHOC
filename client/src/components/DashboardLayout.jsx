@@ -115,24 +115,26 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     } catch {}
   }, []);
 
-  const currentTeacher = role === 'teacher' && session?.id
-    ? teachers.find(t => String(t.id) === String(session.id))
+  const sessionTeacherId = session?.id || session?._id;
+
+  const currentTeacher = role === 'teacher' && sessionTeacherId
+    ? teachers.find(t => String(t.id) === String(sessionTeacherId))
     : null;
 
   // ⭐ Fix: Chuyển sang logic "Pessimistic" (Mặc định là Pending trừ khi có bằng chứng là Active)
   // Việc này giúp tránh bị "Flash" mở khóa menu khi login (do data chưa load kịp)
-  const isTeacherPending = (role === 'teacher' && session?.id) ? (
+  const isTeacherPending = (role === 'teacher' && sessionTeacherId) ? (
      String(session?.status || '').toLowerCase() !== 'active' && 
      (!currentTeacher || String(currentTeacher.status || '').toLowerCase() !== 'active')
   ) : false;
 
-  const isTeacherActive = (role === 'teacher' && session?.id) ? (
+  const isTeacherActive = (role === 'teacher' && sessionTeacherId) ? (
      String(session?.status || '').toLowerCase() === 'active' || 
      (currentTeacher && String(currentTeacher.status || '').toLowerCase() === 'active')
   ) : false;
 
   useEffect(() => {
-    if (role !== 'teacher' || !session?.id) return;
+    if (role !== 'teacher' || !sessionTeacherId) return;
     if (window.location.pathname.includes('/teacher/test')) return;
     
     // Nếu hệ thống đang tải hoặc currentTeacher chưa có nhưng session lại nói là active/pending thì CHỜ.
@@ -149,10 +151,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     if (!allowed.includes(s)) {
       navigate('/teacher/test', { replace: true });
     }
-  }, [currentTeacher, role, session, isRefetching, navigate]);
+  }, [currentTeacher, role, session, sessionTeacherId, isRefetching, navigate]);
 
   useEffect(() => {
-    if (role !== 'teacher' || !session?.id) return;
+    if (role !== 'teacher' || !sessionTeacherId) return;
     
     const isLocalStatusValid = String(session?.status).toLowerCase();
     if (isRefetching || (!currentTeacher && isLocalStatusValid)) return;
@@ -168,7 +170,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     if (status === 'active' && window.location.pathname.includes('/teacher/test')) {
       navigate('/teacher', { replace: true });
     }
-  }, [currentTeacher?.status, session?.status, role, session?.id, navigate, isRefetching]);
+  }, [currentTeacher?.status, session?.status, role, sessionTeacherId, navigate, isRefetching]);
 
   // Admin/staff lần đầu: mở đổi MK ngay.
   // HV/GV: chờ hoàn thành hướng dẫn (LmsGuideHost) rồi mới mở.
@@ -266,7 +268,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <header className={`cms-topbar-glass flex flex-col border-b border-slate-100/80 flex-shrink-0 z-40 safe-pad-top ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="h-14 sm:h-16 flex items-center gap-1.5 sm:gap-3 pl-[4.25rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-4 min-w-0">
+          <div className="h-14 sm:h-16 flex items-center gap-1.5 sm:gap-3 pl-[4.25rem] sm:pl-20 md:pl-6 lg:pl-6 pr-2 sm:pr-4 min-w-0">
             <div className="min-w-0 flex-1">
               <h1 className="text-base sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
               <p className="text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5">
@@ -478,7 +480,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             className={
               isImmersivePage
                 ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
-                : 'cms-page min-w-0'
+                : 'cms-page min-w-0 mx-auto max-w-7xl'
             }
           >
             <Outlet />
