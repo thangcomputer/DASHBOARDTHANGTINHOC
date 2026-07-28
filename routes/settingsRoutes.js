@@ -13,9 +13,12 @@ const {
   getMergedExamCatalog,
   normalizeCustomList,
   sanitizeCustomExamSubjectEntry,
+  mergeCourseSubjectsIntoCustom,
+  inferExamSubjectsFromCourseName,
   BUILTIN_EXAM_SUBJECT_IDS,
 } = require('../services/examSubjectCatalog');
 const { getCachedSettings, invalidateSettingsCache } = require('../services/settingsCache');
+const Course = require('../models/Course');
 
 /** Chuyển URL đầy đủ http(s)://.../uploads/... → /uploads/... (tránh mixed-content trên HTTPS) */
 function normalizeUploadFileUrl(url) {
@@ -354,8 +357,37 @@ function sanitizeStudentExamFilesPayload(body) {
   return out;
 }
 
-function examCatalogPayload(settings) {
-  const custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
+/**
+ * Catalog môn thi = builtin + custom settings + môn gắn trên Course (đồng bộ DB).
+ * Nếu tìm thấy môn còn thiếu → ghi vào examSubjectsCustomRaw để lần sau dùng chung.
+ * Khóa học cũ thiếu examSubjects → backfill từ tên/category.
+ */
+async function examCatalogPayload(settings) {
+  let custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
+  try {
+    const courses = await Course.find({}).select('name category examSubjects').lean();
+
+    // Backfill examSubjects cho khóa học cũ (chỉ những bản ghi đang trống)
+    const toBackfill = courses.filter((c) => !Array.isArray(c.examSubjects) || c.examSubjects.length === 0);
+    if (toBackfill.length) {
+      await Promise.all(toBackfill.map(async (c) => {
+        const ids = inferExamSubjectsFromCourseName(c.name, c.category, custom);
+        if (!ids.length) return;
+        await Course.updateOne({ _id: c._id }, { $set: { examSubjects: ids } });
+        c.examSubjects = ids;
+      }));
+      logger.info(`[EXAM-SUBJECTS] Backfilled examSubjects for ${toBackfill.length} course(s)`);
+    }
+
+    const { custom: mergedCustom, added } = mergeCourseSubjectsIntoCustom(custom, courses);
+    if (added.length) {
+      custom = mergedCustom;
+      await updateMainSettings({ $set: { examSubjectsCustomRaw: custom } });
+      logger.info(`[EXAM-SUBJECTS] Synced ${added.length} subject(s) from courses: ${added.map((s) => s.id).join(', ')}`);
+    }
+  } catch (err) {
+    logger.warn('[EXAM-SUBJECTS] Course sync skipped:', err.message);
+  }
   return {
     custom,
     merged: getMergedExamCatalog(custom),
@@ -374,7 +406,7 @@ router.get('/student-exam-config', authMiddleware, async (req, res) => {
     const hasEssayMinutesOnServer = essayMinsRaw != null && typeof essayMinsRaw === 'object';
     const filesRaw = settings.studentExamFilesRaw;
     const hasExamFilesOnServer = filesRaw != null && typeof filesRaw === 'object';
-    const catalog = examCatalogPayload(settings);
+    const catalog = await examCatalogPayload(settings);
     return res.json({
       success: true,
       data: {
@@ -559,11 +591,11 @@ router.put('/teacher-exam-config', authMiddleware, isAdmin, async (req, res) => 
   }
 });
 
-// ── GET /api/settings/exam-subjects ── Danh muc mon thi (mac dinh + tuy chinh)
+// ── GET /api/settings/exam-subjects ── Danh muc mon thi (mac dinh + tuy chinh + sync Course)
 router.get('/exam-subjects', authMiddleware, async (req, res) => {
   try {
     const settings = await getSettings();
-    const catalog = examCatalogPayload(settings);
+    const catalog = await examCatalogPayload(settings);
     return res.json({ success: true, data: catalog });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

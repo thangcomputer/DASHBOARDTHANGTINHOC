@@ -22,12 +22,12 @@ export const MOS_EXAM_IDS = ['mos-word', 'mos-excel', 'mos-powerpoint'];
 export const DESIGN_EXAM_IDS = ['photoshop', 'canva', 'corel', 'autocad'];
 export const PROGRAMMING_EXAM_IDS = ['cpp', 'web', 'python'];
 export const EXAM_SUBJECT_GROUP_LABELS = {
-  office: 'Tin hoc van phong',
+  office: 'Tin học văn phòng',
   design: 'Design',
-  mos: 'Tin hoc MOS',
-  programming: 'Lap trinh',
-  pedagogy: 'Su pham',
-  admin: 'Admin tao',
+  mos: 'Tin học MOS',
+  programming: 'Lập trình',
+  pedagogy: 'Sư phạm',
+  admin: 'Admin tạo',
 };
 
 export function slugifyExamSubjectId(raw) {

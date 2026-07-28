@@ -132,6 +132,56 @@ function resolveExamSubjectsForCourse(course, customRaw) {
   return inferExamSubjectsFromCourseName(course.name, course.category, customRaw);
 }
 
+/**
+ * Quét Course.examSubjects / tên khóa → sinh môn custom còn thiếu (group: admin).
+ * Dùng để Teacher/Student nhìn thấy đúng các môn Admin đã gắn vào khóa học cũ.
+ */
+function collectSubjectsFromCourses(courses, customRaw) {
+  const existing = new Set(getMergedExamCatalog(customRaw).map((s) => s.id));
+  const discovered = [];
+  const seen = new Set();
+
+  (Array.isArray(courses) ? courses : []).forEach((course) => {
+    const rawIds = Array.isArray(course?.examSubjects)
+      ? course.examSubjects.map(String)
+      : [];
+
+    rawIds.forEach((rawId) => {
+      const id = String(rawId || '').trim();
+      if (!id || existing.has(id) || seen.has(id) || BUILTIN_EXAM_SUBJECT_IDS.includes(id)) return;
+      seen.add(id);
+      const labelFromId = id
+        .split('-')
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+      const entry = sanitizeCustomExamSubjectEntry({
+        id,
+        label: labelFromId || id,
+        group: 'admin',
+      });
+      if (entry) discovered.push(entry);
+    });
+  });
+
+  return discovered;
+}
+
+function mergeCourseSubjectsIntoCustom(customRaw, courses) {
+  const base = normalizeCustomList(customRaw);
+  const discovered = collectSubjectsFromCourses(courses, base);
+  if (!discovered.length) return { custom: base, added: [] };
+  const seen = new Set(base.map((s) => s.id));
+  const added = [];
+  discovered.forEach((entry) => {
+    if (seen.has(entry.id) || BUILTIN_EXAM_SUBJECT_IDS.includes(entry.id)) return;
+    seen.add(entry.id);
+    base.push(entry);
+    added.push(entry);
+  });
+  return { custom: base, added };
+}
+
 module.exports = {
   BUILTIN_EXAM_SUBJECT_IDS,
   BUILTIN_EXAM_SUBJECTS,
@@ -146,4 +196,6 @@ module.exports = {
   resolveExamSubjectsForCourse,
   inferExamSubjectsFromCourseName,
   resolveExamSubjectId,
+  collectSubjectsFromCourses,
+  mergeCourseSubjectsIntoCustom,
 };
