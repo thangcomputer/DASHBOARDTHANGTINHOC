@@ -91,28 +91,17 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const [linkSaved, setLinkSaved] = useState(false);
   const [gradeSaved, setGradeSaved] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
-  const [attForm, setAttForm] = useState({ note: 'Đã điểm danh hoàn thành buổi học', grade: '' });
+  const [attForm, setAttForm] = useState({ note: 'Đã điểm danh hoàn thành buổi học', grade: student.avgGrade ?? student.lastGrade ?? 0 });
 
   useEffect(() => {
     setGradeInput(student.avgGrade ?? student.lastGrade ?? '');
     setLinkInput(student.linkHoc);
     setNotesInput(student.notes || '');
+    setAttForm((prev) => ({
+      ...prev,
+      grade: student.avgGrade ?? student.lastGrade ?? 0,
+    }));
   }, [student._enrollmentKey, student.course, student.avgGrade, student.lastGrade, student.linkHoc, student.notes]);
-
-  const submitAttendance = () => {
-    const raw = attForm.grade;
-    if (raw === '' || raw === null || raw === undefined) {
-      showGlossyAlert('Vui lòng nhập điểm buổi học (0-10) trước khi điểm danh.');
-      return;
-    }
-    const gradeNum = Number(raw);
-    if (!Number.isFinite(gradeNum) || gradeNum < 0 || gradeNum > 10) {
-      showGlossyAlert('Điểm không hợp lệ. Nhập số từ 0 đến 10.');
-      return;
-    }
-    onAttendance((student._id || student.id), attForm.note || 'Đã điểm danh hoàn thành buổi học', gradeNum);
-    setShowAttendanceModal(false);
-  };
 
   // ASSIGNMENTS STATE
   const [courseAssignments, setCourseAssignments] = useState([]);
@@ -437,8 +426,8 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
           </div>
         </div>
 
-        {/* Tabs — 4 cột đều; mobile chỉ icon */}
-        <div className="grid grid-cols-4 bg-white border-b border-slate-100 px-1 sm:px-4 md:px-8">
+        {/* Tabs — mobile: 4 cột chỉ icon; sm+: icon + chữ */}
+        <div className="grid grid-cols-4 w-full bg-white border-b border-slate-100 px-0 sm:px-4 md:px-8">
           {panels.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -447,12 +436,12 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               title={label}
               aria-label={label}
               aria-current={activePanel === key ? 'page' : undefined}
-              className={`relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1 sm:px-3 py-3 sm:py-4 text-xs font-medium uppercase tracking-wide transition-all min-h-11 ${
+              className={`relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-3 py-3 sm:py-4 text-[10px] sm:text-xs font-medium uppercase tracking-wide transition-all min-w-0 ${
                 activePanel === key ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
-              <Icon size={18} className="shrink-0" aria-hidden="true" />
-              <span className="hidden sm:inline truncate max-w-full leading-none">{label}</span>
+              <Icon size={16} className="shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline truncate max-w-full">{label}</span>
               {activePanel === key && (
                 <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-t-full" />
               )}
@@ -496,19 +485,16 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                      <button 
                        type="button"
                        onClick={() => {
-                         if (isCompleted) return;
+                         if (!canCheckIn && !isCompleted) return;
                          const tGrade = (student.grades || []).find(g => g.date === todayStr);
-                         setAttForm({
-                           note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học',
-                           grade: tGrade?.grade != null && tGrade.grade !== '' ? String(tGrade.grade) : '',
-                         });
+                         setAttForm({ note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học', grade: tGrade?.grade ?? (student.lastGrade || 0) });
                          setShowAttendanceModal(true);
                        }} 
-                       disabled={isCompleted || attendanceGate?.status === 'no_schedule'}
+                       disabled={isCompleted || !canCheckIn || attendanceGate?.status === 'no_schedule'}
                        title={
                          isCompleted ? 'Khóa học đã hoàn thành' :
                          attendanceGate?.status === 'no_schedule' ? 'Hôm nay chưa có lịch dạy' :
-                         !canCheckIn ? 'Đã điểm danh — bấm để cập nhật điểm/ghi chú' : 
+                         !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                          'Bấm để điểm danh buổi học hôm nay'
                        }
                        className={`h-9 sm:h-auto sm:py-5 rounded-xl sm:rounded-3xl font-bold text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all ${
@@ -517,7 +503,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                          : attendanceGate?.status === 'no_schedule'
                            ? 'border border-slate-300 text-slate-700 bg-white cursor-not-allowed'
                          : !canCheckIn
-                           ? 'border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100'
+                           ? 'border border-slate-300 text-slate-500 bg-white cursor-not-allowed'
                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-[0.98]'
                        }`}
                      >
@@ -528,7 +514,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                            : attendanceGate?.status === 'no_schedule'
                              ? 'Chưa có lịch'
                              : !canCheckIn
-                               ? 'Cập nhật điểm'
+                               ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
                                : 'Điểm danh'}
                        </span>
                      </button>
@@ -617,7 +603,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   </h4>
                   <button 
                     onClick={() => setShowAddAssign(!showAddAssign)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-100 transition-all flex items-center gap-1.5"
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-100 transition-all flex items-center gap-1.5"
                   >
                     {showAddAssign ? <X size={14} /> : <Plus size={14} />} {showAddAssign ? 'HỦY' : 'GIAO BÀI TẬP'}
                   </button>
@@ -721,19 +707,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                             </div>
                             <div className="flex flex-col items-end gap-3 font-black flex-shrink-0">
                               {isSubmitted ? (
-                                <div className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 border shadow-sm ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
+                                <div className={`px-4 py-1.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 border shadow-sm ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
                                   {isGraded ? <Check size={12}/> : <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
                                   {isGraded ? `${getGradeLabel(submission.grade)}: ${submission.grade}/10` : 'ĐÃ NỘP BÀI'}
                                 </div>
                                                             ) : (
-                                <span className="px-4 py-2 rounded-full text-xs uppercase tracking-widest bg-gray-50 text-slate-300">CHƯA NỘP</span>
+                                <span className="px-4 py-1.5 rounded-2xl text-xs uppercase tracking-widest bg-gray-50 text-slate-300">CHƯA NỘP</span>
                               )}
                               
                               {isSubmitted && submission.submittedFileUrl && (
                                 <a 
                                   href={buildMediaDownloadUrl(submission.submittedFileUrl, submission.submittedFileUrl.split('/').pop())} 
                                   target="_blank" rel="noreferrer" 
-                                  className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-full font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm"
+                                  className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-xl font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm"
                                   title="Tải bài làm của học viên"
                                 >
                                   <Download size={14} /> TẢI BÀI
@@ -748,11 +734,11 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                                     placeholder="Điểm (0-10)"
                                     value={gradingInputs[submission._id] || ''}
                                     onChange={(e) => setGradingInputs({...gradingInputs, [submission._id]: e.target.value})}
-                                    className="w-28 bg-slate-50 border-2 border-indigo-100 rounded-full px-4 py-2 text-sm font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
+                                    className="w-24 bg-white border-2 border-indigo-100 rounded-xl p-2 text-xs font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
                                   />
                                   <button 
                                     onClick={() => handleGradeSubmit(submission._id)} 
-                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
+                                    className="bg-red-600 hover:bg-red-700 text-white p-2 px-4 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
                                   >
                                     LƯU
                                   </button>
@@ -766,11 +752,11 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                                     placeholder="Sửa điểm"
                                     value={gradingInputs[submission._id] ?? submission.grade ?? ''}
                                     onChange={(e) => setGradingInputs({...gradingInputs, [submission._id]: e.target.value})}
-                                    className="w-28 bg-slate-50 border-2 border-indigo-100 rounded-full px-4 py-2 text-sm font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
+                                    className="w-24 bg-white border-2 border-indigo-100 rounded-xl p-2 text-xs font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
                                   />
                                   <button 
                                     onClick={() => handleGradeSubmit(submission._id)} 
-                                    className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-full text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
+                                    className="bg-amber-500 hover:bg-amber-600 text-white p-2 px-3 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
                                   >
                                     SỬA ĐIỂM
                                   </button>
@@ -798,7 +784,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
             )}
             {activePanel === 'grade' && (
               <div className="space-y-8 animate-in slide-in-from-right-10 duration-500">
-                 <div className="bg-amber-50 border border-amber-100 rounded-[40px] p-8 sm:p-10 flex flex-col md:flex-row items-center gap-10 shadow-sm">
+                 <div className="bg-amber-50 border border-amber-100 rounded-[40px] p-10 flex flex-col md:flex-row items-center gap-10">
                     <div className="flex-1 space-y-4">
                        <div className="flex items-center gap-4 mb-2">
                           <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm">
@@ -812,19 +798,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        <input 
                           type="number" min="0" max="10" step="0.5" 
                           value={gradeInput} onChange={e => setGradeInput(e.target.value)}
-                          className="w-28 bg-white border-2 border-amber-200 rounded-2xl p-4 text-3xl font-black text-amber-700 text-center focus:border-amber-500 outline-none"
+                          className="w-24 bg-white border-2 border-amber-200 rounded-2xl p-4 text-3xl font-black text-amber-700 text-center focus:border-amber-500 outline-none"
                        />
                        <p className="text-xs font-bold text-amber-400 italic">* Điểm số sẽ được hiển thị công khai trên học bạ</p>
                        <button 
                          onClick={handleGradeSave}
-                         className="w-full py-4 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:from-amber-700 hover:to-orange-700 transition shadow-lg shadow-amber-100"
+                         className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-700 transition shadow-lg shadow-amber-100"
                        >
                          LƯU KẾT QUẢ ĐÁNH GIÁ
                        </button>
                     </div>
-                    <div className="w-40 h-40 bg-gradient-to-b from-amber-50 to-white rounded-full border-8 border-amber-100 flex flex-col items-center justify-center shadow-xl">
+                    <div className="w-40 h-40 bg-white rounded-full border-8 border-amber-100 flex flex-col items-center justify-center shadow-xl">
                        <span className="text-xs font-black text-amber-300 uppercase leading-none mb-1">Xếp loại</span>
-                       <span className="text-6xl font-black text-amber-600 leading-none">
+                       <span className="text-6xl font-black text-amber-600">
                           {gradeLetter}
                        </span>
                     </div>
@@ -890,7 +876,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                     Hủy
                   </button>
                   <button 
-                    onClick={submitAttendance}
+                    onClick={() => {
+                      onAttendance((student._id || student.id), attForm.note, Number(attForm.grade));
+                      setShowAttendanceModal(false);
+                    }}
                     className="flex-[2] py-4 text-white font-black text-xs uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg shadow-green-100 hover:shadow-green-200 transition-all active:scale-95"
                   >
                     Xác nhận Điểm danh
@@ -993,19 +982,16 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 </div>
               ) : (
                 <button onClick={() => {
-                    if (isCompleted) return;
+                    if (!canCheckIn && !isCompleted) return;
                     const tGrade = (student.grades || []).find(g => g.date === todayStr);
-                    setAttForm({
-                      note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học',
-                      grade: tGrade?.grade != null && tGrade.grade !== '' ? String(tGrade.grade) : '',
-                    });
+                    setAttForm({ note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học', grade: tGrade?.grade ?? (student.lastGrade || 0) });
                     setShowAttendanceModal(true);
                   }} 
-                  disabled={isCompleted || attendanceGate?.status === 'no_schedule'}
+                  disabled={isCompleted || !canCheckIn || attendanceGate?.status === 'no_schedule'}
                   title={
                     isCompleted ? 'Hoàn thành' :
                     attendanceGate?.status === 'no_schedule' ? 'Chưa có lịch dạy' :
-                    !canCheckIn ? 'Đã điểm danh — bấm để cập nhật điểm' : 
+                    !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                     'Bấm để điểm danh'
                   }
                   className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${
@@ -1014,7 +1000,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                     : attendanceGate?.status === 'no_schedule'
                       ? 'bg-slate-100 text-slate-800 cursor-not-allowed border-2 border-slate-300'
                     : !canCheckIn
-                      ? 'bg-amber-50 text-amber-700 border-2 border-amber-300 hover:bg-amber-100'
+                      ? 'bg-slate-50 text-slate-600 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200'
                       : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
                   }`}>
                   <CheckCircle size={18} />
@@ -1024,7 +1010,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                       : attendanceGate?.status === 'no_schedule'
                         ? 'KHÔNG CÓ LỊCH'
                         : !canCheckIn
-                          ? 'CẬP NHẬT ĐIỂM'
+                          ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
                           : 'ĐIỂM DANH'}
                   </span>
                 </button>
@@ -1149,17 +1135,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
 
             <div className="bg-slate-50 px-8 py-6 flex gap-4 flex-shrink-0">
               <button 
-                onClick={() => setShowAttendanceModal(false)}
+                onClick={closeModal}
                 className="flex-[1] py-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition"
+                disabled={submitting}
               >
                 Hủy bỏ
               </button>
               <button 
-                onClick={submitAttendance}
-                className="flex-[2] py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
+                onClick={handleSubmit}
+                disabled={submitting || (attForm._originalData?.status === 'completed' && !activeTab)}
+                className="flex-[2] py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <Save size={18} />
-                Xác nhận Điểm danh
+                {submitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                {attForm._originalData?.status === 'completed' ? 'Cập nhật' : 'Xác nhận Điểm danh'}
               </button>
             </div>
           </div>
