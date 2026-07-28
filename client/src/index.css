@@ -1337,16 +1337,82 @@
 .cms-teacher-card {
   background: var(--cms-surface);
   border: 1px solid var(--cms-border);
-  border-radius: var(--cms-r-card);
+  border-radius: 16px;
   box-shadow: var(--cms-shadow);
   padding: 16px;
   transition: transform var(--cms-duration) ease, box-shadow var(--cms-duration) ease;
 }
+@media (min-width: 390px) {
+  .cms-teacher-card { padding: 20px; }
+}
 .cms-teacher-card:active { transform: scale(0.992); }
+.cms-teacher-card__metrics {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+@media (min-width: 360px) {
+  .cms-teacher-card__metrics { grid-template-columns: 1fr 1fr; }
+}
+.cms-teacher-card__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--cms-neutral-50);
+  border: 1px solid var(--cms-border);
+}
+.cms-teacher-card__metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cms-neutral-500);
+  letter-spacing: 0.02em;
+}
+.cms-teacher-card__metric-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cms-neutral-900);
+  line-height: 1.2;
+}
+.cms-teacher-card__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--cms-border);
+  background: #fff;
+  font-size: 13px;
+  color: var(--cms-neutral-500);
+}
+.cms-teacher-card__status.is-ready {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #047857;
+}
+.cms-teacher-card__status.is-wait {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+.cms-teacher-card__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--cms-border);
+}
 .cms-progress {
   height: 6px;
   width: 100%;
-  max-width: 96px;
   border-radius: 999px;
   background: var(--cms-neutral-200);
   overflow: hidden;
@@ -2031,6 +2097,7 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   .cms-dash-badge-primary { @apply bg-red-50 text-red-600; }
   .cms-dash-badge-warning { @apply bg-amber-50 text-amber-700; }
   .cms-dash-badge-neutral { @apply bg-slate-100 text-slate-600; }
+  .cms-dash-badge-info { @apply bg-sky-50 text-sky-700; }
 
   .cms-dash-empty {
     @apply text-sm text-slate-400 text-center py-8 px-4;

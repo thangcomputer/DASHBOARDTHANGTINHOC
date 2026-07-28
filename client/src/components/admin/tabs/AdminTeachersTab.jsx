@@ -92,6 +92,7 @@ export default function AdminTeachersTab() {
 
               return (
                 <article key={t.id} className={`cms-teacher-card ${t.practicalStatus === 'submitted' ? 'ring-1 ring-amber-200' : ''}`}>
+                  {/* Header */}
                   <div className="flex items-start gap-3">
                     <Avatar
                       size="card"
@@ -101,11 +102,14 @@ export default function AdminTeachersTab() {
                       src={t.avatar}
                       color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-red-400'}
                     />
-                    <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-base font-semibold text-slate-900 truncate">{t.name}</p>
-                          <p className="text-[13px] text-slate-500 mt-0.5">{t.phone}</p>
+                          <p className="text-[15px] sm:text-base font-bold text-slate-900 truncate leading-tight">{t.name}</p>
+                          <p className="text-[13px] text-slate-500 mt-1 flex items-center gap-1.5 min-w-0">
+                            <Phone size={12} className="shrink-0 text-slate-400" />
+                            <span className="truncate font-mono">{t.phone || '—'}</span>
+                          </p>
                         </div>
                         <span className={`cms-dash-badge flex-shrink-0 ${
                           active ? 'cms-dash-badge-success'
@@ -117,151 +121,183 @@ export default function AdminTeachersTab() {
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap gap-1.5">
-                        {t.branchCode && <span className="cms-dash-badge-neutral">{t.branchCode}</span>}
-                        {t.specialty && <span className="cms-dash-badge-info">{t.specialty}</span>}
-                      </div>
-
-                      {/* Metrics group */}
-                      <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Star size={12} className="text-amber-500 fill-amber-500" />
-                          <span className={`text-[13px] font-semibold ${passed ? 'text-emerald-700' : 'text-red-600'}`}>
-                            {score ?? 'Chưa thi'}{score != null && '/100'}
-                          </span>
-                          {score != null && (
-                            <>
-                              <div className="cms-progress">
-                                <span
-                                  className={passed ? 'bg-emerald-500' : 'bg-red-400'}
-                                  style={{ width: `${Math.min(100, score)}%` }}
-                                />
-                              </div>
-                              <span className={`text-[11px] font-semibold ${passed ? 'text-emerald-600' : 'text-red-500'}`}>
-                                {passed ? 'Đạt' : 'Trượt'}
-                              </span>
-                            </>
+                      {(t.specialty || t.branchCode) && (
+                        <div className="flex flex-wrap gap-1.5 mt-2.5">
+                          {t.specialty && (
+                            <span className="cms-dash-badge-info max-w-full truncate">{t.specialty}</span>
                           )}
-                          {rating.count > 0 && (
-                            <span className="cms-dash-badge-warning ml-auto">
-                              <Star size={10} className="fill-amber-500 text-amber-500" /> {rating.avg}/5 ({rating.count})
-                            </span>
+                          {t.branchCode && (
+                            <span className="cms-dash-badge-neutral">{t.branchCode}</span>
                           )}
                         </div>
+                      )}
+                    </div>
+                  </div>
 
-                        {(() => {
-                          const d = resolveTeacherExamDate(t);
-                          if (!d) return null;
-                          const fmt = d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-                          return (
-                            <p className={`text-[12px] ${isTeacherExamDateApproximate(t) ? 'text-amber-600' : 'text-slate-500'}`}>
-                              Ngày thi{isTeacherExamDateApproximate(t) ? ' (ước lượng)' : ''}: {fmt}
-                            </p>
-                          );
-                        })()}
-
-                        {t.assignedStudents?.length > 0 && (
-                          <p className="text-[12px] text-sky-700 font-medium">Đang dạy: {t.assignedStudents.length} học viên</p>
+                  {/* Metrics — 2 tiles, không chen chúc */}
+                  <div className="cms-teacher-card__metrics mt-3.5">
+                    <div className="cms-teacher-card__metric">
+                      <span className="cms-teacher-card__metric-label">Điểm bài test</span>
+                      <div className="cms-teacher-card__metric-value">
+                        <Star size={14} className={`shrink-0 ${passed ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
+                        <span className={score == null ? 'text-slate-400 font-semibold' : passed ? 'text-emerald-700' : 'text-red-600'}>
+                          {score == null ? 'Chưa thi' : `${score}/100`}
+                        </span>
+                        {score != null && (
+                          <span className={`ml-auto text-[11px] font-bold shrink-0 ${passed ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {passed ? 'Đạt' : 'Trượt'}
+                          </span>
                         )}
                       </div>
+                      {score != null && (
+                        <div className="cms-progress">
+                          <span
+                            className={passed ? 'bg-emerald-500' : 'bg-red-400'}
+                            style={{ width: `${Math.min(100, score)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
 
-                      {/* Practical file group */}
-                      <div className="rounded-xl border border-slate-100 p-3">
-                        {t.practicalFile ? (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`cms-dash-badge ${t.practicalStatus === 'reviewed' ? 'cms-dash-badge-success' : 'cms-dash-badge-warning'}`}>
-                              <FileSpreadsheet size={12} />
-                              {practicalFileDisplayName(t.practicalFile)}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setReviewModal(t)}
-                              className="text-[13px] font-semibold text-sky-700 hover:underline"
-                            >
-                              Tải & kiểm tra
-                            </button>
-                          </div>
+                    <div className="cms-teacher-card__metric">
+                      <span className="cms-teacher-card__metric-label">Đánh giá học viên</span>
+                      <div className="cms-teacher-card__metric-value">
+                        <Star size={14} className={`shrink-0 ${rating.count > 0 ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
+                        {rating.count > 0 ? (
+                          <>
+                            <span className="text-amber-700">{rating.avg}/5</span>
+                            <span className="text-[12px] font-semibold text-slate-400">({rating.count})</span>
+                          </>
                         ) : (
-                          <p className="text-[13px] text-slate-400">Chưa nộp bài thực hành</p>
-                        )}
-                      </div>
-
-                      {t.approvedAt && (
-                        <p className="text-[12px] text-emerald-600 flex items-center gap-1">
-                          <CheckCircle2 size={12} /> Duyệt {new Date(t.approvedAt).toLocaleString('vi-VN')}
-                        </p>
-                      )}
-                      {locked && t.lockReason && (
-                        <p className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1">
-                          {t.lockReason}
-                        </p>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex flex-col gap-2 pt-1">
-                        {isSuperAdmin && (['inactive'].includes(String(t.status).toLowerCase()) || locked) && (
-                          <button
-                            type="button"
-                            onClick={() => setGrantModal({ id: t.id, name: t.name || t.email || t.phone, type: locked ? 'retry' : 'first' })}
-                            className={`cms-btn cms-btn-sm ${locked ? 'cms-btn-primary' : 'cms-btn-secondary'}`}
-                          >
-                            <Unlock size={15} /> {locked ? 'Cấp quyền thi lại' : 'Cấp truy cập thi'}
-                          </button>
-                        )}
-
-                        {isSuperAdmin && pending && (
-                          <div className="space-y-1">
-                            <button
-                              type="button"
-                              onClick={() => setApproveModal(t)}
-                              disabled={(t.testScore || 0) < 80 || t.practicalStatus !== 'reviewed'}
-                              className="cms-btn cms-btn-success cms-btn-sm w-full"
-                            >
-                              <UserCheck size={15} /> Cấp quyền giảng dạy
-                            </button>
-                            {(t.testScore || 0) < 80 && (
-                              <p className="text-[11px] text-red-500 font-semibold">Chưa đủ 80 điểm</p>
-                            )}
-                            {t.practicalStatus !== 'reviewed' && (
-                              <p className="text-[11px] text-amber-600 font-semibold">Chưa duyệt bài thực hành</p>
-                            )}
-                          </div>
-                        )}
-
-                        {isSuperAdmin && (
-                          <div className="cms-card-actions">
-                            {active && (
-                              <button
-                                type="button"
-                                onClick={() => handlePayTeacher(t)}
-                                className="cms-btn cms-btn-outline cms-btn-sm"
-                              >
-                                <DollarSign size={14} /> Thanh toán
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setEditTeacher(t)}
-                              className="cms-btn cms-btn-outline cms-btn-icon"
-                              title="Chỉnh sửa"
-                              aria-label="Chỉnh sửa"
-                            >
-                              <Edit3 size={16} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeTeacher(t.id)}
-                              className="cms-btn cms-btn-outline cms-btn-icon text-red-600"
-                              title="Xóa"
-                              aria-label="Xóa"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                          <span className="text-slate-400 font-semibold">Chưa có</span>
                         )}
                       </div>
                     </div>
                   </div>
+
+                  {/* Meta lines */}
+                  {(() => {
+                    const d = resolveTeacherExamDate(t);
+                    if (!d && !(t.assignedStudents?.length > 0)) return null;
+                    return (
+                      <div className="mt-2.5 space-y-1">
+                        {d && (
+                          <p className={`text-[12px] flex items-center gap-1.5 ${isTeacherExamDateApproximate(t) ? 'text-amber-600' : 'text-slate-500'}`}>
+                            <CalendarCheck size={12} className="shrink-0" />
+                            Ngày thi{isTeacherExamDateApproximate(t) ? ' (ước lượng)' : ''}:{' '}
+                            {d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                        {t.assignedStudents?.length > 0 && (
+                          <p className="text-[12px] text-sky-700 font-medium">Đang dạy: {t.assignedStudents.length} học viên</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Practical status */}
+                  <div
+                    className={`cms-teacher-card__status mt-3 ${
+                      t.practicalStatus === 'reviewed' ? 'is-ready'
+                        : t.practicalFile ? 'is-wait' : ''
+                    }`}
+                  >
+                    <FileSpreadsheet size={16} className="shrink-0 opacity-80" />
+                    {t.practicalFile ? (
+                      <div className="min-w-0 flex-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="font-semibold truncate">
+                          {practicalFileDisplayName(t.practicalFile)}
+                        </span>
+                        <span className="text-[11px] font-bold uppercase tracking-wide opacity-80">
+                          {t.practicalStatus === 'reviewed' ? 'Đã duyệt' : 'Chờ kiểm tra'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setReviewModal(t)}
+                          className="ml-auto text-[13px] font-bold text-sky-700 hover:underline shrink-0 min-h-9 px-1"
+                        >
+                          Tải &amp; kiểm tra
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="font-medium">Chưa nộp bài thực hành</span>
+                    )}
+                  </div>
+
+                  {t.approvedAt && (
+                    <p className="text-[12px] text-emerald-600 flex items-center gap-1.5 mt-2.5">
+                      <CheckCircle2 size={12} /> Duyệt {new Date(t.approvedAt).toLocaleString('vi-VN')}
+                    </p>
+                  )}
+                  {locked && t.lockReason && (
+                    <p className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mt-2.5">
+                      {t.lockReason}
+                    </p>
+                  )}
+
+                  {/* Actions */}
+                  {isSuperAdmin && (
+                    <div className="cms-teacher-card__footer">
+                      {(String(t.status).toLowerCase() === 'inactive' || locked) && (
+                        <button
+                          type="button"
+                          onClick={() => setGrantModal({ id: t.id, name: t.name || t.email || t.phone, type: locked ? 'retry' : 'first' })}
+                          className={`cms-btn cms-btn-sm w-full ${locked ? 'cms-btn-primary' : 'cms-btn-secondary'}`}
+                        >
+                          <Unlock size={15} /> {locked ? 'Cấp quyền thi lại' : 'Cấp truy cập thi'}
+                        </button>
+                      )}
+
+                      {pending && (
+                        <div className="space-y-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setApproveModal(t)}
+                            disabled={(t.testScore || 0) < 80 || t.practicalStatus !== 'reviewed'}
+                            className="cms-btn cms-btn-success cms-btn-sm w-full"
+                          >
+                            <UserCheck size={15} /> Cấp quyền giảng dạy
+                          </button>
+                          {(t.testScore || 0) < 80 && (
+                            <p className="text-[11px] text-red-500 font-semibold">Chưa đủ 80 điểm</p>
+                          )}
+                          {t.practicalStatus !== 'reviewed' && (
+                            <p className="text-[11px] text-amber-600 font-semibold">Chưa duyệt bài thực hành</p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="cms-card-actions">
+                        {active && (
+                          <button
+                            type="button"
+                            onClick={() => handlePayTeacher(t)}
+                            className="cms-btn cms-btn-outline cms-btn-sm"
+                          >
+                            <DollarSign size={14} /> Thanh toán
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setEditTeacher(t)}
+                          className="cms-btn cms-btn-outline cms-btn-icon"
+                          title="Chỉnh sửa"
+                          aria-label="Chỉnh sửa"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeTeacher(t.id)}
+                          className="cms-btn cms-btn-outline cms-btn-icon text-red-600"
+                          title="Xóa"
+                          aria-label="Xóa"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </article>
               );
             }) : (
