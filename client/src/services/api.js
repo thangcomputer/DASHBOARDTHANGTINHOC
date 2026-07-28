@@ -353,6 +353,8 @@ const FATAL_AUTH_CODES = new Set([
   'TOKEN_REVOKED',
   'REFRESH_REUSE',
   'DEVICE_CONFLICT',
+  'ACCOUNT_DISABLED',
+  'USER_NOT_FOUND',
 ]);
 
 const redirectToLogin = (prefix) => {

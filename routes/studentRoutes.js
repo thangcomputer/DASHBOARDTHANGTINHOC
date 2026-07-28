@@ -389,6 +389,10 @@ router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
     }
 
     const student = new Student(req.body);
+    if (!student.studentCode || !String(student.studentCode).trim()) {
+      const seq = String(Date.now()).slice(-8);
+      student.studentCode = `HV${seq}`;
+    }
     await student.save();
 
     const io = req.app.get('io');
@@ -410,6 +414,9 @@ router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
       ? await Branch.findById(student.branchId).select('name code').lean()
       : null;
     const studentObj = student.toObject();
+    delete studentObj.password;
+    delete studentObj.refreshToken;
+    delete studentObj.deviceFingerprint;
     if (branchDoc) {
       studentObj.branchName = branchDoc.name || branchDoc.code || '';
       studentObj.branchCode = studentObj.branchCode || branchDoc.code || '';
@@ -509,13 +516,35 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
       }
     }
 
-    const student = await Student.findByIdAndUpdate(req.params.id, safeBody, {
+    const prevStatusDoc = await Student.findById(req.params.id).select('status').lean();
+    const nextStatus = safeBody.status != null ? String(safeBody.status).toLowerCase() : null;
+    const prevStatus = String(prevStatusDoc?.status || '').toLowerCase();
+    const locking = nextStatus
+      && ['suspended', 'inactive'].includes(nextStatus)
+      && !['suspended', 'inactive'].includes(prevStatus);
+
+    const updateOps = locking
+      ? { $set: safeBody, $inc: { tokenVersion: 1 }, $unset: { refreshToken: '' } }
+      : safeBody;
+
+    const student = await Student.findByIdAndUpdate(req.params.id, updateOps, {
       returnDocument: 'after',
       runValidators: true,
     }).populate('teacherId', 'name phone specialty');
 
     if (!student) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+
+    if (locking) {
+      const ioLock = req.app.get('io');
+      if (ioLock) {
+        ioLock.emit('auth:forceLogout', {
+          userId: String(student._id),
+          role: 'student',
+          reason: 'account_disabled',
+        });
+      }
     }
 
     // Đồng bộ enrollment chính — applyEnrollmentStats lấy totalSessions từ đây
@@ -761,6 +790,9 @@ router.put('/:id/pay', [authMiddleware, isAdmin, branchFilter, assertStudentBran
     student.paid = true;
     student.paidAt = new Date();
     student.paymentMethod = paymentMethod;
+    if (!(Number(student.paidAmount) > 0)) {
+      student.paidAmount = Number(student.price) || 0;
+    }
     await student.save({ validateModifiedOnly: true });
 
     // Tự động tạo hóa đơn
@@ -801,7 +833,15 @@ router.put('/:id/pay', [authMiddleware, isAdmin, branchFilter, assertStudentBran
     res.json({
       success: true,
       message: `Đã xác nhận thanh toán ${student.price.toLocaleString('vi-VN')}đ`,
-      data: { student, invoice },
+      data: {
+        student: (() => {
+          const o = student.toObject();
+          delete o.password;
+          delete o.refreshToken;
+          return o;
+        })(),
+        invoice,
+      },
     });
   } catch (error) {
     logger.error('[STUDENTS] Pay error:', error);

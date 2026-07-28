@@ -778,6 +778,15 @@ router.post('/login/public', loginLimiter, async (req, res) => {
       if (sStatus === 'suspended') return res.status(403).json({ success: false, message: 'Tài khoản đã bị tạm vắng / vô hiệu hóa.' });
       // locked / pending+submitted: vẫn cho đăng nhập — /teacher/test xử lý UI
     }
+    if (userRole === 'student') {
+      if (sStatus === 'inactive' || sStatus === 'suspended') {
+        return res.status(403).json({
+          success: false,
+          isBan: true,
+          message: 'Tài khoản học viên đã bị khóa hoặc vô hiệu hóa. Vui lòng liên hệ trung tâm.',
+        });
+      }
+    }
 
     // Xác thực mật khẩu
     const isMatch = await user.comparePassword(password);

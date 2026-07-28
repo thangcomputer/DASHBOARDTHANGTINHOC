@@ -558,18 +558,25 @@ router.post('/', async (req, res) => {
     }
 
     let rBranch = '';
+    let resolvedReceiverName = receiverName;
     if (!isGroup) {
       if (receiverId === 'admin') {
         rBranch = 'HỆ THỐNG';
+        if (!resolvedReceiverName) resolvedReceiverName = 'Admin';
       } else if (mongoose.Types.ObjectId.isValid(receiverId)) {
         if (receiverRole === 'teacher' || receiverRole === 'admin' || receiverRole === 'staff') {
-          const t = await Teacher.findById(receiverId).select('branchCode').lean();
+          const t = await Teacher.findById(receiverId).select('branchCode name').lean();
           rBranch = t?.branchCode || '';
+          if (!resolvedReceiverName) resolvedReceiverName = t?.name || 'Người nhận';
         } else if (receiverRole === 'student') {
-          const s = await Student.findById(receiverId).select('branchCode').lean();
+          const s = await Student.findById(receiverId).select('branchCode name').lean();
           rBranch = s?.branchCode || '';
+          if (!resolvedReceiverName) resolvedReceiverName = s?.name || 'Học viên';
         }
       }
+    }
+    if (!resolvedReceiverName && !isBroadcast && !isGroup) {
+      resolvedReceiverName = 'Người nhận';
     }
 
     // ⭐ CHỐNG CHÉO CHI NHÁNH (Cross-Branch Protection)
@@ -595,7 +602,7 @@ router.post('/', async (req, res) => {
     // Học viên → admin/staff: chỉ gộp receiverId = 'admin' khi nhắn vào hộp thư chung (id chữ "admin" hoặc không phải ObjectId).
     // Nếu chọn staff / admin cụ thể (ObjectId) → lưu đúng receiverId để super admin không thấy tin nhắn riêng của chi nhánh.
     let finalReceiverId = isBroadcast ? receiverId : (isGroup ? groupId : receiverId);
-    let finalReceiverName = isBroadcast ? 'Thông báo hệ thống' : (isGroup ? 'Group' : receiverName);
+    let finalReceiverName = isBroadcast ? 'Thông báo hệ thống' : (isGroup ? 'Group' : resolvedReceiverName);
     if (!isBroadcast && !isGroup && senderRole === 'student' && (receiverRole === 'admin' || receiverRole === 'staff')) {
       const rid = String(receiverId || '');
       if (rid === 'admin' || !mongoose.Types.ObjectId.isValid(rid)) {
@@ -603,7 +610,7 @@ router.post('/', async (req, res) => {
         finalReceiverName = DEPT_SUPER_LABEL;
       } else {
         finalReceiverId = rid;
-        finalReceiverName = staffDisplayName(receiverName, rBranch);
+        finalReceiverName = staffDisplayName(resolvedReceiverName, rBranch);
       }
     }
 

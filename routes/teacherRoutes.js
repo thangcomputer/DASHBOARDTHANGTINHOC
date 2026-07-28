@@ -398,7 +398,23 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
       }
     }
 
-    const teacher = await Teacher.findByIdAndUpdate(req.params.id, updates, {
+    const prev = await Teacher.findById(req.params.id).select('status tokenVersion').lean();
+    if (!prev) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    const nextStatus = updates.status !== undefined ? String(updates.status).toLowerCase() : null;
+    const prevStatus = String(prev.status || '').toLowerCase();
+    const locking = nextStatus && ['suspended', 'inactive'].includes(nextStatus)
+      && !['suspended', 'inactive'].includes(prevStatus);
+
+    const updateOps = { $set: updates };
+    if (locking) {
+      updateOps.$inc = { tokenVersion: 1 };
+      updateOps.$unset = { ...(updateOps.$unset || {}), refreshToken: 1 };
+    }
+
+    const teacher = await Teacher.findByIdAndUpdate(req.params.id, updateOps, {
       returnDocument: 'after',
       runValidators: true,
     }).select('-password -refreshToken');
@@ -410,6 +426,13 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       io.emit('data:refresh', { type: 'teacher', id: teacher._id });
+      if (locking) {
+        io.emit('auth:forceLogout', {
+          userId: String(teacher._id),
+          role: 'teacher',
+          reason: 'account_disabled',
+        });
+      }
     }
 
     return res.json({

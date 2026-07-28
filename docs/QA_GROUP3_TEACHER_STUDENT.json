@@ -1,0 +1,108 @@
+{
+  "at": "2026-07-28T13:26:04.102Z",
+  "results": [
+    {
+      "id": "G3-00",
+      "name": "healthz",
+      "result": "PASS",
+      "severity": "Critical",
+      "actual": "status=200"
+    },
+    {
+      "id": "G3-01",
+      "name": "Setup GV+HV+assign + login",
+      "actual": "t=true s=true tid=6a68adeb48d89910aca887a9 sid=6a68adeb48d89910aca887ac",
+      "result": "PASS",
+      "severity": "Critical"
+    },
+    {
+      "id": "G3-02",
+      "name": "GV tạo buổi học cho HV được gán",
+      "expected": "201 + teacherId=self",
+      "actual": "status=201 id=6a68adec48d89910aca887b5 msg=",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "POST /api/schedules"
+    },
+    {
+      "id": "G3-03",
+      "name": "HV thấy lịch GV vừa tạo",
+      "expected": "schedule trong list",
+      "actual": "status=200 seen=true n=1",
+      "result": "PASS",
+      "severity": "Critical"
+    },
+    {
+      "id": "G3-04",
+      "name": "GV không spoof teacherId người khác",
+      "expected": "403 hoặc 201 với teacherId=self",
+      "actual": "status=201 tid=6a68adeb48d89910aca887a9",
+      "result": "PASS",
+      "severity": "Critical"
+    },
+    {
+      "id": "G3-05",
+      "name": "GV hủy lịch → HV thấy cancelled",
+      "expected": "status cancelled + note/reason",
+      "actual": "cancel=200 schStatus=cancelled note=QA hủy lịch",
+      "result": "PASS",
+      "severity": "High"
+    },
+    {
+      "id": "G3-06",
+      "name": "GV điểm danh (tạo schedule completed)",
+      "expected": "201 hoặc 400 cooldown",
+      "actual": "status=201 msg=",
+      "result": "PASS",
+      "severity": "High",
+      "note": ""
+    },
+    {
+      "id": "G3-07",
+      "name": "GV nhập điểm → Admin/DB thấy",
+      "expected": "200 + avgGrade cập nhật",
+      "actual": "put=200 avg=9 msg=",
+      "result": "PASS",
+      "severity": "High"
+    },
+    {
+      "id": "G3-08",
+      "name": "GV mở danh sách hội thoại",
+      "expected": "200",
+      "actual": "status=403",
+      "result": "FAIL",
+      "severity": "Medium",
+      "api": "GET /api/messages/conversations"
+    },
+    {
+      "id": "G3-09",
+      "name": "GV không upload training admin",
+      "expected": "403",
+      "actual": "status=403",
+      "result": "PASS",
+      "severity": "High"
+    },
+    {
+      "id": "G3-10",
+      "name": "API bài tập (assignments) cho GV",
+      "expected": "200 hoặc 404 nếu module khác path",
+      "actual": "status=404",
+      "result": "PASS",
+      "severity": "Medium"
+    },
+    {
+      "id": "G3-11",
+      "name": "Video LMS / nộp bài / email điểm / đánh giá khóa",
+      "expected": "UI + LMS content fixtures",
+      "actual": "SKIP — cần dữ liệu LMS/assignment UI; không crash API core",
+      "result": "SKIP",
+      "severity": "Medium"
+    },
+    {
+      "id": "G3-12",
+      "name": "Cleanup",
+      "result": "PASS",
+      "severity": "Low"
+    }
+  ]
+}

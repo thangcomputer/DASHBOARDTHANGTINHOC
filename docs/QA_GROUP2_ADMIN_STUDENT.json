@@ -1,0 +1,208 @@
+{
+  "at": "2026-07-28T13:25:04.248Z",
+  "base": "http://127.0.0.1:5000",
+  "results": [
+    {
+      "id": "G2-00",
+      "name": "API healthz",
+      "expected": "200",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "GET /healthz"
+    },
+    {
+      "id": "G2-00b",
+      "name": "Setup GV active để phân công",
+      "actual": "status=201 tid=6a68adaf42474fe19a56b560",
+      "result": "PASS",
+      "severity": "High",
+      "api": "POST /api/teachers"
+    },
+    {
+      "id": "G2-01",
+      "name": "Admin tạo học viên + tài khoản",
+      "roleAct": "admin",
+      "roleRecv": "student",
+      "expected": "201 + id + có password hashed (không trả plain)",
+      "actual": "status=201 id=6a68adaf42474fe19a56b563 pwdReturned=false msg=",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "POST /api/students",
+      "db": "students"
+    },
+    {
+      "id": "G2-02",
+      "name": "Sinh mã học viên (studentCode)",
+      "expected": "studentCode không rỗng sau create",
+      "actual": "studentCode=\"HV45103961\"",
+      "result": "PASS",
+      "severity": "High",
+      "api": "POST /api/students",
+      "file": "models/Student.js + studentRoutes",
+      "fix": "Auto-generate studentCode unique khi tạo HV (VD HV + yyMMdd + seq)"
+    },
+    {
+      "id": "G2-03",
+      "name": "Gửi Email khi tạo HV",
+      "expected": "Enqueue email credential",
+      "actual": "POST /students chỉ notifyAdmins + socket student:new — không email HV",
+      "result": "FAIL",
+      "severity": "High",
+      "file": "routes/studentRoutes.js ~394-405",
+      "fix": "Enqueue welcome email nếu có email"
+    },
+    {
+      "id": "G2-04",
+      "name": "Gửi SMS khi tạo HV",
+      "expected": "SMS nếu product hỗ trợ",
+      "actual": "Không có SMS provider / enqueue SMS trong create student",
+      "result": "FAIL",
+      "severity": "Medium",
+      "fix": "Bỏ qua nếu product không cam kết SMS; hoặc tích hợp Zalo OA template"
+    },
+    {
+      "id": "G2-05",
+      "name": "Thông báo cho HV khi tạo tài khoản",
+      "expected": "Notification tới HV",
+      "actual": "Chỉ notifyAdmins — HV không nhận notification chào mừng",
+      "result": "FAIL",
+      "severity": "Medium",
+      "file": "routes/studentRoutes.js"
+    },
+    {
+      "id": "G2-06",
+      "name": "HV đăng nhập",
+      "expected": "200 + role student",
+      "actual": "status=200 role=student token=yes msg=Chào mừng QA HV 3893!",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "POST /api/auth/login/public"
+    },
+    {
+      "id": "G2-07",
+      "name": "Đúng khóa học / học phí / công nợ ban đầu",
+      "expected": "course=Word, price=1500000, paid=false",
+      "actual": "course=Word price=1500000 paid=false status=Chờ xếp lớp",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "GET /api/students/:id"
+    },
+    {
+      "id": "G2-08",
+      "name": "HV GET profile của mình",
+      "expected": "200 (self) hoặc cơ chế /me",
+      "actual": "studentTokenStatus=200 msg=",
+      "result": "PASS",
+      "severity": "High",
+      "api": "GET /api/students/:id",
+      "fix": "",
+      "note": ""
+    },
+    {
+      "id": "G2-09",
+      "name": "HV xem lịch (ban đầu rỗng)",
+      "expected": "200 array",
+      "actual": "status=200 n=0",
+      "result": "PASS",
+      "severity": "High",
+      "api": "GET /api/schedules/student/:id"
+    },
+    {
+      "id": "G2-10",
+      "name": "HV đọc student training / LMS data",
+      "expected": "200",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "High",
+      "api": "GET /api/settings/student-training-data"
+    },
+    {
+      "id": "G2-11",
+      "name": "Admin gán giảng viên",
+      "expected": "200 + teacherId khớp",
+      "actual": "status=200 teacherId=6a68adaf42474fe19a56b560 msg=Đã gán giảng viên thành công",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "PUT /api/students/:id/assign-teacher"
+    },
+    {
+      "id": "G2-12",
+      "name": "GV thấy HV sau phân công",
+      "expected": "HV có trong list GV",
+      "actual": "tLogin=200 listStatus=200 found=true n=1",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "GET /api/students (teacher)"
+    },
+    {
+      "id": "G2-13",
+      "name": "Admin sửa khóa/học phí → DB cập nhật",
+      "expected": "course=Excel price=1800000",
+      "actual": "put=200 course=Excel price=1800000",
+      "result": "PASS",
+      "severity": "High",
+      "api": "PUT /api/students/:id"
+    },
+    {
+      "id": "G2-14",
+      "name": "Admin đánh dấu đã thanh toán",
+      "expected": "paid=true",
+      "actual": "status=200 paid=true paidAmount=0 msg=Đã xác nhận thanh toán 1.800.000đ",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "PUT /api/students/:id/pay"
+    },
+    {
+      "id": "G2-15",
+      "name": "Admin thêm enrollment khóa 2",
+      "expected": "200/201",
+      "actual": "status=201 msg=Đã thêm khóa \"PowerPoint\" cho học viên",
+      "result": "PASS",
+      "severity": "High",
+      "api": "POST /api/students/:id/enrollments"
+    },
+    {
+      "id": "G2-16",
+      "name": "HV không xem finance/analytics admin",
+      "expected": "403",
+      "actual": "tx=403 analytics=403",
+      "result": "PASS",
+      "severity": "Critical"
+    },
+    {
+      "id": "G2-17",
+      "name": "HV không tạo HV khác",
+      "expected": "403",
+      "actual": "status=403",
+      "result": "PASS",
+      "severity": "Critical"
+    },
+    {
+      "id": "G2-18",
+      "name": "Admin khóa HV (status=suspended)",
+      "expected": "PUT ok + JWT cũ bị chặn + login bị chặn",
+      "actual": "put=200 oldToken=401 login=403 msg=Tài khoản học viên đã bị khóa hoặc vô hiệu hóa. Vui lòng liên hệ trung tâm.",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "PUT /api/students/:id + auth",
+      "file": "middleware/auth.js + authRoutes login/public",
+      "fix": ""
+    },
+    {
+      "id": "G2-19",
+      "name": "Cleanup xóa HV QA",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "Low"
+    },
+    {
+      "id": "G2-20",
+      "name": "Chứng chỉ / đổi lớp lịch / video UI",
+      "expected": "Covered deeper in G3–G5",
+      "actual": "SKIP — cần LMS content + schedule fixtures",
+      "result": "SKIP",
+      "severity": "Medium"
+    }
+  ]
+}

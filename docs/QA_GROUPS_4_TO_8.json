@@ -1,0 +1,144 @@
+{
+  "at": "2026-07-28T13:27:26.660Z",
+  "results": [
+    {
+      "id": "GX-00",
+      "name": "healthz",
+      "result": "PASS",
+      "severity": "Critical",
+      "actual": "200"
+    },
+    {
+      "id": "G4-01",
+      "name": "Đăng ký HV (finance fixture)",
+      "result": "PASS",
+      "severity": "Critical",
+      "actual": "status=201"
+    },
+    {
+      "id": "G4-02",
+      "name": "Thanh toán → tạo hóa đơn",
+      "expected": "200 + invoice.maHoaDon",
+      "actual": "status=200 maHD=HD2607-0003 paidAmt=2000000",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "PUT /api/students/:id/pay"
+    },
+    {
+      "id": "G4-03",
+      "name": "Admin list hóa đơn",
+      "actual": "status=200 n=3",
+      "result": "PASS",
+      "severity": "High"
+    },
+    {
+      "id": "G4-04",
+      "name": "Voucher / hoàn tiền / gia hạn khóa",
+      "actual": "SKIP — không có API voucher/refund/renew trong phạm vi hiện tại",
+      "result": "SKIP",
+      "severity": "Medium"
+    },
+    {
+      "id": "G5-01",
+      "name": "HV đọc LMS student-training-data",
+      "actual": "status=200 videos=0",
+      "result": "PASS",
+      "severity": "Critical"
+    },
+    {
+      "id": "G5-02",
+      "name": "HV đọc training GV data (thường được phép read)",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "Medium"
+    },
+    {
+      "id": "G5-03",
+      "name": "Quiz/Thi/Pass/Fail/Chứng chỉ UI",
+      "actual": "SKIP — cần bank câu hỏi + exam room browser",
+      "result": "SKIP",
+      "severity": "High"
+    },
+    {
+      "id": "G6-01",
+      "name": "GV lấy contacts chat",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "High",
+      "api": "GET /api/messages/contacts"
+    },
+    {
+      "id": "G6-02",
+      "name": "GV conversations/:userId",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "High",
+      "api": "GET /api/messages/conversations/:userId"
+    },
+    {
+      "id": "G6-03",
+      "name": "GV gửi tin nhắn text cho HV",
+      "actual": "status=201 msg=",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "POST /api/messages",
+      "fix": ""
+    },
+    {
+      "id": "G6-04",
+      "name": "HV contacts",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "High"
+    },
+    {
+      "id": "G6-05",
+      "name": "Typing/Seen/Emoji/Upload realtime UI",
+      "actual": "SKIP — cần socket browser client",
+      "result": "SKIP",
+      "severity": "Medium"
+    },
+    {
+      "id": "G7-01",
+      "name": "HV list notifications API",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "High",
+      "api": "GET /api/notifications"
+    },
+    {
+      "id": "G7-02",
+      "name": "Email/SMS/Push channels",
+      "actual": "FAIL/SKIP — OTP queue tồn tại nhưng welcome email/SMS/push chưa đủ cho mọi event",
+      "result": "FAIL",
+      "severity": "Medium"
+    },
+    {
+      "id": "G8-01",
+      "name": "DB sync sau thanh toán (paid=true)",
+      "actual": "paid=true code=HV45246399",
+      "result": "PASS",
+      "severity": "Critical"
+    },
+    {
+      "id": "G8-02",
+      "name": "JWT role isolation vẫn đúng sau các thao tác",
+      "actual": "studentTx=403",
+      "result": "PASS",
+      "severity": "Critical"
+    },
+    {
+      "id": "G8-03",
+      "name": "Cache/localStorage/UI realtime",
+      "actual": "SKIP — cần browser; API SoT đã verify ở các nhóm",
+      "result": "SKIP",
+      "severity": "Medium"
+    },
+    {
+      "id": "GX-99",
+      "name": "Cleanup",
+      "result": "PASS",
+      "severity": "Low"
+    }
+  ]
+}

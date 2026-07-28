@@ -30,22 +30,45 @@ const authMiddleware = async (req, res, next) => {
     req.accessToken = token; // Lưu token gốc để dùng khi logout
     req.tokenAudience = decoded.aud || 'legacy'; // 'public' | 'internal' | 'legacy'
 
-    // ⭐ Fix 1: Kiểm tra tokenVersion (chống chia sẻ tài khoản)
+    // ⭐ Fix 1: Kiểm tra tokenVersion + trạng thái tài khoản (khóa/vô hiệu)
     // Chỉ áp dụng cho user có ID thực (không phải hardcoded admin)
-    if (decoded.id && decoded.id !== 'admin' && decoded.tokenVersion !== undefined) {
+    if (decoded.id && decoded.id !== 'admin') {
       let dbUser = null;
       if (decoded.role === 'student') {
-        dbUser = await Student.findById(decoded.id).select('tokenVersion').lean();
+        dbUser = await Student.findById(decoded.id).select('tokenVersion status').lean();
       } else {
-        dbUser = await Teacher.findById(decoded.id).select('tokenVersion').lean();
+        dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role').lean();
       }
 
-      if (dbUser && dbUser.tokenVersion !== undefined && dbUser.tokenVersion !== decoded.tokenVersion) {
+      if (!dbUser) {
+        return res.status(401).json({
+          success: false,
+          code: 'USER_NOT_FOUND',
+          message: 'Tài khoản không còn tồn tại. Vui lòng đăng nhập lại.',
+        });
+      }
+
+      if (dbUser.tokenVersion !== undefined && decoded.tokenVersion !== undefined
+          && dbUser.tokenVersion !== decoded.tokenVersion) {
         return res.status(401).json({
           success: false,
           code: 'TOKEN_VERSION_MISMATCH',
           message: 'Tài khoản đã đăng nhập ở thiết bị khác. Phiên này đã bị vô hiệu.',
         });
+      }
+
+      const sStatus = String(dbUser.status || '').toLowerCase();
+      if (decoded.role === 'teacher' || decoded.role === 'student') {
+        if (sStatus === 'suspended' || sStatus === 'inactive') {
+          return res.status(403).json({
+            success: false,
+            code: 'ACCOUNT_DISABLED',
+            isBan: true,
+            message: sStatus === 'inactive'
+              ? 'Tài khoản chưa được cấp quyền đăng nhập.'
+              : 'Tài khoản đã bị vô hiệu hóa.',
+          });
+        }
       }
     }
 
