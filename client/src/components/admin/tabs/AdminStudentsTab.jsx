@@ -228,7 +228,7 @@ export default function AdminStudentsTab() {
     'w-full h-11 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:border-red-500 focus:ring-2 focus:ring-red-500/15 outline-none cursor-pointer transition-all';
 
   const teacherSelectClass =
-    'w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-2.5 text-sm font-medium text-slate-700 outline-none focus:border-sky-400 cursor-pointer';
+    'w-full min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-sky-400 cursor-pointer';
 
   const renderTeacherSelects = (s, enrollments, hasMultiCourse, primaryEnr, teacherVal) => {
     if (hasMultiCourse) {
@@ -240,7 +240,7 @@ export default function AdminStudentsTab() {
             const { matched, other } = teachersForCourse(enr, enrTeacherVal);
             return (
               <div key={enrId} className="space-y-1">
-                <p className="text-xs font-semibold text-sky-700 truncate">{enr.courseName || enr.name}</p>
+                <p className="text-xs font-semibold text-sky-700 leading-snug break-words">{enr.courseName || enr.name}</p>
                 <CmsSelect
                   value={enrTeacherVal}
                   onChange={(e) => {
@@ -475,7 +475,9 @@ export default function AdminStudentsTab() {
                   </div>
 
                   <div className="mt-2 space-y-1.5">
-                    <p className="text-sm font-medium text-slate-700 truncate">{s.course}</p>
+                    <p className="text-sm font-semibold text-sky-700 leading-snug break-words">
+                      {s.course}
+                    </p>
                     {(s.courses?.length > 1 || s.enrollments?.length > 1) && (
                       <p className="text-xs font-semibold text-sky-600">
                         +{(s.courses || s.enrollments).length - 1} khóa khác
@@ -486,20 +488,71 @@ export default function AdminStudentsTab() {
                 </div>
               </div>
 
-              <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 min-[375px]:grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Giảng viên</p>
-                  {renderTeacherSelects(s, enrollments, hasMultiCourse, primaryEnr, teacherVal)}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Học phí</p>
-                    {renderTuition(s, enrollments, hasMultiCourse)}
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Trạng thái</p>
-                    {renderPaid(s, enrollments, hasMultiCourse)}
-                  </div>
+              {/* 3 cột: Giảng viên HD / Học phí / Trạng thái */}
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(4.5rem,0.85fr)_minmax(4.25rem,auto)] gap-x-2 gap-y-2 items-start">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Giảng viên HD</p>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Học phí</p>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right">Trạng thái</p>
+
+                  {hasMultiCourse ? (
+                    enrollments.map((enr) => {
+                      const enrId = enr.enrollmentId || enr.id;
+                      const enrTeacherVal = enr.teacherId || '';
+                      const { matched, other } = teachersForCourse(enr, enrTeacherVal);
+                      return (
+                        <div key={enrId} className="contents">
+                          <div className="min-w-0 space-y-1">
+                            <p className="text-[11px] font-semibold text-sky-700 leading-snug break-words">
+                              {enr.courseName || enr.name}
+                            </p>
+                            <CmsSelect
+                              value={enrTeacherVal}
+                              onChange={(e) => {
+                                e?.stopPropagation?.();
+                                handleAssignTeacher(s.id || s._id, e.target.value || null, enrId !== 'main' ? enrId : undefined);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className={teacherSelectClass}
+                            >
+                              <option value="">Chưa phân công</option>
+                              {matched.map((t) => (
+                                <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                              ))}
+                              {other.map((t) => (
+                                <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
+                                  {t.name} (khác môn)
+                                </option>
+                              ))}
+                            </CmsSelect>
+                          </div>
+                          <div className="min-w-0 pt-0.5">
+                            <p className="text-sm font-semibold text-slate-800 leading-tight tabular-nums">
+                              {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
+                            </p>
+                          </div>
+                          <div className="flex justify-end pt-0.5">
+                            <PaidBadge paid={!!enr.paid} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <>
+                      <div className="min-w-0">
+                        {renderTeacherSelects(s, enrollments, false, primaryEnr, teacherVal)}
+                      </div>
+                      <div className="min-w-0 pt-0.5">
+                        {renderTuition(s, enrollments, false)}
+                      </div>
+                      <div className="flex justify-end pt-0.5">
+                        {renderPaid(s, enrollments, false)}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </article>

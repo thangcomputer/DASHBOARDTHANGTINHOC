@@ -196,18 +196,25 @@ export default function StudentDetailModal({ studentId, onClose }) {
         ) : (
           <>
             {/* ── HEADER ────────────────────────────────────────────────── */}
-            <div className="bg-white border-b border-slate-100 px-4 pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5 relative shrink-0">
+            <div
+              className="bg-white border-b border-slate-100 px-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5 relative shrink-0"
+              style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))' }}
+            >
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Đóng"
-                className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 inline-flex items-center justify-center w-11 h-11 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors shadow-sm"
+                className="absolute z-20 inline-flex items-center justify-center w-11 h-11 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors shadow-sm"
+                style={{
+                  top: 'max(0.75rem, env(safe-area-inset-top, 0px))',
+                  right: 'max(0.75rem, env(safe-area-inset-right, 0px))',
+                }}
               >
                 <X size={20} />
               </button>
 
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-5 pr-12">
-                <div className="relative shrink-0">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-5 pr-14">
+                <div className="relative shrink-0 mt-1">
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white flex items-center justify-center shadow-md border-2 border-white overflow-hidden">
                     <img
                       src={resolveAvatarUrl({ avatar: data.student?.avatar, role: 'student' })}
@@ -222,7 +229,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
 
                 <div className="flex-1 min-w-0 text-center sm:text-left space-y-2.5 w-full">
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight truncate max-w-full">
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight break-words max-w-full">
                       {data.student.name}
                     </h2>
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
@@ -233,7 +240,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                   </div>
 
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5">
-                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-semibold border border-indigo-100 max-w-full truncate">
+                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-semibold border border-indigo-100 max-w-full whitespace-normal break-words text-left">
                       {data.student.course}
                     </span>
                     {(data.student.courses?.length > 1 || data.student.enrollments?.length > 1) && (
@@ -561,48 +568,49 @@ export default function StudentDetailModal({ studentId, onClose }) {
               {/* --- TAB 2: ATTENDANCE --- */}
               {activeTab === 'attendance' && (
                 <div className="animate-in slide-in-from-right-10 duration-500">
-                  <div className="bg-white rounded-3xl overflow-hidden border border-slate-100">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left min-w-[600px]">
-                        <thead>
-                        <tr className="bg-slate-50">
-                          <th className="px-6 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày học</th>
-                          {(getClientEnrollments(data.student).length > 1) && (
-                            <th className="px-4 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Khóa học</th>
-                          )}
-                          <th className="px-4 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Giảng viên</th>
-                          <th className="px-4 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Nội dung / Ghi chú</th>
-                          <th className="px-4 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase text-center">Trạng thái</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {data.schedules.map(sch => (
-                          <tr key={sch._id} className="hover:bg-slate-50/50 transition">
-                            <td className="px-6 py-4 text-xs font-bold text-slate-700">{fmtDate(sch.date)}</td>
-                            {(getClientEnrollments(data.student).length > 1) && (
-                              <td className="px-4 py-4 text-xs font-bold text-blue-600">{sch.course || '—'}</td>
-                            )}
-                            <td className="px-4 py-4 text-xs font-semibold text-slate-600">{sch.teacherName || '—'}</td>
-                            <td className="px-4 py-4 text-xs text-slate-400">{sch.note || sch.subject || 'Dạy thực tế'}</td>
-                            <td className="px-4 py-4 text-center">
-                              <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${
-                                sch.status === 'completed'
-                                  ? 'bg-emerald-50 text-emerald-600'
-                                  : sch.status === 'cancelled'
-                                    ? 'bg-red-50 text-red-600'
-                                    : 'bg-amber-50 text-amber-600'
-                              }`}>
-                                {sch.status === 'completed' ? 'Đã học' : sch.status === 'cancelled' ? 'Đã hủy' : 'Sắp tới'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                        {data.schedules.length === 0 && (
-                          <tr><td colSpan={4} className="py-20 text-center text-slate-300 italic text-sm">Chưa có dữ liệu điểm danh</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                    </div>
+                  <div className="bg-white rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-100">
+                    {data.schedules.length === 0 ? (
+                      <p className="cms-empty-cell">Chưa có dữ liệu điểm danh</p>
+                    ) : (
+                      <div className="cms-modal-table-scroll">
+                        <table className="w-full text-left min-w-[520px]">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày học</th>
+                              {(getClientEnrollments(data.student).length > 1) && (
+                                <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Khóa học</th>
+                              )}
+                              <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Giảng viên</th>
+                              <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Nội dung</th>
+                              <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase text-center">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {data.schedules.map(sch => (
+                              <tr key={sch._id} className="hover:bg-slate-50/50 transition">
+                                <td className="px-4 sm:px-6 py-3.5 text-xs font-bold text-slate-700 whitespace-nowrap">{fmtDate(sch.date)}</td>
+                                {(getClientEnrollments(data.student).length > 1) && (
+                                  <td className="px-3 sm:px-4 py-3.5 text-xs font-bold text-blue-600">{sch.course || '—'}</td>
+                                )}
+                                <td className="px-3 sm:px-4 py-3.5 text-xs font-semibold text-slate-600">{sch.teacherName || '—'}</td>
+                                <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-400 max-w-[160px] break-words">{sch.note || sch.subject || 'Dạy thực tế'}</td>
+                                <td className="px-3 sm:px-4 py-3.5 text-center">
+                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${
+                                    sch.status === 'completed'
+                                      ? 'bg-emerald-50 text-emerald-600'
+                                      : sch.status === 'cancelled'
+                                        ? 'bg-red-50 text-red-600'
+                                        : 'bg-amber-50 text-amber-600'
+                                  }`}>
+                                    {sch.status === 'completed' ? 'Đã học' : sch.status === 'cancelled' ? 'Đã hủy' : 'Sắp tới'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -610,33 +618,33 @@ export default function StudentDetailModal({ studentId, onClose }) {
               {/* --- TAB 3: FINANCE --- */}
               {activeTab === 'finance' && (
                 <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div className="bg-emerald-600 rounded-3xl p-8 text-white relative overflow-hidden flex flex-col justify-between h-48">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                     <div className="bg-emerald-600 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] sm:h-48">
                         <DollarSign className="absolute -right-8 -bottom-8 w-40 h-40 opacity-10" />
                         <div>
                           <p className="text-[11px] font-black opacity-60 uppercase tracking-widest mb-1">Trạng thái đóng phí</p>
-                          <h4 className="text-3xl font-black">{data.student.paid ? 'ĐÃ HOÀN TẤT' : 'CÒN NỢ'}</h4>
+                          <h4 className="text-2xl sm:text-3xl font-black">{data.student.paid ? 'ĐÃ HOÀN TẤT' : 'CÒN NỢ'}</h4>
                         </div>
-                        <div className="flex justify-between items-end">
+                        <div className="flex justify-between items-end gap-3">
                           <div>
                             <p className="text-[10px] font-bold opacity-60">Đăng ký ngày</p>
                             <p className="text-sm font-black">{fmtDate(data.student.createdAt)}</p>
                           </div>
                           {!data.student.paid && (
-                            <button onClick={() => showModal({ 
+                            <button type="button" onClick={() => showModal({ 
                                 title: 'Hướng dẫn nghiệp vụ', 
                                 content: 'Chức năng "Thu Học Phí" vui lòng thực hiện tại tab "Giao dịch" để đảm bảo tính đồng nhất của dữ liệu kế toán!', 
                                 type: 'info' 
-                            })} className="bg-white text-emerald-600 px-6 py-2 rounded-xl font-black text-[11px] uppercase tracking-wider hover:bg-emerald-50 transition-all">
+                            })} className="bg-white text-emerald-600 px-4 sm:px-6 py-2 rounded-xl font-black text-[11px] uppercase tracking-wider hover:bg-emerald-50 transition-all shrink-0">
                               Thu học phí ngay
                             </button>
                           )}
                         </div>
                      </div>
-                     <div className="bg-white rounded-3xl p-8 border border-slate-100 flex flex-col justify-between h-48 shadow-sm">
+                     <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-100 flex flex-col justify-between min-h-[9.5rem] sm:h-48 shadow-sm">
                         <div>
                           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Số tiền thanh toán</p>
-                          <h4 className="text-3xl font-black text-slate-800">{fmt(data.student.price)}</h4>
+                          <h4 className="text-2xl sm:text-3xl font-black text-slate-800">{fmt(data.student.price)}</h4>
                         </div>
                         <div className="flex gap-4">
                            <div className="flex-1 p-3 bg-slate-50 rounded-2xl border border-slate-100">
@@ -654,55 +662,58 @@ export default function StudentDetailModal({ studentId, onClose }) {
                   </div>
 
                   <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider pt-4">Lịch sử hóa đơn</h3>
-                  <div className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left min-w-[600px]">
-                        <thead>
-                        <tr className="bg-slate-50">
-                          <th className="px-6 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Mã Hóa đơn</th>
-                          <th className="px-4 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày tạo</th>
-                          <th className="px-4 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Nội dung</th>
-                          <th className="px-4 py-4 text-right text-[11px] font-black text-slate-400 tracking-widest uppercase">Số tiền</th>
-                          <th className="px-6 py-4 text-center text-[11px] font-black text-slate-400 tracking-widest uppercase">In</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {data.invoices.map(inv => (
-                          <tr key={inv._id} className="hover:bg-slate-50/50 transition">
-                            <td className="px-6 py-4">
-                              <span className="text-xs font-black text-indigo-600">{inv.maHoaDon}</span>
-                            </td>
-                            <td className="px-4 py-4 text-xs font-semibold text-slate-600">{fmtDate(inv.createdAt)}</td>
-                            <td className="px-4 py-4 text-xs text-slate-400">{inv.khoaHoc} — {inv.ghiChu || 'Thu phí ghi danh'}</td>
-                            <td className="px-4 py-4 text-right font-black text-slate-800 text-sm">{fmt(inv.hocPhi)}</td>
-                            <td className="px-6 py-4 text-center">
-                              <button onClick={() => window.print()} className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 inline-flex items-center justify-center transition-all">
-                                <Printer size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {data.invoices.length === 0 && (
-                          <tr><td colSpan={5} className="py-20 text-center text-slate-300 italic text-sm">Chưa phát sinh hóa đơn nào</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                    </div>
+                  <div className="bg-white rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
+                    {data.invoices.length === 0 ? (
+                      <p className="cms-empty-cell">Chưa phát sinh hóa đơn nào</p>
+                    ) : (
+                      <div className="cms-modal-table-scroll">
+                        <table className="w-full text-left min-w-[520px]">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Mã HĐ</th>
+                              <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày tạo</th>
+                              <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Nội dung</th>
+                              <th className="px-3 sm:px-4 py-3 text-right text-[11px] font-black text-slate-400 tracking-widest uppercase">Số tiền</th>
+                              <th className="px-4 sm:px-6 py-3 text-center text-[11px] font-black text-slate-400 tracking-widest uppercase">In</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {data.invoices.map(inv => (
+                              <tr key={inv._id} className="hover:bg-slate-50/50 transition">
+                                <td className="px-4 sm:px-6 py-3.5">
+                                  <span className="text-xs font-black text-indigo-600">{inv.maHoaDon}</span>
+                                </td>
+                                <td className="px-3 sm:px-4 py-3.5 text-xs font-semibold text-slate-600 whitespace-nowrap">{fmtDate(inv.createdAt)}</td>
+                                <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-400 max-w-[140px] break-words">{inv.khoaHoc} — {inv.ghiChu || 'Thu phí ghi danh'}</td>
+                                <td className="px-3 sm:px-4 py-3.5 text-right font-black text-slate-800 text-sm whitespace-nowrap">{fmt(inv.hocPhi)}</td>
+                                <td className="px-4 sm:px-6 py-3.5 text-center">
+                                  <button type="button" onClick={() => window.print()} className="w-9 h-9 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 inline-flex items-center justify-center transition-all">
+                                    <Printer size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
                 {/* --- TAB: ASSIGNMENTS --- */}
                 {activeTab === 'assignments' && (
-                  <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-black text-slate-800 text-sm uppercase tracking-wider flex items-center gap-2">
-                        <BookOpen size={16} className="text-blue-500" /> Danh sách bài tập được giao
+                  <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-10 duration-500">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="font-black text-slate-800 text-sm uppercase tracking-wider flex items-center gap-2 min-w-0">
+                        <BookOpen size={16} className="text-blue-500 shrink-0" />
+                        <span className="leading-snug">Danh sách bài tập được giao</span>
                       </h3>
-                      <button 
+                      <button
+                        type="button"
                         onClick={() => setShowAddAssign(!showAddAssign)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition-all flex items-center gap-1.5"
+                        className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 min-h-11 rounded-xl text-[11px] font-black uppercase tracking-wider shadow-sm transition-all inline-flex items-center gap-1.5 shrink-0"
                       >
-                        <Plus size={14} /> GIAO BÀI TẬP MỚI
+                        <Plus size={14} /> Giao bài tập mới
                       </button>
                     </div>
 
@@ -759,23 +770,26 @@ export default function StudentDetailModal({ studentId, onClose }) {
                       </div>
                     )}
 
-                    <div className="bg-white rounded-[32px] overflow-hidden border border-slate-100 shadow-sm">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left min-w-[600px]">
+                    <div className="bg-white rounded-2xl sm:rounded-[32px] overflow-hidden border border-slate-100 shadow-sm">
+                      {loadingAssign ? (
+                        <div className="py-16 flex justify-center">
+                          <Loader2 className="animate-spin text-indigo-400" />
+                        </div>
+                      ) : assignments.length === 0 ? (
+                        <p className="cms-empty-cell">Chưa có bài tập nào được giao</p>
+                      ) : (
+                      <div className="cms-modal-table-scroll">
+                        <table className="w-full text-left min-w-[520px]">
                           <thead>
                             <tr className="bg-slate-50">
-                            <th className="px-6 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Bài tập</th>
-                            <th className="px-4 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase">Thời hạn</th>
-                            <th className="px-4 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase text-center">Tiến độ</th>
-                            <th className="px-6 py-4 text-[11px] font-black text-slate-400 tracking-widest uppercase text-center">Kết quả</th>
+                            <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Bài tập</th>
+                            <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Thời hạn</th>
+                            <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase text-center">Tiến độ</th>
+                            <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase text-center">Kết quả</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                          {loadingAssign ? (
-                            <tr><td colSpan={4} className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-indigo-400" /></td></tr>
-                          ) : assignments.length === 0 ? (
-                            <tr><td colSpan={4} className="py-20 text-center text-slate-300 italic text-sm">Chưa có bài tập nào được giao</td></tr>
-                          ) : assignments.map(a => {
+                          {assignments.map(a => {
                             const sub = a.mySubmission;
                             const isLate = new Date() > new Date(a.deadline) && !sub;
                             return (
@@ -829,6 +843,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                         </tbody>
                       </table>
                       </div>
+                      )}
                     </div>
                   </div>
                 )}

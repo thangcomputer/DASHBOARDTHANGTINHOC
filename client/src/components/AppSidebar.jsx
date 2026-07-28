@@ -328,22 +328,22 @@ const AppSidebar = ({
   const renderSidebarContent = () => (
     <div className={`flex flex-col h-full bg-gradient-to-b ${config.brand.color} text-white overflow-x-hidden`}>
 
-      {/* ── Logo + Collapse button ── */}
+      {/* ── Logo + Collapse / Close ── */}
       <div
         className={`relative flex items-center border-b border-white/10 ${
-          (collapsed && !mobileOpen) ? 'px-3 py-4 justify-center' : 'px-3 py-4'
+          (collapsed && !mobileOpen) ? 'px-3 py-4 justify-center' : 'px-3 py-3.5'
         }`}
       >
         {(!collapsed || mobileOpen) ? (
           <>
-            {/* Cột trái cân với nút X (mobile) / nút thu gọn (desktop) */}
-            <span className="w-11 h-11 shrink-0 lg:hidden" aria-hidden="true" />
+            <span className="w-11 h-11 shrink-0" aria-hidden="true" />
             <button
               type="button"
-              className="flex-1 min-w-0 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity bg-transparent border-0 p-0"
+              className="flex-1 min-w-0 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity bg-transparent border-0 p-0 px-1"
               onClick={() => {
                 navigate(config.items[0].path);
                 triggerBackgroundSync();
+                if (mobileOpen) setMobileOpen(false);
               }}
               title="Làm mới bảng điều khiển"
               aria-label="Về trang tổng quan"
@@ -351,11 +351,22 @@ const AppSidebar = ({
               <img
                 src={dynamicLogo || '/logo-thang-tin-hoc.svg'}
                 alt="Thắng Tin Học"
-                className="h-9 sm:h-8 max-w-[min(100%,180px)] object-contain"
-                style={dynamicLogo ? { maxHeight: '36px' } : { filter: 'brightness(0) invert(1)' }}
+                className="h-8 max-w-[min(100%,152px)] object-contain"
+                style={dynamicLogo ? { maxHeight: '32px' } : { filter: 'brightness(0) invert(1)' }}
               />
             </button>
-            <span className="w-11 h-11 shrink-0 hidden lg:block" aria-hidden="true" />
+            {mobileOpen ? (
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="w-11 h-11 shrink-0 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-white border border-white/20 lg:hidden"
+                aria-label="Đóng menu"
+              >
+                <X size={18} />
+              </button>
+            ) : (
+              <span className="w-11 h-11 shrink-0" aria-hidden="true" />
+            )}
           </>
         ) : null}
         <button
@@ -552,16 +563,8 @@ const AppSidebar = ({
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
           <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-[min(85vw,280px)] max-w-[280px] animate-in slide-in-from-left duration-300 pt-[env(safe-area-inset-top,0px)]">
-            <div className="h-full relative shadow-2xl">
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                className="absolute top-3 right-3 z-20 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white/15 hover:bg-white/25 rounded-xl flex items-center justify-center text-white border border-white/20"
-                aria-label="Đóng menu"
-              >
-                <X size={18} />
-              </button>
+          <div className="absolute left-0 top-0 h-full w-[min(88vw,300px)] max-w-[300px] animate-in slide-in-from-left duration-300 pt-[env(safe-area-inset-top,0px)]">
+            <div className="h-full relative shadow-2xl overflow-hidden">
               {renderSidebarContent()}
             </div>
           </div>
