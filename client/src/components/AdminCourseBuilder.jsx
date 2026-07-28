@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Plus, Edit3, Trash2, Video, ChevronDown, ChevronUp, Save, Layers, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '../utils/toast.jsx';

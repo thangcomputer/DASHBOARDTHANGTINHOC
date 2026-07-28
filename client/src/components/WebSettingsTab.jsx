@@ -1,4 +1,4 @@
-﻿/**
+/**
  * WebSettingsTab.jsx — Cài đặt Web (Logo, Favicon, Loading Screen)
  * Chỉ Super Admin truy cập. Nằm trong SystemSettingsTab.
  * Thông báo Nhân viên: dùng tab Popup thông báo (đối tượng = Nhân viên).

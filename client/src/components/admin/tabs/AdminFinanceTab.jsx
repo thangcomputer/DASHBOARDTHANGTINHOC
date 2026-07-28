@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useAdminTab } from '../AdminTabContext';
 import {
   DollarSign, Download, TrendingUp, RefreshCw, CreditCard, Users,

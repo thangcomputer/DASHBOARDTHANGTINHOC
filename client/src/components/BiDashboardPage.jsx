@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   BarChart3, Download, Loader2, RefreshCw, TrendingDown, TrendingUp,
   Users, GraduationCap, Calendar, DollarSign, ClipboardCheck, Wallet,

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * EmployeeManagementTab.jsx — Module Quản lý Nhân sự & Trả lương
  * Tab 1: Danh sách nhân sự (CRUD)
  * Tab 2: Trả lương (thanh toán + VietQR + lịch sử)

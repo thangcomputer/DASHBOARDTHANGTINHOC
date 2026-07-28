@@ -1,4 +1,4 @@
-﻿import React, { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import { useData } from '../../../context/DataContext';
