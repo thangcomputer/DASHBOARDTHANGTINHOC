@@ -75,32 +75,35 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
   return (
     <div className="space-y-5">
       {/* 4-Stat Box */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/50 rounded-2xl p-4 text-center shadow-sm">
-          <p className="text-3xl font-black text-blue-700">{created}</p>
-          <p className="text-[10px] uppercase font-black text-blue-500 mt-1.5 tracking-wider">Lịch đã xếp</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3 text-center">
+          <p className="text-2xl sm:text-3xl font-bold text-sky-700">{created}</p>
+          <p className="text-[10px] uppercase font-bold text-sky-500 mt-1 tracking-wider">Lịch đã xếp</p>
         </div>
-        <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-100/50 rounded-2xl p-4 text-center shadow-sm">
-          <p className="text-3xl font-black text-red-600">{cancelled}</p>
-          <p className="text-[10px] uppercase font-black text-red-500 mt-1.5 tracking-wider">Đã huỷ</p>
+        <div className="rounded-2xl border border-red-100 bg-red-50 p-3 text-center">
+          <p className="text-2xl sm:text-3xl font-bold text-red-600">{cancelled}</p>
+          <p className="text-[10px] uppercase font-bold text-red-500 mt-1 tracking-wider">Đã huỷ</p>
         </div>
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100/50 rounded-2xl p-4 text-center shadow-sm">
-          <p className="text-3xl font-black text-amber-600">{cancelRate}%</p>
-          <p className="text-[10px] uppercase font-black text-amber-600 mt-1.5 tracking-wider">Tỷ lệ hủy</p>
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-center">
+          <p className="text-2xl sm:text-3xl font-bold text-amber-600">{cancelRate}%</p>
+          <p className="text-[10px] uppercase font-bold text-amber-600 mt-1 tracking-wider">Tỷ lệ hủy</p>
         </div>
       </div>
 
       {/* Danh sách */}
-      <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden shadow-sm">
-        <div className="bg-slate-50 px-5 py-3 border-b-2 border-slate-100 flex items-center justify-between">
-          <h4 className="font-bold text-sm text-slate-700 flex items-center gap-2">
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
             <Calendar size={16} className="text-slate-500" /> Bản ghi hoạt động
           </h4>
         </div>
         {history.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">
-            <Calendar size={32} className="mx-auto mb-2 opacity-20" />
-            <p className="text-sm font-medium">Chưa có hoạt động xếp lịch nào</p>
+          <div className="cms-empty">
+            <div className="cms-empty__icon">
+              <Calendar size={26} />
+            </div>
+            <p className="cms-empty__title">Chưa có hoạt động xếp lịch nào</p>
+            <p className="cms-empty__desc">Khi có lịch được xếp hoặc huỷ, bản ghi sẽ hiện tại đây.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

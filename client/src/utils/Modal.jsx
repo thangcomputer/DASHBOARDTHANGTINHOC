@@ -38,22 +38,11 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
     success:  { icon: CheckCircle, tone: 'text-emerald-600 bg-emerald-50' },
     warning:  { icon: AlertCircle, tone: 'text-amber-600 bg-amber-50' },
     error:    { icon: AlertCircle, tone: 'text-red-600 bg-red-50' },
-    question: { icon: HelpCircle,  tone: 'text-violet-600 bg-violet-50' },
+    question: { icon: HelpCircle,  tone: 'text-sky-600 bg-sky-50' },
   };
 
   const config = typeConfigs[modal.type] || typeConfigs.info;
   const Icon = config.icon;
-
-  const sizeClasses = {
-    sm: 'md:max-w-sm',
-    md: 'md:max-w-md',
-    lg: 'md:max-w-lg',
-    xl: 'md:max-w-xl',
-    '2xl': 'md:max-w-2xl',
-    '3xl': 'md:max-w-3xl',
-    full: 'md:max-w-[95vw]',
-  };
-  const sizeClass = sizeClasses[modal.size] || sizeClasses.sm;
 
   return (
     <>
@@ -62,42 +51,38 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
         role="dialog"
         aria-modal="true"
         aria-label={modal.title || 'Thông báo'}
-        className={`cms-sheet w-full ${sizeClass}`}
+        className="cms-sheet w-full"
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
         <div className="cms-sheet-header">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${config.tone}`}>
-              <Icon size={20} aria-hidden="true" />
-            </span>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 truncate">
-              {modal.title || 'Thông báo'}
-            </h3>
-          </div>
+          <span className={`cms-sheet-header__side ${config.tone}`} aria-hidden="true">
+            <Icon size={18} />
+          </span>
+          <h3 className="cms-sheet-header__title">{modal.title || 'Thông báo'}</h3>
           <button
             type="button"
             onClick={onCancel}
             aria-label="Đóng"
-            className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 hover:text-red-600 flex items-center justify-center transition-colors duration-200"
+            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
         <div className="cms-sheet-body">
-          <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          <div className="text-sm text-slate-600 leading-relaxed">
             {modal.content}
           </div>
         </div>
 
         <div className="cms-sheet-footer">
           {modal.cancelText ? (
-            <button type="button" onClick={onCancel} className="cms-btn cms-btn-outline flex-1">
+            <button type="button" onClick={onCancel} className="cms-btn cms-btn-outline">
               {modal.cancelText}
             </button>
           ) : null}
           {modal.confirmText ? (
-            <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary flex-[1.4]">
+            <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary">
               {modal.confirmText}
             </button>
           ) : null}

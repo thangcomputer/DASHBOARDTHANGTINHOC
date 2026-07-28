@@ -61,27 +61,45 @@ export default function ResetPasswordOtpModal({ modal, onClose }) {
     : '';
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[99999] p-4" onClick={close}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><KeyRound size={20} /></div>
-            <div>
-              <p className="font-black text-base">Cấp lại mật khẩu</p>
-              <p className="text-white/80 text-xs">{modal.role === 'teacher' ? 'Giảng viên' : 'Học viên'}: <strong>{modal.name}</strong></p>
-            </div>
+    <>
+      <div className="cms-sheet-backdrop" onClick={close} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Cấp lại mật khẩu"
+        className="cms-sheet w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
+        <div className="cms-sheet-header">
+          <span className="cms-sheet-header__side bg-amber-50 text-amber-600" aria-hidden="true">
+            <KeyRound size={18} />
+          </span>
+          <div className="min-w-0">
+            <h3 className="cms-sheet-header__title">Cấp lại mật khẩu</h3>
+            <p className="text-center text-[11px] text-slate-500 truncate mt-0.5">
+              {modal.role === 'teacher' ? 'Giảng viên' : 'Học viên'}: <strong>{modal.name}</strong>
+            </p>
           </div>
-          <button type="button" onClick={close} className="hover:bg-white/20 rounded-lg p-1 transition"><X size={18} /></button>
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Đóng"
+            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <X size={18} />
+          </button>
         </div>
-        <div className="p-6 space-y-4">
+
+        <div className="cms-sheet-body space-y-4">
           {!otpResult ? (
-            <div className="text-center py-6">
-              <div className="w-10 h-10 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-gray-500 font-bold">Đang sinh mã OTP...</p>
+            <div className="cms-empty py-8">
+              <div className="w-10 h-10 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin" />
+              <p className="cms-empty__desc">Đang sinh mã OTP...</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className={`flex items-center justify-center gap-2 py-2 px-4 rounded-full font-black text-lg mx-auto w-fit ${
+            <>
+              <div className={`flex items-center justify-center gap-2 py-2 px-4 rounded-full font-bold text-lg mx-auto w-fit ${
                 otpCountdown > 30 ? 'bg-emerald-50 text-emerald-600'
                   : otpCountdown > 0 ? 'bg-amber-50 text-amber-600'
                     : 'bg-red-50 text-red-500'
@@ -91,52 +109,58 @@ export default function ResetPasswordOtpModal({ modal, onClose }) {
                   ? `${Math.floor(otpCountdown / 60)}:${String(otpCountdown % 60).padStart(2, '0')}`
                   : 'Hết hạn'}
               </div>
-              <div className="bg-gray-50 border-2 border-dashed border-amber-300 rounded-2xl p-4 text-center">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-1">Mã OTP</p>
-                <p className="text-5xl font-black text-amber-600 tracking-[0.3em] font-mono">{otpResult.otp}</p>
+              <div className="rounded-2xl border border-dashed border-amber-300 bg-slate-50 p-4 text-center">
+                <p className="cms-label mb-1">Mã OTP</p>
+                <p className="text-5xl font-bold text-amber-600 tracking-[0.3em] font-mono">{otpResult.otp}</p>
               </div>
-              <div className="bg-blue-50 rounded-xl p-3 text-sm text-gray-700 leading-relaxed">
-                <p className="font-bold text-blue-700 text-xs mb-1">Nội dung gửi cho {otpResult.name}:</p>
-                <p className="font-mono text-xs bg-white rounded-lg p-2 border border-blue-200 whitespace-pre-wrap">{otpMessage}</p>
+              <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-slate-700 leading-relaxed">
+                <p className="font-semibold text-sky-700 text-[12px] mb-1">Nội dung gửi cho {otpResult.name}:</p>
+                <p className="font-mono text-[12px] bg-white rounded-lg p-2 border border-sky-100 whitespace-pre-wrap">{otpMessage}</p>
               </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(otpMessage);
-                    toast.success('Đã copy nội dung tin nhắn!');
-                  }}
-                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition"
-                >
-                  Copy tin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const phone = (otpResult.zalo || otpResult.phone || '').replace(/[^0-9]/g, '');
-                    window.open(`https://zalo.me/${phone}`, '_blank');
-                    navigator.clipboard.writeText(otpMessage);
-                    toast.success('Mở Zalo! Nội dung đã được copy sẵn.');
-                  }}
-                  className="flex-[2] py-3 bg-[#0068ff] hover:bg-[#0055d4] text-white font-bold rounded-xl transition shadow-lg"
-                >
-                  Gửi Zalo
-                </button>
-              </div>
-              {otpCountdown === 0 && (
-                <button
-                  type="button"
-                  disabled={resetPwLoading}
-                  onClick={generateOtp}
-                  className="w-full py-2.5 border-2 border-amber-400 text-amber-600 font-bold rounded-xl hover:bg-amber-50 transition flex items-center justify-center gap-2"
-                >
-                  <RefreshCw size={15} /> Sinh lại OTP mới
-                </button>
-              )}
-            </div>
+            </>
           )}
         </div>
+
+        {otpResult && (
+          <div className="cms-sheet-footer" style={{ flexDirection: 'column' }}>
+            <div className="flex gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(otpMessage);
+                  toast.success('Đã copy nội dung tin nhắn!');
+                }}
+                className="cms-btn cms-btn-outline"
+              >
+                Copy tin
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const phone = (otpResult.zalo || otpResult.phone || '').replace(/[^0-9]/g, '');
+                  window.open(`https://zalo.me/${phone}`, '_blank');
+                  navigator.clipboard.writeText(otpMessage);
+                  toast.success('Mở Zalo! Nội dung đã được copy sẵn.');
+                }}
+                className="cms-btn cms-btn-primary"
+                style={{ background: '#0068ff', boxShadow: '0 4px 12px rgba(0,104,255,0.28)' }}
+              >
+                Gửi Zalo
+              </button>
+            </div>
+            {otpCountdown === 0 && (
+              <button
+                type="button"
+                disabled={resetPwLoading}
+                onClick={generateOtp}
+                className="cms-btn cms-btn-outline w-full"
+              >
+                <RefreshCw size={15} /> Sinh lại OTP mới
+              </button>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </>
   );
 }

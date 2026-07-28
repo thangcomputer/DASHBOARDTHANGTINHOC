@@ -204,22 +204,25 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
   // ── STEP: success ─────────────────────────────────────────────────────────
   if (step === 'success') {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]" style={{ backdropFilter: 'blur(8px)' }}>
-        <div className="bg-white rounded-3xl shadow-2xl p-10 flex flex-col items-center gap-4 w-72">
-          <div className="relative w-20 h-20">
-            {/* Spinner ring */}
-            <svg className="animate-spin absolute inset-0" viewBox="0 0 80 80" fill="none">
-              <circle cx="40" cy="40" r="36" stroke="#22c55e" strokeWidth="6" strokeDasharray="200" strokeDashoffset="50" strokeLinecap="round" />
-            </svg>
-            {/* Checkmark */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <CheckCircle2 size={44} className="text-emerald-500 animate-bounce" />
+      <>
+        <div className="cms-sheet-backdrop" aria-hidden="true" />
+        <div role="dialog" aria-modal="true" aria-label="Thanh toán thành công" className="cms-sheet w-full">
+          <div className="cms-sheet-body">
+            <div className="cms-empty">
+              <div className="relative w-20 h-20">
+                <svg className="animate-spin absolute inset-0" viewBox="0 0 80 80" fill="none">
+                  <circle cx="40" cy="40" r="36" stroke="#22c55e" strokeWidth="6" strokeDasharray="200" strokeDashoffset="50" strokeLinecap="round" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <CheckCircle2 size={44} className="text-emerald-500" />
+                </div>
+              </div>
+              <p className="cms-empty__title text-emerald-700">Thanh toán thành công!</p>
+              <p className="cms-empty__desc">Đã đăng ký học viên<br /><strong>{form.name}</strong></p>
             </div>
           </div>
-          <p className="text-lg font-black text-emerald-700">Thanh toán thành công!</p>
-          <p className="text-xs text-gray-400 text-center">Đã đăng ký học viên<br /><strong>{form.name}</strong></p>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -230,256 +233,290 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
     const isUrgent = timeLeft < 60;
 
     return (
-      <div className="fixed inset-0 bg-black/65 flex items-center justify-center z-[9999] p-4" style={{ backdropFilter: 'blur(8px)' }}>
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-red-600 to-red-500 px-5 py-4 text-white flex items-center justify-between">
-            <div>
-              <p className="font-black text-base">💳 Quét QR Thanh Toán</p>
-              <p className="text-xs opacity-80">{form.name} — {form.course?.slice(0,25)}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {sessionId && (
-                <button 
-                  onClick={() => {
-                    const shareUrl = `${window.location.origin}/pay/${sessionId}`;
-                    navigator.clipboard.writeText(shareUrl);
-                    toast.success('Đã copy link thanh toán! Bạn có thể gửi qua Zalo/Facebook cho học viên.');
-                  }}
-                  className="w-8 h-8 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center transition"
-                  title="Chia sẻ link thanh toán"
-                >
-                  <Share2 size={14} />
-                </button>
-              )}
-              <button onClick={onClose} className="w-8 h-8 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center transition">
-                <X size={14} />
+      <>
+        <div className="cms-sheet-backdrop" onClick={onClose} aria-hidden="true" />
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Quét QR thanh toán"
+          className="cms-sheet w-full"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
+          <div className="cms-sheet-header">
+            {sessionId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const shareUrl = `${window.location.origin}/pay/${sessionId}`;
+                  navigator.clipboard.writeText(shareUrl);
+                  toast.success('Đã copy link thanh toán! Bạn có thể gửi qua Zalo/Facebook cho học viên.');
+                }}
+                aria-label="Chia sẻ link thanh toán"
+                title="Chia sẻ link thanh toán"
+                className="cms-sheet-header__side bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+              >
+                <Share2 size={16} />
               </button>
+            ) : (
+              <span className="cms-sheet-header__side bg-red-50 text-red-600" aria-hidden="true">
+                <CreditCard size={18} />
+              </span>
+            )}
+            <div className="min-w-0">
+              <h3 className="cms-sheet-header__title">Quét QR thanh toán</h3>
+              <p className="text-center text-[11px] text-slate-500 truncate mt-0.5">
+                {form.name} — {form.course?.slice(0, 28)}
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Đóng"
+              className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <div className="p-5 space-y-4">
+          <div className="cms-sheet-body space-y-4">
             {expired ? (
-              <div className="text-center py-8 space-y-3">
-                <div className="text-5xl">⏰</div>
-                <p className="font-black text-red-600 text-lg">Phiên thanh toán hết hạn</p>
-                <p className="text-sm text-gray-400">Vui lòng thử lại</p>
-                <button onClick={() => { setStep('form'); }} className="px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition">
-                  Quay lại
-                </button>
+              <div className="cms-empty">
+                <div className="cms-empty__icon text-2xl" aria-hidden="true">⏰</div>
+                <p className="cms-empty__title text-red-600">Phiên thanh toán hết hạn</p>
+                <p className="cms-empty__desc">Vui lòng thử lại</p>
               </div>
             ) : (
               <>
-                {/* Countdown bar */}
                 <div>
-                  <div className="flex justify-between text-xs font-bold mb-1">
-                    <span className={isUrgent ? 'text-red-500 animate-pulse' : 'text-gray-500'}>⏱ Còn lại</span>
-                    <span className={`font-mono font-black ${isUrgent ? 'text-red-500' : 'text-gray-700'}`}>{formatTime(timeLeft)}</span>
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span className={isUrgent ? 'text-red-500 animate-pulse' : 'text-slate-500'}>Còn lại</span>
+                    <span className={`font-mono font-bold ${isUrgent ? 'text-red-500' : 'text-slate-700'}`}>{formatTime(timeLeft)}</span>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all duration-1000 ${isUrgent ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
 
-                {/* Amount */}
-                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-3 text-center">
-                  <p className="text-xs text-gray-500 font-medium">Số tiền cần thanh toán</p>
-                  <p className="text-2xl font-black text-red-600">{form.price.toLocaleString('vi-VN')}đ</p>
+                <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-center">
+                  <p className="text-xs text-slate-500 font-medium">Số tiền cần thanh toán</p>
+                  <p className="text-2xl font-bold text-red-600 mt-1">{form.price.toLocaleString('vi-VN')}đ</p>
                 </div>
 
-                {/* QR Code */}
                 {qrUrl ? (
                   <div className="flex justify-center">
-                    <div className="border-4 border-emerald-400 rounded-2xl p-2 shadow-lg shadow-emerald-100">
+                    <div className="border-2 border-emerald-300 rounded-2xl p-2 shadow-sm">
                       <img src={qrUrl} alt="VietQR" className="w-44 h-44 object-contain rounded-xl" />
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
-                    <Loader2 size={20} className="animate-spin" /> Đang tải mã QR...
+                  <div className="cms-empty py-8">
+                    <Loader2 size={22} className="animate-spin text-slate-400" />
+                    <p className="cms-empty__desc">Đang tải mã QR...</p>
                   </div>
                 )}
 
-                {/* Transfer content */}
-                <div className="bg-gray-50 rounded-xl p-3 text-center">
-                  <p className="text-xs text-gray-400 mb-0.5">Nội dung chuyển khoản</p>
-                  <p className="font-mono font-bold text-gray-800 text-sm">{ckContent}</p>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+                  <p className="text-xs text-slate-400 mb-0.5">Nội dung chuyển khoản</p>
+                  <p className="font-mono font-semibold text-slate-800 text-sm">{ckContent}</p>
                 </div>
 
-                {/* Polling indicator */}
-                <div className="flex items-center gap-2 text-xs text-gray-400 justify-center">
+                <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
                   <Loader2 size={12} className="animate-spin text-emerald-500" />
                   Đang kiểm tra thanh toán tự động mỗi 3 giây...
                 </div>
-
-                <button onClick={onClose} className="w-full py-2 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition">
-                  Đóng (thanh toán sau)
-                </button>
               </>
             )}
           </div>
+
+          <div className="cms-sheet-footer">
+            {expired ? (
+              <button type="button" onClick={() => { setStep('form'); }} className="cms-btn cms-btn-primary">
+                Quay lại
+              </button>
+            ) : (
+              <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">
+                Đóng (thanh toán sau)
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
-  // ── STEP: form (Tái cấu trúc UI lưới 2 cột) ─────────────────────────────
+  // ── STEP: form ────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4" style={{ backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-[#dc2626] to-[#991b1b] px-8 py-6 flex items-center justify-between">
-          <h3 className="text-white font-black text-2xl flex items-center gap-4">
-            <div className="p-2 bg-white/20 rounded-2xl backdrop-blur-md">
-              <Plus size={28} />
-            </div>
-            Thêm Học Viên Mới
-          </h3>
-          <button onClick={onClose} className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center text-white transition-all cursor-pointer">
-            <X size={20} />
+    <>
+      <div className="cms-sheet-backdrop" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Thêm học viên mới"
+        className="cms-sheet cms-sheet--wide w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
+        <div className="cms-sheet-header">
+          <span className="cms-sheet-header__side bg-red-50 text-red-600" aria-hidden="true">
+            <Plus size={18} />
+          </span>
+          <h3 className="cms-sheet-header__title">Thêm học viên mới</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        {/* Body Lưới 2 cột */}
-        <div className="p-10 max-h-[75vh] overflow-y-auto w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* Cột Trái: Thông tin Cá nhân */}
-            <div className="space-y-6 md:border-r border-gray-100 md:pr-10">
-              <h4 className="font-black text-gray-400 text-xs mb-6 flex items-center gap-2 uppercase tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">1</span>
-                Thông tin Cá nhân
-              </h4>
-              
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Họ tên học viên <span className="text-red-500">*</span></label>
-                <input name="name" value={form.name} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 uppercase font-black text-gray-800 outline-none transition-all shadow-sm" placeholder="VD: NGUYỄN VĂN A" />
-              </div>
-              
-              <div className="flex gap-3 items-end">
-                <div style={{width: '100px', flexShrink: 0}}>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Tuổi</label>
-                  <input name="age" type="number" value={form.age} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] px-3 py-4 font-bold text-gray-800 outline-none transition-all shadow-sm text-center" placeholder="20" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Số điện thoại / Zalo <span className="text-red-500">*</span></label>
-                  <input name="phone" value={form.phone} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm font-mono" placeholder="0911222333" />
-                </div>
-              </div>
+        <div className="cms-sheet-body space-y-6">
+          <section className="cms-form">
+            <div className="cms-step">
+              <span className="cms-step__num">1</span>
+              <span className="cms-step__label">Thông tin cá nhân</span>
             </div>
 
-            {/* Cột Phải: Thông tin Khóa học */}
-            <div className="space-y-6 md:pl-2">
-              <h4 className="font-black text-gray-400 text-xs mb-6 flex items-center gap-2 uppercase tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-slate-800 text-white flex items-center justify-center text-xs shadow-lg shadow-slate-200">2</span>
-                Đăng ký Khóa học
-              </h4>
+            <div>
+              <label className="cms-label">Họ tên học viên <span className="text-red-500">*</span></label>
+              <input
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                className="cms-input uppercase"
+                placeholder="VD: Nguyễn Văn A"
+              />
+            </div>
 
-              {/* Step: Branch Selection (If SuperAdmin) */}
-              {isSuperAdmin && (
+            <div className="cms-form-row">
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Cơ sở (Chi nhánh)</label>
-                <CmsSelect name="branchId" value={form.branchId || ''} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm appearance-none cursor-pointer">
+                <label className="cms-label">Tuổi</label>
+                <input
+                  name="age"
+                  type="number"
+                  value={form.age}
+                  onChange={handleChange}
+                  className="cms-input text-center"
+                  placeholder="20"
+                />
+              </div>
+              <div>
+                <label className="cms-label">Số điện thoại / Zalo <span className="text-red-500">*</span></label>
+                <input
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                  className="cms-input font-mono"
+                  placeholder="0911222333"
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="cms-form">
+            <div className="cms-step">
+              <span className="cms-step__num cms-step__num--muted">2</span>
+              <span className="cms-step__label">Đăng ký khóa học</span>
+            </div>
+
+            {isSuperAdmin && (
+              <div>
+                <label className="cms-label">Cơ sở (chi nhánh)</label>
+                <CmsSelect
+                  name="branchId"
+                  value={form.branchId || ''}
+                  onChange={handleChange}
+                  className="cms-input"
+                >
                   <option value="">-- Chọn cơ sở đào tạo --</option>
-                  {branches.map(b => (
+                  {branches.map((b) => (
                     <option key={b._id} value={b._id}>{b.name}</option>
                   ))}
                 </CmsSelect>
               </div>
-              )}
+            )}
 
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-3">Hình thức học</label>
-                <div className="flex gap-4">
-                  <label className={`flex items-center gap-3 cursor-pointer border-2 p-4 rounded-2xl transition-all flex-1 ${form.learningMode === 'OFFLINE' ? 'border-red-600 bg-red-50 shadow-md shadow-red-100' : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'}`}>
-                    <input type="radio" name="learningMode" value="OFFLINE" checked={form.learningMode === 'OFFLINE'} onChange={handleChange} className="hidden" />
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${form.learningMode === 'OFFLINE' ? 'border-red-600' : 'border-gray-300'}`}>
-                       {form.learningMode === 'OFFLINE' && <div className="w-2.5 h-2.5 rounded-full bg-red-600" />}
-                    </div>
-                    <span className="font-black uppercase text-xs">🏢 Tại cơ sở</span>
-                  </label>
-                  <label className={`flex items-center gap-3 cursor-pointer border-2 p-4 rounded-2xl transition-all flex-1 ${form.learningMode === 'ONLINE' ? 'border-red-600 bg-red-50 shadow-md shadow-red-100' : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'}`}>
-                    <input type="radio" name="learningMode" value="ONLINE" checked={form.learningMode === 'ONLINE'} onChange={handleChange} className="hidden" />
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${form.learningMode === 'ONLINE' ? 'border-red-600' : 'border-gray-300'}`}>
-                       {form.learningMode === 'ONLINE' && <div className="w-2.5 h-2.5 rounded-full bg-red-600" />}
-                    </div>
-                    <span className="font-black uppercase text-xs">🌐 Online</span>
-                  </label>
-                </div>
+            <div>
+              <label className="cms-label">Hình thức học</label>
+              <div className="cms-chip-grid">
+                <label className={`cms-chip-option ${form.learningMode === 'OFFLINE' ? 'is-on' : ''}`}>
+                  <input type="radio" name="learningMode" value="OFFLINE" checked={form.learningMode === 'OFFLINE'} onChange={handleChange} className="sr-only" />
+                  🏢 Tại cơ sở
+                </label>
+                <label className={`cms-chip-option ${form.learningMode === 'ONLINE' ? 'is-on' : ''}`}>
+                  <input type="radio" name="learningMode" value="ONLINE" checked={form.learningMode === 'ONLINE'} onChange={handleChange} className="sr-only" />
+                  🌐 Online
+                </label>
               </div>
+            </div>
 
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Khóa học & Học phí</label>
-                {dbCourses.length > 0 ? (
-                  <CmsSelect name="courseId" value={form.courseId} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm cursor-pointer">
-                    {dbCourses.map(c => {
-                      const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
-                      const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
-                      return <option key={c._id} value={c._id}>{c.name} — {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)</option>;
-                    })}
-                  </CmsSelect>
-                ) : (
-                  <div className="p-4 bg-gray-50 rounded-[20px] text-gray-400 text-xs font-bold animate-pulse">Đang tải dữ liệu khóa học...</div>
-                )}
-                {form.price > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 shadow-sm">
-                      <DollarSign size={14} className="font-black" />
-                      <span className="text-xs font-black">HỌC PHÍ: {form.price.toLocaleString('vi-VN')}đ</span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-xl border border-blue-100 shadow-sm">
-                      <span className="text-xs font-black">SỐ BUỔI: {form.totalSessions}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Giảng viên hướng dẫn</label>
-                <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="w-full bg-gray-50 border-2 border-transparent focus:border-red-600 focus:bg-white rounded-[20px] p-4 font-black text-gray-800 outline-none transition-all shadow-sm cursor-pointer">
-                  <option value="">-- Chọn sau (Không bắt buộc) --</option>
-                  {(teachers || []).filter(Boolean).filter(t => String(t.status || '').toLowerCase() === 'active').map(t => (
-                    <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.phone ? ` — ${t.phone}` : ''}</option>
-                  ))}
+            <div>
+              <label className="cms-label">Khóa học &amp; học phí</label>
+              {dbCourses.length > 0 ? (
+                <CmsSelect name="courseId" value={form.courseId} onChange={handleChange} className="cms-input">
+                  {dbCourses.map((c) => {
+                    const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
+                    const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
+                    return (
+                      <option key={c._id} value={c._id}>
+                        {c.name} — {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
+                      </option>
+                    );
+                  })}
                 </CmsSelect>
-                {(teachers || []).filter(Boolean).filter(t => String(t.status || '').toLowerCase() === 'active').length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">⚠️ Chưa có giảng viên chính thức (Active) để phân công.</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Footer: Bottom actions */}
-          <div className="mt-12 pt-10 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-gray-50/50 -mx-10 -mb-10 px-10 pb-10 pt-8 rounded-b-[40px]">
-            <label className="flex items-center gap-4 cursor-pointer select-none group">
-              <div className="relative">
-                <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="peer hidden" />
-                <div className="w-7 h-7 bg-white rounded-lg border-2 border-gray-200 peer-checked:bg-red-600 peer-checked:border-red-600 transition-all flex items-center justify-center shadow-sm">
-                  <CheckCircle2 size={16} className="text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+              ) : (
+                <div className="cms-input flex items-center text-slate-400">Đang tải dữ liệu khóa học...</div>
+              )}
+              {form.price > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-100 text-[12px] font-bold">
+                    <DollarSign size={13} /> Học phí: {form.price.toLocaleString('vi-VN')}đ
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-700 px-3 py-1.5 rounded-xl border border-sky-100 text-[12px] font-bold">
+                    Số buổi: {form.totalSessions}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <span className="text-sm font-black text-gray-800 block uppercase tracking-tight group-hover:text-red-600 transition-colors">Thanh toán tiền mặt</span>
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Học sinh đã nộp tiền mặt trực tiếp</p>
-              </div>
-            </label>
-
-            <div className="flex gap-4 w-full md:w-auto">
-              <button 
-                onClick={onClose} 
-                className="px-10 py-4 bg-white border-2 border-gray-100 rounded-[22px] text-xs font-black text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all"
-              >
-                HỦY BỎ
-              </button>
-              <button 
-                onClick={handleSubmitForm} 
-                className="flex-1 md:flex-none px-12 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-red-200 hover:shadow-red-500/30 hover:-translate-y-1 transition-all flex items-center justify-center gap-3 uppercase active:scale-95"
-              >
-                {form.paid ? <><CheckCircle2 size={18} /> HOÀN TẤT ĐĂNG KÝ</> : <><CreditCard size={18} /> QUÉT MÃ QR & ĐĂNG KÝ</>}
-              </button>
+              )}
             </div>
-          </div>
+
+            <div>
+              <label className="cms-label">Giảng viên hướng dẫn</label>
+              <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="cms-input">
+                <option value="">-- Chọn sau (không bắt buộc) --</option>
+                {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').map((t) => (
+                  <option key={t.id || t._id} value={t.id || t._id}>
+                    {t.name}{t.phone ? ` — ${t.phone}` : ''}
+                  </option>
+                ))}
+              </CmsSelect>
+              {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').length === 0 && (
+                <p className="text-[12px] text-amber-600 mt-1.5">Chưa có giảng viên Active để phân công.</p>
+              )}
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="mt-1 w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500" />
+              <span>
+                <span className="block text-[14px] font-semibold text-slate-800">Thanh toán tiền mặt</span>
+                <span className="block text-[12px] text-slate-500 mt-0.5">Học sinh đã nộp tiền mặt trực tiếp</span>
+              </span>
+            </label>
+          </section>
+        </div>
+
+        <div className="cms-sheet-footer">
+          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">
+            Hủy bỏ
+          </button>
+          <button type="button" onClick={handleSubmitForm} className="cms-btn cms-btn-primary">
+            {form.paid
+              ? <><CheckCircle2 size={16} /> Hoàn tất đăng ký</>
+              : <><CreditCard size={16} /> Quét QR &amp; đăng ký</>}
+          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

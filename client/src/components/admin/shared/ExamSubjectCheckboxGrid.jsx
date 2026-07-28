@@ -5,18 +5,10 @@ export default function ExamSubjectCheckboxGrid({
   catalog,
   value = [],
   onChange,
-  accent = 'green',
+  accent = 'red',
 }) {
   const options = getExamSubjectOptions(catalog);
   const selected = Array.isArray(value) ? value : [];
-  const ring =
-    accent === 'purple' ? 'border-purple-500 bg-purple-50'
-      : accent === 'blue' ? 'border-blue-500 bg-blue-50'
-        : 'border-green-500 bg-green-50';
-  const dot =
-    accent === 'purple' ? 'text-purple-700'
-      : accent === 'blue' ? 'text-blue-700'
-        : 'text-green-700';
 
   const toggle = (id) => {
     const next = selected.includes(id)
@@ -25,32 +17,44 @@ export default function ExamSubjectCheckboxGrid({
     onChange(next);
   };
 
+  const accentClass =
+    accent === 'blue' ? 'is-accent-blue'
+      : accent === 'purple' ? 'is-accent-purple'
+        : accent === 'green' ? 'is-accent-green'
+          : '';
+
   return (
     <div className="space-y-2">
-      <label className="text-xs font-bold text-gray-500 uppercase block">
+      <label className="cms-label">
         Môn học <span className="text-red-500">*</span>
       </label>
-      <div className="flex flex-wrap gap-2">
+      <div className={`cms-chip-grid ${accentClass}`}>
         {options.map(({ id, label }) => {
           const on = selected.includes(id);
           return (
             <label
               key={id}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border-2 cursor-pointer text-sm font-semibold transition-colors ${on ? ring : 'border-gray-200 bg-white hover:border-gray-300'}`}
+              className={`cms-chip-option ${on ? 'is-on' : ''}`}
             >
               <input
                 type="checkbox"
-                className="rounded border-gray-300"
+                className="sr-only"
                 checked={on}
                 onChange={() => toggle(id)}
               />
-              <span className={on ? dot : 'text-gray-700'}>{label}</span>
+              <span
+                className={`cms-chip-check ${on ? 'is-on' : ''}`}
+                aria-hidden="true"
+              >
+                ✓
+              </span>
+              <span className="min-w-0 leading-snug">{label}</span>
             </label>
           );
         })}
       </div>
       {!options.length && (
-        <p className="text-xs text-amber-600">Chưa có danh mục môn. Cấu hình tại Cài đặt hệ thống.</p>
+        <p className="text-[12px] text-amber-600">Chưa có danh mục môn. Cấu hình tại Cài đặt hệ thống.</p>
       )}
     </div>
   );

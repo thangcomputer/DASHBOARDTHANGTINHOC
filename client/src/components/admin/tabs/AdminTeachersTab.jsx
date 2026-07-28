@@ -229,7 +229,7 @@ export default function AdminTeachersTab() {
                         )}
 
                         {isSuperAdmin && (
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="cms-card-actions">
                             {active && (
                               <button
                                 type="button"
@@ -244,6 +244,7 @@ export default function AdminTeachersTab() {
                               onClick={() => setEditTeacher(t)}
                               className="cms-btn cms-btn-outline cms-btn-icon"
                               title="Chỉnh sửa"
+                              aria-label="Chỉnh sửa"
                             >
                               <Edit3 size={16} />
                             </button>
@@ -252,6 +253,7 @@ export default function AdminTeachersTab() {
                               onClick={() => removeTeacher(t.id)}
                               className="cms-btn cms-btn-outline cms-btn-icon text-red-600"
                               title="Xóa"
+                              aria-label="Xóa"
                             >
                               <Trash2 size={16} />
                             </button>

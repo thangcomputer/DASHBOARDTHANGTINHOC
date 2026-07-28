@@ -24,28 +24,26 @@ export default function AddTeacherModal({
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
         <div className="cms-sheet-header">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center flex-shrink-0">
-              <GraduationCap size={20} aria-hidden="true" />
-            </span>
-            <h3 className="text-base font-semibold text-slate-900 truncate">Thêm Giảng viên mới</h3>
-          </div>
+          <span className="cms-sheet-header__side bg-sky-50 text-sky-600" aria-hidden="true">
+            <GraduationCap size={18} />
+          </span>
+          <h3 className="cms-sheet-header__title">Thêm giảng viên mới</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 hover:text-red-600 flex items-center justify-center transition-colors duration-200"
+            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
         <div className="cms-sheet-body space-y-6">
-          <section className="space-y-3">
-            <h4 className="cms-label !mb-0 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-lg bg-sky-600 text-white flex items-center justify-center text-[11px] font-bold">1</span>
-              Thông tin cá nhân
-            </h4>
+          <section className="cms-form">
+            <div className="cms-step">
+              <span className="cms-step__num">1</span>
+              <span className="cms-step__label">Thông tin cá nhân</span>
+            </div>
 
             <div>
               <label className="cms-label">Họ tên <span className="text-red-500">*</span></label>
@@ -80,33 +78,34 @@ export default function AddTeacherModal({
               />
             </div>
 
-            <div>
-              <label className="cms-label">Ngày vào làm</label>
-              <input
-                type="date"
-                value={teacherForm.startDate}
-                onChange={(e) => setTeacherForm((p) => ({ ...p, startDate: e.target.value }))}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className="cms-label">Địa chỉ</label>
-              <input
-                type="text"
-                value={teacherForm.address}
-                onChange={(e) => setTeacherForm((p) => ({ ...p, address: e.target.value }))}
-                className={inputClass}
-                placeholder="VD: 123 Đường ABC, Quận X..."
-              />
+            <div className="cms-form-row">
+              <div>
+                <label className="cms-label">Ngày vào làm</label>
+                <input
+                  type="date"
+                  value={teacherForm.startDate}
+                  onChange={(e) => setTeacherForm((p) => ({ ...p, startDate: e.target.value }))}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="cms-label">Địa chỉ</label>
+                <input
+                  type="text"
+                  value={teacherForm.address}
+                  onChange={(e) => setTeacherForm((p) => ({ ...p, address: e.target.value }))}
+                  className={inputClass}
+                  placeholder="VD: 123 Đường ABC, Quận X..."
+                />
+              </div>
             </div>
           </section>
 
-          <section className="space-y-3">
-            <h4 className="cms-label !mb-0 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-lg bg-slate-800 text-white flex items-center justify-center text-[11px] font-bold">2</span>
-              Chuyên môn & chi nhánh
-            </h4>
+          <section className="cms-form">
+            <div className="cms-step">
+              <span className="cms-step__num cms-step__num--muted">2</span>
+              <span className="cms-step__label">Chuyên môn &amp; chi nhánh</span>
+            </div>
 
             <div>
               <ExamSubjectCheckboxGrid
@@ -120,7 +119,7 @@ export default function AddTeacherModal({
                 }))}
               />
               {teacherForm.specialty && (
-                <p className="text-xs text-sky-700 mt-2 font-semibold">Chuyên môn: {teacherForm.specialty}</p>
+                <p className="text-[12px] text-sky-700 mt-2 font-semibold">Chuyên môn: {teacherForm.specialty}</p>
               )}
             </div>
 
@@ -162,7 +161,7 @@ export default function AddTeacherModal({
               </div>
             )}
 
-            <p className="text-[13px] text-slate-600 bg-sky-50 border border-sky-100 rounded-xl p-3 leading-relaxed">
+            <p className="text-[13px] text-slate-600 bg-sky-50 border border-sky-100 rounded-xl p-3.5 leading-relaxed">
               Giảng viên sau khi được tạo sẽ ở trạng thái <strong>&quot;Chưa cấp quyền&quot; (Inactive)</strong>.
               Admin cần duyệt cấp quyền thì họ mới có thể đăng nhập bằng SĐT.
             </p>
@@ -170,10 +169,10 @@ export default function AddTeacherModal({
         </div>
 
         <div className="cms-sheet-footer">
-          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline flex-1">
+          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">
             Hủy
           </button>
-          <button type="button" onClick={onSubmit} className="cms-btn cms-btn-primary flex-[1.4]">
+          <button type="button" onClick={onSubmit} className="cms-btn cms-btn-primary">
             <GraduationCap size={16} /> Lưu
           </button>
         </div>

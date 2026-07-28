@@ -616,14 +616,14 @@ export default function AdminStudentTrainingTab() {
                             {item.fileSize && <p className="text-xs text-gray-400 mt-0.5">{item.fileSize}</p>}
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 sm:ml-3 shrink-0 items-center self-end sm:self-auto">
+                        <div className="cms-card-actions w-full sm:w-auto sm:ml-3 self-stretch sm:self-auto">
                           {sTrainingTab === 'videos' && (
-                             <button type="button" onClick={() => setSCourseBuilderMode(item)} className="min-h-11 px-3 py-2 rounded-2xl bg-sky-50 border border-sky-100 hover:bg-sky-100 text-sky-700 text-xs font-bold transition whitespace-nowrap inline-flex items-center gap-1.5">
+                             <button type="button" onClick={() => setSCourseBuilderMode(item)} className="cms-btn cms-btn-outline cms-btn-sm text-sky-700 border-sky-100 bg-sky-50 hover:bg-sky-100">
                                <Layers size={13} /> Giáo trình
                              </button>
                           )}
                           <button type="button" onClick={() => setSTrainingForm({ ...item })}
-                            className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-600 transition"><Edit3 size={16} /></button>
+                            className="cms-btn cms-btn-outline cms-btn-icon text-sky-600" aria-label="Chỉnh sửa" title="Chỉnh sửa"><Edit3 size={16} /></button>
                           <button type="button" onClick={() => {
                             showGlobalModal({
                               title: 'Xác nhận xoá tài liệu',
@@ -633,7 +633,7 @@ export default function AdminStudentTrainingTab() {
                               cancelText: 'Huỷ bỏ',
                               onConfirm: () => removeStudentTrainingItem(sTrainingTab, item.id)
                             });
-                          }} className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 rounded-2xl bg-red-50 hover:bg-red-100 text-red-500 transition"><Trash2 size={16} /></button>
+                          }} className="cms-btn cms-btn-outline cms-btn-icon text-red-600" aria-label="Xóa" title="Xóa"><Trash2 size={16} /></button>
                         </div>
                       </div>
                     ))}
