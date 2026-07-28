@@ -370,9 +370,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
     return (
       <div className="bg-white rounded-2xl sm:rounded-[40px] shadow-lg sm:shadow-2xl shadow-blue-900/5 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500">
         {/* Header */}
-        <div className="bg-[#1e293b] px-4 py-4 sm:px-8 sm:py-6 md:px-10 md:py-8 text-white">
-          <div className="flex items-start gap-2.5 sm:gap-6 min-w-0">
-            <div className="w-10 h-10 sm:w-20 sm:h-20 rounded-full sm:rounded-[28px] overflow-hidden shadow-lg border-2 border-white/15 bg-white shrink-0">
+        <div className="bg-slate-50/80 px-4 py-4 sm:px-8 sm:py-6 md:px-10 md:py-8 border-b border-slate-100">
+          <div className="bg-white border border-slate-100 shadow-sm rounded-2xl sm:rounded-[28px] p-4 sm:p-6">
+            <div className="flex items-start gap-3 sm:gap-6 min-w-0">
+            <div className="w-10 h-10 sm:w-20 sm:h-20 rounded-full sm:rounded-[28px] overflow-hidden shadow-sm border border-slate-200 bg-white shrink-0">
               <img
                 src={resolveAvatarUrl({ avatar: student.avatarUrl || student.photo, role: 'student' })}
                 alt={getDisplayName(student)}
@@ -382,23 +383,23 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
             <div className="flex-1 min-w-0">
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-sm sm:text-2xl font-black tracking-tight uppercase break-words line-clamp-2 leading-snug">
+                  <h2 className="text-sm sm:text-2xl font-bold tracking-tight text-slate-800 break-words line-clamp-2 leading-snug">
                     {getDisplayName(student)}
                   </h2>
-                  <p className="text-slate-400 text-[11px] sm:text-sm font-semibold mt-0.5 break-words line-clamp-2 leading-snug">
+                  <p className="text-slate-500 text-[11px] sm:text-sm font-semibold mt-0.5 break-words line-clamp-2 leading-snug">
                     {student.course}{student.age ? ` · ${student.age} tuổi` : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className={`hidden min-[380px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
-                    isCompleted ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-200'
+                    isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
                   }`}>
                     {isCompleted ? 'Hoàn thành' : 'Đang học'}
                   </span>
                   <button
                     type="button"
                     onClick={() => window.open(`http://zalo.me/${student.zalo || student.phone}`, '_blank')}
-                    className="w-8 h-8 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center transition-all border border-white/10"
+                    className="w-8 h-8 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center transition-all border border-slate-200"
                     title="Gửi tin nhắn"
                     aria-label="Gửi tin nhắn"
                   >
@@ -411,29 +412,30 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               </div>
               <div className="flex flex-wrap items-center gap-1.5 mt-2">
                 <span className={`min-[380px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase ${
-                  isCompleted ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-200'
+                  isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
                 }`}>
                   {isCompleted ? 'Hoàn thành' : 'Đang học'}
                 </span>
-                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-white/10 text-slate-300 border border-white/5 uppercase">
+                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-slate-100 text-slate-500 border border-slate-200 uppercase">
                   {student.learningMode || 'OFFLINE'}
                 </span>
               </div>
             </div>
           </div>
           
-          <div className="mt-4 pt-3 border-t border-white/10">
+          <div className="mt-4 pt-3 border-t border-slate-100">
             <div className="flex justify-between items-center mb-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide text-slate-400">
               <span>Tiến độ khóa học</span>
-              <span className="text-white tabular-nums">{done}/{student.totalSessions} buổi ({progressPct}%)</span>
+              <span className="text-slate-700 tabular-nums">{done}/{student.totalSessions} buổi ({progressPct}%)</span>
             </div>
-            <div className="h-1.5 sm:h-2.5 bg-slate-800 rounded-full overflow-hidden border border-white/5">
+            <div className="h-1.5 sm:h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
               <div
-                className="h-full rounded-full bg-indigo-500 transition-all duration-700 ease-out"
+                className="h-full rounded-full bg-blue-500 transition-all duration-700 ease-out"
                 style={{ width: `${progressPct}%` }}
               />
             </div>
           </div>
+        </div>
         </div>
 
         {/* Tabs — 4 cột, icon + nhãn rõ ràng */}
@@ -465,28 +467,28 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-500">
                  {/* Stat Boxes — 3 cột trên mobile */}
                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
-                    <div className="bg-blue-50/70 border border-blue-100 rounded-xl sm:rounded-2xl py-2.5 px-2 sm:p-6 text-center">
-                       <p className="text-[9px] sm:text-xs font-bold text-blue-400 uppercase tracking-wide mb-0.5">Đã học</p>
-                       <h4 className="text-lg sm:text-4xl font-black text-blue-700 leading-none tabular-nums">{done}</h4>
-                       <p className="text-[9px] sm:text-xs font-semibold text-blue-300 mt-0.5 uppercase">buổi</p>
+                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
+                       <p className="text-[9px] sm:text-xs font-bold text-blue-400 uppercase tracking-wide mb-1">Đã học</p>
+                       <h4 className="text-xl sm:text-4xl font-extrabold text-blue-600 leading-none tabular-nums">{done}</h4>
+                       <p className="text-[9px] sm:text-xs font-semibold text-blue-300 mt-1 uppercase">buổi</p>
                     </div>
-                    <div className={`border rounded-xl sm:rounded-2xl py-2.5 px-2 sm:p-6 text-center ${isCompleted ? 'bg-emerald-50/70 border-emerald-100' : 'bg-orange-50/70 border-orange-100'}`}>
-                       <p className={`text-[9px] sm:text-xs font-bold uppercase tracking-wide mb-0.5 ${isCompleted ? 'text-emerald-400' : 'text-orange-400'}`}>Còn lại</p>
-                       <h4 className={`text-lg sm:text-4xl font-black leading-none tabular-nums ${isCompleted ? 'text-emerald-700' : 'text-orange-700'}`}>{student.remainingSessions}</h4>
-                       <p className={`text-[9px] sm:text-xs font-semibold mt-0.5 uppercase ${isCompleted ? 'text-emerald-300' : 'text-orange-300'}`}>buổi</p>
+                    <div className="bg-amber-50/60 border border-amber-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
+                       <p className="text-[9px] sm:text-xs font-bold uppercase tracking-wide mb-1 text-amber-400">Còn lại</p>
+                       <h4 className="text-xl sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{student.remainingSessions}</h4>
+                       <p className="text-[9px] sm:text-xs font-semibold mt-1 uppercase text-amber-300">buổi</p>
                     </div>
-                    <div className="bg-violet-50/70 border border-violet-100 rounded-xl sm:rounded-2xl py-2.5 px-2 sm:p-6 text-center">
-                       <p className="text-[9px] sm:text-xs font-bold text-violet-400 uppercase tracking-wide mb-0.5">Điểm TB</p>
+                    <div className="bg-purple-50/60 border border-purple-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
+                       <p className="text-[9px] sm:text-xs font-bold text-purple-400 uppercase tracking-wide mb-1">Điểm TB</p>
                        <div className="flex items-baseline justify-center gap-0.5">
-                          <h4 className="text-lg sm:text-4xl font-black text-violet-700 leading-none tabular-nums">{student.lastGrade || 0}</h4>
-                          <span className="text-[10px] sm:text-lg font-bold text-violet-300">/10</span>
+                          <h4 className="text-xl sm:text-4xl font-extrabold text-purple-600 leading-none tabular-nums">{student.lastGrade || 0}</h4>
+                          <span className="text-[10px] sm:text-lg font-bold text-purple-300">/10</span>
                        </div>
-                       <p className="text-[9px] sm:text-xs font-semibold text-violet-300 mt-0.5 uppercase hidden sm:block">Đánh giá chung</p>
+                       <p className="text-[9px] sm:text-xs font-semibold text-purple-300 mt-1 uppercase hidden sm:block">Đánh giá chung</p>
                     </div>
                  </div>
 
                  {/* Actions outlined gọn */}
-                 <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                 <div className="grid grid-cols-2 gap-2 mt-4 sm:gap-4">
                    {attendanceGate?.status === 'not_yet' ? (
                      <div className="flex items-center justify-center h-9 sm:h-auto sm:py-5 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide border border-dashed border-slate-300 rounded-xl bg-slate-50">
                         Chưa đến giờ dạy
@@ -507,14 +509,14 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                          !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                          'Bấm để điểm danh buổi học hôm nay'
                        }
-                       className={`h-9 sm:h-auto sm:py-5 rounded-xl sm:rounded-3xl font-bold text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all ${
+                       className={`h-10 sm:h-auto sm:py-5 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all ${
                          isCompleted 
-                           ? 'border border-slate-300 text-slate-500 bg-white cursor-not-allowed'
+                           ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
                          : attendanceGate?.status === 'no_schedule'
-                           ? 'border border-slate-300 text-slate-700 bg-white cursor-not-allowed'
+                           ? 'bg-slate-100 text-slate-700 cursor-not-allowed'
                          : !canCheckIn
-                           ? 'border border-slate-300 text-slate-500 bg-white cursor-not-allowed'
-                           : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-[0.98]'
+                           ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
                        }`}
                      >
                        <CheckCircle size={14} className="shrink-0" aria-hidden="true" />
@@ -539,10 +541,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        : !canCancelAttendance ? `Đã quá 1 tiếng, không thể hủy (${minsElapsedSinceAttend} phút trước)`
                        : `Còn ${cancelTimeLeft} phút để hủy. Nhấn để hủy điểm danh hôm nay`
                      }
-                     className={`h-9 sm:h-auto sm:py-5 rounded-xl sm:rounded-3xl font-bold text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all border ${
+                     className={`h-10 sm:h-auto sm:py-5 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all ${
                        canCancelAttendance && !isCompleted
-                         ? 'border-rose-300 text-rose-700 bg-white hover:bg-rose-50 active:scale-[0.98]'
-                         : 'border-slate-300 text-slate-500 bg-white cursor-not-allowed'
+                         ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
+                         : 'bg-slate-100 text-slate-500 cursor-not-allowed'
                      }`}
                    >
                      <X size={14} className="shrink-0" aria-hidden="true" />
@@ -559,13 +561,16 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                     <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1.5 mb-2">
                        <FileText size={12} aria-hidden="true" /> Ghi chú học viên
                     </label>
+                    <div className="border border-slate-200 rounded-xl p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
                     <textarea 
                        value={notesInput} onChange={e => setNotesInput(e.target.value)}
                        onBlur={() => onUpdateNotes((student._id || student.id), notesInput)}
                        placeholder="Nhận xét cá nhân, ghi nhận đặc biệt về học viên này..."
-                       className="w-full bg-white border border-slate-200 rounded-xl p-3 sm:p-5 text-xs sm:text-sm font-medium focus:border-blue-400 focus:ring-2 focus:ring-blue-50 outline-none transition-all resize-none"
+                       className="w-full bg-transparent border-0 rounded-none p-0 text-xs sm:text-sm font-medium outline-none resize-none"
                        rows={3}
                     />
+                    <span className="text-[11px] text-slate-400 ml-auto block mt-2">Tự động lưu khi rời ô nhập</span>
+                    </div>
                  </div>
               </div>
            )}
