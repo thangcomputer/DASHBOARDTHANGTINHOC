@@ -10,6 +10,7 @@ import api from '../../../services/api';
 import { useAdminStudents } from './useAdminStudents';
 import { useAdminTeachers } from './useAdminTeachers';
 import { EXAM_RESULTS_STUDENTS_FETCH_CAP } from './adminConstants';
+import { sumClientPaidTuition } from '../../../utils/enrollments';
 
 export { EXAM_RESULTS_STUDENTS_FETCH_CAP };
 
@@ -190,21 +191,41 @@ export function useAdminDashboardState() {
     }
   }, [activeTab]);
 
-  // Finance from server
+  // Finance from server — lấy đủ HV + mọi enrollment (không chỉ khóa chính / page 10)
   const financeFetcher = async ([, branch_id]) => {
-    const params = branch_id && branch_id !== 'all' ? { branch_id } : {};
-    const [resTx, resSt] = await Promise.all([
-      api.transactions.getAll(params),
-      api.students.getAll(`?${new URLSearchParams(params).toString()}`),
+    const params = {
+      limit: 100,
+      page: 1,
+      ...(branch_id && branch_id !== 'all' ? { branch_id } : {}),
+    };
+    const [resTx, firstPage] = await Promise.all([
+      api.transactions.getAll(branch_id && branch_id !== 'all' ? { branch_id } : {}),
+      api.students.getAll(params),
     ]);
+
+    let financeStudents = firstPage?.success ? (firstPage.data || []) : [];
+    const totalPages = Number(firstPage?.totalPages) || 1;
+    if (firstPage?.success && totalPages > 1) {
+      const rest = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          api.students.getAll({ ...params, page: i + 2 }),
+        ),
+      );
+      rest.forEach((pageRes) => {
+        if (pageRes?.success && Array.isArray(pageRes.data)) {
+          financeStudents = financeStudents.concat(pageRes.data);
+        }
+      });
+    }
+
     return {
       financialData: resTx?.success ? (resTx.data || []) : [],
-      financeStudents: resSt?.success ? (resSt.data || []) : [],
+      financeStudents,
     };
   };
 
   const { data: financeRes, isValidating: isLoadingFinance } = useSWR(
-    activeTab === 'finance' ? ['admin_finance', selectedBranchId] : null,
+    activeTab === 'finance' ? ['admin_finance_v2', selectedBranchId] : null,
     financeFetcher,
     { refreshInterval: 60_000, revalidateOnFocus: false, dedupingInterval: 20_000 },
   );
@@ -424,7 +445,7 @@ export function useAdminDashboardState() {
     ? branchStats.activeTeachers
     : safeTeachers.length;
   const statTotalRevenue = branchStats?.totalRevenue
-    ?? filteredStudents.filter((s) => s.paid).reduce((sum, s) => sum + (s.price || 0), 0);
+    ?? filteredStudents.reduce((sum, s) => sum + sumClientPaidTuition(s), 0);
   const statPendingTeachers = branchStats?.pendingTeachers
     ?? safeTeachers.filter((t) => t.status === 'Pending').length;
 

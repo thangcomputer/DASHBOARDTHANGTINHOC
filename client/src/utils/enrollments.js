@@ -138,6 +138,78 @@ export function scopeStudentToEnrollment(student, enrollment) {
     paid: enrollment.paid ?? student.paid, price: enrollment.price ?? student.price,
     activeEnrollmentId: enrollment.enrollmentId || enrollment.id };
 }
+
+/** SUM học phí đã thu của mọi khóa — đồng bộ BI / báo cáo doanh thu. */
+export function sumClientPaidTuition(student) {
+  if (!student) return 0;
+  const list = getClientEnrollments(student);
+  const isPaidEnr = (e) =>
+    e?.paid === true
+    || e?.paid === 'Đã đóng phí'
+    || e?.paid === 'true'
+    || e?.paid === 1;
+
+  if (list.length > 0) {
+    const fromPaid = list
+      .filter(isPaidEnr)
+      .reduce((s, e) => s + (Number(e.price) || 0), 0);
+    if (fromPaid > 0) return fromPaid;
+    const paidAmount = Number(student.paidAmount) || 0;
+    if (paidAmount > 0) return paidAmount;
+    if (student.paid) return list.reduce((s, e) => s + (Number(e.price) || 0), 0);
+    return 0;
+  }
+  if (!student.paid) return 0;
+  const paidAmount = Number(student.paidAmount) || 0;
+  if (paidAmount > 0) return paidAmount;
+  return Number(student.price) || 0;
+}
+
+/** Flatten HV → từng dòng khóa học (dùng tab Tài chính). */
+export function expandFinanceEnrollmentRows(students) {
+  const rows = [];
+  (students || []).forEach((student) => {
+    const sid = student.id || student._id;
+    const list = getClientEnrollments(student);
+    if (list.length === 0) {
+      rows.push({
+        key: String(sid),
+        studentId: sid,
+        studentName: student.name || '—',
+        courseName: student.course || '—',
+        price: Number(student.price) || 0,
+        paid: !!student.paid,
+        enrollmentId: null,
+        isLegacy: true,
+      });
+      return;
+    }
+    list.forEach((enr, idx) => {
+      const enrId = enr.enrollmentId || enr.id;
+      rows.push({
+        key: `${sid}-${enrId || idx}`,
+        studentId: sid,
+        studentName: student.name || '—',
+        courseName: enr.courseName || enr.name || student.course || '—',
+        price: Number(enr.price) || 0,
+        paid: enr.paid === true || enr.paid === 'Đã đóng phí' || enr.paid === 'true' || enr.paid === 1,
+        enrollmentId: enrId && enrId !== 'main' ? enrId : null,
+        isLegacy: !enrId || enrId === 'main',
+      });
+    });
+  });
+  return rows;
+}
+
+export function sumClientListedTuition(student) {
+  if (!student) return 0;
+  const list = getClientEnrollments(student);
+  if (list.length > 0) {
+    return list.reduce((s, e) => s + (Number(e.price) || 0), 0);
+  }
+  return Number(student.price) || 0;
+}
+
 export function filterSchedulesByCourse(schedules, courseName) {
   if (!courseName) return schedules || [];
   return (schedules || []).filter((s) => String(s.course || '') === String(courseName));

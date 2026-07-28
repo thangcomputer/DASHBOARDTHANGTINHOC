@@ -1,15 +1,48 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAdminTab } from '../AdminTabContext';
 import {
   DollarSign, Download, TrendingUp, RefreshCw, CreditCard, Users,
 } from 'lucide-react';
 import { exportToCSV } from '../../../utils/exportExcel';
+import {
+  expandFinanceEnrollmentRows,
+} from '../../../utils/enrollments';
+import api from '../../../services/api';
+import { mutate } from 'swr';
 
 export default function AdminFinanceTab() {
   const {
-    isSuperAdmin, transactions, toast, addSystemLog,
+    isSuperAdmin, toast, addSystemLog,
     financeStudents, isLoadingFinance, markStudentPaid, financialData,
   } = useAdminTab();
+
+  const financeRows = useMemo(
+    () => expandFinanceEnrollmentRows(financeStudents),
+    [financeStudents],
+  );
+  const totalCollected = financeRows.filter((r) => r.paid).reduce((s, r) => s + r.price, 0);
+  const totalListed = financeRows.reduce((s, r) => s + r.price, 0);
+  const totalDebt = Math.max(0, totalListed - totalCollected);
+
+  const handlePayRow = async (row) => {
+    const tid = toast.loading('Đang xác nhận thanh toán...');
+    try {
+      if (row.enrollmentId) {
+        const res = await api.students.payEnrollment(row.studentId, row.enrollmentId, {
+          paymentMethod: 'cash',
+        });
+        if (!res?.success) throw new Error(res?.message || 'Thanh toán thất bại');
+      } else {
+        await markStudentPaid(row.studentId);
+      }
+      toast.dismiss(tid);
+      toast.success('Đã xác nhận thu học phí');
+      mutate((key) => Array.isArray(key) && key[0] === 'admin_finance_v2');
+    } catch (e) {
+      toast.dismiss(tid);
+      toast.error(e.message || 'Lỗi thanh toán');
+    }
+  };
 
   return (
             <div className="space-y-4 sm:space-y-6">
@@ -24,28 +57,27 @@ export default function AdminFinanceTab() {
                       <button
                         type="button"
                         onClick={() => {
-                          
-                            const tid = toast.loading('Đang xuất báo cáo hóa đơn...');
+                            const tid = toast.loading('Đang xuất báo cáo doanh thu...');
                             try {
-                              const financialData = transactions.map(t => ({
-                                "Mã GD": t.id || "N/A",
-                                "Ngày": t.date || "N/A",
-                                "Mô tả": `Thanh toán lương: ${t.teacherName} (Khóa ${t.course})`,
-                                "Số tiền": t.amount,
-                                "Trạng thái": t.status === 'completed' ? 'Hoàn thành' : (t.status === 'pending' ? 'Đang xử lý' : t.status),
+                              const exportData = financeRows.map((r) => ({
+                                "Mã HV": r.studentId || "N/A",
+                                "Học viên": r.studentName || "N/A",
+                                "Khóa học": r.courseName || "N/A",
+                                "Số tiền (VNĐ)": r.price || 0,
+                                "Trạng thái": r.paid ? "Đã nộp" : "Chưa nộp",
                               }));
-                              if (financialData.length === 0) throw new Error('Không có dữ liệu giao dịch');
-                              exportToCSV(financialData, `BaoCaoTaiChinh_${new Date().toISOString().split('T')[0]}.csv`);
-                              addSystemLog('Xuất báo cáo', 'Tài chính (Chi lương)', 'Admin', 'bg-orange-500 text-white');
+                              if (exportData.length === 0) throw new Error('Không có dữ liệu học phí');
+                              exportToCSV(exportData, `BaoCaoDoanhThu_${new Date().toISOString().split('T')[0]}.csv`);
+                              addSystemLog('Xuất báo cáo', 'Tài chính (Doanh thu học phí)', 'Admin', 'bg-orange-500 text-white');
                               toast.dismiss(tid);
-                              toast.success('Xuất báo cáo tài chính thành công!');
+                              toast.success('Xuất báo cáo doanh thu thành công!');
                             } catch (e) {
                               toast.dismiss(tid);
                               toast.error('Xuất thất bại: ' + (e.message || 'Lỗi'));
                             }
                         }}
                         className="cms-m-btn border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex-1 sm:flex-initial text-[13px]">
-                        <Download size={14} className="flex-shrink-0" /> Xuất báo cáo chi phí
+                        <Download size={14} className="flex-shrink-0" /> Xuất báo cáo doanh thu
                       </button>
                     </div>
                   </div>
@@ -58,7 +90,7 @@ export default function AdminFinanceTab() {
                         <div className="min-w-0">
                           <p className="text-red-100 text-[12px] font-semibold tracking-wide">Tổng doanh thu thực tế (Đã thu)</p>
                           <p className="text-[1.5rem] sm:text-4xl font-extrabold mt-2 break-words">
-                            {(financeStudents.filter(s => s.paid).reduce((sum, s) => sum + (s.price || 0), 0)).toLocaleString('vi-VN')}đ
+                            {totalCollected.toLocaleString('vi-VN')}đ
                           </p>
                         </div>
                         <div className="bg-white/20 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20 flex items-center gap-1.5 shrink-0 self-start min-h-11">
@@ -80,42 +112,42 @@ export default function AdminFinanceTab() {
                       <div className="flex flex-wrap gap-3 mt-5 text-[12px] font-semibold text-red-100 border-t border-white/10 pt-4">
                         <div className="flex-1 min-w-[140px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
                           <p className="opacity-70 mb-0.5">Dự kiến (Tất cả)</p>
-                          <p className="text-[15px] font-bold text-white">{(financeStudents.reduce((sum, s) => sum + (s.price || 0), 0)).toLocaleString('vi-VN')}đ</p>
+                          <p className="text-[15px] font-bold text-white">{totalListed.toLocaleString('vi-VN')}đ</p>
                         </div>
                         <div className="flex-1 min-w-[140px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
                           <p className="opacity-70 mb-0.5">Công nợ (Chưa thu)</p>
-                          <p className="text-[15px] font-bold text-red-200">{(financeStudents.filter(s => !s.paid).reduce((sum, s) => sum + (s.price || 0), 0)).toLocaleString('vi-VN')}đ</p>
+                          <p className="text-[15px] font-bold text-red-200">{totalDebt.toLocaleString('vi-VN')}đ</p>
                         </div>
                       </div>
                     </div>
                   </div>
                   <div className="divide-y divide-slate-50 border-t border-slate-50 max-h-80 overflow-y-auto relative">
                     {isLoadingFinance && <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10"><RefreshCw className="animate-spin text-indigo-500" /></div>}
-                    {!isLoadingFinance && financeStudents.length === 0 && (
+                    {!isLoadingFinance && financeRows.length === 0 && (
                       <div className="cms-m-empty min-h-[160px]">Chưa có giao dịch học phí.</div>
                     )}
-                    {financeStudents.map(s => (
-                      <div key={s.id} className="cms-m-list-row hover:bg-slate-50">
+                    {financeRows.map((r) => (
+                      <div key={r.key} className="cms-m-list-row hover:bg-slate-50">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${s.paid ? 'bg-emerald-500' : 'bg-red-500'}`}>
-                            {s.name[0]}
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${r.paid ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                            {(r.studentName || '?')[0]}
                           </div>
                           <div className="min-w-0">
-                            <p className="cms-m-list-title">{s.name}</p>
-                            <p className="cms-m-caption line-clamp-2">{s.course}</p>
+                            <p className="cms-m-list-title">{r.studentName}</p>
+                            <p className="cms-m-caption line-clamp-2">{r.courseName}</p>
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                           <div className="text-left sm:text-right min-w-0">
-                            <p className="text-[15px] font-extrabold text-slate-900 break-words">{(s.price || 0).toLocaleString('vi-VN')}đ</p>
-                            <span className={`text-[13px] font-bold ${s.paid ? 'text-sky-700' : 'text-red-500'}`}>
-                              {s.paid ? 'Đã nộp' : 'Chưa nộp'}
+                            <p className="text-[15px] font-extrabold text-slate-900 break-words">{(r.price || 0).toLocaleString('vi-VN')}đ</p>
+                            <span className={`text-[13px] font-bold ${r.paid ? 'text-sky-700' : 'text-red-500'}`}>
+                              {r.paid ? 'Đã nộp' : 'Chưa nộp'}
                             </span>
                           </div>
-                          {!s.paid && (
+                          {!r.paid && (
                             <button
                               type="button"
-                              onClick={() => markStudentPaid(s.id)}
+                              onClick={() => handlePayRow(r)}
                               className="cms-m-btn bg-sky-50 text-sky-700 border border-sky-100 hover:bg-sky-100 w-full sm:w-auto"
                             >
                               Xác nhận thu
@@ -137,7 +169,6 @@ export default function AdminFinanceTab() {
                     <button
                       type="button"
                       onClick={() => {
-                        
                           const tid = toast.loading('Đang xuất báo cáo hóa đơn...');
                           try {
                             const exportData = financialData.map(t => ({
@@ -199,20 +230,6 @@ export default function AdminFinanceTab() {
                             <span className="text-[12px] font-mono text-slate-500 bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100">
                               STK: {bankInfo.accountNumber}
                             </span>
-                            <span className="text-[12px] font-bold text-slate-500 bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100 uppercase">
-                              {bankInfo.accountName}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${bankInfo.bankName} - ${bankInfo.accountNumber} - ${bankInfo.accountName}`);
-                                toast.success('Đã copy thông tin ngân hàng!');
-                              }}
-                              className="cms-m-btn !min-h-11 !px-3 text-[12px] text-blue-600 bg-blue-50 border border-blue-100"
-                              title="Copy thông tin ngân hàng"
-                            >
-                              📋 Copy
-                            </button>
                           </div>
                         )}
                       </div>

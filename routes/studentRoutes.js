@@ -158,35 +158,53 @@ router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
     const unpaid = await Student.countDocuments({ ...bf, paid: false });
     const unlocked = await Student.countDocuments({ ...bf, studentExamUnlocked: true });
 
-    // ⭐ Fix: Doanh thu = SUM(paidAmount) chỉ từ HV đã thanh toán
-    // paidAmount = số tiền thực nhận qua SePay, chính xác hơn price (giá niêm yết)
-    // Fallback sang price nếu paidAmount = 0 (compatibility)
-    const revenueResult = await Student.aggregate([
-      { $match: { ...bf, paid: true } },
-      {
-        $group: {
-          _id: null,
-          totalPaidAmount: { $sum: { $cond: [{ $gt: ['$paidAmount', 0] }, '$paidAmount', '$price'] } },
-          totalListedPrice: { $sum: '$price' },
-        }
-      },
-    ]);
-    const totalRevenue = revenueResult[0]?.totalPaidAmount || 0;
+    const {
+      sumPaidRevenue,
+    } = require('../services/revenueAggregate');
 
-    const pendingResult = await Student.aggregate([
-      { $match: { ...bf, paid: false } },
-      { $group: { _id: null, total: { $sum: '$price' } } },
+    // Doanh thu = SUM price của mọi enrollment đã thanh toán (không chỉ khóa chính)
+    const [revenueAll, pendingResult, todayRevenueRow] = await Promise.all([
+      sumPaidRevenue({ branchFilter: bf }),
+      Student.aggregate([
+        { $match: { ...bf } },
+        {
+          $project: {
+            pending: {
+              $cond: [
+                { $gt: [{ $size: { $ifNull: ['$enrollments', []] } }, 0] },
+                {
+                  $sum: {
+                    $map: {
+                      input: {
+                        $filter: {
+                          input: '$enrollments',
+                          as: 'e',
+                          cond: { $ne: ['$$e.paid', true] },
+                        },
+                      },
+                      as: 'e',
+                      in: { $ifNull: ['$$e.price', 0] },
+                    },
+                  },
+                },
+                {
+                  $cond: [{ $eq: ['$paid', true] }, 0, { $ifNull: ['$price', 0] }],
+                },
+              ],
+            },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$pending' } } },
+      ]),
+      (async () => {
+        const nowVN = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
+        const startOfTodayVN = new Date(Date.UTC(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate()) - 7 * 60 * 60 * 1000);
+        return sumPaidRevenue({ branchFilter: bf, start: startOfTodayVN, end: new Date() });
+      })(),
     ]);
+    const totalRevenue = revenueAll.total || 0;
     const pendingRevenue = pendingResult[0]?.total || 0;
-
-    // ⭐ Fix timezone: Doanh thu HÔM NAY (UTC+7)
-    const nowVN = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
-    const startOfTodayVN = new Date(Date.UTC(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate()) - 7 * 60 * 60 * 1000);
-    const todayResult = await Student.aggregate([
-      { $match: { ...bf, paid: true, paidAt: { $gte: startOfTodayVN } } },
-      { $group: { _id: null, total: { $sum: { $cond: [{ $gt: ['$paidAmount', 0] }, '$paidAmount', '$price'] } } } },
-    ]);
-    const todayRevenue = todayResult[0]?.total || 0;
+    const todayRevenue = todayRevenueRow.total || 0;
 
     // Số giảng viên active (branch-aware)
     const Teacher = require('../models/Teacher');
@@ -1250,9 +1268,14 @@ router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, checkPermission
     if (amount > 0) {
       student.paidAmount = (Number(student.paidAmount) || 0) + amount;
     }
-    if (enr.isPrimary || student.enrollments.length === 1) {
+    if (enr.isPrimary || student.enrollments.length === 1 || student.enrollments.every((e) => e.paid)) {
       student.paid = true;
       student.paidAt = enr.paidAt;
+      student.paymentMethod = paymentMethod;
+    } else if (student.enrollments.some((e) => e.paid)) {
+      // Có ít nhất 1 khóa đã thu — đánh dấu HV đã có thanh toán (KPI/list)
+      student.paid = true;
+      if (!student.paidAt) student.paidAt = enr.paidAt;
       student.paymentMethod = paymentMethod;
     }
     student.markModified('enrollments');

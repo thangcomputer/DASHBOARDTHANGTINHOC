@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { ScheduleView } from './StudentScheduleView';
 import { getGradeTextClasses } from '../../utils/gradeColors';
 
@@ -11,17 +11,6 @@ export default function StudentScheduleTab({
 }) {
   return (
           <div className="cms-sd cms-sd-page cms-sd-stack max-w-5xl">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between min-w-0">
-              <h2 className="cms-sd-section-title flex items-start sm:items-center gap-2 min-w-0">
-                <Calendar size={20} className="text-blue-500 shrink-0 mt-0.5 sm:mt-0" aria-hidden="true" />
-                <span className="min-w-0 leading-snug">
-                  Lịch học — <span className="line-clamp-2 sm:line-clamp-none">{viewStudent.course}</span>
-                </span>
-              </h2>
-              <span className="cms-sd-caption sm:text-right tabular-nums pl-7 sm:pl-0">
-                {mySchedules?.filter(s => s.status === 'completed').length || 0}/{viewStudent.totalSessions} buổi hoàn thành
-              </span>
-            </div>
             <ScheduleView schedules={mySchedules} student={viewStudent} setNoteModalSched={setNoteModalSched} />
 
             <div>

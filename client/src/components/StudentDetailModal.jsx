@@ -17,6 +17,38 @@ import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
 import { useToast } from '../utils/toast';
 
 const fmt = (n) => n ? Number(n).toLocaleString('vi-VN') + 'đ' : '0đ';
+const fmtTuition = (n) => {
+  const v = Math.round(Number(n) || 0);
+  if (v >= 10_000_000) {
+    const tr = (v / 1_000_000).toLocaleString('vi-VN', {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    });
+    return `${tr} tr`;
+  }
+  return v.toLocaleString('vi-VN') + 'đ';
+};
+const enrollmentRemaining = (enr) => {
+  if (enr?.remainingSessions != null && enr.remainingSessions !== '') {
+    return Math.max(0, Number(enr.remainingSessions) || 0);
+  }
+  const total = Number(enr?.totalSessions) || 12;
+  const done = Number(enr?.completedSessions) || 0;
+  return Math.max(0, total - done);
+};
+const summarizeEnrollments = (list) => {
+  const items = Array.isArray(list) ? list : [];
+  const totalSessions = items.reduce((s, e) => s + (Number(e.totalSessions) || 12), 0);
+  const completedSessions = items.reduce((s, e) => s + (Number(e.completedSessions) || 0), 0);
+  const remainingSessions = items.reduce((s, e) => s + enrollmentRemaining(e), 0);
+  const price = items.reduce((s, e) => s + (Number(e.price) || 0), 0);
+  const progressPercent = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+  const grades = items.map((e) => Number(e.avgGrade)).filter((g) => Number.isFinite(g) && g > 0);
+  const avgGrade = grades.length
+    ? Math.round((grades.reduce((a, b) => a + b, 0) / grades.length) * 10) / 10
+    : null;
+  return { totalSessions, completedSessions, remainingSessions, price, progressPercent, avgGrade };
+};
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
 const fmtDateTimeVN = (input) => {
   if (!input) return '';
@@ -39,9 +71,15 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const { showModal }             = useModal();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'attendance' | 'finance' | 'academic'
+  const [courseFilter, setCourseFilter] = useState('all'); // 'all' | enrollmentId
 
   const { updateStudent, assignTeacher, teachers } = useData() || {};
   const [showAddEnrollment, setShowAddEnrollment] = useState(false);
+
+  useEffect(() => {
+    setCourseFilter('all');
+    setActiveTab('summary');
+  }, [studentId]);
 
   const reloadProfile = () => {
     if (!studentId) return;
@@ -229,6 +267,34 @@ export default function StudentDetailModal({ studentId, onClose }) {
 
   if (!studentId) return null;
 
+  const enrollments = data?.student ? getClientEnrollments(data.student) : [];
+  const filterIsValid = courseFilter === 'all'
+    || enrollments.some((e) => String(e.enrollmentId || e.id) === String(courseFilter));
+  const effectiveCourseFilter = filterIsValid ? courseFilter : 'all';
+  const scopedEnrollments = effectiveCourseFilter === 'all'
+    ? enrollments
+    : enrollments.filter((e) => String(e.enrollmentId || e.id) === String(effectiveCourseFilter));
+  const summaryMetrics = summarizeEnrollments(scopedEnrollments);
+  const activeEnrollment = effectiveCourseFilter !== 'all'
+    ? enrollments.find((e) => String(e.enrollmentId || e.id) === String(effectiveCourseFilter)) || null
+    : null;
+  const enrollmentTeacherNames = [...new Set(
+    enrollments.map((e) => String(e.teacherName || '').trim()).filter(Boolean),
+  )];
+  const statusTeacherName = activeEnrollment
+    ? (activeEnrollment.teacherName || 'Chưa gán')
+    : (enrollmentTeacherNames.length > 0
+      ? enrollmentTeacherNames.join(', ')
+      : (data?.student?.teacherId?.name
+        || data?.student?.teacherName
+        || 'Chưa gán'));
+  const statusLabel = activeEnrollment
+    ? (activeEnrollment.status === 'completed' || activeEnrollment.status === 'Hoàn thành'
+      ? 'Hoàn thành'
+      : (activeEnrollment.status === 'active' ? 'Đang học' : (activeEnrollment.status || data?.student?.status || '—')))
+    : (data?.student?.status || '—');
+  const avgGradeDisplay = summaryMetrics.avgGrade ?? data?.student?.avgGrade ?? '—';
+
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
@@ -342,33 +408,54 @@ export default function StudentDetailModal({ studentId, onClose }) {
               </div>
             </div>
 
-            {/* ── TABS — scroll ngang trên mobile ───────────────────────── */}
+            {/* ── TABS + Course filter ─────────────────────────────────────── */}
             <div className="bg-white border-b border-slate-100 shrink-0">
-              <div className="flex gap-1 px-3 sm:px-6 overflow-x-auto overscroll-x-contain hide-scrollbar scroll-smooth">
-                {[
-                  { id: 'summary', label: 'Tổng quan', icon: ClipboardList },
-                  { id: 'attendance', label: 'Lịch học', icon: Clock },
-                  { id: 'assignments', label: 'Bài tập', icon: BookOpen },
-                  { id: 'finance', label: 'Tài chính', icon: CreditCard },
-                  { id: 'academic', label: 'Điểm số', icon: Trophy },
-                ].map((tab) => (
-                  <button
-                    type="button"
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`relative flex items-center gap-1.5 shrink-0 min-h-12 px-3 sm:px-4 text-[13px] font-semibold whitespace-nowrap transition-colors ${
-                      activeTab === tab.id
-                        ? 'text-indigo-600'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    <tab.icon size={15} className="shrink-0" />
-                    {tab.label}
-                    {activeTab === tab.id && (
-                      <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-600 rounded-full" />
-                    )}
-                  </button>
-                ))}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 sm:px-6 py-1.5 sm:py-0">
+                <div className="flex gap-1 flex-1 min-w-0 overflow-x-auto overscroll-x-contain hide-scrollbar scroll-smooth">
+                  {[
+                    { id: 'summary', label: 'Tổng quan', icon: ClipboardList },
+                    { id: 'attendance', label: 'Lịch học', icon: Clock },
+                    { id: 'assignments', label: 'Bài tập', icon: BookOpen },
+                    { id: 'finance', label: 'Tài chính', icon: CreditCard },
+                    { id: 'academic', label: 'Điểm số', icon: Trophy },
+                  ].map((tab) => (
+                    <button
+                      type="button"
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`relative flex items-center gap-1.5 shrink-0 min-h-12 px-3 sm:px-4 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                        activeTab === tab.id
+                          ? 'text-indigo-600'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      <tab.icon size={15} className="shrink-0" />
+                      {tab.label}
+                      {activeTab === tab.id && (
+                        <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-600 rounded-full" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {enrollments.length > 1 && (
+                  <div className="w-full sm:w-64 shrink-0 pb-2 sm:pb-0">
+                    <CmsSelect
+                      value={effectiveCourseFilter}
+                      onChange={(e) => setCourseFilter(e.target.value)}
+                      aria-label="Lọc theo khóa học"
+                    >
+                      <option value="all">Tất cả khóa học ({enrollments.length})</option>
+                      {enrollments.map((enr) => {
+                        const id = String(enr.enrollmentId || enr.id);
+                        return (
+                          <option key={id} value={id}>
+                            {enr.courseName || enr.name}
+                          </option>
+                        );
+                      })}
+                    </CmsSelect>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -378,29 +465,30 @@ export default function StudentDetailModal({ studentId, onClose }) {
               {/* --- TAB 1: SUMMARY --- */}
               {activeTab === 'summary' && (
                 <div className="space-y-8 animate-in fade-in duration-500">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     <StatBox 
                       label="Tiến độ học tập" 
-                      value={`${data.student.progressPercent || 0}%`} 
+                      value={`${summaryMetrics.progressPercent}%`} 
                       icon={TrendingUp} 
                       color="bg-red-600" 
-                      sub={`${data.student.completedSessions || 0}/${data.student.totalSessions || 12} buổi`}
+                      sub={`${summaryMetrics.completedSessions}/${summaryMetrics.totalSessions || 0} buổi`}
                     />
                     <StatBox 
                       label="Số buổi còn lại" 
-                      value={data.student.remainingSessions || 0} 
+                      value={summaryMetrics.remainingSessions} 
                       icon={Clock} 
                       color="bg-amber-500" 
                     />
                     <StatBox 
                       label="Học phí gốc" 
-                      value={fmt(data.student.price)} 
+                      value={fmtTuition(summaryMetrics.price)} 
                       icon={DollarSign} 
-                      color="bg-emerald-600" 
+                      color="bg-emerald-600"
+                      valueClassName="text-lg sm:text-xl tracking-tight"
                     />
                     <StatBox 
                       label="Điểm trung bình" 
-                      value={data.student.avgGrade || '—'} 
+                      value={avgGradeDisplay === 0 || avgGradeDisplay == null || avgGradeDisplay === '' ? '—' : avgGradeDisplay} 
                       icon={Star} 
                       color="bg-violet-500" 
                       sub="Tổng hợp bài tập"
@@ -418,23 +506,29 @@ export default function StudentDetailModal({ studentId, onClose }) {
                           <div>
                              <div className="flex justify-between items-end mb-2">
                                <p className="text-xs font-black text-slate-500 uppercase tracking-tighter">Hoàn thành khóa học</p>
-                               <p className="text-xl font-black text-indigo-600">{data.student.progressPercent || 0}%</p>
+                               <p className="text-xl font-black text-indigo-600">{summaryMetrics.progressPercent}%</p>
                              </div>
                              <div className="h-4 bg-slate-100 rounded-full overflow-hidden p-1 shadow-inner">
                                 <div 
                                   className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-1000 ease-out shadow-lg" 
-                                  style={{ width: `${data.student.progressPercent || 0}%` }}
+                                  style={{ width: `${summaryMetrics.progressPercent}%` }}
                                 />
                              </div>
+                             <p className="mt-2 text-[11px] font-semibold text-slate-400">
+                               {summaryMetrics.completedSessions}/{summaryMetrics.totalSessions} buổi
+                               {activeEnrollment
+                                 ? ` · ${activeEnrollment.courseName || activeEnrollment.name}`
+                                 : (enrollments.length > 1 ? ` · ${enrollments.length} khóa` : '')}
+                             </p>
                           </div>
                            <div className="grid grid-cols-2 gap-4 pt-4">
                              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
                                 <p className="text-[10px] font-black text-indigo-900/40 uppercase mb-1">Giảng viên phụ trách</p>
-                                <p className="text-sm font-black text-indigo-900">{data.student.teacherId?.name || 'Chưa gán'}</p>
+                                <p className="text-sm font-black text-indigo-900">{statusTeacherName}</p>
                              </div>
                              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                 <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Trạng thái hiện tại</p>
-                                <p className="text-sm font-black text-slate-700">{data.student.status}</p>
+                                <p className="text-sm font-black text-slate-700">{statusLabel}</p>
                              </div>
                           </div>
 
@@ -1053,14 +1147,14 @@ export default function StudentDetailModal({ studentId, onClose }) {
 }
 
 {/* Helper UI Components */}
-function StatBox({ label, value, icon: Icon, color, sub }) {
+function StatBox({ label, value, icon: Icon, color, sub, valueClassName }) {
   return (
-    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-sm relative overflow-hidden">
+    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-sm relative overflow-hidden min-w-0">
        <div className={`absolute top-0 left-0 w-1 h-full ${color}`} />
-       <div className="flex items-start justify-between gap-3 pl-1">
-          <div className="space-y-1 min-w-0">
+       <div className="flex items-start justify-between gap-3 pl-1 min-w-0">
+          <div className="space-y-1 min-w-0 flex-1">
              <p className="text-[11px] font-semibold text-slate-500">{label}</p>
-             <h4 className="text-xl sm:text-2xl font-bold text-slate-800 truncate">{value}</h4>
+             <h4 className={`text-xl font-bold text-slate-800 break-words leading-tight ${valueClassName || ''}`}>{value}</h4>
              {sub && <p className="text-[11px] text-slate-400 font-medium">{sub}</p>}
           </div>
           <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center text-white shrink-0`}>

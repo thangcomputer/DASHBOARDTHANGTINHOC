@@ -1,6 +1,6 @@
 /**
- * BI service — executive KPIs, so sanh ky truoc, breakdown.
- * Cache 90s (Phase 5).
+ * BI service — executive KPIs, so sánh kỳ trước, breakdown.
+ * Doanh thu: SUM enrollment.paid (services/revenueAggregate), cache 90s.
  */
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
@@ -9,6 +9,11 @@ const Transaction = require('../models/Transaction');
 const ExamResult = require('../models/ExamResult');
 const Branch = require('../models/Branch');
 const cache = require('../utils/cache');
+const {
+  sumPaidRevenue,
+  listPaidItems,
+  revenueByCourse,
+} = require('./revenueAggregate');
 
 function getPeriodRange(period) {
   const end = new Date();
@@ -40,26 +45,9 @@ function pctChange(current, previous) {
   return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
-async function sumStudentRevenue(match) {
-  const rows = await Student.aggregate([
-    { $match: match },
-    {
-      $group: {
-        _id: null,
-        total: {
-          $sum: {
-            $cond: [{ $gt: ['$paidAmount', 0] }, '$paidAmount', '$price'],
-          },
-        },
-      },
-    },
-  ]);
-  return rows[0]?.total || 0;
-}
-
 async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'all' } = {}) {
   const bf = buildBranchFilter(branchFilter, queryBranch);
-  const cacheKey = 'bi:overview:' + period + ':' + (bf.branchId || queryBranch || 'all');
+  const cacheKey = 'bi:overview:v2:' + period + ':' + (bf.branchId || queryBranch || 'all');
 
   return cache.wrap(cacheKey, 90, async () => {
     const { start, end, prevStart, prevEnd } = getPeriodRange(period);
@@ -71,8 +59,8 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       studentsUnpaid,
       studentsNew,
       studentsNewPrev,
-      revenuePeriod,
-      revenuePrev,
+      revenueNow,
+      revenuePrevRow,
       teachersActive,
       teachersPending,
       schedulesCompleted,
@@ -82,20 +70,17 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       examTotal,
       examPassed,
       branches,
+      byCourse,
+      paidItems,
+      newStudents,
     ] = await Promise.all([
       Student.countDocuments(bf),
       Student.countDocuments({ ...bf, paid: true }),
       Student.countDocuments({ ...bf, paid: false }),
       Student.countDocuments({ ...bf, createdAt: { $gte: start, $lte: end } }),
       Student.countDocuments({ ...bf, createdAt: { $gte: prevStart, $lte: prevEnd } }),
-      sumStudentRevenue({ ...bf, paid: true, $or: [
-        { paidAt: { $gte: start, $lte: end } },
-        { paidAt: null, updatedAt: { $gte: start, $lte: end } },
-      ]}),
-      sumStudentRevenue({ ...bf, paid: true, $or: [
-        { paidAt: { $gte: prevStart, $lte: prevEnd } },
-        { paidAt: null, updatedAt: { $gte: prevStart, $lte: prevEnd } },
-      ]}),
+      sumPaidRevenue({ branchFilter: bf, start, end }),
+      sumPaidRevenue({ branchFilter: bf, start: prevStart, end: prevEnd }),
       Teacher.countDocuments({ ...teacherBf, status: { $in: ['Active', 'active'] } }),
       Teacher.countDocuments({ ...teacherBf, status: { $in: ['Pending', 'pending'] } }),
       Schedule.countDocuments({ ...bf, status: 'completed', date: { $gte: start, $lte: end } }),
@@ -105,35 +90,16 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       ExamResult.countDocuments({ createdAt: { $gte: start, $lte: end } }),
       ExamResult.countDocuments({ createdAt: { $gte: start, $lte: end }, passed: true }),
       Branch.find({ isActive: { $ne: false } }).select('name code').lean(),
+      revenueByCourse({ branchFilter: bf, start, end, limit: 8 }),
+      listPaidItems({ branchFilter: bf, start, end }),
+      Student.find({
+        ...bf,
+        createdAt: { $gte: start, $lte: end },
+      }).select('createdAt').lean(),
     ]);
 
-    // Revenue by course (period new paid students)
-    const byCourse = await Student.aggregate([
-      {
-        $match: {
-          ...bf,
-          paid: true,
-          createdAt: { $gte: start, $lte: end },
-        },
-      },
-      {
-        $group: {
-          _id: '$course',
-          count: { $sum: 1 },
-          revenue: {
-            $sum: { $cond: [{ $gt: ['$paidAmount', 0] }, '$paidAmount', '$price'] },
-          },
-        },
-      },
-      { $sort: { revenue: -1 } },
-      { $limit: 8 },
-    ]);
-
-    // Daily new students sparkline
-    const newStudents = await Student.find({
-      ...bf,
-      createdAt: { $gte: start, $lte: end },
-    }).select('createdAt price paid').lean();
+    const revenuePeriod = revenueNow.total || 0;
+    const revenuePrev = revenuePrevRow.total || 0;
 
     const dayMap = {};
     const cur = new Date(start);
@@ -141,14 +107,23 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
     const endDay = new Date(end);
     endDay.setHours(23, 59, 59, 999);
     while (cur <= endDay) {
-      dayMap[cur.toISOString().slice(0, 10)] = { label: cur.toISOString().slice(0, 10), students: 0, revenue: 0 };
+      dayMap[cur.toISOString().slice(0, 10)] = {
+        label: cur.toISOString().slice(0, 10),
+        students: 0,
+        revenue: 0,
+      };
       cur.setDate(cur.getDate() + 1);
     }
     newStudents.forEach((s) => {
       const key = new Date(s.createdAt).toISOString().slice(0, 10);
       if (!dayMap[key]) return;
       dayMap[key].students += 1;
-      if (s.paid) dayMap[key].revenue += s.price || 0;
+    });
+    paidItems.forEach((item) => {
+      if (!item?.paidAt) return;
+      const key = new Date(item.paidAt).toISOString().slice(0, 10);
+      if (!dayMap[key]) return;
+      dayMap[key].revenue += Number(item.amount) || 0;
     });
     const trend = Object.values(dayMap);
 
@@ -176,9 +151,10 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
         examPassed,
         examPassRate,
         paidRate: studentsTotal > 0 ? Math.round((studentsPaid / studentsTotal) * 1000) / 10 : 0,
+        paymentsPeriod: revenueNow.paymentCount || 0,
       },
-      byCourse: byCourse.map((c) => ({
-        course: c._id || 'Khac',
+      byCourse: (byCourse || []).map((c) => ({
+        course: c.course || 'Khác',
         count: c.count,
         revenue: c.revenue,
       })),

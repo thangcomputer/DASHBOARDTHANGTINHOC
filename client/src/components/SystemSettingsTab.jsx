@@ -733,7 +733,8 @@ export default function SystemSettingsTab() {
 
       {/* ── TAB 6: TÀI KHOẢN ADMIN ──────────────────────────────────────────── */}
       {activeSubTab === 'account' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 w-full max-w-full lg:max-w-2xl">
+        <div className={`grid grid-cols-1 gap-4 sm:gap-6 w-full max-w-full ${isSuperAdmin ? 'lg:grid-cols-2' : 'lg:max-w-2xl'}`}>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 min-w-0">
           <div>
             <div className="flex items-center gap-2">
               <Lock size={16} className="text-red-600 shrink-0" />
@@ -840,9 +841,10 @@ export default function SystemSettingsTab() {
             {adminSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {adminSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
           </button>
+          </div>
 
           {isSuperAdmin && (
-            <div className="border-t border-gray-100 pt-6 space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-4 min-w-0 h-fit">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <ShieldCheck size={16} className="text-emerald-600" />

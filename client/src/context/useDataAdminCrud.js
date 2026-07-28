@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import api from '../services/api';
 import { isTeacherActive, isTeacherPending } from '../constants/teacherStatus';
 import { loadState } from './dataStorage';
-import { expandStudentsForTeacher } from '../utils/enrollments';
+import { expandStudentsForTeacher, sumClientPaidTuition } from '../utils/enrollments';
 
 /**
  * Admin/teacher student-teacher CRUD, exam results, and related helpers for DataProvider.
@@ -566,7 +566,7 @@ export function useDataAdminCrud({
   const getAdminStats = useCallback(() => {
     const safeStudents = students.filter(Boolean);
     const safeTeachers = teachers.filter(Boolean);
-    const totalRevenue = safeStudents.filter(s => s.paid).reduce((sum, s) => sum + (s.price || 0), 0);
+    const totalRevenue = safeStudents.reduce((sum, s) => sum + sumClientPaidTuition(s), 0);
     const activeTeachers = safeTeachers.filter(t => isTeacherActive(t.status)).length;
     const pendingTeachers = safeTeachers.filter(t => isTeacherPending(t.status)).length;
     return {
