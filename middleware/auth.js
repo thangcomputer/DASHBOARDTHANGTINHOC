@@ -150,47 +150,93 @@ const isSuperAdmin = async (req, res, next) => {
  * Lưu ý: permissions được fetch từ DB mỗi lần request để đảm bảo
  * phản ánh thay đổi real-time (không stale cache từ JWT)
  */
+async function assertStaffPermissions(req, res, matcher) {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Chưa xác thực' });
+    return false;
+  }
+
+  if (req.user.id === 'admin') return true;
+
+  if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+    res.status(403).json({
+      success: false,
+      message: '403 Forbidden: Yêu cầu quyền Admin/Staff',
+    });
+    return false;
+  }
+
+  const user = await Teacher.findById(req.user.id).select('adminRole permissions role').lean();
+  if (!user) {
+    res.status(404).json({ success: false, message: 'Tài khoản không tồn tại' });
+    return false;
+  }
+
+  if (user.adminRole === 'SUPER_ADMIN') {
+    req.user.adminRole = 'SUPER_ADMIN';
+    req.user.permissions = user.permissions || [];
+    return true;
+  }
+
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  if (!matcher(perms)) {
+    res.status(403).json({
+      success: false,
+      message: '403 Forbidden: Bạn không có quyền thực hiện thao tác này. Liên hệ Super Admin để được cấp quyền.',
+    });
+    return false;
+  }
+
+  req.user.adminRole = user.adminRole;
+  req.user.permissions = perms;
+  return true;
+}
+
+/** Kiểm tra quyền STAFF/admin (boolean) — dùng trong handler đa vai trò. */
+async function userHasPermission(reqUser, requiredPermission) {
+  if (!reqUser) return false;
+  if (reqUser.id === 'admin') return true;
+  if (reqUser.role !== 'admin' && reqUser.role !== 'staff') return false;
+  try {
+    const user = await Teacher.findById(reqUser.id).select('adminRole permissions').lean();
+    if (!user) return false;
+    if (user.adminRole === 'SUPER_ADMIN') return true;
+    return Array.isArray(user.permissions) && user.permissions.includes(requiredPermission);
+  } catch {
+    return false;
+  }
+}
+
 const checkPermission = (requiredPermission) => {
   return async (req, res, next) => {
     try {
-      // Hardcoded admin: bỏ qua tất cả
-      if (!req.user) {
-        return res.status(401).json({ success: false, message: 'Chưa xác thực' });
-      }
-
-      if (req.user.id === 'admin') return next();
-
-      if (req.user.role !== 'admin' && req.user.role !== 'staff') {
-        return res.status(403).json({
-          success: false,
-          message: `403 Forbidden: Cần quyền "${requiredPermission}"`,
-        });
-      }
-
-      // Fetch từ DB để lấy adminRole + permissions real-time
-      const user = await Teacher.findById(req.user.id).select('adminRole permissions role').lean();
-      if (!user) {
-        return res.status(404).json({ success: false, message: 'Tài khoản không tồn tại' });
-      }
-
-      // SUPER_ADMIN: toàn quyền
-      if (user.adminRole === 'SUPER_ADMIN') return next();
-
-      // STAFF: kiểm tra mảng permissions
-      if (!user.permissions || !user.permissions.includes(requiredPermission)) {
-        return res.status(403).json({
-          success: false,
-          message: `403 Forbidden: Bạn không có quyền "${requiredPermission}". Liên hệ Super Admin để được cấp quyền.`,
-        });
-      }
-
-      // Gắn permissions vào req để các route tiếp theo dùng nếu cần
-      req.user.adminRole   = user.adminRole;
-      req.user.permissions = user.permissions;
-      next();
+      const ok = await assertStaffPermissions(
+        req,
+        res,
+        (perms) => perms.includes(requiredPermission),
+      );
+      if (ok) next();
     } catch (err) {
       logger.error('[checkPermission] error:', err);
-      res.status(500).json({ success: false, message: 'Lỗi server khi kiểm tra quyền' });
+      return res.status(500).json({ success: false, message: 'Lỗi kiểm tra quyền' });
+    }
+  };
+};
+
+/** STAFF cần ít nhất một trong các quyền (OR). */
+const checkAnyPermission = (...requiredPermissions) => {
+  const list = requiredPermissions.flat().filter(Boolean);
+  return async (req, res, next) => {
+    try {
+      const ok = await assertStaffPermissions(
+        req,
+        res,
+        (perms) => list.some((p) => perms.includes(p)),
+      );
+      if (ok) next();
+    } catch (err) {
+      logger.error('[checkAnyPermission] error:', err);
+      return res.status(500).json({ success: false, message: 'Lỗi kiểm tra quyền' });
     }
   };
 };
@@ -336,4 +382,14 @@ const requireInternalToken = (req, res, next) => {
   });
 };
 
-module.exports = { authMiddleware, isAdmin, isTeacher, isSuperAdmin, checkPermission, branchFilter, requireInternalToken };
+module.exports = {
+  authMiddleware,
+  isAdmin,
+  isTeacher,
+  isSuperAdmin,
+  checkPermission,
+  checkAnyPermission,
+  userHasPermission,
+  branchFilter,
+  requireInternalToken,
+};

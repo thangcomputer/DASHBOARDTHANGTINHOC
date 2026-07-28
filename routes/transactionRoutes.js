@@ -7,13 +7,14 @@ const router      = express.Router();
 const Transaction = require('../models/Transaction');
 const Teacher     = require('../models/Teacher');
 const Schedule    = require('../models/Schedule');
-const { authMiddleware, isAdmin, isTeacher, branchFilter } = require('../middleware/auth');
+const { authMiddleware, checkPermission, isTeacher, branchFilter } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
-router.get('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.get('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter], async (req, res) => {
   try {
     const { status, teacherId, month, branchId: queryBranch, page, limit } = req.query;
     const filter = { ...req.branchFilter };
@@ -54,7 +55,7 @@ router.get('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
 
 // ─── GET /api/transactions/stats ──────────────────────────────────────────────
 // Thống kê tài chính giảng viên (Admin/Staff, branch-aware)
-router.get('/stats', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.get('/stats', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter], async (req, res) => {
   try {
     // ⭐ Fix: branch-aware stats
     const matchFilter = { status: 'confirmed' };
@@ -169,7 +170,7 @@ router.post('/calculate', authMiddleware, isTeacher, async (req, res) => {
 
 // ─── POST /api/transactions ────────────────────────────────────────────────────
 // Admin tạo phiếu chi lương cho giảng viên
-router.post('/', authMiddleware, isAdmin, async (req, res) => {
+router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const { teacherId, amount, description, month, note } = req.body;
 
@@ -223,7 +224,7 @@ router.post('/', authMiddleware, isAdmin, async (req, res) => {
 
 // ─── PUT /api/transactions/:id/confirm ────────────────────────────────────────
 // Admin xác nhận đã thanh toán lương
-router.put('/:id/confirm', authMiddleware, isAdmin, async (req, res) => {
+router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const { confirmedBy = 'Admin' } = req.body;
 
@@ -260,7 +261,7 @@ router.put('/:id/confirm', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // ─── PUT /api/transactions/:id/cancel ─────────────────────────────────────────
-router.put('/:id/cancel', authMiddleware, isAdmin, async (req, res) => {
+router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const transaction = await Transaction.findByIdAndUpdate(
       req.params.id,
@@ -279,7 +280,7 @@ router.put('/:id/cancel', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // ─── DELETE /api/transactions/:id ────────────────────────────────────────────
-router.delete('/:id', authMiddleware, isAdmin, async (req, res) => {
+router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const transaction = await Transaction.findByIdAndDelete(req.params.id);
     if (!transaction) {

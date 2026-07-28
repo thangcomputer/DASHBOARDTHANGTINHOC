@@ -3,14 +3,15 @@ const router  = express.Router();
 const Invoice = require('../models/Invoice');
 const Student = require('../models/Student');
 const { generateInvoicePDF } = require('../modules/pdfInvoice');
-const { authMiddleware, isAdmin, branchFilter } = require('../middleware/auth');
+const { authMiddleware, checkPermission, branchFilter } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const { enqueueInvoicePdf, enqueueInvoiceEmail } = require('../services/queue/jobQueue');
 const logger = require('../config/logger');
 
 // ─── GET /api/invoices ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy hóa đơn (STAFF bị giới hạn theo chi nhánh)
-router.get('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.get('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter], async (req, res) => {
   try {
     const { studentId, search, branchId: queryBranch, paymentMethod, from, to } = req.query;
     const filter = { ...req.branchFilter }; // {} for admin, {branchId:...} for staff
@@ -46,7 +47,7 @@ router.get('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
 });
 
 // ─── GET /api/invoices/stats (branch-aware, timezone-safe) ────────────────────
-router.get('/stats', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.get('/stats', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter], async (req, res) => {
   try {
     // ⭐ Fix: branch-aware filter
     const bf = { ...req.branchFilter };
@@ -99,7 +100,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // ─── POST /api/invoices ────────────────────────────────────────────────────────
 // Tạo hóa đơn thủ công (Admin) — dùng field names từ Student schema mới
-router.post('/', authMiddleware, isAdmin, async (req, res) => {
+router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const { hocVienId, ghiChu } = req.body;
 
@@ -177,7 +178,7 @@ router.get('/:id/pdf', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /api/invoices/:id/pdf/queue ── Sinh PDF nền (lưu uploads/invoices) ──
-router.post('/:id/pdf/queue', authMiddleware, isAdmin, async (req, res) => {
+router.post('/:id/pdf/queue', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id).select('_id maHoaDon');
     if (!invoice) {
@@ -196,7 +197,7 @@ router.post('/:id/pdf/queue', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // ─── POST /api/invoices/:id/email ── Gửi PDF hóa đơn qua email (queue) ───────
-router.post('/:id/email', authMiddleware, isAdmin, async (req, res) => {
+router.post('/:id/email', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id)
       .populate('hocVien', 'email name');
@@ -229,7 +230,7 @@ router.post('/:id/email', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // ─── DELETE /api/invoices/:id ──────────────────────────────────────────────────
-router.delete('/:id', authMiddleware, isAdmin, async (req, res) => {
+router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const invoice = await Invoice.findByIdAndDelete(req.params.id);
     if (!invoice) {

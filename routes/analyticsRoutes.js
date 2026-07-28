@@ -8,10 +8,11 @@ const Student  = require('../models/Student');
 const Invoice  = require('../models/Invoice');
 const Schedule = require('../models/Schedule');
 const Branch   = require('../models/Branch');
-const { authMiddleware, isAdmin, branchFilter } = require('../middleware/auth');
+const { authMiddleware, checkAnyPermission, branchFilter } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
 
-const guard = [authMiddleware, isAdmin, branchFilter];
+const guard = [authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE), branchFilter];
 
 // ── Helper: tính khoảng thời gian từ period string ────────────────────────────
 function getPeriodRange(period) {

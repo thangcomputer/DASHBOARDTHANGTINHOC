@@ -7,7 +7,8 @@ const fs       = require('fs');
 const Teacher  = require('../models/Teacher');
 const Schedule = require('../models/Schedule');
 const Transaction = require('../models/Transaction');
-const { authMiddleware, isAdmin, isTeacher, branchFilter } = require('../middleware/auth');
+const { authMiddleware, isAdmin, isTeacher, branchFilter, checkPermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
@@ -269,7 +270,7 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
 });
 
 // ─── GET /api/teachers/stats/summary ──────────────────────────────────────────
-router.get('/stats/summary', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.get('/stats/summary', [authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS), branchFilter], async (req, res) => {
   try {
     const bf = { ...req.branchFilter };
     const { branch_id } = req.query;
@@ -477,7 +478,7 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
 
 // ─── PUT /api/teachers/:id/score ──────────────────────────────────────────────
 // Admin nhập điểm bài test Onboarding cho giảng viên
-router.put('/:id/score', authMiddleware, isAdmin, async (req, res) => {
+router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS), async (req, res) => {
   try {
     const { testScore, testNotes } = req.body;
 
@@ -532,7 +533,7 @@ router.put('/:id/score', authMiddleware, isAdmin, async (req, res) => {
 
 // ─── PUT /api/teachers/:id/approve ────────────────────────────────────────────
 // Admin duyệt giảng viên — STRICT: chỉ khi testScore >= 80
-router.put('/:id/approve', authMiddleware, isAdmin, async (req, res) => {
+router.put('/:id/approve', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS), async (req, res) => {
   try {
     const teacherCheck = await Teacher.findById(req.params.id);
     if (!teacherCheck) {
@@ -643,7 +644,7 @@ router.post('/:id/submit-practical', authMiddleware, isTeacher, async (req, res)
 
 // ─── PUT /api/teachers/:id/reject ─────────────────────────────────────────────
 // Admin từ chối / tạm dừng giảng viên
-router.put('/:id/reject', authMiddleware, isAdmin, async (req, res) => {
+router.put('/:id/reject', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS), async (req, res) => {
   try {
     const { reason } = req.body;
 
@@ -764,7 +765,7 @@ router.get('/:id/finance', authMiddleware, async (req, res) => {
 
 // ─── GET /api/teachers/:id/finance/pending ──────────────────────────────────────
 // Lấy số buổi còn nợ thanh toán (cho modal Step 1)
-router.get('/:id/finance/pending', authMiddleware, isAdmin, async (req, res) => {
+router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
@@ -800,7 +801,7 @@ router.get('/:id/finance/pending', authMiddleware, isAdmin, async (req, res) => 
 
 // ─── PUT /api/teachers/:id/finance/pay-flexible ──────────────────────────────────
 // Thanh toán linh hoạt: Admin tự chọn số buổi và số tiền, FIFO (cũ nhất trước)
-router.put('/:id/finance/pay-flexible', [authMiddleware, isAdmin, superAdminOnlyTeacher], async (req, res) => {
+router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
   try {
     const { sessionsCount, amount, note } = req.body;
     const idempotencyKey = String(
@@ -937,7 +938,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, isAdmin, superAdminOnly
 });
 
 // ─── PUT /api/teachers/:id/finance/pay-all ──────────────────────────────────────
-router.put('/:id/finance/pay-all', [authMiddleware, isAdmin, superAdminOnlyTeacher], async (req, res) => {
+router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
   try {
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });

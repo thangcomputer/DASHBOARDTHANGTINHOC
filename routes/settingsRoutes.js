@@ -6,7 +6,8 @@ const fs = require('fs');
 
 const SystemSettings = require('../models/SystemSettings');
 const { verifyAdminPassword } = require('../utils/adminPassword');
-const { authMiddleware, isAdmin } = require('../middleware/auth');
+const { authMiddleware, checkPermission, checkAnyPermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
 const {
@@ -98,7 +99,7 @@ router.get('/bank', async (req, res) => {
 });
 
 // ── GET /api/settings ─────────────────────────────────────────── (Admin only)
-router.get('/', authMiddleware, isAdmin, async (req, res) => {
+router.get('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   try {
     const settings = await getSettings();
     return res.json({ success: true, data: settings });
@@ -108,7 +109,7 @@ router.get('/', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // ── PUT /api/settings ─────────────────────────────────────────── (Admin only)
-router.put('/', authMiddleware, isAdmin, async (req, res) => {
+router.put('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   try {
     const allowed = [
       'popupIsActive', 'popupTitle', 'popupContent', 'popupImageUrl', 'popupTargetRole',
@@ -128,7 +129,7 @@ router.put('/', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // ── POST /api/settings/upload-popup-image ── Upload banner popup ─────────────
-router.post('/upload-popup-image', authMiddleware, isAdmin, upload.single('image'), async (req, res) => {
+router.post('/upload-popup-image', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const imageUrl = `/uploads/popup/${req.file.filename}`;
@@ -161,7 +162,7 @@ const uploadSig = multer({
   },
 });
 
-router.post('/upload-invoice-signature', authMiddleware, isAdmin, uploadSig.single('image'), async (req, res) => {
+router.post('/upload-invoice-signature', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), uploadSig.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const signatureUrl = `/uploads/signature/${req.file.filename}`;
@@ -241,7 +242,7 @@ router.get('/web', async (req, res) => {
 });
 
 // ── PUT /api/settings/web ── Admin only — Cập nhật cài đặt web ───────────────
-router.put('/web', authMiddleware, isAdmin, async (req, res) => {
+router.put('/web', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   try {
     const updates = {};
     const { logoUrl, faviconUrl, faviconAdminUrl, loadingStyle, staffPopup } = req.body;
@@ -278,7 +279,7 @@ router.get('/training-data', authMiddleware, async (req, res) => {
 });
 
 // ── PUT /api/settings/training-data ── Cập nhật training data (Admin) ─────────────
-router.put('/training-data', authMiddleware, isAdmin, async (req, res) => {
+router.put('/training-data', authMiddleware, checkPermission(PERMISSIONS.MANAGE_TRAINING), async (req, res) => {
   try {
     await updateMainSettings({ $set: { trainingRawData: req.body.trainingData } });
     // Broadcast via socket that training data was updated
@@ -303,7 +304,7 @@ router.get('/student-training-data', authMiddleware, async (req, res) => {
 });
 
 // ── PUT /api/settings/student-training-data ── Cập nhật student training data (Admin) ─────────────
-router.put('/student-training-data', authMiddleware, isAdmin, async (req, res) => {
+router.put('/student-training-data', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING), async (req, res) => {
   try {
     await updateMainSettings({ $set: { studentTrainingRawData: req.body.studentTrainingData } });
     // Broadcast via socket that data was updated
@@ -513,7 +514,7 @@ router.get('/teacher-exam-config', authMiddleware, async (req, res) => {
 });
 
 // ── PUT /api/settings/teacher-exam-config ── Admin/Staff lưu ngân hàng thi GV (+ phút làm bài tùy chọn)
-router.put('/teacher-exam-config', authMiddleware, isAdmin, async (req, res) => {
+router.put('/teacher-exam-config', authMiddleware, checkPermission(PERMISSIONS.MANAGE_TRAINING), async (req, res) => {
   try {
     const { questions, timeLimitMinutes, teacherExamMinutes, teacherEssayExamMinutes } = req.body || {};
     const settings = await getSettings();
@@ -603,7 +604,7 @@ router.get('/exam-subjects', authMiddleware, async (req, res) => {
 });
 
 // ── POST /api/settings/exam-subjects ── Admin them mon thi moi
-router.post('/exam-subjects', authMiddleware, isAdmin, async (req, res) => {
+router.post('/exam-subjects', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   try {
     const entry = sanitizeCustomExamSubjectEntry(req.body || {});
     if (!entry) {
@@ -641,7 +642,7 @@ router.post('/exam-subjects', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // ── DELETE /api/settings/exam-subjects/:id ── Admin xoa mon tuy chinh
-router.delete('/exam-subjects/:id', authMiddleware, isAdmin, async (req, res) => {
+router.delete('/exam-subjects/:id', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!id || BUILTIN_EXAM_SUBJECT_IDS.includes(id)) {
@@ -659,7 +660,7 @@ router.delete('/exam-subjects/:id', authMiddleware, isAdmin, async (req, res) =>
 });
 
 // ── PUT /api/settings/student-exam-config ── Admin/Staff lưu ngân hàng + thời gian thi HV
-router.put('/student-exam-config', authMiddleware, isAdmin, async (req, res) => {
+router.put('/student-exam-config', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING), async (req, res) => {
   try {
     const { studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles } = req.body || {};
     const updates = {};
@@ -744,7 +745,7 @@ const uploadTraining = multer({
   },
 });
 
-router.post('/upload-training-file', authMiddleware, isAdmin, (req, res) => {
+router.post('/upload-training-file', authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.MANAGE_STUDENT_TRAINING), (req, res) => {
   uploadTraining.single('file')(req, res, (err) => {
     if (err) {
       if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
@@ -786,7 +787,7 @@ const uploadLogo = multer({
   },
 });
 
-router.post('/upload-logo', authMiddleware, isAdmin, uploadLogo.single('logo'), async (req, res) => {
+router.post('/upload-logo', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), uploadLogo.single('logo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const logoUrl = `/uploads/logo/${req.file.filename}`;
@@ -819,7 +820,7 @@ const uploadFavicon = multer({
   },
 });
 
-router.post('/upload-favicon', authMiddleware, isAdmin, uploadFavicon.single('favicon'), async (req, res) => {
+router.post('/upload-favicon', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), uploadFavicon.single('favicon'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const kind = String(req.query?.kind || req.body?.kind || 'public').toLowerCase() === 'admin' ? 'admin' : 'public';
@@ -858,7 +859,7 @@ const uploadInvLogo = multer({
   },
 });
 
-router.post('/upload-invoice-logo', authMiddleware, isAdmin, uploadInvLogo.single('logo'), async (req, res) => {
+router.post('/upload-invoice-logo', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), uploadInvLogo.single('logo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const logoUrl = `/uploads/invoice_logo/${req.file.filename}`;
@@ -888,7 +889,7 @@ const PayrollLog = require('../models/PayrollLog');
 const Employee = require('../models/Employee');
 const mongoose = require('mongoose');
 
-router.post('/reset-data', authMiddleware, isAdmin, async (req, res) => {
+router.post('/reset-data', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   const { phrase, password, options = { all: true } } = req.body;
   const userId = req.user.id;
 
