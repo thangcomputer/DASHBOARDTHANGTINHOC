@@ -426,19 +426,22 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
           </div>
         </div>
 
-        {/* Tabs — scroll ngang trên mobile */}
-        <div className="flex overflow-x-auto whitespace-nowrap hide-scrollbar px-1 sm:px-4 md:px-8 bg-white border-b border-slate-100">
+        {/* Tabs — 4 cột đều; mobile chỉ icon */}
+        <div className="grid grid-cols-4 bg-white border-b border-slate-100 px-1 sm:px-4 md:px-8">
           {panels.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               type="button"
               onClick={() => setActivePanel(key)}
-              className={`shrink-0 flex items-center justify-center gap-1.5 px-3 sm:px-4 py-3 sm:py-4 text-xs font-medium uppercase tracking-wide transition-all relative ${
+              title={label}
+              aria-label={label}
+              aria-current={activePanel === key ? 'page' : undefined}
+              className={`relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1 sm:px-3 py-3 sm:py-4 text-xs font-medium uppercase tracking-wide transition-all min-h-11 ${
                 activePanel === key ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
-              <Icon size={13} className="shrink-0" aria-hidden="true" />
-              <span>{label}</span>
+              <Icon size={18} className="shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline truncate max-w-full leading-none">{label}</span>
               {activePanel === key && (
                 <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-t-full" />
               )}
