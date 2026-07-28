@@ -214,12 +214,12 @@ const TeacherFinanceAndTraining = () => {
 
             {/* Báo cáo & Biểu đồ */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 mt-4 sm:mt-6">
-               <div className="lg:col-span-8 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100">
-                  <div className="flex items-center gap-2 mb-4 sm:mb-6">
+               <div className="lg:col-span-8 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-100">
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
                      <BarChart className="text-blue-600 shrink-0" size={18} aria-hidden="true" />
                      <h3 className="text-sm sm:text-base font-extrabold text-slate-800 uppercase tracking-tight">Biểu đồ thu nhập</h3>
                   </div>
-                  <div className="min-h-[220px] sm:min-h-[350px] h-[220px] sm:h-[350px] w-full flex items-end justify-center gap-4 sm:gap-6 md:gap-10 mt-2 sm:mt-8 pb-10 sm:pb-14 border-b border-dashed border-slate-200 px-1 sm:px-2 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200">
+                  <div className="min-h-[140px] sm:min-h-[180px] h-[140px] sm:h-[180px] w-full flex items-end justify-center gap-4 sm:gap-6 md:gap-10 mt-1 sm:mt-2 pb-8 sm:pb-10 border-b border-dashed border-slate-200 px-1 sm:px-2 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200">
                      {chartData.length > 0 ? chartData.map((d, i) => (
                          <div key={i} className="w-12 sm:w-16 md:w-20 flex-shrink-0 flex flex-col items-center justify-end h-full gap-2 group relative">
                              <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-lg pointer-events-none whitespace-nowrap z-20">
@@ -232,8 +232,8 @@ const TeacherFinanceAndTraining = () => {
                              </span>
                          </div>
                      )) : (
-                         <div className="w-full min-h-[180px] h-full flex flex-col items-center justify-center text-sm text-slate-400 font-medium gap-2">
-                           <BarChart size={28} className="text-slate-300" aria-hidden="true" />
+                         <div className="w-full min-h-[100px] h-full flex flex-col items-center justify-center text-sm text-slate-400 font-medium gap-1.5">
+                           <BarChart size={22} className="text-slate-300" aria-hidden="true" />
                            Chưa có dữ liệu thống kê
                          </div>
                      )}

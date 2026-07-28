@@ -226,61 +226,6 @@ export default function StudentOverviewTab({
           </div>
 
           <aside className="lg:col-span-4 cms-sd-stack min-w-0">
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
-              <div className="cms-sd-card text-center flex flex-col items-center justify-center min-h-[10rem]">
-                <p className="cms-sd-caption font-bold uppercase mb-3">Tiến độ</p>
-                <div className="relative w-20 h-20 mx-auto">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
-                    <circle cx="50" cy="50" r="42" fill="none" stroke="#f1f5f9" strokeWidth="8" />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="42"
-                      fill="none"
-                      stroke="url(#sd-grad)"
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      strokeDasharray={`${progressPct * 2.64} 264`}
-                      className="transition-all duration-1000"
-                    />
-                    <defs>
-                      <linearGradient id="sd-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" style={{ stopColor: '#ef4444' }} />
-                        <stop offset="100%" style={{ stopColor: '#f97316' }} />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div>
-                      <p className="text-[15px] font-extrabold text-slate-900 tabular-nums leading-none">{progressPct}%</p>
-                      <p className="cms-sd-caption mt-1">hoàn thành</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3 w-full flex justify-between cms-sd-caption px-0.5">
-                  <span>Đã: <strong className="text-slate-800 tabular-nums">{studentData.completedSessions}</strong></span>
-                  <span>Còn: <strong className="text-slate-800 tabular-nums">{studentData.remainingSessions}</strong></span>
-                </div>
-              </div>
-
-              <div className="cms-sd-card text-center flex flex-col items-center justify-center min-h-[10rem]">
-                <p className="cms-sd-caption font-bold uppercase mb-2">Điểm TB</p>
-                <p className="text-4xl font-extrabold text-blue-600 tabular-nums leading-none">{studentData.avgGrade}</p>
-                <p className="cms-sd-caption mt-2">/ 10 điểm</p>
-                <div
-                  className={`mt-3 cms-sd-caption font-bold px-2.5 py-1 rounded-full ${
-                    studentData.avgGrade >= 8
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : studentData.avgGrade >= 6
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-red-100 text-red-700'
-                  }`}
-                >
-                  {studentData.avgGrade >= 8 ? 'GIỎI' : studentData.avgGrade >= 6 ? 'KHÁ' : 'TRUNG BÌNH'}
-                </div>
-              </div>
-            </div>
-
             <section className="rounded-[16px] p-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.06)] bg-slate-700">
               <h3 className="cms-sd-caption font-bold uppercase tracking-wide text-slate-300 flex items-center gap-2 mb-3">
                 <Download size={16} aria-hidden="true" /> Tài liệu

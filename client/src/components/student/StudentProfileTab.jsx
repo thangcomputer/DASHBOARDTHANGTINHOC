@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  CheckCircle, User, Settings, BookOpen, TrendingUp,
+  CheckCircle, User, Settings, BookOpen,
   Mail, Phone, MessageCircle, MapPin, Lock, ChevronRight, ChevronDown,
   GraduationCap, BadgeDollarSign, Wallet,
 } from 'lucide-react';
@@ -20,7 +20,6 @@ export default function StudentProfileTab({
     personal: false,
     summary: false,
     courses: true,
-    progress: false,
   });
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -38,19 +37,6 @@ export default function StudentProfileTab({
       return `${name}: ${price.toLocaleString('vi-VN')}đ`;
     })
     : [`${Number(studentData?.price || 0).toLocaleString('vi-VN')}đ`];
-
-  const progressCourses = courses.length
-    ? courses
-    : [{
-      id: 'main',
-      name: studentData?.course || 'Khóa học',
-      courseName: studentData?.course,
-      completedSessions: studentData?.completedSessions || 0,
-      totalSessions: studentData?.totalSessions || 12,
-      teacherName: teacherValue === 'Chưa phân công' ? '' : teacherValue.replace(/^Thầy\s+/i, ''),
-      avgGrade: studentData?.avgGrade,
-      remainingSessions: studentData?.remainingSessions,
-    }];
 
   return (
     <div className="cms-sd cms-sd-page cms-sd-stack cms-sd-profile">
@@ -277,57 +263,6 @@ export default function StudentProfileTab({
           </div>}
         </section>
       )}
-
-      <section className="cms-sd-card !p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-          <button type="button" onClick={() => toggleSection('progress')} className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-            <TrendingUp size={16} className="text-emerald-600" aria-hidden="true" /> Tiến trình
-          </button>
-          <button type="button" onClick={() => toggleSection('progress')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
-            <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.progress ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-        {openSections.progress && <div className="p-4 space-y-4">
-          {progressCourses.map((c) => {
-            const total = Number(c.totalSessions) || 12;
-            const done = Number(c.completedSessions) || 0;
-            const remain = c.remainingSessions != null ? Number(c.remainingSessions) : Math.max(0, total - done);
-            const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-            const title = c.courseName || c.name || 'Khóa học';
-            return (
-              <article key={c.id || c.enrollmentId || title} className="rounded-[14px] border border-slate-100 bg-slate-50/50 p-3">
-                <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-tight line-clamp-2">{title}</h4>
-                    <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
-                      GV: {c.teacherName || 'Chưa phân công'}
-                    </p>
-                  </div>
-                  <span className="text-sm font-extrabold text-emerald-600 tabular-nums shrink-0">{pct}%</span>
-                </div>
-                <div className="w-full h-2 bg-white border border-slate-100 rounded-full overflow-hidden mb-2.5">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-700"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: 'Đã học', value: done, color: 'text-blue-600 bg-blue-50' },
-                    { label: 'Còn lại', value: remain, color: 'text-violet-600 bg-violet-50' },
-                    { label: 'Tổng buổi', value: total, color: 'text-teal-600 bg-teal-50' },
-                  ].map((s) => (
-                    <div key={s.label} className={`${s.color} rounded-[12px] p-2.5 text-center`}>
-                      <p className="text-sm font-extrabold tabular-nums">{s.value}</p>
-                      <p className="text-[10px] font-bold uppercase mt-0.5 opacity-80">{s.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </article>
-            );
-          })}
-        </div>}
-      </section>
     </div>
   );
 }
