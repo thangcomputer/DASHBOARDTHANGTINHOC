@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CmsSelect from '../ui/CmsSelect';
 import {
   Calendar, Video, CheckCircle, Save, MessageSquare, FileText,
@@ -83,6 +84,7 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam, isDetailed, attendanceGate }) => {
+  const navigate = useNavigate();
   const { showModal } = useModal();
   const { onDataRefresh, socket } = useSocket();
   const [linkInput, setLinkInput] = useState(student.linkHoc);
@@ -403,10 +405,12 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   </span>
                   <button
                     type="button"
-                    onClick={() => window.open(`http://zalo.me/${student.zalo || student.phone}`, '_blank')}
-                    className="w-8 h-8 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center transition-all border border-slate-200"
-                    title="Gửi tin nhắn"
-                    aria-label="Gửi tin nhắn"
+                    onClick={() => navigate('/teacher/inbox', {
+                      state: { selectUserId: String(student.id || student._id) },
+                    })}
+                    className="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition-all border border-blue-100"
+                    title="Nhắn tin nội bộ"
+                    aria-label="Nhắn tin nội bộ"
                   >
                     <MessageSquare size={14} />
                   </button>

@@ -77,18 +77,18 @@ export default function TeacherStudentsTab({
                             </div>
                           </div>
                           
-                          {!isSelected && (
-                            <button 
+                          <button 
                               type="button"
                               onClick={(e) => { 
                                 e.stopPropagation(); 
-                                navigate('/teacher/inbox'); 
+                                navigate('/teacher/inbox', { state: { selectUserId: String(sId) } }); 
                               }} 
-                              className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-blue-100 hover:text-blue-600 transition-all border-none outline-none shrink-0"
+                              className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 hover:text-blue-700 transition-all border-none outline-none shrink-0"
+                              title="Nhắn tin nội bộ"
+                              aria-label="Nhắn tin nội bộ"
                             >
                               <MessageSquare size={14} />
                             </button>
-                          )}
                         </div>
                       );
                     })
