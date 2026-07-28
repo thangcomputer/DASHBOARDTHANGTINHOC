@@ -73,7 +73,12 @@ export function scopeStudentToEnrollment(student, enrollment) {
     remainingSessions: enrollment.remainingSessions ?? student.remainingSessions,
     avgGrade: enrollment.avgGrade ?? student.avgGrade,
     lastGrade: enrollment.isPrimary ? student.lastGrade : (enrollment.avgGrade ?? 0),
-    grades: enrollment.grades?.length ? enrollment.grades : student.grades,
+    grades: (enrollment.grades && enrollment.grades.length)
+      ? enrollment.grades
+      : (student.grades || []),
+    attendanceHistory: (enrollment.grades && enrollment.grades.length)
+      ? enrollment.grades
+      : (student.grades || student.attendanceHistory || []),
     linkHoc: enrollment.linkHoc || student.linkHoc, nextClass: enrollment.nextClass || student.nextClass,
     nextClassTime: enrollment.nextClassTime || student.nextClassTime,
     paid: enrollment.paid ?? student.paid, price: enrollment.price ?? student.price,

@@ -95,6 +95,100 @@ function toClientCourse(enrollment, index) {
   };
 }
 
+function normCourseName(name) {
+  return String(name || '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function gradeDateKeys(raw) {
+  if (!raw) return [];
+  const keys = new Set([String(raw).trim()]);
+  const d = new Date(raw);
+  if (!Number.isNaN(d.getTime())) {
+    keys.add(d.toLocaleDateString('vi-VN'));
+    keys.add(d.toISOString().slice(0, 10));
+  }
+  // dd/mm/yyyy already in set if raw is that format
+  return [...keys];
+}
+
+/**
+ * Ghi nhật ký điểm danh vào enrollment + root grades (tránh HV không thấy log dù lịch đã completed).
+ */
+function recordAttendanceGrade(studentDoc, {
+  courseName,
+  note,
+  grade = 0,
+  date = new Date(),
+} = {}) {
+  if (!studentDoc) return false;
+  const dateObj = date instanceof Date ? date : new Date(date);
+  const dateVN = Number.isNaN(dateObj.getTime())
+    ? new Date().toLocaleDateString('vi-VN')
+    : dateObj.toLocaleDateString('vi-VN');
+  const entry = {
+    date: dateVN,
+    note: note || 'Đã điểm danh hoàn thành buổi học',
+    grade: Number(grade) || 0,
+  };
+  const entryKeys = new Set(gradeDateKeys(dateVN).concat(gradeDateKeys(dateObj)));
+
+  const alreadyHas = (grades) => (grades || []).some((g) => {
+    const keys = gradeDateKeys(g.date);
+    return keys.some((k) => entryKeys.has(k));
+  });
+
+  let changed = false;
+  const courseKey = normCourseName(courseName);
+
+  if (Array.isArray(studentDoc.enrollments) && studentDoc.enrollments.length) {
+    let idx = courseKey
+      ? studentDoc.enrollments.findIndex((e) => normCourseName(e.courseName) === courseKey)
+      : -1;
+    if (idx < 0) {
+      idx = studentDoc.enrollments.findIndex((e) => e.isPrimary);
+    }
+    if (idx < 0) idx = 0;
+
+    const enr = studentDoc.enrollments[idx];
+    const enrGrades = Array.isArray(enr.grades) ? [...enr.grades] : [];
+    if (!alreadyHas(enrGrades)) {
+      enrGrades.unshift(entry);
+      studentDoc.enrollments[idx].grades = enrGrades;
+      changed = true;
+    }
+    const valid = enrGrades.filter((g) => Number(g.grade) > 0);
+    if (valid.length) {
+      studentDoc.enrollments[idx].avgGrade = Math.round(
+        (valid.reduce((s, g) => s + Number(g.grade), 0) / valid.length) * 10
+      ) / 10;
+    }
+    if (studentDoc.enrollments[idx].isPrimary || studentDoc.enrollments.length === 1) {
+      if (!alreadyHas(studentDoc.grades)) {
+        studentDoc.grades = [entry, ...(studentDoc.grades || [])];
+        changed = true;
+      }
+      if (entry.grade > 0) studentDoc.lastGrade = entry.grade;
+      const rootValid = (studentDoc.grades || []).filter((g) => Number(g.grade) > 0);
+      if (rootValid.length) {
+        studentDoc.avgGrade = Math.round(
+          (rootValid.reduce((s, g) => s + Number(g.grade), 0) / rootValid.length) * 10
+        ) / 10;
+      }
+    }
+  } else if (!alreadyHas(studentDoc.grades)) {
+    studentDoc.grades = [entry, ...(studentDoc.grades || [])];
+    if (entry.grade > 0) studentDoc.lastGrade = entry.grade;
+    changed = true;
+  }
+
+  if (changed && typeof studentDoc.markModified === 'function') {
+    studentDoc.markModified('enrollments');
+    studentDoc.markModified('grades');
+  }
+  return changed;
+}
+
 async function applyEnrollmentStats(doc, studentId, Schedule) {
   const enrollments = getEnrollmentsFromStudent(doc);
   if (!enrollments.length) {
@@ -131,6 +225,9 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
     const courseName = e.courseName || e.course;
     const completed = sessionByCourse[courseName] ?? e.completedSessions ?? 0;
     const total = e.totalSessions || 12;
+    const enrGrades = (e.grades && e.grades.length)
+      ? e.grades
+      : ((e.isPrimary || enrollments.length === 1) ? (doc.grades || []) : (e.grades || []));
     return {
       ...e,
       _id: e._id,
@@ -138,6 +235,7 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
       completedSessions: completed,
       remainingSessions: Math.max(0, total - completed),
       status: completed >= total ? 'completed' : (e.status || 'active'),
+      grades: enrGrades,
     };
   });
 
@@ -217,4 +315,6 @@ module.exports = {
   expandStudentsForTeacher,
   teacherIdStr,
   resolveEnrollmentExamSubjects,
+  recordAttendanceGrade,
+  normCourseName,
 };

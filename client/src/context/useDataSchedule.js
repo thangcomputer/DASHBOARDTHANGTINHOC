@@ -111,7 +111,11 @@ export function useDataSchedule({
         // Optimistic Schedule Update
         setSchedules(prev => prev.map(s => (s._id || s.id) === (existSch._id || existSch.id) ? { ...s, status: 'completed' } : s));
 
-        const resSch = await api.schedules?.update(existSch._id || existSch.id, { status: 'completed' });
+        const resSch = await api.schedules?.update(existSch._id || existSch.id, {
+          status: 'completed',
+          note: note || existSch.note || 'Đã điểm danh hoàn thành buổi học',
+          grade: grade || 0,
+        });
         if (!resSch?.success) throw new Error(resSch?.message || 'Lỗi cập nhật lịch học');
       } else {
         // Create new schedule
@@ -134,8 +138,10 @@ export function useDataSchedule({
           startTime: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           endTime: new Date(now.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           course: courseName || targetStudentSync.course || '',
+          note: note || 'Đã điểm danh hoàn thành buổi học',
           status: 'completed',
           paymentStatus: 'pending',
+          grade: grade || 0,
         };
 
         setSchedules(prev => [...prev, newSch]);

@@ -274,13 +274,47 @@ const StudentDashboard = ({ onNavigate }) => {
   }, [viewStudent?.teacherId]);
 
   const displayGrades = useMemo(() => {
-    const grades = viewStudent?.grades || [];
-    if (!grades.length) return [];
+    const rawGrades = [...(viewStudent?.grades || [])];
+
+    const dateKeysOf = (raw) => {
+      if (!raw) return [];
+      const keys = new Set([String(raw).trim()]);
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) {
+        keys.add(d.toLocaleDateString('vi-VN'));
+        keys.add(d.toISOString().slice(0, 10));
+      }
+      return [...keys];
+    };
+
+    const gradeKeySet = new Set();
+    rawGrades.forEach((g) => dateKeysOf(g.date).forEach((k) => gradeKeySet.add(k)));
+
+    // Fallback: buổi lịch đã completed nhưng chưa có trong grades → vẫn hiện nhật ký
+    (mySchedules || []).forEach((s) => {
+      if (s.status !== 'completed') return;
+      const keys = dateKeysOf(s.date);
+      if (keys.some((k) => gradeKeySet.has(k))) return;
+      const parsedDate = new Date(s.date);
+      const dateLabel = Number.isNaN(parsedDate.getTime())
+        ? String(s.date)
+        : parsedDate.toLocaleDateString('vi-VN');
+      rawGrades.push({
+        date: dateLabel,
+        time: s.startTime || '',
+        note: s.note || 'Đã điểm danh hoàn thành buổi học',
+        grade: 0,
+        _fromSchedule: true,
+      });
+      keys.forEach((k) => gradeKeySet.add(k));
+    });
+
+    if (!rawGrades.length) return [];
 
     const homeworkByKey = new Map();
     const others = [];
 
-    grades.forEach((g, idx) => {
+    rawGrades.forEach((g, idx) => {
       const note = g.note || '';
       const noteLower = note.toLowerCase();
       const isHomework = noteLower.includes('bài nộp') || noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm');
@@ -302,7 +336,7 @@ const StudentDashboard = ({ onNavigate }) => {
 
     return [...others, ...homeworkByKey.values()]
       .sort((a, b) => b._sortKey - a._sortKey);
-  }, [viewStudent?.grades]);
+  }, [viewStudent?.grades, mySchedules]);
 
   const studyLogs = useMemo(() => {
     if (!viewStudent) return [];

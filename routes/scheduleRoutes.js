@@ -6,6 +6,7 @@ const Teacher  = require('../models/Teacher');
 const ScheduleHistory = require('../models/ScheduleHistory');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const logger = require('../config/logger');
+const { recordAttendanceGrade } = require('../services/enrollmentService');
 
 function parseTimeToMinutes(raw) {
   if (raw == null || raw === '') return null;
@@ -404,6 +405,27 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.status(201).json({ success: true, data: schedule });
 
+    // Điểm danh qua tạo lịch completed → ghi nhật ký grades cho HV
+    if (schedule.status === 'completed' && studentId) {
+      try {
+        const student = await Student.findById(studentId);
+        if (student) {
+          const changed = recordAttendanceGrade(student, {
+            courseName: courseFinal,
+            note: note || topic || 'Đã điểm danh hoàn thành buổi học',
+            grade: Number(req.body.grade) || 0,
+            date: schedule.date || new Date(),
+          });
+          if (changed) {
+            await student.save();
+            if (io) io.emit('student:updated', student._id);
+          }
+        }
+      } catch (gradeErr) {
+        logger.error('[SCHEDULE] recordAttendanceGrade on create:', gradeErr);
+      }
+    }
+
     // 📝 GHI AUDIT LOG: CREATED
     ScheduleHistory.create({
       scheduleId: schedule._id,
@@ -562,11 +584,10 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
       { path: 'studentId', select: 'name course totalSessions studentExamUnlocked' },
     ]);
 
-    // BUSINESS LOGIC: Nếu đánh dấu hoàn thành → kiểm tra unlock thi
+    // BUSINESS LOGIC: Nếu đánh dấu hoàn thành → kiểm tra unlock thi + ghi nhật ký điểm danh
     if (status === 'completed' && schedule.studentId) {
       await checkAndUnlockExam(schedule.studentId.toString(), io);
 
-      // Cập nhật remainingSessions của học viên (Tách biệt logic trừ buổi và cộng buổi)
       const student = await Student.findById(schedule.studentId);
       if (student) {
         // Automatically mark as paid if Admin paid in advance
@@ -575,6 +596,19 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
              is_paid_to_teacher: true,
              paymentStatus: 'paid'
            });
+        }
+
+        const attendanceNote = (updates.note !== undefined ? updates.note : schedule.note)
+          || 'Đã điểm danh hoàn thành buổi học';
+        const changed = recordAttendanceGrade(student, {
+          courseName: schedule.course,
+          note: attendanceNote,
+          grade: Number(req.body.grade) || 0,
+          date: schedule.date || new Date(),
+        });
+        if (changed) {
+          await student.save();
+          if (io) io.emit('student:updated', student._id);
         }
       }
     }
