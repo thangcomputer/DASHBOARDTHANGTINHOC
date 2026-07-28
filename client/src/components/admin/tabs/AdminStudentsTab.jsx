@@ -370,34 +370,33 @@ export default function AdminStudentsTab() {
           </CmsSelect>
         </div>
 
-        {/* Action buttons — 44px / 12px radius */}
-        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+        {/* Action buttons — Xuất/Excel auto, Thêm học viên lấy phần còn lại */}
+        <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <button
             type="button"
             onClick={handleExportExcel}
             disabled={isExportingExcel}
-            className="cms-students-btn-outline"
+            className="cms-students-btn-outline !px-2.5 shrink-0"
           >
             {isExportingExcel
-              ? <><Loader2 size={15} className="animate-spin" /> ...</>
-              : <><Download size={15} /> <span className="hidden min-[375px]:inline">Xuất</span></>}
+              ? <><Loader2 size={15} className="animate-spin shrink-0" /> ...</>
+              : <><Download size={15} className="shrink-0" /> Xuất</>}
           </button>
           <button
             type="button"
             onClick={() => setShowImportModal(true)}
-            className="cms-students-btn-outline"
+            className="cms-students-btn-outline !px-2.5 shrink-0"
           >
-            <FileSpreadsheet size={15} />
-            <span className="hidden min-[375px]:inline">Excel</span>
+            <FileSpreadsheet size={15} className="shrink-0" />
+            Excel
           </button>
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="cms-students-btn-primary col-span-1"
+            className="cms-students-btn-primary !px-2.5 min-w-0 text-[12px] min-[360px]:text-[13px] sm:text-sm whitespace-nowrap"
           >
-            <Plus size={16} />
-            <span className="truncate">Thêm</span>
-            <span className="hidden min-[390px]:inline truncate"> học viên</span>
+            <Plus size={15} className="shrink-0" />
+            Thêm học viên
           </button>
         </div>
       </div>
