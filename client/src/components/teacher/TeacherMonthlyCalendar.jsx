@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, X, Ban, PlayCircle, CheckCircle, Video, MessageSquare, Edit3, Trash2 } from 'lucide-react';
 import { csrfFetch } from '../../services/api';
-import { isScheduleOngoingNow, parseTimeToMinutes } from '../../utils/scheduleTime';
+import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
 
 const STATUS_COLORS = {
@@ -37,7 +37,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
   const [cancelTarget, setCancelTarget] = useState(null); // schedule đang muốn hủy
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
-  const [liveTick, setLiveTick] = useState(0);
+  const [, setLiveTick] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => setLiveTick((n) => n + 1), 30000);
@@ -84,44 +84,6 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
   }, [schedules, month, year]);
 
   const selectedSchedules = selectedDay ? (scheduleMap[selectedDay] || []) : [];
-
-  const isUpcomingInMonth = (s) => {
-    if (!s || s.status !== 'scheduled') return false;
-    const d = new Date(s.date);
-    if (Number.isNaN(d.getTime())) return false;
-    d.setHours(0, 0, 0, 0);
-    if (d.getMonth() !== month || d.getFullYear() !== year) return false;
-    if (d > today) return true;
-    if (d < today) return false;
-    // Cùng ngày hôm nay: chỉ giữ buổi đang diễn ra hoặc chưa kết thúc
-    if (isScheduleOngoingNow(s)) return true;
-    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
-    const endMins = parseTimeToMinutes(s.endTime);
-    const startMins = parseTimeToMinutes(s.startTime);
-    if (endMins != null) return nowMins <= endMins;
-    if (startMins != null) return nowMins <= startMins;
-    return true;
-  };
-
-  const upcomingSchedules = useMemo(
-    () => schedules
-      .filter(isUpcomingInMonth)
-      .sort((a, b) => new Date(a.date) - new Date(b.date) || String(a.startTime || '').localeCompare(String(b.startTime || ''))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [schedules, month, year, today.getTime(), liveTick],
-  );
-
-  const monthStats = useMemo(() => {
-    const inMonth = (s) => {
-      const d = new Date(s.date);
-      return !Number.isNaN(d.getTime()) && d.getMonth() === month && d.getFullYear() === year;
-    };
-    return {
-      completed: schedules.filter((s) => s.status === 'completed' && inMonth(s)).length,
-      upcoming: upcomingSchedules.length,
-      cancelled: schedules.filter((s) => s.status === 'cancelled' && inMonth(s)).length,
-    };
-  }, [schedules, month, year, upcomingSchedules]);
 
   const days = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
@@ -280,13 +242,13 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
           })}
         </div>
 
-        {/* Legend — 2x2 on mobile */}
+        {/* Legend */}
         <div className="mt-3 px-1 sm:px-2 pt-3 border-t border-slate-100">
-          <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600">
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-400 shrink-0" /> Đã dạy</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-400 shrink-0" /> Sắp tới</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-green-500 shrink-0" /> Đang diễn ra</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-red-400 shrink-0" /> Đã hủy</span>
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-600">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" /> Đã dạy</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" /> Sắp tới</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" /> Đang diễn ra</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0" /> Đã hủy</span>
           </div>
           <p className="mt-2 text-[11px] text-blue-600 font-medium flex items-center gap-1">
             <Plus size={11} className="shrink-0" /> Click ngày trống để sắp lịch
@@ -333,9 +295,9 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                 const isCancellable = !past && s.status === 'scheduled' && displayStatus !== 'ongoing';
                 const cfg = STATUS_COLORS[displayStatus] || STATUS_COLORS.scheduled;
                 return (
-                  <div key={s._id || s.id} className="px-5 py-4 flex items-center gap-4 group hover:bg-gray-50 transition-colors">
+                  <div key={s._id || s.id} className="px-5 py-4 flex items-start gap-3 group hover:bg-gray-50 transition-colors">
                     {/* Status icon */}
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.badge}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.badge}`}>
                       {displayStatus === 'completed' ? <CheckCircle size={16} /> :
                        displayStatus === 'cancelled' ? <Ban size={16} /> :
                        displayStatus === 'ongoing' ? <Video size={16} className="animate-pulse" /> :
@@ -343,15 +305,18 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-bold truncate ${s.status === 'cancelled' ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                      <p className={`text-sm font-bold break-words ${s.status === 'cancelled' ? 'line-through text-gray-400' : 'text-gray-800'}`}>
                         {s.studentName || s.course || 'Lịch học'}
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {s.startTime}{s.endTime ? ` – ${s.endTime}` : ''} &bull; {s.course}
+                      <p className="text-xs font-semibold text-slate-500 mt-1">
+                        {s.startTime}{s.endTime ? ` – ${s.endTime}` : ''}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5 break-words">
+                        {s.course}
                       </p>
                       {(s.topic || s.note) && (
-                        <p className="text-xs font-medium text-blue-600 mt-1 truncate border-l-2 border-blue-500 pl-2 bg-blue-50/50 py-0.5 rounded-r">
-                          <span className="font-bold opacity-80">Ghi chú của bạn:</span> {s.topic || s.note}
+                        <p className="text-xs text-slate-600 mt-2 border-l-2 border-blue-500 bg-slate-50 px-2 py-2 rounded-r-lg break-words">
+                          <span className="font-semibold text-blue-600">Ghi chú của bạn:</span> {` ${s.topic || s.note}`}
                         </p>
                       )}
                       {s.studentNote && (
@@ -363,7 +328,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                           </div>
                         </div>
                       )}
-                      <span className={`text-xs cms-min-text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-wider inline-block mt-1 ${cfg.badge}`}>
+                      <span className={`text-xs cms-min-text-xs font-medium px-2.5 py-1 rounded-full inline-flex items-center border mt-2 ${cfg.badge}`}>
                         {cfg.label}
                       </span>
                     </div>
@@ -410,11 +375,14 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <h4 className="text-sm font-bold text-gray-700">📅 Sắp tới trong tháng</h4>
           <span className="text-xs text-gray-400 font-bold">
-            {upcomingSchedules.length} buổi
+            {schedules.filter(s => s.status === 'scheduled' && new Date(s.date) >= today && new Date(s.date).getMonth() === month).length} buổi
           </span>
         </div>
         <div className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
-          {upcomingSchedules.map(s => {
+          {schedules
+            .filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month)
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
+            .map(s => {
               const d = new Date(s.date);
               const displayStatus = getDisplayStatus(s);
               const cfg = STATUS_COLORS[displayStatus] || STATUS_COLORS.scheduled;
@@ -436,7 +404,8 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0 uppercase ${cfg.badge}`}>
                     {displayStatus === 'ongoing' ? 'Đang diễn ra' : s.startTime}
                   </span>
-                  {displayStatus !== 'ongoing' && (
+                  {/* Hover cancel button */}
+                  {new Date(s.date) >= today && displayStatus !== 'ongoing' && (
                     <button
                       onClick={() => { setCancelTarget(s); setCancelReason(''); }}
                       className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
@@ -448,30 +417,28 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                 </div>
               );
             })}
-          {upcomingSchedules.length === 0 && (
+          {schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length === 0 && (
             <div className="px-5 py-6 text-center text-gray-400 text-sm">Không có buổi nào sắp tới.</div>
           )}
         </div>
       </div>
 
-      {/* ─ STATS ROW: 3 cột, icon + số ─ */}
+      {/* ─ STATS ROW ─ */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          { label: 'Đã dạy', value: monthStats.completed, color: 'bg-emerald-50 text-emerald-700', Icon: CheckCircle },
-          { label: 'Sắp tới', value: monthStats.upcoming, color: 'bg-amber-50 text-amber-700', Icon: Clock },
-          { label: 'Đã hủy', value: monthStats.cancelled, color: 'bg-rose-50 text-rose-600', Icon: Ban },
-        ].map((st) => (
-          <div
-            key={st.label}
-            title={st.label}
-            aria-label={`${st.label}: ${st.value}`}
-            className={`${st.color} rounded-xl py-2.5 px-1.5 sm:p-3 text-center shadow-sm border border-white/60 flex flex-col items-center gap-1`}
-          >
-            <st.Icon size={16} className="opacity-80" aria-hidden="true" />
-            <p className="text-lg font-bold tabular-nums leading-none">{st.value}</p>
-            <p className="hidden sm:block text-[10px] font-semibold uppercase tracking-wider opacity-80">{st.label}</p>
-          </div>
-        ))}
+          { label: 'Đã dạy', value: schedules.filter(s => s.status === 'completed' && new Date(s.date).getMonth() === month).length, color: 'bg-emerald-50 text-emerald-700', icon: CheckCircle },
+          { label: 'Sắp tới', value: schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length, color: 'bg-amber-50 text-amber-700', icon: Clock },
+          { label: 'Đã hủy', value: schedules.filter(s => s.status === 'cancelled' && new Date(s.date).getMonth() === month).length, color: 'bg-rose-50 text-rose-700', icon: Ban },
+        ].map((st, i) => {
+          const Icon = st.icon;
+          return (
+            <div key={i} className={`${st.color} rounded-xl p-2.5 text-center shadow-sm border border-white/60 flex flex-col items-center justify-center`}>
+              <Icon size={15} className="mb-1.5" />
+              <p className="text-lg font-bold tabular-nums leading-none">{st.value}</p>
+              <p className="text-[11px] font-medium mt-1">{st.label}</p>
+            </div>
+          );
+        })}
       </div>
 
       </div>

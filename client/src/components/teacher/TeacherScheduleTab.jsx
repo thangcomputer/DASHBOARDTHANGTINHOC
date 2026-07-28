@@ -12,7 +12,7 @@ export default function TeacherScheduleTab({
                 <Calendar size={20} className="text-blue-600 shrink-0" /> Lịch dạy
               </h2>
               <button onClick={() => { setEditingSchedule(null); setShowScheduleModal(true); }}
-                className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm hover:shadow transition flex items-center justify-center gap-2 w-full sm:w-auto shrink-0 min-h-10">
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition flex items-center justify-center gap-2 w-full sm:w-auto shrink-0 min-h-10">
                 <Plus size={14} /> Xếp lịch mới
               </button>
             </div>
