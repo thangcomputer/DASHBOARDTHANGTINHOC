@@ -723,6 +723,7 @@
   flex-direction: column;
   width: min(96vw, var(--cms-modal-max));
   max-height: min(92dvh, 900px);
+  overflow: hidden;
   background: var(--cms-surface);
   border-radius: var(--cms-r-sheet) var(--cms-r-sheet) 0 0;
   box-shadow: 0 8px 32px rgba(15, 23, 42, 0.18);
@@ -745,8 +746,6 @@
   padding: 12px var(--cms-modal-pad);
   border-bottom: 1px solid var(--cms-border);
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
   background: var(--cms-surface);
   z-index: 2;
 }
@@ -789,8 +788,6 @@
   border-top: 1px solid var(--cms-border);
   background: var(--cms-surface);
   flex-shrink: 0;
-  position: sticky;
-  bottom: 0;
   z-index: 2;
 }
 .cms-sheet-footer > .cms-btn {
@@ -827,8 +824,6 @@
   border-bottom: 1px solid var(--cms-border);
   flex-shrink: 0;
   background: var(--cms-surface);
-  position: sticky;
-  top: 0;
   z-index: 1;
 }
 .cms-sheet-tab {
