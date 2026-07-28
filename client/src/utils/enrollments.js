@@ -217,7 +217,8 @@ export function sumClientListedTuition(student) {
 
 export function filterSchedulesByCourse(schedules, courseName) {
   if (!courseName) return schedules || [];
-  return (schedules || []).filter((s) => String(s.course || '') === String(courseName));
+  const want = normCourseKey(courseName);
+  return (schedules || []).filter((s) => normCourseKey(s.course) === want);
 }
 
 function normCourseKey(name) {

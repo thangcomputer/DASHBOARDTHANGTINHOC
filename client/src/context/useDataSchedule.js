@@ -310,11 +310,19 @@ export function useDataSchedule({
   }, [schedules, triggerBackgroundSync, addNotification]);
 
   const getSchedulesByTeacher = useCallback((teacherId) => {
-    return schedules.filter(s => String(s.teacherId) === String(teacherId));
+    const tid = String(teacherId || '');
+    return schedules.filter((s) => {
+      const id = String(s.teacherId?._id || s.teacherId?.id || s.teacherId || '');
+      return id === tid;
+    });
   }, [schedules]);
 
   const getSchedulesByStudent = useCallback((studentId) => {
-    return schedules.filter(s => String(s.studentId) === String(studentId));
+    const sid = String(studentId || '');
+    return schedules.filter((s) => {
+      const id = String(s.studentId?._id || s.studentId?.id || s.studentId || '');
+      return id === sid;
+    });
   }, [schedules]);
 
   return {

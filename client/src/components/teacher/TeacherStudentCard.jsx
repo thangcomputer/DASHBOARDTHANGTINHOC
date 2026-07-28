@@ -714,11 +714,20 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                           <div className="flex items-start justify-between gap-2 relative z-10">
                             <h5 className="line-clamp-2 font-semibold text-slate-800 text-sm sm:text-base leading-snug break-words flex-1 min-w-0 flex items-center gap-2 flex-wrap">
                               <span className="min-w-0">{assign.title}</span>
-                              {['admin', 'staff'].includes(String(assign.assignedByRole || '').toLowerCase()) && (
-                                <span className="shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200">
-                                  Admin
-                                </span>
-                              )}
+                              {(() => {
+                                const role = String(assign.assignedByRole || '').toLowerCase();
+                                const isAdmin = role === 'admin' || role === 'staff';
+                                const label = isAdmin ? 'Admin giao' : 'Giáo viên';
+                                return (
+                                  <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border ${
+                                    isAdmin
+                                      ? 'bg-violet-100 text-violet-700 border-violet-200'
+                                      : 'bg-sky-100 text-sky-700 border-sky-200'
+                                  }`}>
+                                    {label}
+                                  </span>
+                                );
+                              })()}
                             </h5>
                             {isSubmitted ? (
                               <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide flex items-center gap-1 border ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>

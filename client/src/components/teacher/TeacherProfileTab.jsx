@@ -32,9 +32,9 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
   const [editingProfile, setEditingProfile] = useState(false);
   const [copiedField, setCopiedField] = useState('');
   const [openSections, setOpenSections] = useState({
-    profile: false,
-    bank: false,
-    status: false,
+    profile: true,
+    bank: true,
+    status: true,
   });
 
   // Load data from currentTeacher
@@ -126,34 +126,52 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
   });
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
-      {/* Page Header */}
-      <div className="flex items-center gap-3 min-w-0">
-        <img
-          src={teacherAvatarUrl}
-          alt={currentTeacher?.name || 'GV'}
-          className="w-11 h-11 rounded-xl object-cover border-2 border-white shadow-md shadow-red-100 bg-white shrink-0"
-        />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-black text-gray-800 truncate">
-            Hồ sơ cá nhân
-          </h2>
-          <p className="text-xs text-gray-400">Thông tin cá nhân, ngân hàng và bảo mật</p>
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-5 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 lg:space-y-5">
+      {/* Hero */}
+      <section className="rounded-2xl lg:rounded-3xl bg-gradient-to-br from-slate-800 via-slate-900 to-red-950 p-4 sm:p-6 lg:p-8 text-white shadow-[0_8px_28px_rgba(0,0,0,0.1)] relative overflow-hidden">
+        <div className="absolute -right-16 -top-16 w-48 h-48 bg-white/5 rounded-full pointer-events-none" aria-hidden="true" />
+        <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-red-500/10 rounded-full pointer-events-none" aria-hidden="true" />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6 min-w-0">
+          <img
+            src={teacherAvatarUrl}
+            alt={currentTeacher?.name || 'GV'}
+            className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl object-cover border-2 border-white/30 shadow-lg bg-white shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] sm:text-xs font-bold uppercase tracking-wide text-red-200/90">Hồ sơ cá nhân</p>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight truncate mt-0.5">
+              {currentTeacher?.name || 'Giảng viên'}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 truncate">
+              Thông tin cá nhân, ngân hàng và bảo mật
+              {currentTeacher?.branchCode ? ` · Cơ sở ${currentTeacher.branchCode}` : ''}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="inline-flex items-center rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide">
+                {String(currentTeacher?.status || '').toLowerCase() === 'active' ? 'Đang hoạt động' : (currentTeacher?.status || '—')}
+              </span>
+              {currentTeacher?.specialty && (
+                <span className="inline-flex items-center rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-slate-200 max-w-full truncate">
+                  {currentTeacher.specialty}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Đổi mật khẩu */}
       <button
         type="button"
         onClick={() => window.dispatchEvent(new CustomEvent('open-change-password-modal'))}
-        className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3.5 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
+        className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3.5 lg:px-5 lg:py-4 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
       >
-        <span className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+        <span className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
           <Shield size={18} aria-hidden="true" />
         </span>
         <span className="flex-1 min-w-0">
-          <span className="block text-sm font-bold text-slate-800">Đổi mật khẩu</span>
-          <span className="block text-xs text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</span>
+          <span className="block text-sm lg:text-base font-bold text-slate-800">Đổi mật khẩu</span>
+          <span className="block text-xs lg:text-sm text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</span>
         </span>
         <Edit3 size={16} className="text-slate-300 shrink-0" aria-hidden="true" />
       </button>
@@ -167,14 +185,14 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-start">
         {/* ── CARD 1: Thông tin cá nhân ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50">
-            <button type="button" onClick={() => setOpenSections((p) => ({ ...p, profile: !p.profile }))} className="font-bold text-gray-800 flex items-center gap-2">
-              <User size={18} className="text-blue-600" /> Thông tin cá nhân
+        <div className="bg-white rounded-2xl lg:rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 lg:px-6 lg:py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 gap-2">
+            <button type="button" onClick={() => setOpenSections((p) => ({ ...p, profile: !p.profile }))} className="font-bold text-gray-800 flex items-center gap-2 text-sm lg:text-base min-w-0">
+              <User size={18} className="text-blue-600 shrink-0" /> Thông tin cá nhân
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setEditingProfile(!editingProfile)}
                 className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
@@ -185,13 +203,13 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
               >
                 <Edit3 size={12} /> {editingProfile ? 'Huỷ' : 'Chỉnh sửa'}
               </button>
-              <button type="button" onClick={() => setOpenSections((p) => ({ ...p, profile: !p.profile }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center">
+              <button type="button" onClick={() => setOpenSections((p) => ({ ...p, profile: !p.profile }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center lg:hidden">
                 <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.profile ? 'rotate-180' : ''}`} />
               </button>
             </div>
           </div>
 
-          {openSections.profile && <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`${openSections.profile ? 'grid' : 'hidden lg:grid'} p-5 lg:p-6 grid-cols-1 md:grid-cols-2 gap-4`}>
             {/* Name - Read only */}
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Họ và tên</label>
@@ -343,16 +361,16 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
                 {saving ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}
               </button>
             )}
-          </div>}
+          </div>
         </div>
 
         {/* ── CARD 2: Thông tin thanh toán ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-teal-50">
-            <button type="button" onClick={() => setOpenSections((p) => ({ ...p, bank: !p.bank }))} className="font-bold text-gray-800 flex items-center gap-2">
-              <CreditCard size={18} className="text-emerald-600" /> Thông tin thanh toán
+        <div className="bg-white rounded-2xl lg:rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 lg:px-6 lg:py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-teal-50 gap-2">
+            <button type="button" onClick={() => setOpenSections((p) => ({ ...p, bank: !p.bank }))} className="font-bold text-gray-800 flex items-center gap-2 text-sm lg:text-base min-w-0">
+              <CreditCard size={18} className="text-emerald-600 shrink-0" /> Thông tin thanh toán
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setEditingBank(!editingBank)}
                 className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
@@ -363,13 +381,13 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
               >
                 <Edit3 size={12} /> {editingBank ? 'Huỷ' : 'Chỉnh sửa'}
               </button>
-              <button type="button" onClick={() => setOpenSections((p) => ({ ...p, bank: !p.bank }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center">
+              <button type="button" onClick={() => setOpenSections((p) => ({ ...p, bank: !p.bank }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center lg:hidden">
                 <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.bank ? 'rotate-180' : ''}`} />
               </button>
             </div>
           </div>
 
-          {openSections.bank && <div className="p-6 space-y-4">
+          <div className={`${openSections.bank ? 'block' : 'hidden lg:block'} p-5 lg:p-6 space-y-4`}>
             {/* Status indicator */}
             {!bankFilled && !editingBank && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 flex items-start gap-3">
@@ -511,22 +529,22 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
                 {saving ? 'Đang lưu...' : 'Lưu thông tin thanh toán'}
               </button>
             )}
-          </div>}
+          </div>
         </div>
       </div>
 
       {/* Account Status Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-violet-50 flex items-center justify-between">
-          <button type="button" onClick={() => setOpenSections((p) => ({ ...p, status: !p.status }))} className="font-bold text-gray-800 flex items-center gap-2">
-            <Shield size={18} className="text-purple-600" /> Trạng thái tài khoản
+      <div className="bg-white rounded-2xl lg:rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 lg:px-6 lg:py-5 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-violet-50 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => setOpenSections((p) => ({ ...p, status: !p.status }))} className="font-bold text-gray-800 flex items-center gap-2 text-sm lg:text-base">
+            <Shield size={18} className="text-purple-600 shrink-0" /> Trạng thái tài khoản
           </button>
-          <button type="button" onClick={() => setOpenSections((p) => ({ ...p, status: !p.status }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center">
+          <button type="button" onClick={() => setOpenSections((p) => ({ ...p, status: !p.status }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center lg:hidden">
             <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.status ? 'rotate-180' : ''}`} />
           </button>
         </div>
-        {openSections.status && <div className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`${openSections.status ? 'block' : 'hidden lg:block'} p-5 lg:p-6`}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
             {[
               {
                 label: 'Trạng thái',
@@ -562,7 +580,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
               </div>
             ))}
           </div>
-        </div>}
+        </div>
       </div>
     </div>
   );

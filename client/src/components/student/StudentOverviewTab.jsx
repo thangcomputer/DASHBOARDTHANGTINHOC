@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   PlayCircle, Clock, CheckCircle, MessageSquare, Download,
   BookOpen, Star, TrendingUp, Zap, Calendar, Video,
-  ClipboardList, ChevronRight, XCircle, Phone,
+  ClipboardList, ChevronRight, XCircle,
 } from 'lucide-react';
 import { CourseSwitcher, StatCard } from './StudentShared';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
@@ -273,12 +273,6 @@ export default function StudentOverviewTab({
               >
                 <MessageSquare size={18} aria-hidden="true" /> Nhắn tin Giảng viên
               </button>
-              <a
-                href="tel:0935758462"
-                className="cms-sd-btn w-full bg-red-50 border border-red-100 text-red-600 hover:bg-red-100"
-              >
-                <Phone size={16} aria-hidden="true" /> Gọi Hotline hỗ trợ
-              </a>
             </div>
           </aside>
         </div>

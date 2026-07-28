@@ -18,14 +18,14 @@ export default {
         sans: ['Roboto', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', '"Helvetica Neue"', 'Arial', 'sans-serif'],
       },
       fontSize: {
-        /* Fluid tokens — dùng thay text-[9px]/text-[10px] */
-        'fluid-xs': ['clamp(0.75rem, 0.7rem + 0.25vw, 0.8125rem)', { lineHeight: '1.25' }],
-        'fluid-sm': ['clamp(0.8125rem, 0.78rem + 0.3vw, 0.875rem)', { lineHeight: '1.4' }],
-        'fluid-base': ['clamp(0.875rem, 0.84rem + 0.35vw, 1rem)', { lineHeight: '1.5' }],
-        'fluid-lg': ['clamp(1rem, 0.92rem + 0.5vw, 1.125rem)', { lineHeight: '1.4' }],
-        'fluid-xl': ['clamp(1.125rem, 1rem + 0.75vw, 1.25rem)', { lineHeight: '1.3' }],
-        'fluid-2xl': ['clamp(1.25rem, 1.1rem + 1vw, 1.5rem)', { lineHeight: '1.25' }],
-        'fluid-3xl': ['clamp(1.5rem, 1.2rem + 1.5vw, 1.875rem)', { lineHeight: '1.2' }],
+        /* Fluid tokens — scale lên rõ hơn trên laptop/desktop */
+        'fluid-xs': ['clamp(0.75rem, 0.7rem + 0.35vw, 0.875rem)', { lineHeight: '1.3' }],
+        'fluid-sm': ['clamp(0.8125rem, 0.76rem + 0.4vw, 0.9375rem)', { lineHeight: '1.4' }],
+        'fluid-base': ['clamp(0.9375rem, 0.88rem + 0.4vw, 1.0625rem)', { lineHeight: '1.5' }],
+        'fluid-lg': ['clamp(1.0625rem, 0.95rem + 0.55vw, 1.1875rem)', { lineHeight: '1.4' }],
+        'fluid-xl': ['clamp(1.1875rem, 1.05rem + 0.7vw, 1.375rem)', { lineHeight: '1.3' }],
+        'fluid-2xl': ['clamp(1.375rem, 1.15rem + 1vw, 1.625rem)', { lineHeight: '1.25' }],
+        'fluid-3xl': ['clamp(1.625rem, 1.3rem + 1.4vw, 2rem)', { lineHeight: '1.2' }],
       },
       borderRadius: {
         cms: '1rem',

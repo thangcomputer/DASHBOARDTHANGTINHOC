@@ -1149,11 +1149,20 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                 <td className="px-6 py-4">
                                   <p className="text-xs font-black text-slate-800 uppercase tracking-tight mb-0.5 flex items-center gap-2 flex-wrap">
                                     <span>{a.title}</span>
-                                    {['admin', 'staff'].includes(String(a.assignedByRole || '').toLowerCase()) && (
-                                      <span className="shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200">
-                                        Admin
-                                      </span>
-                                    )}
+                                    {(() => {
+                                      const role = String(a.assignedByRole || '').toLowerCase();
+                                      const isAdmin = role === 'admin' || role === 'staff';
+                                      const label = isAdmin ? 'Admin giao' : 'Giáo viên';
+                                      return (
+                                        <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border ${
+                                          isAdmin
+                                            ? 'bg-violet-100 text-violet-700 border-violet-200'
+                                            : 'bg-sky-100 text-sky-700 border-sky-200'
+                                        }`}>
+                                          {label}
+                                        </span>
+                                      );
+                                    })()}
                                   </p>
                                   <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">{a.description || 'Không có mô tả'}</p>
                                   {(a.fileUrl || a.attachedFileUrl) && (
@@ -1161,10 +1170,12 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                       <Download size={10} /> Tải đề bài
                                     </a>
                                   )}
-                                  {(a.assignedByRole || a.assignedByName) && (
+                                  {(a.assignedByRole || a.assignedByName || a.teacherId) && (
                                     <p className="text-[10px] text-slate-400 font-bold mt-1">
                                       Giao bởi: <span className="text-slate-600">
-                                        {a.assignedByName || (String(a.assignedByRole).toLowerCase() === 'teacher' ? 'Giảng viên' : 'Admin')}
+                                        {['admin', 'staff'].includes(String(a.assignedByRole || '').toLowerCase())
+                                          ? (a.assignedByName || 'Admin')
+                                          : (a.assignedByName || 'Giáo viên')}
                                       </span>
                                     </p>
                                   )}

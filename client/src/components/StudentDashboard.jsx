@@ -17,6 +17,7 @@ import {
   formatTeacherDisplay,
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
+import { normalizeScheduleDate } from '../utils/scheduleTime';
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
 import { StudentNoteModal } from './student/StudentNoteModal';
 import {
@@ -199,12 +200,41 @@ const StudentDashboard = ({ onNavigate }) => {
   };
 
   const fetchMyAssignments = useCallback(() => {
-    const course = viewStudent?.course || studentData?.course;
-    if (!course || !STUDENT_ID) return;
-    api.assignments.getByStudentAndCourse(STUDENT_ID, course)
-      .then((res) => { if (res.success) setMyAssignments(res.data); })
+    if (!STUDENT_ID) return;
+    const names = [...new Set(
+      (enrollments || [])
+        .map((e) => String(e.courseName || e.name || '').trim())
+        .filter(Boolean)
+    )];
+    const fallback = String(viewStudent?.course || studentData?.course || '').trim();
+    if (fallback && !names.includes(fallback)) names.push(fallback);
+    if (names.length === 0) {
+      setMyAssignments([]);
+      return;
+    }
+
+    const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    Promise.all(
+      names.map((name) => api.assignments.getByStudentAndCourse(STUDENT_ID, name).catch(() => null))
+    )
+      .then((results) => {
+        const merged = [];
+        const seen = new Set();
+        results.forEach((res, idx) => {
+          const want = norm(names[idx]);
+          (res?.success ? res.data : []).forEach((a) => {
+            if (want && norm(a.courseId) !== want) return;
+            const id = String(a._id || a.id || '');
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+            merged.push(a);
+          });
+        });
+        merged.sort((a, b) => new Date(b.deadline || b.createdAt || 0) - new Date(a.deadline || a.createdAt || 0));
+        setMyAssignments(merged);
+      })
       .catch(() => {});
-  }, [viewStudent?.course, studentData?.course, STUDENT_ID]);
+  }, [enrollments, viewStudent?.course, studentData?.course, STUDENT_ID]);
 
   useEffect(() => {
     fetchMyAssignments();
@@ -272,16 +302,14 @@ const StudentDashboard = ({ onNavigate }) => {
   );
 
   const upcomingScheduleCount = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    return (mySchedules || []).filter((s) => {
-      if (s.status !== 'scheduled') return false;
-      const d = new Date(s.date);
-      if (Number.isNaN(d.getTime())) return false;
-      d.setHours(0, 0, 0, 0);
-      return d >= todayStart;
+    // Tổng quan: đếm mọi khóa của HV (không lọc theo course switcher)
+    const todayStr = normalizeScheduleDate(new Date());
+    return (mySchedulesAll || []).filter((s) => {
+      if (String(s.status || '') !== 'scheduled') return false;
+      const d = normalizeScheduleDate(s.date);
+      return d >= todayStr;
     }).length;
-  }, [mySchedules]);
+  }, [mySchedulesAll]);
   const myMaterials = useMemo(() =>
     materials.filter(m => student?.course?.includes(m.course) || m.course?.includes('THVP NÂNG CAO')),
     [materials, student]
@@ -543,7 +571,7 @@ const StudentDashboard = ({ onNavigate }) => {
         {currentHash === 'schedule' ? (
           <StudentLazyScheduleTab
             viewStudent={viewStudent}
-            mySchedules={mySchedules}
+            mySchedules={mySchedulesAll}
             setNoteModalSched={setNoteModalSched}
             displayGrades={displayGrades}
           />

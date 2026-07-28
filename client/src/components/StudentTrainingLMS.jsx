@@ -898,7 +898,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         {mainTab === 'assignments' && (
           <div className="bg-white rounded-[24px] p-4 sm:p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2.5">
-              <BookOpen className="text-green-600" /> Bài tập từ Giảng viên
+              <BookOpen className="text-green-600" /> Bài tập được giao
             </h2>
             <div className="space-y-3">
               {trainingData?.assignments?.map((a, idx) => {
@@ -918,6 +918,13 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                 const aExpanded = expandedAssignKey === aKey;
                 const aShowToggle = aPlain.length > 160 || aHasHtml;
                 const aDefault = 'Hoàn thành và nộp file bài tập theo đúng định dạng được yêu cầu (.zip, .rar, .pdf).';
+                const isAdminAssign = ['admin', 'staff'].includes(String(a.assignedByRole || '').toLowerCase());
+                const isTeacherAssign = String(a.assignedByRole || '').toLowerCase() === 'teacher'
+                  || (!a.assignedByRole && !!a.teacherId);
+                const assignerLabel = isAdminAssign
+                  ? 'Admin giao'
+                  : (isTeacherAssign ? 'Giáo viên' : (a.assignedByName ? String(a.assignedByName) : 'Giáo viên'));
+                const teacherName = String(a.assignedByName || '').trim();
                 return (
                   <div key={aKey} className="p-4 rounded-2xl border border-slate-100 transition-all flex gap-3 items-start bg-slate-50/40">
                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-green-100 to-indigo-100 flex items-center justify-center text-green-600 shrink-0 border border-green-200 shadow-inner">
@@ -925,7 +932,21 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col gap-2 mb-2">
-                        <h3 className="font-bold text-slate-800 text-base leading-tight line-clamp-2">{a.title}</h3>
+                        <h3 className="font-bold text-slate-800 text-base leading-tight flex items-center gap-2 flex-wrap">
+                          <span className="line-clamp-2 min-w-0">{a.title}</span>
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border ${
+                            isAdminAssign
+                              ? 'bg-violet-100 text-violet-700 border-violet-200'
+                              : 'bg-sky-100 text-sky-700 border-sky-200'
+                          }`}>
+                            {assignerLabel}
+                          </span>
+                        </h3>
+                        {!isAdminAssign && teacherName && teacherName.toLowerCase() !== 'giảng viên' && (
+                          <p className="text-[11px] text-slate-500 font-medium -mt-1">
+                            Giao bởi: {teacherName}
+                          </p>
+                        )}
                         {!submission && a.deadline && (
                           <div className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border flex items-center gap-1.5 whitespace-nowrap w-fit ${isLate ? 'bg-red-50 text-red-600 border-red-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
                             <Timer size={13} className={isLate ? '' : 'animate-pulse'} />

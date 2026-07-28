@@ -17,8 +17,8 @@ export default function StudentProfileTab({
   setShowTuitionModal,
 }) {
   const [openSections, setOpenSections] = useState({
-    personal: false,
-    summary: false,
+    personal: true,
+    summary: true,
     courses: true,
   });
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -41,228 +41,251 @@ export default function StudentProfileTab({
   return (
     <div className="cms-sd cms-sd-page cms-sd-stack cms-sd-profile">
       {/* Hero */}
-      <section className="rounded-[16px] bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-800 p-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.06)] relative overflow-hidden">
-        <div className="absolute -right-10 -top-10 w-32 h-32 bg-white/5 rounded-full pointer-events-none" aria-hidden="true" />
-        <div className="relative z-10 flex items-center gap-3.5 min-w-0">
-          <div className="relative shrink-0">
-            <div className="w-16 h-16 rounded-[14px] overflow-hidden border-2 border-white/30 bg-white shadow-md">
+      <section className="rounded-2xl lg:rounded-3xl bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-800 p-4 sm:p-6 lg:p-8 text-white shadow-[0_8px_28px_rgba(0,0,0,0.08)] relative overflow-hidden">
+        <div className="absolute -right-16 -top-16 w-48 h-48 bg-white/5 rounded-full pointer-events-none" aria-hidden="true" />
+        <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-emerald-400/10 rounded-full pointer-events-none" aria-hidden="true" />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6 min-w-0">
+          <div className="relative shrink-0 self-start sm:self-center">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl overflow-hidden border-2 border-white/35 bg-white shadow-lg">
               <img
                 src={resolveAvatarUrl({ avatar: studentData.avatar, role: 'student' })}
                 alt={studentData.name}
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-emerald-400 rounded-full border-2 border-white flex items-center justify-center">
-              <CheckCircle size={10} className="text-white" aria-hidden="true" />
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full border-2 border-white flex items-center justify-center">
+              <CheckCircle size={12} className="text-white" aria-hidden="true" />
             </div>
           </div>
 
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-extrabold tracking-tight truncate">{studentData.name}</h2>
-            <p className="text-[11px] font-semibold text-teal-100/90 mt-0.5 truncate">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight truncate">
+              {studentData.name}
+            </h2>
+            <p className="text-xs sm:text-sm font-semibold text-teal-100/95 mt-1 truncate">
               {studentData.course || 'Học viên Thắng Tin Học'}
             </p>
-            <div className="mt-2 flex gap-2">
-              <div className="rounded-lg bg-white/12 px-2.5 py-1 min-w-0">
-                <p className="text-sm font-extrabold tabular-nums leading-none">{progressPct}%</p>
-                <p className="text-[10px] text-teal-100 mt-0.5">Tiến độ</p>
+            <div className="mt-3 lg:mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-w-xl">
+              <div className="rounded-xl bg-white/12 backdrop-blur-sm px-3 py-2.5 lg:px-4 lg:py-3">
+                <p className="text-lg sm:text-xl lg:text-2xl font-extrabold tabular-nums leading-none">{progressPct}%</p>
+                <p className="text-[10px] sm:text-xs text-teal-100 mt-1 font-semibold uppercase tracking-wide">Tiến độ</p>
               </div>
-              <div className="rounded-lg bg-white/12 px-2.5 py-1 min-w-0">
-                <p className="text-sm font-extrabold tabular-nums leading-none">{studentData.avgGrade}</p>
-                <p className="text-[10px] text-teal-100 mt-0.5">Điểm TB</p>
+              <div className="rounded-xl bg-white/12 backdrop-blur-sm px-3 py-2.5 lg:px-4 lg:py-3">
+                <p className="text-lg sm:text-xl lg:text-2xl font-extrabold tabular-nums leading-none">{studentData.avgGrade ?? 0}</p>
+                <p className="text-[10px] sm:text-xs text-teal-100 mt-1 font-semibold uppercase tracking-wide">Điểm TB</p>
+              </div>
+              <div className="rounded-xl bg-white/12 backdrop-blur-sm px-3 py-2.5 lg:px-4 lg:py-3 col-span-2 sm:col-span-1">
+                <p className="text-lg sm:text-xl lg:text-2xl font-extrabold tabular-nums leading-none">
+                  {studentData.remainingSessions ?? Math.max(0, (studentData.totalSessions || 0) - (studentData.completedSessions || 0))}
+                </p>
+                <p className="text-[10px] sm:text-xs text-teal-100 mt-1 font-semibold uppercase tracking-wide">Buổi còn lại</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Bảo mật */}
-      <section className="cms-sd-card !p-0 overflow-hidden">
-        <button
-          type="button"
-          onClick={openChangePassword}
-          className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
-        >
-          <span className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-            <Lock size={18} aria-hidden="true" />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-sm font-bold text-slate-800">Đổi mật khẩu</span>
-            <span className="block text-xs text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</span>
-          </span>
-          <ChevronRight size={18} className="text-slate-300 shrink-0" aria-hidden="true" />
-        </button>
-      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-5 items-start">
+        {/* Cột trái: bảo mật + thông tin + tóm tắt */}
+        <div className="lg:col-span-5 cms-sd-stack min-w-0">
+          <section className="cms-sd-card !p-0 overflow-hidden">
+            <button
+              type="button"
+              onClick={openChangePassword}
+              className="w-full flex items-center gap-3 px-4 py-3.5 lg:px-5 lg:py-4 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
+            >
+              <span className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                <Lock size={18} aria-hidden="true" />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm lg:text-base font-bold text-slate-800">Đổi mật khẩu</span>
+                <span className="block text-xs lg:text-sm text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</span>
+              </span>
+              <ChevronRight size={18} className="text-slate-300 shrink-0" aria-hidden="true" />
+            </button>
+          </section>
 
-      {/* Thông tin + học tập */}
-      <div className="grid grid-cols-1 gap-3">
-        <section className="cms-sd-card !p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-            <button type="button" onClick={() => toggleSection('personal')} className="flex items-center gap-2 text-sm font-extrabold text-slate-800 min-w-0">
-              <User size={16} className="text-teal-600" aria-hidden="true" /> Thông tin cá nhân
-            </button>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowUpdateProfileModal(true)}
-                className="text-[11px] font-extrabold uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 min-h-9 rounded-lg transition-colors flex items-center gap-1"
-              >
-                <Settings size={13} aria-hidden="true" /> Cập nhật
+          <section className="cms-sd-card !p-0 overflow-hidden">
+            <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2">
+              <button type="button" onClick={() => toggleSection('personal')} className="flex items-center gap-2 text-sm lg:text-base font-extrabold text-slate-800 min-w-0">
+                <User size={16} className="text-teal-600 shrink-0" aria-hidden="true" /> Thông tin cá nhân
               </button>
-              <button type="button" onClick={() => toggleSection('personal')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
-                <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.personal ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
-          </div>
-          {openSections.personal && <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
-            {[
-              { icon: Mail, label: 'Email', value: studentData.email || 'Chưa cập nhật' },
-              { icon: Phone, label: 'Số điện thoại', value: studentData.phone || studentData.zalo || 'Chưa cập nhật' },
-              { icon: MessageCircle, label: 'Zalo', value: studentData.zalo || 'Chưa cập nhật' },
-              { icon: MapPin, label: 'Địa chỉ', value: studentData.address || 'Chưa cập nhật' },
-            ].map((item) => (
-              <li key={item.label} className="flex items-center gap-3 px-4 py-3 min-w-0">
-                <item.icon size={16} className="text-slate-400 shrink-0" aria-hidden="true" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{item.label}</p>
-                  <p className="text-sm font-semibold text-slate-800 truncate">{item.value}</p>
-                </div>
-              </li>
-            ))}
-          </ul>}
-        </section>
-
-        <section className="cms-sd-card !p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-            <button type="button" onClick={() => toggleSection('summary')} className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-              <BookOpen size={16} className="text-blue-600" aria-hidden="true" /> Tóm tắt học tập
-            </button>
-            <button type="button" onClick={() => toggleSection('summary')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
-              <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.summary ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-          {openSections.summary && <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
-            <li className="flex items-start gap-3 px-4 py-3 min-w-0 md:col-span-2">
-              <GraduationCap size={16} className="text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Giáo viên</p>
-                <p className="text-sm font-semibold text-slate-800">{teacherValue}</p>
-              </div>
-            </li>
-            <li className="flex items-center gap-3 px-4 py-3 min-w-0">
-              <BadgeDollarSign size={16} className="text-slate-400 shrink-0" aria-hidden="true" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Trạng thái</p>
-                <p className="text-sm font-semibold text-slate-800 truncate">{studentData.status}</p>
-              </div>
-            </li>
-            <li className="flex items-start gap-3 px-4 py-3 min-w-0 md:col-span-2">
-              <Wallet size={16} className="text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Học phí theo khóa</p>
-                <ul className="mt-1 space-y-1">
-                  {tuitionLines.map((line) => (
-                    <li key={line} className="text-sm font-semibold text-slate-800 leading-snug">{line}</li>
-                  ))}
-                </ul>
-              </div>
-            </li>
-            <li className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between px-4 py-3 md:col-span-2">
-              <div className="flex items-center gap-3 min-w-0">
-                <CheckCircle
-                  size={16}
-                  className={studentData.paid ? 'text-emerald-500' : 'text-amber-500'}
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Thanh toán</p>
-                  <p className={`text-sm font-bold ${studentData.paid ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {studentData.paid ? 'Đã đóng học phí' : 'Chưa đóng'}
-                  </p>
-                </div>
-              </div>
-              {!studentData.paid && (
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowTuitionModal(true)}
-                  className="cms-sd-btn bg-red-600 text-white hover:bg-red-700 w-full sm:w-auto"
+                  onClick={() => setShowUpdateProfileModal(true)}
+                  className="text-[11px] lg:text-xs font-extrabold uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 lg:px-3 min-h-9 rounded-lg transition-colors flex items-center gap-1"
                 >
-                  Đóng ngay
+                  <Settings size={13} aria-hidden="true" /> Cập nhật
                 </button>
-              )}
-            </li>
-          </ul>}
-        </section>
-      </div>
+                <button type="button" onClick={() => toggleSection('personal')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center lg:hidden">
+                  <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.personal ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+            </div>
+            <ul className={`${openSections.personal ? 'grid' : 'hidden lg:grid'} grid-cols-1 gap-0.5`}>
+              {[
+                { icon: Mail, label: 'Email', value: studentData.email || 'Chưa cập nhật' },
+                { icon: Phone, label: 'Số điện thoại', value: studentData.phone || studentData.zalo || 'Chưa cập nhật' },
+                { icon: MessageCircle, label: 'Zalo', value: studentData.zalo || 'Chưa cập nhật' },
+                { icon: MapPin, label: 'Địa chỉ', value: studentData.address || 'Chưa cập nhật' },
+              ].map((item) => (
+                <li key={item.label} className="flex items-center gap-3 px-4 py-3 lg:px-5 lg:py-3.5 min-w-0 hover:bg-slate-50/60">
+                  <item.icon size={16} className="text-slate-400 shrink-0" aria-hidden="true" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wide text-slate-400">{item.label}</p>
+                    <p className="text-sm lg:text-[15px] font-semibold text-slate-800 truncate">{item.value}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
 
-      {studentData.courses && studentData.courses.length > 0 && (
-        <section className="cms-sd-card !p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
-            <button type="button" onClick={() => toggleSection('courses')} className="text-sm font-extrabold text-slate-800 flex items-center gap-2 min-w-0">
-              <BookOpen size={16} className="text-blue-600 shrink-0" aria-hidden="true" /> Khóa học
-            </button>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-extrabold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                {studentData.courses.length}
-              </span>
-              <button type="button" onClick={() => toggleSection('courses')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
-                <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.courses ? 'rotate-180' : ''}`} />
+          <section className="cms-sd-card !p-0 overflow-hidden">
+            <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2">
+              <button type="button" onClick={() => toggleSection('summary')} className="text-sm lg:text-base font-extrabold text-slate-800 flex items-center gap-2">
+                <BookOpen size={16} className="text-blue-600 shrink-0" aria-hidden="true" /> Tóm tắt học tập
+              </button>
+              <button type="button" onClick={() => toggleSection('summary')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center lg:hidden">
+                <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.summary ? 'rotate-180' : ''}`} />
               </button>
             </div>
-          </div>
-          {openSections.courses && <div className="p-3 space-y-2.5">
-            {studentData.courses.map((c) => {
-              const isCompleted = c.status === 'completed';
-              const pct = Math.round((c.completedSessions / c.totalSessions) * 100) || 0;
-              return (
-                <article
-                  key={c.id}
-                  className={`rounded-[14px] border p-3 ${
-                    isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-slate-50/40'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2 min-w-0 mb-2">
-                    <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-slate-800 uppercase tracking-tight line-clamp-2">{c.name}</h4>
-                      <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
-                        GV: {c.teacherName || 'Chưa phân công'}
-                        {c.registeredAt ? ` · ${new Date(c.registeredAt).toLocaleDateString('vi-VN')}` : ''}
-                      </p>
-                    </div>
-                    <span
-                      className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase shrink-0 ${
-                        isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+            <ul className={`${openSections.summary ? 'grid' : 'hidden lg:grid'} grid-cols-1 gap-0.5`}>
+              <li className="flex items-start gap-3 px-4 py-3 lg:px-5 lg:py-3.5 min-w-0">
+                <GraduationCap size={16} className="text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wide text-slate-400">Giáo viên</p>
+                  <p className="text-sm lg:text-[15px] font-semibold text-slate-800">{teacherValue}</p>
+                </div>
+              </li>
+              <li className="flex items-center gap-3 px-4 py-3 lg:px-5 lg:py-3.5 min-w-0">
+                <BadgeDollarSign size={16} className="text-slate-400 shrink-0" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wide text-slate-400">Trạng thái</p>
+                  <p className="text-sm lg:text-[15px] font-semibold text-slate-800 truncate">{studentData.status}</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3 px-4 py-3 lg:px-5 lg:py-3.5 min-w-0">
+                <Wallet size={16} className="text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wide text-slate-400">Học phí theo khóa</p>
+                  <ul className="mt-1 space-y-1">
+                    {tuitionLines.map((line) => (
+                      <li key={line} className="text-sm lg:text-[15px] font-semibold text-slate-800 leading-snug">{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              </li>
+              <li className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between px-4 py-3 lg:px-5 lg:py-3.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <CheckCircle
+                    size={16}
+                    className={studentData.paid ? 'text-emerald-500' : 'text-amber-500'}
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <p className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wide text-slate-400">Thanh toán</p>
+                    <p className={`text-sm lg:text-[15px] font-bold ${studentData.paid ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {studentData.paid ? 'Đã đóng học phí' : 'Chưa đóng'}
+                    </p>
+                  </div>
+                </div>
+                {!studentData.paid && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTuitionModal(true)}
+                    className="cms-sd-btn bg-red-600 text-white hover:bg-red-700 w-full sm:w-auto"
+                  >
+                    Đóng ngay
+                  </button>
+                )}
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        {/* Cột phải: khóa học */}
+        <div className="lg:col-span-7 min-w-0">
+          {courses.length > 0 ? (
+            <section className="cms-sd-card !p-0 overflow-hidden h-full">
+              <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
+                <button type="button" onClick={() => toggleSection('courses')} className="text-sm lg:text-base font-extrabold text-slate-800 flex items-center gap-2 min-w-0">
+                  <BookOpen size={16} className="text-blue-600 shrink-0" aria-hidden="true" /> Khóa học
+                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] lg:text-xs font-extrabold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full tabular-nums">
+                    {courses.length}
+                  </span>
+                  <button type="button" onClick={() => toggleSection('courses')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center lg:hidden">
+                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.courses ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+              </div>
+              <div className={`${openSections.courses ? 'grid' : 'hidden lg:grid'} p-3 lg:p-4 gap-2.5 lg:gap-3 sm:grid-cols-1 xl:grid-cols-2`}>
+                {courses.map((c) => {
+                  const isCompleted = c.status === 'completed';
+                  const total = Number(c.totalSessions) || 12;
+                  const done = Number(c.completedSessions) || 0;
+                  const pct = Math.round((done / total) * 100) || 0;
+                  const title = c.courseName || c.name || 'Khóa học';
+                  return (
+                    <article
+                      key={c.id || c.enrollmentId || title}
+                      className={`rounded-2xl border p-3.5 lg:p-4 transition-shadow hover:shadow-md ${
+                        isCompleted ? 'border-emerald-100 bg-emerald-50/40' : 'border-slate-100 bg-slate-50/50'
                       }`}
                     >
-                      {isCompleted ? 'Xong' : 'Học'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="h-1.5 bg-white rounded-full overflow-hidden border border-slate-100">
-                        <div
-                          className={`h-full rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-red-500'}`}
-                          style={{ width: `${pct}%` }}
-                        />
+                      <div className="flex items-start justify-between gap-2 min-w-0 mb-3">
+                        <div className="min-w-0">
+                          <h4 className="text-sm lg:text-[15px] font-bold text-blue-700 uppercase tracking-tight line-clamp-2">
+                            {title}
+                          </h4>
+                          <p className="text-[11px] lg:text-xs font-semibold text-slate-500 mt-1 truncate">
+                            GV: {c.teacherName || 'Chưa phân công'}
+                            {c.registeredAt ? ` · ${new Date(c.registeredAt).toLocaleDateString('vi-VN')}` : ''}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-[10px] lg:text-[11px] font-extrabold px-2 py-1 rounded-md uppercase shrink-0 ${
+                            isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                          }`}
+                        >
+                          {isCompleted ? 'Xong' : 'Học'}
+                        </span>
                       </div>
-                      <div className="flex justify-between mt-1">
-                        <p className="text-[11px] font-semibold text-slate-500 tabular-nums">
-                          {c.completedSessions}/{c.totalSessions} buổi
-                        </p>
-                        <p className="text-[11px] font-bold text-slate-600 tabular-nums">{pct}%</p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="h-2 bg-white rounded-full overflow-hidden border border-slate-100">
+                            <div
+                              className={`h-full rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-red-500'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between mt-1.5">
+                            <p className="text-[11px] lg:text-xs font-semibold text-slate-500 tabular-nums">
+                              {done}/{total} buổi
+                            </p>
+                            <p className="text-[11px] lg:text-xs font-bold text-slate-600 tabular-nums">{pct}%</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 pl-1">
+                          <p className="text-base lg:text-lg font-extrabold text-slate-800 tabular-nums">{c.avgGrade ?? 0}</p>
+                          <p className="text-[10px] font-bold uppercase text-slate-400">TB</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-extrabold text-slate-800 tabular-nums">{c.avgGrade}</p>
-                      <p className="text-[10px] font-bold uppercase text-slate-400">TB</p>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>}
-        </section>
-      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ) : (
+            <section className="cms-sd-card flex flex-col items-center justify-center py-12 text-center">
+              <BookOpen size={28} className="text-slate-300 mb-2" aria-hidden="true" />
+              <p className="text-sm font-semibold text-slate-600">Chưa có khóa học</p>
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
