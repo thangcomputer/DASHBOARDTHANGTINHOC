@@ -157,17 +157,18 @@
     @apply w-full;
   }
 
-  /* Tab strip: mobile = 3-col grid (wrap); tablet+ = flex wrap with labels */
+  /* Tab strip: chia ??u chi?u ngang; mobile icon+s?; tablet+ có ch? */
   .cms-hscroll-tabs {
     @apply w-full max-w-full min-w-0;
   }
 
   .cms-hscroll-tabs__track {
-    @apply grid grid-cols-3 gap-1.5 w-full;
+    @apply flex flex-wrap gap-1.5 w-full;
   }
 
   .cms-hscroll-tab {
-    @apply inline-flex items-center justify-center gap-1 min-h-10 w-full px-1.5 py-2 rounded-xl text-[11px] sm:text-[13px] font-semibold transition-all min-w-0;
+    @apply inline-flex items-center justify-center gap-1 min-h-10 px-1.5 py-2 rounded-xl text-[11px] sm:text-[13px] font-semibold transition-all min-w-0;
+    flex: 1 1 0;
   }
 
   .cms-hscroll-tab__label {
@@ -182,8 +183,9 @@
     .cms-hscroll-tab {
       flex-direction: column;
       gap: 0.125rem;
-      padding-left: 0.35rem;
-      padding-right: 0.35rem;
+      padding-left: 0.25rem;
+      padding-right: 0.25rem;
+      min-width: calc(20% - 0.3rem);
     }
     .cms-hscroll-tab__count {
       font-size: 10px;
@@ -192,12 +194,7 @@
   }
 
   @media (min-width: 640px) {
-    .cms-hscroll-tabs__track {
-      display: flex;
-      flex-wrap: wrap;
-    }
     .cms-hscroll-tab {
-      width: auto;
       flex: 1 1 calc(33.333% - 0.375rem);
       min-width: max-content;
       max-width: 100%;

@@ -180,7 +180,7 @@ export default function AdminStudentTrainingTab() {
                           </CmsSelect>
                           {!documentCourseOptions.length && (
                             <p className="text-xs text-amber-600 mt-1">
-                              Chưa có khóa học. Tạo khóa tại <strong>Cài đặt hệ thống → Học phí khóa học</strong>, hoặc tab Quản lý Khóa học (video LMS).
+                              Chưa có khóa học. Tạo khóa tại <strong>Cài đặt hệ thống → Học phí khóa học</strong>, hoặc tab Quản lý Khóa học (video).
                             </p>
                           )}
                         </div>
@@ -194,7 +194,7 @@ export default function AdminStudentTrainingTab() {
                           <div className="flex flex-wrap items-center gap-2 min-h-[46px]">
                             <label className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/50 text-sky-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-sky-100 transition-colors shrink-0 ${sTrainingFileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
                               {sTrainingFileUploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-                              {sTrainingFileUploading ? 'Đang tải...' : 'TẢI FILE'}
+                              {sTrainingFileUploading ? 'Đang tải...' : 'TẢI TỆP'}
                               <input type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar" onChange={(e) => handleTrainingDocUpload(e, 'student')} />
                             </label>
                             {sTrainingForm.fileUrl && (
@@ -359,7 +359,7 @@ export default function AdminStudentTrainingTab() {
                               <span className="sm:hidden">TN</span><span className="hidden sm:inline">Trắc nghiệm</span>
                             </th>
                             <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide text-center whitespace-nowrap">
-                              <span className="sm:hidden">TL</span><span className="hidden sm:inline">Tự luận (File)</span>
+                              <span className="sm:hidden">TL</span><span className="hidden sm:inline">Tự luận (tệp)</span>
                             </th>
                             <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide text-center whitespace-nowrap">
                               <span className="sm:hidden">Chấm TL</span><span className="hidden sm:inline">Chấm điểm TL</span>
@@ -739,7 +739,7 @@ export default function AdminStudentTrainingTab() {
 
                   {/* Tự luận */}
                   <div className="bg-red-50 rounded-2xl p-4 space-y-3 border border-red-100">
-                    <p className="text-xs font-black text-sky-700 uppercase tracking-widest">✍️ Phần Tự luận (Admin tự chấm)</p>
+                    <p className="text-xs font-black text-sky-700 uppercase tracking-widest">✍️ Phần tự luận (quản trị tự chấm)</p>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Điểm tự luận (0–10)</label>

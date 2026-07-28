@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminTab } from '../AdminTabContext';
 import { AlertTriangle, ShieldAlert, MessageSquare, CheckCircle2, MessageCircle } from 'lucide-react';
@@ -15,7 +15,7 @@ export default function AdminEvaluationsTab() {
         <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-slate-100 bg-gradient-to-r from-red-50 to-white">
           <h2 className="cms-m-heading flex items-start sm:items-center gap-2 min-w-0">
             <AlertTriangle size={20} className="text-red-500 flex-shrink-0 mt-0.5 sm:mt-0" aria-hidden="true" />
-            <span className="break-anywhere">Báo Cáo Đánh Giá Chất Lượng Nội Bộ (Milestone)</span>
+            <span className="break-anywhere">Báo cáo đánh giá chất lượng nội bộ</span>
           </h2>
           <p className="cms-m-caption mt-2">
             Đây là các đánh giá riêng tư từ học viên được gửi trực tiếp cho Admin tại các mốc Buổi 1 và 50% khóa học.

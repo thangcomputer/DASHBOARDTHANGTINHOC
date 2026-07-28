@@ -112,7 +112,7 @@ export default function AdminTrainingTab() {
                     )}
                     {trainingTab === 'guides' && (
                       <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Icon (emoji)</label>
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Biểu tượng</label>
                         <input value={trainingForm.icon || ''} onChange={e => setTrainingForm({ ...trainingForm, icon: e.target.value })}
                           className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none" placeholder="📋" />
                       </div>
@@ -129,7 +129,7 @@ export default function AdminTrainingTab() {
                           <div className="flex flex-wrap items-center gap-2 min-h-[46px]">
                             <label className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-red-300 bg-red-50/50 text-red-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-red-100 transition-colors shrink-0 ${trainingFileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
                               {trainingFileUploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-                              {trainingFileUploading ? 'Đang tải...' : 'TẢI FILE'}
+                              {trainingFileUploading ? 'Đang tải...' : 'TẢI TỆP'}
                               <input type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar" onChange={(e) => handleTrainingDocUpload(e, 'teacher')} />
                             </label>
                             {trainingForm.fileUrl && (
@@ -318,7 +318,7 @@ export default function AdminTrainingTab() {
                                 <tr className="bg-blue-50 border-b border-blue-100">
                                   <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide">Giảng viên</th>
                                   <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Trắc nghiệm</th>
-                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Bài tự luận (File)</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Bài tự luận (tệp)</th>
                                   <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Trạng thái</th>
                                   <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide">Ngày thi</th>
                                   <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-right">Thao tác</th>
@@ -591,7 +591,7 @@ export default function AdminTrainingTab() {
                 <div className="p-4 sm:p-6 space-y-4">
                   <div className="bg-gray-50 rounded-xl p-4 space-y-1">
                     <p className="text-sm"><strong>Giảng viên:</strong> {gvReviewModal.name}</p>
-                    <p className="text-sm break-all"><strong>File:</strong> {practicalFileDisplayName(gvReviewModal.practicalFile)}</p>
+                    <p className="text-sm break-all"><strong>Tệp:</strong> {practicalFileDisplayName(gvReviewModal.practicalFile)}</p>
                     <p className="text-sm"><strong>Điểm trắc nghiệm:</strong> {gvReviewModal.testScore ?? 0}/100</p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
