@@ -843,13 +843,16 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0 },
           ].map(t => (
             <button key={t.key} onClick={() => setMainTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+              className={`relative flex min-w-[88px] max-w-[96px] shrink-0 flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
                 mainTab === t.key
                   ? 'bg-red-500 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}>
-              <t.icon size={15} /> {t.label}
-              <span className={`text-[10px] ml-1 px-1.5 py-0.5 rounded-full leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
+              <t.icon size={15} className="shrink-0" />
+              <span className="text-[11px] leading-tight text-center line-clamp-2 min-h-[2.1rem]">
+                {t.label}
+              </span>
+              <span className={`absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
                 {t.count}
               </span>
             </button>

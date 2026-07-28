@@ -691,15 +691,17 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               onClick={() => setMainTab(t.key)}
               title={t.label}
               aria-label={t.label}
-              className={`relative flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${mainTab === t.key
+              className={`relative flex min-w-[88px] max-w-[96px] shrink-0 flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${mainTab === t.key
                 ? 'bg-red-500 text-white shadow-sm'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
             >
               <t.icon size={15} className="shrink-0" aria-hidden="true" />
-              <span className="truncate max-w-full">{t.label}</span>
+              <span className="text-[11px] leading-tight text-center line-clamp-2 min-h-[2.1rem]">
+                {t.label}
+              </span>
               {t.count > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
+                <span className={`absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
                   {t.count}
                 </span>
               )}
