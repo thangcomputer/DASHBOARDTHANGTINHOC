@@ -6,13 +6,15 @@ import {
   MapPin, Phone, MessageSquare, Calendar, ChevronRight,
   TrendingUp, CreditCard, ClipboardList, ShieldCheck, 
   Printer, Loader2, AlertCircle, CheckCircle2, Star,
-  Smartphone, Hash, ArrowUpRight, Building2, Plus, Download
+  Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2
 } from 'lucide-react';
 import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments } from '../utils/enrollments';
 import { teacherMatchesCourse } from '../utils/examSubjects';
+import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
+import { useToast } from '../utils/toast';
 
 const fmt = (n) => n ? Number(n).toLocaleString('vi-VN') + 'đ' : '0đ';
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
@@ -35,11 +37,11 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const [loading, setLoading]     = useState(true);
   const [data, setData]           = useState(null);
   const { showModal }             = useModal();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'attendance' | 'finance' | 'academic'
 
   const { updateStudent, assignTeacher, teachers } = useData() || {};
   const [showAddEnrollment, setShowAddEnrollment] = useState(false);
-  const [newEnr, setNewEnr] = useState({ courseName: '', teacherId: '', price: 0, totalSessions: 12 });
 
   const reloadProfile = () => {
     if (!studentId) return;
@@ -58,22 +60,86 @@ export default function StudentDetailModal({ studentId, onClose }) {
     } catch { /* ignore */ }
   };
 
-  const handleAddEnrollment = async () => {
+  const handleAddEnrollmentSubmit = async (payload) => {
     const sid = data?.student?._id || data?.student?.id || studentId;
-    if (!newEnr.courseName?.trim()) return;
+    if (!sid) return false;
     try {
-      const res = await api.students.addEnrollment(sid, {
-        courseName: newEnr.courseName.trim(),
-        teacherId: newEnr.teacherId || undefined,
-        price: Number(newEnr.price) || 0,
-        totalSessions: Number(newEnr.totalSessions) || 12,
-      });
+      const res = await api.students.addEnrollment(sid, payload);
       if (res?.success) {
-        setShowAddEnrollment(false);
-        setNewEnr({ courseName: '', teacherId: '', price: 0, totalSessions: 12 });
+        toast.success(res.message || 'Đã thêm khóa học');
         reloadProfile();
+        return true;
       }
-    } catch { /* ignore */ }
+      toast.error(res?.message || 'Không thể thêm khóa học');
+      return false;
+    } catch {
+      toast.error('Lỗi kết nối API');
+      return false;
+    }
+  };
+
+  const handlePayEnrollment = (enr) => {
+    const sid = data?.student?._id || data?.student?.id || studentId;
+    const enrId = enr.enrollmentId || enr.id;
+    if (!sid || !enrId || enrId === 'main') {
+      toast.error('Không xác định được khóa học để thanh toán');
+      return;
+    }
+    showModal({
+      title: 'Xác nhận thanh toán',
+      content: `Xác nhận đã thu học phí khóa "${enr.courseName || enr.name}" — ${fmt(enr.price)}?`,
+      type: 'question',
+      confirmText: 'Đã thu tiền',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        const tid = toast.loading('Đang xác nhận thanh toán...');
+        try {
+          const res = await api.students.payEnrollment(sid, enrId, { paymentMethod: 'cash' });
+          toast.dismiss(tid);
+          if (res?.success) {
+            toast.success(res.message || 'Đã thanh toán');
+            reloadProfile();
+          } else {
+            toast.error(res?.message || 'Thanh toán thất bại');
+          }
+        } catch {
+          toast.dismiss(tid);
+          toast.error('Lỗi kết nối API');
+        }
+      },
+    });
+  };
+
+  const handleDeleteEnrollment = (enr) => {
+    const sid = data?.student?._id || data?.student?.id || studentId;
+    const enrId = enr.enrollmentId || enr.id;
+    if (!sid || !enrId || enrId === 'main') {
+      toast.error('Không xác định được khóa học để xóa');
+      return;
+    }
+    showModal({
+      title: 'Xóa khóa học',
+      content: `Xóa khóa "${enr.courseName || enr.name}" khỏi học viên này? Không thể hoàn tác.`,
+      type: 'warning',
+      confirmText: 'Xóa khóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        const tid = toast.loading('Đang xóa khóa...');
+        try {
+          const res = await api.students.deleteEnrollment(sid, enrId);
+          toast.dismiss(tid);
+          if (res?.success) {
+            toast.success(res.message || 'Đã xóa khóa');
+            reloadProfile();
+          } else {
+            toast.error(res?.message || 'Không xóa được khóa');
+          }
+        } catch {
+          toast.dismiss(tid);
+          toast.error('Lỗi kết nối API');
+        }
+      },
+    });
   };
   const handleUnlockExams = async () => {
     if (!data.student || !data.student.examProgress || !updateStudent) return;
@@ -386,6 +452,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                               }
                               return { matched, other };
                             };
+                            const canDelete = enrollments.length > 1;
                             return (
                               <div className="pt-6 mt-4 border-t border-slate-100">
                                 <div className="flex items-center justify-between mb-4">
@@ -394,100 +461,80 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                   </h4>
                                   <button
                                     type="button"
-                                    onClick={() => setShowAddEnrollment((v) => !v)}
+                                    onClick={() => setShowAddEnrollment(true)}
                                     className="text-[10px] font-black uppercase text-blue-600 hover:text-blue-800 flex items-center gap-1"
                                   >
                                     <Plus size={12} /> Thêm khóa
                                   </button>
                                 </div>
-                                {showAddEnrollment && (
-                                  <div className="mb-4 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <input
-                                      placeholder="Tên khóa học"
-                                      value={newEnr.courseName}
-                                      onChange={(e) => setNewEnr((f) => ({ ...f, courseName: e.target.value }))}
-                                      className="py-2 px-3 rounded-xl border border-blue-200 text-sm font-bold"
-                                    />
-                                    <CmsSelect
-                                      value={newEnr.teacherId}
-                                      onChange={(e) => setNewEnr((f) => ({ ...f, teacherId: e.target.value }))}
-                                      className="py-2 px-3 rounded-xl border border-blue-200 text-sm font-bold"
-                                    >
-                                      <option value="">Giảng viên</option>
-                                      {(() => {
-                                        const { matched, other } = splitTeachers(newEnr.courseName);
-                                        return (
-                                          <>
-                                            {matched.map((t) => (
-                                              <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-                                            ))}
-                                            {other.map((t) => (
-                                              <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
-                                            ))}
-                                          </>
-                                        );
-                                      })()}
-                                    </CmsSelect>
-                                    <input
-                                      type="number"
-                                      placeholder="Học phí"
-                                      value={newEnr.price}
-                                      onChange={(e) => setNewEnr((f) => ({ ...f, price: e.target.value }))}
-                                      className="py-2 px-3 rounded-xl border border-blue-200 text-sm font-bold"
-                                    />
-                                    <input
-                                      type="number"
-                                      placeholder="Số buổi"
-                                      value={newEnr.totalSessions}
-                                      onChange={(e) => setNewEnr((f) => ({ ...f, totalSessions: e.target.value }))}
-                                      className="py-2 px-3 rounded-xl border border-blue-200 text-sm font-bold"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={handleAddEnrollment}
-                                      className="sm:col-span-2 py-2 rounded-xl bg-red-600 text-white text-xs font-black"
-                                    >
-                                      Lưu khóa học mới
-                                    </button>
-                                  </div>
-                                )}
                                 <div className="space-y-3">
                                   {enrollments.map((enr) => {
                                     const enrId = enr.enrollmentId || enr.id;
                                     const progress = enr.totalSessions
                                       ? Math.round(((enr.completedSessions || 0) / enr.totalSessions) * 100)
                                       : 0;
+                                    const isPaid = enr.paid === true || enr.paid === 'Đã đóng phí';
                                     return (
-                                      <div key={enrId} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center gap-3">
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-black text-slate-900 truncate">
-                                            {enr.courseName || enr.name}
-                                            {enr.isPrimary && <span className="ml-2 text-[9px] text-indigo-500 font-black">CHÍNH</span>}
-                                          </p>
-                                          <p className="text-[10px] text-slate-500 font-bold mt-0.5">
-                                            {enr.completedSessions || 0}/{enr.totalSessions || 12} buổi · {progress}% · {fmt(enr.price)}
-                                          </p>
+                                      <div key={enrId} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-3">
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-black text-slate-900 truncate">
+                                              {enr.courseName || enr.name}
+                                              {enr.isPrimary && <span className="ml-2 text-[9px] text-indigo-500 font-black">CHÍNH</span>}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                                              {enr.completedSessions || 0}/{enr.totalSessions || 12} buổi · {progress}% · {fmt(enr.price)}
+                                            </p>
+                                            <span className={`inline-flex mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${
+                                              isPaid
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : 'bg-amber-100 text-amber-700'
+                                            }`}
+                                            >
+                                              {isPaid ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                                            </span>
+                                          </div>
+                                          <CmsSelect
+                                            value={enr.teacherId || ''}
+                                            onChange={(e) => handleAssignEnrollmentTeacher(enrId, e.target.value)}
+                                            className="sm:w-44 py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
+                                          >
+                                            <option value="">Chưa phân công GV</option>
+                                            {(() => {
+                                              const { matched, other } = splitTeachers(enr);
+                                              return (
+                                                <>
+                                                  {matched.map((t) => (
+                                                    <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                                                  ))}
+                                                  {other.map((t) => (
+                                                    <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
+                                                  ))}
+                                                </>
+                                              );
+                                            })()}
+                                          </CmsSelect>
                                         </div>
-                                        <CmsSelect
-                                          value={enr.teacherId || ''}
-                                          onChange={(e) => handleAssignEnrollmentTeacher(enrId, e.target.value)}
-                                          className="sm:w-44 py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
-                                        >
-                                          <option value="">Chưa phân công GV</option>
-                                          {(() => {
-                                            const { matched, other } = splitTeachers(enr);
-                                            return (
-                                              <>
-                                                {matched.map((t) => (
-                                                  <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-                                                ))}
-                                                {other.map((t) => (
-                                                  <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
-                                                ))}
-                                              </>
-                                            );
-                                          })()}
-                                        </CmsSelect>
+                                        <div className="flex flex-wrap gap-2">
+                                          {!isPaid && enrId !== 'main' && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handlePayEnrollment(enr)}
+                                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wide hover:bg-emerald-700"
+                                            >
+                                              <DollarSign size={12} /> Thanh toán
+                                            </button>
+                                          )}
+                                          {canDelete && enrId !== 'main' && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteEnrollment(enr)}
+                                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-red-200 text-red-600 text-[10px] font-black uppercase tracking-wide hover:bg-red-50"
+                                            >
+                                              <Trash2 size={12} /> Xóa khóa
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -992,6 +1039,15 @@ export default function StudentDetailModal({ studentId, onClose }) {
           </>
         )}
       </div>
+
+      {showAddEnrollment && data?.student && (
+        <AddEnrollmentModal
+          student={data.student}
+          teachers={teachers || []}
+          onSubmit={handleAddEnrollmentSubmit}
+          onClose={() => setShowAddEnrollment(false)}
+        />
+      )}
     </div>
   );
 }

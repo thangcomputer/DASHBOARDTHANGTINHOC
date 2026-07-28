@@ -1065,6 +1065,140 @@ router.post('/:id/enrollments', authMiddleware, isAdmin, async (req, res) => {
   }
 });
 
+function syncStudentFromPrimaryEnrollment(student) {
+  if (!student?.enrollments?.length) return;
+  const primary = student.enrollments.find((e) => e.isPrimary) || student.enrollments[0];
+  if (!primary) return;
+  student.course = primary.courseName;
+  student.price = Number(primary.price) || 0;
+  student.paid = !!primary.paid;
+  if (primary.paidAt) student.paidAt = primary.paidAt;
+  student.teacherId = primary.teacherId || null;
+  student.teacherName = primary.teacherName || '';
+  student.totalSessions = primary.totalSessions || 12;
+  student.remainingSessions = primary.remainingSessions ?? primary.totalSessions ?? 12;
+  student.completedSessions = primary.completedSessions || 0;
+}
+
+// ─── PUT /api/students/:id/enrollments/:enrollmentId/pay ──────────────────────
+// Xác nhận thanh toán học phí cho 1 khóa (enrollment)
+router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const { paymentMethod = 'cash', note = '' } = req.body || {};
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+    if (!student.enrollments?.length && student.course) {
+      student.enrollments = [legacyEnrollmentFromStudent(student)];
+      student.enrollments[0].isPrimary = true;
+    }
+    const idx = (student.enrollments || []).findIndex((e) => String(e._id) === String(req.params.enrollmentId));
+    if (idx < 0) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
+    }
+    const enr = student.enrollments[idx];
+    if (enr.paid) {
+      return res.status(409).json({ success: false, message: 'Khóa học này đã thanh toán' });
+    }
+    const amount = Number(enr.price) || 0;
+    enr.paid = true;
+    enr.paidAt = new Date();
+    if (amount > 0) {
+      student.paidAmount = (Number(student.paidAmount) || 0) + amount;
+    }
+    if (enr.isPrimary || student.enrollments.length === 1) {
+      student.paid = true;
+      student.paidAt = enr.paidAt;
+      student.paymentMethod = paymentMethod;
+    }
+    student.markModified('enrollments');
+    await student.save();
+
+    let invoice = null;
+    if (amount > 0) {
+      try {
+        const count = await Invoice.countDocuments();
+        const now = new Date();
+        const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
+        invoice = await Invoice.create({
+          maHoaDon: maHD,
+          hocVien: student._id,
+          hoTen: student.name,
+          khoaHoc: enr.courseName,
+          hocPhi: amount,
+          ghiChu: note || `Thanh toán khóa ${enr.courseName}`,
+        });
+      } catch (invErr) {
+        logger.warn('[ENROLLMENT PAY] Invoice create skipped:', invErr.message);
+      }
+    }
+
+    const io = req.app.get('io');
+    if (io) io.emit('data:refresh', { type: 'student', id: student._id });
+
+    const doc = student.toObject();
+    await applyEnrollmentStats(doc, student._id, Schedule);
+    return res.json({
+      success: true,
+      message: `Đã xác nhận thanh toán khóa "${enr.courseName}"${amount ? ` — ${amount.toLocaleString('vi-VN')}đ` : ''}`,
+      data: { student: doc, invoice },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── DELETE /api/students/:id/enrollments/:enrollmentId ───────────────────────
+// Xóa 1 khóa học khỏi tài khoản học viên
+router.delete('/:id/enrollments/:enrollmentId', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+    if (!student.enrollments?.length && student.course) {
+      student.enrollments = [legacyEnrollmentFromStudent(student)];
+      student.enrollments[0].isPrimary = true;
+    }
+    const list = student.enrollments || [];
+    if (list.length <= 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không thể xóa khóa duy nhất. Học viên cần giữ ít nhất 1 khóa học.',
+      });
+    }
+    const idx = list.findIndex((e) => String(e._id) === String(req.params.enrollmentId));
+    if (idx < 0) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
+    }
+    const removed = list[idx];
+    const wasPrimary = !!removed.isPrimary;
+    const courseName = removed.courseName;
+    list.splice(idx, 1);
+    if (wasPrimary || !list.some((e) => e.isPrimary)) {
+      list.forEach((e, i) => { e.isPrimary = i === 0; });
+    }
+    student.enrollments = list;
+    syncStudentFromPrimaryEnrollment(student);
+    student.markModified('enrollments');
+    await student.save();
+
+    const io = req.app.get('io');
+    if (io) io.emit('data:refresh', { type: 'student', id: student._id });
+
+    const doc = student.toObject();
+    await applyEnrollmentStats(doc, student._id, Schedule);
+    return res.json({
+      success: true,
+      message: `Đã xóa khóa "${courseName}"`,
+      data: doc,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ─── PUT /api/students/:id/assign-teacher ─────────────────────────────────────
 // Admin/Staff gán (hoặc bỏ gán) giảng viên — theo khóa (enrollmentId) hoặc khóa chính
 router.put('/:id/assign-teacher', authMiddleware, isAdmin, async (req, res) => {

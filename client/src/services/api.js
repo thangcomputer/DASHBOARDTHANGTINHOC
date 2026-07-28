@@ -736,6 +736,19 @@ export const studentsAPI = {
     });
     return res.json();
   },
+  payEnrollment: async (id, enrollmentId, data = {}) => {
+    const res = await apiFetch(`/students/${id}/enrollments/${enrollmentId}/pay`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+  deleteEnrollment: async (id, enrollmentId) => {
+    const res = await apiFetch(`/students/${id}/enrollments/${enrollmentId}`, {
+      method: 'DELETE',
+    });
+    return res.json();
+  },
   pay: async (id, data) => {
     const res = await apiFetch(`/students/${id}/pay`, {
       method: 'POST',
