@@ -9,18 +9,18 @@ export default function TeacherStudentsTab({
   markAttendance, updateLink, saveGrade, updateNotes, lockStudentExam,
 }) {
   return (
-          <div className="px-4 md:px-8 py-6 min-h-[calc(100vh-120px)] xl:h-[calc(100vh-120px)] flex flex-col xl:flex-row gap-6 xl:overflow-hidden">
+          <div className="px-4 md:px-8 py-4 sm:py-6 min-h-[calc(100vh-120px)] xl:h-[calc(100vh-120px)] flex flex-col xl:flex-row gap-4 sm:gap-6 xl:overflow-hidden">
             
             {/* CỘT 1: DANH SÁCH HỌC VIÊN (Sidebar) */}
-            <div className="w-full xl:w-80 h-[500px] xl:h-full flex flex-col bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex-shrink-0">
-               <div className="p-4 border-b border-gray-50 bg-gray-50/30">
+            <div className="w-full xl:w-80 h-[420px] sm:h-[500px] xl:h-full flex flex-col bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex-shrink-0">
+               <div className="p-3 sm:p-4 border-b border-slate-50 bg-slate-50/40">
                   <div className="relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       value={studentSearch}
                       onChange={e => setStudentSearch(e.target.value)}
                       placeholder="Tìm học viên..."
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 transition-all"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
                </div>
@@ -39,32 +39,36 @@ export default function TeacherStudentsTab({
                           onClick={() => setSelectedEnrollmentKey(rowKey)}
                           role="button"
                           tabIndex={0}
-                          className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all group cursor-pointer ${
-                            isSelected ? 'bg-red-600 text-white shadow-lg shadow-red-100' : 'hover:bg-gray-50 text-gray-700'
+                          className={`w-full flex items-center gap-3 p-2.5 sm:p-3 rounded-xl transition-all group cursor-pointer border ${
+                            isSelected
+                              ? 'bg-blue-50/60 border-blue-200 border-l-4 border-l-blue-600 shadow-sm'
+                              : 'border-transparent hover:bg-slate-50 text-slate-700'
                           }`}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setSelectedEnrollmentKey(rowKey); } }}
                         >
-                          <div className="relative">
-                            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm bg-white">
+                          <div className="relative shrink-0">
+                            <div className="w-10 h-10 rounded-full overflow-hidden shadow-sm bg-white border border-slate-100">
                               <img src={resolveAvatarUrl({ role: 'student' })} alt="" className="w-full h-full object-cover" />
                             </div>
                             {isOnline && (
-                              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full" title="Đang hoạt động" />
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" title="Đang hoạt động" />
                             )}
                           </div>
                           
                           <div className="flex-1 text-left min-w-0">
-                            <p className={`text-sm font-bold truncate ${isSelected ? 'text-white' : 'text-gray-900'}`}>{s.name}</p>
+                            <p className={`text-sm font-bold truncate ${isSelected ? 'text-slate-900' : 'text-slate-900'}`}>{s.name}</p>
                             {s.course && (
-                              <p className={`text-[10px] font-black uppercase tracking-tight truncate mt-0.5 ${isSelected ? 'text-blue-200' : 'text-indigo-600'}`}>
+                              <p className={`text-[10px] font-bold uppercase tracking-tight truncate mt-0.5 ${isSelected ? 'text-blue-600' : 'text-indigo-600'}`}>
                                 {s.course}
                               </p>
                             )}
-                            <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className="flex items-center gap-1.5 mt-1">
                               {isOnline ? (
-                                <span className={`text-xs font-bold uppercase tracking-tighter ${isSelected ? 'text-blue-200' : 'text-green-500'}`}>Đang online</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                                  Đang online
+                                </span>
                               ) : (
-                                <span className={`text-xs font-medium ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
+                                <span className="text-[10px] font-medium text-slate-400">
                                   {lastSeenUsers[String(sId)]
                                     ? `${timeAgo(lastSeenUsers[String(sId)])}`
                                     : 'Chưa online'}
@@ -75,11 +79,12 @@ export default function TeacherStudentsTab({
                           
                           {!isSelected && (
                             <button 
+                              type="button"
                               onClick={(e) => { 
                                 e.stopPropagation(); 
                                 navigate('/teacher/inbox'); 
                               }} 
-                              className="w-8 h-8 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-blue-100 hover:text-blue-600 transition-all border-none outline-none"
+                              className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-blue-100 hover:text-blue-600 transition-all border-none outline-none shrink-0"
                             >
                               <MessageSquare size={14} />
                             </button>

@@ -51,13 +51,13 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
         disabled={!canFail}
         title={hint}
         onClick={openConfirm}
-        className={`inline-flex justify-center items-center gap-1.5 text-xs font-black px-3 py-2 rounded-xl transition-all flex-1 min-[440px]:flex-initial ${
+        className={`inline-flex justify-center items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all h-8 ${
           canFail
-            ? 'bg-red-600 hover:bg-red-700 active:scale-95 text-white shadow-lg shadow-red-900/30'
+            ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
             : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
         }`}
       >
-        <XCircle size={14} /> ĐÁNH TRƯỢT
+        <XCircle size={12} /> Đánh trượt
       </button>
     );
   }
@@ -367,111 +367,120 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
 
   if (isDetailed) {
     return (
-      <div className="bg-white rounded-[40px] shadow-2xl shadow-blue-900/5 border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-500">
-        {/* Header - Dark Theme */}
-        <div className="bg-[#1e293b] px-4 py-6 sm:px-8 md:px-10 md:py-8 text-white">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 min-w-0">
-             <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-[28px] overflow-hidden shadow-2xl border-4 border-white/10 bg-white">
-                  <img
-                    src={resolveAvatarUrl({ avatar: student.avatarUrl || student.photo, role: 'student' })}
-                    alt={getDisplayName(student)}
-                    className="w-full h-full object-cover"
-                  />
+      <div className="bg-white rounded-2xl sm:rounded-[40px] shadow-lg sm:shadow-2xl shadow-blue-900/5 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500">
+        {/* Header */}
+        <div className="bg-[#1e293b] px-4 py-4 sm:px-8 sm:py-6 md:px-10 md:py-8 text-white">
+          <div className="flex items-start gap-3 sm:gap-6 min-w-0">
+            <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-full sm:rounded-[28px] overflow-hidden shadow-lg border-2 border-white/15 bg-white shrink-0">
+              <img
+                src={resolveAvatarUrl({ avatar: student.avatarUrl || student.photo, role: 'student' })}
+                alt={getDisplayName(student)}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-2xl font-black tracking-tight uppercase truncate">{getDisplayName(student)}</h2>
+                  <p className="text-slate-400 text-[11px] sm:text-sm font-semibold mt-0.5 line-clamp-2">
+                    {student.course}{student.age ? ` · ${student.age} tuổi` : ''}
+                  </p>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-black tracking-tight uppercase">{getDisplayName(student)}</h2>
-                  <div className="flex flex-wrap items-center gap-3 mt-1.5">
-                     <span className="text-slate-400 text-sm font-bold">{student.course} · {student.age} tuổi</span>
-                     <span className="px-3 py-0.5 rounded-lg text-xs font-black tracking-widest bg-white/10 text-slate-300 border border-white/5 uppercase">
-                        {student.learningMode || 'OFFLINE'}
-                     </span>
-                  </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
+                    isCompleted ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-200'
+                  }`}>
+                    {isCompleted ? 'Hoàn thành' : 'Đang học'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => window.open(`http://zalo.me/${student.zalo || student.phone}`, '_blank')}
+                    className="w-8 h-8 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center transition-all border border-white/10"
+                    title="Gửi tin nhắn"
+                    aria-label="Gửi tin nhắn"
+                  >
+                    <MessageSquare size={14} />
+                  </button>
+                  {onLockExam && (
+                    <FailExamButton student={student} onLockExam={onLockExam} compact />
+                  )}
                 </div>
-             </div>
-             
-             <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
-                <span className={`px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm ${
-                  isCompleted ? 'bg-green-500 text-white' : 'bg-red-600 text-white'
-                }`}>
-                  {isCompleted ? 'Hoàn thành' : 'Đang học'}
-                </span>
-                <button 
-                  onClick={() => window.open(`http://zalo.me/${student.zalo || student.phone}`, '_blank')}
-                  className="w-12 h-12 shrink-0 bg-white/10 hover:bg-white/20 text-white rounded-2xl flex items-center justify-center transition-all border border-white/5"
-                  title="Gửi tin nhắn"
-                >
-                  <MessageSquare size={20} />
-                </button>
-                {onLockExam && (
-                  <FailExamButton student={student} onLockExam={onLockExam} />
-                )}
-             </div>
+              </div>
+              <span className="inline-flex mt-2 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-white/10 text-slate-300 border border-white/5 uppercase">
+                {student.learningMode || 'OFFLINE'}
+              </span>
+            </div>
           </div>
           
-          {/* Progress Bar inside Header */}
-          <div className="mt-8 pt-6 border-t border-white/5">
-             <div className="flex justify-between items-center mb-3 text-xs font-black uppercase tracking-widest text-slate-400">
-                <span>Tiến độ khóa học</span>
-                <span className="text-white">{done}/{student.totalSessions} buổi ({progressPct}%)</span>
-             </div>
-             <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-white/5 shadow-inner">
-                <div className={`h-full rounded-full bg-red-500 shadow-lg shadow-red-500/50 transition-all duration-[1500ms] ease-out`}
-                  style={{ width: `${progressPct}%` }} />
-             </div>
+          <div className="mt-4 pt-3 border-t border-white/10">
+            <div className="flex justify-between items-center mb-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide text-slate-400">
+              <span>Tiến độ khóa học</span>
+              <span className="text-white tabular-nums">{done}/{student.totalSessions} buổi ({progressPct}%)</span>
+            </div>
+            <div className="h-1.5 sm:h-2.5 bg-slate-800 rounded-full overflow-hidden border border-white/5">
+              <div
+                className="h-full rounded-full bg-indigo-500 transition-all duration-700 ease-out"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Tabs - Material Design Style */}
-        <div className="flex px-1 sm:px-4 md:px-8 bg-white border-b border-gray-50 cms-table-wrap">
+        {/* Tabs — scroll ngang trên mobile */}
+        <div className="flex overflow-x-auto whitespace-nowrap hide-scrollbar px-1 sm:px-4 md:px-8 bg-white border-b border-slate-100">
           {panels.map(({ key, icon: Icon, label }) => (
-            <button key={key} onClick={() => setActivePanel(key)}
-              className={`flex-1 min-w-[5.5rem] sm:min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-4 sm:py-5 text-xs font-black uppercase tracking-widest transition-all relative ${
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActivePanel(key)}
+              className={`shrink-0 flex items-center justify-center gap-1.5 px-3 sm:px-4 py-3 sm:py-4 text-xs font-medium uppercase tracking-wide transition-all relative ${
                 activePanel === key ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
-              }`}>
-              <Icon size={14} /> {label}
+              }`}
+            >
+              <Icon size={13} className="shrink-0" aria-hidden="true" />
+              <span>{label}</span>
               {activePanel === key && (
-                <div className="absolute bottom-0 left-4 right-4 h-1 bg-red-600 rounded-t-full shadow-[0_-2px_6px_rgba(37,99,235,0.4)]" />
+                <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-t-full" />
               )}
             </button>
           ))}
         </div>
 
         {/* Action Content */}
-        <div className="p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-8">
+        <div className="p-3 sm:p-6 md:p-10 space-y-4 sm:space-y-8">
            {activePanel === 'progress' && (
-              <div className="space-y-8 animate-in fade-in duration-500">
-                 {/* Stat Boxes */}
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-blue-50/70 border border-blue-100 rounded-[32px] p-6 text-center transform hover:scale-105 transition-all">
-                       <p className="text-xs font-black text-blue-400 uppercase tracking-widest mb-1">Đã học</p>
-                       <h4 className="text-4xl font-black text-blue-700 leading-none">{done}</h4>
-                       <p className="text-xs font-bold text-blue-300 mt-1 uppercase">buổi</p>
+              <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-500">
+                 {/* Stat Boxes — 3 cột trên mobile */}
+                 <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
+                    <div className="bg-blue-50/70 border border-blue-100 rounded-xl sm:rounded-2xl py-2.5 px-2 sm:p-6 text-center">
+                       <p className="text-[9px] sm:text-xs font-bold text-blue-400 uppercase tracking-wide mb-0.5">Đã học</p>
+                       <h4 className="text-lg sm:text-4xl font-black text-blue-700 leading-none tabular-nums">{done}</h4>
+                       <p className="text-[9px] sm:text-xs font-semibold text-blue-300 mt-0.5 uppercase">buổi</p>
                     </div>
-                    <div className={`border rounded-[32px] p-6 text-center transform hover:scale-105 transition-all ${isCompleted ? 'bg-green-50/70 border-green-100' : 'bg-orange-50/70 border-orange-100'}`}>
-                       <p className={`text-xs font-black uppercase tracking-widest mb-1 ${isCompleted ? 'text-green-400' : 'text-orange-400'}`}>Còn lại</p>
-                       <h4 className={`text-4xl font-black leading-none ${isCompleted ? 'text-green-700' : 'text-orange-700'}`}>{student.remainingSessions}</h4>
-                       <p className={`text-xs font-bold mt-1 uppercase ${isCompleted ? 'text-green-300' : 'text-orange-300'}`}>buổi</p>
+                    <div className={`border rounded-xl sm:rounded-2xl py-2.5 px-2 sm:p-6 text-center ${isCompleted ? 'bg-emerald-50/70 border-emerald-100' : 'bg-orange-50/70 border-orange-100'}`}>
+                       <p className={`text-[9px] sm:text-xs font-bold uppercase tracking-wide mb-0.5 ${isCompleted ? 'text-emerald-400' : 'text-orange-400'}`}>Còn lại</p>
+                       <h4 className={`text-lg sm:text-4xl font-black leading-none tabular-nums ${isCompleted ? 'text-emerald-700' : 'text-orange-700'}`}>{student.remainingSessions}</h4>
+                       <p className={`text-[9px] sm:text-xs font-semibold mt-0.5 uppercase ${isCompleted ? 'text-emerald-300' : 'text-orange-300'}`}>buổi</p>
                     </div>
-                    <div className="bg-purple-50/70 border border-purple-100 rounded-[32px] p-6 text-center transform hover:scale-105 transition-all">
-                       <p className="text-xs font-black text-purple-400 uppercase tracking-widest mb-1">Điểm TB</p>
-                       <div className="flex items-center justify-center gap-1">
-                          <h4 className="text-4xl font-black text-purple-700 leading-none">{student.lastGrade || 0}</h4>
-                          <span className="text-lg font-black text-purple-300">/ 10</span>
+                    <div className="bg-violet-50/70 border border-violet-100 rounded-xl sm:rounded-2xl py-2.5 px-2 sm:p-6 text-center">
+                       <p className="text-[9px] sm:text-xs font-bold text-violet-400 uppercase tracking-wide mb-0.5">Điểm TB</p>
+                       <div className="flex items-baseline justify-center gap-0.5">
+                          <h4 className="text-lg sm:text-4xl font-black text-violet-700 leading-none tabular-nums">{student.lastGrade || 0}</h4>
+                          <span className="text-[10px] sm:text-lg font-bold text-violet-300">/10</span>
                        </div>
-                       <p className="text-xs font-bold text-purple-300 mt-1 uppercase">Đánh giá chung</p>
+                       <p className="text-[9px] sm:text-xs font-semibold text-violet-300 mt-0.5 uppercase hidden sm:block">Đánh giá chung</p>
                     </div>
                  </div>
 
-                 {/* === 2-COLUMN LAYOUT: Điểm danh | Hủy điểm danh === */}
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                   {/* CỘT TRÁI: Nút ĐIỂM DANH */}
+                 {/* Actions outlined gọn */}
+                 <div className="grid grid-cols-2 gap-2 sm:gap-4">
                    {attendanceGate?.status === 'not_yet' ? (
-                     <div className="flex items-center justify-center py-5 text-xs font-black text-slate-600 uppercase tracking-widest border-2 border-dashed border-slate-300 rounded-3xl bg-slate-50">
+                     <div className="flex items-center justify-center h-9 sm:h-auto sm:py-5 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide border border-dashed border-slate-300 rounded-xl bg-slate-50">
                         Chưa đến giờ dạy
                      </div>
                    ) : (
                      <button 
+                       type="button"
                        onClick={() => {
                          if (!canCheckIn && !isCompleted) return;
                          const tGrade = (student.grades || []).find(g => g.date === todayStr);
@@ -485,31 +494,31 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                          !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                          'Bấm để điểm danh buổi học hôm nay'
                        }
-                       className={`py-5 rounded-3xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl ${
+                       className={`h-9 sm:h-auto sm:py-5 rounded-xl sm:rounded-3xl font-bold text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all ${
                          isCompleted 
-                           ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-2 border-gray-300'
+                           ? 'border border-slate-300 text-slate-500 bg-white cursor-not-allowed'
                          : attendanceGate?.status === 'no_schedule'
-                           ? 'bg-slate-100 text-slate-800 cursor-not-allowed border-2 border-slate-300 shadow-md'
+                           ? 'border border-slate-300 text-slate-700 bg-white cursor-not-allowed'
                          : !canCheckIn
-                           ? 'bg-slate-50 text-slate-600 cursor-not-allowed border-2 border-slate-200 pointer-events-none select-none'
-                           : 'bg-gradient-to-br from-emerald-500 to-green-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97]'
+                           ? 'border border-slate-300 text-slate-500 bg-white cursor-not-allowed'
+                           : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-[0.98]'
                        }`}
                      >
-                       <CheckCircle size={20} />
-                       <span className="text-xs leading-tight text-center">
+                       <CheckCircle size={14} className="shrink-0" aria-hidden="true" />
+                       <span className="truncate">
                          {isCompleted 
-                           ? 'HOÀN THÀNH'
+                           ? 'Hoàn thành'
                            : attendanceGate?.status === 'no_schedule'
-                             ? 'CHƯA CÓ LỊCH'
+                             ? 'Chưa có lịch'
                              : !canCheckIn
-                               ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
-                               : 'ĐIỂM DANH'}
+                               ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
+                               : 'Điểm danh'}
                        </span>
                      </button>
                    )}
 
-                   {/* CỘT PHẢI: Nút HỦY ĐIỂM DANH — giới hạn 1 tiếng */}
                    <button
+                     type="button"
                      onClick={() => { if (canCancelAttendance) handleUndoAttendance(); }}
                      disabled={!canCancelAttendance || isCompleted}
                      title={
@@ -517,32 +526,32 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        : !canCancelAttendance ? `Đã quá 1 tiếng, không thể hủy (${minsElapsedSinceAttend} phút trước)`
                        : `Còn ${cancelTimeLeft} phút để hủy. Nhấn để hủy điểm danh hôm nay`
                      }
-                     className={`py-5 rounded-3xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all border-2 ${
+                     className={`h-9 sm:h-auto sm:py-5 rounded-xl sm:rounded-3xl font-bold text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all border ${
                        canCancelAttendance && !isCompleted
-                         ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100 hover:border-red-400 active:scale-[0.97] shadow-sm cursor-pointer'
-                         : 'bg-slate-50 border-slate-300 text-slate-700 cursor-not-allowed pointer-events-none select-none shadow-sm'
+                         ? 'border-rose-300 text-rose-700 bg-white hover:bg-rose-50 active:scale-[0.98]'
+                         : 'border-slate-300 text-slate-500 bg-white cursor-not-allowed'
                      }`}
                    >
-                     <X size={20} />
-                     <span className="text-xs leading-tight text-center">
+                     <X size={14} className="shrink-0" aria-hidden="true" />
+                     <span className="truncate">
                        {canCancelAttendance && cancelTimeLeft > 0
-                         ? <>{`HỦY`}<br/>{`(${cancelTimeLeft}p)`}</>
-                         : <>HỦY<br/>ĐIỂM DANH</>}
+                         ? `Hủy (${cancelTimeLeft}p)`
+                         : 'Hủy điểm danh'}
                      </span>
                    </button>
                  </div>
 
-                 {/* Notes Area */}
-                 <div className="bg-gray-50/50 rounded-3xl p-6 border border-gray-100">
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                       <FileText size={14} /> Ghi chú học viên
+                 {/* Notes */}
+                 <div className="mt-4 sm:mt-0">
+                    <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                       <FileText size={12} aria-hidden="true" /> Ghi chú học viên
                     </label>
                     <textarea 
                        value={notesInput} onChange={e => setNotesInput(e.target.value)}
                        onBlur={() => onUpdateNotes((student._id || student.id), notesInput)}
                        placeholder="Nhận xét cá nhân, ghi nhận đặc biệt về học viên này..."
-                       className="w-full bg-white border border-gray-200 rounded-2xl p-5 text-sm font-medium focus:border-blue-400 focus:ring-4 focus:ring-blue-50 outline-none transition-all resize-none shadow-inner"
-                       rows={4}
+                       className="w-full bg-white border border-slate-200 rounded-xl p-3 sm:p-5 text-xs sm:text-sm font-medium focus:border-blue-400 focus:ring-2 focus:ring-blue-50 outline-none transition-all resize-none"
+                       rows={3}
                     />
                  </div>
               </div>
