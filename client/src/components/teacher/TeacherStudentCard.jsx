@@ -50,14 +50,15 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
         type="button"
         disabled={!canFail}
         title={hint}
+        aria-label="Đánh trượt"
         onClick={openConfirm}
-        className={`inline-flex justify-center items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all h-8 ${
+        className={`inline-flex justify-center items-center w-8 h-8 rounded-lg transition-all shrink-0 ${
           canFail
             ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
             : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
         }`}
       >
-        <XCircle size={12} /> Đánh trượt
+        <XCircle size={14} />
       </button>
     );
   }
@@ -359,10 +360,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const gradeLetter = gradeValue >= 8.5 ? 'A' : gradeValue >= 7 ? 'B' : gradeValue >= 5 ? 'C' : 'D';
 
   const panels = [
-    { key: 'progress', icon: Activity, label: 'TIẾN ĐỘ' },
-    { key: 'assignments', icon: BookOpen, label: 'BÀI TẬP' },
-    { key: 'link', icon: Video, label: 'LINK HỌC' },
-    { key: 'grade', icon: Award, label: 'ĐÁNH GIÁ' },
+    { key: 'progress', icon: Activity, label: 'Tiến độ' },
+    { key: 'assignments', icon: BookOpen, label: 'Bài tập' },
+    { key: 'link', icon: Video, label: 'Link học' },
+    { key: 'grade', icon: Award, label: 'Đánh giá' },
   ];
 
   if (isDetailed) {
@@ -370,8 +371,8 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
       <div className="bg-white rounded-2xl sm:rounded-[40px] shadow-lg sm:shadow-2xl shadow-blue-900/5 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500">
         {/* Header */}
         <div className="bg-[#1e293b] px-4 py-4 sm:px-8 sm:py-6 md:px-10 md:py-8 text-white">
-          <div className="flex items-start gap-3 sm:gap-6 min-w-0">
-            <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-full sm:rounded-[28px] overflow-hidden shadow-lg border-2 border-white/15 bg-white shrink-0">
+          <div className="flex items-start gap-2.5 sm:gap-6 min-w-0">
+            <div className="w-10 h-10 sm:w-20 sm:h-20 rounded-full sm:rounded-[28px] overflow-hidden shadow-lg border-2 border-white/15 bg-white shrink-0">
               <img
                 src={resolveAvatarUrl({ avatar: student.avatarUrl || student.photo, role: 'student' })}
                 alt={getDisplayName(student)}
@@ -379,15 +380,17 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h2 className="text-base sm:text-2xl font-black tracking-tight uppercase truncate">{getDisplayName(student)}</h2>
-                  <p className="text-slate-400 text-[11px] sm:text-sm font-semibold mt-0.5 line-clamp-2">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-sm sm:text-2xl font-black tracking-tight uppercase break-words line-clamp-2 leading-snug">
+                    {getDisplayName(student)}
+                  </h2>
+                  <p className="text-slate-400 text-[11px] sm:text-sm font-semibold mt-0.5 break-words line-clamp-2 leading-snug">
                     {student.course}{student.age ? ` · ${student.age} tuổi` : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
+                  <span className={`hidden min-[380px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
                     isCompleted ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-200'
                   }`}>
                     {isCompleted ? 'Hoàn thành' : 'Đang học'}
@@ -406,9 +409,16 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   )}
                 </div>
               </div>
-              <span className="inline-flex mt-2 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-white/10 text-slate-300 border border-white/5 uppercase">
-                {student.learningMode || 'OFFLINE'}
-              </span>
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                <span className={`min-[380px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase ${
+                  isCompleted ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-200'
+                }`}>
+                  {isCompleted ? 'Hoàn thành' : 'Đang học'}
+                </span>
+                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-white/10 text-slate-300 border border-white/5 uppercase">
+                  {student.learningMode || 'OFFLINE'}
+                </span>
+              </div>
             </div>
           </div>
           
@@ -426,8 +436,8 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
           </div>
         </div>
 
-        {/* Tabs — mobile: 4 cột chỉ icon; sm+: icon + chữ */}
-        <div className="grid grid-cols-4 w-full bg-white border-b border-slate-100 px-0 sm:px-4 md:px-8">
+        {/* Tabs — 4 cột, icon + nhãn rõ ràng */}
+        <div className="grid grid-cols-4 w-full bg-white border-b border-slate-100">
           {panels.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -436,12 +446,12 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               title={label}
               aria-label={label}
               aria-current={activePanel === key ? 'page' : undefined}
-              className={`relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-3 py-3 sm:py-4 text-[10px] sm:text-xs font-medium uppercase tracking-wide transition-all min-w-0 ${
+              className={`relative flex flex-col items-center justify-center gap-0.5 px-1 py-2.5 sm:py-3.5 text-[9px] sm:text-[11px] font-semibold tracking-wide transition-all min-w-0 ${
                 activePanel === key ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               <Icon size={16} className="shrink-0" aria-hidden="true" />
-              <span className="hidden sm:inline truncate max-w-full">{label}</span>
+              <span className="truncate max-w-full leading-tight">{label}</span>
               {activePanel === key && (
                 <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-t-full" />
               )}
@@ -596,16 +606,18 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
            )}
 
             {activePanel === 'assignments' && (
-              <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <BookOpen size={14} /> Danh sách bài tập được giao
+              <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-10 duration-500">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-xs sm:text-sm font-semibold text-slate-600 truncate min-w-0">
+                    Danh sách bài tập
                   </h4>
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => setShowAddAssign(!showAddAssign)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-100 transition-all flex items-center gap-1.5"
+                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1"
                   >
-                    {showAddAssign ? <X size={14} /> : <Plus size={14} />} {showAddAssign ? 'HỦY' : 'GIAO BÀI TẬP'}
+                    {showAddAssign ? <X size={14} /> : <Plus size={14} />}
+                    {showAddAssign ? 'Hủy' : 'Giao bài'}
                   </button>
                 </div>
 
@@ -681,92 +693,97 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                           </div>
                         </div>
                       ) : (
-                        <div key={assign._id} className="bg-white rounded-[40px] p-6 border border-gray-100 hover:border-indigo-200 hover:shadow-2xl hover:shadow-slate-200/50 transition-all group relative overflow-hidden">
-                          {isGraded && <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full translate-x-12 -translate-y-12" />}
-                          <div className="flex items-start justify-between gap-6 relative z-10">
-                            <div className="flex-1 min-w-0">
-                              <h5 className="font-black text-slate-800 text-base mb-2 group-hover:text-indigo-600 transition-colors uppercase leading-tight truncate pr-4">{assign.title}</h5>
-                              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                                 <p className="text-xs font-black text-slate-400 flex items-center gap-1.5"><Clock size={12} className="text-orange-400"/> HẠN: {new Date(assign.deadline).toLocaleDateString('vi-VN')}</p>
-                                 {assign.fileUrl && (
-                                   <a href={resolveMediaUrl(assign.fileUrl)} target="_blank" rel="noreferrer" className="text-xs font-black text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 px-3 py-1 rounded-lg">
-                                     <Link2 size={12} /> XEM ĐỀ BÀI
-                                   </a>
-                                 )}
-                                 {!isGraded && (
-                                 <div className="flex items-center gap-2 mt-2 w-full sm:w-auto sm:mt-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleEditAssign(assign)} title="Sửa bài tập" className="text-slate-400 hover:text-indigo-600 transition-colors bg-slate-50 hover:bg-indigo-50 p-1.5 rounded-lg">
-                                      <Edit3 size={14} />
-                                    </button>
-                                    <button onClick={() => handleDeleteAssign(assign._id)} title="Xóa bài tập" className="text-slate-400 hover:text-red-500 transition-colors bg-slate-50 hover:bg-red-50 p-1.5 rounded-lg">
-                                      <Trash2 size={14} />
-                                    </button>
-                                 </div>
-                                 )}
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-3 font-black flex-shrink-0">
-                              {isSubmitted ? (
-                                <div className={`px-4 py-1.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 border shadow-sm ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
-                                  {isGraded ? <Check size={12}/> : <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
-                                  {isGraded ? `${getGradeLabel(submission.grade)}: ${submission.grade}/10` : 'ĐÃ NỘP BÀI'}
-                                </div>
-                                                            ) : (
-                                <span className="px-4 py-1.5 rounded-2xl text-xs uppercase tracking-widest bg-gray-50 text-slate-300">CHƯA NỘP</span>
-                              )}
-                              
-                              {isSubmitted && submission.submittedFileUrl && (
-                                <a 
-                                  href={buildMediaDownloadUrl(submission.submittedFileUrl, submission.submittedFileUrl.split('/').pop())} 
-                                  target="_blank" rel="noreferrer" 
-                                  className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-xl font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm"
-                                  title="Tải bài làm của học viên"
-                                >
-                                  <Download size={14} /> TẢI BÀI
-                                </a>
-                              )}
-                              
-                              {isSubmitted && !isGraded && (
-                                <div className="flex items-center gap-2 mt-2">
-                                  <input 
-                                    type="number" 
-                                    min="0" max="10" 
-                                    placeholder="Điểm (0-10)"
-                                    value={gradingInputs[submission._id] || ''}
-                                    onChange={(e) => setGradingInputs({...gradingInputs, [submission._id]: e.target.value})}
-                                    className="w-24 bg-white border-2 border-indigo-100 rounded-xl p-2 text-xs font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
-                                  />
-                                  <button 
-                                    onClick={() => handleGradeSubmit(submission._id)} 
-                                    className="bg-red-600 hover:bg-red-700 text-white p-2 px-4 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
-                                  >
-                                    LƯU
-                                  </button>
-                                </div>
-                              )}
-                              {isSubmitted && isGraded && (
-                                <div className="flex items-center gap-2 mt-2">
-                                  <input 
-                                    type="number" 
-                                    min="0" max="10" 
-                                    placeholder="Sửa điểm"
-                                    value={gradingInputs[submission._id] ?? submission.grade ?? ''}
-                                    onChange={(e) => setGradingInputs({...gradingInputs, [submission._id]: e.target.value})}
-                                    className="w-24 bg-white border-2 border-indigo-100 rounded-xl p-2 text-xs font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
-                                  />
-                                  <button 
-                                    onClick={() => handleGradeSubmit(submission._id)} 
-                                    className="bg-amber-500 hover:bg-amber-600 text-white p-2 px-3 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
-                                  >
-                                    SỬA ĐIỂM
-                                  </button>
-                                </div>
-                              )}
-                              {isGraded && submission.teacherFeedback && (
-                                <p className="text-xs cms-min-text-xs text-slate-400 italic max-w-[150px] text-right line-clamp-1">"{submission.teacherFeedback}"</p>
-                              )}
-                            </div>
+                        <div key={assign._id} className="bg-white rounded-2xl sm:rounded-[40px] p-4 sm:p-6 border border-slate-100 hover:border-indigo-200 hover:shadow-lg transition-all group relative overflow-hidden">
+                          {isGraded && <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full translate-x-12 -translate-y-12 pointer-events-none" />}
+
+                          {/* Dòng 1: tên + badge */}
+                          <div className="flex items-start justify-between gap-2 relative z-10">
+                            <h5 className="line-clamp-2 font-semibold text-slate-800 text-sm sm:text-base leading-snug break-words flex-1 min-w-0">
+                              {assign.title}
+                            </h5>
+                            {isSubmitted ? (
+                              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide flex items-center gap-1 border ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
+                                {isGraded ? <Check size={11} /> : <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
+                                {isGraded ? `${getGradeLabel(submission.grade)}: ${submission.grade}/10` : 'Đã nộp'}
+                              </span>
+                            ) : (
+                              <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide bg-slate-50 text-slate-400">
+                                Chưa nộp
+                              </span>
+                            )}
                           </div>
+
+                          {/* Dòng 2: hạn + tải bài + sửa/xóa */}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2.5 relative z-10">
+                            <p className="text-[11px] sm:text-xs font-medium text-slate-500 flex items-center gap-1">
+                              <Clock size={12} className="text-orange-400 shrink-0" />
+                              Hạn: {new Date(assign.deadline).toLocaleDateString('vi-VN')}
+                            </p>
+                            {isSubmitted && submission.submittedFileUrl && (
+                              <a
+                                href={buildMediaDownloadUrl(submission.submittedFileUrl, submission.submittedFileUrl.split('/').pop())}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] sm:text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                title="Tải bài làm của học viên"
+                              >
+                                <Download size={12} /> Tải bài làm
+                              </a>
+                            )}
+                            {!isGraded && (
+                              <div className="flex items-center gap-1 ml-auto">
+                                <button type="button" onClick={() => handleEditAssign(assign)} title="Sửa bài tập" className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50">
+                                  <Edit3 size={14} />
+                                </button>
+                                <button type="button" onClick={() => handleDeleteAssign(assign._id)} title="Xóa bài tập" className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Dòng 3: chấm điểm */}
+                          {isSubmitted && (
+                            <div className="grid grid-cols-2 gap-2 mt-3 relative z-10">
+                              <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                placeholder={isGraded ? 'Sửa điểm' : 'Điểm 0-10'}
+                                value={gradingInputs[submission._id] ?? (isGraded ? (submission.grade ?? '') : '')}
+                                onChange={(e) => setGradingInputs({ ...gradingInputs, [submission._id]: e.target.value })}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-500 text-center"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleGradeSubmit(submission._id)}
+                                className={`w-full py-2 rounded-lg text-xs font-medium text-white transition-all ${
+                                  isGraded ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
+                              >
+                                {isGraded ? 'Sửa điểm' : 'Lưu điểm'}
+                              </button>
+                            </div>
+                          )}
+
+                          {isGraded && submission.teacherFeedback && (
+                            <p className="text-[11px] text-slate-400 italic mt-2 line-clamp-2 relative z-10">*{submission.teacherFeedback}</p>
+                          )}
+                          {isGraded && !submission.teacherFeedback && (
+                            <p className="text-[11px] text-slate-400 italic mt-2 relative z-10">*Giảng viên đã sửa điểm</p>
+                          )}
+
+                          {/* Link phụ: xem đề bài */}
+                          {assign.fileUrl && (
+                            <a
+                              href={resolveMediaUrl(assign.fileUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 mt-2.5 text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-800 relative z-10"
+                            >
+                              <Link2 size={12} /> Xem đề bài
+                            </a>
+                          )}
                         </div>
                       );
                     })}
@@ -783,37 +800,42 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               </div>
             )}
             {activePanel === 'grade' && (
-              <div className="space-y-8 animate-in slide-in-from-right-10 duration-500">
-                 <div className="bg-amber-50 border border-amber-100 rounded-[40px] p-10 flex flex-col md:flex-row items-center gap-10">
-                    <div className="flex-1 space-y-4">
-                       <div className="flex items-center gap-4 mb-2">
-                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm">
-                             <Award size={24} />
-                          </div>
-                          <div>
-                             <h3 className="text-xl font-black text-amber-900">Đánh giá quá trình</h3>
-                             <p className="text-xs font-bold text-amber-500">Môn {student.course} · Cập nhật điểm trung bình dựa trên bài tập</p>
-                          </div>
-                       </div>
-                       <input 
-                          type="number" min="0" max="10" step="0.5" 
-                          value={gradeInput} onChange={e => setGradeInput(e.target.value)}
-                          className="w-24 bg-white border-2 border-amber-200 rounded-2xl p-4 text-3xl font-black text-amber-700 text-center focus:border-amber-500 outline-none"
-                       />
-                       <p className="text-xs font-bold text-amber-400 italic">* Điểm số sẽ được hiển thị công khai trên học bạ</p>
-                       <button 
-                         onClick={handleGradeSave}
-                         className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-700 transition shadow-lg shadow-amber-100"
-                       >
-                         LƯU KẾT QUẢ ĐÁNH GIÁ
-                       </button>
+              <div className="space-y-6 sm:space-y-8 animate-in slide-in-from-right-10 duration-500">
+                 <div className="bg-amber-50 border border-amber-100 rounded-2xl sm:rounded-[40px] p-5 sm:p-10 text-center flex flex-col items-center gap-4 sm:gap-6">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm">
+                        <Award size={22} />
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-bold text-amber-900">Đánh giá quá trình</h3>
+                      <p className="text-[11px] sm:text-xs font-medium text-amber-600 max-w-sm leading-relaxed">
+                        Môn {student.course} · Cập nhật điểm trung bình dựa trên bài tập
+                      </p>
                     </div>
-                    <div className="w-40 h-40 bg-white rounded-full border-8 border-amber-100 flex flex-col items-center justify-center shadow-xl">
-                       <span className="text-xs font-black text-amber-300 uppercase leading-none mb-1">Xếp loại</span>
-                       <span className="text-6xl font-black text-amber-600">
-                          {gradeLetter}
-                       </span>
+
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.5"
+                      value={gradeInput}
+                      onChange={e => setGradeInput(e.target.value)}
+                      className="w-28 sm:w-32 bg-white border-2 border-amber-200 rounded-xl p-3 text-2xl font-bold text-amber-700 text-center focus:border-amber-500 outline-none"
+                    />
+
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-full border-4 border-amber-100 flex flex-col items-center justify-center shadow-md">
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wide">Xếp loại</span>
+                      <span className="text-4xl sm:text-5xl font-bold text-amber-600 leading-none mt-0.5">{gradeLetter}</span>
                     </div>
+
+                    <p className="text-[11px] font-medium text-amber-500 italic">* Điểm số sẽ được hiển thị công khai trên học bạ</p>
+
+                    <button
+                      type="button"
+                      onClick={handleGradeSave}
+                      className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium text-sm transition-all"
+                    >
+                      {gradeSaved ? 'Đã lưu ✓' : 'Lưu kết quả đánh giá'}
+                    </button>
                  </div>
               </div>
            )}
