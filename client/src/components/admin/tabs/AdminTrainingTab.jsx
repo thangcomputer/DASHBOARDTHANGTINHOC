@@ -13,7 +13,6 @@ import { resolveTeacherExamDate, isTeacherExamDateApproximate, resolvePracticalF
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
-import { truncateWords } from '../../../utils/truncateWords';
 
 export default function AdminTrainingTab() {
   const {
@@ -56,7 +55,8 @@ export default function AdminTrainingTab() {
                   <button
                     key={t.key}
                     type="button"
-                    title={t.label}
+                    title={`${t.label} (${t.count})`}
+                    aria-label={`${t.label} (${t.count})`}
                     onClick={() => { setTrainingTab(t.key); setTrainingForm(null); }}
                     className={`cms-hscroll-tab ${
                       trainingTab === t.key
@@ -64,9 +64,8 @@ export default function AdminTrainingTab() {
                         : 'text-gray-500 hover:bg-gray-100'
                     }`}
                   >
-                    <t.icon size={15} className="shrink-0" />
-                    <span className="cms-hscroll-tab__label sm:hidden">{truncateWords(t.label, 2)}</span>
-                    <span className="cms-hscroll-tab__label hidden sm:inline">{t.label}</span>
+                    <t.icon size={16} className="shrink-0" aria-hidden="true" />
+                    <span className="cms-hscroll-tab__label">{t.label}</span>
                     <span className="cms-hscroll-tab__count">({t.count})</span>
                   </button>
                 ))}

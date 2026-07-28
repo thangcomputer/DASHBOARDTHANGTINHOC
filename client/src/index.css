@@ -174,15 +174,28 @@
   }
 
   .cms-hscroll-tab {
-    @apply inline-flex items-center gap-1.5 min-h-10 px-2.5 sm:px-3.5 py-2 rounded-xl text-[13px] sm:text-sm font-semibold whitespace-nowrap transition-all shrink-0;
+    @apply inline-flex items-center justify-center gap-1.5 min-h-10 min-w-10 px-2.5 sm:px-3 py-2 rounded-xl text-[12px] sm:text-[13px] font-semibold whitespace-nowrap transition-all shrink-0;
   }
 
   .cms-hscroll-tab__label {
-    @apply min-w-0;
+    @apply hidden min-[640px]:inline min-w-0;
   }
 
   .cms-hscroll-tab__count {
-    @apply text-[11px] opacity-70 shrink-0 tabular-nums;
+    @apply text-[10px] sm:text-[11px] opacity-80 shrink-0 tabular-nums;
+  }
+
+  /* Mobile: icon + count only ? hide count number text on very narrow if needed */
+  @media (max-width: 639.98px) {
+    .cms-hscroll-tab {
+      min-width: 2.75rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+    .cms-hscroll-tab__count {
+      font-size: 10px;
+      font-weight: 700;
+    }
   }
 
   .cms-label {

@@ -12,7 +12,6 @@ import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 import api, { apiFetch, buildMediaDownloadUrl } from '../../../services/api';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
-import { truncateWords } from '../../../utils/truncateWords';
 
 function mergeDocumentCourseOptions(dbCourses, lmsVideos) {
   const merged = [];
@@ -104,7 +103,8 @@ export default function AdminStudentTrainingTab() {
                   <button
                     key={t.key}
                     type="button"
-                    title={t.label}
+                    title={`${t.label} (${t.count})`}
+                    aria-label={`${t.label} (${t.count})`}
                     onClick={() => { setSTrainingTab(t.key); setSTrainingForm(null); setSCourseBuilderMode(null); }}
                     className={`cms-hscroll-tab ${
                       sTrainingTab === t.key
@@ -112,9 +112,8 @@ export default function AdminStudentTrainingTab() {
                         : 'text-gray-500 hover:bg-gray-100'
                     }`}
                   >
-                    <t.icon size={15} className="shrink-0" />
-                    <span className="cms-hscroll-tab__label sm:hidden">{truncateWords(t.label, 2)}</span>
-                    <span className="cms-hscroll-tab__label hidden sm:inline">{t.label}</span>
+                    <t.icon size={16} className="shrink-0" aria-hidden="true" />
+                    <span className="cms-hscroll-tab__label">{t.label}</span>
                     <span className="cms-hscroll-tab__count">({t.count})</span>
                   </button>
                 ))}
@@ -337,20 +336,29 @@ export default function AdminStudentTrainingTab() {
                     </span>
                   </div>
 
-                  {/* Table */}
+                  {/* Table — mobile: vuốt ngang; chữ header rút gọn để thấy đủ cột */}
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                    <p className="sm:hidden text-[11px] text-slate-400 px-3 py-1.5 border-b border-slate-50">
+                      Vuốt ngang để xem đủ cột →
+                    </p>
                     <div className="cms-table-wrap">
-                      <table className="w-full text-left border-collapse min-w-[1050px]">
+                      <table className="w-full text-left border-collapse min-w-[640px] sm:min-w-[900px]">
                         <thead>
                           <tr className="bg-amber-50 border-b border-amber-100">
-                            <th className="px-4 py-3 text-xs font-black text-amber-700 uppercase tracking-widest">Học viên</th>
-                            <th className="px-4 py-3 text-xs font-black text-amber-700 uppercase tracking-widest">Khóa học</th>
-                            <th className="px-4 py-3 text-xs font-black text-amber-700 uppercase tracking-widest">Môn thi</th>
-                            <th className="px-4 py-3 text-xs font-black text-amber-700 uppercase tracking-widest text-center">Trắc nghiệm</th>
-                            <th className="px-4 py-3 text-xs font-black text-amber-700 uppercase tracking-widest text-center">Tự luận (File)</th>
-                            <th className="px-4 py-3 text-xs font-black text-amber-700 uppercase tracking-widest text-center">Chấm điểm TL</th>
-                            <th className="px-4 py-3 text-xs font-black text-amber-700 uppercase tracking-widest text-center">Trạng thái</th>
-                            <th className="px-4 py-3 text-xs font-black text-amber-700 uppercase tracking-widest text-center">Khóa đến</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide whitespace-nowrap">Học viên</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide whitespace-nowrap">Khóa học</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide whitespace-nowrap">Môn thi</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide text-center whitespace-nowrap">
+                              <span className="sm:hidden">TN</span><span className="hidden sm:inline">Trắc nghiệm</span>
+                            </th>
+                            <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide text-center whitespace-nowrap">
+                              <span className="sm:hidden">TL</span><span className="hidden sm:inline">Tự luận (File)</span>
+                            </th>
+                            <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide text-center whitespace-nowrap">
+                              <span className="sm:hidden">Chấm TL</span><span className="hidden sm:inline">Chấm điểm TL</span>
+                            </th>
+                            <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide text-center whitespace-nowrap">Trạng thái</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold text-amber-700 uppercase tracking-wide text-center whitespace-nowrap">Khóa đến</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
