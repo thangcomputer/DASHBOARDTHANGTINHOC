@@ -3,7 +3,7 @@ import {
   Play, CheckCircle, Lock, ChevronRight, Clock, Award, BookOpen,
   ArrowLeft, Shield, Users, BarChart2, RefreshCw, GraduationCap,
   PlayCircle, ChevronDown, ChevronUp, Star, AlertCircle, CheckCircle2,
-  FileBox, Video, Download, FileText
+  FileBox, Video, Download, FileText, Plus, Pencil
 } from 'lucide-react';
 
 import { useData } from '../context/DataContext';
@@ -13,6 +13,7 @@ import {
 } from '../utils/trainingSubjectFilter';
 import api, { buildMediaDownloadUrl, csrfFetch } from '../services/api';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
+import { formatLessonDisplayTitle, LMS_PLAYER_TABS } from '../utils/lmsLessonUi';
 
 const MOCK_COURSES = [
   { _id: '1', title: 'Đào tạo Giảng viên Mới', progress: 0, 
@@ -334,9 +335,9 @@ const YouTubePlayerSecure = ({
             <button
               onClick={() => playerRef.current?.playVideo?.()}
               className="relative w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #e53e3e 0%, #c53030 100%)', boxShadow: '0 0 40px rgba(229,62,62,0.5), 0 8px 32px rgba(0,0,0,0.4)' }}
+              style={{ background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)', boxShadow: '0 0 40px rgba(16,185,129,0.45), 0 8px 32px rgba(0,0,0,0.4)' }}
             >
-              <div className="absolute inset-0 rounded-full border-2 border-red-400/40 animate-ping" />
+              <div className="absolute inset-0 rounded-full border-2 border-emerald-300/40 animate-ping" />
               <Play size={32} className="text-white ml-1 drop-shadow-lg" fill="white" />
             </button>
             <p className="mt-5 text-white/70 text-sm font-semibold tracking-wide">Nhấn để bắt đầu học</p>
@@ -361,7 +362,7 @@ const YouTubePlayerSecure = ({
         {!isReady && (
           <div className="absolute inset-0 z-20 bg-slate-900 flex items-center justify-center rounded-2xl">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-[3px] border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+              <div className="w-12 h-12 border-[3px] border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
               <p className="text-slate-400 font-semibold text-xs animate-pulse tracking-widest uppercase">Đang tải video...</p>
             </div>
           </div>
@@ -439,18 +440,18 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
       onClick={() => lesson.isUnlocked && onClick(lesson)}
       className={`flex items-start gap-3 px-5 py-4 border-b border-slate-100 transition-all relative
         ${!lesson.isUnlocked ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}
-        ${isCurrent ? 'bg-blue-50 border-l-4 border-l-blue-600' : lesson.isCompleted ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
+        ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : lesson.isCompleted ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
       `}
     >
       {/* Status Icon */}
       <div className="mt-0.5 flex-shrink-0">
         {lesson.isCompleted ? (
-          <CheckCircle size={18} className="text-blue-600" />
+          <CheckCircle size={18} className="text-emerald-600" />
         ) : !lesson.isUnlocked ? (
           <Lock size={16} className="text-slate-400" />
         ) : isCurrent ? (
-          <div className="w-[18px] h-[18px] rounded-full border-2 border-blue-600 flex items-center justify-center">
-            <div className="w-2 h-2 bg-red-600 rounded-full animate-ping" />
+          <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-600 flex items-center justify-center">
+            <div className="w-2 h-2 bg-emerald-600 rounded-full animate-ping" />
           </div>
         ) : (
           <PlayCircle size={18} className="text-slate-300" />
@@ -458,11 +459,8 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
-          Bài {index + 1}
-        </p>
-        <h4 className={`text-sm leading-snug truncate ${isCurrent ? 'text-blue-700 font-black' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-700 font-bold'}`}>
-          {lesson.title}
+        <h4 className={`text-sm leading-snug line-clamp-2 ${isCurrent ? 'text-emerald-700 font-black' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-700 font-bold'}`}>
+          {formatLessonDisplayTitle(lesson.title, index)}
         </h4>
         {lesson.duration ? (
           <span className="text-[10px] text-slate-500 flex items-center gap-1 mt-1 font-semibold">
@@ -612,7 +610,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [courseProgressMap, setCourseProgressMap] = useState({});
   const [expandedChapters, setExpandedChapters] = useState({});
-  const [courseTab, setCourseTab] = useState('video'); // video | data | notice
+  const [courseTab, setCourseTab] = useState('video'); // video | list | data | notice
   const [mainTab, setMainTab] = useState('courses'); // courses | guides | files
   const [expandedGuideKey, setExpandedGuideKey] = useState(null);
 
@@ -644,11 +642,12 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
     setLoading(true);
     lmsApiFetch('/teacher/overview')
       .then((res) => {
-        // overview đã lọc theo môn phía server — không lọc lại (DTO thiếu examSubjects)
         if (res?.success && res.data?.courses?.length) {
-          applyCourses(res.data.courses);
+          applyCourses(filterTrainingItemsBySubject(res.data.courses, teacherSubjectIds || [], examSubjectsCatalog));
+        } else if (visibleTraining?.videos) {
+          applyCourses(visibleTraining.videos);
         } else {
-          applyCourses(visibleTraining?.videos || []);
+          applyCourses([]);
         }
       })
       .catch(() => applyCourses(visibleTraining?.videos || []))
@@ -842,30 +841,21 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           </div>
         )}
 
-        {/* TOP TABS FOR TEACHER — 3 cột, mobile chỉ icon */}
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 bg-white rounded-2xl p-1.5 sm:p-2 shadow-sm border border-gray-100 w-full mb-8">
+        {/* TOP TABS FOR TEACHER */}
+        <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 w-fit mb-8">
           {[
             { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0 },
             { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0 },
           ].map(t => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setMainTab(t.key)}
-              title={t.label}
-              aria-label={`${t.label}: ${t.count}`}
-              className={`relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all min-h-11 ${
+            <button key={t.key} onClick={() => setMainTab(t.key)}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
                 mainTab === t.key
                   ? 'bg-red-600 text-white shadow-md'
                   : 'text-slate-500 hover:bg-slate-100'
-              }`}
-            >
-              <t.icon size={18} className="shrink-0" aria-hidden="true" />
-              <span className="hidden sm:inline truncate">{t.label}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none ${
-                mainTab === t.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'
               }`}>
+              <t.icon size={16} /> {t.label} 
+              <span className={`text-[10px] ml-1 bg-white/20 px-2 py-0.5 rounded-full ${mainTab === t.key ? 'text-white' : 'bg-slate-200 text-slate-500'}`}>
                 {t.count}
               </span>
             </button>
@@ -883,7 +873,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
                <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
                <p className="font-bold">Chưa có khóa học nào</p>
-               <p className="text-xs mt-1">Chưa có video đào tạo phù hợp. Admin cần thêm khóa tại Quản lý đào tạo GV.</p>
+               <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1058,43 +1048,35 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         {/* Progress rail */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5">
           <div
-            className={`h-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-400' : 'bg-red-500'}`}
+            className={`h-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-400' : 'bg-emerald-500'}`}
             style={{ width: `${overallProgress}%` }}
           />
         </div>
 
-        <div className="h-13 px-5 flex items-center justify-between" style={{ height: '52px' }}>
-          {/* Left */}
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="h-13 px-3 sm:px-5 flex items-center justify-between gap-2" style={{ height: '52px' }}>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <button
+              type="button"
               onClick={() => { setSelectedCourse(null); setLessons([]); setCurrentLesson(null); }}
               className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all text-slate-400 hover:text-white flex-shrink-0"
+              aria-label="Quay lại"
             >
               <ArrowLeft size={16} />
             </button>
-            <div className="w-px h-5 bg-white/10 flex-shrink-0" />
-            <div className="min-w-0 flex items-center gap-2">
-              <span className="hidden md:inline-flex items-center gap-1 bg-red-500/15 text-blue-400 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border border-blue-500/20">
-                KHÓA HỌC
-              </span>
-              <h2 className="font-bold text-[13px] text-slate-100 truncate leading-none">{selectedCourse.title}</h2>
-            </div>
+            <div className="w-px h-5 bg-white/10 flex-shrink-0 hidden sm:block" />
+            <h2 className="font-bold text-[13px] text-slate-100 truncate leading-snug min-w-0">{selectedCourse.title}</h2>
           </div>
 
-          {/* Right */}
-          <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {completing && (
               <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold animate-pulse uppercase tracking-widest">
                 <RefreshCw size={11} className="animate-spin" /> Đang lưu...
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <p className="text-[11px] text-slate-500 font-semibold hidden sm:block">
-                Tiến độ hoàn thành
-                <strong className={`ml-1.5 ${overallProgress === 100 ? 'text-emerald-400' : 'text-white'}`}>{overallProgress}%</strong>
-              </p>
-              {overallProgress === 100 && <Award size={16} className="text-emerald-400" />}
-            </div>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 tabular-nums">
+              {overallProgress}%
+              {overallProgress === 100 && <Award size={12} className="text-emerald-400" />}
+            </span>
           </div>
         </div>
       </div>
@@ -1105,8 +1087,8 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         {/* ══ LEFT COLUMN ══ */}
         <div className="flex flex-col flex-1 min-w-0 lg:flex-[7] overflow-hidden">
 
-          {/* VIDEO WRAPPER — 3:4 aspect ratio, max 75vh, centered */}
-          <div className="flex-shrink-0 px-5 pt-4 pb-3 flex justify-center">
+          {/* VIDEO WRAPPER — 16:9 */}
+          <div className="flex-shrink-0 px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 flex justify-center">
             <div
               className="relative overflow-hidden shadow-2xl shadow-black/60 w-full"
               style={{
@@ -1134,40 +1116,40 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           {/* INFO PANEL BELOW VIDEO */}
           <div className="flex flex-col flex-1 min-h-0">
 
-            {/* TAB BAR */}
-            <div className="flex px-5 flex-shrink-0 border-b border-white/[0.06]" style={{ background: '#0d1117' }}>
-              {[
-                { key: 'video', label: 'Bài giảng' },
-                { key: 'data',  label: 'Tài liệu'  },
-                { key: 'notice',label: 'Thông báo'  },
-              ].map(t => (
+            {/* TAB BAR — 4 tabs */}
+            <div className="grid grid-cols-4 flex-shrink-0 border-b border-white/[0.06]" style={{ background: '#0d1117' }}>
+              {LMS_PLAYER_TABS.map(t => (
                 <button
                   key={t.key}
+                  type="button"
                   onClick={() => setCourseTab(t.key)}
-                  className={`px-5 py-3.5 text-[11px] font-bold tracking-wide border-b-2 transition-all ${
+                  className={`px-1 sm:px-3 py-3 text-[9px] sm:text-[11px] font-bold tracking-wide border-b-2 transition-all truncate ${
                     courseTab === t.key
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-emerald-500'
                       : 'text-slate-500 border-transparent hover:text-slate-300'
                   }`}
                 >
-                  {t.label}
+                  <span className="sm:hidden">{t.shortLabel}</span>
+                  <span className="hidden sm:inline">{t.label}</span>
                 </button>
               ))}
             </div>
 
             {/* TAB CONTENT */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 custom-scrollbar-dark" style={{ background: '#0d1117' }}>
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 custom-scrollbar-dark" style={{ background: '#0d1117' }}>
 
               {courseTab === 'video' && currentLesson && (
-                <div className="max-w-3xl space-y-5">
-                  {/* Chapter label + Title */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <span className="inline-block text-[9px] font-black text-blue-400/80 uppercase tracking-[0.15em] mb-2">
+                <div className="max-w-3xl space-y-4 sm:space-y-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="inline-block text-[9px] font-black text-emerald-400/80 uppercase tracking-[0.15em] mb-2">
                         {currentLesson.chapterTitle || 'Mục lục'}
                       </span>
-                      <h1 className="text-xl font-bold text-white leading-snug">
-                        {currentLesson.title}
+                      <h1 className="text-lg sm:text-xl font-bold text-white leading-snug capitalize">
+                        {formatLessonDisplayTitle(
+                          currentLesson.title,
+                          Math.max(0, lessons.findIndex(l => String(l._id) === String(currentLesson._id)))
+                        )}
                       </h1>
                       {currentLesson.duration && (
                         <span className="inline-flex items-center gap-1.5 mt-2 text-slate-500 text-[11px] font-semibold">
@@ -1177,28 +1159,137 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                       )}
                     </div>
                     {currentLesson.isCompleted && (
-                      <div className="flex-shrink-0 flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-xl text-[11px] font-bold border border-emerald-500/20">
-                        <CheckCircle size={13} /> Đã hoàn thành
+                      <div className="flex-shrink-0 flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-bold border border-emerald-500/20">
+                        <CheckCircle size={13} /> Đã xong
                       </div>
                     )}
                   </div>
 
-                  {/* Anti-cheat notice */}
-                  <div className="flex items-center gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
-                    <AlertCircle size={14} className="text-amber-400/80 flex-shrink-0" />
+                  <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
+                    <AlertCircle size={14} className="text-amber-400/80 flex-shrink-0 mt-0.5" />
                     <p className="text-amber-200/60 text-[11px] leading-relaxed">
                       <strong className="text-amber-400/80">Lưu ý:</strong> Hệ thống chống tua video đã bật.
                       Bạn phải xem hết thời lượng video để được ghi nhận tiến độ hoàn thành.
                     </p>
                   </div>
 
-                  {/* Description */}
-                  <div className="pt-4 border-t border-white/[0.06] space-y-2">
+                  <div className="pt-3 border-t border-white/[0.06] space-y-2">
                     <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Mô tả bài giảng</p>
                     <p className="text-slate-400 leading-relaxed text-[13px]">
                       {currentLesson.description || 'Vui lòng theo dõi video để nắm vững kiến thức. Hệ thống sẽ tự động ghi nhận tiến độ học tập khi bạn xem hết thời lượng yêu cầu của bài giảng này.'}
                     </p>
                   </div>
+                </div>
+              )}
+
+              {courseTab === 'list' && (
+                <div className="max-w-3xl space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-300">Nội dung khóa học</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {lessons.filter(l => l.isCompleted).length}/{lessons.length} bài · {overallProgress}%
+                      </p>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedCourse(null); setShowAdminPanel(true); }}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/25"
+                        >
+                          <Plus size={12} /> Thêm bài
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedCourse(null); setShowAdminPanel(true); }}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10"
+                        >
+                          <Pencil size={12} /> Sửa
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${overallProgress}%` }} />
+                  </div>
+                  {Object.entries(groupedLessons).map(([chapter, chapterLessons]) => {
+                    const isExpanded = expandedChapters[chapter] !== false;
+                    const chapterCompleted = chapterLessons.filter(l => l.isCompleted).length;
+                    return (
+                      <div key={chapter} className="rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.02]">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedChapters(prev => ({ ...prev, [chapter]: !prev[chapter] }))}
+                          className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-white/5"
+                        >
+                          <div>
+                            <p className="text-[11px] font-bold text-slate-300">{chapter}</p>
+                            <p className="text-[9px] text-slate-600 mt-0.5 font-semibold">{chapterCompleted}/{chapterLessons.length} hoàn thành</p>
+                          </div>
+                          {isExpanded ? <ChevronUp size={13} className="text-slate-600" /> : <ChevronDown size={13} className="text-slate-600" />}
+                        </button>
+                        {isExpanded && chapterLessons.map((lesson) => {
+                          const globalIdx = lessons.findIndex(l => String(l._id) === String(lesson._id));
+                          const isCurrent = currentLesson?._id === lesson._id;
+                          return (
+                            <div
+                              key={lesson._id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                if (!lesson.isUnlocked) return;
+                                setCurrentLesson(lesson);
+                                setCourseTab('video');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && lesson.isUnlocked) {
+                                  setCurrentLesson(lesson);
+                                  setCourseTab('video');
+                                }
+                              }}
+                              className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-all ${
+                                !lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
+                              } ${
+                                isCurrent
+                                  ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
+                                  : 'border-l-4 border-transparent hover:bg-white/[0.04]'
+                              }`}
+                            >
+                              <div className="mt-0.5 flex-shrink-0">
+                                {lesson.isCompleted ? (
+                                  <div className="w-[18px] h-[18px] rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <CheckCircle size={12} className="text-emerald-400" />
+                                  </div>
+                                ) : !lesson.isUnlocked ? (
+                                  <Lock size={14} className="text-slate-600" />
+                                ) : isCurrent ? (
+                                  <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center" title="Đang phát">
+                                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                                  </div>
+                                ) : (
+                                  <PlayCircle size={16} className="text-slate-600" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className={`text-[12px] leading-snug line-clamp-2 ${
+                                  isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
+                                }`}>
+                                  {formatLessonDisplayTitle(lesson.title, globalIdx)}
+                                </h4>
+                                {lesson.duration ? (
+                                  <span className="text-[10px] text-slate-600 flex items-center gap-1 mt-1">
+                                    <Clock size={9} />
+                                    {Math.floor(lesson.duration / 60)}:{String(lesson.duration % 60).padStart(2,'0')}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -1210,14 +1301,14 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                     <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer group">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[9px] font-black text-white ${
-                          file.type === 'PDF' ? 'bg-rose-500/80' : file.type === 'DOCX' ? 'bg-red-600/80' : 'bg-emerald-600/80'
+                          file.type === 'PDF' ? 'bg-rose-500/80' : file.type === 'DOCX' ? 'bg-emerald-600/80' : 'bg-emerald-600/80'
                         }`}>{file.type}</div>
                         <div>
                           <h4 className="font-semibold text-slate-200 text-sm">{file.title}</h4>
                           <p className="text-[10px] text-slate-600 mt-0.5">{file.size}</p>
                         </div>
                       </div>
-                      <button className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:bg-red-600 group-hover:text-white transition-all">
+                      <button type="button" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:bg-emerald-600 group-hover:text-white transition-all">
                         <Download size={13} />
                       </button>
                     </div>
@@ -1252,7 +1343,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                 className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
                   overallProgress === 100
                     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-                    : 'bg-red-500/15 text-blue-400 border-blue-500/20'
+                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
                 }`}
               >
                 {lessons.filter(l => l.isCompleted).length}/{lessons.length} BÀI
@@ -1262,7 +1353,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             <div className="h-1 bg-white/5 rounded-full mt-3 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
-                  overallProgress === 100 ? 'bg-emerald-500' : 'bg-red-500'
+                  overallProgress === 100 ? 'bg-emerald-500' : 'bg-emerald-500'
                 }`}
                 style={{ width: `${overallProgress}%` }}
               />
@@ -1306,22 +1397,21 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                           !lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
                         } ${
                           isCurrent
-                            ? 'bg-red-600/10 border-l-2 border-blue-500'
-                            : 'border-l-2 border-transparent hover:bg-white/[0.04]'
+                            ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
+                            : 'border-l-4 border-transparent hover:bg-white/[0.04]'
                         }`}
-                        style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
                       >
                         {/* Status icon */}
                         <div className="mt-0.5 flex-shrink-0">
                           {lesson.isCompleted ? (
-                            <div className="w-[18px] h-[18px] rounded-full bg-red-500/20 flex items-center justify-center">
-                              <CheckCircle size={12} className="text-blue-400" />
+                            <div className="w-[18px] h-[18px] rounded-full bg-emerald-500/20 flex items-center justify-center">
+                              <CheckCircle size={12} className="text-emerald-400" />
                             </div>
                           ) : !lesson.isUnlocked ? (
                             <Lock size={14} className="text-slate-600" />
                           ) : isCurrent ? (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-blue-500 flex items-center justify-center">
-                              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                            <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                             </div>
                           ) : (
                             <PlayCircle size={16} className="text-slate-600" />
@@ -1329,11 +1419,10 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <p className="text-[9px] font-black text-slate-600 uppercase tracking-wider mb-0.5">Bài {globalIdx + 1}</p>
-                          <h4 className={`text-[12px] leading-snug truncate ${
-                            isCurrent ? 'text-blue-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
+                          <h4 className={`text-[12px] leading-snug line-clamp-2 ${
+                            isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
                           }`}>
-                            {lesson.title}
+                            {formatLessonDisplayTitle(lesson.title, globalIdx)}
                           </h4>
                           {lesson.duration ? (
                             <span className="text-[10px] text-slate-600 flex items-center gap-1 mt-1">

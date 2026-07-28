@@ -17,6 +17,7 @@ import StudentExamRoom from './StudentExamRoom';
 import api, { buildMediaDownloadUrl, resolveMediaUrl, csrfFetch } from '../services/api';
 import { useToast } from '../utils/toast';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
+import { formatLessonDisplayTitle, LMS_PLAYER_TABS } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
 
 const MOCK_COURSES = [
@@ -244,18 +245,18 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
       onClick={() => lesson.isUnlocked && onClick(lesson)}
       className={`flex items-start gap-3 px-5 py-4 border-b border-slate-100 transition-all relative
         ${!lesson.isUnlocked ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}
-        ${isCurrent ? 'bg-green-50 border-l-4 border-l-blue-600' : lesson.isCompleted ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
+        ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : lesson.isCompleted ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
       `}
     >
       {/* Status Icon */}
       <div className="mt-0.5 flex-shrink-0">
         {lesson.isCompleted ? (
-          <CheckCircle size={18} className="text-green-600" />
+          <CheckCircle size={18} className="text-emerald-600" />
         ) : !lesson.isUnlocked ? (
           <Lock size={16} className="text-slate-400" />
         ) : isCurrent ? (
-          <div className="w-[18px] h-[18px] rounded-full border-2 border-green-600 flex items-center justify-center">
-            <div className="w-2 h-2 bg-green-600 rounded-full animate-ping" />
+          <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-600 flex items-center justify-center">
+            <div className="w-2 h-2 bg-emerald-600 rounded-full animate-ping" />
           </div>
         ) : (
           <PlayCircle size={18} className="text-slate-300" />
@@ -263,11 +264,8 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
-          Bài {index + 1}
-        </p>
-        <h4 className={`text-sm leading-snug truncate ${isCurrent ? 'text-green-700 font-black' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-700 font-bold'}`}>
-          {lesson.title}
+        <h4 className={`text-sm leading-snug line-clamp-2 ${isCurrent ? 'text-emerald-700 font-black' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-700 font-bold'}`}>
+          {formatLessonDisplayTitle(lesson.title, index)}
         </h4>
         {lesson.duration ? (
           <span className="text-[10px] text-slate-500 flex items-center gap-1 mt-1 font-semibold">
@@ -374,7 +372,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [courseProgressMap, setCourseProgressMap] = useState({});
   const [expandedChapters, setExpandedChapters] = useState({});
-  const [courseTab, setCourseTab] = useState('video'); // video | data | notice
+  const [courseTab, setCourseTab] = useState('video'); // video | list | data | notice
   const [mainTab, setMainTab] = useState('courses'); // courses | guides | files
   const [localSubmissions, setLocalSubmissions] = useState({});
   const [uploadingAssignId, setUploadingAssignId] = useState(null);
@@ -720,7 +718,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
               <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
               <p className="font-bold">Chưa có khóa học nào</p>
-              <p className="text-xs mt-1">Chưa có video phù hợp với khóa bạn đang học. Admin cần gán video tại Quản lý đào tạo HV.</p>
+              <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1112,43 +1110,35 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         {/* Progress rail */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5">
           <div
-            className={`h-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-400' : 'bg-green-500'}`}
+            className={`h-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-400' : 'bg-emerald-500'}`}
             style={{ width: `${overallProgress}%` }}
           />
         </div>
 
-        <div className="h-13 px-5 flex items-center justify-between" style={{ height: '52px' }}>
-          {/* Left */}
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="h-13 px-3 sm:px-5 flex items-center justify-between gap-2" style={{ height: '52px' }}>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <button
+              type="button"
               onClick={() => { setSelectedCourse(null); setLessons([]); setCurrentLesson(null); }}
               className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all text-slate-400 hover:text-white flex-shrink-0"
+              aria-label="Quay lại"
             >
               <ArrowLeft size={16} />
             </button>
-            <div className="w-px h-5 bg-white/10 flex-shrink-0" />
-            <div className="min-w-0 flex items-center gap-2">
-              <span className="hidden md:inline-flex items-center gap-1 bg-green-500/15 text-green-400 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border border-green-500/20">
-                KHÓA HỌC
-              </span>
-              <h2 className="font-bold text-[13px] text-slate-100 truncate leading-none">{selectedCourse.title}</h2>
-            </div>
+            <div className="w-px h-5 bg-white/10 flex-shrink-0 hidden sm:block" />
+            <h2 className="font-bold text-[13px] text-slate-100 truncate leading-snug min-w-0">{selectedCourse.title}</h2>
           </div>
 
-          {/* Right */}
-          <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {completing && (
               <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold animate-pulse uppercase tracking-widest">
                 <RefreshCw size={11} className="animate-spin" /> Đang lưu...
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <p className="text-[11px] text-slate-500 font-semibold hidden sm:block">
-                Tiến độ hoàn thành
-                <strong className={`ml-1.5 ${overallProgress === 100 ? 'text-emerald-400' : 'text-white'}`}>{overallProgress}%</strong>
-              </p>
-              {overallProgress === 100 && <Award size={16} className="text-emerald-400" />}
-            </div>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 tabular-nums">
+              {overallProgress}%
+              {overallProgress === 100 && <Award size={12} className="text-emerald-400" />}
+            </span>
           </div>
         </div>
       </div>
@@ -1159,8 +1149,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         {/* ══ LEFT COLUMN ══ */}
         <div className="flex flex-col flex-1 min-w-0 lg:flex-[7] overflow-hidden">
 
-          {/* VIDEO WRAPPER — 3:4 aspect ratio, max 75vh, centered */}
-          <div className="flex-shrink-0 px-5 pt-4 pb-3 flex justify-center">
+          {/* VIDEO WRAPPER — 16:9 */}
+          <div className="flex-shrink-0 px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 flex justify-center">
             <div
               className="relative overflow-hidden shadow-2xl shadow-black/60 w-full"
               style={{
@@ -1181,39 +1171,40 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           {/* INFO PANEL BELOW VIDEO */}
           <div className="flex flex-col flex-1 min-h-0">
 
-            {/* TAB BAR */}
-            <div className="flex px-5 flex-shrink-0 border-b border-white/[0.06]" style={{ background: '#0d1117' }}>
-              {[
-                { key: 'video', label: 'Bài giảng' },
-                { key: 'data', label: 'Tài liệu' },
-                { key: 'notice', label: 'Thông báo' },
-              ].map(t => (
+            {/* TAB BAR — 4 tabs */}
+            <div className="grid grid-cols-4 flex-shrink-0 border-b border-white/[0.06]" style={{ background: '#0d1117' }}>
+              {LMS_PLAYER_TABS.map(t => (
                 <button
                   key={t.key}
+                  type="button"
                   onClick={() => setCourseTab(t.key)}
-                  className={`px-5 py-3.5 text-[11px] font-bold tracking-wide border-b-2 transition-all ${courseTab === t.key
-                    ? 'text-white border-green-500'
-                    : 'text-slate-500 border-transparent hover:text-slate-300'
-                    }`}
+                  className={`px-1 sm:px-3 py-3 text-[9px] sm:text-[11px] font-bold tracking-wide border-b-2 transition-all truncate ${
+                    courseTab === t.key
+                      ? 'text-white border-emerald-500'
+                      : 'text-slate-500 border-transparent hover:text-slate-300'
+                  }`}
                 >
-                  {t.label}
+                  <span className="sm:hidden">{t.shortLabel}</span>
+                  <span className="hidden sm:inline">{t.label}</span>
                 </button>
               ))}
             </div>
 
             {/* TAB CONTENT */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 custom-scrollbar-dark" style={{ background: '#0d1117' }}>
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 custom-scrollbar-dark" style={{ background: '#0d1117' }}>
 
               {courseTab === 'video' && currentLesson && (
-                <div className="max-w-3xl space-y-5">
-                  {/* Chapter label + Title */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <span className="inline-block text-[9px] font-black text-green-400/80 uppercase tracking-[0.15em] mb-2">
+                <div className="max-w-3xl space-y-4 sm:space-y-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="inline-block text-[9px] font-black text-emerald-400/80 uppercase tracking-[0.15em] mb-2">
                         {currentLesson.chapterTitle || 'Mục lục'}
                       </span>
-                      <h1 className="text-xl font-bold text-white leading-snug">
-                        {currentLesson.title}
+                      <h1 className="text-lg sm:text-xl font-bold text-white leading-snug">
+                        {formatLessonDisplayTitle(
+                          currentLesson.title,
+                          Math.max(0, lessons.findIndex(l => String(l._id) === String(currentLesson._id)))
+                        )}
                       </h1>
                       {currentLesson.duration && (
                         <span className="inline-flex items-center gap-1.5 mt-2 text-slate-500 text-[11px] font-semibold">
@@ -1222,14 +1213,26 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         </span>
                       )}
                     </div>
+                    {currentLesson.isCompleted && (
+                      <div className="flex-shrink-0 flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-bold border border-emerald-500/20">
+                        <CheckCircle size={13} /> Đã xong
+                      </div>
+                    )}
                   </div>
 
-                  {/* Description */}
-                  <div className="pt-4 border-t border-white/[0.06] space-y-2">
+                  <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
+                    <AlertCircle size={14} className="text-amber-400/80 flex-shrink-0 mt-0.5" />
+                    <p className="text-amber-200/60 text-[11px] leading-relaxed">
+                      <strong className="text-amber-400/80">Lưu ý:</strong> Hệ thống chống tua video đã bật.
+                      Bạn phải xem hết thời lượng video để được ghi nhận tiến độ hoàn thành.
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/[0.06] space-y-2">
                     <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Mô tả bài giảng</p>
                     {currentLesson.description && /<[a-z][\s\S]*>/i.test(currentLesson.description) ? (
                       <div
-                        className="text-slate-400 leading-relaxed text-[13px] max-h-[45vh] overflow-y-auto break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-green-400 [&_a]:underline"
+                        className="text-slate-400 leading-relaxed text-[13px] max-h-[45vh] overflow-y-auto break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-emerald-400 [&_a]:underline"
                         dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(currentLesson.description) }}
                       />
                     ) : (
@@ -1242,6 +1245,103 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                 </div>
               )}
 
+              {courseTab === 'list' && (
+                <div className="max-w-3xl space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-300">Nội dung khóa học</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {lessons.filter(l => l.isCompleted).length}/{lessons.length} bài · {overallProgress}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${overallProgress}%` }} />
+                  </div>
+                  {Object.entries(groupedLessons).map(([chapter, chapterLessons]) => {
+                    const isExpanded = expandedChapters[chapter] !== false;
+                    const chapterCompleted = chapterLessons.filter(l => l.isCompleted).length;
+                    return (
+                      <div key={chapter} className="rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.02]">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedChapters(prev => ({ ...prev, [chapter]: !prev[chapter] }))}
+                          className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-white/5"
+                        >
+                          <div>
+                            <p className="text-[11px] font-bold text-slate-300">{chapter}</p>
+                            <p className="text-[9px] text-slate-600 mt-0.5 font-semibold">{chapterCompleted}/{chapterLessons.length} hoàn thành</p>
+                          </div>
+                          {isExpanded ? <ChevronUp size={13} className="text-slate-600" /> : <ChevronDown size={13} className="text-slate-600" />}
+                        </button>
+                        {isExpanded && chapterLessons.map((lesson) => {
+                          const globalIdx = lessons.findIndex(l => String(l._id) === String(lesson._id));
+                          const isCurrent = currentLesson?._id === lesson._id;
+                          return (
+                            <div
+                              key={lesson._id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                if (!lesson.isUnlocked) return;
+                                setCurrentLesson(lesson);
+                                if (!lesson.isCompleted) {
+                                  localStorage.setItem(`student_lms_completed_${lesson._id}`, 'true');
+                                  setLessons(prev => prev.map(l => l._id === lesson._id ? { ...l, isCompleted: true } : l));
+                                }
+                                setCourseTab('video');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && lesson.isUnlocked) {
+                                  setCurrentLesson(lesson);
+                                  setCourseTab('video');
+                                }
+                              }}
+                              className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-all ${
+                                !lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
+                              } ${
+                                isCurrent
+                                  ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
+                                  : 'border-l-4 border-transparent hover:bg-white/[0.04]'
+                              }`}
+                            >
+                              <div className="mt-0.5 flex-shrink-0">
+                                {lesson.isCompleted ? (
+                                  <div className="w-[18px] h-[18px] rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <CheckCircle size={12} className="text-emerald-400" />
+                                  </div>
+                                ) : !lesson.isUnlocked ? (
+                                  <Lock size={14} className="text-slate-600" />
+                                ) : isCurrent ? (
+                                  <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center" title="Đang phát">
+                                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                                  </div>
+                                ) : (
+                                  <PlayCircle size={16} className="text-slate-600" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className={`text-[12px] leading-snug line-clamp-2 ${
+                                  isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
+                                }`}>
+                                  {formatLessonDisplayTitle(lesson.title, globalIdx)}
+                                </h4>
+                                {lesson.duration ? (
+                                  <span className="text-[10px] text-slate-600 flex items-center gap-1 mt-1">
+                                    <Clock size={9} />
+                                    {Math.floor(lesson.duration / 60)}:{String(lesson.duration % 60).padStart(2, '0')}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               {courseTab === 'data' && (
                 <div className="max-w-3xl space-y-3">
                   {!selectedCourse.files || selectedCourse.files.length === 0 ? (
@@ -1249,14 +1349,14 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                   ) : selectedCourse.files.map((file, idx) => (
                     <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer group">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[9px] font-black text-white ${file.type === 'PDF' ? 'bg-rose-500/80' : file.type === 'DOCX' ? 'bg-green-600/80' : 'bg-emerald-600/80'
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[9px] font-black text-white ${file.type === 'PDF' ? 'bg-rose-500/80' : file.type === 'DOCX' ? 'bg-emerald-600/80' : 'bg-emerald-600/80'
                           }`}>{file.type}</div>
                         <div>
                           <h4 className="font-semibold text-slate-200 text-sm">{file.title}</h4>
                           <p className="text-[10px] text-slate-600 mt-0.5">{file.size}</p>
                         </div>
                       </div>
-                      <button className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:bg-green-600 group-hover:text-white transition-all">
+                      <button type="button" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:bg-emerald-600 group-hover:text-white transition-all">
                         <Download size={13} />
                       </button>
                     </div>
@@ -1290,7 +1390,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               <span
                 className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${overallProgress === 100
                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-                  : 'bg-green-500/15 text-green-400 border-green-500/20'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
                   }`}
               >
                 {lessons.filter(l => l.isCompleted).length}/{lessons.length} BÀI
@@ -1299,7 +1399,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             {/* Mini progress bar */}
             <div className="h-1 bg-white/5 rounded-full mt-3 overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-500' : 'bg-green-500'
+                className={`h-full rounded-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-500' : 'bg-emerald-500'
                   }`}
                 style={{ width: `${overallProgress}%` }}
               />
@@ -1348,22 +1448,21 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         }}
                         className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-all relative ${!lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
                           } ${isCurrent
-                            ? 'bg-green-600/10 border-l-2 border-green-500'
-                            : 'border-l-2 border-transparent hover:bg-white/[0.04]'
+                            ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
+                            : 'border-l-4 border-transparent hover:bg-white/[0.04]'
                           }`}
-                        style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
                       >
                         {/* Status icon */}
                         <div className="mt-0.5 flex-shrink-0">
                           {lesson.isCompleted ? (
-                            <div className="w-[18px] h-[18px] rounded-full bg-green-500/20 flex items-center justify-center">
-                              <CheckCircle size={12} className="text-green-400" />
+                            <div className="w-[18px] h-[18px] rounded-full bg-emerald-500/20 flex items-center justify-center">
+                              <CheckCircle size={12} className="text-emerald-400" />
                             </div>
                           ) : !lesson.isUnlocked ? (
                             <Lock size={14} className="text-slate-600" />
                           ) : isCurrent ? (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-green-500 flex items-center justify-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                            <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                             </div>
                           ) : (
                             <PlayCircle size={16} className="text-slate-600" />
@@ -1371,10 +1470,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <p className="text-[9px] font-black text-slate-600 uppercase tracking-wider mb-0.5">Bài {globalIdx + 1}</p>
-                          <h4 className={`text-[12px] leading-snug truncate ${isCurrent ? 'text-green-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
+                          <h4 className={`text-[12px] leading-snug line-clamp-2 ${isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
                             }`}>
-                            {lesson.title}
+                            {formatLessonDisplayTitle(lesson.title, globalIdx)}
                           </h4>
                           {lesson.duration ? (
                             <span className="text-[10px] text-slate-600 flex items-center gap-1 mt-1">
