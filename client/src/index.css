@@ -485,7 +485,7 @@
   --cms-field-gap: 16px;
   --cms-primary: #dc2626;
   --cms-primary-fg: #ffffff;
-  --cms-secondary: #0284c7;
+  --cms-secondary: #dc2626;
   --cms-success: #059669;
   --cms-warning: #d97706;
   --cms-info: #0284c7;
@@ -562,9 +562,9 @@
 }
 .cms-btn-primary:hover:not(:disabled) { filter: brightness(0.95); }
 .cms-btn-secondary {
-  background: var(--cms-secondary);
+  background: var(--cms-primary);
   color: #fff;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--cms-secondary) 28%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--cms-primary) 28%, transparent);
 }
 .cms-btn-secondary:hover:not(:disabled) { filter: brightness(0.95); }
 .cms-btn-warning {
@@ -1039,7 +1039,7 @@
   transition: background var(--cms-duration) ease, color var(--cms-duration) ease;
 }
 .cms-chip-active {
-  background: var(--cms-secondary);
+  background: var(--cms-primary);
   color: #fff;
 }
 .cms-chat-conv-row {

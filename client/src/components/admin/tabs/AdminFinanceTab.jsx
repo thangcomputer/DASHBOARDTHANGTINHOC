@@ -50,13 +50,13 @@ export default function AdminFinanceTab() {
                     </div>
                   </div>
                   <div className="p-4 sm:p-6">
-                    <div className="bg-gradient-to-br from-red-700 to-red-800 rounded-2xl p-4 sm:p-6 text-white shadow-[0_6px_20px_rgba(37,99,235,0.25)] relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-red-700 to-red-900 rounded-2xl p-4 sm:p-6 text-white shadow-[0_6px_20px_rgba(220,38,38,0.25)] relative overflow-hidden">
                       <div className="absolute top-0 right-0 p-4 opacity-10">
                         <DollarSign size={80} />
                       </div>
                       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
                         <div className="min-w-0">
-                          <p className="text-blue-100 text-[12px] font-semibold tracking-wide">Tổng doanh thu thực tế (Đã thu)</p>
+                          <p className="text-red-100 text-[12px] font-semibold tracking-wide">Tổng doanh thu thực tế (Đã thu)</p>
                           <p className="text-[1.5rem] sm:text-4xl font-extrabold mt-2 break-words">
                             {(financeStudents.filter(s => s.paid).reduce((sum, s) => sum + (s.price || 0), 0)).toLocaleString('vi-VN')}đ
                           </p>
@@ -70,21 +70,21 @@ export default function AdminFinanceTab() {
                       <div className="mt-6 h-16 flex items-end gap-1.5 px-1" aria-hidden="true">
                         {[30, 45, 35, 60, 50, 80, 75, 95].map((h, i) => (
                           <div key={i} className="flex-1 bg-white/20 rounded-t-sm hover:bg-white/40 transition-all duration-200 cursor-pointer relative group" style={{ height: `${h}%` }}>
-                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-white text-blue-600 px-1.5 py-0.5 rounded text-[8px] font-black opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-white text-red-600 px-1.5 py-0.5 rounded text-[8px] font-black opacity-0 group-hover:opacity-100 transition-opacity">
                               {h}M
                             </div>
                           </div>
                         ))}
                       </div>
 
-                      <div className="flex flex-wrap gap-3 mt-5 text-[12px] font-semibold text-blue-100 border-t border-white/10 pt-4">
+                      <div className="flex flex-wrap gap-3 mt-5 text-[12px] font-semibold text-red-100 border-t border-white/10 pt-4">
                         <div className="flex-1 min-w-[140px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
                           <p className="opacity-70 mb-0.5">Dự kiến (Tất cả)</p>
                           <p className="text-[15px] font-bold text-white">{(financeStudents.reduce((sum, s) => sum + (s.price || 0), 0)).toLocaleString('vi-VN')}đ</p>
                         </div>
                         <div className="flex-1 min-w-[140px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
                           <p className="opacity-70 mb-0.5">Công nợ (Chưa thu)</p>
-                          <p className="text-[15px] font-bold text-red-300">{(financeStudents.filter(s => !s.paid).reduce((sum, s) => sum + (s.price || 0), 0)).toLocaleString('vi-VN')}đ</p>
+                          <p className="text-[15px] font-bold text-red-200">{(financeStudents.filter(s => !s.paid).reduce((sum, s) => sum + (s.price || 0), 0)).toLocaleString('vi-VN')}đ</p>
                         </div>
                       </div>
                     </div>
@@ -97,7 +97,7 @@ export default function AdminFinanceTab() {
                     {financeStudents.map(s => (
                       <div key={s.id} className="cms-m-list-row hover:bg-slate-50">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${s.paid ? 'bg-sky-500' : 'bg-red-400'}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${s.paid ? 'bg-emerald-500' : 'bg-red-500'}`}>
                             {s.name[0]}
                           </div>
                           <div className="min-w-0">

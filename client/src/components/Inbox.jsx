@@ -694,9 +694,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               </div>
               {currentUserRole !== 'student' && (
                 <button
+                  type="button"
                   onClick={() => setShowCreateGroup(true)}
-                  className="w-12 h-12 flex shrink-0 items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
+                  className="w-12 h-12 flex shrink-0 items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors shadow-sm"
                   title="Tạo nhóm chat"
+                  aria-label="Tạo nhóm chat"
                 >
                   <Plus size={20} />
                 </button>
@@ -1218,29 +1220,29 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
       {/* ── Create Group Modal ── */}
       {showCreateGroup && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-500">
-              <div className="px-8 py-6 bg-gradient-to-br from-[#1E3A8A] to-[#1E293B] text-white flex items-center justify-between">
-                 <div className="flex items-center gap-3">
-                   <Users className="text-blue-300" />
-                   <h3 className="font-extrabold text-xl tracking-tight uppercase">Tạo nhóm chat mới</h3>
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-[24px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-280 max-h-[min(92dvh,720px)] flex flex-col">
+              <div className="px-5 py-4 bg-gradient-to-br from-red-700 to-red-900 text-white flex items-center justify-between shrink-0">
+                 <div className="flex items-center gap-2.5 min-w-0">
+                   <Users size={18} className="text-red-200 shrink-0" />
+                   <h3 className="font-semibold text-base tracking-tight truncate">Tạo nhóm chat mới</h3>
                  </div>
-                 <button onClick={() => setShowCreateGroup(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20}/></button>
+                 <button type="button" onClick={() => setShowCreateGroup(false)} className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-xl transition-colors" aria-label="Đóng"><X size={18}/></button>
               </div>
-              <div className="p-8 space-y-6">
+              <div className="p-5 space-y-5 overflow-y-auto min-h-0 flex-1">
                 <div>
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Tên nhóm</label>
+                   <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tên nhóm</label>
                    <input
                      type="text"
                      value={groupName}
                      onChange={e => setGroupName(e.target.value)}
                      placeholder="Ví dụ: Nhóm học Tiếng Anh Giao Tiếp..."
-                     className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all font-bold text-slate-800"
+                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 focus:bg-white transition-all font-medium text-sm text-slate-800"
                    />
                 </div>
 
                  <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Chọn thành viên</label>
+                  <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Chọn thành viên</label>
                   <div className="relative mb-3">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
@@ -1248,21 +1250,21 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       value={memberSearch}
                       onChange={e => setMemberSearch(e.target.value)}
                       placeholder="Tìm tên giáo viên hoặc học viên..."
-                      className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-300 focus:bg-white transition-all font-bold text-slate-700"
+                      className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-300 focus:bg-white transition-all font-medium text-slate-700"
                     />
                   </div>
-                  <div className="max-h-52 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                  <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                      {contacts
                        .filter(u => u.id !== currentUserId && u.id !== 'admin')
                        .filter(u => !memberSearch || (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()))
                        .map(u => {
                          const isSelected = selectedParticipants.some(p => p.userId === u.id);
                          return (
-                          <label key={u.id} className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer border transition-all group ${isSelected ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                          <label key={u.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all group ${isSelected ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
                              <div className="relative">
                                <input
                                  type="checkbox"
-                                 className="w-5 h-5 rounded-lg border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+                                 className="w-5 h-5 rounded-md border-2 border-slate-200 text-red-600 focus:ring-red-500 transition-all cursor-pointer"
                                  checked={isSelected}
                                  onChange={(e) => {
                                    if (e.target.checked) setSelectedParticipants([...selectedParticipants, { userId: u.id, name: u.name, role: u.role }]);
@@ -1270,18 +1272,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                  }}
                                />
                              </div>
-                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-sm ${
+                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
                                u.role === 'admin' ? 'bg-red-500' :
-                               u.role === 'teacher' ? 'bg-red-600' : 'bg-emerald-600'
+                               u.role === 'teacher' ? 'bg-amber-600' : 'bg-emerald-600'
                              }`}>
                                {(u.name || '?')[0].toUpperCase()}
                              </div>
-                             <div className="flex-1">
-                                <p className="font-bold text-slate-800 text-sm leading-tight">{u.name}</p>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase">{
-                                  u.role === 'admin' ? 'Nhân viên / Admin' :
-                                  u.role === 'teacher' ? 'Giảng viên' : 'Học viên'
-                                }</p>
+                             <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{u.name}</p>
+                                <p className="text-[11px] text-slate-500 font-medium">
+                                  {u.role === 'admin' ? 'Nhân viên / Admin' :
+                                  u.role === 'teacher' ? 'Giảng viên' : 'Học viên'}
+                                </p>
                              </div>
                           </label>
                          );
@@ -1289,14 +1291,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   </div>
                 </div>
 
-                <div className="flex gap-4 pt-4">
+                <div className="flex gap-3 pt-1">
                   <button
+                    type="button"
                     onClick={() => setShowCreateGroup(false)}
-                    className="flex-1 py-4 px-6 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-all"
+                    className="flex-1 min-h-12 py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-all"
                   >
                     Hủy bỏ
                   </button>
                   <button
+                    type="button"
                     disabled={!groupName.trim() || selectedParticipants.length === 0}
                     onClick={async () => {
                       try {
@@ -1313,7 +1317,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         toast?.error('Lỗi kết nối máy chủ.');
                       }
                     }}
-                    className="flex-[2] py-4 px-6 bg-red-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-200"
+                    className="flex-[1.4] min-h-12 py-3 px-4 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                   >
                     Tạo nhóm ngay
                   </button>

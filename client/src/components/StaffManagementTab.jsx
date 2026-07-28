@@ -679,7 +679,7 @@ export default function StaffManagementTab() {
         <button
           type="button"
           onClick={() => setModal(null)}
-          className="cms-btn cms-btn-secondary cms-btn-sm w-full min-[390px]:w-auto"
+          className="cms-btn cms-btn-primary cms-btn-sm w-full min-[390px]:w-auto"
         >
           <UserPlus size={15} /> Tạo tài khoản
         </button>
