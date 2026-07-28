@@ -815,12 +815,7 @@
   align-items: center;
   gap: 10px;
   margin: 0 0 4px;
-  padding: 10px 0;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: color-mix(in srgb, var(--cms-surface) 92%, transparent);
-  backdrop-filter: blur(6px);
+  padding: 4px 0 8px;
 }
 .cms-step + .cms-form,
 .cms-step + .cms-form-row,
