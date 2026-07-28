@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, X, Ban, PlayCircle, CheckCircle, Video, MessageSquare, Edit3, Trash2 } from 'lucide-react';
 import { csrfFetch } from '../../services/api';
-import { isScheduleOngoingNow } from '../../utils/scheduleTime';
+import { isScheduleOngoingNow, parseTimeToMinutes } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
 
 const STATUS_COLORS = {
@@ -37,7 +37,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
   const [cancelTarget, setCancelTarget] = useState(null); // schedule đang muốn hủy
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
-  const [, setLiveTick] = useState(0);
+  const [liveTick, setLiveTick] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => setLiveTick((n) => n + 1), 30000);
@@ -84,6 +84,44 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
   }, [schedules, month, year]);
 
   const selectedSchedules = selectedDay ? (scheduleMap[selectedDay] || []) : [];
+
+  const isUpcomingInMonth = (s) => {
+    if (!s || s.status !== 'scheduled') return false;
+    const d = new Date(s.date);
+    if (Number.isNaN(d.getTime())) return false;
+    d.setHours(0, 0, 0, 0);
+    if (d.getMonth() !== month || d.getFullYear() !== year) return false;
+    if (d > today) return true;
+    if (d < today) return false;
+    // Cùng ngày hôm nay: chỉ giữ buổi đang diễn ra hoặc chưa kết thúc
+    if (isScheduleOngoingNow(s)) return true;
+    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+    const endMins = parseTimeToMinutes(s.endTime);
+    const startMins = parseTimeToMinutes(s.startTime);
+    if (endMins != null) return nowMins <= endMins;
+    if (startMins != null) return nowMins <= startMins;
+    return true;
+  };
+
+  const upcomingSchedules = useMemo(
+    () => schedules
+      .filter(isUpcomingInMonth)
+      .sort((a, b) => new Date(a.date) - new Date(b.date) || String(a.startTime || '').localeCompare(String(b.startTime || ''))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [schedules, month, year, today.getTime(), liveTick],
+  );
+
+  const monthStats = useMemo(() => {
+    const inMonth = (s) => {
+      const d = new Date(s.date);
+      return !Number.isNaN(d.getTime()) && d.getMonth() === month && d.getFullYear() === year;
+    };
+    return {
+      completed: schedules.filter((s) => s.status === 'completed' && inMonth(s)).length,
+      upcoming: upcomingSchedules.length,
+      cancelled: schedules.filter((s) => s.status === 'cancelled' && inMonth(s)).length,
+    };
+  }, [schedules, month, year, upcomingSchedules]);
 
   const days = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
@@ -372,14 +410,11 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <h4 className="text-sm font-bold text-gray-700">📅 Sắp tới trong tháng</h4>
           <span className="text-xs text-gray-400 font-bold">
-            {schedules.filter(s => s.status === 'scheduled' && new Date(s.date) >= today && new Date(s.date).getMonth() === month).length} buổi
+            {upcomingSchedules.length} buổi
           </span>
         </div>
         <div className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
-          {schedules
-            .filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month)
-            .sort((a, b) => new Date(a.date) - new Date(b.date))
-            .map(s => {
+          {upcomingSchedules.map(s => {
               const d = new Date(s.date);
               const displayStatus = getDisplayStatus(s);
               const cfg = STATUS_COLORS[displayStatus] || STATUS_COLORS.scheduled;
@@ -401,8 +436,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0 uppercase ${cfg.badge}`}>
                     {displayStatus === 'ongoing' ? 'Đang diễn ra' : s.startTime}
                   </span>
-                  {/* Hover cancel button */}
-                  {new Date(s.date) >= today && displayStatus !== 'ongoing' && (
+                  {displayStatus !== 'ongoing' && (
                     <button
                       onClick={() => { setCancelTarget(s); setCancelReason(''); }}
                       className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
@@ -414,23 +448,28 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                 </div>
               );
             })}
-          {schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length === 0 && (
+          {upcomingSchedules.length === 0 && (
             <div className="px-5 py-6 text-center text-gray-400 text-sm">Không có buổi nào sắp tới.</div>
           )}
         </div>
       </div>
 
-      {/* ─ STATS ROW ─ */}
-      <div className="grid grid-cols-4 gap-2">
+      {/* ─ STATS ROW: 3 cột, icon + số ─ */}
+      <div className="grid grid-cols-3 gap-2">
         {[
-          { label: 'Tổng', value: schedules.filter(s => new Date(s.date).getMonth() === month).length, color: 'bg-blue-50 text-blue-700' },
-          { label: 'Đã dạy', value: schedules.filter(s => s.status === 'completed' && new Date(s.date).getMonth() === month).length, color: 'bg-emerald-50 text-emerald-700' },
-          { label: 'Sắp tới', value: schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length, color: 'bg-amber-50 text-amber-700' },
-          { label: 'Đã hủy', value: schedules.filter(s => s.status === 'cancelled' && new Date(s.date).getMonth() === month).length, color: 'bg-rose-50 text-rose-600' },
-        ].map((st, i) => (
-          <div key={i} className={`${st.color} rounded-xl py-2.5 px-1.5 sm:p-3 text-center shadow-sm border border-white/60`}>
+          { label: 'Đã dạy', value: monthStats.completed, color: 'bg-emerald-50 text-emerald-700', Icon: CheckCircle },
+          { label: 'Sắp tới', value: monthStats.upcoming, color: 'bg-amber-50 text-amber-700', Icon: Clock },
+          { label: 'Đã hủy', value: monthStats.cancelled, color: 'bg-rose-50 text-rose-600', Icon: Ban },
+        ].map((st) => (
+          <div
+            key={st.label}
+            title={st.label}
+            aria-label={`${st.label}: ${st.value}`}
+            className={`${st.color} rounded-xl py-2.5 px-1.5 sm:p-3 text-center shadow-sm border border-white/60 flex flex-col items-center gap-1`}
+          >
+            <st.Icon size={16} className="opacity-80" aria-hidden="true" />
             <p className="text-lg font-bold tabular-nums leading-none">{st.value}</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mt-1 opacity-80">{st.label}</p>
+            <p className="hidden sm:block text-[10px] font-semibold uppercase tracking-wider opacity-80">{st.label}</p>
           </div>
         ))}
       </div>

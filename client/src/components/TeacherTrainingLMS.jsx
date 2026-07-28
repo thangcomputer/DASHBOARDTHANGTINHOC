@@ -843,21 +843,30 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           </div>
         )}
 
-        {/* TOP TABS FOR TEACHER */}
-        <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 w-fit mb-8">
+        {/* TOP TABS FOR TEACHER — 3 cột, mobile chỉ icon */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 bg-white rounded-2xl p-1.5 sm:p-2 shadow-sm border border-gray-100 w-full mb-8">
           {[
             { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0 },
             { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0 },
           ].map(t => (
-            <button key={t.key} onClick={() => setMainTab(t.key)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setMainTab(t.key)}
+              title={t.label}
+              aria-label={`${t.label}: ${t.count}`}
+              className={`relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all min-h-11 ${
                 mainTab === t.key
                   ? 'bg-red-600 text-white shadow-md'
                   : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              <t.icon size={18} className="shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline truncate">{t.label}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none ${
+                mainTab === t.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'
               }`}>
-              <t.icon size={16} /> {t.label} 
-              <span className={`text-[10px] ml-1 bg-white/20 px-2 py-0.5 rounded-full ${mainTab === t.key ? 'text-white' : 'bg-slate-200 text-slate-500'}`}>
                 {t.count}
               </span>
             </button>
