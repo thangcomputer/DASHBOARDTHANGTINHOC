@@ -318,8 +318,8 @@ const YouTubePlayerSecure = ({
   return (
     <div className="flex flex-col w-full h-full">
       {/* YouTube Player */}
-      <div ref={containerRef} className="relative flex-1 bg-black group rounded-2xl overflow-hidden">
-        <div id={`yt-player-${lessonId}`} className="w-full h-full" />
+      <div ref={containerRef} className="relative w-full h-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg group">
+        <div id={`yt-player-${lessonId}`} className="absolute inset-0 w-full h-full" />
 
         {/* ▶️ PREMIUM OVERLAY */}
         {overlayVisible && (
@@ -374,55 +374,49 @@ const YouTubePlayerSecure = ({
             <CheckCircle size={12} /> Đã xem xong
           </div>
         )}
-      </div>
+        {requiredSeconds > 0 && !overlayVisible && (
+          <div className={`absolute top-3 right-3 z-10 text-xs px-2.5 py-1 rounded-full border backdrop-blur-md font-bold ${
+            displayWatched >= requiredSeconds
+              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+              : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+          }`}>
+            {displayWatched >= requiredSeconds
+              ? 'Đủ điều kiện'
+              : `Cần xem ${formatTime(Math.max(0, requiredSeconds - displayWatched))} nữa`}
+          </div>
+        )}
 
-      {/* ⏱ TIMER UI — bên dưới video */}
-      {isReady && (
-        <div className="flex-shrink-0 px-1 py-2 flex items-center justify-between">
-          {/* Bên trái: Tiến độ xem thực tế */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
-              <Clock size={12} className="text-blue-400" />
-              <span className="text-white font-mono text-[11px] font-bold tabular-nums">
-                {formatTime(displayWatched)}
-              </span>
-              <span className="text-slate-500 text-[11px]">/</span>
-              <span className="text-slate-400 font-mono text-[11px] tabular-nums">
-                {formatTime(totalDuration)}
-              </span>
-            </div>
-
-            {/* Progress bar thực tế */}
-            {totalDuration > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-red-500 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, (displayWatched / totalDuration) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-slate-500 font-bold">
-                  {Math.round((displayWatched / totalDuration) * 100)}%
+        {isReady && !overlayVisible && (
+          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/45 to-transparent p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-black/35 border border-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                <Clock size={12} className="text-emerald-300" />
+                <span className="text-white font-mono text-[11px] font-bold tabular-nums">
+                  {formatTime(displayWatched)}
+                </span>
+                <span className="text-slate-500 text-[11px]">/</span>
+                <span className="text-slate-300 font-mono text-[11px] tabular-nums">
+                  {formatTime(totalDuration)}
                 </span>
               </div>
-            )}
-          </div>
 
-          {/* Bên phải: Yêu cầu 2/3 */}
-          {requiredSeconds > 0 && (
-            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${
-              displayWatched >= requiredSeconds
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400/70 border-amber-500/20'
-            }`}>
-              {displayWatched >= requiredSeconds
-                ? <><CheckCircle size={11} /> Đủ điều kiện</>
-                : <><AlertCircle size={11} /> Cần xem {formatTime(Math.max(0, requiredSeconds - displayWatched))} nữa</>
-              }
+              {totalDuration > 0 && (
+                <>
+                  <div className="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (displayWatched / totalDuration) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-white/70 font-bold tabular-nums">
+                    {Math.round((displayWatched / totalDuration) * 100)}%
+                  </span>
+                </>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1088,16 +1082,8 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         <div className="flex flex-col flex-1 min-w-0 lg:flex-[7] overflow-hidden">
 
           {/* VIDEO WRAPPER — 16:9 */}
-          <div className="flex-shrink-0 px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 flex justify-center">
-            <div
-              className="relative overflow-hidden shadow-2xl shadow-black/60 w-full"
-              style={{
-                borderRadius: '16px',
-                aspectRatio: '16 / 9',
-                maxHeight: '65vh',
-                margin: '0 auto',
-              }}
-            >
+          <div className="flex-shrink-0 px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3">
+            <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg">
               <YouTubePlayerSecure
                 key={currentLesson?._id}
                 videoId={currentLesson?.videoUrl}
@@ -1463,6 +1449,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         .custom-scrollbar-dark::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar-dark::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
         .custom-scrollbar-dark::-webkit-scrollbar-thumb:hover { background: #334155; }
+        [id^="yt-player-"] iframe { width: 100% !important; height: 100% !important; object-fit: cover; }
       `}} />
     </div>
   );
