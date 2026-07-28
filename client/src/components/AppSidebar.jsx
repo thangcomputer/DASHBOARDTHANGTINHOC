@@ -123,7 +123,6 @@ const MENU_CONFIG = {
       },
     ],
     bottomItems: [
-      { key: 'account', icon: User, label: 'Tài khoản', isChangePassword: true },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
     accentColor: 'bg-red-600',
@@ -145,14 +144,42 @@ const AppSidebar = ({
   adminRole = null,       // 'SUPER_ADMIN' | 'STAFF' | null
   userPermissions = [],   // ['manage_students', ...]
 }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const SIDEBAR_COLLAPSE_KEY = 'cms_sidebar_collapsed';
+  // Tablet / laptop hẹp (< xl 1200px): rail + overlay khi mở rộng
+  const TABLET_RAIL_MQ = '(min-width: 768px) and (max-width: 1199.98px)';
+  const NARROW_DEFAULT_MQ = '(max-width: 1199.98px)';
+
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const saved = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
+      if (saved === '1' || saved === '0') return saved === '1';
+    } catch { /* ignore */ }
+    // Tablet / màn hẹp: mặc định thu gọn để nội dung rộng
+    return window.matchMedia(NARROW_DEFAULT_MQ).matches;
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [tabletRail, setTabletRail] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia(TABLET_RAIL_MQ).matches
+  ));
+
+  useEffect(() => {
+    const mq = window.matchMedia(TABLET_RAIL_MQ);
+    const sync = () => setTabletRail(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  const setCollapsedPersist = (next) => {
+    setCollapsed(next);
+    try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+  };
 
   // Tour hướng dẫn cần thấy đủ menu (mở mobile / bỏ thu gọn)
   useEffect(() => {
     const openForGuide = () => {
-      setCollapsed(false);
-      // Tablet+ dùng sidebar cố định; chỉ mobile mới dùng drawer/hamburger
+      setCollapsedPersist(false);
       if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
         setMobileOpen(true);
       }
@@ -168,11 +195,22 @@ const AppSidebar = ({
     const collapseOnContentInteract = () => {
       if (typeof window === 'undefined') return;
       if (!window.matchMedia('(min-width: 768px)').matches) return;
-      setCollapsed(true);
+      setCollapsedPersist(true);
     };
     main.addEventListener('pointerdown', collapseOnContentInteract);
     return () => main.removeEventListener('pointerdown', collapseOnContentInteract);
   }, []);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Đổi trang trên tablet/laptop hẹp → thu sidebar
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!window.matchMedia(TABLET_RAIL_MQ).matches) return;
+    setCollapsedPersist(true);
+  }, [location.pathname, location.hash]);
+
   const [openGroups, setOpenGroups] = useState(() => {
     const defaults = {
       'people-group': false,
@@ -187,8 +225,6 @@ const AppSidebar = ({
       return defaults;
     }
   });
-  const navigate = useNavigate();
-  const location = useLocation();
   const { 
     students, teachers, getPrivateEvaluationsForAdmin, getConversations, triggerBackgroundSync,
     notifications: allNotifications, markNotificationRead
@@ -383,7 +419,7 @@ const AppSidebar = ({
         ) : null}
         <button
           type="button"
-          onClick={() => setCollapsed(c => !c)}
+          onClick={() => setCollapsedPersist(!collapsed)}
           aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
           className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 items-center justify-center flex-shrink-0 transition-all z-10"
         >
@@ -547,11 +583,24 @@ const AppSidebar = ({
     </div>
   );
 
+  const overlayExpand = tabletRail && !collapsed;
+
   return (
     <>
-      {/* ── Desktop Sidebar ── */}
-      <div className={`hidden md:flex flex-col fixed left-0 top-0 h-screen z-30 transition-all duration-300
+      {/* Tablet: nền mờ khi mở rộng sidebar (overlay, không đẩy co layout) */}
+      {overlayExpand && (
+        <button
+          type="button"
+          className="hidden md:block xl:hidden fixed inset-0 z-[55] bg-black/40 border-0 cursor-default"
+          aria-label="Đóng menu"
+          onClick={() => setCollapsedPersist(true)}
+        />
+      )}
+
+      {/* ── Desktop / Tablet Sidebar ── */}
+      <div className={`hidden md:flex flex-col fixed left-0 top-0 h-screen transition-all duration-300
         ${collapsed ? 'w-16' : 'w-64'}
+        ${overlayExpand ? 'z-[60] shadow-2xl' : 'z-30'}
       `}>
         {renderSidebarContent()}
       </div>
@@ -585,8 +634,8 @@ const AppSidebar = ({
         </div>
       )}
 
-      {/* ── Spacer for main content ── */}
-      <div className={`hidden md:block flex-shrink-0 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`} />
+      {/* Spacer: tablet luôn giữ rail icon (w-16); desktop mới đẩy theo collapsed */}
+      <div className={`hidden md:block flex-shrink-0 transition-all duration-300 ${collapsed || tabletRail ? 'w-16' : 'w-64'}`} />
     </>
   );
 };

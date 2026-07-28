@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
@@ -91,7 +91,8 @@ export default function AdminStudentTrainingTab() {
                 </h2>
               </div>
 
-              {/* Sub-tabs */}
+              {/* Sub-tabs + primary action (laptop+: one row of tabs, action left-aligned) */}
+              <div className="flex flex-col gap-3 lg:gap-4">
               <div className="cms-hscroll-tabs w-full rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
                 <div className="cms-hscroll-tabs__track">
                 {[
@@ -120,13 +121,13 @@ export default function AdminStudentTrainingTab() {
                 </div>
               </div>
 
-              {/* Add button */}
               {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && (
-                <button onClick={() => { setSCourseBuilderMode(null); setSTrainingForm({ examSubjects: [] }); }}
-                  className="w-auto mx-auto min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm({ examSubjects: [] }); }}
+                  className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
                   <Plus size={15} /> {sTrainingTab === 'videos' ? 'Thêm Khóa học' : 'Thêm tài liệu'}
                 </button>
               )}
+              </div>
               {sTrainingTab === 'questions' && <StudentQuestionBankPanel />}
 
               {/* Kết quả thi tự động từ bài thi của học viên - không cần thêm thủ công */}
@@ -607,7 +608,7 @@ export default function AdminStudentTrainingTab() {
               {sTrainingTab !== 'exam-results' && sTrainingTab !== 'questions' && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {(studentTrainingData?.[sTrainingTab] || []).map(item => (
-                      <div key={item.id} className="px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition border-b border-gray-50 last:border-b-0">
+                      <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition border-b border-gray-50 last:border-b-0">
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                           {sTrainingTab === 'videos' && (
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition" onClick={() => setSCourseBuilderMode(item)}>

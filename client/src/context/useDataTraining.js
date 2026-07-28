@@ -68,15 +68,8 @@ export function useDataTraining(currentUser) {
     applyExamCatalogFromServer(d);
     if (d.hasStudentExamBank) {
       const serverQs = Array.isArray(d.studentQuestions) ? d.studentQuestions : [];
-      setStudentQuestions((prev) => {
-        const prevArr = Array.isArray(prev) ? prev : [];
-        if (prevArr.length === 0) return serverQs;
-        if (prevArr.length > serverQs.length) return prevArr;
-        const serverIds = new Set(serverQs.map((q) => q?.id).filter(Boolean));
-        const localOnly = prevArr.filter((q) => q?.id && !serverIds.has(q.id));
-        if (localOnly.length > 0) return [...serverQs, ...localOnly];
-        return serverQs;
-      });
+      // Server là nguồn sự thật — tránh localStorage seed cũ che ngân hàng Admin
+      setStudentQuestions(serverQs);
     }
     if (d.studentExamMinutes && typeof d.studentExamMinutes === 'object') {
       setStudentExamMinutes(() => {
@@ -198,6 +191,21 @@ export function useDataTraining(currentUser) {
         }
       } catch { /* ignore */ }
       if (!cancelled) setStudentExamBankHydrated(true);
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.id, currentUser?.role, applyStudentExamConfigFromServer]);
+
+  // Học viên: luôn hydrate ngân hàng câu hỏi từ server (không phụ thuộc sync nền)
+  useEffect(() => {
+    if (currentUser?.role !== 'student') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.settings.getStudentExamConfig();
+        if (!cancelled && res?.success && res.data) {
+          applyStudentExamConfigFromServer(res.data);
+        }
+      } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
   }, [currentUser?.id, currentUser?.role, applyStudentExamConfigFromServer]);

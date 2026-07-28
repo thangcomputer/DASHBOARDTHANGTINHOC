@@ -720,7 +720,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
               <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
               <p className="font-bold">Chưa có khóa học nào</p>
-              <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
+              <p className="text-xs mt-1">Chưa có video đào tạo phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
@@ -867,9 +867,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                 );
               })}
               {(!trainingData?.files || trainingData.files.length === 0) && (
-                <div className="text-center py-12 text-slate-400">
-                  <FileBox size={32} className="mx-auto mb-2 text-slate-200" />
-                  <p className="text-sm">Chưa có tài liệu nào được cung cấp.</p>
+                <div className="col-span-full py-16 text-center text-slate-400">
+                  <FileBox size={40} className="mx-auto mb-3 opacity-40" />
+                  <p className="font-bold">Chưa có tài liệu</p>
+                  <p className="text-xs mt-1">Chưa có tài liệu phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
                 </div>
               )}
             </div>

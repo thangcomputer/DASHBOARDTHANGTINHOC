@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
@@ -42,7 +42,8 @@ export default function AdminTrainingTab() {
                  }} />
               ) : (
                 <>
-              {/* Sub-tabs */}
+              {/* Sub-tabs + primary action (laptop+: one row of tabs, action left-aligned) */}
+              <div className="flex flex-col gap-3 lg:gap-4">
               <div className="cms-hscroll-tabs rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
                 <div className="cms-hscroll-tabs__track">
                 {[
@@ -72,19 +73,19 @@ export default function AdminTrainingTab() {
                 </div>
               </div>
 
-              {/* Add button */}
               {trainingTab !== 'questions' && trainingTab !== 'exam-results-gv' && (
-                <button onClick={() => setTrainingForm({ examSubjects: [] })}
-                  className="w-auto mx-auto min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                <button type="button" onClick={() => setTrainingForm({ examSubjects: [] })}
+                  className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
                   <Plus size={15} /> {trainingTab === 'videos' ? 'Thêm Khóa học' : trainingTab === 'guides' ? 'Thêm quy trình' : 'Thêm tài liệu'}
                 </button>
               )}
               {trainingTab === 'exam-results-gv' && (
-                <button onClick={() => setErGvForm({ ...BLANK_ER_GV })}
-                  className="w-auto mx-auto min-h-11 justify-center bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                <button type="button" onClick={() => setErGvForm({ ...BLANK_ER_GV })}
+                  className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
                   <Plus size={15} /> Thêm kết quả thi
                 </button>
               )}
+              </div>
 
               {/* Add/Edit Form */}
               {trainingForm && (
@@ -441,8 +442,8 @@ export default function AdminTrainingTab() {
               {trainingTab !== 'exam-results-gv' && trainingTab !== 'questions' && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="divide-y divide-gray-50">
-                    {(trainingData?.[trainingTab] || []).slice(0, trainingTab === 'videos' ? 4 : 20).map(item => (
-                    <div key={item.id} className="px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition">
+                    {(trainingData?.[trainingTab] || []).map(item => (
+                    <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition">
                       <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                         {trainingTab === 'videos' && (
                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition" onClick={() => setCourseBuilderMode(item)}>

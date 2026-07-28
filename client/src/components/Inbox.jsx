@@ -676,7 +676,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
         {/* ── Sidebar: Conversations ── */}
         <div className={`
-          w-full md:w-[340px] lg:w-[380px] bg-white border-r border-gray-100 flex flex-col flex-shrink-0
+          w-full md:w-[min(42%,280px)] lg:w-[340px] xl:w-[380px] bg-white border-r border-gray-100 flex flex-col flex-shrink-0 min-w-0
           ${activeConv ? 'hidden md:flex' : 'flex'}
         `}>
           {/* Search & Add Group */}

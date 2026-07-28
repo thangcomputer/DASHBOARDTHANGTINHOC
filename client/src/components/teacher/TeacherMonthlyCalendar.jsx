@@ -124,9 +124,9 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
   };
 
   return (
-    <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-5 lg:gap-6 w-full min-w-0">
+    <div className="flex flex-col lg:flex-row lg:items-start gap-4 md:gap-5 lg:gap-6 w-full min-w-0">
       {/* ─ CALENDAR GRID ─ */}
-      <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-sm border-0 p-3 sm:p-5 md:p-6 w-full md:flex-1 md:min-w-0">
+      <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-sm border-0 p-3 sm:p-5 md:p-6 w-full lg:flex-1 lg:min-w-0">
         {/* Header Nav */}
         <div className="px-1 sm:px-2 py-3 sm:py-4 flex items-center justify-between mb-1 sm:mb-2 gap-2 min-w-0">
           <h3 className="font-extrabold text-slate-800 text-sm sm:text-lg md:text-xl tracking-wide shrink-0">
@@ -257,7 +257,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
       </div>
 
       {/* ─ RIGHT COLUMN (Detail Panel & Upcoming) ─ */}
-      <div className="w-full md:w-[min(100%,20rem)] lg:w-[22rem] xl:w-[24rem] md:flex-none md:sticky md:top-4 flex flex-col gap-4 md:gap-5">
+      <div className="w-full lg:w-[min(100%,20rem)] xl:w-[22rem] 2xl:w-[24rem] lg:flex-none lg:sticky lg:top-4 flex flex-col gap-4 md:gap-5">
         
       {/* ─ DETAIL PANEL (khi chọn 1 ngày) Hoặc TRẠNG THÁI TRỐNG ─ */}
       {selectedDay ? (

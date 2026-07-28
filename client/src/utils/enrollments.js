@@ -1,5 +1,5 @@
 /** Client helpers */
-import { itemMatchesSubjectIds } from './trainingSubjectFilter.js';
+import { itemMatchesSubjectIds, resolveItemExamSubjects } from './trainingSubjectFilter.js';
 
 export function teacherIdStr(teacherId) {
   if (!teacherId) return '';
@@ -175,41 +175,74 @@ export function studentCanAccessTrainingItem(item, accessKeys, enrollments, fall
 }
 
 function matchesActiveCourse(item, activeCourseName, enrollments) {
-  if (!activeCourseName) return true;
-  if (item.courseId && item.courseName) return true;
+  if (!activeCourseName || activeCourseName === 'all') return true;
   const activeNorm = normCourseKey(activeCourseName);
   if (item.courseName && normCourseKey(item.courseName) === activeNorm) return true;
   const enr = (enrollments || []).find((e) => normCourseKey(e.courseName || e.name) === activeNorm);
   if (item.courseId && enr?.courseId && String(item.courseId) === String(enr.courseId)) return true;
+  // Tài liệu không gắn khóa cụ thể → hiện theo môn (đã lọc subject ở ngoài)
+  if (!item.courseId && !item.courseName) return true;
   return false;
 }
 
 export function filterStudentTrainingFiles(files, { enrollments, fallbackCourse, activeCourseName, allowedSubjectIds, catalog } = {}) {
   const list = Array.isArray(files) ? files : [];
+  if (!list.length) return [];
+
   const accessKeys = getStudentCourseAccessKeys(enrollments, fallbackCourse);
-  return list.filter((f) =>
-    studentCanAccessTrainingItem(f, accessKeys, enrollments, fallbackCourse)
-    && matchesActiveCourse(f, activeCourseName, enrollments)
-    && itemMatchesSubjectIds(f, allowedSubjectIds, catalog)
-  );
+  const hasEnrollment = !!(enrollments?.length || fallbackCourse);
+
+  return list.filter((f) => {
+    // 1) Khớp môn của khóa HV đang xem / đang học
+    if (allowedSubjectIds?.length && itemMatchesSubjectIds(f, allowedSubjectIds, catalog)) {
+      return matchesActiveCourse(f, activeCourseName, enrollments);
+    }
+
+    // 2) Gắn đúng khóa enrollment
+    if (studentCanAccessTrainingItem(f, accessKeys, enrollments, fallbackCourse)) {
+      return matchesActiveCourse(f, activeCourseName, enrollments);
+    }
+
+    // 3) Tài liệu chung chưa gắn môn
+    if (hasEnrollment && !resolveItemExamSubjects(f, catalog).length) {
+      return matchesActiveCourse(f, activeCourseName, enrollments);
+    }
+
+    return false;
+  });
 }
 
 export function filterStudentTrainingVideos(videos, { enrollments, fallbackCourse, allowedSubjectIds, catalog } = {}) {
   const list = Array.isArray(videos) ? videos : [];
-  if (!enrollments?.length && !fallbackCourse) {
-    return list.filter((v) => itemMatchesSubjectIds(v, allowedSubjectIds, catalog));
-  }
+  if (!list.length) return [];
+
   const accessKeys = getStudentCourseAccessKeys(enrollments, fallbackCourse);
+  const hasEnrollment = !!(enrollments?.length || fallbackCourse);
+
   return list.filter((v) => {
+    // 1) Khớp môn thi của khóa HV đang học (cách chính để thấy video Admin xuất bản)
+    if (allowedSubjectIds?.length && itemMatchesSubjectIds(v, allowedSubjectIds, catalog)) {
+      return true;
+    }
+
+    // 2) Gắn trực tiếp theo enrollment (id / tên khóa)
     const id = v.id || v._id;
-    let courseOk = false;
-    if (id && accessKeys.has(`id:${String(id)}`)) courseOk = true;
-    else if (v.title && accessKeys.has(`name:${normCourseKey(v.title)}`)) courseOk = true;
-    else courseOk = (enrollments || []).some((e) => {
+    if (id && accessKeys.has(`id:${String(id)}`)) return true;
+    if (v.title && accessKeys.has(`name:${normCourseKey(v.title)}`)) return true;
+    const linkedByEnrollment = (enrollments || []).some((e) => {
       if (id && e.courseId && String(e.courseId) === String(id)) return true;
       const en = e.courseName || e.name;
       return v.title && en && normCourseKey(en) === normCourseKey(v.title);
-    }) || (fallbackCourse && v.title && normCourseKey(fallbackCourse) === normCourseKey(v.title));
-    return courseOk && itemMatchesSubjectIds(v, allowedSubjectIds, catalog);
+    });
+    if (linkedByEnrollment) return true;
+    if (fallbackCourse && v.title && normCourseKey(fallbackCourse) === normCourseKey(v.title)) return true;
+
+    // 3) Nội dung chung chưa gắn môn: HV đã xếp lớp được xem
+    if (hasEnrollment) {
+      const itemSubs = resolveItemExamSubjects(v, catalog);
+      if (!itemSubs.length) return true;
+    }
+
+    return false;
   });
 }

@@ -222,15 +222,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     });
   }, [student, updateStudent, subjectId]);
 
-  // ── Tải ngân hàng câu hỏi từ server (học viên có thể vào thi trước khi sync xong) ──
+  // ── Tải ngân hàng câu hỏi từ server (luôn đồng bộ Admin → HV) ──
   useEffect(() => {
     let cancelled = false;
     const hasLocalMc = getStudentMcQuestionsForExam(studentQuestions, subjectId).length > 0;
-    if (hasLocalMc) {
-      setQuestionsLoading(false);
-      return undefined;
-    }
-    setQuestionsLoading(true);
+    if (!hasLocalMc) setQuestionsLoading(true);
     (async () => {
       try {
         const res = await api.settings.getStudentExamConfig();
@@ -247,7 +243,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       if (!cancelled) setQuestionsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [subjectId, studentQuestions, setStudentQuestions]);
+  }, [subjectId, setStudentQuestions]);
 
   // Cập nhật đề khi admin lưu ngân hàng (socket data:refresh)
   useEffect(() => {
