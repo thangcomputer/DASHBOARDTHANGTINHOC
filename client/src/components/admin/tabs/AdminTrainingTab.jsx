@@ -208,131 +208,228 @@ export default function AdminTrainingTab() {
                       </div>
                       <span className="text-xs text-gray-400 font-bold sm:ml-auto">{filteredGv.length} bản ghi</span>
                     </div>
-                    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                      <div className="cms-table-wrap">
-                        <table className="w-full text-left border-collapse min-w-[800px]">
-                          <thead>
-                            <tr className="bg-blue-50 border-b border-blue-100">
-                              <th className="px-4 py-3 text-xs font-black text-blue-700 uppercase tracking-widest">Giảng viên</th>
-                              <th className="px-4 py-3 text-xs font-black text-blue-700 uppercase tracking-widest text-center">Trắc nghiệm</th>
-                              <th className="px-4 py-3 text-xs font-black text-blue-700 uppercase tracking-widest text-center">Bài tự luận (File)</th>
-                              <th className="px-4 py-3 text-xs font-black text-blue-700 uppercase tracking-widest text-center">Trạng thái chung</th>
-                              <th className="px-4 py-3 text-xs font-black text-blue-700 uppercase tracking-widest">Ngày thi</th>
-                              <th className="px-4 py-3 text-xs font-black text-blue-700 uppercase tracking-widest text-right">Thao tác</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                            {filteredGv.map(t => {
-                              const mcScore = Number(t.testScore) || 0;
-                              const isPassedMC = mcScore >= 80;
-                              return (
-                                <tr key={t.id || t._id} className="hover:bg-blue-50/20 transition-colors">
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-xl bg-red-500 flex items-center justify-center text-white text-xs font-black">
-                                        {(t.name || '?')[0]}
-                                      </div>
-                                      <div>
-                                        <span className="font-bold text-sm text-gray-800 block">{t.name}</span>
-                                        <span className="text-xs text-gray-400 font-bold">{t.phone}</span>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-3 text-center">
-                                    <div className="flex flex-col items-center">
-                                      <span className={`text-lg font-black ${isPassedMC ? 'text-sky-700' : 'text-red-500'}`}>{mcScore}/100</span>
-                                      <span className="text-xs cms-min-text-xs text-gray-400 font-bold uppercase">{isPassedMC ? 'ĐẠT' : 'TRƯỢT'}</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-3 text-center">
+                    {filteredGv.length === 0 ? (
+                      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-14 text-center text-gray-400">
+                        <Trophy size={36} className="mx-auto mb-3 text-gray-200" />
+                        <p className="text-sm font-bold">Chưa có kết quả thi nào</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Mobile: card grid — không bị cắt cột */}
+                        <div className="sm:hidden grid grid-cols-1 gap-3">
+                          {filteredGv.map(t => {
+                            const mcScore = Number(t.testScore) || 0;
+                            const isPassedMC = mcScore >= 80;
+                            const examDate = resolveTeacherExamDate(t);
+                            const statusLabel = t.status === 'active' ? 'CHÍNH THỨC' : t.status === 'Locked' ? 'BỊ KHÓA' : 'ĐANG CHỜ';
+                            const statusCls = t.status === 'active'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : t.status === 'Locked'
+                                ? 'bg-red-50 text-red-600 border-red-200'
+                                : 'bg-amber-50 text-amber-600 border-amber-200';
+                            return (
+                              <div key={t.id || t._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 space-y-3 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-9 h-9 rounded-xl bg-red-500 flex items-center justify-center text-white text-xs font-black shrink-0">
+                                    {(t.name || '?')[0]}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-bold text-sm text-gray-800 truncate">{t.name}</p>
+                                    <p className="text-xs text-gray-400 font-bold truncate">{t.phone}</p>
+                                  </div>
+                                  <span className={`shrink-0 inline-flex px-2 py-1 rounded-lg text-[10px] font-black border ${statusCls}`}>{statusLabel}</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                  <div className="rounded-xl bg-slate-50 px-1.5 py-2 min-w-0">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wide mb-0.5">TN</p>
+                                    <p className={`text-sm font-black ${isPassedMC ? 'text-sky-700' : 'text-red-500'}`}>{mcScore}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase">{isPassedMC ? 'Đạt' : 'Trượt'}</p>
+                                  </div>
+                                  <div className="rounded-xl bg-slate-50 px-1.5 py-2 min-w-0 flex flex-col items-center justify-center">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wide mb-0.5">Tự luận</p>
                                     {t.practicalFile ? (
                                       <button
                                         type="button"
                                         onClick={() => setGvReviewModal(t)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 rounded-xl text-xs font-bold transition-all border border-red-200 max-w-[200px] truncate"
+                                        className="text-[10px] font-bold text-red-700 underline truncate max-w-full"
                                         title={practicalFileDisplayName(t.practicalFile)}
                                       >
-                                        <Download size={12} className="shrink-0" />
-                                        <span className="truncate">{practicalFileDisplayName(t.practicalFile)}</span>
+                                        Xem file
                                       </button>
                                     ) : (
-                                      <span className="text-gray-300 text-xs font-bold italic">Chưa nộp</span>
+                                      <span className="text-[10px] text-gray-300 font-bold italic">Chưa nộp</span>
                                     )}
-                                  </td>
-                                  <td className="px-4 py-3 text-center">
-                                    <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black ${
-                                      t.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 
-                                      t.status === 'Locked' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
-                                    }`}>
-                                      {t.status === 'active' ? 'CHÍNH THỨC' : t.status === 'Locked' ? 'BỊ KHÓA' : 'ĐANG CHỜ'}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <span className="text-xs text-gray-400 font-bold">
-                                      {(() => {
-                                        const d = resolveTeacherExamDate(t);
-                                        return d
-                                          ? d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                                          : 'N/A';
-                                      })()}
-                                    </span>
-                                    {isTeacherExamDateApproximate(t) && (
-                                      <span className="block text-xs cms-min-text-xs text-amber-600 font-bold mt-0.5">Ước lượng từ cập nhật hồ sơ</span>
-                                    )}
-                                  </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <div className="flex justify-end gap-1">
-                                      {String(t.status || '').toLowerCase() === 'pending' && t.practicalFile ? (
-                                        <>
-                                          <button onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'passed', status: 'active' })} className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-black tracking-wide border border-emerald-200">CHẤM ĐẠT</button>
-                                          <button onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'failed', status: 'Locked', lockReason: 'Bài thi Tự luận/Thực hành chưa đạt yêu cầu' })} className="px-3 py-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 text-xs font-black tracking-wide border border-red-200">CHẤM TRƯỢT</button>
-                                        </>
-                                      ) : String(t.status || '').toLowerCase() === 'active' ? (
-                                        <span className="text-xs text-sky-700 font-black">XONG</span>
-                                      ) : String(t.status || '').toLowerCase() === 'locked' ? (
-                                        <button
-                                          type="button"
-                                          onClick={async () => {
-                                            const id = t.id || t._id;
-                                            try {
-                                              await ctxUpdateTeacher(id, {
-                                                status: 'pending',
-                                                lockReason: null,
-                                                practicalStatus: 'none',
-                                                practicalFile: null,
-                                                testScore: 0,
-                                                testStatus: null,
-                                                testDate: null,
-                                              });
-                                              toast.success('Đã mở khóa — giảng viên có thể vào thi lại.');
-                                            } catch (e) {
-                                              toast.error(e?.message || 'Không cập nhật được. Cần quyền Super Admin hoặc quyền Đào tạo trên tài khoản nhân viên.');
-                                            }
-                                          }}
-                                          className="relative z-10 px-2 py-1.5 rounded-lg bg-white text-gray-800 hover:bg-gray-50 text-xs font-black border-2 border-gray-800 shadow-sm cursor-pointer"
-                                        >
-                                          CHO THI LẠI
-                                        </button>
-                                      ) : (
-                                        <span className="text-xs text-gray-400 font-bold border px-2 py-1 border-gray-100 rounded-lg">ĐANG THI...</span>
-                                      )}
-                                    </div>
-                                  </td>
+                                  </div>
+                                  <div className="rounded-xl bg-slate-50 px-1.5 py-2 min-w-0">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wide mb-0.5">Ngày thi</p>
+                                    <p className="text-[10px] font-bold text-gray-600 leading-tight">
+                                      {examDate
+                                        ? examDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                                        : 'N/A'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 justify-end">
+                                  {String(t.status || '').toLowerCase() === 'pending' && t.practicalFile ? (
+                                    <>
+                                      <button type="button" onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'passed', status: 'active' })} className="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">CHẤM ĐẠT</button>
+                                      <button type="button" onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'failed', status: 'Locked', lockReason: 'Bài thi Tự luận/Thực hành chưa đạt yêu cầu' })} className="px-2.5 py-1.5 rounded-xl bg-red-50 text-red-600 text-[10px] font-black border border-red-200">CHẤM TRƯỢT</button>
+                                    </>
+                                  ) : String(t.status || '').toLowerCase() === 'active' ? (
+                                    <span className="text-xs text-sky-700 font-black">XONG</span>
+                                  ) : String(t.status || '').toLowerCase() === 'locked' ? (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        const id = t.id || t._id;
+                                        try {
+                                          await ctxUpdateTeacher(id, {
+                                            status: 'pending',
+                                            lockReason: null,
+                                            practicalStatus: 'none',
+                                            practicalFile: null,
+                                            testScore: 0,
+                                            testStatus: null,
+                                            testDate: null,
+                                          });
+                                          toast.success('Đã mở khóa — giảng viên có thể vào thi lại.');
+                                        } catch (e) {
+                                          toast.error(e?.message || 'Không cập nhật được. Cần quyền Super Admin hoặc quyền Đào tạo trên tài khoản nhân viên.');
+                                        }
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-lg bg-white text-gray-800 text-[10px] font-black border-2 border-gray-800"
+                                    >
+                                      CHO THI LẠI
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] text-gray-400 font-bold border px-2 py-1 border-gray-100 rounded-lg">ĐANG THI...</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Desktop/tablet: table */}
+                        <div className="hidden sm:block bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                          <div className="cms-table-wrap">
+                            <table className="w-full text-left border-collapse min-w-[720px]">
+                              <thead>
+                                <tr className="bg-blue-50 border-b border-blue-100">
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide">Giảng viên</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Trắc nghiệm</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Bài tự luận (File)</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Trạng thái</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide">Ngày thi</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-right">Thao tác</th>
                                 </tr>
-                              );
-                            })}
-                            {filteredGv.length === 0 && (
-                              <tr>
-                                <td colSpan="6" className="px-6 py-14 text-center text-gray-400">
-                                  <Trophy size={36} className="mx-auto mb-3 text-gray-200" />
-                                  <p className="text-sm font-bold">Chưa có kết quả thi nào</p>
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50">
+                                {filteredGv.map(t => {
+                                  const mcScore = Number(t.testScore) || 0;
+                                  const isPassedMC = mcScore >= 80;
+                                  return (
+                                    <tr key={t.id || t._id} className="hover:bg-blue-50/20 transition-colors">
+                                      <td className="px-3 py-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <div className="w-8 h-8 rounded-xl bg-red-500 flex items-center justify-center text-white text-xs font-black shrink-0">
+                                            {(t.name || '?')[0]}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <span className="font-bold text-sm text-gray-800 block truncate">{t.name}</span>
+                                            <span className="text-xs text-gray-400 font-bold">{t.phone}</span>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-3 text-center">
+                                        <div className="flex flex-col items-center">
+                                          <span className={`text-lg font-black ${isPassedMC ? 'text-sky-700' : 'text-red-500'}`}>{mcScore}/100</span>
+                                          <span className="text-xs cms-min-text-xs text-gray-400 font-bold uppercase">{isPassedMC ? 'ĐẠT' : 'TRƯỢT'}</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-3 text-center">
+                                        {t.practicalFile ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => setGvReviewModal(t)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 rounded-xl text-xs font-bold transition-all border border-red-200 max-w-[200px] truncate"
+                                            title={practicalFileDisplayName(t.practicalFile)}
+                                          >
+                                            <Download size={12} className="shrink-0" />
+                                            <span className="truncate">{practicalFileDisplayName(t.practicalFile)}</span>
+                                          </button>
+                                        ) : (
+                                          <span className="text-gray-300 text-xs font-bold italic">Chưa nộp</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-3 text-center">
+                                        <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black ${
+                                          t.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                          t.status === 'Locked' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
+                                        }`}>
+                                          {t.status === 'active' ? 'CHÍNH THỨC' : t.status === 'Locked' ? 'BỊ KHÓA' : 'ĐANG CHỜ'}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-3">
+                                        <span className="text-xs text-gray-400 font-bold">
+                                          {(() => {
+                                            const d = resolveTeacherExamDate(t);
+                                            return d
+                                              ? d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                              : 'N/A';
+                                          })()}
+                                        </span>
+                                        {isTeacherExamDateApproximate(t) && (
+                                          <span className="block text-xs cms-min-text-xs text-amber-600 font-bold mt-0.5">Ước lượng từ cập nhật hồ sơ</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-3 text-right">
+                                        <div className="flex justify-end gap-1 flex-wrap">
+                                          {String(t.status || '').toLowerCase() === 'pending' && t.practicalFile ? (
+                                            <>
+                                              <button onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'passed', status: 'active' })} className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-black tracking-wide border border-emerald-200">CHẤM ĐẠT</button>
+                                              <button onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'failed', status: 'Locked', lockReason: 'Bài thi Tự luận/Thực hành chưa đạt yêu cầu' })} className="px-3 py-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 text-xs font-black tracking-wide border border-red-200">CHẤM TRƯỢT</button>
+                                            </>
+                                          ) : String(t.status || '').toLowerCase() === 'active' ? (
+                                            <span className="text-xs text-sky-700 font-black">XONG</span>
+                                          ) : String(t.status || '').toLowerCase() === 'locked' ? (
+                                            <button
+                                              type="button"
+                                              onClick={async () => {
+                                                const id = t.id || t._id;
+                                                try {
+                                                  await ctxUpdateTeacher(id, {
+                                                    status: 'pending',
+                                                    lockReason: null,
+                                                    practicalStatus: 'none',
+                                                    practicalFile: null,
+                                                    testScore: 0,
+                                                    testStatus: null,
+                                                    testDate: null,
+                                                  });
+                                                  toast.success('Đã mở khóa — giảng viên có thể vào thi lại.');
+                                                } catch (e) {
+                                                  toast.error(e?.message || 'Không cập nhật được. Cần quyền Super Admin hoặc quyền Đào tạo trên tài khoản nhân viên.');
+                                                }
+                                              }}
+                                              className="relative z-10 px-2 py-1.5 rounded-lg bg-white text-gray-800 hover:bg-gray-50 text-xs font-black border-2 border-gray-800 shadow-sm cursor-pointer"
+                                            >
+                                              CHO THI LẠI
+                                            </button>
+                                          ) : (
+                                            <span className="text-xs text-gray-400 font-bold border px-2 py-1 border-gray-100 rounded-lg">ĐANG THI...</span>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })()}

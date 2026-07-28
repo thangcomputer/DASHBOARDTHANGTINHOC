@@ -336,7 +336,14 @@ export default function AdminStudentTrainingTab() {
                     </span>
                   </div>
 
-                  {/* Table — mobile: vuốt ngang; chữ header rút gọn để thấy đủ cột */}
+                  {filtered.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-14 text-center text-gray-400">
+                      <Trophy size={36} className="mx-auto mb-3 text-gray-200" />
+                      <p className="text-sm font-bold">Chưa có kết quả thi nào</p>
+                      <p className="text-xs text-gray-300 mt-1">Khi học viên hoàn thành bài thi, kết quả sẽ tự động hiện tại đây</p>
+                    </div>
+                  ) : (
+                  /* Table — mobile: vuốt ngang; chữ header rút gọn để thấy đủ cột */
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
                     <p className="sm:hidden text-[11px] text-slate-400 px-3 py-1.5 border-b border-slate-50">
                       Vuốt ngang để xem đủ cột →
@@ -587,19 +594,11 @@ export default function AdminStudentTrainingTab() {
                               </tr>
                             );
                           })}
-                          {filtered.length === 0 && (
-                            <tr>
-                              <td colSpan="8" className="px-6 py-14 text-center text-gray-400">
-                                <Trophy size={36} className="mx-auto mb-3 text-gray-200" />
-                                <p className="text-sm font-bold">Chưa có kết quả thi nào</p>
-                                <p className="text-xs text-gray-300 mt-1">Khi học viên hoàn thành bài thi, kết quả sẽ tự động hiện tại đây</p>
-                              </td>
-                            </tr>
-                          )}
                         </tbody>
                       </table>
                     </div>
                   </div>
+                  )}
                 </div>
                 );
               })()}
