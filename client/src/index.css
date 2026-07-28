@@ -157,7 +157,7 @@
     @apply w-full;
   }
 
-  /* Tab strip: chia ??u chi?u ngang; mobile icon+s?; tablet+ có ch? */
+  /* Tab strip: even spacing; mobile icon+count; tablet+ labels */
   .cms-hscroll-tabs {
     @apply w-full max-w-full min-w-0;
   }
