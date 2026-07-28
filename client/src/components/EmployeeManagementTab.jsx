@@ -406,7 +406,7 @@ export default function EmployeeManagementTab() {
                 <option key={p.value} value={p.value}>{p.emoji} {p.label}</option>
               ))}
             </CmsSelect>
-            <button type="button" onClick={openAdd} className="cms-hr-btn cms-hr-btn-primary w-full md:w-auto md:ml-auto">
+            <button type="button" onClick={openAdd} className="cms-hr-btn cms-hr-btn-primary self-center w-auto px-6 md:ml-auto md:self-auto">
               <Plus size={16} /> Thêm nhân sự
             </button>
           </div>

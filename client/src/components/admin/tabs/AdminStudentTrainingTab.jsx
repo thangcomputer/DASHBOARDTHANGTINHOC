@@ -116,7 +116,7 @@ export default function AdminStudentTrainingTab() {
               {/* Add button */}
               {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && (
                 <button onClick={() => { setSCourseBuilderMode(null); setSTrainingForm({ examSubjects: [] }); }}
-                  className="w-full sm:w-auto min-h-11 justify-center bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                  className="w-auto mx-auto min-h-11 justify-center bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
                   <Plus size={15} /> {sTrainingTab === 'videos' ? 'Thêm Khóa học' : 'Thêm tài liệu'}
                 </button>
               )}

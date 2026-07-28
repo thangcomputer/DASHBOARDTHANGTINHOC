@@ -67,13 +67,13 @@ export default function AdminTrainingTab() {
               {/* Add button */}
               {trainingTab !== 'questions' && trainingTab !== 'exam-results-gv' && (
                 <button onClick={() => setTrainingForm({ examSubjects: [] })}
-                  className="w-full sm:w-auto min-h-11 justify-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                  className="w-auto mx-auto min-h-11 justify-center bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
                   <Plus size={15} /> {trainingTab === 'videos' ? 'Thêm Khóa học' : trainingTab === 'guides' ? 'Thêm quy trình' : 'Thêm tài liệu'}
                 </button>
               )}
               {trainingTab === 'exam-results-gv' && (
                 <button onClick={() => setErGvForm({ ...BLANK_ER_GV })}
-                  className="w-full sm:w-auto min-h-11 justify-center bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                  className="w-auto mx-auto min-h-11 justify-center bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
                   <Plus size={15} /> Thêm kết quả thi
                 </button>
               )}
