@@ -188,84 +188,129 @@ export default function BranchManagementTab() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {modal !== undefined && (
         <BranchModal branch={modal} onClose={() => setModal(undefined)} onSaved={handleSaved} />
       )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Building2 size={16} /> Quản lý Chi nhánh / Cơ sở
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <Building2 size={16} className="text-blue-600 shrink-0" />
+            <span>Quản lý Chi nhánh / Cơ sở</span>
           </h3>
-          <p className="text-xs text-gray-400 mt-0.5">Mã chi nhánh được gắn vào nội dung QR để tự động phân loại doanh thu</p>
+          <p className="text-[13px] text-slate-500 mt-1 leading-relaxed">
+            Mã chi nhánh gắn vào QR để phân loại doanh thu tự động
+          </p>
         </div>
-        <button onClick={() => setModal(null)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition">
+        <button
+          type="button"
+          onClick={() => setModal(null)}
+          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition shrink-0 w-full sm:w-auto"
+        >
           <Plus size={15} /> Thêm chi nhánh
         </button>
       </div>
 
-      {/* Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800 flex items-start gap-2">
-        <AlertTriangle size={13} className="flex-shrink-0 mt-0.5 text-blue-500" />
+      <div className="bg-sky-50 border border-sky-100 rounded-xl px-3.5 py-3 text-[13px] text-sky-900 flex items-start gap-2.5 leading-relaxed">
+        <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-sky-600" />
         <div>
-          <strong>Mã QR có chi nhánh:</strong> Khi học viên cơ sở CS1 thanh toán, nội dung chuyển khoản sẽ là
-          <code className="bg-white border border-blue-200 rounded px-1 mx-1 font-mono">CS1 TTH123 Nop hoc phi</code>
-          → SePay tự động ghi nhận doanh thu cho CS1.
+          <strong className="font-semibold">Mã QR có chi nhánh:</strong>{' '}
+          Ví dụ học viên CS1 thanh toán sẽ có nội dung{' '}
+          <code className="inline bg-white border border-sky-200 rounded-md px-1.5 py-0.5 font-mono text-[12px] text-sky-800 break-all">
+            CS1 TTH123 Nop hoc phi
+          </code>
+          {' '}→ SePay ghi doanh thu cho CS1.
         </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
-          <Loader2 size={22} className="animate-spin" /> <span className="text-sm">Đang tải...</span>
+        <div className="flex items-center justify-center py-14 gap-3 text-slate-400">
+          <Loader2 size={20} className="animate-spin" /> <span className="text-sm">Đang tải...</span>
         </div>
       ) : branches.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <Building2 size={40} className="mx-auto mb-3 opacity-20" />
+        <div className="text-center py-14 text-slate-400">
+          <Building2 size={36} className="mx-auto mb-3 opacity-20" />
           <p className="text-sm">Chưa có chi nhánh nào. Thêm ngay bên trên.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {branches.map(b => (
-            <div key={b._id} className={`border-2 rounded-2xl p-4 transition ${b.isActive ? 'bg-white border-gray-100 hover:border-blue-200' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+            <div
+              key={b._id}
+              className={`rounded-xl border p-3.5 transition ${
+                b.isActive
+                  ? 'bg-white border-slate-200'
+                  : 'bg-slate-50 border-slate-200 opacity-70'
+              }`}
+            >
               <div className="flex items-start gap-3">
-                {/* Icon */}
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${b.isActive ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white' : 'bg-gray-300 text-gray-500'}`}>
-                  <Building2 size={20} />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  b.isActive ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-500'
+                }`}>
+                  <Building2 size={18} />
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-bold text-gray-800">{b.name}</p>
-                    <span className="text-[10px] bg-blue-100 text-blue-700 font-black px-2 py-0.5 rounded-full font-mono">
-                      {b.code}
-                    </span>
-                    {b.isActive
-                      ? <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">● Hoạt động</span>
-                      : <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">● Đã vô hiệu</span>
-                    }
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 space-y-1.5">
+                      <p className="text-sm font-semibold text-slate-900 leading-snug break-words">{b.name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md font-mono">
+                          {b.code}
+                        </span>
+                        {b.isActive
+                          ? <span className="text-[11px] bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-md">Hoạt động</span>
+                          : <span className="text-[11px] bg-red-50 text-red-600 font-medium px-2 py-0.5 rounded-md">Đã vô hiệu</span>
+                        }
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setModal(b)}
+                        aria-label="Sửa chi nhánh"
+                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      {b.isActive && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(b)}
+                          disabled={deleting === b._id}
+                          aria-label="Xóa chi nhánh"
+                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50"
+                        >
+                          {deleting === b._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {b.address && <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1"><MapPin size={10} />{b.address}</p>}
-                  {b.phone   && <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1"><Phone   size={10} />{b.phone}</p>}
-                  <p className="text-[10px] text-gray-400 mt-1 font-mono">
-                    QR prefix: <span className="text-blue-600 font-bold">{b.code} TTH### Nop hoc phi</span>
-                  </p>
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button onClick={() => setModal(b)}
-                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
-                    <Edit2 size={15} />
-                  </button>
-                  {b.isActive && (
-                    <button onClick={() => handleDelete(b)} disabled={deleting === b._id}
-                      className="w-9 h-9 flex items-center justify-center rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50">
-                      {deleting === b._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={15} />}
-                    </button>
+                  {(b.address || b.phone) && (
+                    <div className="space-y-1 text-[13px] text-slate-500">
+                      {b.address && (
+                        <p className="flex items-start gap-1.5 min-w-0">
+                          <MapPin size={12} className="mt-0.5 shrink-0" />
+                          <span className="break-words">{b.address}</span>
+                        </p>
+                      )}
+                      {b.phone && (
+                        <p className="flex items-center gap-1.5">
+                          <Phone size={12} className="shrink-0" />
+                          <span>{b.phone}</span>
+                        </p>
+                      )}
+                    </div>
                   )}
+
+                  <p className="text-[12px] text-slate-500 leading-relaxed">
+                    QR prefix:{' '}
+                    <span className="font-mono text-[12px] text-blue-700 break-all">
+                      {b.code} TTH### Nop hoc phi
+                    </span>
+                  </p>
                 </div>
               </div>
             </div>

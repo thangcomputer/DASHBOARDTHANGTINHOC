@@ -482,14 +482,14 @@ export default function SystemSettingsTab() {
 
       {/* ── TAB 2: HỌC PHÍ KHÓA HỌC ── CoursePricingTab component ───────────────── */}
       {activeSubTab === 'pricing' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-5">
           <CoursePricingTab />
         </div>
       )}
 
       {/* ── TAB 3: CHI NHÁNH ──────────────────────────────────────────────────── */}
       {activeSubTab === 'branches' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-5">
           <BranchManagementTab />
         </div>
       )}
@@ -731,105 +731,109 @@ export default function SystemSettingsTab() {
 
       {/* ── TAB 6: TÀI KHOẢN ADMIN ──────────────────────────────────────────── */}
       {activeSubTab === 'account' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-6 w-full max-w-full lg:max-w-2xl">
-          <div className="flex items-center gap-2 mb-1">
-            <Lock size={16} className="text-red-600" />
-            <h3 className="font-bold text-gray-800">Thay đổi thông tin Admin</h3>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 w-full max-w-full lg:max-w-2xl">
+          <div>
+            <div className="flex items-center gap-2">
+              <Lock size={16} className="text-red-600 shrink-0" />
+              <h3 className="text-base font-semibold text-slate-900">Thay đổi thông tin Admin</h3>
+            </div>
+            <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-xl px-3.5 py-3">
+              Thay đổi tên hiển thị và mật khẩu đăng nhập của tài khoản Admin.
+            </p>
           </div>
-          <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-xl p-3">
-            🔐 Thay đổi tên hiển thị và mật khẩu đăng nhập của tài khoản Admin.
-          </p>
 
           {adminSuccess && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2 text-emerald-700 text-sm font-bold">
-              <CheckCircle2 size={16} /> {adminSuccess}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-3 flex items-center gap-2 text-emerald-700 text-sm font-semibold">
+              <CheckCircle2 size={16} className="shrink-0" /> {adminSuccess}
             </div>
           )}
 
           {/* Tên hiển thị */}
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Tên hiển thị mới (tùy chọn)</label>
-            <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-red-400 transition">
-              <User size={15} className="text-red-500 flex-shrink-0" />
+            <label className="text-[13px] font-medium text-slate-600 block mb-1.5">Tên hiển thị mới (tùy chọn)</label>
+            <div className="flex items-center gap-2.5 bg-white border border-slate-200 rounded-xl px-3.5 min-h-12 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/10 transition">
+              <User size={16} className="text-slate-400 flex-shrink-0" />
               <input
                 type="text"
                 value={adminName}
                 onChange={e => setAdminName(e.target.value)}
-                className="flex-1 text-sm font-bold outline-none bg-transparent"
+                className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent py-3"
                 placeholder="Nhập tên hiển thị mới..."
               />
             </div>
           </div>
 
-          <div className="border-t border-gray-100 pt-4">
-            <p className="text-xs font-bold text-gray-400 uppercase mb-3 flex items-center gap-1"><KeyRound size={12} /> Đổi mật khẩu (tùy chọn)</p>
+          <div className="border-t border-slate-100 pt-5 space-y-4">
+            <p className="text-[13px] font-semibold text-slate-700 flex items-center gap-1.5">
+              <KeyRound size={14} className="text-slate-500" /> Đổi mật khẩu (tùy chọn)
+            </p>
 
-            {/* Mật khẩu hiện tại */}
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               <div>
-                <label className="text-xs font-bold text-gray-500 block mb-1.5">Mật khẩu hiện tại</label>
-                <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-red-400 transition">
-                  <Lock size={15} className="text-gray-400 flex-shrink-0" />
+                <label className="text-[13px] font-medium text-slate-600 block mb-1.5">Mật khẩu hiện tại</label>
+                <div className="flex items-center gap-2.5 bg-white border border-slate-200 rounded-xl px-3.5 min-h-12 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/10 transition">
+                  <Lock size={16} className="text-slate-400 flex-shrink-0" />
                   <input
                     type={showAdminOldPw ? 'text' : 'password'}
                     value={adminOldPw}
                     onChange={e => setAdminOldPw(e.target.value)}
-                    className="flex-1 text-sm font-bold outline-none bg-transparent"
+                    className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent py-3"
                     placeholder="Nhập mật khẩu hiện tại..."
                   />
-                  <button type="button" onClick={() => setShowAdminOldPw(!showAdminOldPw)} className="text-gray-400 hover:text-gray-600">
-                    {showAdminOldPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                  <button type="button" onClick={() => setShowAdminOldPw(!showAdminOldPw)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Hiện/ẩn mật khẩu">
+                    {showAdminOldPw ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
 
-              {/* Mật khẩu mới */}
               <div>
-                <label className="text-xs font-bold text-gray-500 block mb-1.5">Mật khẩu mới (ít nhất 6 ký tự)</label>
-                <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-red-400 transition">
-                  <KeyRound size={15} className="text-red-500 flex-shrink-0" />
+                <label className="text-[13px] font-medium text-slate-600 block mb-1.5">Mật khẩu mới (ít nhất 6 ký tự)</label>
+                <div className="flex items-center gap-2.5 bg-white border border-slate-200 rounded-xl px-3.5 min-h-12 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/10 transition">
+                  <KeyRound size={16} className="text-slate-400 flex-shrink-0" />
                   <input
                     type={showAdminNewPw ? 'text' : 'password'}
                     value={adminNewPw}
                     onChange={e => setAdminNewPw(e.target.value)}
-                    className="flex-1 text-sm font-bold outline-none bg-transparent"
+                    className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent py-3"
                     placeholder="Nhập mật khẩu mới..."
                   />
-                  <button type="button" onClick={() => setShowAdminNewPw(!showAdminNewPw)} className="text-gray-400 hover:text-gray-600">
-                    {showAdminNewPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                  <button type="button" onClick={() => setShowAdminNewPw(!showAdminNewPw)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Hiện/ẩn mật khẩu">
+                    {showAdminNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
 
-              {/* Xác nhận mật khẩu mới */}
               <div>
-                <label className="text-xs font-bold text-gray-500 block mb-1.5">Xác nhận mật khẩu mới</label>
-                <div className={`flex items-center gap-2 bg-white border-2 rounded-xl px-4 py-3 transition ${
-                  adminNewPw2 && adminNewPw !== adminNewPw2 ? 'border-red-300' : 'border-gray-200 focus-within:border-red-400'
+                <label className="text-[13px] font-medium text-slate-600 block mb-1.5">Xác nhận mật khẩu mới</label>
+                <div className={`flex items-center gap-2.5 bg-white border rounded-xl px-3.5 min-h-12 transition ${
+                  adminNewPw2 && adminNewPw !== adminNewPw2
+                    ? 'border-red-300'
+                    : 'border-slate-200 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/10'
                 }`}>
-                  <KeyRound size={15} className="text-gray-400 flex-shrink-0" />
+                  <KeyRound size={16} className="text-slate-400 flex-shrink-0" />
                   <input
                     type="password"
                     value={adminNewPw2}
                     onChange={e => setAdminNewPw2(e.target.value)}
-                    className="flex-1 text-sm font-bold outline-none bg-transparent"
+                    className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent py-3"
                     placeholder="Nhập lại mật khẩu mới..."
                   />
                   {adminNewPw2 && adminNewPw === adminNewPw2 && (
-                    <CheckCircle2 size={15} className="text-emerald-500" />
+                    <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
                   )}
                 </div>
                 {adminNewPw2 && adminNewPw !== adminNewPw2 && (
-                  <p className="text-xs text-red-500 mt-1 ml-1">Mật khẩu xác nhận không khớp</p>
+                  <p className="text-xs text-red-500 mt-1.5">Mật khẩu xác nhận không khớp</p>
                 )}
               </div>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={handleAdminProfileSave}
             disabled={adminSaving || (adminNewPw && adminNewPw !== adminNewPw2)}
-            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl hover:from-red-700 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-red-100"
+            className="w-full min-h-12 py-3 mt-1 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
           >
             {adminSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {adminSaving ? 'Đang lưu...' : 'Lưu thay đổi'}

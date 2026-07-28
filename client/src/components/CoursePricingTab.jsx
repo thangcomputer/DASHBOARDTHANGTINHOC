@@ -553,136 +553,216 @@ export default function CoursePricingTab() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Tag size={16} className="text-blue-600" /> Quản lý Học phí Khóa học
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <Tag size={16} className="text-blue-600 shrink-0" />
+            <span>Quản lý Học phí Khóa học</span>
           </h3>
-          <p className="text-xs text-gray-400 mt-0.5">Thay đổi giá chỉ ảnh hưởng học viên đăng ký <strong>mới</strong></p>
+          <p className="text-[13px] text-slate-500 mt-1 leading-relaxed">
+            Thay đổi giá chỉ ảnh hưởng học viên đăng ký <strong className="font-semibold text-slate-700">mới</strong>
+          </p>
         </div>
         <button
+          type="button"
           onClick={() => setModalCourse(null)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-sm shadow-blue-200"
+          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition shadow-sm shrink-0 w-full sm:w-auto"
         >
           <Plus size={15} /> Thêm khóa học
         </button>
       </div>
 
-      {/* Warning */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-2">
-        <AlertCircle size={13} className="flex-shrink-0 mt-0.5 text-amber-600" />
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3 text-[13px] text-amber-900 flex items-start gap-2.5 leading-relaxed">
+        <AlertCircle size={15} className="flex-shrink-0 mt-0.5 text-amber-600" />
         <span>
-          <strong>Price Snapshot:</strong> Học viên đã đăng ký trước đây sẽ giữ nguyên giá cũ.
-          Để điều chỉnh giá cho học viên cụ thể → Quản lý Học viên → Cập nhật học phí.
+          <strong className="font-semibold">Price Snapshot:</strong> Học viên đã đăng ký trước giữ nguyên giá cũ.
+          Điều chỉnh từng học viên → Quản lý Học viên.
         </span>
       </div>
 
-      {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
-          <Loader2 size={22} className="animate-spin text-blue-400" />
+        <div className="flex items-center justify-center py-14 gap-3 text-slate-400">
+          <Loader2 size={20} className="animate-spin text-blue-400" />
           <span className="text-sm">Đang tải...</span>
         </div>
       ) : courses.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <BookOpen size={40} className="mx-auto mb-3 opacity-20" />
+        <div className="text-center py-14 text-slate-400">
+          <BookOpen size={36} className="mx-auto mb-3 opacity-20" />
           <p className="text-sm">Chưa có khóa học nào.</p>
-          <button onClick={() => setModalCourse(null)}
-            className="mt-3 text-blue-600 font-bold text-sm hover:underline">
+          <button
+            type="button"
+            onClick={() => setModalCourse(null)}
+            className="mt-3 text-blue-600 font-semibold text-sm hover:underline"
+          >
             + Thêm khóa học đầu tiên
           </button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-gray-200">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-bold text-gray-500 text-xs uppercase">Tên khóa học</th>
-                <th className="text-right px-4 py-3 font-bold text-gray-500 text-xs uppercase">Giá gốc</th>
-                <th className="text-center px-4 py-3 font-bold text-gray-500 text-xs uppercase">Giảm giá</th>
-                <th className="text-right px-4 py-3 font-bold text-gray-500 text-xs uppercase">Giá áp dụng</th>
-                <th className="text-center px-4 py-3 font-bold text-gray-500 text-xs uppercase">Môn thi</th>
-                <th className="text-center px-4 py-3 font-bold text-gray-500 text-xs uppercase">Buổi</th>
-                <th className="text-center px-4 py-3 font-bold text-gray-500 text-xs uppercase">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {courses.map((course, idx) => {
-                const ep = calcEffective(course.price, course.discountPercent);
-                const hasDiscount = course.discountPercent > 0;
-                return (
-                  <tr key={course._id} className={`border-b border-gray-100 hover:bg-blue-50/30 transition ${idx % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
-                    {/* Tên */}
-                    <td className="px-4 py-3.5">
-                      <p className="font-bold text-gray-800 text-sm leading-tight">{course.name}</p>
+        <>
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {courses.map((course) => {
+              const ep = calcEffective(course.price, course.discountPercent);
+              const hasDiscount = course.discountPercent > 0;
+              return (
+                <article key={course._id} className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 leading-snug break-words">{course.name}</p>
                       {course.description && (
-                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{course.description}</p>
+                        <p className="text-[12px] text-slate-500 mt-1 leading-relaxed line-clamp-2">{course.description}</p>
                       )}
-                    </td>
-                    {/* Giá gốc */}
-                    <td className="px-4 py-3.5 text-right">
-                      <span className={`font-mono text-sm ${hasDiscount ? 'line-through text-gray-400' : 'font-bold text-gray-800'}`}>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setModalCourse(course)}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600"
+                        title="Sửa"
+                        aria-label="Sửa khóa học"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(course)}
+                        disabled={deleting === course._id}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-50 text-red-500 disabled:opacity-50"
+                        title="Xóa"
+                        aria-label="Xóa khóa học"
+                      >
+                        {deleting === course._id
+                          ? <Loader2 size={13} className="animate-spin" />
+                          : <Trash2 size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2.5">
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-slate-500 mb-0.5">Giá gốc</p>
+                      <p className={`text-[13px] tabular-nums leading-tight ${hasDiscount ? 'line-through text-slate-400' : 'font-semibold text-slate-800'}`}>
                         {fmt(course.price)}đ
-                      </span>
-                    </td>
-                    {/* Giảm giá */}
-                    <td className="px-4 py-3.5 text-center">
+                      </p>
+                    </div>
+                    <div className="min-w-0 text-center">
+                      <p className="text-[11px] text-slate-500 mb-0.5">Giảm giá</p>
                       {hasDiscount ? (
-                        <span className="inline-flex items-center gap-1 bg-red-100 text-red-600 font-black text-xs px-2.5 py-1 rounded-full">
+                        <span className="inline-flex text-[12px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
                           -{course.discountPercent}%
                         </span>
                       ) : (
-                        <span className="text-gray-300 text-xs">—</span>
+                        <span className="text-[13px] text-slate-300">—</span>
                       )}
-                    </td>
-                    {/* Giá áp dụng */}
-                    <td className="px-4 py-3.5 text-right">
-                      <span className={`font-mono font-black text-sm ${hasDiscount ? 'text-red-600' : 'text-blue-700'}`}>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <p className="text-[11px] text-slate-500 mb-0.5">Giá áp dụng</p>
+                      <p className={`text-[13px] font-semibold tabular-nums leading-tight ${hasDiscount ? 'text-red-600' : 'text-blue-700'}`}>
                         {fmt(ep)}đ
-                      </span>
-                    </td>
-                    {/* Môn thi */}
-                    <td className="px-4 py-3.5 text-center">
-                      <span className="text-[11px] font-semibold text-gray-600 leading-snug block max-w-[140px] mx-auto">
-                        {formatExamSubjectsSummary(course.examSubjects, examSubjectsCatalog)}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        ({Array.isArray(course.examSubjects) && course.examSubjects.length ? course.examSubjects.length : 0} môn)
-                      </span>
-                    </td>
-                    {/* Buổi */}
-                    <td className="px-4 py-3.5 text-center">
-                      <span className="text-xs font-bold text-gray-500">{course.totalSessions}</span>
-                    </td>
-                    {/* Thao tác */}
-                    <td className="px-4 py-3.5 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => setModalCourse(course)}
-                          className="w-8 h-8 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-                          title="Sửa"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(course)}
-                          disabled={deleting === course._id}
-                          className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50"
-                          title="Xóa"
-                        >
-                          {deleting === course._id
-                            ? <Loader2 size={13} className="animate-spin" />
-                            : <Trash2 size={14} />
-                          }
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-500">
+                    <span>
+                      {formatExamSubjectsSummary(course.examSubjects, examSubjectsCatalog)}
+                      {' '}
+                      ({Array.isArray(course.examSubjects) && course.examSubjects.length ? course.examSubjects.length : 0} môn)
+                    </span>
+                    <span className="text-slate-300">·</span>
+                    <span>{course.totalSessions} buổi</span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-4 py-3 font-semibold text-slate-500 text-[12px]">Tên khóa học</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-500 text-[12px]">Giá gốc</th>
+                  <th className="text-center px-4 py-3 font-semibold text-slate-500 text-[12px]">Giảm giá</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-500 text-[12px]">Giá áp dụng</th>
+                  <th className="text-center px-4 py-3 font-semibold text-slate-500 text-[12px]">Môn thi</th>
+                  <th className="text-center px-4 py-3 font-semibold text-slate-500 text-[12px]">Buổi</th>
+                  <th className="text-center px-4 py-3 font-semibold text-slate-500 text-[12px]">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((course, idx) => {
+                  const ep = calcEffective(course.price, course.discountPercent);
+                  const hasDiscount = course.discountPercent > 0;
+                  return (
+                    <tr key={course._id} className={`border-b border-slate-100 hover:bg-blue-50/30 transition ${idx % 2 === 0 ? '' : 'bg-slate-50/50'}`}>
+                      <td className="px-4 py-3.5">
+                        <p className="font-semibold text-slate-800 text-sm leading-snug">{course.name}</p>
+                        {course.description && (
+                          <p className="text-[12px] text-slate-500 mt-0.5 line-clamp-1">{course.description}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className={`font-mono text-sm tabular-nums ${hasDiscount ? 'line-through text-slate-400' : 'font-semibold text-slate-800'}`}>
+                          {fmt(course.price)}đ
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        {hasDiscount ? (
+                          <span className="inline-flex items-center gap-1 bg-red-50 text-red-600 font-semibold text-[12px] px-2.5 py-1 rounded-full">
+                            -{course.discountPercent}%
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className={`font-mono font-semibold text-sm tabular-nums ${hasDiscount ? 'text-red-600' : 'text-blue-700'}`}>
+                          {fmt(ep)}đ
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="text-[12px] font-medium text-slate-600 leading-snug block max-w-[140px] mx-auto">
+                          {formatExamSubjectsSummary(course.examSubjects, examSubjectsCatalog)}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          ({Array.isArray(course.examSubjects) && course.examSubjects.length ? course.examSubjects.length : 0} môn)
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="text-[13px] font-medium text-slate-600">{course.totalSessions}</span>
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setModalCourse(course)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                            title="Sửa"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(course)}
+                            disabled={deleting === course._id}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50"
+                            title="Xóa"
+                          >
+                            {deleting === course._id
+                              ? <Loader2 size={13} className="animate-spin" />
+                              : <Trash2 size={14} />}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
