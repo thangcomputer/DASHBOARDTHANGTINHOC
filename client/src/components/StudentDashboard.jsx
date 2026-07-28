@@ -542,9 +542,6 @@ const StudentDashboard = ({ onNavigate }) => {
         {/* ═══ CONTENT — Switch based on hash ═══ */}
         {currentHash === 'schedule' ? (
           <StudentLazyScheduleTab
-            enrollments={enrollments}
-            activeCourseName={activeCourseName}
-            setActiveCourseName={setActiveCourseName}
             viewStudent={viewStudent}
             mySchedules={mySchedules}
             setNoteModalSched={setNoteModalSched}
@@ -552,9 +549,6 @@ const StudentDashboard = ({ onNavigate }) => {
           />
         ) : currentHash === 'materials' ? (
           <StudentLazyMaterialsTab
-            enrollments={enrollments}
-            activeCourseName={activeCourseName}
-            setActiveCourseName={setActiveCourseName}
             viewStudent={viewStudent}
             studentTrainingForLms={studentTrainingForLms}
             myAssignments={myAssignments}

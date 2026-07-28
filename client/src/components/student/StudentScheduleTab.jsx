@@ -1,13 +1,9 @@
 import React from 'react';
 import { Calendar, FileText } from 'lucide-react';
-import { CourseSwitcher } from './StudentShared';
 import { ScheduleView } from './StudentScheduleView';
 import { getGradeTextClasses } from '../../utils/gradeColors';
 
 export default function StudentScheduleTab({
-  enrollments,
-  activeCourseName,
-  setActiveCourseName,
   viewStudent,
   mySchedules,
   setNoteModalSched,
@@ -15,11 +11,6 @@ export default function StudentScheduleTab({
 }) {
   return (
           <div className="cms-sd cms-sd-page cms-sd-stack max-w-5xl">
-            <CourseSwitcher
-              courses={enrollments}
-              activeCourseName={activeCourseName || viewStudent.course}
-              onChange={setActiveCourseName}
-            />
             <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between min-w-0">
               <h2 className="cms-sd-section-title flex items-start sm:items-center gap-2 min-w-0">
                 <Calendar size={20} className="text-blue-500 shrink-0 mt-0.5 sm:mt-0" aria-hidden="true" />
