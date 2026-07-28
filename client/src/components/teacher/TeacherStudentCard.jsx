@@ -177,13 +177,18 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
     setLoadingAssign(true);
     try {
       const sid = student.id || student._id;
-      const res = await api.assignments.getByStudentAndCourse(sid, student.course);
+      const course = String(student.course || '').trim();
+      const res = await api.assignments.getByStudentAndCourse(sid, course);
       if (res.success) {
+        const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+        const want = norm(course);
         setCourseAssignments(
-          res.data.map((a) => ({
-            ...a,
-            submissions: a.mySubmission ? [a.mySubmission] : [],
-          }))
+          (res.data || [])
+            .filter((a) => !want || norm(a.courseId) === want)
+            .map((a) => ({
+              ...a,
+              submissions: a.mySubmission ? [a.mySubmission] : [],
+            }))
         );
       }
     } catch (e) { void 0 }

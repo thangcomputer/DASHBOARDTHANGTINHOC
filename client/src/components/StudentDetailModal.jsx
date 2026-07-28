@@ -286,8 +286,10 @@ export default function StudentDetailModal({ studentId, onClose }) {
     setLoadingAssign(true);
     try {
       const res = await api.assignments.getByStudentAndCourse(studentId, course);
-      if (res.success) setAssignments(res.data || []);
-      else setAssignments([]);
+      const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const want = norm(course);
+      const rows = (res.success ? res.data : []) || [];
+      setAssignments(rows.filter((a) => !want || norm(a.courseId) === want));
     } catch (err) { void 0; setAssignments([]); }
     finally { setLoadingAssign(false); }
   };
@@ -300,13 +302,16 @@ export default function StudentDetailModal({ studentId, onClose }) {
     }
     setLoadingAssign(true);
     try {
+      const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
       const results = await Promise.all(
         names.map((name) => api.assignments.getByStudentAndCourse(studentId, name).catch(() => null)),
       );
       const merged = [];
       const seen = new Set();
-      results.forEach((res) => {
+      results.forEach((res, idx) => {
+        const want = norm(names[idx]);
         (res?.success ? res.data : []).forEach((a) => {
+          if (want && norm(a.courseId) !== want) return;
           const id = String(a._id || a.id || '');
           if (!id || seen.has(id)) return;
           seen.add(id);

@@ -124,19 +124,16 @@ router.get('/student/:studentId/course/:courseId', authMiddleware, async (req, r
       return res.status(403).json({ success: false, message: 'Không có quyền xem bài tập của học viên khác' });
     }
 
-    // Course matching: tolerate case/whitespace differences, and handle "course code" vs "full label"
-    // Examples:
-    // - stored courseId: "THVP" while student.course: "THVP NÂNG CAO (12 BUỔI)"
-    // - stored courseId: "THVP Nâng Cao" vs "THVP  NÂNG   CAO"
+    // Khớp đúng tên khóa (không phân biệt hoa thường / khoảng trắng thừa).
+    // Không dùng token substring (vd. "TIN") — sẽ làm CB và NC trùng nhau.
     const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rawCourse = String(req.params.courseId || '');
     const normalizedCourse = rawCourse.trim().replace(/\s+/g, ' ');
+    if (!normalizedCourse) {
+      return res.json({ success: true, data: [] });
+    }
     const spaced = escapeRegex(normalizedCourse).replace(/\\ /g, '\\s+');
     const exactCourseRegex = new RegExp(`^${spaced}$`, 'i');
-
-    // Try to extract a short "course code" token (e.g. THVP, MOS, AUTOCAD, PYTHON)
-    const token = (normalizedCourse.match(/[A-Z0-9]{2,}/) || [])[0] || '';
-    const tokenRegex = token ? new RegExp(escapeRegex(token), 'i') : null;
 
     // Chỉ bài giao đích danh cho học viên này (bài cũ không có studentId không còn hiển thị ở đây)
     const sid = String(req.params.studentId || '');
@@ -153,9 +150,8 @@ router.get('/student/:studentId/course/:courseId', authMiddleware, async (req, r
       $and: [
         {
           $or: [
+            { courseId: normalizedCourse },
             { courseId: { $regex: exactCourseRegex } },
-            { courseId: { $regex: new RegExp(escapeRegex(normalizedCourse), 'i') } },
-            ...(tokenRegex ? [{ courseId: { $regex: tokenRegex } }] : []),
           ],
         },
         studentOnlyScope,
