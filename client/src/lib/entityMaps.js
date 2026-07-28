@@ -14,16 +14,41 @@ export function mapSchedule(sch) {
 
 export function mapStudent(s) {
   if (!s) return s;
-  const teacherId = typeof s.teacherId === 'object' && s.teacherId
-    ? String(s.teacherId._id || s.teacherId.id || '')
-    : String(s.teacherId || '');
-  const teacherName = (typeof s.teacherId === 'object' && s.teacherId?.name)
-    ? s.teacherId.name
-    : (s.teacherName || '');
+  const teacherIdRaw = s.teacherId;
+  let teacherId = '';
+  let teacherIds = [];
+  let teacherNames = [];
+
+  if (Array.isArray(teacherIdRaw)) {
+    // Backend có thể trả teacherId dạng mảng (nhiều môn / nhiều GV)
+    teacherIds = teacherIdRaw
+      .map((t) => {
+        if (!t) return '';
+        if (typeof t === 'object') return String(t._id || t.id || '');
+        return String(t);
+      })
+      .filter(Boolean);
+
+    teacherNames = teacherIdRaw
+      .map((t) => (t && typeof t === 'object' ? (t.name || t.teacherName || '') : ''))
+      .filter(Boolean);
+
+    teacherId = teacherIds[0] || '';
+  } else if (typeof teacherIdRaw === 'object' && teacherIdRaw) {
+    teacherId = String(teacherIdRaw._id || teacherIdRaw.id || '');
+    const singleName = teacherIdRaw?.name || teacherIdRaw?.teacherName || '';
+    if (singleName) teacherNames = [singleName];
+  } else {
+    teacherId = String(teacherIdRaw || '');
+  }
+
+  const teacherName = teacherNames[0] || s.teacherName || '';
   return {
     ...s,
     id: s._id || s.id,
     teacherId,
+    ...(teacherIds.length ? { teacherIds } : {}),
+    ...(teacherNames.length ? { teacherNames } : {}),
     ...(teacherName ? { teacherName } : {}),
   };
 }

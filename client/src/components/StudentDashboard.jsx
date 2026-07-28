@@ -41,19 +41,35 @@ const StudentDashboard = ({ onNavigate }) => {
     if (!student) return null;
     
     // Properly handle populated vs unpopulated `teacherId`
-    const actualTeacherId = (typeof student.teacherId === 'object' && student.teacherId !== null) 
-      ? student.teacherId._id || student.teacherId.id 
-      : student.teacherId;
-      
-    const teacherRecord = teachers?.find(t => String(t.id) === String(actualTeacherId));
-    
-    const extractedTeacherName = (typeof student.teacherId === 'object' && student.teacherId?.name) 
-      ? student.teacherId.name 
-      : (student.teacherName || teacherRecord?.name);
-      
-    const extractedTeacherPhone = (typeof student.teacherId === 'object' && student.teacherId?.phone) 
-      ? student.teacherId.phone 
-      : (teacherRecord?.phone || student.zalo || '');
+    // Backend có thể trả `teacherId` dạng mảng (nhiều môn / nhiều GV)
+    const rawTeacherId = student.teacherId;
+    const actualTeacherId = (typeof rawTeacherId === 'object' && rawTeacherId !== null)
+      ? rawTeacherId._id || rawTeacherId.id
+      : rawTeacherId;
+
+    const teacherIds = Array.isArray(student.teacherIds) && student.teacherIds.length
+      ? student.teacherIds.map((id) => String(id))
+      : (actualTeacherId ? [String(actualTeacherId)] : []);
+
+    const teacherNamesFromApi = Array.isArray(student.teacherNames) && student.teacherNames.length
+      ? student.teacherNames.map((n) => String(n)).filter(Boolean)
+      : [];
+
+    const teacherRecords = teacherIds
+      .map((id) => teachers?.find((t) => String(t.id) === String(id)))
+      .filter(Boolean);
+
+    const teacherNames = teacherNamesFromApi.length
+      ? teacherNamesFromApi
+      : teacherRecords.map((t) => t.name).filter(Boolean);
+
+    const extractedTeacherPhone = (typeof rawTeacherId === 'object' && rawTeacherId?.phone)
+      ? rawTeacherId.phone
+      : (teacherRecords[0]?.phone || student.zalo || '');
+
+    const teacherDisplay = teacherNames.length
+      ? teacherNames.map((n) => `Thầy ${n}`).join(', ')
+      : 'Chưa phân công';
 
     const joinClassUrl = [student.linkHoc, student.online_meeting_url]
       .map((u) => (u && String(u).trim()) || '')
@@ -72,8 +88,8 @@ const StudentDashboard = ({ onNavigate }) => {
       ...student,
       joinClassUrl,
       isLikelyLiveClass,
-      teacher: extractedTeacherName ? `Thầy ${extractedTeacherName}` : 'Chưa phân công',
-      teacherId: actualTeacherId,
+      teacher: teacherDisplay,
+      teacherId: teacherIds[0] || actualTeacherId,
       teacherZalo: extractedTeacherPhone,
       attendanceHistory: student.grades || [],
       courses: getClientEnrollments(student),
@@ -274,48 +290,13 @@ const StudentDashboard = ({ onNavigate }) => {
   }, [viewStudent?.teacherId]);
 
   const displayGrades = useMemo(() => {
-    const rawGrades = [...(viewStudent?.grades || [])];
-
-    const dateKeysOf = (raw) => {
-      if (!raw) return [];
-      const keys = new Set([String(raw).trim()]);
-      const d = new Date(raw);
-      if (!Number.isNaN(d.getTime())) {
-        keys.add(d.toLocaleDateString('vi-VN'));
-        keys.add(d.toISOString().slice(0, 10));
-      }
-      return [...keys];
-    };
-
-    const gradeKeySet = new Set();
-    rawGrades.forEach((g) => dateKeysOf(g.date).forEach((k) => gradeKeySet.add(k)));
-
-    // Fallback: buổi lịch đã completed nhưng chưa có trong grades → vẫn hiện nhật ký
-    (mySchedules || []).forEach((s) => {
-      if (s.status !== 'completed') return;
-      const keys = dateKeysOf(s.date);
-      if (keys.some((k) => gradeKeySet.has(k))) return;
-      const parsedDate = new Date(s.date);
-      const dateLabel = Number.isNaN(parsedDate.getTime())
-        ? String(s.date)
-        : parsedDate.toLocaleDateString('vi-VN');
-      const sessionGrade = s.sessionGrade != null ? Number(s.sessionGrade) : null;
-      rawGrades.push({
-        date: dateLabel,
-        time: s.startTime || '',
-        note: s.note || 'Đã điểm danh hoàn thành buổi học',
-        grade: Number.isFinite(sessionGrade) ? sessionGrade : null,
-        _fromSchedule: true,
-      });
-      keys.forEach((k) => gradeKeySet.add(k));
-    });
-
-    if (!rawGrades.length) return [];
+    const grades = viewStudent?.grades || [];
+    if (!grades.length) return [];
 
     const homeworkByKey = new Map();
     const others = [];
 
-    rawGrades.forEach((g, idx) => {
+    grades.forEach((g, idx) => {
       const note = g.note || '';
       const noteLower = note.toLowerCase();
       const isHomework = noteLower.includes('bài nộp') || noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm');
@@ -337,7 +318,7 @@ const StudentDashboard = ({ onNavigate }) => {
 
     return [...others, ...homeworkByKey.values()]
       .sort((a, b) => b._sortKey - a._sortKey);
-  }, [viewStudent?.grades, mySchedules]);
+  }, [viewStudent?.grades]);
 
   const studyLogs = useMemo(() => {
     if (!viewStudent) return [];

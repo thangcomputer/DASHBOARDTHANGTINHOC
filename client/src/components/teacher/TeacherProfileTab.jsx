@@ -186,7 +186,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
             </div>
           </div>
 
-          {openSections.profile && <div className="p-6 space-y-4">
+          {openSections.profile && <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Name - Read only */}
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Họ và tên</label>
@@ -322,7 +322,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
             </div>
 
             {/* Bio */}
-            <div>
+            <div className="md:col-span-2">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Giới thiệu bản thân</label>
               {editingProfile ? (
                 <textarea
@@ -343,7 +343,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
               <button
                 onClick={handleSaveProfile}
                 disabled={saving}
-                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-red-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full md:col-span-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-red-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? <Clock size={16} className="animate-spin" /> : <Save size={16} />}
                 {saving ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}

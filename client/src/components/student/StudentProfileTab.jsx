@@ -24,6 +24,10 @@ export default function StudentProfileTab({
   });
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  const teacherValue = Array.isArray(studentData?.teacher)
+    ? studentData.teacher.filter(Boolean).join(', ')
+    : (studentData?.teacher || 'Chưa phân công');
+
   return (
     <div className="cms-sd cms-sd-page cms-sd-stack cms-sd-profile">
       {/* Hero */}
@@ -100,7 +104,7 @@ export default function StudentProfileTab({
               </button>
             </div>
           </div>
-          {openSections.personal && <ul className="divide-y divide-slate-50">
+          {openSections.personal && <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
             {[
               { icon: Mail, label: 'Email', value: studentData.email || 'Chưa cập nhật' },
               { icon: Phone, label: 'Số điện thoại', value: studentData.phone || studentData.zalo || 'Chưa cập nhật' },
@@ -127,9 +131,9 @@ export default function StudentProfileTab({
               <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.summary ? 'rotate-180' : ''}`} />
             </button>
           </div>
-          {openSections.summary && <ul className="divide-y divide-slate-50">
+          {openSections.summary && <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
             {[
-              { icon: GraduationCap, label: 'Giáo viên', value: studentData.teacher },
+              { icon: GraduationCap, label: 'Giáo viên', value: teacherValue },
               { icon: BadgeDollarSign, label: 'Trạng thái', value: studentData.status },
               { icon: Wallet, label: 'Học phí', value: studentData.price?.toLocaleString('vi-VN') + 'đ' },
             ].map((item) => (
@@ -141,7 +145,7 @@ export default function StudentProfileTab({
                 </div>
               </li>
             ))}
-            <li className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between px-4 py-3">
+            <li className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between px-4 py-3 md:col-span-2">
               <div className="flex items-center gap-3 min-w-0">
                 <CheckCircle
                   size={16}
