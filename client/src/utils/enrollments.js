@@ -142,20 +142,8 @@ export function filterStudentTrainingFiles(files, { enrollments, fallbackCourse,
 
 export function filterStudentTrainingVideos(videos, { enrollments, fallbackCourse, allowedSubjectIds, catalog } = {}) {
   const list = Array.isArray(videos) ? videos : [];
-  if (!enrollments?.length && !fallbackCourse) {
-    return list.filter((v) => itemMatchesSubjectIds(v, allowedSubjectIds, catalog));
-  }
-  const accessKeys = getStudentCourseAccessKeys(enrollments, fallbackCourse);
-  return list.filter((v) => {
-    const id = v.id || v._id;
-    let courseOk = false;
-    if (id && accessKeys.has(`id:${String(id)}`)) courseOk = true;
-    else if (v.title && accessKeys.has(`name:${normCourseKey(v.title)}`)) courseOk = true;
-    else courseOk = (enrollments || []).some((e) => {
-      if (id && e.courseId && String(e.courseId) === String(id)) return true;
-      const en = e.courseName || e.name;
-      return v.title && en && normCourseKey(en) === normCourseKey(v.title);
-    }) || (fallbackCourse && v.title && normCourseKey(fallbackCourse) === normCourseKey(v.title));
-    return courseOk && itemMatchesSubjectIds(v, allowedSubjectIds, catalog);
-  });
+  // Match by exam subjects (same idea as teacher LMS). Do NOT require LMS title
+  // to equal the pricing-catalog course name — admin video titles rarely match.
+  if (!enrollments?.length && !fallbackCourse && !allowedSubjectIds?.length) return [];
+  return list.filter((v) => itemMatchesSubjectIds(v, allowedSubjectIds, catalog));
 }
