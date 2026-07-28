@@ -16,246 +16,319 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
     pm.bankInfo?.accountHolder || pm.bankInfo?.accountName || pm.teacherName || '',
   );
 
+  const close = () => setPayoutModal(null);
+  const canGoQr = !pm.isLoading && Number(pm.amount) > 0 && Number(pm.sessionsCount) > 0;
+
   return (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[150] p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+    <>
+      <div className="cms-sheet-backdrop" onClick={close} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Thanh toán lương giảng viên"
+        className="cms-sheet w-full md:max-w-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
 
-              {/* Header */}
-              <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 px-6 py-4 text-white flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <DollarSign size={20} />
-                  <div>
-                    <h3 className="font-bold text-base leading-tight">Thanh Toán Lương Giảng Viên</h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {['Nhập thông tin', 'Quét QR chuyển khoản'].map((s, i) => (
-                        <span key={i} className={`text-xs px-2 py-0.5 rounded-full ${pm.step === i + 1 ? 'bg-white text-emerald-700 font-bold' : 'bg-emerald-800/50 text-emerald-200'}`}>
-                          {i + 1}. {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <button onClick={() => setPayoutModal(null)} className="hover:bg-emerald-800/40 rounded-lg p-1 transition"><X size={20} /></button>
+        <div className="cms-sheet-header">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <span className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+              <DollarSign size={18} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-slate-900 truncate">Thanh toán lương GV</h3>
+              <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
+                {['Nhập thông tin', 'Quét QR'].map((label, i) => {
+                  const active = pm.step === i + 1;
+                  return (
+                    <span
+                      key={label}
+                      className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                        active
+                          ? 'bg-red-600 text-white'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {i + 1}. {label}
+                    </span>
+                  );
+                })}
               </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={close}
+            className="cms-btn cms-btn-ghost cms-btn-icon shrink-0"
+            aria-label="Đóng"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-              {/* BƯỚC 1: FORM NHẬP */}
-              {pm.step === 1 && (
+        {pm.step === 1 && (
+          <>
+            <div className="cms-sheet-body space-y-4">
+              {pm.isLoading ? (
+                <div className="flex items-center justify-center py-10 gap-3 text-slate-500">
+                  <Loader2 size={20} className="animate-spin text-red-500" />
+                  <span className="text-sm font-medium">Đang tải thông tin giảng viên...</span>
+                </div>
+              ) : (
                 <>
-                  <div className="p-6 space-y-4">
-                    {pm.isLoading ? (
-                      <div className="flex items-center justify-center py-8 gap-3 text-gray-500">
-                        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                        <span>Đang tải thông tin giảng viên...</span>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="font-semibold text-slate-900 text-[16px] truncate">{pm.teacherName}</p>
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wide">Lương/buổi</p>
+                        <p className="font-semibold text-slate-800 text-[13px] tabular-nums truncate">
+                          {salaryPS.toLocaleString('vi-VN')}đ
+                        </p>
                       </div>
-                    ) : (
-                      <>
-                        {/* Teacher card */}
-                        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4">
-                          <p className="font-bold text-emerald-800 text-lg">{pm.teacherName}</p>
-                          <div className="grid grid-cols-3 gap-3 mt-3">
-                            <div>
-                              <p className="text-xs text-gray-500 uppercase font-bold">Lương/buổi</p>
-                              <p className="font-bold text-gray-800 text-sm">{salaryPS.toLocaleString('vi-VN')}đ</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500 uppercase font-bold">Buổi còn nợ</p>
-                              <p className="font-bold text-amber-600 text-sm">{pm.pendingSessionsCount} buổi</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500 uppercase font-bold">Tổng nợ</p>
-                              <p className="font-bold text-red-600 text-sm">{(pm.pendingSessionsCount * salaryPS).toLocaleString('vi-VN')}đ</p>
-                            </div>
-                          </div>
-                          {pm.bankInfo?.bankName && (
-                            <div className="mt-3 pt-3 border-t border-emerald-200 flex items-center gap-2 text-sm text-gray-600">
-                              <CreditCard size={14} className="text-emerald-600" />
-                              <span className="font-semibold">{pm.bankInfo.bankName}</span>
-                              <span>·</span>
-                              <span className="font-mono font-bold">{pm.bankInfo.accountNumber}</span>
-                              {pm.bankInfo.accountHolder && <span className="text-gray-400">· {pm.bankInfo.accountHolder}</span>}
-                            </div>
-                          )}
-                        </div>
-
-                        {salaryPS === 0 && (
-                          <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-start gap-2">
-                            <AlertCircle size={15} className="text-amber-600 mt-0.5 shrink-0" />
-                            <p className="text-xs text-amber-700 font-medium">Giảng viên chưa có mức lương/buổi. Hãy cập nhật ở trang Giảng viên → Chỉnh sửa trước.</p>
-                          </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wide">Buổi nợ</p>
+                        <p className="font-semibold text-amber-700 text-[13px] tabular-nums">
+                          {pm.pendingSessionsCount} buổi
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wide">Tổng nợ</p>
+                        <p className="font-semibold text-red-600 text-[13px] tabular-nums truncate">
+                          {(pm.pendingSessionsCount * salaryPS).toLocaleString('vi-VN')}đ
+                        </p>
+                      </div>
+                    </div>
+                    {pm.bankInfo?.bankName && (
+                      <div className="mt-3 pt-3 border-t border-slate-200 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-slate-600">
+                        <CreditCard size={14} className="text-sky-600 shrink-0" />
+                        <span className="font-semibold">{pm.bankInfo.bankName}</span>
+                        <span className="font-mono font-bold text-slate-800">{pm.bankInfo.accountNumber}</span>
+                        {pm.bankInfo.accountHolder && (
+                          <span className="text-slate-400 truncate">{pm.bankInfo.accountHolder}</span>
                         )}
-
-                        {/* Số buổi thanh toán */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
-                              Số buổi muốn thanh toán
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const cur = Math.max(0, Number(pm.sessionsCount || 0) - 1);
-                                  setPayoutModal(prev => ({ ...prev, sessionsCount: String(cur), amount: String(cur * salaryPS) }));
-                                }}
-                                className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 font-black text-xl flex items-center justify-center transition flex-shrink-0"
-                              >−</button>
-                              <input
-                                type="number" min="0"
-                                value={pm.sessionsCount}
-                                onChange={e => {
-                                  const s = e.target.value;
-                                  const autoA = Math.max(0, Number(s)) * salaryPS;
-                                  setPayoutModal(prev => ({ ...prev, sessionsCount: s, amount: String(autoA) }));
-                                }}
-                                className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-center focus:border-emerald-400 outline-none"
-                                placeholder="0"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const cur = Number(pm.sessionsCount || 0) + 1;
-                                  setPayoutModal(prev => ({ ...prev, sessionsCount: String(cur), amount: String(cur * salaryPS) }));
-                                }}
-                                className="w-10 h-10 rounded-xl bg-emerald-100 hover:bg-emerald-200 font-black text-xl text-emerald-700 flex items-center justify-center transition flex-shrink-0"
-                              >+</button>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {pm.pendingSessionsCount > 0
-                                ? `Hệ thống ghi nhận: ${pm.pendingSessionsCount} buổi chưa thanh toán`
-                                : '⚠️ Chưa có lịch dạy completed — nhập thủ công'}
-                            </p>
-                          </div>
-
-                          {/* Số tiền */}
-                          <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
-                              Số tiền thanh toán (VND)
-                            </label>
-                            <input
-                              type="number" min="0"
-                              value={pm.amount}
-                              onChange={e => setPayoutModal(prev => ({ ...prev, amount: e.target.value }))}
-                              className="w-full border-2 border-emerald-300 rounded-xl px-3 py-2.5 text-sm font-bold text-emerald-700 focus:border-emerald-500 outline-none bg-emerald-50"
-                              placeholder="Tự nhập hoặc tự tính"
-                            />
-                            {autoAmt > 0 && Number(pm.amount) !== autoAmt && (
-                              <button onClick={() => setPayoutModal(prev => ({ ...prev, amount: String(autoAmt) }))}
-                                className="text-xs text-emerald-600 mt-1 underline">
-                                Khôi phục = {autoAmt.toLocaleString('vi-VN')}đ
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Ghi chú */}
-                        <div>
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
-                            Nội dung chuyển khoản
-                          </label>
-                          <textarea
-                            value={pm.note || ''}
-                            onChange={e => setPayoutModal(prev => ({ ...prev, note: e.target.value }))}
-                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 outline-none resize-none"
-                            rows={2} placeholder="Thù lao dạy tháng 4..."
-                          />
-                        </div>
-
-                        {Number(pm.amount) > 0 && (
-                          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
-                            <span className="text-sm text-emerald-700 font-medium">💸 Tổng cần chuyển:</span>
-                            <span className="text-xl font-black text-emerald-700">{Number(pm.amount).toLocaleString('vi-VN')}đ</span>
-                          </div>
-                        )}
-                      </>
+                      </div>
                     )}
                   </div>
-                  <div className="px-6 pb-6 flex gap-3">
-                    <button onClick={() => setPayoutModal(null)} className="flex-1 py-3 border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50">Huỷ</button>
-                    <button
-                      onClick={onGoToQR}
-                      disabled={pm.isLoading || !Number(pm.amount) || !Number(pm.sessionsCount)}
-                      className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold hover:from-emerald-700 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    >
-                      <CreditCard size={16} /> Xem QR Chuyển Khoản →
-                    </button>
-                  </div>
-                </>
-              )}
 
-              {/* BƯỚC 2: QR CODE */}
-              {pm.step === 2 && (
-                <>
-                  <div className="p-6 space-y-4">
-                    <div className="text-center">
-                      <p className="font-bold text-gray-800 text-base">Quét mã QR để chuyển khoản</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {Number(pm.amount).toLocaleString('vi-VN')}đ → <span className="font-semibold">{pm.teacherName}</span>
+                  {salaryPS === 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                      <AlertCircle size={15} className="text-amber-600 mt-0.5 shrink-0" />
+                      <p className="text-[13px] text-amber-800 font-medium leading-snug">
+                        Giảng viên chưa có mức lương/buổi. Cập nhật ở Giảng viên → Chỉnh sửa trước.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
+                    <div>
+                      <label className="cms-label">Số buổi muốn thanh toán</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = Math.max(0, Number(pm.sessionsCount || 0) - 1);
+                            setPayoutModal((prev) => ({
+                              ...prev,
+                              sessionsCount: String(cur),
+                              amount: String(cur * salaryPS),
+                            }));
+                          }}
+                          className="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-lg flex items-center justify-center transition shrink-0"
+                          aria-label="Giảm số buổi"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          value={pm.sessionsCount}
+                          onChange={(e) => {
+                            const s = e.target.value;
+                            const autoA = Math.max(0, Number(s)) * salaryPS;
+                            setPayoutModal((prev) => ({
+                              ...prev,
+                              sessionsCount: s,
+                              amount: String(autoA),
+                            }));
+                          }}
+                          className="cms-input text-center font-bold tabular-nums"
+                          placeholder="0"
+                          aria-label="Số buổi"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = Number(pm.sessionsCount || 0) + 1;
+                            setPayoutModal((prev) => ({
+                              ...prev,
+                              sessionsCount: String(cur),
+                              amount: String(cur * salaryPS),
+                            }));
+                          }}
+                          className="w-11 h-11 rounded-xl bg-red-50 hover:bg-red-100 font-bold text-lg text-red-700 flex items-center justify-center transition shrink-0"
+                          aria-label="Tăng số buổi"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p className="text-[12px] text-slate-500 mt-1.5">
+                        {pm.pendingSessionsCount > 0
+                          ? `Hệ thống ghi nhận: ${pm.pendingSessionsCount} buổi chưa thanh toán`
+                          : 'Chưa có lịch dạy completed — nhập thủ công'}
                       </p>
                     </div>
 
-                    {qrUrl ? (
-                      <div className="flex justify-center">
-                        <div className="border-4 border-emerald-100 rounded-2xl p-2 bg-white shadow-lg">
-                          <img
-                            src={qrUrl}
-                            alt="QR Chuyển khoản"
-                            className="w-56 h-56 object-contain rounded-xl"
-                            onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                          />
-                          <div style={{ display: 'none' }} className="w-56 h-56 flex flex-col items-center justify-center text-gray-400 gap-2">
-                            <AlertCircle size={32} />
-                            <p className="text-xs text-center">Không thể tải QR.<br/>Vui lòng chuyển thủ công.</p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center">
-                        <AlertCircle size={28} className="text-amber-500 mx-auto mb-2" />
-                        <p className="text-sm text-amber-700 font-medium">Giảng viên chưa có thông tin ngân hàng đầy đủ (mã ngân hàng &amp; số TK)</p>
-                        <p className="text-xs text-amber-600 mt-1">Vui lòng cập nhật trang hồ sơ của giảng viên</p>
-                      </div>
-                    )}
-
-                    {/* Summary */}
-                    <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Ngân hàng</span>
-                        <span className="font-semibold">{pm.bankInfo?.bankName || '—'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Số tài khoản</span>
-                        <span className="font-mono font-bold">{pm.bankInfo?.accountNumber || '—'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Chủ tài khoản</span>
-                        <span className="font-semibold">{pm.bankInfo?.accountHolder || pm.teacherName}</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2">
-                        <span className="text-gray-500">Nội dung CK</span>
-                        <span className="font-medium text-right max-w-[60%]">{pm.note}</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2">
-                        <span className="font-bold text-gray-700">Số tiền</span>
-                        <span className="font-black text-lg text-emerald-700">{Number(pm.amount).toLocaleString('vi-VN')}đ</span>
-                      </div>
+                    <div>
+                      <label className="cms-label">Số tiền thanh toán (VND)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={pm.amount}
+                        onChange={(e) => setPayoutModal((prev) => ({ ...prev, amount: e.target.value }))}
+                        className="cms-input font-bold tabular-nums text-red-700"
+                        placeholder="Tự nhập hoặc tự tính"
+                      />
+                      {autoAmt > 0 && Number(pm.amount) !== autoAmt && (
+                        <button
+                          type="button"
+                          onClick={() => setPayoutModal((prev) => ({ ...prev, amount: String(autoAmt) }))}
+                          className="text-[12px] text-sky-700 mt-1.5 font-semibold underline"
+                        >
+                          Khôi phục = {autoAmt.toLocaleString('vi-VN')}đ
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="px-6 pb-6 flex gap-3">
-                    <button onClick={() => setPayoutModal(prev => ({ ...prev, step: 1 }))}
-                      className="flex-1 py-3 border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2">
-                      ← Quay lại chỉnh sửa
-                    </button>
-                    <button
-                      onClick={onConfirm}
-                      className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold hover:from-emerald-700 flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
-                    >
-                      <CheckCircle2 size={16} /> Đã chuyển khoản xong
-                    </button>
+
+                  <div>
+                    <label className="cms-label">Nội dung chuyển khoản</label>
+                    <textarea
+                      value={pm.note || ''}
+                      onChange={(e) => setPayoutModal((prev) => ({ ...prev, note: e.target.value }))}
+                      className="cms-input !min-h-[72px] py-3 resize-none"
+                      rows={2}
+                      placeholder="Thù lao dạy tháng..."
+                    />
                   </div>
+
+                  {Number(pm.amount) > 0 && (
+                    <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 flex items-center justify-between gap-3">
+                      <span className="text-[13px] text-red-800 font-medium">Tổng cần chuyển</span>
+                      <span className="text-lg font-bold text-red-700 tabular-nums">
+                        {Number(pm.amount).toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
-
             </div>
-          </div>
+
+            <div className="cms-sheet-footer gap-2">
+              <button type="button" onClick={close} className="cms-btn cms-btn-outline flex-1">
+                Huỷ
+              </button>
+              <button
+                type="button"
+                onClick={onGoToQR}
+                disabled={!canGoQr}
+                className="cms-btn cms-btn-primary flex-[1.4]"
+              >
+                <CreditCard size={16} /> Xem QR
+              </button>
+            </div>
+          </>
+        )}
+
+        {pm.step === 2 && (
+          <>
+            <div className="cms-sheet-body space-y-4">
+              <div className="text-center">
+                <p className="font-semibold text-slate-900 text-base">Quét mã QR để chuyển khoản</p>
+                <p className="text-[13px] text-slate-500 mt-1">
+                  {Number(pm.amount).toLocaleString('vi-VN')}đ →{' '}
+                  <span className="font-semibold text-slate-800">{pm.teacherName}</span>
+                </p>
+              </div>
+
+              {qrUrl ? (
+                <div className="flex justify-center">
+                  <div className="border-2 border-slate-200 rounded-2xl p-2 bg-white shadow-sm">
+                    <img
+                      src={qrUrl}
+                      alt="QR Chuyển khoản"
+                      className="w-52 h-52 sm:w-56 sm:h-56 object-contain rounded-xl"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                    <div
+                      style={{ display: 'none' }}
+                      className="w-52 h-52 sm:w-56 sm:h-56 flex flex-col items-center justify-center text-slate-400 gap-2"
+                    >
+                      <AlertCircle size={32} />
+                      <p className="text-xs text-center px-3">
+                        Không thể tải QR.
+                        <br />
+                        Vui lòng chuyển thủ công.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center">
+                  <AlertCircle size={28} className="text-amber-500 mx-auto mb-2" />
+                  <p className="text-sm text-amber-800 font-medium">
+                    Giảng viên chưa có thông tin ngân hàng đầy đủ (mã NH &amp; số TK)
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1">Vui lòng cập nhật hồ sơ giảng viên</p>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2.5 text-[13px]">
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500 shrink-0">Ngân hàng</span>
+                  <span className="font-semibold text-right">{pm.bankInfo?.bankName || '—'}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500 shrink-0">Số tài khoản</span>
+                  <span className="font-mono font-bold text-right">{pm.bankInfo?.accountNumber || '—'}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500 shrink-0">Chủ tài khoản</span>
+                  <span className="font-semibold text-right">
+                    {pm.bankInfo?.accountHolder || pm.teacherName}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3 border-t border-slate-200 pt-2.5">
+                  <span className="text-slate-500 shrink-0">Nội dung CK</span>
+                  <span className="font-medium text-right max-w-[62%]">{pm.note}</span>
+                </div>
+                <div className="flex justify-between gap-3 border-t border-slate-200 pt-2.5 items-center">
+                  <span className="font-semibold text-slate-700">Số tiền</span>
+                  <span className="font-bold text-lg text-red-600 tabular-nums">
+                    {Number(pm.amount).toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="cms-sheet-footer gap-2">
+              <button
+                type="button"
+                onClick={() => setPayoutModal((prev) => ({ ...prev, step: 1 }))}
+                className="cms-btn cms-btn-outline flex-1"
+              >
+                ← Quay lại
+              </button>
+              <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary flex-[1.4]">
+                <CheckCircle2 size={16} /> Đã chuyển xong
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
