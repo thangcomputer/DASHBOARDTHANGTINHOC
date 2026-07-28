@@ -1,9 +1,19 @@
 const BUILTIN_EXAM_SUBJECTS = [
-  { id: 'coban', label: 'May vi tinh (Co ban)', short: 'C', bg: 'bg-slate-600', minutes: 90, builtin: true },
-  { id: 'word', label: 'Word', short: 'W', bg: 'bg-blue-600', minutes: 90, builtin: true },
-  { id: 'excel', label: 'Excel', short: 'X', bg: 'bg-green-600', minutes: 90, builtin: true },
-  { id: 'powerpoint', label: 'PowerPoint', short: 'P', bg: 'bg-orange-500', minutes: 90, builtin: true },
-  { id: 'canva', label: 'Canva', short: 'CA', bg: 'bg-purple-600', minutes: 90, builtin: true },
+  { id: 'coban', label: 'May vi tinh (Co ban)', short: 'C', bg: 'bg-slate-600', minutes: 90, builtin: true, group: 'office' },
+  { id: 'word', label: 'Word', short: 'W', bg: 'bg-blue-600', minutes: 90, builtin: true, group: 'office' },
+  { id: 'excel', label: 'Excel', short: 'X', bg: 'bg-green-600', minutes: 90, builtin: true, group: 'office' },
+  { id: 'powerpoint', label: 'PowerPoint', short: 'P', bg: 'bg-orange-500', minutes: 90, builtin: true, group: 'office' },
+  { id: 'photoshop', label: 'Photoshop', short: 'PS', bg: 'bg-sky-600', minutes: 90, builtin: true, group: 'design' },
+  { id: 'canva', label: 'Canva', short: 'CA', bg: 'bg-purple-600', minutes: 90, builtin: true, group: 'design' },
+  { id: 'corel', label: 'Corel', short: 'CR', bg: 'bg-pink-600', minutes: 90, builtin: true, group: 'design' },
+  { id: 'autocad', label: 'AutoCAD', short: 'AU', bg: 'bg-amber-600', minutes: 90, builtin: true, group: 'design' },
+  { id: 'mos-word', label: 'MOS-Word', short: 'MW', bg: 'bg-indigo-600', minutes: 90, builtin: true, group: 'mos' },
+  { id: 'mos-excel', label: 'MOS-Excel', short: 'ME', bg: 'bg-emerald-700', minutes: 90, builtin: true, group: 'mos' },
+  { id: 'mos-powerpoint', label: 'MOS-PowerPoint', short: 'MP', bg: 'bg-rose-600', minutes: 90, builtin: true, group: 'mos' },
+  { id: 'cpp', label: 'C++', short: 'C+', bg: 'bg-cyan-700', minutes: 90, builtin: true, group: 'programming' },
+  { id: 'web', label: 'Web', short: 'WB', bg: 'bg-teal-700', minutes: 90, builtin: true, group: 'programming' },
+  { id: 'python', label: 'Python', short: 'PY', bg: 'bg-yellow-600', minutes: 90, builtin: true, group: 'programming' },
+  { id: 'situation', label: 'Su pham (Tinh huong)', short: 'SP', bg: 'bg-red-600', minutes: 90, builtin: true, group: 'pedagogy' },
 ];
 
 const BUILTIN_EXAM_SUBJECT_IDS = BUILTIN_EXAM_SUBJECTS.map((s) => s.id);
@@ -51,7 +61,7 @@ function sanitizeCustomExamSubjectEntry(raw) {
   const minutes = Number.isFinite(minutesRaw) && minutesRaw >= 1 && minutesRaw <= 600
     ? Math.round(minutesRaw)
     : 90;
-  return { id, label, short, bg, minutes, custom: true };
+  return { id, label, short, bg, minutes, custom: true, group: String(raw?.group || 'admin').trim() || 'admin' };
 }
 
 function normalizeCustomList(customRaw) {
@@ -94,9 +104,18 @@ function inferExamSubjectsFromCourseName(name, category, customRaw) {
   const n = normalizeCourseKey(name);
   const valid = getValidExamSubjectIds(customRaw);
   const pick = (ids) => ids.filter((id) => valid.has(id));
+  if (n.includes('mos')) return pick(['mos-word', 'mos-excel', 'mos-powerpoint']);
+  if (n.includes('photoshop')) return pick(['photoshop']);
+  if (n.includes('corel')) return pick(['corel']);
+  if (n.includes('autocad')) return pick(['autocad']);
+  if (n.includes('python')) return pick(['python']);
+  if (n.includes('c++') || n.includes('cpp')) return pick(['cpp']);
+  if (n.includes('web')) return pick(['web']);
   if (n.includes('canva')) return pick(['canva']);
-  if (category === 'van-phong' || category === 'chung-chi') return pick([...OFFICE_EXAM_IDS]);
-  if (category === 'do-hoa') return pick(['canva']);
+  if (category === 'van-phong') return pick([...OFFICE_EXAM_IDS]);
+  if (category === 'chung-chi') return pick(['mos-word', 'mos-excel', 'mos-powerpoint']);
+  if (category === 'do-hoa') return pick(['photoshop', 'canva', 'corel', 'autocad']);
+  if (category === 'lap-trinh') return pick(['cpp', 'web', 'python']);
   if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
   if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
   if (n.includes('powerpoint') || n.includes('ppt')) return pick(['coban', 'powerpoint']);

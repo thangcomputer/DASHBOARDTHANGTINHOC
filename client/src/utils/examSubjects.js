@@ -1,14 +1,34 @@
 /** Catalog mon thi (mac dinh + tuy chinh tu server) */
 export const BUILTIN_EXAM_SUBJECTS = {
-  coban: { id: 'coban', label: 'M\u00E1y vi t\u00EDnh (C\u01A1 b\u1EA3n)', short: 'C', bg: 'bg-slate-600', minutes: 90 },
-  word: { id: 'word', label: 'Word', short: 'W', bg: 'bg-blue-600', minutes: 90 },
-  excel: { id: 'excel', label: 'Excel', short: 'X', bg: 'bg-green-600', minutes: 90 },
-  powerpoint: { id: 'powerpoint', label: 'PowerPoint', short: 'P', bg: 'bg-orange-500', minutes: 90 },
-  canva: { id: 'canva', label: 'Canva', short: 'CA', bg: 'bg-purple-600', minutes: 90 },
-  situation: { id: 'situation', label: 'S\u01B0 ph\u1EA1m (T\u00ECnh hu\u1ED1ng)', short: 'SP', bg: 'bg-rose-600', minutes: 90 },
+  coban: { id: 'coban', label: 'M\u00E1y vi t\u00EDnh (C\u01A1 b\u1EA3n)', short: 'C', bg: 'bg-slate-600', minutes: 90, group: 'office' },
+  word: { id: 'word', label: 'Word', short: 'W', bg: 'bg-blue-600', minutes: 90, group: 'office' },
+  excel: { id: 'excel', label: 'Excel', short: 'X', bg: 'bg-green-600', minutes: 90, group: 'office' },
+  powerpoint: { id: 'powerpoint', label: 'PowerPoint', short: 'P', bg: 'bg-orange-500', minutes: 90, group: 'office' },
+  photoshop: { id: 'photoshop', label: 'Photoshop', short: 'PS', bg: 'bg-sky-600', minutes: 90, group: 'design' },
+  canva: { id: 'canva', label: 'Canva', short: 'CA', bg: 'bg-purple-600', minutes: 90, group: 'design' },
+  corel: { id: 'corel', label: 'Corel', short: 'CR', bg: 'bg-pink-600', minutes: 90, group: 'design' },
+  autocad: { id: 'autocad', label: 'AutoCAD', short: 'AU', bg: 'bg-amber-600', minutes: 90, group: 'design' },
+  'mos-word': { id: 'mos-word', label: 'MOS-Word', short: 'MW', bg: 'bg-indigo-600', minutes: 90, group: 'mos' },
+  'mos-excel': { id: 'mos-excel', label: 'MOS-Excel', short: 'ME', bg: 'bg-emerald-700', minutes: 90, group: 'mos' },
+  'mos-powerpoint': { id: 'mos-powerpoint', label: 'MOS-PowerPoint', short: 'MP', bg: 'bg-rose-600', minutes: 90, group: 'mos' },
+  cpp: { id: 'cpp', label: 'C++', short: 'C+', bg: 'bg-cyan-700', minutes: 90, group: 'programming' },
+  web: { id: 'web', label: 'Web', short: 'WB', bg: 'bg-teal-700', minutes: 90, group: 'programming' },
+  python: { id: 'python', label: 'Python', short: 'PY', bg: 'bg-yellow-600', minutes: 90, group: 'programming' },
+  situation: { id: 'situation', label: 'S\u01B0 ph\u1EA1m (T\u00ECnh hu\u1ED1ng)', short: 'SP', bg: 'bg-rose-600', minutes: 90, group: 'pedagogy' },
 };
 export const EXAM_SUBJECTS = BUILTIN_EXAM_SUBJECTS;
 export const OFFICE_EXAM_IDS = ['coban', 'word', 'excel', 'powerpoint'];
+export const MOS_EXAM_IDS = ['mos-word', 'mos-excel', 'mos-powerpoint'];
+export const DESIGN_EXAM_IDS = ['photoshop', 'canva', 'corel', 'autocad'];
+export const PROGRAMMING_EXAM_IDS = ['cpp', 'web', 'python'];
+export const EXAM_SUBJECT_GROUP_LABELS = {
+  office: 'Tin hoc van phong',
+  design: 'Design',
+  mos: 'Tin hoc MOS',
+  programming: 'Lap trinh',
+  pedagogy: 'Su pham',
+  admin: 'Admin tao',
+};
 
 export function slugifyExamSubjectId(raw) {
   return String(raw || '')
@@ -41,7 +61,7 @@ export function mergeExamCatalog(customList) {
   const merged = { ...BUILTIN_EXAM_SUBJECTS };
   (Array.isArray(customList) ? customList : []).forEach((item) => {
     if (!item?.id || !item?.label) return;
-    const entry = { id: item.id, label: item.label, bg: item.bg || 'bg-gray-600', minutes: item.minutes || 90, custom: true };
+    const entry = { id: item.id, label: item.label, bg: item.bg || 'bg-gray-600', minutes: item.minutes || 90, custom: true, group: item.group || 'admin' };
     merged[item.id] = { ...entry, short: getExamSubjectInitials({ ...entry, short: item.short }) };
   });
   return merged;
@@ -54,7 +74,11 @@ export function mergedArrayToCatalog(list) {
 
 export function getExamSubjectOptions(catalog) {
   const map = catalog || BUILTIN_EXAM_SUBJECTS;
-  return Object.values(map).map(({ id, label }) => ({ id, label }));
+  return Object.values(map).map(({ id, label, group }) => ({ id, label, group: group || 'admin' }));
+}
+
+export function getExamSubjectGroupLabel(group) {
+  return EXAM_SUBJECT_GROUP_LABELS[group] || 'Khac';
 }
 
 export function normalizeCourseKey(name) {
@@ -70,11 +94,20 @@ export function mapCourseToExamSubjectIds(courseName, catalog) {
   const n = normalizeCourseKey(courseName);
   const pick = (ids) => ids.filter((id) => cat[id]);
   if (!n) return [];
+  if (n.includes('mos')) return pick([...MOS_EXAM_IDS]);
+  if (n.includes('photoshop')) return pick(['photoshop']);
+  if (n.includes('corel')) return pick(['corel']);
+  if (n.includes('autocad')) return pick(['autocad']);
+  if (n.includes('python')) return pick(['python']);
+  if (n.includes('c++') || n.includes('cpp')) return pick(['cpp']);
+  if (n.includes('web')) return pick(['web']);
   // Combo Powerpoint + Canva trong cùng tên khóa
   if (n.includes('canva') && (n.includes('powerpoint') || n.includes('ppt'))) {
     return pick(['coban', 'powerpoint', 'canva']);
   }
   if (n.includes('canva')) return pick(['canva']);
+  if (n.includes('thiet ke') || n.includes('do hoa') || n.includes('design')) return pick([...DESIGN_EXAM_IDS]);
+  if (n.includes('lap trinh') || n.includes('programming')) return pick([...PROGRAMMING_EXAM_IDS]);
   if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) return pick([...OFFICE_EXAM_IDS]);
   if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
   if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
@@ -116,8 +149,21 @@ export function mapCourseToExamSubjectIdsStrict(courseName, catalog) {
     || n.includes('may vi tinh')
     || n.includes('co ban')
     || n.includes('canva');
+  const looksExtended =
+    n.includes('mos')
+    || n.includes('photoshop')
+    || n.includes('corel')
+    || n.includes('autocad')
+    || n.includes('python')
+    || n.includes('c++')
+    || n.includes('cpp')
+    || n.includes('web')
+    || n.includes('lap trinh')
+    || n.includes('thiet ke')
+    || n.includes('do hoa')
+    || n.includes('design');
   const allOffice = loose.length > 0 && loose.every((id) => OFFICE_EXAM_IDS.includes(id));
-  if (allOffice && !looksOffice) return [];
+  if (allOffice && !looksOffice && !looksExtended) return [];
   return loose;
 }
 
@@ -154,6 +200,13 @@ export function getCourseTeachingFocus(courseOrEnrollment, catalog) {
   }
   if (n.includes('canva') && (n.includes('powerpoint') || n.includes('ppt'))) return ['powerpoint', 'canva'];
   if (n.includes('canva')) return ['canva'];
+  if (n.includes('photoshop')) return ['photoshop'];
+  if (n.includes('corel')) return ['corel'];
+  if (n.includes('autocad')) return ['autocad'];
+  if (n.includes('mos')) return [...MOS_EXAM_IDS];
+  if (n.includes('python')) return ['python'];
+  if (n.includes('c++') || n.includes('cpp')) return ['cpp'];
+  if (n.includes('web')) return ['web'];
   if (n.includes('excel')) return ['excel'];
   if (n.includes('word')) return ['word'];
   if (n.includes('powerpoint') || n.includes('ppt')) return ['powerpoint'];

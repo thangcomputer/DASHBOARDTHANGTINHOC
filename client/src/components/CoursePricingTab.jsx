@@ -19,6 +19,7 @@ import {
   formatExamSubjectsSummary,
   mapCourseToExamSubjectIds,
   slugifyExamSubjectId,
+  getExamSubjectGroupLabel,
 } from '../utils/examSubjects';
 
 const API = import.meta.env.VITE_API_URL || '';
@@ -71,6 +72,12 @@ function CourseModal({
   const [addingSubject, setAddingSubject] = useState(false);
 
   const examOptions = getExamSubjectOptions(examSubjectsCatalog);
+  const groupedExamOptions = examOptions.reduce((acc, item) => {
+    const key = item.group || 'admin';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
 
   const effective = calcEffective(form.price, form.discountPercent);
   const hasDiscount = Number(form.discountPercent) > 0 && Number(form.price) > 0;
@@ -304,38 +311,47 @@ function CourseModal({
                 Môn thi trong Phòng Thi ({selectedCount})
               </h4>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {examOptions.map(({ id, label }) => {
-                  const selected = Array.isArray(form.examSubjects) ? form.examSubjects : [];
-                  const checked = selected.includes(id);
-                  return (
-                    <label
-                      key={id}
-                      className={`flex items-center gap-2 border-2 rounded-2xl px-3 py-2.5 cursor-pointer transition ${
-                        checked ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => {
-                          setForm((f) => {
-                            const current = Array.isArray(f.examSubjects) ? f.examSubjects : [];
-                            const next = checked
-                              ? current.filter((x) => x !== id)
-                              : [...current, id];
-                            return { ...f, examSubjects: next };
-                          });
-                        }}
-                        className="rounded border-gray-300 text-blue-600"
-                      />
-                      <span className="text-sm font-semibold text-gray-700">{label}</span>
-                      {examSubjectsCatalog?.[id]?.custom && (
-                        <span className="ml-auto text-[9px] font-black uppercase text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Mới</span>
-                      )}
-                    </label>
-                  );
-                })}
+              <div className="space-y-4">
+                {Object.entries(groupedExamOptions).map(([groupKey, items]) => (
+                  <div key={groupKey} className="space-y-2">
+                    <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                      {getExamSubjectGroupLabel(groupKey)}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {items.map(({ id, label }) => {
+                        const selected = Array.isArray(form.examSubjects) ? form.examSubjects : [];
+                        const checked = selected.includes(id);
+                        return (
+                          <label
+                            key={id}
+                            className={`flex items-center gap-2 border-2 rounded-2xl px-3 py-2.5 cursor-pointer transition ${
+                              checked ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setForm((f) => {
+                                  const current = Array.isArray(f.examSubjects) ? f.examSubjects : [];
+                                  const next = checked
+                                    ? current.filter((x) => x !== id)
+                                    : [...current, id];
+                                  return { ...f, examSubjects: next };
+                                });
+                              }}
+                              className="rounded border-gray-300 text-blue-600"
+                            />
+                            <span className="text-sm font-semibold text-gray-700">{label}</span>
+                            {examSubjectsCatalog?.[id]?.custom && (
+                              <span className="ml-auto text-[9px] font-black uppercase text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Mới</span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {otherCourses.length > 0 && (
