@@ -1,7 +1,35 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, X, Ban, PlayCircle, CheckCircle, Video, MessageSquare, Edit3, Trash2 } from 'lucide-react';
+import { csrfFetch } from '../../services/api';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
+
+const STATUS_COLORS = {
+  completed: {
+    cell: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    badge: 'bg-emerald-100 text-emerald-700',
+    dot: 'bg-emerald-500',
+    label: '✓ Hoàn thành',
+  },
+  scheduled: {
+    cell: 'bg-amber-50 border-amber-200 text-amber-700',
+    badge: 'bg-amber-100 text-amber-700',
+    dot: 'bg-amber-400',
+    label: '● Sắp tới',
+  },
+  ongoing: {
+    cell: 'bg-green-50 border-green-200 text-green-700',
+    badge: 'bg-green-100 text-green-700',
+    dot: 'bg-green-500',
+    label: '● Đang diễn ra',
+  },
+  cancelled: {
+    cell: 'bg-red-50 border-red-200 text-red-400',
+    badge: 'bg-red-100 text-red-500',
+    dot: 'bg-red-400',
+    label: '✗ Đã hủy',
+  },
+};
 
 export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCancelSchedule }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
