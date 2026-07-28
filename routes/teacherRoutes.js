@@ -340,6 +340,7 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
     }
 
     const isAdminRole = (req.user.role === 'admin' || req.user.role === 'staff');
+    // Self-edit: chỉ profile cá nhân — không được tự ghi điểm thi / status / practical
     const allowedFields = isAdminRole 
       ? [
           'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'bio', 'startDate', 'address',
@@ -352,9 +353,6 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
         ]
       : [
           'zalo', 'email', 'bio', 'bankAccount', 'avatar', 'address',
-          'testScore', 'testStatus', 'testDate', 'faceViolationCount', 'status', 'lockReason',
-          'testMcCorrect', 'testMcWrong', 'testMcTotal',
-          'practicalFile', 'practicalStatus'
         ];
 
     const updates = {};
@@ -831,6 +829,17 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, isAdmin, superAdminOnly
         ...(idempotencyKey ? { idempotencyKey } : {}),
       });
     } catch (createErr) {
+      // Rollback claim nếu tạo phiếu chi thất bại (tránh buổi bị đánh dấu paid mà không có ledger)
+      if (actualCount > 0 && sessionIds.length > 0 && !(createErr?.code === 11000 && idempotencyKey)) {
+        try {
+          await Schedule.updateMany(
+            { _id: { $in: sessionIds }, is_paid_to_teacher: true },
+            { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
+          );
+        } catch (rollbackErr) {
+          logger.error('[TEACHERS] Pay rollback failed:', rollbackErr);
+        }
+      }
       if (createErr?.code === 11000 && idempotencyKey) {
         const existing = await Transaction.findOne({ idempotencyKey }).lean();
         if (existing) {
@@ -903,10 +912,21 @@ router.put('/:id/finance/pay-all', [authMiddleware, isAdmin, superAdminOnlyTeach
       return res.status(400).json({ success: false, message: `Số tiền thanh toán (${estimatedAmount.toLocaleString('vi-VN')}đ) vượt quá giới hạn 500 triệu. Vui lòng kiểm tra lại mức lương/buổi.` });
     }
 
-    // Đánh dấu atomic các buổi chưa thanh toán rồi tính theo modifiedCount
+    // Claim atomic theo danh sách _id đã chọn — rollback chỉ các id này nếu create fail
+    const pendingSessions = await Schedule.find({
+      teacherId: req.params.id,
+      status: 'completed',
+      is_paid_to_teacher: { $ne: true }
+    }).select('_id').lean();
+
+    const sessionIds = pendingSessions.map((s) => s._id);
+    if (sessionIds.length === 0) {
+      return res.status(409).json({ success: false, message: 'Các buổi đã được thanh toán bởi yêu cầu khác' });
+    }
+
     const claim = await Schedule.updateMany(
       {
-        teacherId: req.params.id,
+        _id: { $in: sessionIds },
         status: 'completed',
         is_paid_to_teacher: { $ne: true }
       },
@@ -922,19 +942,32 @@ router.put('/:id/finance/pay-all', [authMiddleware, isAdmin, superAdminOnlyTeach
 
     // Tạo giao dịch thanh toán
     const now = new Date();
-    const transaction = await Transaction.create({
-      teacherId: req.params.id,
-      teacherName: teacher.name,
-      teacherPhone: teacher.phone,
-      amount: totalAmount,
-      description: `Thanh toán thù lao ${paidCount} buổi dạy`,
-      month: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
-      status: 'confirmed',
-      confirmedBy: req.user.name || 'Admin',
-      confirmedAt: now,
-      bankName: teacher.bankAccount?.bankName || '',
-      bankAccount: teacher.bankAccount?.accountNumber || ''
-    });
+    let transaction;
+    try {
+      transaction = await Transaction.create({
+        teacherId: req.params.id,
+        teacherName: teacher.name,
+        teacherPhone: teacher.phone,
+        amount: totalAmount,
+        description: `Thanh toán thù lao ${paidCount} buổi dạy`,
+        month: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
+        status: 'confirmed',
+        confirmedBy: req.user.name || 'Admin',
+        confirmedAt: now,
+        bankName: teacher.bankAccount?.bankName || '',
+        bankAccount: teacher.bankAccount?.accountNumber || ''
+      });
+    } catch (createErr) {
+      try {
+        await Schedule.updateMany(
+          { _id: { $in: sessionIds }, is_paid_to_teacher: true },
+          { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
+        );
+      } catch (rollbackErr) {
+        logger.error('[FINANCE] Pay-all rollback failed:', rollbackErr);
+      }
+      throw createErr;
+    }
 
     const io = req.app.get('io');
     if (io) {

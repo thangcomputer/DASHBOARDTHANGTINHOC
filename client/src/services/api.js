@@ -178,6 +178,18 @@ export const getRolePrefix = (overrideRole = null) => {
 };
 
 /** Chuẩn hóa URL file upload (IP/http cũ → domain hiện tại) */
+const PUBLIC_UPLOAD_RE = /\/uploads\/(logo|favicon|popup|images|invoice_logo|feed)(\/|$)/i;
+
+function withUploadAccessToken(url) {
+  if (!url || typeof window === 'undefined') return url;
+  if (!url.includes('/uploads/') || PUBLIC_UPLOAD_RE.test(url)) return url;
+  if (/[?&]access_token=/.test(url)) return url;
+  const token = getAccessToken();
+  if (!token) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}access_token=${encodeURIComponent(token)}`;
+}
+
 export const resolveMediaUrl = (url) => {
   if (!url || url === '#') return '';
   const trimmed = String(url).trim();
@@ -185,14 +197,14 @@ export const resolveMediaUrl = (url) => {
   if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) return trimmed;
   // Sửa URL hỏng kiểu https:///uploads/...
   if (/^https?:\/\/\//i.test(trimmed)) {
-    return trimmed.replace(/^https?:\/\/+/, '/');
+    return withUploadAccessToken(trimmed.replace(/^https?:\/\/+/, '/'));
   }
-  if (trimmed.startsWith('/uploads/')) return trimmed;
+  if (trimmed.startsWith('/uploads/')) return withUploadAccessToken(trimmed);
   if (trimmed.startsWith('/')) return trimmed;
-  if (trimmed.startsWith('uploads/')) return `/${trimmed}`;
+  if (trimmed.startsWith('uploads/')) return withUploadAccessToken(`/${trimmed}`);
 
   const uploadsPath = trimmed.match(/\/uploads\/[^\s?#]+/i);
-  if (uploadsPath) return uploadsPath[0];
+  if (uploadsPath) return withUploadAccessToken(uploadsPath[0]);
 
   // Link ngoài không có https:// (Drive, Dropbox, …)
   if (/^https?:\/\//i.test(trimmed)) {
@@ -200,7 +212,7 @@ export const resolveMediaUrl = (url) => {
     try {
       const parsed = new URL(trimmed);
       if (parsed.pathname.startsWith('/uploads/')) {
-        return `${window.location.origin}${parsed.pathname}${parsed.search || ''}`;
+        return withUploadAccessToken(`${window.location.origin}${parsed.pathname}${parsed.search || ''}`);
       }
       if (parsed.hostname === window.location.hostname) {
         return `${window.location.origin}${parsed.pathname}${parsed.search || ''}`;
@@ -219,7 +231,7 @@ export const resolveMediaUrl = (url) => {
   try {
     const parsed = new URL(trimmed, window.location.origin);
     if (parsed.pathname.startsWith('/uploads/')) {
-      return `${window.location.origin}${parsed.pathname}${parsed.search || ''}`;
+      return withUploadAccessToken(`${window.location.origin}${parsed.pathname}${parsed.search || ''}`);
     }
     if (parsed.hostname === window.location.hostname) {
       return `${window.location.origin}${parsed.pathname}${parsed.search || ''}`;

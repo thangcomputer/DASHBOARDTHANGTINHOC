@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import useSWR, { mutate } from 'swr';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
@@ -428,7 +428,7 @@ export function useAdminDashboardState() {
   const statPendingTeachers = branchStats?.pendingTeachers
     ?? safeTeachers.filter((t) => t.status === 'Pending').length;
 
-  const adminTabValue = {
+  const adminTabValue = useMemo(() => ({
     search, setSearch, filterCourse, setFilterCourse, filterPaid, setFilterPaid,
     handleExportExcel, isExportingExcel, setShowImportModal, setShowModal,
     studentsPagination, filteredStudents, safeTeachers, safeBranches,
@@ -458,8 +458,36 @@ export function useAdminDashboardState() {
     erSearch, setErSearch, gradingRow, setGradingRow, gradingValue, setGradingValue,
     addNotification, sqSection, setSqSection, sqType, setSqType, sqSearch, setSqSearch, removeStudentQuestion,
     removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
-    erForm, setErForm, safeStudentsList, updateExamResult, addExamResult, examSubjectsCatalog,
-  };
+    erForm, setErForm, safeStudentsList, updateExamResult, addExamResult,
+  }), [
+    search, filterCourse, filterPaid, handleExportExcel, isExportingExcel,
+    studentsPagination, filteredStudents, safeTeachers, safeBranches,
+    assignTeacher, addEnrollment, actionMenuId, enrollmentModalStudent,
+    sendDebtReminder, approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
+    handlePrintInvoice, removeStudent, currentPage,
+    teachers, filteredTeachers, isSuperAdmin, getTeacherRating,
+    handlePayTeacher, removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed,
+    courseBuilderMode, trainingData, updateTrainingItem, trainingTab,
+    trainingForm, questions, trainingFileUploading,
+    handleTrainingDocUpload, handleTeacherQuestionsExcelFile,
+    addTrainingItem, showGlobalModal, erGvSearch, erGvForm, ctxUpdateTeacher,
+    qSearch, qSection, qDifficulty, qSort, qForm,
+    addQuestion, updateQuestion, removeQuestion, resetQuestions,
+    teacherExamTimeLimitMinutes, safeTeachersList, examSubjectsCatalog,
+    getPrivateEvaluationsForAdmin, markEvaluationRead,
+    transactions, addSystemLog, financeStudents, isLoadingFinance, markStudentPaid, financialData,
+    isLoadingLogs, dbLogs,
+    sCourseBuilderMode, updateStudentTrainingItem,
+    studentTrainingData, sTrainingTab,
+    students, studentQuestions, studentExamMinutes, updateStudentExamMinutes,
+    studentExamFiles, setStudentExamFile,
+    resetStudentQuestions, handleStudentQuestionsExcelFile,
+    sTrainingForm, sTrainingFileUploading, addStudentTrainingItem,
+    erSearch, gradingRow, gradingValue,
+    addNotification, sqSection, sqType, sqSearch, removeStudentQuestion,
+    removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
+    erForm, safeStudentsList, updateExamResult, addExamResult,
+  ]);
 
   return {
     activeTab,

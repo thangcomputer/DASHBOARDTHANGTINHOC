@@ -4,13 +4,13 @@ const Invoice = require('../models/Invoice');
 const Student = require('../models/Student');
 const { generateInvoicePDF } = require('../modules/pdfInvoice');
 const { authMiddleware, isAdmin, branchFilter } = require('../middleware/auth');
-const sanitizeRegex = require('../middleware/sanitizeRegex');
+const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const { enqueueInvoicePdf, enqueueInvoiceEmail } = require('../services/queue/jobQueue');
 const logger = require('../config/logger');
 
 // ─── GET /api/invoices ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy hóa đơn (STAFF bị giới hạn theo chi nhánh)
-router.get('/', [authMiddleware, branchFilter], async (req, res) => {
+router.get('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
   try {
     const { studentId, search, branchId: queryBranch, paymentMethod, from, to } = req.query;
     const filter = { ...req.branchFilter }; // {} for admin, {branchId:...} for staff

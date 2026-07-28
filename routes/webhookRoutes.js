@@ -187,9 +187,20 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
         });
       } catch (dupErr) {
         if (dupErr?.code === 11000) {
-          return res.json({ success: true, matched: false, duplicate: true });
+          const existing = await SepayWebhookEvent.findOne({ gatewayTxnId }).select('matched matchedRef').lean();
+          // Đã khớp trước đó → idempotent OK; chưa khớp (crash giữa chừng) → rematch bên dưới
+          if (existing?.matched) {
+            return res.json({
+              success: true,
+              matched: true,
+              duplicate: true,
+              matchedRef: existing.matchedRef || '',
+            });
+          }
+          logger.warn(`[SEPAY] Duplicate gatewayTxnId chưa matched — rematch: ${gatewayTxnId}`);
+        } else {
+          throw dupErr;
         }
-        throw dupErr;
       }
     }
 

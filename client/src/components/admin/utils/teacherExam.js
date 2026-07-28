@@ -1,3 +1,5 @@
+import { resolveMediaUrl, buildMediaDownloadUrl } from '../../../services/api';
+
 export function resolveTeacherExamDate(t) {
   if (!t) return null;
   if (t.testDate) {
@@ -26,24 +28,29 @@ export function resolvePracticalFileUrl(practicalFile) {
   const raw = String(practicalFile).trim();
   if (!raw) return '';
 
+  let path = raw;
   if (/^https?:\/\//i.test(raw)) {
     try {
-      return new URL(raw).pathname;
+      path = new URL(raw).pathname;
     } catch {
       const m = raw.match(/^https?:\/\/[^/]+(\/.*)$/i);
-      if (m) return m[1];
+      if (m) path = m[1];
     }
+  } else if (raw.startsWith('/uploads/')) {
+    path = raw;
+  } else if (raw.startsWith('uploads/')) {
+    path = `/${raw}`;
+  } else {
+    path = `/uploads/practical/${raw.replace(/^\/+/, '')}`;
   }
-
-  if (raw.startsWith('/uploads/')) return raw;
-  if (raw.startsWith('uploads/')) return `/${raw}`;
-  return `/uploads/practical/${raw.replace(/^\/+/, '')}`;
+  return resolveMediaUrl(path);
 }
 
 export function practicalFileDisplayName(practicalFile) {
   const path = resolvePracticalFileUrl(practicalFile);
   if (!path) return '';
-  return decodeURIComponent(path.split('/').pop() || practicalFile);
+  const clean = path.split('?')[0];
+  return decodeURIComponent(clean.split('/').pop() || practicalFile);
 }
 
 /** URL tải file (ép download) */
@@ -51,7 +58,7 @@ export function practicalFileDownloadUrl(practicalFile) {
   const base = resolvePracticalFileUrl(practicalFile);
   if (!base) return '';
   const name = practicalFileDisplayName(practicalFile);
-  return `${base}?download=1&downloadAs=${encodeURIComponent(name)}`;
+  return buildMediaDownloadUrl(base, name) || base;
 }
 
 /** URL mở xem trong tab trình duyệt */

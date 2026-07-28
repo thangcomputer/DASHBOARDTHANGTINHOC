@@ -54,8 +54,7 @@ export function useDataSync({
         // Admin: students handled by StudentsContext.fetchStudentsPaginated, skip here
         promises.push(api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })));
       } else if (isTeacher) {
-        // Teacher: can hoc vien da gan — gioi han de tranh payload lon
-        promises.push(api.students.getAll({ limit: 300 }).catch(() => ({ success: false })));
+        // Teacher students: StudentsContext (SWR) owns list — tránh double-fetch
         promises.push(api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })));
       }
 
@@ -91,10 +90,6 @@ export function useDataSync({
         const schedulesRes = results[idx++];
         if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
       } else if (isTeacher) {
-        const studentsRes = results[idx++];
-        if (studentsRes?.success) {
-          setStudents((studentsRes.data || []).filter(Boolean).map(mapStudent));
-        }
         const schedulesRes = results[idx++];
         if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
       }

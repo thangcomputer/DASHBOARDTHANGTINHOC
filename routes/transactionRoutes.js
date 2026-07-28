@@ -8,11 +8,12 @@ const Transaction = require('../models/Transaction');
 const Teacher     = require('../models/Teacher');
 const Schedule    = require('../models/Schedule');
 const { authMiddleware, isAdmin, isTeacher, branchFilter } = require('../middleware/auth');
+const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
-router.get('/', [authMiddleware, branchFilter], async (req, res) => {
+router.get('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
   try {
     const { status, teacherId, month, branchId: queryBranch, page, limit } = req.query;
     const filter = { ...req.branchFilter };
@@ -20,7 +21,10 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
     if (queryBranch && queryBranch !== 'all' && !filter.branchId) filter.branchId = queryBranch;
     if (status)    filter.status    = status;
     if (teacherId) filter.teacherId = teacherId;
-    if (month)     filter.month     = { $regex: month, $options: 'i' };
+    if (month) {
+      const safeMonth = sanitizeRegex(String(month), 32);
+      if (safeMonth) filter.month = { $regex: safeMonth, $options: 'i' };
+    }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(1000, Math.max(1, parseInt(limit, 10) || 200));

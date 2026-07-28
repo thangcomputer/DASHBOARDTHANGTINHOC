@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { KeyRound, Clock, RefreshCw, X } from 'lucide-react';
+import { KeyRound, Clock, RefreshCw, X, CheckCircle2 } from 'lucide-react';
 import { useToast } from '../../../utils/toast.jsx';
 import api from '../../../services/api';
 
@@ -32,7 +32,9 @@ export default function ResetPasswordOtpModal({ modal, onClose }) {
       if (res.success) {
         setOtpResult(res.data);
         startCountdown();
-        toast.success('Đã sinh OTP thành công!');
+        toast.success(res.data?.queued
+          ? 'Đã tạo OTP và đưa vào hàng đợi gửi.'
+          : 'Đã tạo OTP (không hiển thị mã trên màn hình).');
       } else {
         toast.error(res.message || 'Lỗi sinh OTP');
       }
@@ -49,105 +51,83 @@ export default function ResetPasswordOtpModal({ modal, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modal?.id, modal?.role]);
 
-  if (!modal) return null;
-
-  const close = () => {
+  const handleClose = () => {
     clearInterval(otpTimerRef.current);
-    onClose();
+    onClose?.();
   };
 
-  const otpMessage = otpResult
-    ? `[THẮNG TIN HỌC] Mã OTP đặt lại mật khẩu: ${otpResult.otp}\n⏱ Hiệu lực 2 phút.\nVào: dashboard.thangtinhoc.edu.vn → Quên mật khẩu → Nhập OTP.`
+  const guideMessage = otpResult
+    ? `[THẮNG TIN HỌC] Admin đã cấp OTP đặt lại mật khẩu cho bạn.\n⏱ Hiệu lực 2 phút.\nVào: dashboard.thangtinhoc.edu.vn → Quên mật khẩu → Nhập OTP nhận được qua Zalo/email.`
     : '';
 
   return (
     <>
-      <div className="cms-sheet-backdrop" onClick={close} aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Cấp lại mật khẩu"
-        className="cms-sheet w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
-        <div className="cms-sheet-header">
-          <span className="cms-sheet-header__side bg-amber-50 text-amber-600" aria-hidden="true">
-            <KeyRound size={18} />
-          </span>
-          <div className="min-w-0">
-            <h3 className="cms-sheet-header__title">Cấp lại mật khẩu</h3>
-            <p className="text-center text-[11px] text-slate-500 truncate mt-0.5">
-              {modal.role === 'teacher' ? 'Giảng viên' : 'Học viên'}: <strong>{modal.name}</strong>
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Đóng"
-            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
+      <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-3 border-b border-gray-100">
+        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 min-w-0">
+          <KeyRound size={18} className="text-amber-600 shrink-0" />
+          Cấp OTP đặt lại mật khẩu
+        </h3>
+        <button type="button" onClick={handleClose} className="shrink-0 inline-flex items-center justify-center min-w-11 min-h-11 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Đóng">
+          <X size={18} />
+        </button>
+      </div>
 
-        <div className="cms-sheet-body space-y-4">
-          {!otpResult ? (
-            <div className="cms-empty py-8">
-              <div className="w-10 h-10 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin" />
-              <p className="cms-empty__desc">Đang sinh mã OTP...</p>
+      <div className="p-5 space-y-4">
+        {resetPwLoading && !otpResult ? (
+          <p className="text-sm text-gray-500 text-center py-8">Đang tạo OTP…</p>
+        ) : (
+          <div className="space-y-3">
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${
+              otpCountdown > 30 ? 'bg-emerald-50 text-emerald-600'
+                : otpCountdown > 0 ? 'bg-amber-50 text-amber-600'
+                  : 'bg-red-50 text-red-600'
+            }`}>
+              <Clock size={14} />
+              {otpCountdown > 0
+                ? `${Math.floor(otpCountdown / 60)}:${String(otpCountdown % 60).padStart(2, '0')}`
+                : 'Hết hạn'}
             </div>
-          ) : (
-            <>
-              <div className={`flex items-center justify-center gap-2 py-2 px-4 rounded-full font-bold text-lg mx-auto w-fit ${
-                otpCountdown > 30 ? 'bg-emerald-50 text-emerald-600'
-                  : otpCountdown > 0 ? 'bg-amber-50 text-amber-600'
-                    : 'bg-red-50 text-red-500'
-              }`}>
-                <Clock size={18} />
-                {otpCountdown > 0
-                  ? `${Math.floor(otpCountdown / 60)}:${String(otpCountdown % 60).padStart(2, '0')}`
-                  : 'Hết hạn'}
+
+            {otpResult && (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-2">
+                <p className="flex items-center gap-2 font-bold text-emerald-800 text-sm">
+                  <CheckCircle2 size={16} /> OTP đã tạo — không hiển thị mã trên UI
+                </p>
+                <p className="text-sm text-gray-700">
+                  Người nhận: <strong>{otpResult.name}</strong>
+                  {' · '}
+                  Zalo/SĐT: <strong>{otpResult.zalo || otpResult.phone}</strong>
+                </p>
+                <p className="text-xs text-gray-500">
+                  {otpResult.message
+                    || (otpResult.queued
+                      ? 'Hệ thống đã xếp hàng gửi OTP qua Zalo/email.'
+                      : 'Nếu kênh tự động lỗi, kiểm tra queue OTP hoặc gửi lại.')}
+                </p>
               </div>
-              <div className="rounded-2xl border border-dashed border-amber-300 bg-slate-50 p-4 text-center">
-                <p className="cms-label mb-1">Mã OTP</p>
-                <p className="text-5xl font-bold text-amber-600 tracking-[0.3em] font-mono">{otpResult.otp}</p>
+            )}
+
+            {otpResult && (
+              <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
+                <p className="font-semibold text-sky-700 text-[12px] mb-1">Gợi ý nhắn HV/GV:</p>
+                <p className="font-mono text-[12px] bg-white rounded-lg p-2 border border-sky-100 whitespace-pre-wrap">{guideMessage}</p>
               </div>
-              <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-slate-700 leading-relaxed">
-                <p className="font-semibold text-sky-700 text-[12px] mb-1">Nội dung gửi cho {otpResult.name}:</p>
-                <p className="font-mono text-[12px] bg-white rounded-lg p-2 border border-sky-100 whitespace-pre-wrap">{otpMessage}</p>
-              </div>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {otpResult && (
-          <div className="cms-sheet-footer" style={{ flexDirection: 'column' }}>
-            <div className="flex gap-3 w-full">
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(otpMessage);
-                  toast.success('Đã copy nội dung tin nhắn!');
-                }}
-                className="cms-btn cms-btn-outline"
-              >
-                Copy tin
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const phone = (otpResult.zalo || otpResult.phone || '').replace(/[^0-9]/g, '');
-                  window.open(`https://zalo.me/${phone}`, '_blank');
-                  navigator.clipboard.writeText(otpMessage);
-                  toast.success('Mở Zalo! Nội dung đã được copy sẵn.');
-                }}
-                className="cms-btn cms-btn-primary"
-                style={{ background: '#0068ff', boxShadow: '0 4px 12px rgba(0,104,255,0.28)' }}
-              >
-                Gửi Zalo
-              </button>
-            </div>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              className="cms-btn cms-btn-outline w-full"
+              onClick={() => {
+                navigator.clipboard.writeText(guideMessage);
+                toast.success('Đã copy hướng dẫn (không gồm mã OTP)');
+              }}
+            >
+              Copy hướng dẫn
+            </button>
             {otpCountdown === 0 && (
               <button
                 type="button"

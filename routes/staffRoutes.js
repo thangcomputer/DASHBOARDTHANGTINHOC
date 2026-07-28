@@ -11,6 +11,17 @@ const { authMiddleware, checkPermission } = require('../middleware/auth');
 const router = express.Router();
 const guard  = [authMiddleware, checkPermission('manage_staff')];
 
+async function actorIsSuperAdmin(req) {
+  if (req.user?.id === 'admin') return true;
+  if (req.user?.adminRole === 'SUPER_ADMIN') return true;
+  try {
+    const me = await Teacher.findById(req.user.id).select('adminRole').lean();
+    return me?.adminRole === 'SUPER_ADMIN';
+  } catch {
+    return false;
+  }
+}
+
 // ── GET /api/staff ─────────────────────────────────────────────────────────────
 router.get('/', guard, async (req, res) => {
   try {
@@ -29,6 +40,13 @@ router.post('/', guard, async (req, res) => {
 
     if (!name || !phone || !password)
       return res.status(400).json({ success: false, message: 'Thiếu tên, số điện thoại hoặc mật khẩu' });
+
+    if (adminRole === 'SUPER_ADMIN' && !(await actorIsSuperAdmin(req))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ Super Admin mới được tạo tài khoản Super Admin',
+      });
+    }
 
     // Validate branch cho STAFF
     let branchCode = '';
@@ -78,6 +96,18 @@ router.put('/:id', guard, async (req, res) => {
     if (status) updates.status = status;
 
     if (adminRole) {
+      const target = await Teacher.findById(req.params.id).select('adminRole').lean();
+      if (!target) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+
+      const promotingToSuper = adminRole === 'SUPER_ADMIN' && target.adminRole !== 'SUPER_ADMIN';
+      const demotingSuper = target.adminRole === 'SUPER_ADMIN' && adminRole !== 'SUPER_ADMIN';
+      if ((promotingToSuper || demotingSuper) && !(await actorIsSuperAdmin(req))) {
+        return res.status(403).json({
+          success: false,
+          message: 'Chỉ Super Admin mới được thăng/hạ quyền Super Admin',
+        });
+      }
+
       updates.adminRole = adminRole;
       if (adminRole === 'SUPER_ADMIN') {
         updates.role        = 'admin';
@@ -118,10 +148,16 @@ router.put('/:id', guard, async (req, res) => {
 router.delete('/:id', guard, async (req, res) => {
   try {
     if (req.params.id === req.user.id)
-      return res.status(400).json({ success: false, message: 'Không thể tự xóa tài khoản của mình' });
-    const deleted = await Teacher.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
-    return res.json({ success: true, message: `Đã xóa tài khoản: ${deleted.name}` });
+      return res.status(400).json({ success: false, message: 'Không thể tự xóa chính mình' });
+
+    const target = await Teacher.findById(req.params.id).select('adminRole').lean();
+    if (!target) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
+    if (target.adminRole === 'SUPER_ADMIN' && !(await actorIsSuperAdmin(req))) {
+      return res.status(403).json({ success: false, message: 'Chỉ Super Admin mới được xóa Super Admin' });
+    }
+
+    await Teacher.findByIdAndDelete(req.params.id);
+    return res.json({ success: true, message: 'Đã xóa tài khoản' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

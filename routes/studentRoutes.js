@@ -294,7 +294,7 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) 
 
 // ─── POST /api/students/import (BẢN GHI HÀNG LOẠT) ──────────────────────────
 // Nhập danh sách học viên từ file Excel (Array of Objects)
-router.post('/import', [authMiddleware, branchFilter], async (req, res) => {
+router.post('/import', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
   try {
     const { students: rawStudents } = req.body;
     if (!Array.isArray(rawStudents) || rawStudents.length === 0) {
@@ -304,16 +304,24 @@ router.post('/import', [authMiddleware, branchFilter], async (req, res) => {
     // Gán chi nhánh tự động: STAFF chỉ được nhập vào CS của mình
     const branchId = req.userBranchId || null;
 
-    const studentsToInsert = rawStudents.map(s => ({
-      ...s,
-      name: s.name?.toUpperCase()?.trim(),
-      branchId: branchId || s.branchId || null,
-      status: s.status || 'Chờ xếp lớp',
-      paid: s.paid === true || s.paid === 'Đã đóng phí',
-      learningMode: ['ONLINE', 'OFFLINE'].includes(s.learningMode?.toUpperCase())
-        ? s.learningMode.toUpperCase()
-        : 'OFFLINE'
-    })).filter(s => s.name && (s.phone || s.zalo));
+    const studentsToInsert = rawStudents.map(s => {
+      const {
+        password: _omitPassword,
+        refreshToken: _omitRefresh,
+        tokenVersion: _omitTv,
+        ...safe
+      } = s || {};
+      return {
+        ...safe,
+        name: s.name?.toUpperCase()?.trim(),
+        branchId: branchId || s.branchId || null,
+        status: s.status || 'Chờ xếp lớp',
+        paid: s.paid === true || s.paid === 'Đã đóng phí',
+        learningMode: ['ONLINE', 'OFFLINE'].includes(s.learningMode?.toUpperCase())
+          ? s.learningMode.toUpperCase()
+          : 'OFFLINE',
+      };
+    }).filter(s => s.name && (s.phone || s.zalo));
 
     if (studentsToInsert.length === 0) {
       return res.status(400).json({ success: false, message: 'Không có bản ghi nào hợp lệ để nhập (Thiếu Tên hoặc SĐT/Zalo).' });
@@ -342,7 +350,7 @@ router.post('/import', [authMiddleware, branchFilter], async (req, res) => {
 // ─── POST /api/students ────────────────────────────────────────────────────────
 // Admin thêm học viên mới
 // ─── POST /api/students ──────────────────────────────────────────────────────────────────
-router.post('/', [authMiddleware, branchFilter], async (req, res) => {
+router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
   try {
     if (req.body.password === undefined && req.body.zalo) {
       req.body.password = req.body.zalo;

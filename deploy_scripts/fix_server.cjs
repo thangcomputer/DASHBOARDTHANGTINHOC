@@ -10,36 +10,41 @@ async function fix() {
   const kill = await ssh.execCommand('pm2 delete dashboardthangtinhoc 2>/dev/null; fuser -k 5000/tcp 2>/dev/null; sleep 1; echo "Done killing port 5000"');
   console.log(kill.stdout || kill.stderr);
 
-  // 2. Fix .env file - add missing MONGODB_URI and other essential vars
-  console.log('\n=== 2. FIX .ENV FILE ===');
+  // 2. Fix .env file — KHÔNG ghi secrets cứng vào repo/script.
+  // Chỉ tạo stub; secrets thật lấy từ env máy chạy script hoặc .env sẵn có trên VPS.
+  console.log('\n=== 2. FIX .ENV FILE (non-secret stubs only) ===');
+  const jwtSecret = process.env.JWT_SECRET;
+  const jwtRefresh = process.env.JWT_REFRESH_SECRET;
+  if (!jwtSecret || !jwtRefresh || jwtSecret.length < 32 || jwtRefresh.length < 32) {
+    throw new Error('Thiếu JWT_SECRET / JWT_REFRESH_SECRET (>=32 ký tự) trên môi trường chạy script. Không ghi secret mặc định.');
+  }
   const envContent = `PORT=5000
-MONGODB_URI=mongodb://127.0.0.1:27017/dashboardthangtinhoc
-JWT_SECRET=thangTinHoc_secret_key_2026
-JWT_REFRESH_SECRET=thangTinHoc_refresh_secret_key_2026
+MONGODB_URI=${process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/dashboardthangtinhoc'}
+JWT_SECRET=${jwtSecret}
+JWT_REFRESH_SECRET=${jwtRefresh}
 JWT_EXPIRES_IN=8h
 NODE_ENV=production
 
 # ── Client URL ──────────────────────────────────────────────────────────────
-CLIENT_URL=http://dashboard.giasutinhoc24h.com
+CLIENT_URL=${process.env.CLIENT_URL || 'https://dashboard.thangtinhoc.edu.vn'}
 
 # ── Google OAuth 2.0 ─
-GOOGLE_CLIENT_ID=472584566291-mtiej0a75fm2gpc5eeju94ndmujped26.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
-GOOGLE_CALLBACK_URL=http://dashboard.giasutinhoc24h.com/api/auth/google/callback
+GOOGLE_CLIENT_ID=${process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID'}
+GOOGLE_CLIENT_SECRET=${process.env.GOOGLE_CLIENT_SECRET || 'YOUR_GOOGLE_CLIENT_SECRET'}
+GOOGLE_CALLBACK_URL=${process.env.GOOGLE_CALLBACK_URL || 'https://dashboard.thangtinhoc.edu.vn/api/auth/google/callback'}
 
 # ── Gemini API ─
-VITE_GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+GEMINI_API_KEY=${process.env.GEMINI_API_KEY || 'YOUR_GEMINI_API_KEY'}
 
 # ── Zalo OAuth ─
-ZALO_APP_ID=YOUR_ZALO_APP_ID
-ZALO_APP_SECRET=YOUR_ZALO_APP_SECRET
-ZALO_CALLBACK_URL=http://dashboard.giasutinhoc24h.com/api/auth/zalo/callback
+ZALO_APP_ID=${process.env.ZALO_APP_ID || 'YOUR_ZALO_APP_ID'}
+ZALO_APP_SECRET=${process.env.ZALO_APP_SECRET || 'YOUR_ZALO_APP_SECRET'}
+ZALO_CALLBACK_URL=${process.env.ZALO_CALLBACK_URL || 'https://dashboard.thangtinhoc.edu.vn/api/auth/zalo/callback'}
 
-# ── Thông tin ngân hàng ─
-BANK_ID=ACB
-ACCOUNT_NO=4628686
-ACCOUNT_NAME=PHI VAN THANG
+# ── Thông tin ngân hàng (không hardcode số TK) ─
+BANK_ID=${process.env.BANK_ID || 'YOUR_BANK_ID'}
+ACCOUNT_NO=${process.env.ACCOUNT_NO || 'YOUR_ACCOUNT_NO'}
+ACCOUNT_NAME=${process.env.ACCOUNT_NAME || 'YOUR_ACCOUNT_NAME'}
 `;
 
   const writeEnv = await ssh.execCommand(`cat > /www/wwwroot/dashboardthangtinhoc/.env << 'ENVEOF'

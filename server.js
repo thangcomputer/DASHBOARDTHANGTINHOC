@@ -93,9 +93,12 @@ function safeDownloadFilename(name) {
   return s.slice(0, 240);
 }
 
-app.use('/uploads', (req, res, next) => {
-  res.setHeader('Cache-Control', 'public, max-age=86400');
+const { uploadsAuthMiddleware } = require('./middleware/uploadsAuth');
+
+app.use('/uploads', uploadsAuthMiddleware, (req, res, next) => {
+  res.setHeader('Cache-Control', 'private, max-age=3600');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
   const forceDownload = req.query.download === '1' || req.query.download === 'true' || !!req.query.downloadAs;
   const isArchive = /\.(zip|rar|7z|tar)$/i.test(req.path);
   const isViewable = /\.(pdf|png|jpe?g|gif|webp|mp4|webm)$/i.test(req.path);

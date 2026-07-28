@@ -6,6 +6,23 @@ const Teacher  = require('../models/Teacher');
 const ScheduleHistory = require('../models/ScheduleHistory');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const logger = require('../config/logger');
+const { studentMatchesTeacher } = require('../services/enrollmentService');
+
+function isAdminOrStaff(user) {
+  const role = String(user?.role || '').toLowerCase();
+  return role === 'admin' || role === 'staff';
+}
+
+async function teacherCanAccessStudent(teacherId, studentId) {
+  const student = await Student.findById(studentId)
+    .select('teacherId enrollments')
+    .lean();
+  if (!student) return false;
+  if (studentMatchesTeacher(student, teacherId)) return true;
+  const teacher = await Teacher.findById(teacherId).select('assignedStudents').lean();
+  const assigned = (teacher?.assignedStudents || []).map((id) => String(id));
+  return assigned.includes(String(studentId));
+}
 
 function parseTimeToMinutes(raw) {
   if (raw == null || raw === '') return null;
@@ -136,10 +153,21 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
   try {
     const { status, date, teacherId, studentId, page, limit } = req.query;
     const filter = { ...req.branchFilter }; // {} for admin, {branchId:...} for staff
+    const role = String(req.user.role || '').toLowerCase();
+
+    // Scope theo role — chặn IDOR dump toàn bộ lịch
+    if (role === 'teacher') {
+      filter.teacherId = req.user.id;
+    } else if (role === 'student') {
+      filter.studentId = req.user.id;
+    } else if (!isAdminOrStaff(req.user)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem lịch' });
+    } else {
+      if (teacherId) filter.teacherId = teacherId;
+      if (studentId) filter.studentId = studentId;
+    }
 
     if (status)    filter.status    = status;
-    if (teacherId) filter.teacherId = teacherId;
-    if (studentId) filter.studentId = studentId;
     if (date) {
       const d = new Date(date);
       const nextDay = new Date(d);
@@ -177,7 +205,14 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
 // ─── GET /api/schedules/stats (branch-aware, secured) ────────────────────────
 router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
   try {
-    const bf = req.branchFilter;  // {} for admin, {branchId:...} for STAFF
+    const role = String(req.user.role || '').toLowerCase();
+    let bf = { ...req.branchFilter };
+    if (role === 'teacher') bf = { teacherId: req.user.id };
+    else if (role === 'student') bf = { studentId: req.user.id };
+    else if (!isAdminOrStaff(req.user)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền' });
+    }
+
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -233,9 +268,18 @@ router.get('/teacher/:teacherId', authMiddleware, async (req, res) => {
 // Học viên xem lịch học của mình
 router.get('/student/:studentId', authMiddleware, async (req, res) => {
   try {
-    // Authorization: Học viên chỉ xem lịch của mình, Admin/GV có thể xem
-    if (req.user.role === 'student' && String(req.user.id) !== String(req.params.studentId)) {
+    const role = String(req.user.role || '').toLowerCase();
+    // Authorization: HV chỉ xem mình; Admin/Staff xem; Teacher chỉ HV được gán
+    if (role === 'student' && String(req.user.id) !== String(req.params.studentId)) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền xem lịch của học viên khác' });
+    }
+    if (role === 'teacher') {
+      const ok = await teacherCanAccessStudent(req.user.id, req.params.studentId);
+      if (!ok) {
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền xem lịch học viên này' });
+      }
+    } else if (role !== 'student' && !isAdminOrStaff(req.user)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền' });
     }
 
     const schedules = await Schedule.find({ studentId: req.params.studentId })
@@ -264,12 +308,21 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền tạo lịch học' });
     }
-    const {
+    let {
       teacherId, teacherName: teacherNameInput,
       studentId, studentName: studentNameInput,
       date, startTime, endTime,
       course, linkHoc, note, topic, status
     } = req.body;
+
+    // Teacher chỉ được tạo lịch cho chính mình + HV được gán
+    if (req.user.role === 'teacher') {
+      teacherId = req.user.id;
+      const ok = await teacherCanAccessStudent(req.user.id, studentId);
+      if (!ok) {
+        return res.status(403).json({ success: false, message: 'Bạn chỉ được tạo lịch cho học viên được phân công' });
+      }
+    }
 
     if (!teacherId || !studentId || !date || !startTime) {
       return res.status(400).json({
@@ -465,6 +518,11 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
     const schedule = await Schedule.findById(req.params.scheduleId);
     if (!schedule) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
+    }
+
+    // Teacher chỉ sửa lịch của mình
+    if (role === 'teacher' && String(schedule.teacherId) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: 'Bạn chỉ được chỉnh sửa lịch của chính mình' });
     }
 
     const effectiveStart = startTime || schedule.startTime;
@@ -670,6 +728,10 @@ router.patch('/:scheduleId/cancel', authMiddleware, async (req, res) => {
     if (!['admin', 'staff', 'teacher'].includes(String(req.user?.role || '').toLowerCase())) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền hủy lịch học' });
     }
+    if (String(req.user.role).toLowerCase() === 'teacher'
+        && String(schedule.teacherId) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: 'Bạn chỉ được hủy lịch của chính mình' });
+    }
 
     if (schedule.status === 'cancelled') {
       return res.status(400).json({ success: false, message: 'Lịch này đã bị hủy rồi' });
@@ -745,6 +807,9 @@ router.patch('/:scheduleId/cancel', authMiddleware, async (req, res) => {
 router.get('/history/:teacherId', authMiddleware, async (req, res) => {
   try {
     const { teacherId } = req.params;
+    if (!isAdminOrStaff(req.user) && String(req.user.id) !== String(teacherId)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem lịch sử lịch dạy này' });
+    }
     const { limit = 50, action } = req.query;
     const filter = { actorId: teacherId };
     if (action) filter.action = action;

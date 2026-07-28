@@ -1574,7 +1574,7 @@ router.post('/admin/generate-otp', authMiddleware, async (req, res) => {
     });
     setTimeout(() => otpStore.delete(key), 125000);
 
-    // Gửi OTP qua queue (Zalo OA / email) — admin vẫn nhận OTP trên UI để gửi tay nếu cần
+    // Gửi OTP qua queue (Zalo OA / email) — không trả mã về client
     const job = await enqueueOtp({
       phone: (user.zalo || phone).trim(),
       email: user.email || undefined,
@@ -1587,16 +1587,20 @@ router.post('/admin/generate-otp', authMiddleware, async (req, res) => {
 
     logger.info(`[ADMIN OTP] Sinh OTP cho ${user.name} (${phone}) - 120s job=${job?.id || 'n/a'}`);
 
+    // Không trả OTP plaintext trong JSON (tránh XSS / proxy log / session bị đánh cắp)
     return res.json({
       success: true,
       data: {
-        otp,
         phone,
         zalo: user.zalo || phone,
         name: user.name,
         expiresIn: 120,
         queued: Boolean(job),
         queueMode: job?.mode,
+        delivery: job ? 'queued' : 'manual_channel_required',
+        message: job
+          ? 'OTP đã được đưa vào hàng đợi gửi (Zalo/email). Không hiển thị mã trên giao diện.'
+          : 'OTP đã tạo. Hệ thống chưa gửi được qua kênh tự động — yêu cầu người dùng dùng Quên mật khẩu sau khi Admin kích hoạt gửi tay ngoài hệ thống, hoặc thử lại.',
       },
     });
   } catch (error) {
