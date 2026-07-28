@@ -679,25 +679,31 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           </div>
         )}
 
-        {/* Tabs — full width like feed */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 bg-white rounded-2xl p-2 shadow-sm border border-gray-100 w-full mb-5 relative z-10">
+        {/* Tabs: mobile = icon only (4 cột); sm+ = icon + chữ */}
+        <div className="grid grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2 bg-white rounded-2xl p-1.5 sm:p-2 shadow-sm border border-gray-100 w-full mb-5 relative z-10">
           {[
             { key: 'courses', icon: PlayCircle, label: 'Video học tập', count: courses.length },
             { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
             { key: 'assignments', icon: BookOpen, label: 'Bài tập về nhà', count: pendingAssignmentCount },
             { key: 'exams', icon: Award, label: 'Điểm thi', count: (student.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').length },
           ].map(t => (
-            <button key={t.key} type="button" onClick={() => setMainTab(t.key)}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl text-[12px] sm:text-[13px] font-bold tracking-wide transition-all min-h-11 ${mainTab === t.key
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setMainTab(t.key)}
+              title={t.label}
+              aria-label={t.label}
+              className={`relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-4 py-2.5 sm:py-3 rounded-xl text-[11px] sm:text-[13px] font-bold tracking-wide transition-all min-h-11 ${mainTab === t.key
                 ? 'bg-green-600 text-white shadow-md'
                 : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                }`}>
-              <t.icon size={16} className="shrink-0" />
-              <span className="truncate">{t.label}</span>
+                }`}
+            >
+              <t.icon size={18} className="shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline truncate max-w-full">{t.label}</span>
               {t.count > 0 && (
-              <span className={`text-[10px] ml-0.5 px-1.5 py-0.5 rounded-full font-black shrink-0 ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                {t.count}
-              </span>
+                <span className={`absolute sm:static top-1 right-1 text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded-full font-black leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  {t.count}
+                </span>
               )}
             </button>
           ))}
@@ -985,52 +991,104 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         {mainTab === 'exams' && (() => {
           const examSubjects = examScoreRows;
 
+          const renderEssayCell = (sub) => {
+            if (sub.essayScore != null) {
+              return (
+                <span className={`font-bold px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs ${sub.essayScore >= 5 ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' : 'text-red-700 bg-red-50 border border-red-100'}`}>
+                  {sub.essayScore}/10
+                </span>
+              );
+            }
+            if (sub.thucHanh === 'da_nop') {
+              return <span className="text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs">Chờ chấm</span>;
+            }
+            if (sub.thucHanh === 'chua_nop' || !sub.thucHanh) {
+              return <span className="text-gray-400 font-medium text-[10px] sm:text-xs">Chưa làm</span>;
+            }
+            return <span className="text-gray-600 font-medium text-[10px] sm:text-xs break-words">{sub.thucHanh}</span>;
+          };
+
+          const renderResultCell = (sub) => {
+            if (sub.status === 'dat') return <span className="text-emerald-600 font-black text-[10px] sm:text-xs">ĐẠT</span>;
+            if (sub.status === 'khong_dat') return <span className="text-red-600 font-black text-[10px] sm:text-xs leading-tight">KHÔNG ĐẠT</span>;
+            if (sub.status === 'dang_khoa') return <span className="text-orange-500 font-bold text-[10px] sm:text-xs">ĐANG KHÓA</span>;
+            return <span className="text-gray-400 font-bold text-[10px] sm:text-xs">CHƯA THI</span>;
+          };
+
           return (
-            <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[400px]">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                  <Award className="text-green-600" /> Bảng Điểm Tổng Hợp
+            <div className="bg-white rounded-2xl p-3 sm:p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[280px]">
+              <div className="flex items-center justify-between mb-3 sm:mb-6">
+                <h2 className="text-sm sm:text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Award className="text-green-600 shrink-0" size={18} aria-hidden="true" />
+                  Bảng Điểm Tổng Hợp
                 </h2>
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-gray-200">
-                <table className="w-full text-left text-[13px] whitespace-nowrap">
+              {/* Mobile: card rows — hiện đủ mọi cột */}
+              <div className="sm:hidden space-y-2.5">
+                {examSubjects.map((sub, idx) => {
+                  const trScore = sub.tracNghiem ? `${sub.tracNghiem.score}/${sub.tracNghiem.total}` : '—';
+                  return (
+                    <article key={sub.id} className="rounded-xl border border-slate-100 bg-slate-50/40 p-3">
+                      <div className="flex items-start gap-2.5 mb-2.5">
+                        <span className="text-[10px] font-black text-slate-400 tabular-nums shrink-0 pt-0.5">
+                          {String(idx + 1).padStart(2, '0')}
+                        </span>
+                        <h3 className="text-xs font-bold text-slate-800 leading-snug flex-1 min-w-0 break-words">
+                          {sub.label}
+                        </h3>
+                        <div className="shrink-0 text-right">{renderResultCell(sub)}</div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="rounded-lg bg-white border border-slate-100 px-2.5 py-2 min-w-0">
+                          <p className="font-bold uppercase tracking-wide text-slate-400 mb-0.5">Trắc nghiệm</p>
+                          <p className="font-bold text-slate-700 tabular-nums break-words">{trScore}</p>
+                        </div>
+                        <div className="rounded-lg bg-white border border-slate-100 px-2.5 py-2 min-w-0">
+                          <p className="font-bold uppercase tracking-wide text-slate-400 mb-0.5 leading-tight">Tự luận / Thực hành</p>
+                          <div className="mt-0.5">{renderEssayCell(sub)}</div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+                {examSubjects.length === 0 && (
+                  <p className="text-center text-xs text-slate-400 py-8">Chưa có dữ liệu điểm thi.</p>
+                )}
+              </div>
+
+              {/* Tablet/desktop: bảng chữ nhỏ, cho phép xuống dòng */}
+              <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-left text-[11px] md:text-[13px] table-fixed">
                   <thead className="bg-[#f8fafc] border-b border-gray-200">
                     <tr>
-                      <th className="px-6 py-4 font-black text-slate-500 w-16 text-center uppercase tracking-wider">STT</th>
-                      <th className="px-6 py-4 font-black text-slate-500 uppercase tracking-wider">Tên môn thi</th>
-                      <th className="px-6 py-4 font-black text-slate-500 text-center uppercase tracking-wider">Trắc nghiệm</th>
-                      <th className="px-6 py-4 font-black text-slate-500 text-center uppercase tracking-wider">Tự luận / Thực hành</th>
-                      <th className="px-6 py-4 font-black text-slate-500 text-center uppercase tracking-wider">Kết quả</th>
+                      <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500 w-10 md:w-14 text-center uppercase tracking-wide leading-tight">STT</th>
+                      <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500 uppercase tracking-wide leading-tight">Tên môn thi</th>
+                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center uppercase tracking-wide leading-tight w-[18%]">Trắc nghiệm</th>
+                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center uppercase tracking-wide leading-tight w-[22%]">Tự luận / Thực hành</th>
+                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center uppercase tracking-wide leading-tight w-[16%]">Kết quả</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {examSubjects.map((sub, idx) => {
-                      const trScore = sub.tracNghiem ? `${sub.tracNghiem.score}/${sub.tracNghiem.total}` : '-';
-
-                      let thText = <span className="text-gray-400 font-medium">Chưa làm</span>;
-                      if (sub.essayScore != null) {
-                        thText = <span className={`font-bold px-2.5 py-1 rounded-md ${sub.essayScore >= 5 ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' : 'text-red-700 bg-red-50 border border-red-100'}`}>{sub.essayScore}/10</span>;
-                      } else if (sub.thucHanh === 'da_nop') {
-                        thText = <span className="text-green-600 font-bold bg-green-50 px-2.5 py-1 rounded-md">Chờ chấm</span>;
-                      } else if (sub.thucHanh === 'chua_nop') {
-                        thText = <span className="text-gray-400 font-medium">Chưa làm</span>;
-                      } else if (sub.thucHanh) {
-                        thText = <span className="text-gray-600 font-medium">{sub.thucHanh}</span>;
-                      }
-
-                      let resText = <span className="text-gray-400 font-bold">CHƯA THI</span>;
-                      if (sub.status === 'dat') resText = <span className="text-emerald-600 font-black">ĐẠT</span>;
-                      else if (sub.status === 'khong_dat') resText = <span className="text-red-600 font-black">KHÔNG ĐẠT</span>;
-                      else if (sub.status === 'dang_khoa') resText = <span className="text-orange-500 font-bold">ĐANG KHÓA</span>;
-
+                      const trScore = sub.tracNghiem ? `${sub.tracNghiem.score}/${sub.tracNghiem.total}` : '—';
                       return (
                         <tr key={sub.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-6 py-4 font-bold text-slate-400 text-center">{String(idx + 1).padStart(2, '0')}</td>
-                          <td className="px-6 py-4 font-bold text-slate-800 text-sm">{sub.label}</td>
-                          <td className="px-6 py-4 font-bold text-center text-slate-600 text-sm">{trScore}</td>
-                          <td className="px-6 py-4 text-center">{thText}</td>
-                          <td className="px-6 py-4 text-center">{resText}</td>
+                          <td className="px-2 md:px-4 py-2.5 md:py-3 font-bold text-slate-400 text-center tabular-nums align-top">
+                            {String(idx + 1).padStart(2, '0')}
+                          </td>
+                          <td className="px-2 md:px-4 py-2.5 md:py-3 font-bold text-slate-800 break-words whitespace-normal align-top leading-snug">
+                            {sub.label}
+                          </td>
+                          <td className="px-2 md:px-3 py-2.5 md:py-3 font-bold text-center text-slate-600 tabular-nums align-top whitespace-normal break-words">
+                            {trScore}
+                          </td>
+                          <td className="px-2 md:px-3 py-2.5 md:py-3 text-center align-top whitespace-normal break-words">
+                            {renderEssayCell(sub)}
+                          </td>
+                          <td className="px-2 md:px-3 py-2.5 md:py-3 text-center align-top whitespace-normal break-words">
+                            {renderResultCell(sub)}
+                          </td>
                         </tr>
                       );
                     })}
