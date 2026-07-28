@@ -329,26 +329,40 @@ const AppSidebar = ({
     <div className={`flex flex-col h-full bg-gradient-to-b ${config.brand.color} text-white overflow-x-hidden`}>
 
       {/* ── Logo + Collapse button ── */}
-      <div className={`flex items-center justify-between border-b border-white/10 ${(collapsed && !mobileOpen) ? 'px-3 py-4' : 'px-5 py-4 pr-12 lg:pr-5'}`}>
-        {(!collapsed || mobileOpen) && (
-          <button
-            type="button"
-            className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0 text-left"
-            onClick={() => {
-              navigate(config.items[0].path);
-              triggerBackgroundSync();
-            }}
-            title="Làm mới bảng điều khiển"
-            aria-label="Về trang tổng quan"
-          >
-            <img src={dynamicLogo || '/logo-thang-tin-hoc.svg'} alt="Thắng Tin Học" className="h-8 max-w-full flex-shrink-0 object-contain" style={dynamicLogo ? { maxHeight: '32px' } : { filter: 'brightness(0) invert(1)' }} />
-          </button>
-        )}
+      <div
+        className={`relative flex items-center border-b border-white/10 ${
+          (collapsed && !mobileOpen) ? 'px-3 py-4 justify-center' : 'px-3 py-4'
+        }`}
+      >
+        {(!collapsed || mobileOpen) ? (
+          <>
+            {/* Cột trái cân với nút X (mobile) / nút thu gọn (desktop) */}
+            <span className="w-11 h-11 shrink-0 lg:hidden" aria-hidden="true" />
+            <button
+              type="button"
+              className="flex-1 min-w-0 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity bg-transparent border-0 p-0"
+              onClick={() => {
+                navigate(config.items[0].path);
+                triggerBackgroundSync();
+              }}
+              title="Làm mới bảng điều khiển"
+              aria-label="Về trang tổng quan"
+            >
+              <img
+                src={dynamicLogo || '/logo-thang-tin-hoc.svg'}
+                alt="Thắng Tin Học"
+                className="h-9 sm:h-8 max-w-[min(100%,180px)] object-contain"
+                style={dynamicLogo ? { maxHeight: '36px' } : { filter: 'brightness(0) invert(1)' }}
+              />
+            </button>
+            <span className="w-11 h-11 shrink-0 hidden lg:block" aria-hidden="true" />
+          </>
+        ) : null}
         <button
           type="button"
           onClick={() => setCollapsed(c => !c)}
           aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-          className="hidden lg:flex w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 items-center justify-center flex-shrink-0 transition-all"
+          className="hidden lg:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 items-center justify-center flex-shrink-0 transition-all"
         >
           {collapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
         </button>
@@ -517,32 +531,36 @@ const AppSidebar = ({
         {renderSidebarContent()}
       </div>
 
-      {/* ── Mobile: Hamburger button ── */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed z-[70] w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white rounded-xl shadow-lg border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform"
-        style={{
-          top: 'max(0.75rem, env(safe-area-inset-top, 0px))',
-          left: 'max(0.75rem, env(safe-area-inset-left, 0px))',
-        }}
-        aria-label="Mở menu điều hướng"
-        aria-expanded={mobileOpen}
-      >
-        <Menu size={20} />
-      </button>
+      {/* ── Mobile: Hamburger button (ẩn khi drawer đang mở để không che logo) ── */}
+      {!mobileOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="lg:hidden fixed z-[70] w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white rounded-xl shadow-lg border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform"
+          style={{
+            top: 'max(0.75rem, env(safe-area-inset-top, 0px))',
+            left: 'max(0.75rem, env(safe-area-inset-left, 0px))',
+          }}
+          aria-label="Mở menu điều hướng"
+          aria-expanded={false}
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
       {/* ── Mobile: Overlay (above header/branch dropdown) ── */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
+        <div className="lg:hidden fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
           <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-[min(85vw,280px)] max-w-[280px] animate-in slide-in-from-left duration-300">
+          <div className="absolute left-0 top-0 h-full w-[min(85vw,280px)] max-w-[280px] animate-in slide-in-from-left duration-300 pt-[env(safe-area-inset-top,0px)]">
             <div className="h-full relative shadow-2xl">
               <button
+                type="button"
                 onClick={() => setMobileOpen(false)}
-                className="absolute top-3 right-3 z-10 w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] bg-white/20 rounded-lg flex items-center justify-center text-white"
+                className="absolute top-3 right-3 z-20 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white/15 hover:bg-white/25 rounded-xl flex items-center justify-center text-white border border-white/20"
                 aria-label="Đóng menu"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
               {renderSidebarContent()}
             </div>
