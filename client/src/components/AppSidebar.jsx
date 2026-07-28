@@ -160,6 +160,19 @@ const AppSidebar = ({
     window.addEventListener('lms-guide-open-nav', openForGuide);
     return () => window.removeEventListener('lms-guide-open-nav', openForGuide);
   }, []);
+
+  // Tablet+: bấm nội dung bên phải → sidebar tự thu gọn
+  useEffect(() => {
+    const main = document.getElementById('main-content');
+    if (!main) return undefined;
+    const collapseOnContentInteract = () => {
+      if (typeof window === 'undefined') return;
+      if (!window.matchMedia('(min-width: 768px)').matches) return;
+      setCollapsed(true);
+    };
+    main.addEventListener('pointerdown', collapseOnContentInteract);
+    return () => main.removeEventListener('pointerdown', collapseOnContentInteract);
+  }, []);
   const [openGroups, setOpenGroups] = useState(() => {
     const defaults = {
       'people-group': false,
@@ -372,7 +385,7 @@ const AppSidebar = ({
           type="button"
           onClick={() => setCollapsed(c => !c)}
           aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-          className="hidden lg:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 items-center justify-center flex-shrink-0 transition-all"
+          className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 items-center justify-center flex-shrink-0 transition-all z-10"
         >
           {collapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
         </button>
