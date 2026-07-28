@@ -229,6 +229,7 @@ export default function AdminStudentsTab() {
 
   const teacherSelectClass =
     'w-full min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-sky-400 cursor-pointer';
+  const teacherSelectWrapClass = 'w-2/3 max-w-full';
 
   const renderTeacherSelects = (s, enrollments, hasMultiCourse, primaryEnr, teacherVal) => {
     if (hasMultiCourse) {
@@ -237,10 +238,11 @@ export default function AdminStudentsTab() {
           {enrollments.map((enr) => {
             const enrTeacherVal = enr.teacherId || '';
             const enrId = enr.enrollmentId || enr.id;
+            const courseLabel = enr.courseName || enr.name || '';
             const { matched, other } = teachersForCourse(enr, enrTeacherVal);
             return (
-              <div key={enrId} className="space-y-1">
-                <p className="text-xs font-semibold text-sky-700 leading-snug break-words">{enr.courseName || enr.name}</p>
+              <div key={enrId} className="space-y-1 min-w-0">
+                <p className="text-xs font-semibold text-sky-700 truncate" title={courseLabel}>{courseLabel}</p>
                 <CmsSelect
                   value={enrTeacherVal}
                   onChange={(e) => {
@@ -249,6 +251,7 @@ export default function AdminStudentsTab() {
                   }}
                   onClick={(e) => e.stopPropagation()}
                   className={teacherSelectClass}
+                  wrapperClassName={teacherSelectWrapClass}
                 >
                   <option value="">Chưa phân công</option>
                   {matched.map((t) => (
@@ -277,6 +280,7 @@ export default function AdminStudentsTab() {
         }}
         onClick={(e) => e.stopPropagation()}
         className={teacherSelectClass}
+        wrapperClassName={teacherSelectWrapClass}
       >
         <option value="">Chưa phân công</option>
         {matched.map((t) => (
@@ -490,7 +494,7 @@ export default function AdminStudentsTab() {
 
               {/* 3 cột: Giảng viên HD / Học phí / Trạng thái */}
               <div className="mt-3 pt-3 border-t border-slate-100">
-                <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(4.5rem,0.85fr)_minmax(4.25rem,auto)] gap-x-2 gap-y-2 items-start">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,0.9fr)_minmax(4.25rem,auto)] gap-x-2 gap-y-2 items-start">
                   <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Giảng viên HD</p>
                   <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Học phí</p>
                   <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right">Trạng thái</p>
@@ -499,12 +503,13 @@ export default function AdminStudentsTab() {
                     enrollments.map((enr) => {
                       const enrId = enr.enrollmentId || enr.id;
                       const enrTeacherVal = enr.teacherId || '';
+                      const courseLabel = enr.courseName || enr.name || '';
                       const { matched, other } = teachersForCourse(enr, enrTeacherVal);
                       return (
                         <div key={enrId} className="contents">
                           <div className="min-w-0 space-y-1">
-                            <p className="text-[11px] font-semibold text-sky-700 leading-snug break-words">
-                              {enr.courseName || enr.name}
+                            <p className="text-[11px] font-semibold text-sky-700 truncate" title={courseLabel}>
+                              {courseLabel}
                             </p>
                             <CmsSelect
                               value={enrTeacherVal}
@@ -514,6 +519,7 @@ export default function AdminStudentsTab() {
                               }}
                               onClick={(e) => e.stopPropagation()}
                               className={teacherSelectClass}
+                              wrapperClassName={teacherSelectWrapClass}
                             >
                               <option value="">Chưa phân công</option>
                               {matched.map((t) => (
