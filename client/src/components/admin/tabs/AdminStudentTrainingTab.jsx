@@ -12,6 +12,7 @@ import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 import api, { apiFetch, buildMediaDownloadUrl } from '../../../services/api';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
+import { truncateWords } from '../../../utils/truncateWords';
 
 function mergeDocumentCourseOptions(dbCourses, lmsVideos) {
   const merged = [];
@@ -93,21 +94,28 @@ export default function AdminStudentTrainingTab() {
 
               {/* Sub-tabs */}
               <div className="cms-hscroll-tabs w-full rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
-                <div className="flex gap-2 min-w-max">
+                <div className="cms-hscroll-tabs__track">
                 {[
                   { key: 'videos', icon: Video, label: 'Quản lý Khóa học', count: studentTrainingData?.videos?.length || 0 },
-                  
                   { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
                   { key: 'questions', icon: HelpCircle, label: 'Ngân hàng câu hỏi', count: studentQuestions?.length || 0 },
                   { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: (students || []).reduce((acc, s) => acc + (s.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').length, 0) },
                 ].map(t => (
-                  <button key={t.key} onClick={() => { setSTrainingTab(t.key); setSTrainingForm(null); setSCourseBuilderMode(null); }}
-                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                  <button
+                    key={t.key}
+                    type="button"
+                    title={t.label}
+                    onClick={() => { setSTrainingTab(t.key); setSTrainingForm(null); setSCourseBuilderMode(null); }}
+                    className={`cms-hscroll-tab ${
                       sTrainingTab === t.key
                         ? t.key === 'exam-results' ? 'bg-amber-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md'
                         : 'text-gray-500 hover:bg-gray-100'
-                    }`}>
-                    <t.icon size={15} /> {t.label} <span className="text-xs opacity-70">({t.count})</span>
+                    }`}
+                  >
+                    <t.icon size={15} className="shrink-0" />
+                    <span className="cms-hscroll-tab__label sm:hidden">{truncateWords(t.label, 2)}</span>
+                    <span className="cms-hscroll-tab__label hidden sm:inline">{t.label}</span>
+                    <span className="cms-hscroll-tab__count">({t.count})</span>
                   </button>
                 ))}
                 </div>

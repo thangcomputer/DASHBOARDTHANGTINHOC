@@ -13,6 +13,7 @@ import { resolveTeacherExamDate, isTeacherExamDateApproximate, resolvePracticalF
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
+import { truncateWords } from '../../../utils/truncateWords';
 
 export default function AdminTrainingTab() {
   const {
@@ -44,7 +45,7 @@ export default function AdminTrainingTab() {
                 <>
               {/* Sub-tabs */}
               <div className="cms-hscroll-tabs rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
-                <div className="flex gap-2 min-w-max">
+                <div className="cms-hscroll-tabs__track">
                 {[
                   { key: 'videos', icon: Video, label: 'Quản lý Khóa học', count: trainingData?.videos?.length || 0 },
                   { key: 'guides', icon: FileText, label: 'Quy trình', count: trainingData?.guides?.length || 0 },
@@ -52,13 +53,21 @@ export default function AdminTrainingTab() {
                   { key: 'questions', icon: ClipboardList, label: 'Ngân hàng câu hỏi', count: questions?.length || 0 },
                   { key: 'exam-results-gv', icon: Trophy, label: 'Kết quả thi', count: (teachers || []).filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked').length },
                 ].map(t => (
-                  <button key={t.key} onClick={() => { setTrainingTab(t.key); setTrainingForm(null); }}
-                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                  <button
+                    key={t.key}
+                    type="button"
+                    title={t.label}
+                    onClick={() => { setTrainingTab(t.key); setTrainingForm(null); }}
+                    className={`cms-hscroll-tab ${
                       trainingTab === t.key
                         ? t.key === 'exam-results-gv' ? 'bg-amber-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md'
                         : 'text-gray-500 hover:bg-gray-100'
-                    }`}>
-                    <t.icon size={15} /> {t.label} <span className="text-xs opacity-70">({t.count})</span>
+                    }`}
+                  >
+                    <t.icon size={15} className="shrink-0" />
+                    <span className="cms-hscroll-tab__label sm:hidden">{truncateWords(t.label, 2)}</span>
+                    <span className="cms-hscroll-tab__label hidden sm:inline">{t.label}</span>
+                    <span className="cms-hscroll-tab__count">({t.count})</span>
                   </button>
                 ))}
                 </div>

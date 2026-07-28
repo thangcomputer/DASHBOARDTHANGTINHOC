@@ -157,15 +157,32 @@
     @apply w-full;
   }
 
-  /* Horizontal tab strip ? swipe on phone */
+  /* Horizontal tab strip ? swipe on phone, last tab never clipped flush */
   .cms-hscroll-tabs {
     @apply w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+    scroll-padding-inline: 8px;
   }
 
   .cms-hscroll-tabs::-webkit-scrollbar {
     height: 4px;
+  }
+
+  .cms-hscroll-tabs__track {
+    @apply flex gap-1.5 min-w-max pr-2;
+  }
+
+  .cms-hscroll-tab {
+    @apply inline-flex items-center gap-1.5 min-h-10 px-2.5 sm:px-3.5 py-2 rounded-xl text-[13px] sm:text-sm font-semibold whitespace-nowrap transition-all shrink-0;
+  }
+
+  .cms-hscroll-tab__label {
+    @apply min-w-0;
+  }
+
+  .cms-hscroll-tab__count {
+    @apply text-[11px] opacity-70 shrink-0 tabular-nums;
   }
 
   .cms-label {
