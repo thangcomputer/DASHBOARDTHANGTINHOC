@@ -11,7 +11,7 @@ import { useLocation } from 'react-router-dom';
 import { useToast } from '../utils/toast';
 import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { displayFileName } from '../utils/validators';
-import { resolveAvatarUrl } from '../utils/defaultAvatars';
+import { resolveAvatarUrl, DEFAULT_AVATARS } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
@@ -761,6 +761,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           src={resolveAvatarUrl({ avatar: conv.user.avatar, role: conv.user.role })}
                           alt={conv.user.name || ''}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            if (el.dataset.fallback === '1') return;
+                            el.dataset.fallback = '1';
+                            const role = String(conv.user.role || '').toLowerCase();
+                            el.src = DEFAULT_AVATARS[role] || DEFAULT_AVATARS.staff;
+                          }}
                         />
                       )}
                     </div>
@@ -911,6 +918,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           src={resolveAvatarUrl({ avatar: activeConv.user.avatar, role: activeConv.user.role })}
                           alt={activeConv.user.name || ''}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            if (el.dataset.fallback === '1') return;
+                            el.dataset.fallback = '1';
+                            const role = String(activeConv.user.role || '').toLowerCase();
+                            el.src = DEFAULT_AVATARS[role] || DEFAULT_AVATARS.staff;
+                          }}
                         />
                       )}
                     </div>

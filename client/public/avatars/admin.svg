@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Admin avatar">
+  <rect width="96" height="96" rx="24" fill="#FEF2F2"/>
+  <circle cx="48" cy="36" r="16" fill="#DC2626"/>
+  <path d="M18 86c4-18 16-28 30-28s26 10 30 28" fill="#DC2626"/>
+  <rect x="58" y="54" width="22" height="14" rx="4" fill="#991B1B"/>
+  <text x="69" y="64.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#fff">AD</text>
+</svg>

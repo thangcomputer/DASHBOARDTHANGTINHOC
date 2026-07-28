@@ -59,7 +59,7 @@ router.get('/contacts', async (req, res) => {
       name:   doc.name || 'Không rõ tên',
       role,
       phone:  doc.phone || '',
-      avatar: String(doc.name || 'U').substring(0, 2).toUpperCase(),
+      avatar: doc.avatar || String(doc.name || 'U').substring(0, 2).toUpperCase(),
       branchId:   doc.branchId   ? doc.branchId.toString()   : null,
       branchCode: doc.branchCode || ''
     });
@@ -67,7 +67,7 @@ router.get('/contacts', async (req, res) => {
     // ────── [1] SuperAdmin luon được lay truoc (mọi role đèu tháy) ──────
     const superAdmins = await Teacher.find(
       { $or: [{ adminRole: 'SUPER_ADMIN' }, { role: 'admin', adminRole: { $ne: 'STAFF' } }] },
-      'name phone branchId branchCode'
+      'name phone branchId branchCode avatar'
     ).lean();
 
     const superAdminContacts = superAdmins.map(a => ({
@@ -105,11 +105,11 @@ router.get('/contacts', async (req, res) => {
 
       const [staffDocs, teacherDocs, studentDocs] = await Promise.all([
         Teacher.find({ adminRole: 'STAFF', ...branchFilter },
-                     'name phone branchId branchCode').lean(),
+                     'name phone branchId branchCode avatar').lean(),
         Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] }, ...branchFilter },
-                     'name phone branchId branchCode').lean(),
+                     'name phone branchId branchCode avatar').lean(),
         Student.find({ ...branchFilter },
-                     'name phone branchId branchCode').lean(),
+                     'name phone branchId branchCode avatar').lean(),
       ]);
 
       staffContacts   = staffDocs.map(d => ({
@@ -134,11 +134,11 @@ router.get('/contacts', async (req, res) => {
       const [teacherDocs, studentDocs] = await Promise.all([
         Teacher.find(
           { role: 'teacher', status: { $in: ['Active', 'active'] }, branchId: staffBranchId },
-          'name phone branchId branchCode'
+          'name phone branchId branchCode avatar'
         ).lean(),
         Student.find(
           { branchId: staffBranchId },
-          'name phone branchId branchCode'
+          'name phone branchId branchCode avatar'
         ).lean(),
       ]);
 
@@ -161,13 +161,13 @@ router.get('/contacts', async (req, res) => {
         teacherBranchId
           ? Teacher.find(
               { adminRole: 'STAFF', branchId: teacherBranchId },
-              'name phone branchId branchCode'
+              'name phone branchId branchCode avatar'
             ).lean()
           : Promise.resolve([]),
         // Student được phân công triệt để (teacherId là ObjectId)
         Student.find(
           { teacherId: userId },
-          'name phone branchId branchCode'
+          'name phone branchId branchCode avatar'
         ).lean(),
       ]);
 
@@ -193,14 +193,14 @@ router.get('/contacts', async (req, res) => {
         studentBranchId
           ? Teacher.find(
               { adminRole: 'STAFF', branchId: studentBranchId },
-              'name phone branchId branchCode'
+              'name phone branchId branchCode avatar'
             ).lean()
           : Promise.resolve([]),
         // Chỉ GV được phân công trực tiếp
         myTeacherId
           ? Teacher.find(
               { _id: myTeacherId, role: 'teacher' },
-              'name phone branchId branchCode'
+              'name phone branchId branchCode avatar'
             ).lean()
           : Promise.resolve([]),
       ]);
