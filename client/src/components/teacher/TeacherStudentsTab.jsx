@@ -40,7 +40,7 @@ export default function TeacherStudentsTab({
                           role="button"
                           tabIndex={0}
                           className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all group cursor-pointer ${
-                            isSelected ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'hover:bg-gray-50 text-gray-700'
+                            isSelected ? 'bg-red-600 text-white shadow-lg shadow-red-100' : 'hover:bg-gray-50 text-gray-700'
                           }`}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setSelectedEnrollmentKey(rowKey); } }}
                         >

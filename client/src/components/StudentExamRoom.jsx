@@ -158,7 +158,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
             {canStart && (
               <button
                 onClick={() => onStart(subject.id)}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-blue-100"
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-100"
               >
                 {(subject.attemptCount || 0) > 0 ? <><Play size={15} /> Thi lại</> : 'Vào thi ngay'}
               </button>
@@ -166,7 +166,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
             {canRetry && (
                <button
                  onClick={() => onStart(subject.id)}
-                 className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-blue-100"
+                 className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-100"
                >
                  <Play size={15} /> Thi lại
                </button>
@@ -476,7 +476,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
                       ? 'bg-red-600 text-white border-red-600'
                       : f.value === 'da_thi'
                         ? 'bg-green-600 text-white border-green-600'
-                        : 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-red-600 text-white border-blue-600'
                     : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                 }`}
               >

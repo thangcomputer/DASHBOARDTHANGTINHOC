@@ -717,7 +717,7 @@ export default function SystemSettingsTab() {
           <button
             onClick={() => handleSave(['invoiceLogoUrl', 'invoiceSignatureUrl', 'invoiceStampText'])}
             disabled={saving}
-            className="w-full py-3 bg-gradient-to-r from-sky-600 to-sky-700 text-white font-bold rounded-xl hover:from-sky-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-sky-100"
+            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl hover:from-red-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-red-100"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? 'Đang lưu...' : 'Lưu cấu hình Hóa đơn'}

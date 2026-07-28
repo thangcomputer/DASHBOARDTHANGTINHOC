@@ -718,10 +718,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {courses.map((course, idx) => {
                 const gradients = [
-                  "from-green-600 via-indigo-600 to-purple-600",
+                  "from-green-600 via-indigo-600 to-red-700",
                   "from-emerald-500 via-teal-500 to-emerald-700",
                   "from-rose-500 via-red-500 to-rose-700",
-                  "from-cyan-500 via-blue-500 to-indigo-600"
+                  "from-cyan-500 via-blue-500 to-red-600"
                 ];
                 const bgClass = gradients[idx % gradients.length];
                 return (

@@ -240,7 +240,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
               {!isPast(selectedDay) && (
                 <button
                   onClick={() => { setSelectedDay(null); if (onAddSchedule) onAddSchedule(new Date(year, month, selectedDay)); }}
-                  className="text-xs bg-blue-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-700 transition flex items-center gap-1.5 mx-auto"
+                  className="text-xs bg-red-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-700 transition flex items-center gap-1.5 mx-auto"
                 >
                   <Plus size={12} /> Sắp lịch ngày này
                 </button>

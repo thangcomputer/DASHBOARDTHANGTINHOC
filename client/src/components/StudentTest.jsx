@@ -901,7 +901,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                   }`}
                 >
                   {tab === 'trac_nghiem' && (
-                    <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-indigo-600" />
+                    <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-red-600" />
                   )}
                   Trắc nghiệm
                   {isTracNghiemSubmitted && <CheckCircle size={16} className="text-emerald-500" />}
@@ -921,7 +921,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                   }`}
                 >
                   {tab === 'tu_luan' && isTracNghiemSubmitted && (
-                    <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-indigo-600" />
+                    <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-red-600" />
                   )}
                   Thực hành / Tự luận
                   {!isTracNghiemSubmitted && <span className="text-xs font-semibold text-slate-400">(Khoá)</span>}
@@ -973,7 +973,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                         <span
                           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black md:h-8 md:w-8 md:text-xs ${
                             answers[currentQ] === i
-                              ? 'bg-indigo-600 text-white'
+                              ? 'bg-red-600 text-white'
                               : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
                           }`}
                         >
@@ -1117,7 +1117,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                         type="button"
                         disabled={tuLuanSubmitting}
                         onClick={trySubmitTuLuan}
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 text-sm font-black text-white shadow-lg shadow-indigo-500/25 transition hover:from-indigo-500 hover:to-violet-500 disabled:opacity-60"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 py-4 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:opacity-60"
                       >
                         <Send size={18} /> {tuLuanSubmitting ? 'ĐANG TẢI LÊN…' : 'NỘP BÀI THỰC HÀNH'}
                       </button>
@@ -1153,7 +1153,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                         onClick={() => setCurrentQ(i)}
                         className={`flex aspect-square items-center justify-center rounded-lg text-xs font-black transition sm:rounded-xl sm:text-sm md:text-[0.95rem] ${
                           active
-                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 ring-2 ring-indigo-300 ring-offset-1 ring-offset-white'
+                            ? 'bg-red-600 text-white shadow-md shadow-indigo-500/30 ring-2 ring-indigo-300 ring-offset-1 ring-offset-white'
                             : done
                               ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
                               : 'border border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white'
@@ -1166,7 +1166,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                 </div>
                 <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-600 md:text-xs">
                   <span className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded bg-indigo-600" />
+                    <span className="h-2.5 w-2.5 rounded bg-red-600" />
                     Đang xem
                   </span>
                   <span className="flex items-center gap-1.5">

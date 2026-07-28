@@ -186,7 +186,7 @@ export default function FileCenterPage() {
           type="button"
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
-          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40"
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40"
         >
           {uploading ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
           Upload file

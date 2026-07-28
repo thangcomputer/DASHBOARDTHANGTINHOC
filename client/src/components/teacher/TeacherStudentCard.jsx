@@ -392,7 +392,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
              
              <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
                 <span className={`px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm ${
-                  isCompleted ? 'bg-green-500 text-white' : 'bg-blue-600 text-white'
+                  isCompleted ? 'bg-green-500 text-white' : 'bg-red-600 text-white'
                 }`}>
                   {isCompleted ? 'Hoàn thành' : 'Đang học'}
                 </span>
@@ -416,7 +416,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 <span className="text-white">{done}/{student.totalSessions} buổi ({progressPct}%)</span>
              </div>
              <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-white/5 shadow-inner">
-                <div className={`h-full rounded-full bg-blue-500 shadow-lg shadow-blue-500/50 transition-all duration-[1500ms] ease-out`}
+                <div className={`h-full rounded-full bg-red-500 shadow-lg shadow-red-500/50 transition-all duration-[1500ms] ease-out`}
                   style={{ width: `${progressPct}%` }} />
              </div>
           </div>
@@ -431,7 +431,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               }`}>
               <Icon size={14} /> {label}
               {activePanel === key && (
-                <div className="absolute bottom-0 left-4 right-4 h-1 bg-blue-600 rounded-t-full shadow-[0_-2px_6px_rgba(37,99,235,0.4)]" />
+                <div className="absolute bottom-0 left-4 right-4 h-1 bg-red-600 rounded-t-full shadow-[0_-2px_6px_rgba(37,99,235,0.4)]" />
               )}
             </button>
           ))}
@@ -573,7 +573,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        <button 
                          onClick={handleLinkSave}
                          className={`px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg ${
-                            linkSaved ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'
+                            linkSaved ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-100'
                          }`}
                        >
                          {linkSaved ? 'ĐÃ LƯU ✓' : 'CẬP NHẬT'}
@@ -591,7 +591,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   </h4>
                   <button 
                     onClick={() => setShowAddAssign(!showAddAssign)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 transition-all flex items-center gap-1.5"
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-100 transition-all flex items-center gap-1.5"
                   >
                     {showAddAssign ? <X size={14} /> : <Plus size={14} />} {showAddAssign ? 'HỦY' : 'GIAO BÀI TẬP'}
                   </button>
@@ -622,7 +622,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                         </div>
                         <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
                       </div>
-                      <button onClick={handleCreateAssign} className="md:col-span-2 bg-indigo-600 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-100">GỬI BÀI TẬP CHO HỌC VIÊN</button>
+                      <button onClick={handleCreateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">GỬI BÀI TẬP CHO HỌC VIÊN</button>
                     </div>
                   </div>
                 )}
@@ -665,7 +665,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                               </div>
                               <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
                             </div>
-                            <button onClick={handleUpdateAssign} className="md:col-span-2 bg-indigo-600 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-100">CẬP NHẬT BÀI TẬP</button>
+                            <button onClick={handleUpdateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">CẬP NHẬT BÀI TẬP</button>
                           </div>
                         </div>
                       ) : (
@@ -696,7 +696,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                             <div className="flex flex-col items-end gap-3 font-black flex-shrink-0">
                               {isSubmitted ? (
                                 <div className={`px-4 py-1.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 border shadow-sm ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
-                                  {isGraded ? <Check size={12}/> : <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />}
+                                  {isGraded ? <Check size={12}/> : <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
                                   {isGraded ? `${getGradeLabel(submission.grade)}: ${submission.grade}/10` : 'ĐÃ NỘP BÀI'}
                                 </div>
                                                             ) : (
@@ -707,7 +707,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                                 <a 
                                   href={buildMediaDownloadUrl(submission.submittedFileUrl, submission.submittedFileUrl.split('/').pop())} 
                                   target="_blank" rel="noreferrer" 
-                                  className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-xl font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm"
+                                  className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-xl font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm"
                                   title="Tải bài làm của học viên"
                                 >
                                   <Download size={14} /> TẢI BÀI
@@ -726,7 +726,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                                   />
                                   <button 
                                     onClick={() => handleGradeSubmit(submission._id)} 
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 px-4 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
+                                    className="bg-red-600 hover:bg-red-700 text-white p-2 px-4 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
                                   >
                                     LƯU
                                   </button>
@@ -896,7 +896,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               <p className="text-white font-bold text-lg tracking-wide truncate">{getDisplayName(student)}</p>
               <p className="text-slate-300 text-xs mt-0.5 flex flex-wrap items-center gap-2">
                 {student.course} · {student.age} tuổi
-                <span className={`inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-black tracking-wider uppercase ${student.learningMode === 'ONLINE' ? 'bg-blue-500/20 text-blue-300' : 'bg-white/10 text-slate-300'}`}>
+                <span className={`inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-black tracking-wider uppercase ${student.learningMode === 'ONLINE' ? 'bg-red-500/20 text-blue-300' : 'bg-white/10 text-slate-300'}`}>
                   {student.learningMode === 'ONLINE' ? '🌐 ONLINE' : '🏢 OFFLINE'}
                 </span>
               </p>
@@ -904,10 +904,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full min-[440px]:w-auto min-[440px]:justify-end">
             <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-              isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'
+              isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-blue-400'
             }`}>{isCompleted ? '✓ Hoàn thành' : student.status}</span>
             <a href={`https://zalo.me/${student.zalo}`} target="_blank" rel="noreferrer"
-              className="inline-flex flex-1 min-[440px]:flex-initial justify-center items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all min-w-0 max-w-full">
+              className="inline-flex flex-1 min-[440px]:flex-initial justify-center items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all min-w-0 max-w-full">
               <MessageSquare size={14} className="shrink-0" /> <span className="truncate">{student.zalo}</span>
             </a>
             {onLockExam && (

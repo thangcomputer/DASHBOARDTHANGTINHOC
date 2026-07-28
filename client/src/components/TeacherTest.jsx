@@ -128,7 +128,7 @@ const EvaluationStepper = ({ currentStep = 1, results = {}, practicalSubmitted =
                     <div key={step.id} className="relative z-10 flex flex-col items-center group">
                         <div className={`${dot} rounded-full flex items-center justify-center transition-all duration-500 shadow-lg ${
                             (i + 1 < currentStep || results.quiz?.passed && i === 0) ? 'bg-green-500 text-white' : 
-                            (i + 1 === currentStep) ? 'bg-blue-600 text-white scale-110' : 'bg-white border-2 border-slate-200 text-slate-300'
+                            (i + 1 === currentStep) ? 'bg-red-600 text-white scale-110' : 'bg-white border-2 border-slate-200 text-slate-300'
                         }`}>
                             {i + 1 < currentStep || (results.quiz?.passed && i === 0) ? <CheckCircle size={iconSz} /> : 
                              i + 1 === currentStep ? (i === 2 ? <User size={iconSz} /> : <FileText size={iconSz} />) : 
@@ -1798,7 +1798,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                       <div className="flex items-start gap-2">
                         <div
                           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${
-                            isQDone(currentQ) ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'
+                            isQDone(currentQ) ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-400'
                           }`}
                         >
                           {currentQ + 1}
@@ -1856,7 +1856,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                           >
                             <span
                               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black ${
-                                answers[currentQ] === i ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'
+                                answers[currentQ] === i ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'
                               }`}
                             >
                               {['A', 'B', 'C', 'D', 'E', 'F'][i] ?? i + 1}
@@ -1926,7 +1926,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                       });
                     }
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-black text-white shadow-md hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98]"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 py-2.5 text-sm font-black text-white shadow-md hover:from-red-700 hover:to-red-800 active:scale-[0.98]"
                 >
                   <Send size={16} />
                   NỘP BÀI KIỂM TRA
@@ -1969,7 +1969,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                             onClick={() => setCurrentQ(i)}
                             className={`flex aspect-square items-center justify-center rounded-md text-[11px] font-black transition ${
                               active
-                                ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-300'
+                                ? 'bg-red-600 text-white shadow-sm ring-1 ring-indigo-300'
                                 : done
                                   ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
                                   : 'border border-slate-200 bg-slate-50 text-slate-500 hover:bg-white'
@@ -1985,7 +1985,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                 ))}
               </div>
               <div className="mt-2 flex shrink-0 flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 pt-1.5 text-[10px] font-semibold text-slate-500">
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-indigo-600" /> Đang xem</span>
+                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-red-600" /> Đang xem</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-emerald-400" /> Đã trả lời</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded border border-slate-300 bg-slate-100" /> Chưa làm</span>
               </div>

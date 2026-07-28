@@ -147,7 +147,7 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 text-white relative">
+        <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-5 text-white relative">
           <button
             onClick={onClose}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"

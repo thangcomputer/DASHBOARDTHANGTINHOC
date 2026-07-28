@@ -396,7 +396,7 @@ const YouTubePlayerSecure = ({
               <div className="flex items-center gap-2">
                 <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                    className="h-full bg-red-500 rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(100, (displayWatched / totalDuration) * 100)}%` }}
                   />
                 </div>
@@ -450,7 +450,7 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
           <Lock size={16} className="text-slate-400" />
         ) : isCurrent ? (
           <div className="w-[18px] h-[18px] rounded-full border-2 border-blue-600 flex items-center justify-center">
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-ping" />
+            <div className="w-2 h-2 bg-red-600 rounded-full animate-ping" />
           </div>
         ) : (
           <PlayCircle size={18} className="text-slate-300" />
@@ -531,7 +531,7 @@ const AdminProgressPanel = ({ courseId }) => {
                   <div className="flex items-center gap-2 mt-1">
                     <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all ${t.isCertified ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                        className={`h-full rounded-full transition-all ${t.isCertified ? 'bg-emerald-500' : 'bg-red-500'}`}
                         style={{ width: `${t.progressPct}%` }}
                       />
                     </div>
@@ -828,7 +828,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             {isAdmin && (
               <button
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-red-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
               >
                 <BarChart2 size={16} /> Xem tiến độ
               </button>
@@ -853,7 +853,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             <button key={t.key} onClick={() => setMainTab(t.key)}
               className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
                 mainTab === t.key
-                  ? 'bg-blue-600 text-white shadow-md'
+                  ? 'bg-red-600 text-white shadow-md'
                   : 'text-slate-500 hover:bg-slate-100'
               }`}>
               <t.icon size={16} /> {t.label} 
@@ -881,10 +881,10 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {courses.map((course, idx) => {
                  const gradients = [
-                    "from-blue-600 via-indigo-600 to-purple-600",
+                    "from-red-600 via-indigo-600 to-red-700",
                     "from-emerald-500 via-teal-500 to-emerald-700",
                     "from-rose-500 via-red-500 to-rose-700",
-                    "from-cyan-500 via-blue-500 to-indigo-600"
+                    "from-cyan-500 via-blue-500 to-red-600"
                  ];
                  const bgClass = gradients[idx % gradients.length];
                  return (
@@ -1050,7 +1050,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         {/* Progress rail */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5">
           <div
-            className={`h-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-400' : 'bg-blue-500'}`}
+            className={`h-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-400' : 'bg-red-500'}`}
             style={{ width: `${overallProgress}%` }}
           />
         </div>
@@ -1066,7 +1066,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             </button>
             <div className="w-px h-5 bg-white/10 flex-shrink-0" />
             <div className="min-w-0 flex items-center gap-2">
-              <span className="hidden md:inline-flex items-center gap-1 bg-blue-500/15 text-blue-400 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border border-blue-500/20">
+              <span className="hidden md:inline-flex items-center gap-1 bg-red-500/15 text-blue-400 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border border-blue-500/20">
                 KHÓA HỌC
               </span>
               <h2 className="font-bold text-[13px] text-slate-100 truncate leading-none">{selectedCourse.title}</h2>
@@ -1202,14 +1202,14 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                     <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer group">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[9px] font-black text-white ${
-                          file.type === 'PDF' ? 'bg-rose-500/80' : file.type === 'DOCX' ? 'bg-blue-600/80' : 'bg-emerald-600/80'
+                          file.type === 'PDF' ? 'bg-rose-500/80' : file.type === 'DOCX' ? 'bg-red-600/80' : 'bg-emerald-600/80'
                         }`}>{file.type}</div>
                         <div>
                           <h4 className="font-semibold text-slate-200 text-sm">{file.title}</h4>
                           <p className="text-[10px] text-slate-600 mt-0.5">{file.size}</p>
                         </div>
                       </div>
-                      <button className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <button className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:bg-red-600 group-hover:text-white transition-all">
                         <Download size={13} />
                       </button>
                     </div>
@@ -1244,7 +1244,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                 className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
                   overallProgress === 100
                     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-                    : 'bg-blue-500/15 text-blue-400 border-blue-500/20'
+                    : 'bg-red-500/15 text-blue-400 border-blue-500/20'
                 }`}
               >
                 {lessons.filter(l => l.isCompleted).length}/{lessons.length} BÀI
@@ -1254,7 +1254,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             <div className="h-1 bg-white/5 rounded-full mt-3 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
-                  overallProgress === 100 ? 'bg-emerald-500' : 'bg-blue-500'
+                  overallProgress === 100 ? 'bg-emerald-500' : 'bg-red-500'
                 }`}
                 style={{ width: `${overallProgress}%` }}
               />
@@ -1298,7 +1298,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                           !lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
                         } ${
                           isCurrent
-                            ? 'bg-blue-600/10 border-l-2 border-blue-500'
+                            ? 'bg-red-600/10 border-l-2 border-blue-500'
                             : 'border-l-2 border-transparent hover:bg-white/[0.04]'
                         }`}
                         style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
@@ -1306,14 +1306,14 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                         {/* Status icon */}
                         <div className="mt-0.5 flex-shrink-0">
                           {lesson.isCompleted ? (
-                            <div className="w-[18px] h-[18px] rounded-full bg-blue-500/20 flex items-center justify-center">
+                            <div className="w-[18px] h-[18px] rounded-full bg-red-500/20 flex items-center justify-center">
                               <CheckCircle size={12} className="text-blue-400" />
                             </div>
                           ) : !lesson.isUnlocked ? (
                             <Lock size={14} className="text-slate-600" />
                           ) : isCurrent ? (
                             <div className="w-[18px] h-[18px] rounded-full border-2 border-blue-500 flex items-center justify-center">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                             </div>
                           ) : (
                             <PlayCircle size={16} className="text-slate-600" />

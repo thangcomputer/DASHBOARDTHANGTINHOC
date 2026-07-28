@@ -16,8 +16,8 @@ export default function TeacherOverviewTab({
             {/* ── HIGHLIGHT HERO SECTION ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                {/* Income & Performance Card */}
-               <div className="md:col-span-2 xl:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 rounded-[40px] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-900/20">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+               <div className="md:col-span-2 xl:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 rounded-[40px] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl shadow-red-900/20">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
                   <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8 h-full">
                      <div className="space-y-4">
                         <div>
@@ -46,7 +46,7 @@ export default function TeacherOverviewTab({
                {/* Rating & Identity Card */}
                <div className="md:col-span-2 xl:col-span-1 bg-white rounded-[40px] p-8 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-center justify-center text-center relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 to-amber-300" />
-                  <div className={`w-20 h-20 ${(currentTeacher?.color || 'bg-blue-600')} rounded-3xl flex items-center justify-center text-white text-3xl font-black shadow-lg mb-4`}>
+                  <div className={`w-20 h-20 ${(currentTeacher?.color || 'bg-red-600')} rounded-3xl flex items-center justify-center text-white text-3xl font-black shadow-lg mb-4`}>
                     {teacherName.substring(0, 2).toUpperCase()}
                   </div>
                   <h4 className="text-lg font-black text-gray-800 mb-1">{teacherName}</h4>
@@ -68,8 +68,8 @@ export default function TeacherOverviewTab({
             {/* Stats Grid */}
             <div className="grid grid-cols-1 min-[576px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               {[
-                { icon: Users, label: 'Đang dạy', value: students.length, sub: 'học viên', color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50' },
-                { icon: BookOpen, label: 'Lộ trình', value: `${totalDone}/${totalSess}`, sub: 'tổng số buổi', color: 'from-purple-500 to-purple-600', bg: 'bg-purple-50' },
+                { icon: Users, label: 'Đang dạy', value: students.length, sub: 'học viên', color: 'from-red-500 to-red-600', bg: 'bg-blue-50' },
+                { icon: BookOpen, label: 'Lộ trình', value: `${totalDone}/${totalSess}`, sub: 'tổng số buổi', color: 'from-purple-500 to-red-700', bg: 'bg-purple-50' },
                 { icon: Award, label: 'Điểm TB', value: avgGrade, sub: '/ 10 điểm', color: 'from-amber-500 to-orange-500', bg: 'bg-orange-50' },
                 { icon: Star, label: 'Uy tín', value: teacherRating.avg, sub: `${teacherRating.count} đánh giá`, color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
               ].map(({ icon: Icon, label, value, sub, color, bg }) => (
@@ -86,7 +86,7 @@ export default function TeacherOverviewTab({
             </div>
 
             {/* ── QUICK ACTIONS ── */}
-            <div className="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 rounded-3xl p-6 text-white shadow-xl shadow-blue-900/20">
+            <div className="bg-gradient-to-r from-red-700 via-blue-800 to-indigo-900 rounded-3xl p-6 text-white shadow-xl shadow-red-900/20">
               <div className="flex items-center gap-2 mb-4">
                 <Zap size={18} className="text-yellow-300" />
                 <h3 className="font-black text-base">Công việc cần xử lý ngay</h3>
@@ -118,7 +118,7 @@ export default function TeacherOverviewTab({
                     icon: Calendar,
                     label: 'Xếp lịch',
                     sub: 'Thêm buổi dạy mới',
-                    color: 'bg-blue-500/20 hover:bg-blue-500/30 border-blue-400/30',
+                    color: 'bg-red-500/20 hover:bg-red-500/30 border-blue-400/30',
                     action: () => { navigate('/teacher#schedule'); },
                   },
                 ].map(({ icon: Icon, label, sub, color, action }) => (

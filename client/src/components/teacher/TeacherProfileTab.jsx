@@ -122,7 +122,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         <img
           src={teacherAvatarUrl}
           alt={currentTeacher?.name || 'GV'}
-          className="w-12 h-12 rounded-2xl object-cover border-2 border-white shadow-lg shadow-blue-200 bg-white"
+          className="w-12 h-12 rounded-2xl object-cover border-2 border-white shadow-lg shadow-red-200 bg-white"
         />
         <div>
           <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
@@ -317,7 +317,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
               <button
                 onClick={handleSaveProfile}
                 disabled={saving}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-red-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? <Clock size={16} className="animate-spin" /> : <Save size={16} />}
                 {saving ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}

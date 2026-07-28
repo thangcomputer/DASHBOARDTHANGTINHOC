@@ -346,9 +346,9 @@
   }
 
   .btn-primary-blue {
-    @apply inline-flex items-center justify-center gap-2 bg-brand-blue text-white font-bold rounded-xl
-           hover:opacity-90 focus:outline-none
-           focus-visible:ring-2 focus-visible:ring-brand-blue/40 focus-visible:ring-offset-2
+    @apply inline-flex items-center justify-center gap-2 bg-brand-red text-white font-bold rounded-xl
+           hover:bg-brand-darkRed focus:outline-none
+           focus-visible:ring-2 focus-visible:ring-brand-red/40 focus-visible:ring-offset-2
            transition-colors disabled:opacity-55 disabled:cursor-not-allowed
            active:scale-[0.98];
   }
@@ -1936,9 +1936,9 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
 .cms-hr-btn-muted { background: #f1f5f9; border-color: #e2e8f0; color: #475569; }
 .cms-hr-btn-amber { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
 .cms-hr-btn-pay {
-  background: #0284c7;
+  background: #dc2626;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.28);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.28);
 }
 .cms-hr-btn-pay:hover { filter: brightness(0.95); }
 .cms-hr-btn-danger { background: #dc2626; color: #fff; }
@@ -2167,11 +2167,13 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100%;
     max-height: min(85dvh, 640px);
     border-radius: var(--dash-r-sheet, 24px) var(--dash-r-sheet, 24px) 0 0;
     box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.12);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    animation: cms-sheet-up 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+    transform: translateY(0);
+    animation: cms-notif-up 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   @media (min-width: 768px) {
@@ -2190,7 +2192,19 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
       border-radius: var(--dash-r-card, 20px);
       box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14);
       padding-bottom: 0;
-      animation: cms-fade-in 200ms ease;
+      transform: none;
+      animation: cms-fade-in 200ms ease both;
+    }
+  }
+
+  @keyframes cms-notif-up {
+    from {
+      transform: translateY(100%);
+      opacity: 0.92;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
     }
   }
 

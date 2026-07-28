@@ -50,7 +50,7 @@ export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA }) => {
             <div key={idx} className="bg-gray-50 rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white text-xs font-bold">
                     {r.studentName?.substring(0, 2)}
                   </div>
                   <div>

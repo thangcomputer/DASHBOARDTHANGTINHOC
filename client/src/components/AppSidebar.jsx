@@ -42,7 +42,7 @@ const MENU_CONFIG = {
       { key: 'changepassword', icon: Lock, label: 'Đổi mật khẩu', isChangePassword: true },
       { key: 'logout',    icon: LogOut,  label: 'Đăng xuất',  isLogout: true },
     ],
-    accentColor: 'bg-indigo-600',
+    accentColor: 'bg-red-600',
     activeClass: 'bg-white/20 text-white shadow-lg backdrop-blur-md border-r-4 border-white',
   },
   teacher: {
@@ -63,7 +63,7 @@ const MENU_CONFIG = {
       { key: 'changepassword', icon: Lock, label: 'Đổi mật khẩu', isChangePassword: true },
       { key: 'logout',  icon: LogOut, label: 'Đăng xuất',      isLogout: true },
     ],
-    accentColor: 'bg-indigo-600',
+    accentColor: 'bg-red-600',
     activeClass: 'bg-white/20 text-white shadow-lg backdrop-blur-md border-r-4 border-white',
   },
   admin: {
@@ -128,7 +128,7 @@ const MENU_CONFIG = {
       { key: 'changepassword', icon: Lock, label: 'Đổi mật khẩu', isChangePassword: true },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
-    accentColor: 'bg-indigo-600',
+    accentColor: 'bg-red-600',
     activeClass: 'bg-white/10 text-white shadow-xl backdrop-blur-lg border-r-[4px] border-white font-bold',
   },
 };

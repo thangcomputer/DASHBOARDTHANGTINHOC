@@ -221,7 +221,7 @@ export default function AdminTrainingTab() {
                                 <tr key={t.id || t._id} className="hover:bg-blue-50/20 transition-colors">
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center text-white text-xs font-black">
+                                      <div className="w-8 h-8 rounded-xl bg-red-500 flex items-center justify-center text-white text-xs font-black">
                                         {(t.name || '?')[0]}
                                       </div>
                                       <div>
@@ -392,7 +392,7 @@ export default function AdminTrainingTab() {
           {erGvForm && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
               <div className="bg-white rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in duration-300">
-                <div className="bg-gradient-to-r from-sky-700 to-sky-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between gap-3 text-white">
+                <div className="bg-gradient-to-r from-red-700 to-red-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between gap-3 text-white">
                   <h3 className="font-bold text-lg sm:text-xl flex items-center gap-2 sm:gap-3 min-w-0">
                     <GraduationCap size={22} className="shrink-0" /> {erGvForm.id ? 'Chỉnh sửa kết quả' : 'Thêm kết quả thi Giảng viên'}
                   </h3>
@@ -466,7 +466,7 @@ export default function AdminTrainingTab() {
                     } catch (err) {
                       toast.error('Lỗi cập nhật: ' + (err.message || 'Không xác định'));
                     }
-                  }} className="flex-1 min-h-11 py-3 bg-gradient-to-r from-sky-700 to-sky-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
+                  }} className="flex-1 min-h-11 py-3 bg-gradient-to-r from-red-700 to-red-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
                     <Save size={16} /> Lưu & Áp dụng
                   </button>
                 </div>
@@ -478,7 +478,7 @@ export default function AdminTrainingTab() {
           {gvReviewModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-                <div className="bg-gradient-to-r from-sky-600 to-sky-500 px-4 sm:px-6 py-4 rounded-t-2xl">
+                <div className="bg-gradient-to-r from-red-600 to-red-500 px-4 sm:px-6 py-4 rounded-t-2xl">
                   <h3 className="text-white font-bold text-lg sm:text-xl flex items-center gap-2">
                     <FileSpreadsheet size={20} /> Kiểm Tra Bài Thực Hành
                   </h3>

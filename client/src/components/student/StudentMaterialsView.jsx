@@ -35,7 +35,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
   });
 
   const typeColors = {
-    VIDEO: 'bg-purple-500', PDF: 'bg-red-500', XLSX: 'bg-green-500', PPTX: 'bg-orange-500', DOCX: 'bg-blue-500',
+    VIDEO: 'bg-purple-500', PDF: 'bg-red-500', XLSX: 'bg-green-500', PPTX: 'bg-orange-500', DOCX: 'bg-red-500',
   };
 
   return (
@@ -224,7 +224,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
                       {m.isDynamicAssignment ? (
                         <button 
                           onClick={() => onSelectAssignment && onSelectAssignment(m.rawAssignment)}
-                          className={`flex-1 justify-center text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-sm ${m.rawAssignment.mySubmission ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                          className={`flex-1 justify-center text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-sm ${m.rawAssignment.mySubmission ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-red-600 text-white hover:bg-red-700'}`}>
                           <FileUp size={14} /> {m.rawAssignment.mySubmission ? 'Nộp lại bài' : 'Nộp bài'}
                         </button>
                       ) : (

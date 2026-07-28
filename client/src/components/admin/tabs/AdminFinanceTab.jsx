@@ -50,7 +50,7 @@ export default function AdminFinanceTab() {
                     </div>
                   </div>
                   <div className="p-4 sm:p-6">
-                    <div className="bg-gradient-to-br from-indigo-700 to-blue-800 rounded-2xl p-4 sm:p-6 text-white shadow-[0_6px_20px_rgba(37,99,235,0.25)] relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-red-700 to-red-800 rounded-2xl p-4 sm:p-6 text-white shadow-[0_6px_20px_rgba(37,99,235,0.25)] relative overflow-hidden">
                       <div className="absolute top-0 right-0 p-4 opacity-10">
                         <DollarSign size={80} />
                       </div>

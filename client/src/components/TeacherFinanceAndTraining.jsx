@@ -193,7 +193,7 @@ const TeacherFinanceAndTraining = () => {
                   <span className="text-orange-200 text-xs">Đang chờ Admin chuyển</span>
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-6 text-white shadow-lg">
                 <p className="text-blue-200 text-[10px] uppercase tracking-wider font-semibold">Tổng buổi đã dạy</p>
                 <p className="text-3xl font-black mt-1">{totalSessions}</p>
                 <div className="flex items-center gap-2 mt-2">
@@ -216,7 +216,7 @@ const TeacherFinanceAndTraining = () => {
                              <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-900 text-white text-[10px] font-bold px-2 py-1 rounded-lg pointer-events-none whitespace-nowrap z-20">
                                  {d.amount.toLocaleString('vi-VN')}đ
                              </div>
-                             <div className="w-full bg-gradient-to-t from-blue-600 to-indigo-500 rounded-t-xl transition-all duration-700 ease-out hover:from-blue-500 hover:to-indigo-400 cursor-pointer shadow-lg shadow-blue-900/20" 
+                             <div className="w-full bg-gradient-to-t from-red-600 to-indigo-500 rounded-t-xl transition-all duration-700 ease-out hover:from-red-500 hover:to-indigo-400 cursor-pointer shadow-lg shadow-red-900/20" 
                                   style={{ height: `${(d.amount / maxAmount) * 85}%`, minHeight: '10%' }} />
                              <span className="text-[11px] font-black text-slate-500 absolute -bottom-10 truncate w-full text-center tracking-tighter">
                                 {d.month.replace('Tháng ', 'T')}
@@ -408,7 +408,7 @@ const TeacherFinanceAndTraining = () => {
                       activeCourse.files.map((file, idx) => (
                         <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:border-green-200 transition-colors">
                            <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-sm ${file.type === 'PDF' ? 'bg-red-500' : file.type === 'DOCX' ? 'bg-blue-500' : 'bg-green-500'}`}>{file.type}</div>
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-sm ${file.type === 'PDF' ? 'bg-red-500' : file.type === 'DOCX' ? 'bg-red-500' : 'bg-green-500'}`}>{file.type}</div>
                               <div>
                                 <h4 className="font-bold text-slate-700">{file.title}</h4>
                                 <p className="text-xs text-slate-400 mt-1 font-semibold">{file.size}</p>

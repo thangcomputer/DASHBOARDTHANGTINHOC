@@ -491,7 +491,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <button
           type="button"
           onClick={() => navigate(`/${role}/inbox`)}
-          className="cms-fab hidden md:inline-flex bg-sky-600 hover:bg-sky-700 text-white p-3.5 sm:p-4 focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2"
+          className="cms-fab hidden md:inline-flex bg-red-600 hover:bg-red-700 text-white p-3.5 sm:p-4 focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2"
           title="Nhắn tin"
           aria-label="Mở hộp thư"
         >
@@ -571,7 +571,7 @@ const ChangePasswordModal = ({ session, role }) => {
   return (
     <div className="cms-modal-shell" role="dialog" aria-modal="true" aria-labelledby="change-password-title">
       <div className="cms-modal-panel max-w-sm">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-red-600 to-red-600 px-6 py-5 flex items-center justify-between">
           <h3 id="change-password-title" className="text-white font-black text-lg flex items-center gap-2">
             <Lock size={20} aria-hidden="true" /> {session?.isFirstLogin === true ? 'Tạo mật khẩu cá nhân' : 'Đổi mật khẩu'}
           </h3>

@@ -264,7 +264,7 @@ const RegistrationForm = ({ onNavigate }) => {
                           const { printInvoice } = require('../utils/exportPDF');
                           printInvoice();
                         }}
-                        className="flex-1 min-w-[120px] py-3.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                        className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                       >
                         <Printer size={18} /> IN (PRINT)
                       </button>
@@ -639,7 +639,7 @@ const RegistrationForm = ({ onNavigate }) => {
                       const { printInvoice } = require('../utils/exportPDF');
                       printInvoice();
                     }}
-                    className="py-3.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                    className="py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                   >
                     <Printer size={20} /> IN
                   </button>

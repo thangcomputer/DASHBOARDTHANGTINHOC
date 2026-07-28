@@ -31,7 +31,7 @@ function LoadingPreview({ style }) {
     ),
     4: (
       <div className="flex items-center justify-center h-full" style={{ perspective: '200px' }}>
-        <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg shadow-lg"
+        <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-red-600 rounded-lg shadow-lg"
           style={{ animation: 'cube3d 2s infinite linear', transformStyle: 'preserve-3d' }} />
       </div>
     ),

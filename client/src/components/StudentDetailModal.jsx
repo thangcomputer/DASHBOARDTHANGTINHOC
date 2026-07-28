@@ -182,7 +182,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
             <div className="relative">
               <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-8 h-8 bg-indigo-600 rounded-lg transform rotate-45 animate-pulse" />
+                <div className="w-8 h-8 bg-red-600 rounded-lg transform rotate-45 animate-pulse" />
               </div>
             </div>
             <p className="text-sm font-semibold text-indigo-900/50">Đang tải hồ sơ...</p>
@@ -299,7 +299,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                     <tab.icon size={15} className="shrink-0" />
                     {tab.label}
                     {activeTab === tab.id && (
-                      <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-indigo-600 rounded-full" />
+                      <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-600 rounded-full" />
                     )}
                   </button>
                 ))}
@@ -317,7 +317,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                       label="Tiến độ học tập" 
                       value={`${data.student.progressPercent || 0}%`} 
                       icon={TrendingUp} 
-                      color="bg-indigo-600" 
+                      color="bg-red-600" 
                       sub={`${data.student.completedSessions || 0}/${data.student.totalSessions || 12} buổi`}
                     />
                     <StatBox 
@@ -445,7 +445,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                     <button
                                       type="button"
                                       onClick={handleAddEnrollment}
-                                      className="sm:col-span-2 py-2 rounded-xl bg-blue-600 text-white text-xs font-black"
+                                      className="sm:col-span-2 py-2 rounded-xl bg-red-600 text-white text-xs font-black"
                                     >
                                       Lưu khóa học mới
                                     </button>
@@ -711,7 +711,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                       <button
                         type="button"
                         onClick={() => setShowAddAssign(!showAddAssign)}
-                        className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 min-h-11 rounded-xl text-[11px] font-black uppercase tracking-wider shadow-sm transition-all inline-flex items-center gap-1.5 shrink-0"
+                        className="w-full sm:w-auto justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-3 min-h-11 rounded-xl text-[11px] font-black uppercase tracking-wider shadow-sm transition-all inline-flex items-center gap-1.5 shrink-0"
                       >
                         <Plus size={14} /> Giao bài tập mới
                       </button>
@@ -763,7 +763,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                         </div>
                         <button 
                           onClick={handleAddAssignment}
-                          className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
+                          className="w-full py-3 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100"
                         >
                           XÁC NHẬN GIAO BÀI
                         </button>
@@ -981,7 +981,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                   <button
                     type="button"
                     onClick={onClose}
-                    className="min-h-12 flex-1 sm:flex-none px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[13px] font-bold hover:bg-indigo-600 transition-colors inline-flex items-center justify-center gap-2"
+                    className="min-h-12 flex-1 sm:flex-none px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[13px] font-bold hover:bg-red-600 transition-colors inline-flex items-center justify-center gap-2"
                   >
                     Hoàn tất xem
                     <ChevronRight size={15} />

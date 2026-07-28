@@ -118,7 +118,7 @@ export default function StudentProfileTab({
                     {!studentData.paid && (
                       <button
                         onClick={() => setShowTuitionModal(true)}
-                        className="text-xs font-bold px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition shadow-sm shadow-blue-100 w-full sm:w-auto"
+                        className="text-xs font-bold px-3 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition shadow-sm shadow-red-100 w-full sm:w-auto"
                       >
                         Đóng ngay
                       </button>
@@ -163,7 +163,7 @@ export default function StudentProfileTab({
                         <div className="flex items-center gap-4 sm:gap-6">
                           <div className="flex-1">
                             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
+                              <div className={`h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }} />
                             </div>
                             <div className="flex justify-between mt-1">
                               <p className="text-xs cms-min-text-xs font-bold text-slate-400">{c.completedSessions}/{c.totalSessions} buổi</p>

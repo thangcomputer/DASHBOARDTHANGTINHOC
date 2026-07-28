@@ -745,7 +745,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 >
                   <div className="relative shrink-0">
                     <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md relative z-10 overflow-hidden ${
-                      isGroup ? 'bg-indigo-500' : 'bg-white ring-2 ' + (
+                      isGroup ? 'bg-red-500' : 'bg-white ring-2 ' + (
                         conv.user.role === 'teacher' ? 'ring-amber-400/80'
                           : conv.user.role === 'student' ? 'ring-sky-400/80'
                             : conv.user.role === 'admin' ? 'ring-rose-400/80'
@@ -783,7 +783,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       <div className="flex items-center gap-1 min-w-0 flex-1">
                         <h4 className="font-semibold text-[#1E293B] text-base truncate">{conv.user.name}</h4>
                         {conv.unread > 0 && (
-                          <span className="ml-1 min-w-[16px] h-4 px-1 bg-blue-600 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-sm">
+                          <span className="ml-1 min-w-[16px] h-4 px-1 bg-red-600 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-sm">
                             {conv.unread > 99 ? '99+' : conv.unread}
                           </span>
                         )}
@@ -900,7 +900,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   </button>
                   <div className="relative shrink-0">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ring-2 ring-white shadow-sm ${
-                      activeConv.isGroup ? 'bg-indigo-500' : 'bg-white'
+                      activeConv.isGroup ? 'bg-red-500' : 'bg-white'
                     }`}>
                       {activeConv.isGroup ? (
                         <Users size={16} />
@@ -981,7 +981,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                              <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
                                role === 'admin' ? 'bg-red-500 text-white' :
-                               role === 'teacher' ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'
+                               role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
                              }`}>
                                {role === 'admin' ? 'Admin' : role === 'teacher' ? 'Giảng viên' : 'Học viên'}
                              </span>
@@ -1033,7 +1033,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                   </div>
                                 ) : msg.messageType === 'file' ? (
                                   <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                                    <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-blue-500 text-white'}`}>
+                                    <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-red-500 text-white'}`}>
                                       <Paperclip size={18} />
                                     </div>
                                     <div className="flex flex-col min-w-0">
@@ -1272,7 +1272,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                              </div>
                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-sm ${
                                u.role === 'admin' ? 'bg-red-500' :
-                               u.role === 'teacher' ? 'bg-blue-600' : 'bg-emerald-600'
+                               u.role === 'teacher' ? 'bg-red-600' : 'bg-emerald-600'
                              }`}>
                                {(u.name || '?')[0].toUpperCase()}
                              </div>
@@ -1313,7 +1313,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         toast?.error('Lỗi kết nối máy chủ.');
                       }
                     }}
-                    className="flex-[2] py-4 px-6 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-200"
+                    className="flex-[2] py-4 px-6 bg-red-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-200"
                   >
                     Tạo nhóm ngay
                   </button>
@@ -1371,7 +1371,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       {broadcastConfig && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-8 duration-500">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 flex items-center justify-between">
+              <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6 flex items-center justify-between">
                 <div>
                   <h3 className="text-white font-black text-lg flex items-center gap-2">
                     <Megaphone size={20} /> Gửi tin nhắn hàng loạt
@@ -1432,7 +1432,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         }
                       }}
                       disabled={isBroadcasting || !broadcastContent.trim()}
-                      className="flex-[2] py-4 px-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-xl hover:shadow-blue-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                      className="flex-[2] py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-xl hover:shadow-red-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
                     >
                       {isBroadcasting ? (
                         <><Loader2 size={16} className="animate-spin" /> Đang gửi...</>

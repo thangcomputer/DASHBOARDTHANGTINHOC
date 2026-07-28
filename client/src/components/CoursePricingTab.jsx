@@ -171,7 +171,7 @@ function CourseModal({
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[min(92vh,920px)]">
         {/* Header lớn — cùng kiểu modal học viên */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 flex items-center justify-between flex-shrink-0">
+        <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6 flex items-center justify-between flex-shrink-0">
           <h3 className="text-white font-black text-xl sm:text-2xl flex items-center gap-4">
             <div className="p-2 bg-white/20 rounded-2xl backdrop-blur-md">
               <BookOpen size={28} />
@@ -192,7 +192,7 @@ function CourseModal({
             {/* Cột trái: Thông tin & học phí */}
             <div className="space-y-5 md:border-r border-gray-100 md:pr-10">
               <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs shadow-lg shadow-blue-200">1</span>
+                <span className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">1</span>
                 Thông tin khóa học
               </h4>
 
@@ -300,7 +300,7 @@ function CourseModal({
             {/* Cột phải: Môn thi */}
             <div className="space-y-5 md:pl-2">
               <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shadow-lg shadow-indigo-200">2</span>
+                <span className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">2</span>
                 Môn thi trong Phòng Thi ({selectedCount})
               </h4>
 
@@ -364,7 +364,7 @@ function CourseModal({
                         const src = otherCourses.find((c) => String(c._id) === String(importCourseId));
                         mergeExamSubjectsFromCourse(src);
                       }}
-                      className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-2xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-2xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                       title="Thêm môn thi từ khóa đã chọn"
                     >
                       <Plus size={18} />
@@ -463,7 +463,7 @@ function CourseModal({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="px-12 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-blue-200 hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 uppercase active:scale-95 disabled:opacity-50"
+              className="px-12 py-4 bg-gradient-to-r from-red-600 to-red-600 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-red-200 hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 uppercase active:scale-95 disabled:opacity-50"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật' : 'Thêm khóa học')}
@@ -566,7 +566,7 @@ export default function CoursePricingTab() {
         <button
           type="button"
           onClick={() => setModalCourse(null)}
-          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition shadow-sm shrink-0 w-full sm:w-auto"
+          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition shadow-sm shrink-0 w-full sm:w-auto"
         >
           <Plus size={15} /> Thêm khóa học
         </button>

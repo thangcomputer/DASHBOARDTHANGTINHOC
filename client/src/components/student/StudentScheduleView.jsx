@@ -90,7 +90,7 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
             return (
               <button key={day} onClick={() => setSelectedDate(day === selectedDate ? null : day)}
                 className={`relative aspect-square min-h-[2.25rem] rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-xs sm:text-sm font-bold transition-all ${
-                  isSelected ? 'bg-blue-600 text-white shadow-xl ring-4 ring-blue-100 scale-105 z-10' :
+                  isSelected ? 'bg-red-600 text-white shadow-xl ring-4 ring-blue-100 scale-105 z-10' :
                   isToday(day) ? 'bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200' :
                   hasSchedule ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'text-slate-600 hover:bg-slate-50'
                 }`}>

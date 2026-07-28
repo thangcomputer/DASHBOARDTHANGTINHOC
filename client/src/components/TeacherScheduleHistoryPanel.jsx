@@ -124,7 +124,7 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
                     <td className="px-5 py-3.5">
                       {log.action === 'CREATED' ? (
                         <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-100/50">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Đã xếp lịch
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Đã xếp lịch
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-red-100/50">

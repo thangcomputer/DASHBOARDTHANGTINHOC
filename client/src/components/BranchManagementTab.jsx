@@ -84,7 +84,7 @@ function BranchModal({ branch, onClose, onSaved }) {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)' }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-700 to-blue-600 px-6 py-5 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-r from-red-700 to-red-600 px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
               <Building2 size={18} />
@@ -122,7 +122,7 @@ function BranchModal({ branch, onClose, onSaved }) {
               Hủy
             </button>
             <button onClick={handleSave} disabled={saving}
-              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-3 rounded-xl hover:from-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50">
+              className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold py-3 rounded-xl hover:from-red-700 transition flex items-center justify-center gap-2 disabled:opacity-50">
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật' : 'Thêm chi nhánh')}
             </button>
@@ -206,7 +206,7 @@ export default function BranchManagementTab() {
         <button
           type="button"
           onClick={() => setModal(null)}
-          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition shrink-0 w-full sm:w-auto"
+          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition shrink-0 w-full sm:w-auto"
         >
           <Plus size={15} /> Thêm chi nhánh
         </button>
@@ -246,7 +246,7 @@ export default function BranchManagementTab() {
             >
               <div className="flex items-start gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  b.isActive ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-500'
+                  b.isActive ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-500'
                 }`}>
                   <Building2 size={18} />
                 </div>

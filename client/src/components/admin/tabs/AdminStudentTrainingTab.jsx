@@ -445,7 +445,7 @@ export default function AdminStudentTrainingTab() {
                                               saveEssayScore(r.studentId, r.subjectId, Math.min(10, Math.max(0, Number(gradingValue))));
                                               setGradingRow(null); setGradingValue('');
                                             }
-                                          }} className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 bg-sky-600 text-white rounded-2xl hover:bg-sky-700 transition" title="Lưu điểm">
+                                          }} className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition" title="Lưu điểm">
                                             <CheckCircle2 size={16} />
                                           </button>
                                           <button type="button" onClick={() => { setGradingRow(null); setGradingValue(''); }}
@@ -522,7 +522,7 @@ export default function AdminStudentTrainingTab() {
                                         }}
                                         className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200"
                                       >
-                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-black shadow-lg hover:bg-blue-700 transition whitespace-nowrap">
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-black shadow-lg hover:bg-red-700 transition whitespace-nowrap">
                                           🔓 Mở khóa thi lại
                                         </span>
                                       </button>

@@ -151,7 +151,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
                 <button
                   type="button"
                   onClick={() => printInvoice()}
-                  className="flex-1 min-w-[120px] py-3.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                 >
                   <Printer size={18} /> IN (PRINT)
                 </button>

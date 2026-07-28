@@ -263,7 +263,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                         return (
                           <tr key={sub._id} className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-500 ring-inset ring-opacity-50' : ''}`}>
                             <td className="p-3 font-bold text-slate-700 text-sm whitespace-nowrap">
-                              {isHighlighted && <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>}
+                              {isHighlighted && <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></span>}
                               {sub.studentId?.name || 'Không xác định'}
                             </td>
                             <td className="p-3 text-xs font-semibold text-slate-500 whitespace-nowrap">{new Date(sub.submittedAt || sub.createdAt).toLocaleString('vi-VN')}</td>

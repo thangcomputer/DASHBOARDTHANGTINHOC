@@ -135,7 +135,7 @@ export default function LmsGuideTour({
   };
 
   const isLast = index >= steps.length - 1;
-  const accent = role === 'teacher' ? 'bg-blue-600' : 'bg-indigo-600';
+  const accent = role === 'teacher' ? 'bg-red-600' : 'bg-red-600';
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
   const isMobile = vw < 1024;

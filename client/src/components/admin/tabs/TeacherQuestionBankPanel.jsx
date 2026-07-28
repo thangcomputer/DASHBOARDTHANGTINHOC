@@ -489,7 +489,7 @@ export default function TeacherQuestionBankPanel() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* ── TRẮC NGHIỆM ── */}
         <section className="bg-white rounded-2xl border-2 border-blue-100 shadow-sm overflow-hidden flex flex-col min-h-[420px]">
-          <header className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between gap-2">
+          <header className="px-4 py-3 bg-gradient-to-r from-red-600 to-red-600 text-white flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <ListChecks size={18} />
               <h3 className="font-bold text-sm">Trắc nghiệm</h3>
@@ -500,7 +500,7 @@ export default function TeacherQuestionBankPanel() {
             <button
               type="button"
               onClick={() => openAddForm('multiple')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm w-full min-[480px]:w-auto"
+              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm w-full min-[480px]:w-auto"
             >
               <Plus size={14} /> Thêm câu
             </button>
@@ -558,7 +558,7 @@ export default function TeacherQuestionBankPanel() {
 
         {/* ── TỰ LUẬN / THỰC HÀNH ── */}
         <section className="bg-white rounded-2xl border-2 border-violet-100 shadow-sm overflow-hidden flex flex-col min-h-[420px]">
-          <header className="px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white flex items-center justify-between gap-2">
+          <header className="px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <PenLine size={18} />
               <h3 className="font-bold text-sm">Tự luận / Thực hành</h3>
@@ -615,7 +615,7 @@ export default function TeacherQuestionBankPanel() {
       {qForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl">
-            <div className={`px-6 py-4 flex items-center justify-between text-white ${qForm.type === 'essay' ? 'bg-gradient-to-r from-violet-600 to-purple-600' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}>
+            <div className={`px-6 py-4 flex items-center justify-between text-white ${qForm.type === 'essay' ? 'bg-gradient-to-r from-red-600 to-red-700' : 'bg-gradient-to-r from-red-600 to-red-600'}`}>
               <h3 className="font-bold flex items-center gap-2">
                 <HelpCircle size={20} />
                 {qForm.id ? 'Sửa câu hỏi' : 'Thêm câu hỏi'}
@@ -799,7 +799,7 @@ export default function TeacherQuestionBankPanel() {
               <button
                 type="button"
                 onClick={handleSaveQuestion}
-                className={`flex-1 py-2.5 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${qForm.type === 'essay' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                className={`flex-1 py-2.5 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${qForm.type === 'essay' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'}`}
               >
                 <Save size={16} /> Lưu
               </button>

@@ -216,7 +216,7 @@ export function useDataSync({
     };
   }, [triggerBackgroundSync, onDataRefresh]);
 
-  const addSystemLog = useCallback((action, target, adminName = 'Admin', color = 'bg-blue-500 text-white') => {
+  const addSystemLog = useCallback((action, target, adminName = 'Admin', color = 'bg-red-500 text-white') => {
     setSystemLogs(prev => {
       const newLog = {
         id: Date.now(),

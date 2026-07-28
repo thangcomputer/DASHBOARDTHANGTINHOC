@@ -186,7 +186,7 @@ export default function CmsSelect({
                 opt.disabled
                   ? 'text-slate-300 bg-slate-50 cursor-not-allowed opacity-60 line-through decoration-slate-300'
                   : isSelected
-                    ? 'bg-blue-600 text-white font-semibold'
+                    ? 'bg-red-600 text-white font-semibold'
                     : 'text-gray-700 font-medium hover:bg-blue-50'
               }`}
             >

@@ -71,7 +71,7 @@ export default function StudentOverviewTab({
                           <p className="text-xs font-bold bg-white/20 inline-block px-3 py-1 rounded-full uppercase">Sắp diễn ra</p>
                         </div>
                         <a href={viewStudent.joinClassUrl || '#'} target="_blank" rel="noreferrer"
-                          className={`w-full md:w-auto ${viewStudent.joinClassUrl && viewStudent.isLikelyLiveClass ? 'bg-indigo-600 text-white animate-pulse shadow-indigo-500/50 hover:bg-indigo-700' : 'bg-white text-red-600'} px-8 py-4 rounded-xl md:rounded-2xl font-black text-center shadow-lg active:scale-95 transition transform hover:scale-105 flex items-center justify-center gap-3`}>
+                          className={`w-full md:w-auto ${viewStudent.joinClassUrl && viewStudent.isLikelyLiveClass ? 'bg-red-600 text-white animate-pulse shadow-red-500/50 hover:bg-red-700' : 'bg-white text-red-600'} px-8 py-4 rounded-xl md:rounded-2xl font-black text-center shadow-lg active:scale-95 transition transform hover:scale-105 flex items-center justify-center gap-3`}>
                           <Video size={22} /> {viewStudent.joinClassUrl && viewStudent.isLikelyLiveClass ? '🔴 THAM GIA LỚP TRỰC TUYẾN' : 'VÀO LỚP NGAY'}
                         </a>
                       </div>
@@ -81,7 +81,7 @@ export default function StudentOverviewTab({
 
                   {/* Stats */}
                   <div className="cms-stat-grid gap-3">
-                    <StatCard icon={BookOpen} label="Đã học" value={viewStudent.completedSessions} sub={`/ ${viewStudent.totalSessions}`} color="from-blue-500 to-blue-600" />
+                    <StatCard icon={BookOpen} label="Đã học" value={viewStudent.completedSessions} sub={`/ ${viewStudent.totalSessions}`} color="from-red-500 to-red-600" />
                     <StatCard icon={Clock} label="Còn lại" value={viewStudent.remainingSessions} sub="buổi" color="from-[#1E3A8A] to-[#203DB5]" />
                     <StatCard icon={Star} label="Điểm TB" value={viewStudent.avgGrade} sub="/ 10" color="from-orange-400 to-orange-500" />
                     <StatCard icon={TrendingUp} label="Tiến độ" value={`${progressPct}%`} sub="hoàn thành" color="from-emerald-400 to-emerald-500" />

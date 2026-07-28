@@ -152,7 +152,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
               <button
                 type="button"
                 onClick={handleSave}
-                className="inline-flex items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-bold shadow-md hover:shadow-lg transition"
+                className="inline-flex items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-600 text-white text-sm font-bold shadow-md hover:shadow-lg transition"
               >
                 <Save size={16} />
                 <span className="hidden sm:inline">Lưu giáo trình</span>
