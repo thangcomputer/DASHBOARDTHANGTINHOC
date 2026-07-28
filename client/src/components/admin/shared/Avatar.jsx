@@ -38,9 +38,10 @@ export default function Avatar({
   const url = resolveAvatarUrl({ avatar: src, role, adminRole });
   const sizeClass =
     size === 'sm' ? 'w-8 h-8'
-      : size === 'lg' ? 'w-14 h-14'
-        : size === 'xl' ? 'w-20 h-20'
-          : 'w-10 h-10';
+      : size === 'card' ? 'w-[52px] h-[52px]'
+        : size === 'lg' ? 'w-14 h-14'
+          : size === 'xl' ? 'w-20 h-20'
+            : 'w-10 h-10';
 
   const badge = ROLE_BADGE[normalized] || ROLE_BADGE.student;
   const ring = ROLE_RING[normalized] || ROLE_RING.student;

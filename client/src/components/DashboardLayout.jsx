@@ -254,17 +254,19 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       />
 
       <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
-        <header className={`min-h-14 sm:h-16 py-2 sm:py-0 flex flex-col sm:flex-row sm:items-center flex-wrap gap-2 sm:gap-3 bg-white border-b border-slate-100 pl-[4.5rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-5 flex-shrink-0 z-40 safe-pad-top ${
+        <header className={`h-14 sm:h-16 flex items-center gap-2 sm:gap-3 bg-white border-b border-slate-100 pl-[4.5rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-4 flex-shrink-0 z-40 safe-pad-top ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="min-w-0 sm:flex-1">
-            <h1 className="text-sm sm:text-base font-bold text-slate-900 truncate leading-tight">{pageTitle}</h1>
-            <p className="text-[11px] sm:text-xs text-slate-500 truncate hidden xs:block">{displayName}</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[15px] sm:text-base font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
+            <p className="text-[11px] text-slate-500 truncate leading-none mt-0.5 hidden min-[390px]:block">{displayName}</p>
           </div>
 
-          <div className="flex items-center flex-wrap justify-end gap-1.5 sm:gap-2 min-w-0">
+          <div className="flex items-center flex-nowrap justify-end gap-1.5 sm:gap-2 min-w-0 flex-shrink-0">
             {role === 'admin' && (
-              <BranchFilterDropdown />
+              <div className={((location.hash || '').replace('#', '') || 'dashboard') === 'students' ? 'hidden lg:block' : ''}>
+                <BranchFilterDropdown />
+              </div>
             )}
 
             {(role === 'student' || role === 'teacher') && (
@@ -404,7 +406,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           className={
             role === 'teacher' && location.pathname === '/teacher/test'
               ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-              : 'flex-1 min-h-0 px-2 py-2 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
+              : 'flex-1 min-h-0 px-2 py-2 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
           }
         >
           <div

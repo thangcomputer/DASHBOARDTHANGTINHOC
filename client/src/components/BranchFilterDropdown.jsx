@@ -19,7 +19,7 @@ const BRANCH_VISIBLE_HASHES = [
   'bi',
 ];
 
-export default function BranchFilterDropdown() {
+export default function BranchFilterDropdown({ className = '', fullWidth = false }) {
   const { selectedBranchId, selectedBranchName, branches, setSelectedBranch, isSuperAdmin, isStaff, isLoadingBranches } = useBranch();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -41,11 +41,14 @@ export default function BranchFilterDropdown() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const widthCls = fullWidth ? 'w-full max-w-none' : 'max-w-[9.5rem] sm:max-w-[11rem]';
+  const heightCls = fullWidth ? 'h-11 rounded-xl text-sm' : 'h-9 rounded-lg text-xs';
+
   if (isStaff) {
     return (
-      <div className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-slate-600 max-w-[9.5rem] sm:max-w-[11rem]">
+      <div className={`inline-flex items-center gap-1.5 px-2.5 border border-slate-200 bg-white text-slate-600 ${heightCls} ${widthCls} ${className}`}>
         <Building2 size={14} className="text-slate-400 flex-shrink-0" aria-hidden="true" />
-        <span className="text-xs font-semibold truncate">{selectedBranchName}</span>
+        <span className="font-semibold truncate">{selectedBranchName}</span>
       </div>
     );
   }
@@ -61,14 +64,14 @@ export default function BranchFilterDropdown() {
   const isFiltered = selectedBranchId && selectedBranchId !== 'all';
 
   return (
-    <div ref={ref} className="relative max-w-full min-w-0 z-50">
+    <div ref={ref} className={`relative min-w-0 z-50 ${fullWidth ? 'w-full' : 'max-w-full'} ${className}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label="Lọc theo chi nhánh"
-        className={`inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border text-xs font-semibold transition-colors min-w-0 max-w-[9.5rem] sm:max-w-[11rem] ${
+        className={`inline-flex items-center gap-1.5 px-2.5 border font-semibold transition-colors min-w-0 ${heightCls} ${widthCls} ${
           isFiltered
             ? 'border-slate-300 bg-slate-50 text-slate-800'
             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
