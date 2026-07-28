@@ -582,11 +582,15 @@ const StudentDashboard = ({ onNavigate }) => {
         )}
       </div>
 
-      {/* FAB - Thay thay thế Zalo bằng liên kết nội bộ tới Hộp Thư */}
-      <button 
+      {/* FAB tin nhắn nhanh: chỉ máy tính */}
+      <button
+        type="button"
         onClick={() => navigate('/student/inbox', { state: { selectUserId: studentData.teacherId } })}
-        className="lg:hidden fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-2xl z-50 active:scale-90 transition">
-        <MessageSquare size={24} />
+        className="hidden md:inline-flex fixed bottom-6 right-6 bg-sky-600 hover:bg-sky-700 text-white p-4 rounded-full shadow-2xl z-50 active:scale-90 transition"
+        aria-label="Mở hộp thư"
+        title="Nhắn tin"
+      >
+        <MessageSquare size={24} aria-hidden="true" />
       </button>
 
       {activeMilestone && (

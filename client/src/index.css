@@ -701,8 +701,8 @@
 
 /* Chat */
 .cms-chat-shell {
-  height: calc(100dvh - 7.5rem - env(safe-area-inset-bottom, 0px));
-  min-height: 360px;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--cms-surface-2);
@@ -710,6 +710,14 @@
   border-radius: var(--cms-r-card);
   box-shadow: var(--cms-shadow);
   overflow: hidden;
+}
+@media (max-width: 767.98px) {
+  .cms-chat-shell {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+  }
 }
 .cms-chat-search-sticky {
   position: sticky;
@@ -719,6 +727,10 @@
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--cms-border);
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
 }
 .cms-chip {
   display: inline-flex;
@@ -746,8 +758,9 @@
   transition: background var(--cms-duration) ease;
 }
 .cms-chat-conv-row:active,
-.cms-chat-conv-row[data-active='true'] {
-  background: var(--cms-neutral-100);
+.cms-chat-conv-row[data-active='true'],
+.cms-chat-conv-row-active {
+  background: #f1f5f9;
 }
 .cms-chat-header {
   display: flex;
@@ -758,6 +771,33 @@
   background: var(--cms-surface);
   border-bottom: 1px solid var(--cms-border);
   flex-shrink: 0;
+}
+.cms-chat-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f8fafc;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.cms-chat-messages::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.cms-chat-input-bar {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  background: var(--cms-surface);
+  border-top: 1px solid var(--cms-border);
 }
 .cms-bubble-mine,
 .cms-bubble-other {
@@ -770,7 +810,7 @@
   box-shadow: var(--cms-shadow);
 }
 .cms-bubble-mine {
-  background: #2563eb;
+  background: var(--cms-secondary);
   color: #fff;
   border-bottom-right-radius: 6px;
 }

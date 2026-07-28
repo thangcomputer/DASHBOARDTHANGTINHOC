@@ -235,6 +235,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const pageTitle = resolvePageTitle(role, location.pathname, location.hash);
   const adminHash = (location.hash || '').replace('#', '') || (location.pathname === '/admin' ? 'dashboard' : '');
   const isStudentsTab = adminHash === 'students';
+  const isInboxPage = location.pathname.includes('/inbox');
+  const isImmersivePage =
+    isInboxPage || (role === 'teacher' && location.pathname === '/teacher/test');
   const showAdminBranch = role === 'admin';
   const roleLabel = role === 'admin'
     ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')
@@ -464,14 +467,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
         <div
           className={
-            role === 'teacher' && location.pathname === '/teacher/test'
+            isImmersivePage
               ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
               : 'flex-1 min-h-0 px-2 py-2 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
           }
         >
           <div
             className={
-              role === 'teacher' && location.pathname === '/teacher/test'
+              isImmersivePage
                 ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
                 : 'cms-page min-w-0'
             }
@@ -483,12 +486,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
       <ChangePasswordModal session={session} role={role} />
 
-      {/* FAB - Inbox (Admin/Teacher) */}
-      {role !== 'student' && (
+      {/* FAB tin nhắn nhanh: chỉ desktop, ẩn trên điện thoại và khi đang ở Hộp thư */}
+      {role !== 'student' && !isInboxPage && (
         <button
           type="button"
           onClick={() => navigate(`/${role}/inbox`)}
-          className="cms-fab bg-blue-600 hover:bg-blue-700 text-white p-3.5 sm:p-4 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2"
+          className="cms-fab hidden md:inline-flex bg-sky-600 hover:bg-sky-700 text-white p-3.5 sm:p-4 focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2"
           title="Nhắn tin"
           aria-label="Mở hộp thư"
         >

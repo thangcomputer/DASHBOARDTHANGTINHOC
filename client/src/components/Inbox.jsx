@@ -724,7 +724,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           </div>
 
           {/* Conversation list */}
-          <div className="flex-1 overflow-y-auto px-2 py-3 bg-white space-y-1">
+          <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar px-2 py-3 bg-white space-y-1 overscroll-contain">
             {filteredConvs.map(conv => {
               const isGroup = !!(groups || []).find(g => g._id === conv.user.id);
               return (
