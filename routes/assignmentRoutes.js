@@ -19,6 +19,26 @@ async function assignmentHasGradedSubmission(assignmentId) {
   return n > 0;
 }
 
+function normCourseLabel(s) {
+  return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** Lấy teacherId theo đúng khóa enrollment (fallback teacher root). */
+function resolveTeacherIdsForStudentCourse(student, courseName) {
+  const ids = [];
+  const want = normCourseLabel(courseName);
+  const enrollments = Array.isArray(student?.enrollments) ? student.enrollments : [];
+  enrollments.forEach((e) => {
+    if (want && normCourseLabel(e.courseName || e.course) !== want) return;
+    const tid = e.teacherId?._id || e.teacherId;
+    if (tid) ids.push(String(tid));
+  });
+  if (!ids.length && student?.teacherId) {
+    ids.push(String(student.teacherId._id || student.teacherId));
+  }
+  return [...new Set(ids.filter(Boolean))];
+}
+
 // Tự động tạo thư mục uploads/assignments nếu chưa có
 const uploadDir = path.join(__dirname, '..', 'uploads', 'assignments');
 if (!fs.existsSync(uploadDir)) {
@@ -216,12 +236,17 @@ router.post('/', authMiddleware, async (req, res) => {
       try {
         const NotificationService = require('../services/NotificationService');
 
+        let studentDoc = null;
         let studentIds;
         if (newAssignment.studentId) {
           studentIds = [newAssignment.studentId.toString()];
+          studentDoc = await Student.findById(newAssignment.studentId)
+            .select('name teacherId enrollments course')
+            .lean();
         } else {
-          const students = await Student.find({ course: req.body.courseId }, '_id');
-          studentIds = students.map(s => s._id.toString());
+          const students = await Student.find({ course: req.body.courseId }, '_id name teacherId enrollments').lean();
+          studentIds = students.map((s) => s._id.toString());
+          studentDoc = students[0] || null;
         }
 
         if (studentIds.length > 0) {
@@ -232,6 +257,43 @@ router.post('/', authMiddleware, async (req, res) => {
             receivers: studentIds,
             link: '/student#materials'
           });
+        }
+
+        // Admin/Staff giao bài → báo GV phụ trách khóa đó
+        if (role === 'admin' || role === 'staff') {
+          let teacherIds = [];
+          if (newAssignment.teacherId) teacherIds.push(String(newAssignment.teacherId));
+          if (studentDoc) {
+            teacherIds.push(...resolveTeacherIdsForStudentCourse(studentDoc, newAssignment.courseId));
+          }
+          teacherIds = [...new Set(teacherIds.filter(Boolean))];
+
+          // Gắn teacherId lên bài (để nộp bài báo đúng GV) nếu còn thiếu
+          if (!newAssignment.teacherId && teacherIds[0] && mongoose.Types.ObjectId.isValid(teacherIds[0])) {
+            newAssignment.teacherId = teacherIds[0];
+            await newAssignment.save();
+          }
+
+          const studentName = studentDoc?.name || 'học viên';
+          if (teacherIds.length > 0) {
+            const teacherMsg =
+              `Admin giao bài tập "${newAssignment.title}" cho học viên ${studentName}. Hãy chấm bài khi học viên nộp.`;
+            await NotificationService.send(io, {
+              type: 'COURSE',
+              title: '📝 Admin giao bài tập',
+              content: teacherMsg,
+              receivers: teacherIds,
+              payload: {
+                assignmentId: String(newAssignment._id),
+                studentId: newAssignment.studentId ? String(newAssignment.studentId) : '',
+                type: 'assignment',
+              },
+              link: '/teacher#students',
+            });
+            teacherIds.forEach((tid) => {
+              io.to(`teacher_${tid}`).emit('assignment:new', newAssignment);
+            });
+          }
         }
 
         io.emit('data:refresh', { type: 'assignment', action: 'create' });
@@ -336,8 +398,10 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
 
     let resolvedTeacherId = teacherId;
     if (!resolvedTeacherId || resolvedTeacherId === 'current') {
+      const fromEnrollment = resolveTeacherIdsForStudentCourse(student, assignmentForSubmit.courseId)[0];
       resolvedTeacherId =
         assignmentForSubmit.teacherId ||
+        fromEnrollment ||
         student?.teacherId ||
         null;
     }
@@ -353,11 +417,16 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
 
     if (resolvedTeacherId) {
       const assignment = assignmentForSubmit;
+      const isAdminAssign = ['admin', 'staff'].includes(String(assignment?.assignedByRole || '').toLowerCase());
+      const submitTitle = '📋 Bài tập mới được nộp';
+      const submitContent = isAdminAssign
+        ? `Học viên ${student?.name || 'Vô danh'} vừa nộp bài "${assignment?.title || ''}" (Admin giao). Hãy chấm bài.`
+        : `Học viên ${student?.name || 'Vô danh'} vừa nộp bài tập "${assignment?.title || ''}".`;
 
       await Notification.create({
         type: 'COURSE',
-        title: '📋 Bài tập mới được nộp',
-        content: `Học viên ${student?.name || 'Vô danh'} vừa nộp bài tập.`,
+        title: submitTitle,
+        content: submitContent,
         receivers: [resolvedTeacherId],
         payload: { studentId, assignmentId: req.params.id, type: 'assignment' },
         path: `/teacher#assignments?courseId=${assignment?.courseId || ''}&assignmentId=${req.params.id}&studentId=${studentId}`
@@ -369,8 +438,8 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
 
         await NotificationService.send(io, {
           type: 'COURSE',
-          title: '📋 Bài tập mới được nộp',
-          content: `Học viên ${student?.name || 'Vô danh'} vừa nộp bài tập.`,
+          title: submitTitle,
+          content: submitContent,
           receivers: resolvedTeacherId,
           payload: { studentId, assignmentId: req.params.id },
           link: `/teacher#assignments?courseId=${assignment?.courseId || ''}&assignmentId=${req.params.id}&studentId=${studentId}`

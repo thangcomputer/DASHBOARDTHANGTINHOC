@@ -1147,7 +1147,14 @@ export default function StudentDetailModal({ studentId, onClose }) {
                             return (
                               <tr key={a._id} className="hover:bg-slate-50/50 transition">
                                 <td className="px-6 py-4">
-                                  <p className="text-xs font-black text-slate-800 uppercase tracking-tight mb-0.5">{a.title}</p>
+                                  <p className="text-xs font-black text-slate-800 uppercase tracking-tight mb-0.5 flex items-center gap-2 flex-wrap">
+                                    <span>{a.title}</span>
+                                    {['admin', 'staff'].includes(String(a.assignedByRole || '').toLowerCase()) && (
+                                      <span className="shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200">
+                                        Admin
+                                      </span>
+                                    )}
+                                  </p>
                                   <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">{a.description || 'Không có mô tả'}</p>
                                   {(a.fileUrl || a.attachedFileUrl) && (
                                     <a href={(a.fileUrl || a.attachedFileUrl)} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-500 font-bold flex items-center gap-1 mt-1 hover:underline">
