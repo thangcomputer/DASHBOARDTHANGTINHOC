@@ -1203,7 +1203,7 @@
   }
 }
 
-/* Modal form g?n ? tránh scrollbar trên viewport ph? bi?n */
+/* Compact modal form - avoid scrollbar on common viewports */
 .cms-sheet--compact {
   --cms-modal-pad: 14px;
   --cms-field-gap: 10px;
