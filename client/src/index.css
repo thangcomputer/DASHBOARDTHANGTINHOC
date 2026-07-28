@@ -583,6 +583,15 @@
   outline: none;
   transition: border-color var(--cms-duration) ease, box-shadow var(--cms-duration) ease, background var(--cms-duration) ease;
 }
+/* Unlayered .cms-input padding beats Tailwind pl/pr utilities ? restore icon gutters */
+.cms-input.pl-9 { padding-left: 2.25rem; }
+.cms-input.pl-10 { padding-left: 2.75rem; }
+.cms-input.pl-11 { padding-left: 2.75rem; }
+.cms-input.pl-12 { padding-left: 3rem; }
+.cms-input.pl-4 { padding-left: 1rem; }
+.cms-input.pr-3 { padding-right: 0.75rem; }
+.cms-input.pr-10 { padding-right: 2.75rem; }
+.cms-input.pr-12 { padding-right: 3rem; }
 .cms-input::placeholder {
   color: #94a3b8;
 }
@@ -1327,6 +1336,9 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   outline: none;
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
+.cms-hr-input.pl-10 { padding-left: 2.75rem; }
+.cms-hr-input.pl-11 { padding-left: 2.75rem; }
+.cms-hr-input.pr-10 { padding-right: 2.75rem; }
 .cms-hr-input:focus {
   background: #fff;
   border-color: #8b5cf6;
