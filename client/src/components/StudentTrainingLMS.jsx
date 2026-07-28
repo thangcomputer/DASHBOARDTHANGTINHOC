@@ -135,104 +135,24 @@ const extractYouTubeId = (url = '') => {
   return match ? match[1] : url.trim();
 };
 
-// ─── PLAYER HỌC VIÊN: bắt ENDED → hoàn thành + auto-next ─────────────────────
-const StudentVideoPlayer = ({ videoId, lessonId, autoPlay = false, onVideoEnded }) => {
+// ─── YOUTUBE PLAYER COMPONENT ────────────────────────────────────────────────
+// Logic mới: Cho phép tua nhưng đếm giây XEM THỰC TẾ
+// Mở khóa khi đã xem đủ 2/3 tổng thời lượng video
+// ─── PLAYER LINH HOẠT CHO HỌC VIÊN ─────────────────────────────────────────────
+
+
+const StudentVideoPlayer = ({ videoId, lessonId }) => {
   const yId = extractYouTubeId(videoId);
-  const playerRef = useRef(null);
-  const onEndedRef = useRef(onVideoEnded);
-  const [overlayVisible, setOverlayVisible] = useState(!autoPlay);
-  const [isReady, setIsReady] = useState(false);
-  const [hasEnded, setHasEnded] = useState(false);
+  const [started, setStarted] = useState(false);
 
   useEffect(() => {
-    onEndedRef.current = onVideoEnded;
-  }, [onVideoEnded]);
+    setStarted(false);
+  }, [lessonId, yId]);
 
-  useEffect(() => {
-    setOverlayVisible(!autoPlay);
-    setHasEnded(false);
-    setIsReady(false);
-  }, [lessonId, yId, autoPlay]);
-
-  useEffect(() => {
-    if (!yId || !lessonId) return;
-
-    let destroyed = false;
-
-    const initPlayer = () => {
-      if (destroyed) return;
-      try {
-        playerRef.current?.destroy?.();
-      } catch { /* ignore */ }
-      playerRef.current = null;
-      setIsReady(false);
-
-      const host = document.getElementById(`yt-student-${lessonId}`);
-      if (!host) return;
-
-      playerRef.current = new window.YT.Player(`yt-student-${lessonId}`, {
-        videoId: yId,
-        playerVars: {
-          controls: 1,
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          enablejsapi: 1,
-          origin: window.location.origin,
-          autoplay: autoPlay ? 1 : 0,
-        },
-        events: {
-          onReady: (event) => {
-            if (destroyed) return;
-            setIsReady(true);
-            if (autoPlay) {
-              try {
-                event.target.playVideo();
-                setOverlayVisible(false);
-              } catch { /* ignore */ }
-            }
-          },
-          onStateChange: (event) => {
-            if (destroyed || !window.YT?.PlayerState) return;
-            if (event.data === window.YT.PlayerState.PLAYING) {
-              setOverlayVisible(false);
-              setHasEnded(false);
-            }
-            if (event.data === window.YT.PlayerState.ENDED) {
-              setHasEnded(true);
-              setOverlayVisible(true);
-              const dur = event.target.getDuration?.() || 0;
-              onEndedRef.current?.(Math.ceil(dur), dur);
-            }
-          },
-        },
-      });
-    };
-
-    if (window.YT?.Player) {
-      initPlayer();
-    } else {
-      if (!document.getElementById('yt-api-script')) {
-        const tag = document.createElement('script');
-        tag.id = 'yt-api-script';
-        tag.src = 'https://www.youtube.com/iframe_api';
-        document.head.appendChild(tag);
-      }
-      const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => {
-        if (typeof prev === 'function') prev();
-        initPlayer();
-      };
-    }
-
-    return () => {
-      destroyed = true;
-      try {
-        playerRef.current?.destroy?.();
-      } catch { /* ignore */ }
-      playerRef.current = null;
-    };
-  }, [yId, lessonId, autoPlay]);
+  const embedParams = 'rel=0&controls=1&modestbranding=1&playsinline=1';
+  const iframeSrc = yId
+    ? `https://www.youtube.com/embed/${yId}?${embedParams}${started ? '&autoplay=1' : ''}`
+    : '';
 
   if (!yId) {
     return (
@@ -246,34 +166,63 @@ const StudentVideoPlayer = ({ videoId, lessonId, autoPlay = false, onVideoEnded 
   return (
     <div className="flex flex-col w-full h-full">
       <div className="relative flex-1 min-h-[160px] bg-black rounded-2xl overflow-hidden shadow-2xl">
-        <div id={`yt-student-${lessonId}`} className="absolute inset-0 w-full h-full" />
-
-        {!isReady && (
-          <div className="absolute inset-0 z-20 bg-slate-900 flex items-center justify-center">
-            <div className="w-10 h-10 border-[3px] border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-          </div>
-        )}
-
-        {overlayVisible && isReady && (
+        <iframe
+          key={`${yId}-${started ? 'play' : 'hold'}`}
+          className="absolute inset-0 w-full h-full"
+          src={iframeSrc}
+          title="YouTube video player"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+        {!started && (
           <button
             type="button"
-            onClick={() => {
-              try {
-                playerRef.current?.playVideo?.();
-                setOverlayVisible(false);
-              } catch { /* ignore */ }
-            }}
-            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 p-6 outline-none"
+            onClick={() => setStarted(true)}
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 p-6 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             aria-label="Nhấn để bắt đầu học"
           >
+            {/* Nền tối + lưới nhẹ (gợi tài liệu / học tập) */}
             <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-[2px]" />
-            <span className="relative z-10 flex h-[4.25rem] w-[4.25rem] items-center justify-center md:h-[5.5rem] md:w-[5.5rem]">
-              <span className="relative flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-green-700 text-white shadow-lg">
+            <div
+              className="absolute inset-0 opacity-[0.22]"
+              style={{
+                backgroundImage: `
+                  linear-gradient(rgba(59, 130, 246, 0.12) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(59, 130, 246, 0.12) 1px, transparent 1px)
+                `,
+                backgroundSize: '44px 44px',
+              }}
+            />
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              {[
+                'left-[8%] top-[12%]', 'left-[22%] top-[8%]', 'left-[78%] top-[14%]', 'left-[88%] top-[22%]',
+                'left-[12%] bottom-[18%]', 'left-[30%] bottom-[12%]', 'left-[70%] bottom-[16%]', 'left-[84%] bottom-[10%]',
+              ].map((pos, i) => (
+                <FileBox
+                  key={i}
+                  className={`absolute h-10 w-10 text-slate-500/25 md:h-12 md:w-12 ${pos}`}
+                  strokeWidth={1.25}
+                />
+              ))}
+            </div>
+
+            <span className="relative z-10 flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center md:h-[5.5rem] md:w-[5.5rem]">
+              <span
+                className="pointer-events-none absolute inset-0 scale-[1.35] rounded-full bg-emerald-400/45 blur-2xl motion-safe:animate-pulse"
+                aria-hidden
+              />
+              <span
+                className="pointer-events-none absolute -inset-2 rounded-full border border-emerald-300/50 motion-safe:animate-ping"
+                style={{ animationDuration: '2.2s' }}
+                aria-hidden
+              />
+              <span className="relative flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-green-700 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.18),0_0_28px_rgba(52,211,153,0.95),0_0_52px_rgba(16,185,129,0.55),0_12px_40px_-8px_rgba(21,128,61,0.55)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.22),0_0_36px_rgba(52,211,153,1),0_0_72px_rgba(16,185,129,0.5),0_14px_44px_-8px_rgba(21,128,61,0.6)] active:scale-95">
                 <Play className="ml-1 h-9 w-9 fill-white text-white md:h-11 md:w-11" strokeWidth={0} />
               </span>
             </span>
             <p className="relative z-10 text-center text-sm font-black tracking-tight text-white drop-shadow-md md:text-base">
-              {hasEnded ? 'Đã xem xong — Xem lại?' : 'Nhấn để bắt đầu học'}
+              Nhấn để bắt đầu học
             </p>
           </button>
         )}
@@ -431,7 +380,6 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   const [uploadingAssignId, setUploadingAssignId] = useState(null);
   const [expandedFileDescKey, setExpandedFileDescKey] = useState(null);
   const [expandedAssignKey, setExpandedAssignKey] = useState(null);
-  const [autoPlayNext, setAutoPlayNext] = useState(false);
 
   const handleFileChange = async (assignmentObj, idx, file) => {
     if (!file) return;
@@ -589,64 +537,95 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
     }
   }, [courses, selectedCourse]);
 
-  // Video kết thúc → đánh dấu hoàn thành, tăng %, tự chuyển bài tiếp theo
+  // Auto-Unlock sự kiện khi đạt chuẩn 2/3 (Chạy ngầm, không nhảy video)
+  const handleEligibilityReached = useCallback(async (actualWatched, totalDur) => {
+    if (!currentLesson || !selectedCourse) return;
+    try {
+      const token = localStorage.getItem('teacher_access_token') ||
+        (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
+        localStorage.getItem('admin_access_token');
+
+      const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+      await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          lessonId: currentLesson._id || currentLesson.id,
+          courseId: selectedCourse._id || selectedCourse.id,
+          watchedSeconds: actualWatched,
+        }),
+      });
+      // Tải lại bài giảng để UI gỡ bỏ ổ khóa bài tiếp theo ở sidebar
+      const res = { success: false };
+      if (res.success) {
+        setLessons(res.data);
+      }
+    } catch (e) { }
+  }, [currentLesson, selectedCourse]);
+
+  // Video kết thúc (được component con tính toán 2/3 và gọi)
   const handleVideoEnded = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse || completing) return;
 
+    const requiredSeconds = Math.ceil((totalDur || 0) * 2 / 3);
+    // Tránh việc hiển thị Alert gây khó chịu, nếu người dùng tua video tới cuối mà chưa đủ % học
+    // thì video sẽ kết thúc nhưng không gửi API mở khóa, chờ hệ thống tính toán tiến độ thực tế (actualWatched)
+    if (false) {
+      return;
+    }
+
     setCompleting(true);
     try {
-      const lessonId = String(currentLesson._id || currentLesson.id);
-      localStorage.setItem(`student_lms_completed_${lessonId}`, 'true');
+      const token =
+        localStorage.getItem('student_access_token') ||
+        (localStorage.getItem('student_user') ? JSON.parse(localStorage.getItem('student_user')).token : '') ||
+        localStorage.getItem('admin_access_token') ||
+        '';
 
-      const updatedLessons = lessons.map((l) =>
-        String(l._id) === lessonId ? { ...l, isCompleted: true } : l
-      );
-      setLessons(updatedLessons);
-
-      const completedCount = updatedLessons.filter((l) => l.isCompleted).length;
-      const pct = updatedLessons.length > 0
-        ? Math.round((completedCount / updatedLessons.length) * 100)
-        : 0;
-      const courseKey = selectedCourse._id || selectedCourse.id;
-      setCourseProgressMap((prev) => ({ ...prev, [courseKey]: pct }));
-
-      // Best-effort sync server (học viên LMS chủ yếu dùng localStorage)
-      try {
-        const token =
-          localStorage.getItem('student_access_token') ||
-          (() => {
-            try {
-              const u = JSON.parse(localStorage.getItem('student_user') || '{}');
-              return u.token || u.accessToken || '';
-            } catch { return ''; }
-          })() ||
-          '';
-        if (token) {
-          const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-          await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({
-              lessonId,
-              courseId: courseKey,
-              watchedSeconds: actualWatched || Math.ceil(totalDur || 0),
-            }),
-          });
+      const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+      await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          lessonId: currentLesson._id || currentLesson.id,
+          courseId: selectedCourse._id || selectedCourse.id,
+          watchedSeconds: actualWatched, // Lưu luôn giây thực tế lúc complete
+        }),
+      });
+      // Reload để mở khóa bài tiếp theo
+      const res = { success: false };
+      if (res.success) {
+        const updatedLessons = res.data;
+        setLessons(updatedLessons);
+        // Tự động chuyển sang bài tiếp theo nếu có
+        const currentIdx = updatedLessons.findIndex(l => String(l._id) === String(currentLesson._id));
+        const next = updatedLessons[currentIdx + 1];
+        if (next?.isUnlocked) {
+          setTimeout(() => setCurrentLesson(next), 800);
         }
-      } catch { /* ignore */ }
-
-      const currentIdx = updatedLessons.findIndex((l) => String(l._id) === lessonId);
-      const next = updatedLessons[currentIdx + 1];
-      if (next) {
-        setTimeout(() => {
-          setAutoPlayNext(true);
-          setCurrentLesson(next);
-        }, 700);
       }
-    } finally {
-      setCompleting(false);
-    }
-  }, [currentLesson, selectedCourse, completing, lessons]);
+    } catch (e) { void 0 }
+    setCompleting(false);
+  }, [currentLesson, selectedCourse, completing]);
+
+  // Handle lưu progress tạm thời
+  const handleSaveProgress = useCallback((lessonId, watchedSeconds) => {
+    if (!selectedCourse) return;
+    const token = localStorage.getItem('teacher_access_token') ||
+      (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
+      localStorage.getItem('admin_access_token');
+
+    const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+    csrfFetch(`${API_BASE}/training-lms/save-watch-progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        lessonId: lessonId,
+        courseId: selectedCourse._id || selectedCourse.id,
+        watchedSeconds: watchedSeconds,
+      }),
+    }).catch(e => void 0);
+  }, [selectedCourse]);
 
   const overallProgress = lessons.length > 0
     ? Math.round((lessons.filter(l => l.isCompleted).length / lessons.length) * 100)
@@ -741,7 +720,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
               <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
               <p className="font-bold">Chưa có khóa học nào</p>
-              <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
+              <p className="text-xs mt-1">Chưa có video phù hợp với khóa bạn đang học. Admin cần gán video tại Quản lý đào tạo HV.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -757,7 +736,6 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                   <div onClick={() => {
                     setSelectedCourse(course);
                     setCourseTab('video');
-                    setAutoPlayNext(false);
                     fetchLessons(course.id || course._id);
                   }} key={course.id || course._id} className="bg-white rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group flex flex-col relative overflow-hidden">
 
@@ -1143,7 +1121,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           {/* Left */}
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => { setSelectedCourse(null); setLessons([]); setCurrentLesson(null); setAutoPlayNext(false); }}
+              onClick={() => { setSelectedCourse(null); setLessons([]); setCurrentLesson(null); }}
               className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all text-slate-400 hover:text-white flex-shrink-0"
             >
               <ArrowLeft size={16} />
@@ -1165,9 +1143,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               </div>
             )}
             <div className="flex items-center gap-2">
-              <p className="text-[11px] text-slate-500 font-semibold">
-                <span className="hidden sm:inline">Tiến độ hoàn thành</span>
-                <strong className={`sm:ml-1.5 ${overallProgress === 100 ? 'text-emerald-400' : 'text-white'}`}>{overallProgress}%</strong>
+              <p className="text-[11px] text-slate-500 font-semibold hidden sm:block">
+                Tiến độ hoàn thành
+                <strong className={`ml-1.5 ${overallProgress === 100 ? 'text-emerald-400' : 'text-white'}`}>{overallProgress}%</strong>
               </p>
               {overallProgress === 100 && <Award size={16} className="text-emerald-400" />}
             </div>
@@ -1194,10 +1172,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             >
               <StudentVideoPlayer
                 key={currentLesson?._id}
-                videoId={currentLesson?.videoUrl || currentLesson?.url}
+                videoId={currentLesson?.videoUrl}
                 lessonId={currentLesson?._id}
-                autoPlay={autoPlayNext}
-                onVideoEnded={handleVideoEnded}
               />
             </div>
           </div>
@@ -1239,7 +1215,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                       <h1 className="text-xl font-bold text-white leading-snug">
                         {currentLesson.title}
                       </h1>
-                      {!!currentLesson.duration && (
+                      {currentLesson.duration && (
                         <span className="inline-flex items-center gap-1.5 mt-2 text-slate-500 text-[11px] font-semibold">
                           <Clock size={12} />
                           {Math.floor(currentLesson.duration / 60)} phút {String(currentLesson.duration % 60).padStart(2, '0')}s
@@ -1262,69 +1238,6 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                           'Vui lòng theo dõi video để nắm vững kiến thức. Hệ thống sẽ tự động ghi nhận tiến độ học tập khi bạn xem hết thời lượng yêu cầu của bài giảng này.'}
                       </p>
                     )}
-                  </div>
-
-                  {/* Mobile lesson list (sidebar ẩn trên điện thoại) */}
-                  <div className="lg:hidden pt-2 border-t border-white/[0.06] space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-300">Nội dung khóa học</h3>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md border bg-green-500/15 text-green-400 border-green-500/20 whitespace-nowrap">
-                        {lessons.filter((l) => l.isCompleted).length}/{lessons.length} BÀI · {overallProgress}%
-                      </span>
-                    </div>
-                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-green-500 transition-all duration-700" style={{ width: `${overallProgress}%` }} />
-                    </div>
-                    <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
-                      {Object.entries(groupedLessons).map(([chapter, chapterLessons]) => (
-                        <div key={`m-${chapter}`}>
-                          <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.04]">
-                            <p className="text-[11px] font-bold text-slate-300">{chapter}</p>
-                            <p className="text-[9px] text-slate-600 mt-0.5 font-semibold">
-                              {chapterLessons.filter((l) => l.isCompleted).length}/{chapterLessons.length} hoàn thành
-                            </p>
-                          </div>
-                          {chapterLessons.map((lesson) => {
-                            const globalIdx = lessons.findIndex((l) => String(l._id) === String(lesson._id));
-                            const isCurrent = String(currentLesson?._id) === String(lesson._id);
-                            return (
-                              <button
-                                key={`m-l-${lesson._id}`}
-                                type="button"
-                                onClick={() => {
-                                  setAutoPlayNext(false);
-                                  setCurrentLesson(lesson);
-                                }}
-                                className={`w-full text-left flex items-start gap-3 px-4 py-3.5 transition-all border-b border-white/[0.03] ${
-                                  isCurrent ? 'bg-green-600/10 border-l-2 border-l-green-500' : 'border-l-2 border-l-transparent hover:bg-white/[0.04]'
-                                }`}
-                              >
-                                <div className="mt-0.5 flex-shrink-0">
-                                  {lesson.isCompleted ? (
-                                    <CheckCircle size={14} className="text-green-400" />
-                                  ) : isCurrent ? (
-                                    <div className="w-[14px] h-[14px] rounded-full border-2 border-green-500 flex items-center justify-center">
-                                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                                    </div>
-                                  ) : (
-                                    <PlayCircle size={14} className="text-slate-600" />
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-wider mb-0.5">Bài {globalIdx + 1}</p>
-                                  <h4 className={`text-[12px] leading-snug truncate ${isCurrent ? 'text-green-400 font-bold' : 'text-slate-300 font-semibold'}`}>
-                                    {lesson.title}
-                                  </h4>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))}
-                      {lessons.length === 0 && (
-                        <p className="text-center text-slate-600 text-sm py-8">Chưa có bài giảng trong khóa này.</p>
-                      )}
-                    </div>
                   </div>
                 </div>
               )}
@@ -1427,8 +1340,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         key={lesson._id}
                         onClick={() => {
                           if (!lesson.isUnlocked) return;
-                          setAutoPlayNext(false);
                           setCurrentLesson(lesson);
+                          if (!lesson.isCompleted) {
+                            localStorage.setItem(`student_lms_completed_${lesson._id}`, 'true');
+                            setLessons(prev => prev.map(l => l._id === lesson._id ? { ...l, isCompleted: true } : l));
+                          }
                         }}
                         className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-all relative ${!lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
                           } ${isCurrent

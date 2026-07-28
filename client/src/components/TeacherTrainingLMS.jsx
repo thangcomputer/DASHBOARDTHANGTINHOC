@@ -644,12 +644,11 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
     setLoading(true);
     lmsApiFetch('/teacher/overview')
       .then((res) => {
+        // overview đã lọc theo môn phía server — không lọc lại (DTO thiếu examSubjects)
         if (res?.success && res.data?.courses?.length) {
-          applyCourses(filterTrainingItemsBySubject(res.data.courses, teacherSubjectIds || [], examSubjectsCatalog));
-        } else if (visibleTraining?.videos) {
-          applyCourses(visibleTraining.videos);
+          applyCourses(res.data.courses);
         } else {
-          applyCourses([]);
+          applyCourses(visibleTraining?.videos || []);
         }
       })
       .catch(() => applyCourses(visibleTraining?.videos || []))
@@ -884,7 +883,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
                <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
                <p className="font-bold">Chưa có khóa học nào</p>
-               <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
+               <p className="text-xs mt-1">Chưa có video đào tạo phù hợp. Admin cần thêm khóa tại Quản lý đào tạo GV.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -142,8 +142,39 @@ export function filterStudentTrainingFiles(files, { enrollments, fallbackCourse,
 
 export function filterStudentTrainingVideos(videos, { enrollments, fallbackCourse, allowedSubjectIds, catalog } = {}) {
   const list = Array.isArray(videos) ? videos : [];
-  // Match by exam subjects (same idea as teacher LMS). Do NOT require LMS title
-  // to equal the pricing-catalog course name — admin video titles rarely match.
-  if (!enrollments?.length && !fallbackCourse && !allowedSubjectIds?.length) return [];
-  return list.filter((v) => itemMatchesSubjectIds(v, allowedSubjectIds, catalog));
+  if (!enrollments?.length && !fallbackCourse) {
+    return list.filter((v) => itemMatchesSubjectIds(v, allowedSubjectIds, catalog));
+  }
+  const accessKeys = getStudentCourseAccessKeys(enrollments, fallbackCourse);
+  return list.filter((v) => {
+    const id = v.id || v._id;
+    const catalogId = v.courseId || v.catalogCourseId;
+    let courseOk = false;
+    if (id && accessKeys.has(`id:${String(id)}`)) courseOk = true;
+    else if (catalogId && accessKeys.has(`id:${String(catalogId)}`)) courseOk = true;
+    else if (v.title && accessKeys.has(`name:${normCourseKey(v.title)}`)) courseOk = true;
+    else {
+      courseOk = (enrollments || []).some((e) => {
+        if (catalogId && e.courseId && String(e.courseId) === String(catalogId)) return true;
+        if (id && e.courseId && String(e.courseId) === String(id)) return true;
+        const en = e.courseName || e.name;
+        if (!v.title || !en) return false;
+        const a = normCourseKey(v.title);
+        const b = normCourseKey(en);
+        return a === b || a.includes(b) || b.includes(a);
+      }) || (fallbackCourse && v.title && (
+        (() => {
+          const a = normCourseKey(v.title);
+          const b = normCourseKey(fallbackCourse);
+          return a === b || a.includes(b) || b.includes(a);
+        })()
+      ));
+    }
+
+    const subjectOk = itemMatchesSubjectIds(v, allowedSubjectIds, catalog);
+    // Khớp tên khóa HOẶC khớp môn thi đều cho xem (tránh HV mất video admin đã giao)
+    if (courseOk) return subjectOk;
+    if (subjectOk && allowedSubjectIds?.length) return true;
+    return false;
+  });
 }

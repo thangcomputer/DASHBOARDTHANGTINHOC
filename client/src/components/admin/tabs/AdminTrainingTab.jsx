@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
@@ -13,6 +13,8 @@ import { resolveTeacherExamDate, isTeacherExamDateApproximate, resolvePracticalF
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
+import { apiFetch } from '../../../services/api';
+import { uniqueCoursesByName } from '../../../utils/uniqueCourses';
 
 export default function AdminTrainingTab() {
   const {
@@ -26,6 +28,36 @@ export default function AdminTrainingTab() {
   } = useAdminTab();
 
   const [gvReviewModal, setGvReviewModal] = useState(null);
+  const [catalogCourses, setCatalogCourses] = useState([]);
+
+  useEffect(() => {
+    apiFetch('/courses')
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data)) {
+          setCatalogCourses(uniqueCoursesByName(res.data));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const applyCatalogCourse = (courseId) => {
+    const c = catalogCourses.find((x) => String(x._id) === String(courseId));
+    if (!c) {
+      setTrainingForm((prev) => ({ ...prev, courseId: '', catalogCourseId: '' }));
+      return;
+    }
+    const examSubjects = Array.isArray(c.examSubjects) && c.examSubjects.length
+      ? c.examSubjects
+      : (trainingForm?.examSubjects || []);
+    setTrainingForm((prev) => ({
+      ...prev,
+      courseId: String(c._id),
+      catalogCourseId: String(c._id),
+      title: c.name || prev?.title || '',
+      examSubjects,
+      desc: prev?.desc || c.description || '',
+    }));
+  };
 
   return (
             <div className="space-y-6">
@@ -96,6 +128,26 @@ export default function AdminTrainingTab() {
                     <button type="button" onClick={() => setTrainingForm(null)} className="shrink-0 inline-flex items-center justify-center min-w-11 min-h-11 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"><X size={18} /></button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {trainingTab === 'videos' && (
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Chọn khóa học từ danh mục Admin</label>
+                        <CmsSelect
+                          value={trainingForm.courseId || trainingForm.catalogCourseId || ''}
+                          onChange={(e) => applyCatalogCourse(e.target.value)}
+                          className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none bg-white"
+                        >
+                          <option value="">— Nhập tay / chọn khóa đã tạo —</option>
+                          {catalogCourses.map((c) => (
+                            <option key={c._id} value={c._id}>{c.name}</option>
+                          ))}
+                        </CmsSelect>
+                        {!catalogCourses.length && (
+                          <p className="text-[11px] text-amber-600 mt-1 font-semibold">
+                            Chưa có khóa trong danh mục. Tạo tại Cài đặt → Học phí khóa học.
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {trainingTab !== 'files' && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tiêu đề</label>

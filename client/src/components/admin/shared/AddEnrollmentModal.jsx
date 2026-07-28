@@ -6,6 +6,7 @@ import {
 import { useToast } from '../../../utils/toast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
+import { uniqueCoursesByName } from '../../../utils/uniqueCourses';
 
 function courseEffectivePrice(c) {
   return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
@@ -66,44 +67,14 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
       .then((r) => r.json())
       .then((res) => {
         if (res.success && res.data?.length) {
-          const courses = res.data;
-          setDbCourses(courses);
-
-          // Không cho chọn trùng khóa học đã có của học viên
-          const existingCourseIds = new Set(
-            (student?.enrollments || []).map((e) => String(e.courseId || '')),
-          );
-          const existingCourseNames = new Set(
-            (student?.enrollments || []).map((e) => String(e.courseName || e.course || '').trim().toLowerCase()),
-          );
-
-          const filtered = courses.filter((c) => {
-            const cid = String(c?._id || '');
-            const nameKey = String(c?.name || '').trim().toLowerCase();
-            return !existingCourseIds.has(cid) && !existingCourseNames.has(nameKey);
-          });
-
-          const first = filtered[0] || courses[0];
+          const unique = uniqueCoursesByName(res.data);
+          setDbCourses(unique);
+          const first = unique[0];
           if (first) setForm((f) => ({ ...f, ...applyCourseToForm(first) }));
         }
       })
       .catch(() => {});
   }, [API]);
-
-  const availableCourses = useMemo(() => {
-    if (!Array.isArray(dbCourses) || dbCourses.length === 0) return [];
-    const existingCourseIds = new Set(
-      (student?.enrollments || []).map((e) => String(e.courseId || '')),
-    );
-    const existingCourseNames = new Set(
-      (student?.enrollments || []).map((e) => String(e.courseName || e.course || '').trim().toLowerCase()),
-    );
-    return dbCourses.filter((c) => {
-      const cid = String(c?._id || '');
-      const nameKey = String(c?.name || '').trim().toLowerCase();
-      return !existingCourseIds.has(cid) && !existingCourseNames.has(nameKey);
-    });
-  }, [dbCourses, student]);
 
   const handleCourseChange = (courseId) => {
     const c = dbCourses.find((x) => String(x._id) === String(courseId));
@@ -448,10 +419,8 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
                   className="cms-input"
                   required
                 >
-                  {availableCourses.length === 0 ? (
-                    <option value="">Không có khóa học khả dụng</option>
-                  ) : null}
-                  {availableCourses.map((c) => {
+                  {dbCourses.length === 0 && <option value="">Đang tải...</option>}
+                  {dbCourses.map((c) => {
                     const ep = courseEffectivePrice(c);
                     const sessions = courseDefaultSessions(c);
                     return (
@@ -461,11 +430,6 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
                     );
                   })}
                 </CmsSelect>
-                {availableCourses.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    Học viên đã có tất cả các khóa học hiện tại.
-                  </p>
-                )}
                 {Number(form.price) > 0 && (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-100 text-[12px] font-bold">

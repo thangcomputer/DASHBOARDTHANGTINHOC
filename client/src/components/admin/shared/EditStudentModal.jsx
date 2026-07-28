@@ -3,6 +3,7 @@ import CmsSelect from '../../ui/CmsSelect';
 import { X, Save, KeyRound, Edit3, Loader2 } from 'lucide-react';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
+import { uniqueCoursesByName } from '../../../utils/uniqueCourses';
 
 function courseEffectivePrice(c) {
   return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
@@ -71,9 +72,10 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
       .then((r) => r.json())
       .then((res) => {
         if (!res.success || !res.data?.length) return;
-        setDbCourses(res.data);
+        const unique = uniqueCoursesByName(res.data);
+        setDbCourses(unique);
         setForm((f) => {
-          const matched = findCourse(res.data, f.courseId || f.course);
+          const matched = findCourse(unique, f.courseId || f.course);
           if (!matched) return f;
           // Đồng bộ học phí + số buổi theo catalog khi mở form (tránh giữ 12 buổi cũ)
           return {

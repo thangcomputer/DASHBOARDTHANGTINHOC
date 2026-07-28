@@ -7,6 +7,7 @@ import {
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useSocket } from '../../../context/SocketContext';
+import { uniqueCoursesByName } from '../../../utils/uniqueCourses';
 
 export default function AddStudentModal({ onAdd, onClose, teachers }) {
   const toast    = useToast();
@@ -33,8 +34,10 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       .then(r => r.json())
       .then(res => {
         if (res.success && res.data.length) {
-          setDbCourses(res.data);
-          const first = res.data[0];
+          const unique = uniqueCoursesByName(res.data);
+          setDbCourses(unique);
+          const first = unique[0];
+          if (!first) return;
           const ep = Math.round(first.price * (1 - (first.discountPercent || 0) / 100));
           let defaultBranchId = '';
           if (selectedBranchId && selectedBranchId !== 'all') {
