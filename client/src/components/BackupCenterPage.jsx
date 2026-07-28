@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
   Archive, Download, Loader2, RefreshCw, Trash2, Database, Plus,
 } from 'lucide-react';
@@ -99,7 +99,7 @@ export default function BackupCenterPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <Archive className="text-violet-600" size={22} /> Sao lưu dữ liệu
+            <Archive className="text-red-600" size={22} /> Sao lưu dữ liệu
           </h1>
           <p className="text-xs text-gray-500 font-medium mt-1">
             Chỉ Super Admin · Giữ tối đa {stats?.keep ?? 7} bản · {stats?.diskLabel || '—'} trên disk
@@ -113,7 +113,7 @@ export default function BackupCenterPage() {
             type="button"
             onClick={onCreate}
             disabled={creating}
-            className="px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-40"
+            className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-40"
           >
             {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
             Tạo backup
@@ -135,7 +135,7 @@ export default function BackupCenterPage() {
         ))}
       </div>
 
-      <div className="bg-violet-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-800 font-medium">
+      <div className="bg-red-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-800 font-medium">
         Backup xuất toàn bộ collection MongoDB ra file <code className="font-mono">.json.gz</code>.
         Lịch tự động 03:00 hàng ngày (tắt bằng <code className="font-mono">BACKUP_SCHEDULE=0</code>).
         Restore thủ công từ file tải về — không ghi đè DB qua UI.
@@ -177,7 +177,7 @@ export default function BackupCenterPage() {
                       type="button"
                       disabled={busyId === row._id}
                       onClick={() => onDownload(row)}
-                      className="p-2 rounded-lg text-violet-600 hover:bg-violet-50"
+                      className="p-2 rounded-lg text-red-600 hover:bg-red-50"
                       title="Tải về"
                     >
                       <Download size={16} />

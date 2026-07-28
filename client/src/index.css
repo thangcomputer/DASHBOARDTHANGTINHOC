@@ -472,7 +472,7 @@
   --cms-r-sheet: 28px;
   --cms-primary: #dc2626;
   --cms-primary-fg: #ffffff;
-  --cms-secondary: #0f172a;
+  --cms-secondary: #0284c7;
   --cms-success: #059669;
   --cms-warning: #d97706;
   --cms-info: #0284c7;
@@ -494,7 +494,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --cms-primary: #f87171;
-    --cms-secondary: #e2e8f0;
+    --cms-secondary: #38bdf8;
     --cms-success: #34d399;
     --cms-warning: #fbbf24;
     --cms-info: #38bdf8;
@@ -550,6 +550,12 @@
 .cms-btn-primary:hover:not(:disabled) { filter: brightness(0.95); }
 .cms-btn-secondary {
   background: var(--cms-secondary);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--cms-secondary) 28%, transparent);
+}
+.cms-btn-secondary:hover:not(:disabled) { filter: brightness(0.95); }
+.cms-btn-warning {
+  background: var(--cms-warning);
   color: #fff;
 }
 .cms-btn-outline {
@@ -1103,9 +1109,9 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   border: 2px solid #cbd5e1;
 }
 .cms-rbac-step-active .cms-rbac-step-dot {
-  background: #0ea5e9;
-  border-color: #0284c7;
-  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.18);
+  background: #dc2626;
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18);
 }
 .cms-rbac-step-label { font-size: 11px; font-weight: 600; color: #94a3b8; }
 .cms-rbac-step-active .cms-rbac-step-label { color: #0f172a; }
@@ -1301,7 +1307,7 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   transition: color 180ms ease, border-color 180ms ease;
 }
 .cms-hr-tab:active { transform: scale(0.98); }
-.cms-hr-tab.is-active { color: #6d28d9; border-bottom-color: #7c3aed; }
+.cms-hr-tab.is-active { color: #dc2626; border-bottom-color: #dc2626; }
 .cms-hr-panel {
   background: #fff;
   border: 1px solid #f1f5f9;
@@ -1341,8 +1347,8 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
 .cms-hr-input.pr-10 { padding-right: 2.75rem; }
 .cms-hr-input:focus {
   background: #fff;
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.16);
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16);
 }
 .cms-hr-input::placeholder { color: #94a3b8; }
 .cms-hr-btn {
@@ -1361,19 +1367,21 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
 }
 .cms-hr-btn:active { transform: scale(0.98); }
 .cms-hr-btn-primary {
-  background: linear-gradient(90deg, #7c3aed, #a855f7);
+  background: #dc2626;
   color: #fff;
-  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.25);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.28);
 }
+.cms-hr-btn-primary:hover { filter: brightness(0.95); }
 .cms-hr-btn-outline { background: #fff; border-color: #e2e8f0; color: #475569; }
 .cms-hr-btn-outline:hover { background: #f8fafc; }
 .cms-hr-btn-muted { background: #f1f5f9; border-color: #e2e8f0; color: #475569; }
-.cms-hr-btn-amber { background: #fef3c7; border-color: #fde68a; color: #b45309; }
+.cms-hr-btn-amber { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
 .cms-hr-btn-pay {
-  background: linear-gradient(90deg, #059669, #14b8a6);
+  background: #0284c7;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.22);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.28);
 }
+.cms-hr-btn-pay:hover { filter: brightness(0.95); }
 .cms-hr-btn-danger { background: #dc2626; color: #fff; }
 .cms-hr-btn-danger-ghost { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 .cms-hr-emp-card {
@@ -1704,8 +1712,8 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 .cms-m-filter-chip.is-active {
-  background: #312e81;
-  border-color: #312e81;
+  background: #dc2626;
+  border-color: #dc2626;
   color: #fff;
 }
 .cms-m-kpi {
@@ -1796,7 +1804,7 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   transition: color 160ms ease, border-color 160ms ease;
 }
 .cms-m-tab.is-active {
-  color: #4f46e5;
-  border-bottom-color: #6366f1;
+  color: #dc2626;
+  border-bottom-color: #dc2626;
 }
 

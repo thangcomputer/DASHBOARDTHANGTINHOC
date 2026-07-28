@@ -1,4 +1,4 @@
-/**
+﻿/**
  * WebSettingsTab.jsx — Cài đặt Web (Logo, Favicon, Loading Screen)
  * Chỉ Super Admin truy cập. Nằm trong SystemSettingsTab.
  * Thông báo Nhân viên: dùng tab Popup thông báo (đối tượng = Nhân viên).
@@ -16,12 +16,12 @@ function LoadingPreview({ style }) {
   const previewStyles = {
     1: (
       <div className="flex items-center justify-center h-full">
-        <div className="w-10 h-10 rounded-full border-3 border-indigo-200 border-t-indigo-600 animate-spin" />
+        <div className="w-10 h-10 rounded-full border-3 border-sky-200 border-t-red-600 animate-spin" />
       </div>
     ),
     2: (
       <div className="flex items-center justify-center h-full">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse shadow-lg" />
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 animate-pulse shadow-lg" />
       </div>
     ),
     3: (
@@ -353,11 +353,11 @@ export default function WebSettingsTab() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Monitor size={16} className="text-purple-600" />
+            <Monitor size={16} className="text-red-600" />
             <h3 className="font-bold text-gray-800">Hiệu ứng Loading</h3>
           </div>
           <button onClick={handlePreview}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition">
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition">
             <Eye size={13} /> Xem trước 3s
           </button>
         </div>
@@ -371,12 +371,12 @@ export default function WebSettingsTab() {
               onClick={() => setConfig(prev => ({ ...prev, loadingStyle: ls.id }))}
               className={`relative rounded-2xl border-2 p-4 text-left transition-all ${
                 config.loadingStyle === ls.id
-                  ? 'border-purple-500 bg-purple-50 shadow-md shadow-purple-100'
+                  ? 'border-red-500 bg-red-50 shadow-md shadow-red-100'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
             >
               {config.loadingStyle === ls.id && (
-                <div className="absolute top-2 right-2 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+                <div className="absolute top-2 right-2 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center">
                   <Check size={12} className="text-white" />
                 </div>
               )}
@@ -392,7 +392,7 @@ export default function WebSettingsTab() {
 
       {/* ══════════════ NÚT LƯU ══════════════ */}
       <button onClick={handleSave} disabled={saving}
-        className="w-full max-w-2xl py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-xl hover:from-indigo-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-indigo-100">
+        className="cms-btn cms-btn-primary w-full max-w-2xl py-3.5 text-[15px] font-bold rounded-xl disabled:opacity-40 mx-auto">
         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
         {saving ? 'Đang lưu...' : 'Lưu toàn bộ cài đặt Web'}
       </button>

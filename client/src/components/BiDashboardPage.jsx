@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
   BarChart3, Download, Loader2, RefreshCw, TrendingDown, TrendingUp,
   Users, GraduationCap, Calendar, DollarSign, ClipboardCheck, Wallet,
@@ -29,7 +29,7 @@ function Delta({ value }) {
   );
 }
 
-function Kpi({ icon: Icon, label, value, sub, delta, color = 'text-indigo-600', bg = 'bg-indigo-50' }) {
+function Kpi({ icon: Icon, label, value, sub, delta, color = 'text-sky-700', bg = 'bg-sky-50' }) {
   return (
     <div className="cms-m-kpi min-h-[112px]">
       <div className="flex items-center justify-between mb-2">
@@ -109,7 +109,7 @@ export default function BiDashboardPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="cms-m-title flex items-center gap-2">
-            <BarChart3 className="text-indigo-600 flex-shrink-0" size={22} aria-hidden="true" /> BI Dashboard
+            <BarChart3 className="text-sky-700 flex-shrink-0" size={22} aria-hidden="true" /> BI Dashboard
           </h1>
           <p className="cms-m-caption mt-1">
             KPI điều hành · so sánh kỳ trước · cache 90s
@@ -163,7 +163,7 @@ export default function BiDashboardPage() {
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi icon={Users} label="Học viên mới" value={k.studentsNew ?? 0} delta={k.studentsNewChange} sub={`Tổng ${k.studentsTotal ?? 0}`} />
             <Kpi icon={DollarSign} label="Doanh thu kỳ" value={fmtMoney(k.revenuePeriod)} delta={k.revenueChange} color="text-emerald-600" bg="bg-emerald-50" sub={`Tỷ lệ TT ${k.paidRate ?? 0}%`} />
-            <Kpi icon={GraduationCap} label="Giảng viên" value={k.teachersActive ?? 0} sub={`Chờ duyệt ${k.teachersPending ?? 0}`} color="text-violet-600" bg="bg-violet-50" />
+            <Kpi icon={GraduationCap} label="Giảng viên" value={k.teachersActive ?? 0} sub={`Chờ duyệt ${k.teachersPending ?? 0}`} color="text-red-600" bg="bg-red-50" />
             <Kpi icon={Calendar} label="Buổi hoàn thành" value={k.schedulesCompleted ?? 0} sub={`Hủy ${k.schedulesCancelled ?? 0} · Sắp tới ${k.schedulesUpcoming ?? 0}`} color="text-amber-600" bg="bg-amber-50" />
           </div>
 

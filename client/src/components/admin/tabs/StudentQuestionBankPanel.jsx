@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import { useData } from '../../../context/DataContext';
@@ -312,7 +312,7 @@ export default function StudentQuestionBankPanel() {
             <label className="text-[11px] font-bold uppercase tracking-wide text-violet-700 block mb-1.5">
               Phút TL
             </label>
-            <div className="flex items-center gap-1.5 border-2 border-violet-200 bg-violet-50/80 rounded-xl px-2.5 py-2">
+            <div className="flex items-center gap-1.5 border-2 border-violet-200 bg-red-50/80 rounded-xl px-2.5 py-2">
               <Clock size={14} className="text-violet-700 shrink-0" />
               <input
                 type="number"
@@ -428,16 +428,16 @@ export default function StudentQuestionBankPanel() {
               <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold">{essayQuestions.length}</span>
             </div>
           </header>
-          <div className="px-3 py-2.5 border-b border-violet-50 flex flex-wrap items-center gap-2 bg-violet-50/40">
+          <div className="px-3 py-2.5 border-b border-violet-50 flex flex-wrap items-center gap-2 bg-red-50/40">
             <button
               type="button"
               onClick={() => openAddForm('essay')}
-              className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
             >
               <Plus size={14} /> Thêm câu / đề TH
             </button>
           </div>
-          <p className="px-3 py-1.5 text-[11px] text-violet-700 bg-violet-50/60 border-b border-violet-50">
+          <p className="px-3 py-1.5 text-[11px] text-violet-700 bg-red-50/60 border-b border-violet-50">
             Mỗi câu tự luận có file đề riêng — thêm câu mới sẽ không dùng lại file câu trước.
           </p>
           <div className="px-3 py-2 border-b border-slate-100">
@@ -662,7 +662,7 @@ export default function StudentQuestionBankPanel() {
               <button
                 type="button"
                 onClick={handleSaveQuestion}
-                className={`flex-1 py-2.5 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${sqForm.type === 'essay' ? 'bg-violet-600 hover:bg-violet-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                className={`flex-1 py-2.5 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${sqForm.type === 'essay' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
               >
                 <Save size={16} /> Lưu
               </button>

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminTab } from '../AdminTabContext';
 import { AlertTriangle, ShieldAlert, MessageSquare, CheckCircle2, MessageCircle } from 'lucide-react';
@@ -46,7 +46,7 @@ export default function AdminEvaluationsTab() {
                       <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">MỚI</span>
                     )}
                     <span className={`text-[12px] font-bold px-2.5 py-1 rounded-full ${
-                      ev.milestone === 'lesson_1' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                      ev.milestone === 'lesson_1' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {ev.milestone === 'lesson_1' ? 'BUỔI ĐẦU TIÊN' : ev.milestone === 'manual_feedback' ? 'PHẢN HỒI TỰ NGUYỆN' : 'MỐC 50% KHÓA'}
                     </span>
@@ -63,13 +63,13 @@ export default function AdminEvaluationsTab() {
                   <div className="flex flex-wrap gap-2">
                     <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-100 rounded-xl shadow-sm min-h-11">
                       <span className="text-[12px] font-semibold text-slate-400 uppercase">Hài lòng:</span>
-                      <span className={`text-[13px] font-bold ${ev.criteria?.satisfied === 'yes' ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`text-[13px] font-bold ${ev.criteria?.satisfied === 'yes' ? 'text-sky-700' : 'text-red-600'}`}>
                         {ev.criteria?.satisfied === 'yes' ? 'CÓ' : 'KHÔNG'}
                       </span>
                     </div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-100 rounded-xl shadow-sm min-h-11">
                       <span className="text-[12px] font-semibold text-slate-400 uppercase">Dễ hiểu:</span>
-                      <span className={`text-[13px] font-bold ${ev.criteria?.lessonClear === 'yes' ? 'text-green-600' : 'text-orange-600'}`}>
+                      <span className={`text-[13px] font-bold ${ev.criteria?.lessonClear === 'yes' ? 'text-sky-700' : 'text-orange-600'}`}>
                         {ev.criteria?.lessonClear === 'yes' ? 'HIỂU' : 'HƠI KHÓ'}
                       </span>
                     </div>
@@ -90,7 +90,7 @@ export default function AdminEvaluationsTab() {
                     <button
                       type="button"
                       onClick={() => markEvaluationRead(ev.id)}
-                      className="cms-m-btn flex-1 bg-green-600 text-white hover:bg-green-700 shadow-sm"
+                      className="cms-m-btn flex-1 bg-red-600 text-white hover:bg-red-700 shadow-sm"
                     >
                       <CheckCircle2 size={16} /> Đã xem
                     </button>

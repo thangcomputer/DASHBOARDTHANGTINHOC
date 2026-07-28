@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RevenueAnalyticsTab.jsx — Dashboard Báo cáo Doanh thu Đa tầng
  * Hiển thị: Tổng doanh thu, So sánh kỳ trước, Biểu đồ thời gian, Breakdown theo chi nhánh
  */
@@ -177,14 +177,14 @@ export default function RevenueAnalyticsTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
-            <BarChart3 size={22} className="text-indigo-600" />
+            <BarChart3 size={22} className="text-sky-700" />
             Báo cáo Doanh thu
           </h2>
           <p className="text-xs text-gray-400 mt-0.5">{isSuperAdmin ? 'Thống kê đa chi nhánh theo thời gian thực' : `Doanh thu chi nhánh ${staffBranchCode}`}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {!isSuperAdmin && (
-            <div className="flex items-center gap-1.5 border border-indigo-200 bg-indigo-50 rounded-xl px-3 py-2 text-sm font-bold text-indigo-700">
+            <div className="flex items-center gap-1.5 border border-sky-200 bg-sky-50 rounded-xl px-3 py-2 text-sm font-bold text-indigo-700">
               <Building2 size={14} /> {staffBranchCode || 'Chi nhánh của bạn'}
             </div>
           )}

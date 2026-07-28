@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
   Activity, AlertTriangle, CheckCircle2, Database, HardDrive,
   Loader2, RefreshCw, Server, Timer, RotateCcw,
@@ -162,8 +162,8 @@ export default function MonitoringPage({ session }) {
               label="Memory"
               value={`${health?.memory?.heapUsedMb ?? '—'} MB`}
               sub={`RSS ${health?.memory?.rssMb ?? '—'} MB`}
-              color="text-violet-600"
-              bg="bg-violet-50"
+              color="text-red-600"
+              bg="bg-red-50"
             />
             <StatCard
               icon={Timer}

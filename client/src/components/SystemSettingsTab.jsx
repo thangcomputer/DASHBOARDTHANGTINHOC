@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SystemSettingsTab.jsx
  * Trang Cài đặt hệ thống cho Admin — 3 tab:
  *  1. Tài khoản thu học phí (ngân hàng trung tâm)
@@ -358,7 +358,7 @@ export default function SystemSettingsTab() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-violet-200">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center shadow-lg shadow-red-200">
             <Settings size={20} className="text-white" />
           </div>
           <div className="min-w-0">
@@ -394,11 +394,11 @@ export default function SystemSettingsTab() {
                   onClick={() => setActiveSubTab(t.key)}
                   className={`flex items-center gap-2.5 w-full text-left px-3.5 py-2.5 text-sm font-bold rounded-xl transition ${
                     active
-                      ? 'text-violet-700 bg-violet-50 ring-1 ring-violet-200'
+                      ? 'text-red-700 bg-red-50 ring-1 ring-red-200'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <t.icon size={15} className={`flex-shrink-0 ${active ? 'text-violet-600' : 'text-gray-400'}`} />
+                  <t.icon size={15} className={`flex-shrink-0 ${active ? 'text-red-600' : 'text-gray-400'}`} />
                   <span className="leading-snug">{t.label}</span>
                 </button>
               );
@@ -471,7 +471,7 @@ export default function SystemSettingsTab() {
           <button
             onClick={() => handleSave(['centerBankCode','centerBankName','centerBankAccountNumber','centerBankAccountName'])}
             disabled={saving || !settings.centerBankCode || !settings.centerBankAccountNumber}
-            className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl hover:from-emerald-700 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-emerald-100"
+            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl hover:from-red-700 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-red-100"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? 'Đang lưu...' : 'Lưu cấu hình ngân hàng'}
@@ -498,7 +498,7 @@ export default function SystemSettingsTab() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 w-full max-w-full lg:max-w-2xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Bell size={16} className="text-violet-600" />
+              <Bell size={16} className="text-red-600" />
               <h3 className="font-bold text-gray-800">Popup thông báo / quảng cáo</h3>
             </div>
             {/* Toggle bật/tắt */}
@@ -540,7 +540,7 @@ export default function SystemSettingsTab() {
                   onClick={() => setSettings(prev => ({ ...prev, popupTargetRole: v }))}
                   className={`py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition border-2 ${
                     settings.popupTargetRole === v
-                      ? 'border-violet-500 bg-violet-50 text-violet-700'
+                      ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
@@ -560,7 +560,7 @@ export default function SystemSettingsTab() {
               type="text"
               value={settings.popupTitle}
               onChange={e => setSettings(prev => ({ ...prev, popupTitle: e.target.value }))}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-violet-400 outline-none transition"
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-red-400 outline-none transition"
               placeholder="VD: 🎉 Thông báo lịch học tháng 4"
             />
           </div>
@@ -572,7 +572,7 @@ export default function SystemSettingsTab() {
               value={settings.popupContent}
               onChange={e => setSettings(prev => ({ ...prev, popupContent: e.target.value }))}
               rows={4}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-violet-400 outline-none resize-none transition"
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-red-400 outline-none resize-none transition"
               placeholder="Nhập nội dung thông báo..."
             />
           </div>
@@ -591,7 +591,7 @@ export default function SystemSettingsTab() {
               <button
                 onClick={() => imgInputRef.current?.click()}
                 disabled={uploading}
-                className="w-full border-2 border-dashed border-violet-300 rounded-xl py-4 text-violet-600 hover:bg-violet-50 flex items-center justify-center gap-2 font-medium text-sm transition disabled:opacity-50"
+                className="w-full border-2 border-dashed border-red-300 rounded-xl py-4 text-red-600 hover:bg-red-50 flex items-center justify-center gap-2 font-medium text-sm transition disabled:opacity-50"
               >
                 {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
                 {uploading ? 'Đang upload...' : 'Chọn ảnh banner'}
@@ -620,7 +620,7 @@ export default function SystemSettingsTab() {
                 type="url"
                 value={settings.popupImageUrl}
                 onChange={e => setSettings(prev => ({ ...prev, popupImageUrl: e.target.value }))}
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-xs font-mono focus:border-violet-400 outline-none transition"
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-xs font-mono focus:border-red-400 outline-none transition"
                 placeholder="Hoặc nhập URL ảnh trực tiếp..."
               />
             </div>
@@ -629,7 +629,7 @@ export default function SystemSettingsTab() {
           <button
             onClick={() => handleSave(['popupIsActive','popupTitle','popupContent','popupImageUrl','popupTargetRole'])}
             disabled={saving}
-            className="w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold rounded-xl hover:from-violet-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-violet-100"
+            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl hover:from-red-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-red-100"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? 'Đang lưu...' : 'Lưu cấu hình Popup'}
@@ -717,7 +717,7 @@ export default function SystemSettingsTab() {
           <button
             onClick={() => handleSave(['invoiceLogoUrl', 'invoiceSignatureUrl', 'invoiceStampText'])}
             disabled={saving}
-            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-blue-100"
+            className="w-full py-3 bg-gradient-to-r from-sky-600 to-sky-700 text-white font-bold rounded-xl hover:from-sky-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-sky-100"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? 'Đang lưu...' : 'Lưu cấu hình Hóa đơn'}
@@ -733,7 +733,7 @@ export default function SystemSettingsTab() {
       {activeSubTab === 'account' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-6 w-full max-w-full lg:max-w-2xl">
           <div className="flex items-center gap-2 mb-1">
-            <Lock size={16} className="text-violet-600" />
+            <Lock size={16} className="text-red-600" />
             <h3 className="font-bold text-gray-800">Thay đổi thông tin Admin</h3>
           </div>
           <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-xl p-3">
@@ -749,8 +749,8 @@ export default function SystemSettingsTab() {
           {/* Tên hiển thị */}
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Tên hiển thị mới (tùy chọn)</label>
-            <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-violet-400 transition">
-              <User size={15} className="text-violet-500 flex-shrink-0" />
+            <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-red-400 transition">
+              <User size={15} className="text-red-500 flex-shrink-0" />
               <input
                 type="text"
                 value={adminName}
@@ -768,7 +768,7 @@ export default function SystemSettingsTab() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">Mật khẩu hiện tại</label>
-                <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-violet-400 transition">
+                <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-red-400 transition">
                   <Lock size={15} className="text-gray-400 flex-shrink-0" />
                   <input
                     type={showAdminOldPw ? 'text' : 'password'}
@@ -786,8 +786,8 @@ export default function SystemSettingsTab() {
               {/* Mật khẩu mới */}
               <div>
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">Mật khẩu mới (ít nhất 6 ký tự)</label>
-                <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-violet-400 transition">
-                  <KeyRound size={15} className="text-violet-500 flex-shrink-0" />
+                <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-red-400 transition">
+                  <KeyRound size={15} className="text-red-500 flex-shrink-0" />
                   <input
                     type={showAdminNewPw ? 'text' : 'password'}
                     value={adminNewPw}
@@ -805,7 +805,7 @@ export default function SystemSettingsTab() {
               <div>
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">Xác nhận mật khẩu mới</label>
                 <div className={`flex items-center gap-2 bg-white border-2 rounded-xl px-4 py-3 transition ${
-                  adminNewPw2 && adminNewPw !== adminNewPw2 ? 'border-red-300' : 'border-gray-200 focus-within:border-violet-400'
+                  adminNewPw2 && adminNewPw !== adminNewPw2 ? 'border-red-300' : 'border-gray-200 focus-within:border-red-400'
                 }`}>
                   <KeyRound size={15} className="text-gray-400 flex-shrink-0" />
                   <input
@@ -829,7 +829,7 @@ export default function SystemSettingsTab() {
           <button
             onClick={handleAdminProfileSave}
             disabled={adminSaving || (adminNewPw && adminNewPw !== adminNewPw2)}
-            className="w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold rounded-xl hover:from-violet-700 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-violet-100"
+            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl hover:from-red-700 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-red-100"
           >
             {adminSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {adminSaving ? 'Đang lưu...' : 'Lưu thay đổi'}

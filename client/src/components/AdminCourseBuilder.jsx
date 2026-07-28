@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Plus, Edit3, Trash2, Video, ChevronDown, ChevronUp, Save, Layers, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '../utils/toast.jsx';
@@ -161,7 +161,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                   {editingChapterId === chapter.id ? (
                      <div className="flex items-center gap-2 w-full max-w-sm">
                         <input autoFocus value={tempTitle} onChange={e => setTempTitle(e.target.value)} className="flex-1 border px-2 py-1 rounded text-sm outline-none focus:border-purple-400" />
-                        <button onClick={() => updateChapterTitle(chapter.id, tempTitle)} className="text-xs bg-purple-600 text-white px-3 py-1 rounded font-bold">Lưu</button>
+                        <button onClick={() => updateChapterTitle(chapter.id, tempTitle)} className="text-xs bg-red-600 text-white px-3 py-1 rounded font-bold">Lưu</button>
                         <button onClick={() => setEditingChapterId(null)} className="text-xs text-gray-500 hover:bg-gray-200 px-3 py-1 rounded font-bold">Hủy</button>
                      </div>
                   ) : (
@@ -193,7 +193,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                     </div>
                   ) : (
                     chapter.lessons.map((lesson, lIdx) => (
-                      <div key={lesson.id} className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm group hover:border-purple-300 transition">
+                      <div key={lesson.id} className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm group hover:border-red-300 transition">
                         
                         {editingLessonId === lesson.id ? (
                           <div className="space-y-3">
@@ -213,7 +213,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                             </div>
                             <div className="flex justify-end gap-2 mt-2">
                                <button onClick={() => setEditingLessonId(null)} className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-bold transition">Hủy</button>
-                               <button onClick={() => updateLesson(chapter.id, lesson.id, { title: tempTitle, videoUrl: tempUrl, url: tempUrl, duration: parseInt(tempDuration) || 0 })} className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-bold transition">Lưu bài học</button>
+                               <button onClick={() => updateLesson(chapter.id, lesson.id, { title: tempTitle, videoUrl: tempUrl, url: tempUrl, duration: parseInt(tempDuration) || 0 })} className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition">Lưu bài học</button>
                             </div>
                           </div>
                         ) : (
@@ -223,7 +223,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                 <button onClick={() => moveLesson(chapter.id, lIdx, 'up')} disabled={lIdx === 0} className="hover:text-blue-600 disabled:opacity-20"><ArrowUp size={12}/></button>
                                 <button onClick={() => moveLesson(chapter.id, lIdx, 'down')} disabled={lIdx === chapter.lessons.length - 1} className="hover:text-blue-600 disabled:opacity-20"><ArrowDown size={12}/></button>
                               </div>
-                              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center"><Video size={14} /></div>
+                              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center"><Video size={14} /></div>
                               <div>
                                 <p className="text-sm font-bold text-gray-700">Bài {lIdx + 1}: {lesson.title}</p>
                                 <p className="text-[10px] text-gray-400 mt-0.5">{lesson.videoUrl || lesson.url || 'Chưa thiết lập URL'} • {lesson.duration || 0}s</p>
@@ -240,7 +240,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                   )}
                   {/* Add Lesson Button */}
                   <div className="mt-4 pt-2 border-t border-gray-100">
-                    <button onClick={() => addLesson(chapter.id)} className="text-sm font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1.5 px-2 py-1 transition">
+                    <button onClick={() => addLesson(chapter.id)} className="text-sm font-bold text-red-600 hover:text-red-700 flex items-center gap-1.5 px-2 py-1 transition">
                        <Plus size={16} /> Thêm bài giảng mới
                     </button>
                   </div>
@@ -249,7 +249,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
             </div>
           ))}
 
-          <button onClick={addChapter} className="w-full py-4 border-2 border-dashed border-purple-200 text-purple-600 font-bold rounded-2xl hover:bg-purple-50 hover:border-purple-300 transition flex items-center justify-center gap-2">
+          <button onClick={addChapter} className="w-full py-4 border-2 border-dashed border-red-200 text-red-600 font-bold rounded-2xl hover:bg-red-50 hover:border-red-300 transition flex items-center justify-center gap-2">
             <Plus size={18} /> Thêm Phần/Chương mới
           </button>
 

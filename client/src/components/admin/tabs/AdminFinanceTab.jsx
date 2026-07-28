@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useAdminTab } from '../AdminTabContext';
 import {
   DollarSign, Download, TrendingUp, RefreshCw, CreditCard, Users,
@@ -18,7 +18,7 @@ export default function AdminFinanceTab() {
                 <div className="cms-m-card">
                   <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
                     <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
-                      <DollarSign size={18} className="text-green-600 flex-shrink-0" /> Doanh Thu Học Phí
+                      <DollarSign size={18} className="text-sky-700 flex-shrink-0" /> Doanh Thu Học Phí
                     </h3>
                     <div className="flex items-stretch sm:items-center gap-2 w-full sm:w-auto min-w-0">
                       <button
@@ -97,7 +97,7 @@ export default function AdminFinanceTab() {
                     {financeStudents.map(s => (
                       <div key={s.id} className="cms-m-list-row hover:bg-slate-50">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${s.paid ? 'bg-green-500' : 'bg-red-400'}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${s.paid ? 'bg-sky-500' : 'bg-red-400'}`}>
                             {s.name[0]}
                           </div>
                           <div className="min-w-0">
@@ -108,7 +108,7 @@ export default function AdminFinanceTab() {
                         <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                           <div className="text-left sm:text-right min-w-0">
                             <p className="text-[15px] font-extrabold text-slate-900 break-words">{(s.price || 0).toLocaleString('vi-VN')}đ</p>
-                            <span className={`text-[13px] font-bold ${s.paid ? 'text-green-600' : 'text-red-500'}`}>
+                            <span className={`text-[13px] font-bold ${s.paid ? 'text-sky-700' : 'text-red-500'}`}>
                               {s.paid ? 'Đã nộp' : 'Chưa nộp'}
                             </span>
                           </div>
@@ -116,7 +116,7 @@ export default function AdminFinanceTab() {
                             <button
                               type="button"
                               onClick={() => markStudentPaid(s.id)}
-                              className="cms-m-btn bg-green-50 text-green-700 border border-green-100 hover:bg-green-100 w-full sm:w-auto"
+                              className="cms-m-btn bg-sky-50 text-sky-700 border border-sky-100 hover:bg-sky-100 w-full sm:w-auto"
                             >
                               Xác nhận thu
                             </button>

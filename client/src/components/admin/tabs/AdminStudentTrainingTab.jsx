@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
@@ -87,7 +87,7 @@ export default function AdminStudentTrainingTab() {
               <>
               <div className="flex items-center justify-between">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
-                  <BookOpen size={20} className="text-green-600 shrink-0" /> Quản lý Đào tạo Học viên
+                  <BookOpen size={20} className="text-sky-700 shrink-0" /> Quản lý Đào tạo Học viên
                 </h2>
               </div>
 
@@ -104,7 +104,7 @@ export default function AdminStudentTrainingTab() {
                   <button key={t.key} onClick={() => { setSTrainingTab(t.key); setSTrainingForm(null); setSCourseBuilderMode(null); }}
                     className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
                       sTrainingTab === t.key
-                        ? t.key === 'exam-results' ? 'bg-amber-600 text-white shadow-md' : 'bg-green-600 text-white shadow-md'
+                        ? t.key === 'exam-results' ? 'bg-amber-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md'
                         : 'text-gray-500 hover:bg-gray-100'
                     }`}>
                     <t.icon size={15} /> {t.label} <span className="text-xs opacity-70">({t.count})</span>
@@ -116,7 +116,7 @@ export default function AdminStudentTrainingTab() {
               {/* Add button */}
               {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && (
                 <button onClick={() => { setSCourseBuilderMode(null); setSTrainingForm({ examSubjects: [] }); }}
-                  className="w-auto mx-auto min-h-11 justify-center bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                  className="w-auto mx-auto min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
                   <Plus size={15} /> {sTrainingTab === 'videos' ? 'Thêm Khóa học' : 'Thêm tài liệu'}
                 </button>
               )}
@@ -126,9 +126,9 @@ export default function AdminStudentTrainingTab() {
 
               {/* Add/Edit Form */}
               {sTrainingForm && (
-                <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-4 sm:p-6 space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-sky-200 p-4 sm:p-6 space-y-4">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-lg font-bold text-green-700 flex items-center gap-2 min-w-0">
+                    <h3 className="text-lg font-bold text-sky-700 flex items-center gap-2 min-w-0">
                       <Edit3 size={16} /> {sTrainingForm.id ? 'Chỉnh sửa' : 'Thêm mới'}
                     </h3>
                     <button type="button" onClick={() => setSTrainingForm(null)} className="shrink-0 inline-flex items-center justify-center min-w-11 min-h-11 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"><X size={18} /></button>
@@ -185,7 +185,7 @@ export default function AdminStudentTrainingTab() {
                         <div>
                           <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tải tệp</label>
                           <div className="flex flex-wrap items-center gap-2 min-h-[46px]">
-                            <label className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-green-300 bg-green-50/50 text-green-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-green-100 transition-colors shrink-0 ${sTrainingFileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                            <label className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/50 text-sky-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-sky-100 transition-colors shrink-0 ${sTrainingFileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
                               {sTrainingFileUploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
                               {sTrainingFileUploading ? 'Đang tải...' : 'TẢI FILE'}
                               <input type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar" onChange={(e) => handleTrainingDocUpload(e, 'student')} />
@@ -195,10 +195,10 @@ export default function AdminStudentTrainingTab() {
                                 href={sTrainingForm.fileUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-2 max-w-[min(100%,14rem)] px-3 py-2 rounded-xl bg-green-100/80 border border-green-200 text-green-900 text-xs font-bold hover:bg-green-200/80 transition-colors truncate"
+                                className="inline-flex items-center gap-2 max-w-[min(100%,14rem)] px-3 py-2 rounded-xl bg-sky-100/80 border border-sky-200 text-sky-900 text-xs font-bold hover:bg-sky-200/80 transition-colors truncate"
                                 title={trainingUploadDisplayName(sTrainingForm.fileUrl, sTrainingForm.fileOriginalName)}
                               >
-                                <FileText size={16} className="shrink-0 text-green-600" />
+                                <FileText size={16} className="shrink-0 text-sky-700" />
                                 <span className="truncate">{trainingUploadDisplayName(sTrainingForm.fileUrl, sTrainingForm.fileOriginalName)}</span>
                               </a>
                             )}
@@ -243,7 +243,7 @@ export default function AdminStudentTrainingTab() {
                       addStudentTrainingItem(sTrainingTab, { ...sTrainingPayload, createdAt: new Date().toISOString().split('T')[0] });
                     }
                     setSTrainingForm(null);
-                  }} className="w-full sm:w-auto min-h-11 justify-center bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-2xl font-bold text-[15px] shadow-md transition flex items-center gap-2">
+                  }} className="w-full sm:w-auto min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-bold text-[15px] shadow-md transition flex items-center gap-2">
                     <Save size={15} /> {sTrainingForm.id ? 'Cập nhật' : 'Thêm mới'}
                   </button>
                 </div>
@@ -373,7 +373,7 @@ export default function AdminStudentTrainingTab() {
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   <div className="flex flex-col items-center">
-                                    <span className={`text-lg font-black ${pct >= 50 ? 'text-green-600' : 'text-red-500'}`}>{r.score}/{r.total}</span>
+                                    <span className={`text-lg font-black ${pct >= 50 ? 'text-sky-700' : 'text-red-500'}`}>{r.score}/{r.total}</span>
                                     <span className="text-xs cms-min-text-xs text-gray-400 font-bold">{pct}%</span>
                                   </div>
                                 </td>
@@ -388,7 +388,7 @@ export default function AdminStudentTrainingTab() {
                                       </a>
                                     ) : (
                                       <div className="flex flex-col items-center gap-1 max-w-[200px] mx-auto">
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-green-50 text-green-700 border border-green-200">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-sky-50 text-sky-700 border border-sky-200">
                                           ✅ Đã nộp
                                         </span>
                                         <span className="text-xs cms-min-text-xs text-amber-700 font-semibold leading-tight text-center">
@@ -411,7 +411,7 @@ export default function AdminStudentTrainingTab() {
                                       // Đã chấm: hiện điểm + nút chấm lại
                                       return (
                                         <div className="flex flex-col items-center gap-1">
-                                          <span className={`text-lg font-black ${r.essayScore >= 5 ? 'text-green-600' : 'text-red-500'}`}>
+                                          <span className={`text-lg font-black ${r.essayScore >= 5 ? 'text-sky-700' : 'text-red-500'}`}>
                                             {r.essayScore}/10
                                           </span>
                                           <button onClick={() => { setGradingRow(rowKey); setGradingValue(String(r.essayScore)); }}
@@ -445,7 +445,7 @@ export default function AdminStudentTrainingTab() {
                                               saveEssayScore(r.studentId, r.subjectId, Math.min(10, Math.max(0, Number(gradingValue))));
                                               setGradingRow(null); setGradingValue('');
                                             }
-                                          }} className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 bg-green-500 text-white rounded-2xl hover:bg-green-600 transition" title="Lưu điểm">
+                                          }} className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 bg-sky-600 text-white rounded-2xl hover:bg-sky-700 transition" title="Lưu điểm">
                                             <CheckCircle2 size={16} />
                                           </button>
                                           <button type="button" onClick={() => { setGradingRow(null); setGradingValue(''); }}
@@ -595,13 +595,13 @@ export default function AdminStudentTrainingTab() {
                       <div key={item.id} className="px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition border-b border-gray-50 last:border-b-0">
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                           {sTrainingTab === 'videos' && (
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition" onClick={() => setSCourseBuilderMode(item)}>
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition" onClick={() => setSCourseBuilderMode(item)}>
                               <BookOpen size={20} className="text-white" />
                             </div>
                           )}
 
                           {sTrainingTab === 'files' && (
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-sm ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-green-500'
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-sm ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'
                               }`}>
                               {item.fileType || 'FILE'}
                             </div>
@@ -609,7 +609,7 @@ export default function AdminStudentTrainingTab() {
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-[15px] sm:text-base text-gray-800 line-clamp-2">{item.title}</p>
                             {sTrainingTab === 'files' && item.courseName && (
-                              <p className="text-xs sm:text-[13px] text-green-600 font-bold mt-0.5">Khóa: {item.courseName}</p>
+                              <p className="text-xs sm:text-[13px] text-sky-700 font-bold mt-0.5">Khóa: {item.courseName}</p>
                             )}
                             <p className="text-xs sm:text-[13px] text-gray-400 line-clamp-2">{(item.desc?.replace(/<[^>]*>/g, '') || '').slice(0, 80)}</p>
                             {item.duration && <p className="text-xs text-green-500 mt-0.5">⏱ {item.duration}</p>}
@@ -618,7 +618,7 @@ export default function AdminStudentTrainingTab() {
                         </div>
                         <div className="flex flex-wrap gap-2 sm:ml-3 shrink-0 items-center self-end sm:self-auto">
                           {sTrainingTab === 'videos' && (
-                             <button type="button" onClick={() => setSCourseBuilderMode(item)} className="min-h-11 px-3 py-2 rounded-2xl bg-green-50 border border-green-100 hover:bg-green-100 text-green-600 text-xs font-bold transition whitespace-nowrap inline-flex items-center gap-1.5">
+                             <button type="button" onClick={() => setSCourseBuilderMode(item)} className="min-h-11 px-3 py-2 rounded-2xl bg-sky-50 border border-sky-100 hover:bg-sky-100 text-sky-700 text-xs font-bold transition whitespace-nowrap inline-flex items-center gap-1.5">
                                <Layers size={13} /> Giáo trình
                              </button>
                           )}
@@ -723,15 +723,15 @@ export default function AdminStudentTrainingTab() {
                   </div>
 
                   {/* Tự luận */}
-                  <div className="bg-purple-50 rounded-2xl p-4 space-y-3 border border-purple-100">
-                    <p className="text-xs font-black text-green-700 uppercase tracking-widest">✍️ Phần Tự luận (Admin tự chấm)</p>
+                  <div className="bg-red-50 rounded-2xl p-4 space-y-3 border border-red-100">
+                    <p className="text-xs font-black text-sky-700 uppercase tracking-widest">✍️ Phần Tự luận (Admin tự chấm)</p>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Điểm tự luận (0–10)</label>
                         <input type="number" min="0" max="10" step="0.5"
                           value={erForm.essayScore !== undefined ? erForm.essayScore : ''}
                           onChange={e => setErForm({ ...erForm, essayScore: e.target.value })}
-                          className="w-full border-2 border-purple-200 rounded-xl p-3 focus:border-green-500 outline-none text-sm font-bold text-purple-800"
+                          className="w-full border-2 border-red-200 rounded-xl p-3 focus:border-green-500 outline-none text-sm font-bold text-red-800"
                           placeholder="7.5" />
                       </div>
                       <div>
@@ -745,7 +745,7 @@ export default function AdminStudentTrainingTab() {
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nhận xét tự luận</label>
                       <textarea value={erForm.essayNote || ''} onChange={e => setErForm({ ...erForm, essayNote: e.target.value })}
-                        rows={2} className="w-full border-2 border-purple-100 rounded-xl p-3 focus:border-green-500 outline-none text-sm resize-none"
+                        rows={2} className="w-full border-2 border-red-100 rounded-xl p-3 focus:border-green-500 outline-none text-sm resize-none"
                         placeholder="Nhận xét bài tự luận, ghi chú..." />
                     </div>
                   </div>
@@ -757,13 +757,13 @@ export default function AdminStudentTrainingTab() {
                       <button onClick={() => setErForm({ ...erForm, passed: true })}
                         className={`flex-1 px-8 py-3 rounded-2xl text-[13px] font-black transition-all duration-300 border-2 ${
                           erForm.passed 
-                            ? 'bg-gradient-to-br from-emerald-500 to-emerald-400 border-transparent text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] scale-[1.02]' 
+                            ? 'bg-emerald-600 border-transparent text-white shadow-md scale-[1.02]' 
                             : 'bg-white border-gray-200 text-gray-400 hover:border-emerald-200 hover:text-emerald-500 hover:bg-emerald-50/50 hover:scale-[1.02]'
                         }`}>ĐẠT</button>
                       <button onClick={() => setErForm({ ...erForm, passed: false })}
                         className={`flex-1 px-8 py-3 rounded-2xl text-[13px] font-black transition-all duration-300 border-2 ${
                           !erForm.passed 
-                            ? 'bg-gradient-to-br from-red-500 to-pink-500 border-transparent text-white shadow-[0_8px_20px_rgba(239,68,68,0.3)] scale-[1.02]' 
+                            ? 'bg-red-600 border-transparent text-white shadow-md scale-[1.02]' 
                             : 'bg-white border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 hover:bg-red-50/50 hover:scale-[1.02]'
                         }`}>CHƯA ĐẠT</button>
                     </div>

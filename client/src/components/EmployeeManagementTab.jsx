@@ -1,4 +1,4 @@
-/**
+﻿/**
  * EmployeeManagementTab.jsx — Module Quản lý Nhân sự & Trả lương
  * Tab 1: Danh sách nhân sự (CRUD)
  * Tab 2: Trả lương (thanh toán + VietQR + lịch sử)
@@ -290,7 +290,7 @@ export default function EmployeeManagementTab() {
       <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
         <div className="min-w-0">
           <h2 className="cms-hr-title flex items-center gap-2">
-            <span className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center flex-shrink-0">
+            <span className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
               <Briefcase size={20} aria-hidden="true" />
             </span>
             <span className="truncate">Quản lý Nhân sự & Lương</span>
@@ -325,7 +325,7 @@ export default function EmployeeManagementTab() {
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="cms-hr-stat">
-            <div className="cms-hr-stat-icon bg-violet-100 text-violet-600"><Users size={16} /></div>
+            <div className="cms-hr-stat-icon bg-red-100 text-red-600"><Users size={16} /></div>
             <p className="cms-hr-stat-value">{stats.total}</p>
             <p className="cms-hr-stat-label">Nhân viên đang làm</p>
           </div>
@@ -428,7 +428,7 @@ export default function EmployeeManagementTab() {
               return (
                 <article key={emp._id} className="cms-hr-emp-card">
                   <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-base font-bold flex-shrink-0">
+                    <div className="w-11 h-11 rounded-full bg-red-100 text-red-700 flex items-center justify-center text-base font-bold flex-shrink-0">
                       {emp.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
                     <div className="flex-1 min-w-0 space-y-2">
@@ -501,7 +501,7 @@ export default function EmployeeManagementTab() {
                   <tr key={emp._id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-sm font-black flex-shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-red-100 text-red-700 flex items-center justify-center text-sm font-black flex-shrink-0">
                           {emp.name?.charAt(0)?.toUpperCase() || '?'}
                         </div>
                         <div>
@@ -511,7 +511,7 @@ export default function EmployeeManagementTab() {
                       </div>
                     </td>
                     <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-100">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-100">
                         {POSITION_MAP[emp.position]?.emoji || '📋'} {POSITION_MAP[emp.position]?.label || emp.position}
                       </span>
                     </td>
@@ -656,7 +656,7 @@ export default function EmployeeManagementTab() {
                     <tr key={log._id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-3 font-medium text-gray-800">{log.employeeName}</td>
                       <td className="px-4 py-3">
-                        <span className="text-xs bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full font-bold">
+                        <span className="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded-full font-bold">
                           {POSITION_MAP[log.position]?.emoji || ''} {POSITION_MAP[log.position]?.label || log.position}
                         </span>
                       </td>
@@ -691,7 +691,7 @@ export default function EmployeeManagementTab() {
             <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
             <div className="cms-hr-sheet-header">
               <h3 className="text-base sm:text-lg font-semibold text-slate-900 flex items-center gap-2 min-w-0">
-                <Briefcase size={18} className="text-violet-600 flex-shrink-0" />
+                <Briefcase size={18} className="text-red-600 flex-shrink-0" />
                 <span className="truncate">{editingEmp ? 'Chỉnh sửa Nhân viên' : 'Thêm Nhân viên mới'}</span>
               </h3>
               <button type="button" onClick={() => setShowForm(false)} className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500" aria-label="Đóng">
@@ -865,7 +865,7 @@ export default function EmployeeManagementTab() {
                         Nhân viên này chưa cập nhật thông tin ngân hàng. Vui lòng cập nhật hồ sơ để sử dụng mã QR.
                       </p>
                       <button type="button" onClick={() => { setShowPayModal(null); openEdit(showPayModal); }}
-                        className="mt-3 min-h-11 text-xs text-violet-600 font-bold hover:underline">
+                        className="mt-3 min-h-11 text-xs text-red-600 font-bold hover:underline">
                         → Cập nhật hồ sơ ngay
                       </button>
                     </div>
