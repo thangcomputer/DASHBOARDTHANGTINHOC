@@ -805,18 +805,18 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
   // ── COURSE LIST VIEW ────────────────────────────────────────────────────────
   if (!selectedCourse) {
     return (
-      <div className="p-6 md:p-10 animate-in fade-in duration-500 min-h-full">
+      <div className="p-4 sm:p-6 md:p-10 animate-in fade-in duration-500 min-h-full">
         {/* Header */}
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">
-              Trung tâm Đào tạo Nội bộ
+        <div className="flex items-start justify-between gap-3 mb-6">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight leading-tight">
+              Trung tâm đào tạo nội bộ
             </h1>
-            <p className="text-slate-400 font-medium mt-2 text-sm">
+            <p className="text-slate-500 font-medium mt-2 text-xs sm:text-sm">
               Hoàn thành chương trình để được chứng nhận đủ điều kiện nhận lớp
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {isAdmin && (
               <button
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
@@ -836,20 +836,20 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         )}
 
         {/* TOP TABS FOR TEACHER */}
-        <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 w-fit mb-8">
+        <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto mb-6">
           {[
             { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0 },
             { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0 },
           ].map(t => (
             <button key={t.key} onClick={() => setMainTab(t.key)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
                 mainTab === t.key
-                  ? 'bg-red-600 text-white shadow-md'
-                  : 'text-slate-500 hover:bg-slate-100'
+                  ? 'bg-red-500 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}>
-              <t.icon size={16} /> {t.label} 
-              <span className={`text-[10px] ml-1 bg-white/20 px-2 py-0.5 rounded-full ${mainTab === t.key ? 'text-white' : 'bg-slate-200 text-slate-500'}`}>
+              <t.icon size={15} /> {t.label}
+              <span className={`text-[10px] ml-1 px-1.5 py-0.5 rounded-full leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
                 {t.count}
               </span>
             </button>
@@ -870,66 +870,62 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {courses.map((course, idx) => {
                  const gradients = [
-                    "from-red-600 via-indigo-600 to-red-700",
-                    "from-emerald-500 via-teal-500 to-emerald-700",
-                    "from-rose-500 via-red-500 to-rose-700",
-                    "from-cyan-500 via-blue-500 to-red-600"
+                    "from-blue-600 to-indigo-700",
+                    "from-teal-500 to-emerald-600",
+                    "from-violet-600 to-fuchsia-600",
+                    "from-sky-500 to-blue-700"
                  ];
                  const bgClass = gradients[idx % gradients.length];
+                 const progress = courseProgressMap[course.id || course._id] || course.overallProgress || course.progress || 0;
+                 const lessonCount = (course.lessons || course.videos || [1]).length;
                  return (
                  <div onClick={() => { 
                     setSelectedCourse(course);
                     setCourseTab('video');
                     fetchLessons(course.id || course._id);
-                 }} key={course.id || course._id} className="bg-white rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group flex flex-col relative overflow-hidden">
+                 }} key={course.id || course._id} className="bg-white rounded-2xl border border-slate-100 shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer group flex flex-col overflow-hidden">
                     
-                    {/* KHU VỰC THUMBNAIL (BANNER) */}
-                    <div className={`h-36 bg-gradient-to-tr ${bgClass} relative overflow-hidden flex items-center justify-center`}>
-                       {/* Hiệu ứng ánh sáng nền */}
-                       <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors pointer-events-none" />
-                       <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-black/10 rounded-full blur-xl pointer-events-none" />
-                       
-                       {/* Trạng thái Category */}
+                    <div className={`h-32 bg-gradient-to-r ${bgClass} relative overflow-hidden`}>
+                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%)] pointer-events-none" />
                        <div className="absolute top-4 right-4">
-                          <span className="bg-white/20 backdrop-blur-md text-white border border-white/20 shadow-sm text-[9px] font-black px-2.5 py-1 rounded-lg tracking-wider uppercase">
+                          <span className="bg-white/20 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-medium uppercase tracking-wider">
                              {course.category || 'MẶC ĐỊNH'}
                           </span>
                        </div>
                     </div>
 
-                    {/* Vòng tròn tiến độ nổi ngoài viền - KHÔNG THỂ BỊ CẮT VÌ ĐẶT BÊN NGOÀI */}
-                    <div className="absolute top-[116px] left-6 z-10 bg-white p-1 rounded-full shadow-md border-2 border-slate-200 transition-transform duration-300 group-hover:scale-110 pointer-events-none">
-                       <CircularProgress size={56} progress={courseProgressMap[course.id || course._id] || course.overallProgress || course.progress || 0} />
-                    </div>
-
-                    {/* KHU VỰC THÔNG TIN */}
-                    <div className="pt-10 pb-5 px-6 flex-1 flex flex-col">
-                       <h3 className="font-extrabold text-slate-800 text-lg group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug mb-2">
+                    <div className="p-5 flex-1 flex flex-col">
+                       <div className="flex items-start gap-3 mb-2">
+                         <div className="flex-1 min-w-0">
+                           <h3 className="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
                           {course.title}
-                       </h3>
+                           </h3>
+                         </div>
+                         <div className="shrink-0 text-right min-w-[3rem]">
+                           <p className="text-sm font-bold text-slate-700">{progress}%</p>
+                         </div>
+                       </div>
+                       <div className="flex items-center gap-2 mb-3">
+                         <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
+                           <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
+                         </div>
+                       </div>
                        <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
                           {course.description || course.desc || 'Hoàn thành khóa học nội bộ này để nâng cao kỹ năng sư phạm và chuyên môn giảng dạy.'}
                        </p>
                        
-                       {/* Footer Thông tin số lượng & Nút Học tiếp */}
-                       <div className="flex items-center justify-between pt-4 border-t border-dashed border-slate-100">
-                          <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                             <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center">
-                               <Video size={12} className="text-blue-500" />
-                             </div>
-                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                {(course.lessons || course.videos || [1]).length} BÀI HỌC
-                             </span>
+                       <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
+                          <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                             <Video size={14} className="text-slate-400" />
+                             <span>{lessonCount} BÀI HỌC</span>
                           </div>
                           
-                          <div className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-blue-600 group-hover:text-indigo-600">
-                             <span className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                                VÀO HỌC
-                             </span>
-                             <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                          <div className="flex items-center gap-1 text-sm font-semibold text-blue-600 group-hover:translate-x-1 transition-transform">
+                             <span>VÀO HỌC</span>
+                             <ChevronRight size={14} />
                           </div>
                        </div>
                     </div>
