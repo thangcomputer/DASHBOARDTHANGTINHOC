@@ -642,30 +642,31 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   // ── COURSE LIST VIEW ────────────────────────────────────────────────────────
   if (!selectedCourse) {
     return (
-      <div className="p-6 md:p-10 animate-in fade-in duration-500 min-h-full">
+      <div className="w-full animate-in fade-in duration-500 min-h-full">
         {/* Header */}
-        <div className="flex items-center justify-between mb-10">
-          <div className="flex gap-4">
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="flex gap-3 min-w-0">
             {onBack && (
-              <button onClick={onBack} className="w-12 h-12 flex flex-shrink-0 items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-50 transition-all shadow-sm mt-1">
-                <ArrowLeft size={20} />
+              <button type="button" onClick={onBack} className="w-10 h-10 flex flex-shrink-0 items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm mt-0.5">
+                <ArrowLeft size={18} />
               </button>
             )}
-            <div>
-              <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none mt-2">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-tight leading-snug">
                 Trung tâm Đào tạo Nội bộ</h1>
-              <p className="text-slate-400 font-medium mt-2 text-sm">
+              <p className="text-slate-400 font-medium mt-1 text-xs sm:text-sm leading-relaxed">
                 Hoàn thành chương trình để được chứng nhận đủ điều kiện nhận lớp
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {isAdmin && (
               <button
+                type="button"
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${showAdminPanel ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
               >
-                <BarChart2 size={16} /> Xem tiến độ
+                <BarChart2 size={16} /> <span className="hidden sm:inline">Xem tiến độ</span>
               </button>
             )}
           </div>
@@ -673,27 +674,28 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
 
         {/* Admin Progress Panel */}
         {isAdmin && showAdminPanel && courses.length > 0 && (
-          <div className="mb-10">
+          <div className="mb-6">
             <AdminProgressPanel courseId={courses[0]?._id} />
           </div>
         )}
 
-        {/* TOP TABS FOR TEACHER */}
-        <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-2 shadow-sm border border-gray-100 w-fit mb-8 relative z-10">
+        {/* Tabs — full width like feed */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 bg-white rounded-2xl p-2 shadow-sm border border-gray-100 w-full mb-5 relative z-10">
           {[
             { key: 'courses', icon: PlayCircle, label: 'Video học tập', count: courses.length },
             { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
             { key: 'assignments', icon: BookOpen, label: 'Bài tập về nhà', count: pendingAssignmentCount },
             { key: 'exams', icon: Award, label: 'Điểm thi', count: (student.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').length },
           ].map(t => (
-            <button key={t.key} onClick={() => setMainTab(t.key)}
-              className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-[13px] font-bold tracking-wide transition-all ${mainTab === t.key
+            <button key={t.key} type="button" onClick={() => setMainTab(t.key)}
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl text-[12px] sm:text-[13px] font-bold tracking-wide transition-all min-h-11 ${mainTab === t.key
                 ? 'bg-green-600 text-white shadow-md'
                 : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                 }`}>
-              <t.icon size={16} /> {t.label}
+              <t.icon size={16} className="shrink-0" />
+              <span className="truncate">{t.label}</span>
               {t.count > 0 && (
-              <span className={`text-[10px] ml-1 px-2 py-0.5 rounded-full font-black ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'}`}>
+              <span className={`text-[10px] ml-0.5 px-1.5 py-0.5 rounded-full font-black shrink-0 ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'}`}>
                 {t.count}
               </span>
               )}

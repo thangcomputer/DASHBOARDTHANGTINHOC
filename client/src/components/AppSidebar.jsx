@@ -39,11 +39,10 @@ const MENU_CONFIG = {
     bottomItems: [
       { key: 'help', icon: HelpCircle, label: 'Trợ giúp', isHelp: true },
       { key: 'profile',   icon: User,    label: 'Hồ sơ',      path: '/student', hash: 'profile' },
-      { key: 'changepassword', icon: Lock, label: 'Đổi mật khẩu', isChangePassword: true },
       { key: 'logout',    icon: LogOut,  label: 'Đăng xuất',  isLogout: true },
     ],
     accentColor: 'bg-red-600',
-    activeClass: 'bg-white/20 text-white shadow-lg backdrop-blur-md border-r-4 border-white',
+    activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md',
   },
   teacher: {
     brand: { label: 'GIẢNG VIÊN', color: 'from-slate-900 to-indigo-950' },
@@ -59,12 +58,11 @@ const MENU_CONFIG = {
     ],
     bottomItems: [
       { key: 'help', icon: HelpCircle, label: 'Trợ giúp', isHelp: true },
-      { key: 'profile', icon: User,   label: 'Hồ sơ cá nhân', path: '/teacher', hash: 'profile' },
-      { key: 'changepassword', icon: Lock, label: 'Đổi mật khẩu', isChangePassword: true },
+      { key: 'profile', icon: User,   label: 'Hồ sơ', path: '/teacher', hash: 'profile' },
       { key: 'logout',  icon: LogOut, label: 'Đăng xuất',      isLogout: true },
     ],
     accentColor: 'bg-red-600',
-    activeClass: 'bg-white/20 text-white shadow-lg backdrop-blur-md border-r-4 border-white',
+    activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md',
   },
   admin: {
     brand: { label: 'QUẢN TRỊ', color: 'from-slate-900 to-indigo-950' },
@@ -125,11 +123,11 @@ const MENU_CONFIG = {
       },
     ],
     bottomItems: [
-      { key: 'changepassword', icon: Lock, label: 'Đổi mật khẩu', isChangePassword: true },
+      { key: 'account', icon: User, label: 'Tài khoản', isChangePassword: true },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
     accentColor: 'bg-red-600',
-    activeClass: 'bg-white/10 text-white shadow-xl backdrop-blur-lg border-r-[4px] border-white font-bold',
+    activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md font-bold',
   },
 };
 
@@ -493,41 +491,43 @@ const AppSidebar = ({
       </nav>
 
       {/* ── Bottom items ── */}
-      <div className="px-3 pb-4 space-y-1 border-t border-white/10 pt-3">
+      <div className="px-2.5 pb-3 space-y-0.5 border-t border-white/10 pt-2.5">
         {config.bottomItems.map(item => {
           const Icon = item.icon;
-          const active = !item.isLogout && !item.isHelp && isActive(item);
+          const active = !item.isLogout && !item.isHelp && !item.isChangePassword && isActive(item);
           return (
             <button
               key={item.key}
+              type="button"
               data-guide-key={item.key}
               onClick={() => handleClick(item)}
-              className={`w-full flex items-center gap-3 rounded-xl transition-all
-                ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-3' : 'px-4 py-3'}
+              className={`w-full flex items-center gap-3 rounded-xl transition-all min-h-11 box-border
+                ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}
                 ${item.isLogout
-                  ? 'text-white/50 hover:text-red-400 hover:bg-red-500/10'
+                  ? 'text-white/50 hover:text-red-300 hover:bg-red-500/10'
                   : item.isHelp
-                    ? 'text-amber-200 hover:text-white hover:bg-amber-500/20 border border-amber-400/30'
-                    : active ? config.activeClass : 'text-white/60 hover:text-white hover:bg-white/10'}
+                    ? 'text-amber-200 hover:text-white hover:bg-amber-500/15'
+                    : active ? config.activeClass : 'text-white/65 hover:text-white hover:bg-white/10'}
               `}
               title={(collapsed && !mobileOpen) ? item.label : undefined}
             >
-              <Icon size={18} className="flex-shrink-0" />
-              {(!collapsed || mobileOpen) && <span className="text-sm font-medium">{item.label}</span>}
+              <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
+              {(!collapsed || mobileOpen) && <span className="text-sm font-medium truncate">{item.label}</span>}
             </button>
           );
         })}
 
         {/* ── Nút Bật/Tắt Âm Thanh ── */}
         <button
+          type="button"
           onClick={handleToggleMute}
           title={(collapsed && !mobileOpen) ? (muted ? "Bật âm báo" : "Tắt âm báo") : undefined}
-          className={`w-full flex items-center gap-3 rounded-xl transition-all text-white/50 hover:text-white hover:bg-white/10
-            ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-3' : 'px-4 py-3'}
+          className={`w-full flex items-center gap-3 rounded-xl transition-all text-white/50 hover:text-white hover:bg-white/10 min-h-11 box-border
+            ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}
           `}
         >
-          {muted ? <VolumeX size={18} className="flex-shrink-0" /> : <Volume2 size={18} className="flex-shrink-0" />}
-          {(!collapsed || mobileOpen) && <span className="text-sm font-medium">{muted ? "Bật âm thanh" : "Tắt âm thanh"}</span>}
+          {muted ? <VolumeX size={18} className="flex-shrink-0" aria-hidden="true" /> : <Volume2 size={18} className="flex-shrink-0" aria-hidden="true" />}
+          {(!collapsed || mobileOpen) && <span className="text-sm font-medium truncate">{muted ? "Bật âm thanh" : "Tắt âm thanh"}</span>}
         </button>
       </div>
     </div>

@@ -33,6 +33,7 @@ const FeedBoard = lazy(() => import('./components/FeedBoard'));
 import DashboardLayout                       from './components/DashboardLayout';
 import api, { clearTokens, getRolePrefix, NetworkOfflineError } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
+import { useIsDesktopExamDevice } from './utils/examDevice';
 import { BranchProvider }                    from './context/BranchContext';
 import LoadingScreen                         from './components/LoadingScreen';
 import PopupBanner                           from './components/PopupBanner';
@@ -159,6 +160,28 @@ function StudentExamWrapper({ session }) {
 function StudentTestWrapper({ session }) {
   const { subjectId } = useParams();
   const nav = useNavigate();
+  const allowStartExam = useIsDesktopExamDevice();
+
+  if (!allowStartExam) {
+    return (
+      <div className="h-[100dvh] max-h-[100dvh] overflow-hidden flex items-center justify-center p-6 bg-slate-50">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-amber-200 shadow-sm p-6 text-center">
+          <p className="text-lg font-bold text-slate-900">Thi chỉ dành cho máy tính</p>
+          <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+            Điện thoại và máy tính bảng không được làm bài thi. Bạn vẫn xem điểm tại Phòng thi.
+          </p>
+          <button
+            type="button"
+            onClick={() => nav('/student/exam')}
+            className="mt-5 w-full min-h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm"
+          >
+            Về Phòng thi (xem điểm)
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <div className="h-[100dvh] max-h-[100dvh] overflow-hidden">

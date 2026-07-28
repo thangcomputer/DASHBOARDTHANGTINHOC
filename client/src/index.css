@@ -224,9 +224,9 @@
     @apply grid grid-cols-2 lg:grid-cols-4 gap-4;
   }
 
-  /* ?? Student dashboard design system (Notion/Classroom density) ?? */
+  /* Student dashboard design system */
   .cms-sd {
-    --sd-page: 20px;
+    --sd-page: 12px;
     --sd-card: 16px;
     --sd-section: 24px;
     --sd-gap: 16px;
@@ -248,6 +248,24 @@
     min-width: 0;
     padding-inline: var(--sd-page);
     padding-block: 12px 20px;
+  }
+
+  @media (min-width: 640px) {
+    .cms-sd {
+      --sd-page: 16px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .cms-sd {
+      --sd-page: 20px;
+    }
+  }
+
+  /* Profile: full usable width like feed (max-w-2xl) */
+  .cms-sd-profile {
+    max-width: 42rem;
+    margin-inline: auto;
   }
 
   .cms-sd-stack {

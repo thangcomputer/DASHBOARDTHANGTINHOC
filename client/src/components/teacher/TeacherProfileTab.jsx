@@ -116,21 +116,37 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
   });
 
   return (
-    <div className="px-4 md:px-8 py-6 md:py-8 space-y-6">
+    <div className="w-full max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
       {/* Page Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <img
           src={teacherAvatarUrl}
           alt={currentTeacher?.name || 'GV'}
-          className="w-12 h-12 rounded-2xl object-cover border-2 border-white shadow-lg shadow-red-200 bg-white"
+          className="w-11 h-11 rounded-xl object-cover border-2 border-white shadow-md shadow-red-100 bg-white shrink-0"
         />
-        <div>
-          <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-black text-gray-800 truncate">
             Hồ sơ cá nhân
           </h2>
-          <p className="text-xs text-gray-400">Quản lý thông tin cá nhân và tài khoản ngân hàng</p>
+          <p className="text-xs text-gray-400">Thông tin cá nhân, ngân hàng và bảo mật</p>
         </div>
       </div>
+
+      {/* Đổi mật khẩu */}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent('open-change-password-modal'))}
+        className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3.5 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
+      >
+        <span className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+          <Shield size={18} aria-hidden="true" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-bold text-slate-800">Đổi mật khẩu</span>
+          <span className="block text-xs text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</span>
+        </span>
+        <Edit3 size={16} className="text-slate-300 shrink-0" aria-hidden="true" />
+      </button>
 
       {/* Save message toast */}
       {saveMsg && (

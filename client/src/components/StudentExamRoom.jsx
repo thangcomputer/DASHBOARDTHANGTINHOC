@@ -15,6 +15,7 @@ import {
   getExamSubjectMeta,
   getExamSubjectInitials,
 } from '../utils/examSubjects';
+import { useIsDesktopExamDevice } from '../utils/examDevice';
 
 const STATUS_FILTERS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -42,7 +43,7 @@ function useCountdown(target) {
   return remaining;
 }
 
-const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }) => {
+const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, allowStartExam = true }) => {
   const meta = getExamSubjectMeta(subject.id, examSubjectsCatalog);
   const initials = getExamSubjectInitials(meta);
   const countdown = useCountdown(subject.lockUntil);
@@ -77,14 +78,12 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
   const thucHanhDisplay = () => {
     if (subject.thucHanh === 'da_nop') {
       if (subject.essayScore !== null && subject.essayScore !== undefined) {
-        // Đã chấm điểm → hiện điểm
         return (
           <span className={`text-sm font-semibold ${subject.essayScore >= 5 ? 'text-green-600' : 'text-red-500'}`}>
             {subject.essayScore}/10
           </span>
         );
       }
-      // Đã nộp nhưng chưa chấm
       return <span className="text-sm text-amber-600 font-semibold">Chờ chấm điểm</span>;
     }
     if (subject.thucHanh === 'chua_nop') return <span className="text-sm text-gray-400">Chưa nộp</span>;
@@ -92,10 +91,13 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
   };
 
   const isLocked = subject.status === 'dang_khoa';
-  const canStart  = isApproved && !isLocked && !isLockedCountDown && (subject.status === 'chua_thi' || !subject.status);
-  const isOngoing = isApproved && !isLocked && !isLockedCountDown && subject.status === 'dang_thi';
-  const canRetry  = isApproved && !isLocked && !isLockedCountDown && subject.status === 'khong_dat';
+  const canStart  = allowStartExam && isApproved && !isLocked && !isLockedCountDown && (subject.status === 'chua_thi' || !subject.status);
+  const isOngoing = allowStartExam && isApproved && !isLocked && !isLockedCountDown && subject.status === 'dang_thi';
+  const canRetry  = allowStartExam && isApproved && !isLocked && !isLockedCountDown && subject.status === 'khong_dat';
   const isPassed  = subject.status === 'dat';
+  const wouldBeAbleToStart =
+    isApproved && !isLocked && !isLockedCountDown &&
+    (subject.status === 'chua_thi' || !subject.status || subject.status === 'dang_thi' || subject.status === 'khong_dat');
 
   return (
     <div className={`bg-white rounded-2xl border shadow-sm transition-all duration-200 overflow-hidden ${
@@ -117,7 +119,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
           {statusBadge()}
         </div>
 
-        {/* Stats */}
+        {/* Stats — luôn xem được trên mọi thiết bị */}
         <div className="space-y-2">
           <div className="flex items-center justify-between py-2 border-b border-gray-50">
             <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -136,7 +138,6 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
         </div>
       </div>
 
-      {/* Admin chưa duyệt hoặc chưa đủ mốc */}
       {!isApproved && (
         <div className="mx-5 mb-3 flex items-center justify-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5">
           <Lock size={14} className="text-gray-500 flex-shrink-0" />
@@ -144,19 +145,25 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
         </div>
       )}
 
-      {/* Action buttons */}
       <div className="px-5 pb-5 pt-2">
         {isLockedCountDown ? (
           <button
+            type="button"
             disabled
             className="w-full py-2.5 bg-gray-100 border border-gray-200 text-gray-400 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed uppercase tracking-wide"
           >
             <Clock size={15} /> Mở khóa sau: {countdown}
           </button>
+        ) : !allowStartExam && wouldBeAbleToStart ? (
+          <div className="w-full py-2.5 px-3 bg-amber-50 border border-amber-200 text-amber-800 font-semibold rounded-xl text-xs flex items-start justify-center gap-2 text-center leading-snug">
+            <Monitor size={15} className="shrink-0 mt-0.5" aria-hidden="true" />
+            <span>Thi chỉ dành cho máy tính (laptop/desktop). Trên điện thoại/máy tính bảng bạn chỉ xem được điểm.</span>
+          </div>
         ) : (
           <>
             {canStart && (
               <button
+                type="button"
                 onClick={() => onStart(subject.id)}
                 className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-100"
               >
@@ -165,6 +172,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
             )}
             {canRetry && (
                <button
+                 type="button"
                  onClick={() => onStart(subject.id)}
                  className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-100"
                >
@@ -173,6 +181,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
             )}
             {isOngoing && (
               <button
+                type="button"
                 onClick={() => onStart(subject.id)}
                 className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-orange-100"
               >
@@ -181,6 +190,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog }
             )}
             {isPassed && (
               <button
+                type="button"
                 disabled
                 className="w-full py-2.5 bg-gray-50 border border-gray-100 text-gray-400 font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-not-allowed opacity-70"
               >
@@ -279,6 +289,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
   const [filterCourse, setFilterCourse] = useState('all');
   const [filterSubject, setFilterSubject] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const allowStartExam = useIsDesktopExamDevice();
 
   // Lấy thông tin HV và tiến độ thi từ DataContext
   const { students, updateStudent, examSubjectsCatalog } = useData();
@@ -387,6 +398,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
   }), [subjectsWithMilestones]);
 
   const handleStart = (subjectId) => {
+    if (!allowStartExam) return;
     if (onStartExam) onStartExam(subjectId);
   };
 
@@ -401,7 +413,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
       {/* ── Main Content ── */}
       <div className="px-4 md:px-8 py-8 max-w-5xl mx-auto">
         {/* Page Title Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-black text-gray-800">Danh sách môn thi</h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -412,12 +424,25 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
             </p>
           </div>
           <button
+            type="button"
             onClick={() => setShowScores(true)}
             className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-all active:scale-95 shadow-lg shadow-red-100 self-start sm:self-auto"
           >
             <Trophy size={16} /> XEM ĐIỂM CỦA TÔI
           </button>
         </div>
+
+        {!allowStartExam && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-amber-900">
+            <Monitor size={18} className="shrink-0 mt-0.5 text-amber-700" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-bold">Thi chỉ dành cho máy tính (laptop/desktop)</p>
+              <p className="text-xs mt-1 leading-relaxed text-amber-800/90">
+                Trên điện thoại và máy tính bảng bạn vẫn xem được điểm, trạng thái môn thi. Để làm bài thi, vui lòng dùng laptop hoặc máy tính để bàn.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Bộ lọc */}
         <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 mb-6 shadow-sm space-y-4">
@@ -496,7 +521,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
         {filteredSubjects.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5">
           {filteredSubjects.map(s => (
-            <SubjectCard key={s.id} subject={s} onStart={handleStart} isGlobalApproved={isAdminApproved} examSubjectsCatalog={examSubjectsCatalog} />
+            <SubjectCard key={s.id} subject={s} onStart={handleStart} isGlobalApproved={isAdminApproved} examSubjectsCatalog={examSubjectsCatalog} allowStartExam={allowStartExam} />
           ))}
         </div>
         ) : (
