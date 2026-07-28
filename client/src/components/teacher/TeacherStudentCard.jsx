@@ -617,7 +617,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   </h4>
                   <button 
                     onClick={() => setShowAddAssign(!showAddAssign)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-100 transition-all flex items-center gap-1.5"
+                    className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-100 transition-all flex items-center gap-1.5"
                   >
                     {showAddAssign ? <X size={14} /> : <Plus size={14} />} {showAddAssign ? 'HỦY' : 'GIAO BÀI TẬP'}
                   </button>
@@ -721,19 +721,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                             </div>
                             <div className="flex flex-col items-end gap-3 font-black flex-shrink-0">
                               {isSubmitted ? (
-                                <div className={`px-4 py-1.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 border shadow-sm ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
+                                <div className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 border shadow-sm ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
                                   {isGraded ? <Check size={12}/> : <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
                                   {isGraded ? `${getGradeLabel(submission.grade)}: ${submission.grade}/10` : 'ĐÃ NỘP BÀI'}
                                 </div>
                                                             ) : (
-                                <span className="px-4 py-1.5 rounded-2xl text-xs uppercase tracking-widest bg-gray-50 text-slate-300">CHƯA NỘP</span>
+                                <span className="px-4 py-2 rounded-full text-xs uppercase tracking-widest bg-gray-50 text-slate-300">CHƯA NỘP</span>
                               )}
                               
                               {isSubmitted && submission.submittedFileUrl && (
                                 <a 
                                   href={buildMediaDownloadUrl(submission.submittedFileUrl, submission.submittedFileUrl.split('/').pop())} 
                                   target="_blank" rel="noreferrer" 
-                                  className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-xl font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm"
+                                  className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-full font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm"
                                   title="Tải bài làm của học viên"
                                 >
                                   <Download size={14} /> TẢI BÀI
@@ -748,11 +748,11 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                                     placeholder="Điểm (0-10)"
                                     value={gradingInputs[submission._id] || ''}
                                     onChange={(e) => setGradingInputs({...gradingInputs, [submission._id]: e.target.value})}
-                                    className="w-24 bg-white border-2 border-indigo-100 rounded-xl p-2 text-xs font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
+                                    className="w-28 bg-slate-50 border-2 border-indigo-100 rounded-full px-4 py-2 text-sm font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
                                   />
                                   <button 
                                     onClick={() => handleGradeSubmit(submission._id)} 
-                                    className="bg-red-600 hover:bg-red-700 text-white p-2 px-4 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
+                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
                                   >
                                     LƯU
                                   </button>
@@ -766,11 +766,11 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                                     placeholder="Sửa điểm"
                                     value={gradingInputs[submission._id] ?? submission.grade ?? ''}
                                     onChange={(e) => setGradingInputs({...gradingInputs, [submission._id]: e.target.value})}
-                                    className="w-24 bg-white border-2 border-indigo-100 rounded-xl p-2 text-xs font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
+                                    className="w-28 bg-slate-50 border-2 border-indigo-100 rounded-full px-4 py-2 text-sm font-bold text-indigo-900 focus:outline-none focus:border-indigo-500 text-center shadow-sm"
                                   />
                                   <button 
                                     onClick={() => handleGradeSubmit(submission._id)} 
-                                    className="bg-amber-500 hover:bg-amber-600 text-white p-2 px-3 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
+                                    className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-full text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap"
                                   >
                                     SỬA ĐIỂM
                                   </button>
@@ -798,7 +798,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
             )}
             {activePanel === 'grade' && (
               <div className="space-y-8 animate-in slide-in-from-right-10 duration-500">
-                 <div className="bg-amber-50 border border-amber-100 rounded-[40px] p-10 flex flex-col md:flex-row items-center gap-10">
+                 <div className="bg-amber-50 border border-amber-100 rounded-[40px] p-8 sm:p-10 flex flex-col md:flex-row items-center gap-10 shadow-sm">
                     <div className="flex-1 space-y-4">
                        <div className="flex items-center gap-4 mb-2">
                           <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm">
@@ -812,19 +812,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        <input 
                           type="number" min="0" max="10" step="0.5" 
                           value={gradeInput} onChange={e => setGradeInput(e.target.value)}
-                          className="w-24 bg-white border-2 border-amber-200 rounded-2xl p-4 text-3xl font-black text-amber-700 text-center focus:border-amber-500 outline-none"
+                          className="w-28 bg-white border-2 border-amber-200 rounded-2xl p-4 text-3xl font-black text-amber-700 text-center focus:border-amber-500 outline-none"
                        />
                        <p className="text-xs font-bold text-amber-400 italic">* Điểm số sẽ được hiển thị công khai trên học bạ</p>
                        <button 
                          onClick={handleGradeSave}
-                         className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-700 transition shadow-lg shadow-amber-100"
+                         className="w-full py-4 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:from-amber-700 hover:to-orange-700 transition shadow-lg shadow-amber-100"
                        >
                          LƯU KẾT QUẢ ĐÁNH GIÁ
                        </button>
                     </div>
-                    <div className="w-40 h-40 bg-white rounded-full border-8 border-amber-100 flex flex-col items-center justify-center shadow-xl">
+                    <div className="w-40 h-40 bg-gradient-to-b from-amber-50 to-white rounded-full border-8 border-amber-100 flex flex-col items-center justify-center shadow-xl">
                        <span className="text-xs font-black text-amber-300 uppercase leading-none mb-1">Xếp loại</span>
-                       <span className="text-6xl font-black text-amber-600">
+                       <span className="text-6xl font-black text-amber-600 leading-none">
                           {gradeLetter}
                        </span>
                     </div>
