@@ -30,34 +30,47 @@ function StudentActionMenu({
   align = 'right',
 }) {
   if (actionMenuId !== s.id) return null;
+
+  const itemCls =
+    'w-full flex items-center gap-3 px-3.5 py-2.5 min-h-11 text-[13px] font-semibold text-left whitespace-nowrap transition-colors';
+
   return (
     <div
-      className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] py-1.5 min-w-[180px] animate-in fade-in zoom-in-95 duration-150`}
+      className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] py-1.5 w-[min(92vw,260px)] animate-in fade-in zoom-in-95 duration-150`}
       onClick={(e) => e.stopPropagation()}
+      role="menu"
     >
-      <button onClick={() => { setShowStudentDetailId(s.id); setActionMenuId(null); }}
-        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 mb-1">
-        <ClipboardList size={13} /> Xem hồ sơ chi tiết
+      <button type="button" role="menuitem" onClick={() => { setShowStudentDetailId(s.id); setActionMenuId(null); }}
+        className={`${itemCls} text-slate-800 hover:bg-slate-50 border-b border-slate-100 mb-0.5`}>
+        <ClipboardList size={15} className="shrink-0 text-slate-500" />
+        <span className="min-w-0">Xem hồ sơ chi tiết</span>
       </button>
-      <button onClick={() => { setEditStudent({ ...s }); setActionMenuId(null); }}
-        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-        <Edit3 size={13} /> Sửa thông tin
+      <button type="button" role="menuitem" onClick={() => { setEditStudent({ ...s }); setActionMenuId(null); }}
+        className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
+        <Edit3 size={15} className="shrink-0 text-slate-500" />
+        <span className="min-w-0">Sửa thông tin</span>
       </button>
-      <button onClick={() => { setActionMenuId(null); setEnrollmentModalStudent(s); }}
-        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-colors">
-        <Plus size={13} /> Thêm khóa học
+      <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); setEnrollmentModalStudent(s); }}
+        className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
+        <Plus size={15} className="shrink-0" />
+        <span className="min-w-0">Thêm khóa học</span>
       </button>
       {!s.paid && (
-        <button onClick={() => { sendDebtReminder(s); setActionMenuId(null); }}
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-          <Bell size={13} /> Nhắc nợ
+        <button type="button" role="menuitem" onClick={() => { sendDebtReminder(s); setActionMenuId(null); }}
+          className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
+          <Bell size={15} className="shrink-0 text-slate-500" />
+          <span className="min-w-0">Nhắc nợ</span>
         </button>
       )}
-      <button onClick={() => { s.studentExamUnlocked ? revokeStudentExam(s.id) : approveStudentExam(s.id); setActionMenuId(null); }}
-        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-        {s.studentExamUnlocked ? <><Lock size={13} /> Khóa phòng thi</> : <><Unlock size={13} /> Cho phép thi</>}
+      <button type="button" role="menuitem" onClick={() => { s.studentExamUnlocked ? revokeStudentExam(s.id) : approveStudentExam(s.id); setActionMenuId(null); }}
+        className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
+        {s.studentExamUnlocked
+          ? <><Lock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Khóa phòng thi</span></>
+          : <><Unlock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Cho phép thi</span></>}
       </button>
       <button
+        type="button"
+        role="menuitem"
         onClick={async () => {
           const webcamEnforced = s.requireWebcam !== false;
           try {
@@ -68,21 +81,26 @@ function StudentActionMenu({
           }
           setActionMenuId(null);
         }}
-        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+        className={`${itemCls} text-slate-700 hover:bg-slate-50`}
       >
-        <Camera size={13} /> {s.requireWebcam !== false ? 'Tắt giám sát Webcam' : 'Bật giám sát Webcam'}
+        <Camera size={15} className="shrink-0 text-slate-500" />
+        <span className="min-w-0">
+          {s.requireWebcam !== false ? 'Tắt webcam khi thi' : 'Bật webcam khi thi'}
+        </span>
       </button>
-      <button onClick={() => { handlePrintInvoice(s); setActionMenuId(null); }}
+      <button type="button" role="menuitem" onClick={() => { handlePrintInvoice(s); setActionMenuId(null); }}
         disabled={!s.paid}
-        className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium transition-colors ${
+        className={`${itemCls} ${
           s.paid ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
         }`}>
-        <Printer size={13} /> Xuất hóa đơn PDF
+        <Printer size={15} className="shrink-0" />
+        <span className="min-w-0">Xuất hóa đơn PDF</span>
       </button>
       <div className="border-t border-slate-100 my-1" />
-      <button onClick={() => { removeStudent(s.id); setActionMenuId(null); }}
-        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
-        <Trash2 size={13} /> Xóa học viên
+      <button type="button" role="menuitem" onClick={() => { removeStudent(s.id); setActionMenuId(null); }}
+        className={`${itemCls} text-red-600 hover:bg-red-50`}>
+        <Trash2 size={15} className="shrink-0" />
+        <span className="min-w-0">Xóa học viên</span>
       </button>
     </div>
   );

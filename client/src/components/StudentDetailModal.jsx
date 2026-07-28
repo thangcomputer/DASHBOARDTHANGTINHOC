@@ -164,16 +164,19 @@ export default function StudentDetailModal({ studentId, onClose }) {
   if (!studentId) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" 
-        onClick={onClose} 
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div
+        className="absolute inset-0 bg-slate-900/55 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={onClose}
+        aria-hidden="true"
       />
-      
-      {/* Modal Container */}
-      <div className="bg-[#f8fafc] w-full max-w-5xl h-[90vh] rounded-[40px] shadow-2xl relative z-10 flex flex-col overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 border border-white/20">
-        
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Hồ sơ học viên"
+        className="bg-[#f8fafc] w-full sm:max-w-5xl h-[min(96dvh,920px)] sm:h-[90vh] rounded-t-2xl sm:rounded-[24px] shadow-2xl relative z-10 flex flex-col overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-200 border border-white/20 pb-[env(safe-area-inset-bottom,0px)]"
+      >
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <div className="relative">
@@ -182,115 +185,122 @@ export default function StudentDetailModal({ studentId, onClose }) {
                 <div className="w-8 h-8 bg-indigo-600 rounded-lg transform rotate-45 animate-pulse" />
               </div>
             </div>
-            <p className="text-sm font-black text-indigo-900/40 uppercase tracking-widest">Đang tải hồ sơ...</p>
+            <p className="text-sm font-semibold text-indigo-900/50">Đang tải hồ sơ...</p>
           </div>
         ) : !data ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-red-500 gap-2">
+          <div className="flex-1 flex flex-col items-center justify-center text-red-500 gap-2 p-6">
             <AlertCircle size={40} />
-            <p className="font-bold">Lỗi tải dữ liệu. Vui lòng thử lại sau.</p>
-            <button onClick={onClose} className="mt-4 px-6 py-2 bg-slate-200 rounded-full font-bold text-slate-700">Đóng</button>
+            <p className="font-bold text-center">Lỗi tải dữ liệu. Vui lòng thử lại sau.</p>
+            <button type="button" onClick={onClose} className="mt-4 min-h-11 px-6 py-2 bg-slate-200 rounded-xl font-bold text-slate-700">Đóng</button>
           </div>
         ) : (
           <>
-            {/* ── HEADER AREA ────────────────────────────────────────────────── */}
-            <div className="bg-white border-b border-slate-100 p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
-               {/* Background Glow */}
-               <div className="absolute -top-20 -right-20 w-80 h-80 bg-indigo-50 rounded-full blur-3xl opacity-50" />
-               <div className="absolute top-10 right-10 flex gap-2">
-                  <button onClick={onClose} className="w-10 h-10 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900 rounded-2xl flex items-center justify-center transition-all">
-                    <X size={20} />
-                  </button>
-               </div>
+            {/* ── HEADER ────────────────────────────────────────────────── */}
+            <div className="bg-white border-b border-slate-100 px-4 pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5 relative shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Đóng"
+                className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 inline-flex items-center justify-center w-11 h-11 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors shadow-sm"
+              >
+                <X size={20} />
+              </button>
 
-               {/* Avatar & Basic Info */}
-               <div className="relative group">
-                 <div className="w-24 h-24 rounded-[32px] bg-white flex items-center justify-center text-white shadow-xl shadow-indigo-100 border-4 border-white transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-5 pr-12">
+                <div className="relative shrink-0">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white flex items-center justify-center shadow-md border-2 border-white overflow-hidden">
                     <img
                       src={resolveAvatarUrl({ avatar: data.student?.avatar, role: 'student' })}
                       className="w-full h-full object-cover"
                       alt={data.student?.name || 'avatar'}
                     />
-                 </div>
-                 <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-1.5 rounded-xl border-4 border-white shadow-lg">
-                    <ShieldCheck size={14} />
-                 </div>
-               </div>
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-lg border-2 border-white shadow">
+                    <ShieldCheck size={12} />
+                  </div>
+                </div>
 
-               <div className="flex-1 text-center md:text-left space-y-2">
-                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                   <h2 className="text-3xl font-black text-slate-900 tracking-tight">{data.student.name}</h2>
-                   <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm ${
-                     data.student.paid ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
-                   }`}>
-                     {data.student.paid ? 'Đã thanh toán' : 'Chưa đóng phí'}
-                   </span>
-                   <span className="px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-indigo-100">
-                     {data.student.course}
-                   </span>
-                   {(data.student.courses?.length > 1 || data.student.enrollments?.length > 1) && (
-                     <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black">
-                       {(data.student.courses || data.student.enrollments).length} khóa học
-                     </span>
-                   )}
-                 </div>
-                 
-                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-slate-400 text-sm font-semibold">
-                   <div className="flex items-center gap-1.5">
-                     <Smartphone size={14} className="text-slate-300" />
-                     <span>{data.student.phone || data.student.zalo}</span>
-                   </div>
-                   <div className="w-1.5 h-1.5 bg-slate-200 rounded-full" />
-                   <div className="flex items-center gap-1.5">
-                     <Building2 size={14} className="text-slate-300" />
-                     <span>Chi nhánh: {data.student.branchCode || 'Hệ thống'}</span>
-                   </div>
-                   <div className="w-1.5 h-1.5 bg-slate-200 rounded-full" />
-                    <div className="flex items-center gap-1.5">
-                      <Calendar size={14} className="text-slate-300" />
-                      <span>Đăng ký: {fmtDate(data.student.createdAt)}</span>
-                    </div>
-                    {data.student.createdByName && (
-                      <>
-                        <div className="w-1.5 h-1.5 bg-slate-200 rounded-full" />
-                        <div className="flex items-center gap-1.5">
-                          <User size={14} className="text-slate-300" />
-                          <span>Người tạo: <strong className="text-slate-500">{data.student.createdByName}</strong> ({data.student.createdByBranch || 'Hệ thống'})</span>
-                        </div>
-                      </>
+                <div className="flex-1 min-w-0 text-center sm:text-left space-y-2.5 w-full">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight truncate max-w-full">
+                      {data.student.name}
+                    </h2>
+                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
+                      data.student.paid ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'
+                    }`}>
+                      {data.student.paid ? 'Đã thanh toán' : 'Chưa đóng phí'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5">
+                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-semibold border border-indigo-100 max-w-full truncate">
+                      {data.student.course}
+                    </span>
+                    {(data.student.courses?.length > 1 || data.student.enrollments?.length > 1) && (
+                      <span className="px-2.5 py-1 bg-sky-50 text-sky-700 rounded-lg text-[11px] font-semibold border border-sky-100 shrink-0">
+                        {(data.student.courses || data.student.enrollments).length} khóa học
+                      </span>
                     )}
                   </div>
-               </div>
+
+                  <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-4 gap-y-1.5 text-[13px] text-slate-600 font-medium">
+                    <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
+                      <Smartphone size={14} className="text-slate-400 shrink-0" />
+                      <span className="truncate font-mono">{data.student.phone || data.student.zalo || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
+                      <Building2 size={14} className="text-slate-400 shrink-0" />
+                      <span className="truncate">Chi nhánh: {data.student.branchCode || 'Hệ thống'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
+                      <Calendar size={14} className="text-slate-400 shrink-0" />
+                      <span className="truncate">Đăng ký: {fmtDate(data.student.createdAt)}</span>
+                    </div>
+                    {data.student.createdByName && (
+                      <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
+                        <User size={14} className="text-slate-400 shrink-0" />
+                        <span className="truncate">
+                          Người tạo: <strong className="text-slate-700">{data.student.createdByName}</strong>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* ── TABS NAVIGATION ───────────────────────────────────────────── */}
-            <div className="flex px-8 bg-white border-b border-slate-100 gap-6">
-               {[
-                 { id: 'summary', label: 'TỔNG QUAN', icon: ClipboardList },
-                 { id: 'attendance', label: 'LỊCH HỌC', icon: Clock },
-                 { id: 'assignments', label: 'BÀI TẬP', icon: BookOpen },
-                 { id: 'finance', label: 'TÀI CHÍNH', icon: CreditCard },
-                 { id: 'academic', label: 'ĐIỂM SỐ', icon: Trophy },
-               ].map(tab => (
-                 <button 
-                   key={tab.id}
-                   onClick={() => setActiveTab(tab.id)}
-                   className={`flex items-center gap-2 py-5 text-[11px] font-black uppercase tracking-widest transition-all relative ${
-                     activeTab === tab.id 
-                       ? 'text-indigo-600' 
-                       : 'text-slate-400 hover:text-slate-600'
-                   }`}
-                 >
-                   <tab.icon size={14} />
-                   {tab.label}
-                   {activeTab === tab.id && (
-                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full animate-in slide-in-from-bottom-1" />
-                   )}
-                 </button>
-               ))}
+            {/* ── TABS — scroll ngang trên mobile ───────────────────────── */}
+            <div className="bg-white border-b border-slate-100 shrink-0">
+              <div className="flex gap-1 px-3 sm:px-6 overflow-x-auto overscroll-x-contain hide-scrollbar scroll-smooth">
+                {[
+                  { id: 'summary', label: 'Tổng quan', icon: ClipboardList },
+                  { id: 'attendance', label: 'Lịch học', icon: Clock },
+                  { id: 'assignments', label: 'Bài tập', icon: BookOpen },
+                  { id: 'finance', label: 'Tài chính', icon: CreditCard },
+                  { id: 'academic', label: 'Điểm số', icon: Trophy },
+                ].map((tab) => (
+                  <button
+                    type="button"
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`relative flex items-center gap-1.5 shrink-0 min-h-12 px-3 sm:px-4 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                      activeTab === tab.id
+                        ? 'text-indigo-600'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <tab.icon size={15} className="shrink-0" />
+                    {tab.label}
+                    {activeTab === tab.id && (
+                      <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-indigo-600 rounded-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* ── MAIN CONTENT AREA ─────────────────────────────────────────── */}
-            <div className={`flex-1 min-h-0 p-8 ${activeTab === 'academic' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+            <div className={`flex-1 min-h-0 p-4 sm:p-6 md:p-8 ${activeTab === 'academic' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
               
               {/* --- TAB 1: SUMMARY --- */}
               {activeTab === 'summary' && (
@@ -926,30 +936,43 @@ export default function StudentDetailModal({ studentId, onClose }) {
             </div>
 
             {/* ── FOOTER ACTIONS ───────────────────────────────────────────── */}
-            <div className="bg-slate-50 border-t border-slate-100 p-6 flex items-center justify-between">
-               <div className="flex gap-2">
-                 <button onClick={() => window.open(`http://zalo.me/${data.student.zalo || data.student.phone}`, '_blank')} className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
-                   <MessageSquare size={14} className="text-indigo-500" /> NHẮN TIN
-                 </button>
-                 <button onClick={() => window.print()} className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
-                   <Printer size={14} className="text-slate-400" /> IN TẤT CẢ
-                 </button>
-               </div>
-               
-               <div className="flex items-center gap-4">
-                  {!data.student.paid && (
-                     <p className="text-xs font-bold text-red-500 flex items-center gap-1.5 animate-pulse">
-                        <AlertCircle size={14} /> Còn nợ: {fmt(data.student.price)}
-                     </p>
-                  )}
-                  <button 
-                    onClick={onClose}
-                    className="px-8 py-3 bg-slate-900 text-white rounded-[20px] text-xs font-black hover:bg-indigo-600 transition-all shadow-xl shadow-slate-200 hover:shadow-indigo-200 flex items-center gap-2 group"
+            <div className="bg-white border-t border-slate-100 px-3 py-3 sm:px-6 sm:py-4 shrink-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-2 flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => window.open(`http://zalo.me/${data.student.zalo || data.student.phone}`, '_blank')}
+                    className="min-h-12 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                   >
-                    HOÀN TẤT XEM
-                    <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    <MessageSquare size={15} className="text-indigo-500 shrink-0" />
+                    Nhắn tin
                   </button>
-               </div>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="min-h-12 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <Printer size={15} className="text-slate-400 shrink-0" />
+                    In tất cả
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {!data.student.paid && (
+                    <p className="text-[12px] font-semibold text-red-500 flex items-center gap-1 shrink-0">
+                      <AlertCircle size={14} /> Còn nợ: {fmt(data.student.price)}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="min-h-12 flex-1 sm:flex-none px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[13px] font-bold hover:bg-indigo-600 transition-colors inline-flex items-center justify-center gap-2"
+                  >
+                    Hoàn tất xem
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
             </div>
           </>
         )}
@@ -961,15 +984,15 @@ export default function StudentDetailModal({ studentId, onClose }) {
 {/* Helper UI Components */}
 function StatBox({ label, value, icon: Icon, color, sub }) {
   return (
-    <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-       <div className={`absolute top-0 left-0 w-1.5 h-full ${color}`} />
-       <div className="flex items-start justify-between">
-          <div className="space-y-1">
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-             <h4 className="text-2xl font-black text-slate-800">{value}</h4>
-             {sub && <p className="text-[10px] text-slate-400 font-bold">{sub}</p>}
+    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-sm relative overflow-hidden">
+       <div className={`absolute top-0 left-0 w-1 h-full ${color}`} />
+       <div className="flex items-start justify-between gap-3 pl-1">
+          <div className="space-y-1 min-w-0">
+             <p className="text-[11px] font-semibold text-slate-500">{label}</p>
+             <h4 className="text-xl sm:text-2xl font-bold text-slate-800 truncate">{value}</h4>
+             {sub && <p className="text-[11px] text-slate-400 font-medium">{sub}</p>}
           </div>
-          <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center text-white shadow-lg shadow-indigo-100 group-hover:rotate-12 transition-transform`}>
+          <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center text-white shrink-0`}>
              <Icon size={18} />
           </div>
        </div>
