@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   CheckCircle, User, Settings, BookOpen, TrendingUp,
-  Mail, Phone, MessageCircle, MapPin, Lock, ChevronRight,
+  Mail, Phone, MessageCircle, MapPin, Lock, ChevronRight, ChevronDown,
   GraduationCap, BadgeDollarSign, Wallet,
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
@@ -16,6 +16,14 @@ export default function StudentProfileTab({
   setShowUpdateProfileModal,
   setShowTuitionModal,
 }) {
+  const [openSections, setOpenSections] = useState({
+    personal: false,
+    summary: false,
+    courses: true,
+    progress: false,
+  });
+  const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
   return (
     <div className="cms-sd cms-sd-page cms-sd-stack cms-sd-profile">
       {/* Hero */}
@@ -76,18 +84,23 @@ export default function StudentProfileTab({
       <div className="grid grid-cols-1 gap-3">
         <section className="cms-sd-card !p-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+            <button type="button" onClick={() => toggleSection('personal')} className="flex items-center gap-2 text-sm font-extrabold text-slate-800 min-w-0">
               <User size={16} className="text-teal-600" aria-hidden="true" /> Thông tin cá nhân
-            </h3>
-            <button
-              type="button"
-              onClick={() => setShowUpdateProfileModal(true)}
-              className="text-[11px] font-extrabold uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 min-h-9 rounded-lg transition-colors flex items-center gap-1"
-            >
-              <Settings size={13} aria-hidden="true" /> Cập nhật
             </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowUpdateProfileModal(true)}
+                className="text-[11px] font-extrabold uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 min-h-9 rounded-lg transition-colors flex items-center gap-1"
+              >
+                <Settings size={13} aria-hidden="true" /> Cập nhật
+              </button>
+              <button type="button" onClick={() => toggleSection('personal')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
+                <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.personal ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
           </div>
-          <ul className="divide-y divide-slate-50">
+          {openSections.personal && <ul className="divide-y divide-slate-50">
             {[
               { icon: Mail, label: 'Email', value: studentData.email || 'Chưa cập nhật' },
               { icon: Phone, label: 'Số điện thoại', value: studentData.phone || studentData.zalo || 'Chưa cập nhật' },
@@ -102,16 +115,19 @@ export default function StudentProfileTab({
                 </div>
               </li>
             ))}
-          </ul>
+          </ul>}
         </section>
 
         <section className="cms-sd-card !p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+            <button type="button" onClick={() => toggleSection('summary')} className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
               <BookOpen size={16} className="text-blue-600" aria-hidden="true" /> Tóm tắt học tập
-            </h3>
+            </button>
+            <button type="button" onClick={() => toggleSection('summary')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
+              <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.summary ? 'rotate-180' : ''}`} />
+            </button>
           </div>
-          <ul className="divide-y divide-slate-50">
+          {openSections.summary && <ul className="divide-y divide-slate-50">
             {[
               { icon: GraduationCap, label: 'Giáo viên', value: studentData.teacher },
               { icon: BadgeDollarSign, label: 'Trạng thái', value: studentData.status },
@@ -149,21 +165,26 @@ export default function StudentProfileTab({
                 </button>
               )}
             </li>
-          </ul>
+          </ul>}
         </section>
       </div>
 
       {studentData.courses && studentData.courses.length > 0 && (
         <section className="cms-sd-card !p-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
-            <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2 min-w-0">
+            <button type="button" onClick={() => toggleSection('courses')} className="text-sm font-extrabold text-slate-800 flex items-center gap-2 min-w-0">
               <BookOpen size={16} className="text-blue-600 shrink-0" aria-hidden="true" /> Khóa học
-            </h3>
-            <span className="text-[11px] font-extrabold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-              {studentData.courses.length}
-            </span>
+            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-extrabold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                {studentData.courses.length}
+              </span>
+              <button type="button" onClick={() => toggleSection('courses')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
+                <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.courses ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
           </div>
-          <div className="p-3 space-y-2.5">
+          {openSections.courses && <div className="p-3 space-y-2.5">
             {studentData.courses.map((c) => {
               const isCompleted = c.status === 'completed';
               const pct = Math.round((c.completedSessions / c.totalSessions) * 100) || 0;
@@ -212,17 +233,20 @@ export default function StudentProfileTab({
                 </article>
               );
             })}
-          </div>
+          </div>}
         </section>
       )}
 
       <section className="cms-sd-card !p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100">
-          <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => toggleSection('progress')} className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
             <TrendingUp size={16} className="text-emerald-600" aria-hidden="true" /> Tiến trình
-          </h3>
+          </button>
+          <button type="button" onClick={() => toggleSection('progress')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
+            <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.progress ? 'rotate-180' : ''}`} />
+          </button>
         </div>
-        <div className="p-4">
+        {openSections.progress && <div className="p-4">
           <div className="mb-4">
             <div className="flex justify-between items-center gap-2 mb-1.5">
               <span className="text-[11px] font-extrabold text-slate-500 uppercase">Hoàn thành</span>
@@ -248,7 +272,7 @@ export default function StudentProfileTab({
               </div>
             ))}
           </div>
-        </div>
+        </div>}
       </section>
     </div>
   );

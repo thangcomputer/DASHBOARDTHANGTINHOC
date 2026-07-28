@@ -166,8 +166,8 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+        <div className="min-w-0">
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <Bell className="text-red-600" size={22} /> Trung tâm thông báo
           </h1>
@@ -175,11 +175,11 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             {unread} chưa đọc · {total} tổng cộng
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => load(page)}
-            className="p-2.5 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100"
+            className="p-2.5 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 shrink-0"
             title="Làm mới"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -188,7 +188,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             type="button"
             onClick={() => onMarkRead(null)}
             disabled={busyId === 'all' || unread === 0}
-            className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1.5 min-w-0"
           >
             <CheckCheck size={14} /> Đọc tất cả
           </button>
@@ -196,7 +196,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             <button
               type="button"
               onClick={() => setBroadcastOpen((v) => !v)}
-              className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 flex items-center gap-1.5"
+              className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 flex items-center gap-1.5 min-w-0"
             >
               <Megaphone size={14} /> Gửi thông báo
             </button>
@@ -241,18 +241,18 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 min-w-0">
         <Filter size={14} className="text-gray-400" />
         <CmsSelect
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white"
+          className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white min-w-[110px]"
         >
           {TYPES.map((t) => (
             <option key={t.value || 'all'} value={t.value}>{t.label}</option>
           ))}
         </CmsSelect>
-        <label className="flex items-center gap-2 text-xs font-bold text-gray-600 cursor-pointer">
+        <label className="flex items-center gap-2 text-xs font-bold text-gray-600 cursor-pointer min-w-0">
           <input
             type="checkbox"
             checked={unreadOnly}

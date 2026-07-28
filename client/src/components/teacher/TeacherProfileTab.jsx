@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   User, Phone, Mail, Building2, CreditCard, Landmark, Copy, Edit3, Shield, MapPin, Save, X, CheckCircle,
-  Calendar, Award, AlertCircle, Clock, DollarSign,
+  Calendar, Award, AlertCircle, Clock, DollarSign, ChevronDown,
 } from 'lucide-react';
 import { BankSelect } from '../BankSelect';
 import { teachersAPI, csrfFetch, resolveMediaUrl } from '../../services/api';
@@ -31,6 +31,11 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
   const [editingBank, setEditingBank] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [copiedField, setCopiedField] = useState('');
+  const [openSections, setOpenSections] = useState({
+    profile: false,
+    bank: false,
+    status: false,
+  });
 
   // Load data from currentTeacher
   useEffect(() => {
@@ -161,22 +166,27 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         {/* ── CARD 1: Thông tin cá nhân ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+            <button type="button" onClick={() => setOpenSections((p) => ({ ...p, profile: !p.profile }))} className="font-bold text-gray-800 flex items-center gap-2">
               <User size={18} className="text-blue-600" /> Thông tin cá nhân
-            </h3>
-            <button
-              onClick={() => setEditingProfile(!editingProfile)}
-              className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                editingProfile
-                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-              }`}
-            >
-              <Edit3 size={12} /> {editingProfile ? 'Huỷ' : 'Chỉnh sửa'}
             </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setEditingProfile(!editingProfile)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  editingProfile
+                    ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                }`}
+              >
+                <Edit3 size={12} /> {editingProfile ? 'Huỷ' : 'Chỉnh sửa'}
+              </button>
+              <button type="button" onClick={() => setOpenSections((p) => ({ ...p, profile: !p.profile }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center">
+                <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.profile ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
           </div>
 
-          <div className="p-6 space-y-4">
+          {openSections.profile && <div className="p-6 space-y-4">
             {/* Name - Read only */}
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Họ và tên</label>
@@ -339,28 +349,33 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
                 {saving ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}
               </button>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* ── CARD 2: Thông tin thanh toán ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-teal-50">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+            <button type="button" onClick={() => setOpenSections((p) => ({ ...p, bank: !p.bank }))} className="font-bold text-gray-800 flex items-center gap-2">
               <CreditCard size={18} className="text-emerald-600" /> Thông tin thanh toán
-            </h3>
-            <button
-              onClick={() => setEditingBank(!editingBank)}
-              className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                editingBank
-                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'
-              }`}
-            >
-              <Edit3 size={12} /> {editingBank ? 'Huỷ' : 'Chỉnh sửa'}
             </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setEditingBank(!editingBank)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  editingBank
+                    ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'
+                }`}
+              >
+                <Edit3 size={12} /> {editingBank ? 'Huỷ' : 'Chỉnh sửa'}
+              </button>
+              <button type="button" onClick={() => setOpenSections((p) => ({ ...p, bank: !p.bank }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center">
+                <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.bank ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
           </div>
 
-          <div className="p-6 space-y-4">
+          {openSections.bank && <div className="p-6 space-y-4">
             {/* Status indicator */}
             {!bankFilled && !editingBank && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 flex items-start gap-3">
@@ -502,18 +517,21 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
                 {saving ? 'Đang lưu...' : 'Lưu thông tin thanh toán'}
               </button>
             )}
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* Account Status Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-violet-50">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
+        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-violet-50 flex items-center justify-between">
+          <button type="button" onClick={() => setOpenSections((p) => ({ ...p, status: !p.status }))} className="font-bold text-gray-800 flex items-center gap-2">
             <Shield size={18} className="text-purple-600" /> Trạng thái tài khoản
-          </h3>
+          </button>
+          <button type="button" onClick={() => setOpenSections((p) => ({ ...p, status: !p.status }))} className="w-8 h-8 rounded-lg hover:bg-white/60 flex items-center justify-center">
+            <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.status ? 'rotate-180' : ''}`} />
+          </button>
         </div>
-        <div className="p-6">
+        {openSections.status && <div className="p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               {
@@ -550,7 +568,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );
