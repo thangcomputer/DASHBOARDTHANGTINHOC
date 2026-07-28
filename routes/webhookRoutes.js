@@ -278,6 +278,22 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
 
         matched = true;
         matchedRef = code;
+        try {
+          const Invoice = require('../models/Invoice');
+          const count = await Invoice.countDocuments();
+          const now = new Date();
+          const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
+          await Invoice.create({
+            maHoaDon: maHD,
+            hocVien: updated._id,
+            hoTen: updated.name || s.name,
+            khoaHoc: updated.course || 'Học phí',
+            hocPhi: amount,
+            ghiChu: `SePay CK — ${String(body.content || '').slice(0, 120)}`,
+          });
+        } catch (invErr) {
+          logger.warn('[SEPAY] Invoice create skipped:', invErr.message);
+        }
         const io = req.app.get('io');
         if (io) {
           io.emit('tuition:paid', {

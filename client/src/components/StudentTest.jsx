@@ -7,9 +7,10 @@ import {
 import ExamMonitor, { CameraHeaderPanel } from './ExamMonitor';
 import { useSocket } from '../context/SocketContext';
 import { useData } from '../context/DataContext';
+import { getClientEnrollments } from '../utils/enrollments';
+import { getExamSubjectMeta, requireWebcamForSubject } from '../utils/examSubjects';
 import { useModal } from '../utils/Modal.jsx';
 import { getStudentMcQuestionsForExam, normalizeMcCorrectIndex, getStudentPracticeFilesForSubject } from '../utils/htmlContent';
-import { getExamSubjectMeta } from '../utils/examSubjects';
 import { EXAM_CAMERA_PERMISSION_LABEL } from '../utils/examUi';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../services/api';
 
@@ -135,6 +136,16 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const student = students?.find(s => String(s.id) === String(STUDENT_ID));
   const { showModal } = useModal();
   const teacherId = student?.teacherId;
+  const enrollments = useMemo(() => getClientEnrollments(student), [student]);
+  const requireWebcam = useMemo(
+    () => requireWebcamForSubject(
+      enrollments,
+      subjectId,
+      examSubjectsCatalog,
+      student?.requireWebcam !== false
+    ),
+    [enrollments, subjectId, examSubjectsCatalog, student?.requireWebcam]
+  );
 
   const [tab, setTab]           = useState('trac_nghiem');
   const [isTracNghiemSubmitted, setIsTracNghiemSubmitted] = useState(false);
@@ -192,12 +203,12 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     setTimeLeft(meta.time);
   }, [meta.time, subjectId]);
 
-  // ── BỎ QUA YÊU CẦU CAMERA NẾU ADMIN ĐÃ TẮT ──
+  // ── BỎ QUA YÊU CẦU CAMERA NẾU ADMIN ĐÃ TẮT (theo khóa của môn thi) ──
   useEffect(() => {
-    if (student?.requireWebcam === false && phase === 'hardware_check' && TOTAL > 0) {
+    if (!requireWebcam && phase === 'hardware_check' && TOTAL > 0) {
       setPhase('test');
     }
-  }, [student?.requireWebcam, phase, TOTAL]);
+  }, [requireWebcam, phase, TOTAL]);
 
   const timerRef   = useRef(null);
   const monitorRef = useRef(null);
@@ -265,7 +276,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   // ── YÊU CẦU CAMERA Ở BƯỚC HARDWARE CHECK TRƯỚC KHI VÀO THI ──
   useEffect(() => {
     if (phase !== 'hardware_check') return;
-    if (student?.requireWebcam === false) return;
+    if (!requireWebcam) return;
 
     let cancelled = false;
     let stream = null;
@@ -290,7 +301,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       cancelled = true;
       if (stream) stream.getTracks().forEach(t => t.stop());
     };
-  }, [phase, student?.requireWebcam]);
+  }, [phase, requireWebcam]);
 
   // ── Timer ──
   const handleSubmitFinalRef = useRef(() => {});
@@ -1217,7 +1228,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       </div>
 
       {/* ExamMonitor (logic only) */}
-      <ExamMonitor ref={monitorRef} isActive={phase === 'test'} onViolate={handleViolation} onResetExam={handleResetExam} requireWebcam={student?.requireWebcam !== false} />
+      <ExamMonitor ref={monitorRef} isActive={phase === 'test'} onViolate={handleViolation} onResetExam={handleResetExam} requireWebcam={requireWebcam} />
 
       {/* ══════════ MODALS ══════════ */}
       {showSubmitConfirm && (

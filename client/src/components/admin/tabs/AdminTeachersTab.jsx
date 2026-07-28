@@ -9,6 +9,13 @@ import Avatar from '../shared/Avatar';
 import { resolveTeacherExamDate, isTeacherExamDateApproximate, practicalFileDisplayName, practicalFileDownloadUrl, practicalFileViewUrl } from '../utils/teacherExam';
 import { isTeacherPending } from '../../../constants/teacherStatus';
 
+const PROCESS_STEPS = [
+  'Bài Test ≥ 80đ',
+  'Nộp file thực hành',
+  'Admin kiểm tra',
+  'Cấp quyền',
+];
+
 export default function AdminTeachersTab() {
   const {
     teachers, safeTeachers, filteredTeachers, search, setSearch, isSuperAdmin, setShowTeacherModal,
@@ -23,65 +30,66 @@ export default function AdminTeachersTab() {
     <>
       <div className="space-y-3 sm:space-y-4">
         <div className="bg-white dark:bg-slate-900 rounded-[20px] border border-slate-100 dark:border-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_14px_rgba(15,23,42,0.04)] overflow-hidden">
-          {/* Sticky toolbar */}
           <div className="cms-teacher-toolbar space-y-3">
-            <div className="flex items-start justify-between gap-3 min-w-0">
-              <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
-                <span className="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center flex-shrink-0">
-                  <GraduationCap size={18} aria-hidden="true" />
-                </span>
-                <span className="leading-snug truncate">Duyệt giảng viên</span>
-                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0">
-                  {teachers.length}
-                </span>
-              </h2>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {filePending > 0 && (
-                <span className="cms-dash-badge-warning">{filePending} file chờ kiểm tra</span>
-              )}
-              <span className="cms-dash-badge-warning">{pendingCount} chờ duyệt</span>
-            </div>
-
-            <div className="flex flex-col min-[390px]:flex-row gap-2">
-              <div className="relative flex-1 min-w-0">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Tìm giảng viên..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="cms-input pl-10"
-                  aria-label="Tìm giảng viên"
-                />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
+                  <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+                    <GraduationCap size={18} aria-hidden="true" />
+                  </span>
+                  <span className="leading-snug truncate">Duyệt giảng viên</span>
+                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0">
+                    {teachers.length}
+                  </span>
+                </h2>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className={`cms-dash-badge ${pendingCount ? 'cms-dash-badge-warning' : 'cms-dash-badge-neutral'}`}>
+                    {pendingCount} chờ duyệt
+                  </span>
+                  {filePending > 0 && (
+                    <span className="cms-dash-badge-warning">{filePending} file chờ kiểm tra</span>
+                  )}
+                </div>
               </div>
-              {isSuperAdmin && (
-                <button
-                  type="button"
-                  onClick={() => setShowTeacherModal(true)}
-                  className="cms-btn cms-btn-primary min-[390px]:w-auto"
-                >
-                  <Plus size={16} /> Thêm giảng viên
-                </button>
-              )}
+
+              <div className="flex flex-col min-[420px]:flex-row gap-2 w-full sm:w-auto sm:max-w-xl sm:flex-1 sm:justify-end">
+                <div className="relative flex-1 min-w-0 sm:max-w-xs">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Tìm giảng viên..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="cms-input pl-10"
+                    aria-label="Tìm giảng viên"
+                  />
+                </div>
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTeacherModal(true)}
+                    className="cms-btn cms-btn-primary shrink-0"
+                  >
+                    <Plus size={16} /> Thêm giảng viên
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Process steps */}
-          <div className="px-3 sm:px-4 py-3 bg-sky-50/70 border-b border-sky-100">
-            <p className="text-[12px] font-semibold text-sky-800 mb-2">Quy trình duyệt</p>
-            <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-sky-700">
-              {['Bài Test ≥ 80đ', '→', 'Nộp file thực hành', '→', 'Admin kiểm tra', '→', 'Cấp quyền'].map((step, i) => (
-                <span key={i} className={i % 2 === 1 ? 'text-sky-400 px-0.5' : 'bg-white px-2 py-1 rounded-lg font-semibold border border-sky-100'}>
-                  {step}
-                </span>
+          <div className="px-3 sm:px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2.5">Quy trình duyệt</p>
+            <div className="cms-teacher-steps">
+              {PROCESS_STEPS.map((label, i) => (
+                <div key={label} className="cms-teacher-step">
+                  <span className="cms-teacher-step__n">{i + 1}</span>
+                  <span className="cms-teacher-step__label">{label}</span>
+                </div>
               ))}
             </div>
           </div>
 
-          {/* Cards */}
-          <div className="p-3 sm:p-4 space-y-3 bg-slate-50/40">
+          <div className="p-3 sm:p-4 space-y-2.5 bg-slate-50/50">
             {filteredTeachers.length > 0 ? filteredTeachers.map((t) => {
               const score = t.testScore;
               const passed = (score || 0) >= 80;
@@ -89,26 +97,29 @@ export default function AdminTeachersTab() {
               const active = ['Active', 'active'].includes(t.status);
               const pending = ['Pending', 'pending'].includes(t.status);
               const locked = String(t.status).toLowerCase() === 'locked';
+              const inactive = String(t.status).toLowerCase() === 'inactive' || locked;
+              const examDate = resolveTeacherExamDate(t);
 
               return (
                 <article key={t.id} className={`cms-teacher-card ${t.practicalStatus === 'submitted' ? 'ring-1 ring-amber-200' : ''}`}>
-                  {/* Header */}
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
                     <Avatar
                       size="card"
                       initials={t.name?.substring(0, 2).toUpperCase() || 'GV'}
                       name={t.name}
                       role="teacher"
                       src={t.avatar}
-                      color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-red-400'}
+                      color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-slate-400'}
                     />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-[15px] sm:text-base font-bold text-slate-900 truncate leading-tight">{t.name}</p>
+                          <p className="text-[15px] font-bold text-slate-900 truncate leading-tight">{t.name}</p>
                           <p className="text-[13px] text-slate-500 mt-1 flex items-center gap-1.5 min-w-0">
                             <Phone size={12} className="shrink-0 text-slate-400" />
                             <span className="truncate font-mono">{t.phone || '—'}</span>
+                            {t.branchCode ? <span className="text-slate-300">·</span> : null}
+                            {t.branchCode ? <span className="truncate font-medium text-slate-500">{t.branchCode}</span> : null}
                           </p>
                         </div>
                         <span className={`cms-dash-badge flex-shrink-0 ${
@@ -121,93 +132,45 @@ export default function AdminTeachersTab() {
                         </span>
                       </div>
 
-                      {(t.specialty || t.branchCode) && (
-                        <div className="flex flex-wrap gap-1.5 mt-2.5 min-w-0">
-                          {t.specialty && (
-                            <span className="cms-dash-badge-info max-w-full line-clamp-2 break-words whitespace-normal text-left">
-                              {t.specialty}
-                            </span>
-                          )}
-                          {t.branchCode && (
-                            <span className="cms-dash-badge-neutral shrink-0">{t.branchCode}</span>
-                          )}
-                        </div>
+                      {t.specialty && (
+                        <p className="text-[12px] text-slate-600 leading-snug line-clamp-2">{t.specialty}</p>
                       )}
                     </div>
                   </div>
 
-                  {/* Metrics — 2 tiles, không chen chúc */}
-                  <div className="cms-teacher-card__metrics mt-3.5">
-                    <div className="cms-teacher-card__metric">
-                      <span className="cms-teacher-card__metric-label">Điểm bài test</span>
-                      <div className="cms-teacher-card__metric-value">
-                        <Star size={14} className={`shrink-0 ${passed ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
-                        <span className={score == null ? 'text-slate-400 font-semibold' : passed ? 'text-emerald-700' : 'text-red-600'}>
-                          {score == null ? 'Chưa thi' : `${score}/100`}
-                        </span>
-                        {score != null && (
-                          <span className={`ml-auto text-[11px] font-bold shrink-0 ${passed ? 'text-emerald-600' : 'text-red-500'}`}>
-                            {passed ? 'Đạt' : 'Trượt'}
-                          </span>
-                        )}
-                      </div>
-                      {score != null && (
-                        <div className="cms-progress">
-                          <span
-                            className={passed ? 'bg-emerald-500' : 'bg-red-400'}
-                            style={{ width: `${Math.min(100, score)}%` }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="cms-teacher-card__metric">
-                      <span className="cms-teacher-card__metric-label">Đánh giá học viên</span>
-                      <div className="cms-teacher-card__metric-value">
-                        <Star size={14} className={`shrink-0 ${rating.count > 0 ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
-                        {rating.count > 0 ? (
-                          <>
-                            <span className="text-amber-700">{rating.avg}/5</span>
-                            <span className="text-[12px] font-semibold text-slate-400">({rating.count})</span>
-                          </>
-                        ) : (
-                          <span className="text-slate-400 font-semibold">Chưa có</span>
-                        )}
-                      </div>
-                    </div>
+                  <div className="cms-teacher-card__chips">
+                    <span className={`cms-teacher-chip ${score == null ? 'cms-teacher-chip--muted' : passed ? 'cms-teacher-chip--ok' : 'cms-teacher-chip--bad'}`}>
+                      <Star size={12} className={passed ? 'fill-current' : ''} />
+                      {score == null ? 'Chưa thi' : `${score}/100 · ${passed ? 'Đạt' : 'Trượt'}`}
+                    </span>
+                    <span className={`cms-teacher-chip ${rating.count > 0 ? 'cms-teacher-chip--warn' : 'cms-teacher-chip--muted'}`}>
+                      <Star size={12} className={rating.count > 0 ? 'fill-current' : ''} />
+                      {rating.count > 0 ? `${rating.avg}/5 · ${rating.count} đánh giá` : 'Chưa có đánh giá'}
+                    </span>
+                    {t.assignedStudents?.length > 0 && (
+                      <span className="cms-teacher-chip cms-teacher-chip--info">
+                        Đang dạy {t.assignedStudents.length} HV
+                      </span>
+                    )}
+                    {examDate && (
+                      <span className={`cms-teacher-chip ${isTeacherExamDateApproximate(t) ? 'cms-teacher-chip--warn' : 'cms-teacher-chip--muted'}`}>
+                        <CalendarCheck size={12} />
+                        Thi {examDate.toLocaleDateString('vi-VN')}
+                        {isTeacherExamDateApproximate(t) ? ' (ước lượng)' : ''}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Meta lines */}
-                  {(() => {
-                    const d = resolveTeacherExamDate(t);
-                    if (!d && !(t.assignedStudents?.length > 0)) return null;
-                    return (
-                      <div className="mt-2.5 space-y-1">
-                        {d && (
-                          <p className={`text-[12px] flex items-center gap-1.5 ${isTeacherExamDateApproximate(t) ? 'text-amber-600' : 'text-slate-500'}`}>
-                            <CalendarCheck size={12} className="shrink-0" />
-                            Ngày thi{isTeacherExamDateApproximate(t) ? ' (ước lượng)' : ''}:{' '}
-                            {d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        )}
-                        {t.assignedStudents?.length > 0 && (
-                          <p className="text-[12px] text-sky-700 font-medium">Đang dạy: {t.assignedStudents.length} học viên</p>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Practical status */}
                   <div
-                    className={`cms-teacher-card__status mt-3 ${
+                    className={`cms-teacher-card__status ${
                       t.practicalStatus === 'reviewed' ? 'is-ready'
                         : t.practicalFile ? 'is-wait' : ''
                     }`}
                   >
-                    <FileSpreadsheet size={16} className="shrink-0 opacity-80" />
+                    <FileSpreadsheet size={15} className="shrink-0 opacity-80" />
                     {t.practicalFile ? (
-                      <div className="min-w-0 flex-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="font-semibold truncate">
+                      <div className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-semibold truncate text-[13px]">
                           {practicalFileDisplayName(t.practicalFile)}
                         </span>
                         <span className="text-[11px] font-bold uppercase tracking-wide opacity-80">
@@ -218,58 +181,57 @@ export default function AdminTeachersTab() {
                           onClick={() => setReviewModal(t)}
                           className="ml-auto text-[13px] font-bold text-sky-700 hover:underline shrink-0 min-h-9 px-1"
                         >
-                          Tải &amp; kiểm tra
+                          Kiểm tra
                         </button>
                       </div>
                     ) : (
-                      <span className="font-medium">Chưa nộp bài thực hành</span>
+                      <span className="font-medium text-[13px]">Chưa nộp bài thực hành</span>
                     )}
                   </div>
 
                   {t.approvedAt && (
-                    <p className="text-[12px] text-emerald-600 flex items-center gap-1.5 mt-2.5">
+                    <p className="text-[12px] text-emerald-600 flex items-center gap-1.5 -mt-1">
                       <CheckCircle2 size={12} /> Duyệt {new Date(t.approvedAt).toLocaleString('vi-VN')}
                     </p>
                   )}
                   {locked && t.lockReason && (
-                    <p className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mt-2.5">
+                    <p className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
                       {t.lockReason}
                     </p>
                   )}
 
-                  {/* Actions */}
                   {isSuperAdmin && (
                     <div className="cms-teacher-card__footer">
-                      {(String(t.status).toLowerCase() === 'inactive' || locked) && (
-                        <button
-                          type="button"
-                          onClick={() => setGrantModal({ id: t.id, name: t.name || t.email || t.phone, type: locked ? 'retry' : 'first' })}
-                          className={`cms-btn cms-btn-sm w-full ${locked ? 'cms-btn-primary' : 'cms-btn-secondary'}`}
-                        >
-                          <Unlock size={15} /> {locked ? 'Cấp quyền thi lại' : 'Cấp truy cập thi'}
-                        </button>
-                      )}
-
-                      {pending && (
-                        <div className="space-y-1.5">
+                      <div className="cms-teacher-card__footer-main">
+                        {inactive && (
                           <button
                             type="button"
-                            onClick={() => setApproveModal(t)}
-                            disabled={(t.testScore || 0) < 80 || t.practicalStatus !== 'reviewed'}
-                            className="cms-btn cms-btn-success cms-btn-sm w-full"
+                            onClick={() => setGrantModal({ id: t.id, name: t.name || t.email || t.phone, type: locked ? 'retry' : 'first' })}
+                            className={`cms-btn cms-btn-sm ${locked ? 'cms-btn-primary' : 'cms-btn-secondary'}`}
                           >
-                            <UserCheck size={15} /> Cấp quyền giảng dạy
+                            <Unlock size={15} /> {locked ? 'Cấp quyền thi lại' : 'Cấp truy cập thi'}
                           </button>
-                          {(t.testScore || 0) < 80 && (
-                            <p className="text-[11px] text-red-500 font-semibold">Chưa đủ 80 điểm</p>
-                          )}
-                          {t.practicalStatus !== 'reviewed' && (
-                            <p className="text-[11px] text-amber-600 font-semibold">Chưa duyệt bài thực hành</p>
-                          )}
-                        </div>
-                      )}
+                        )}
 
-                      <div className="cms-card-actions">
+                        {pending && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setApproveModal(t)}
+                              disabled={(t.testScore || 0) < 80 || t.practicalStatus !== 'reviewed'}
+                              className="cms-btn cms-btn-success cms-btn-sm"
+                            >
+                              <UserCheck size={15} /> Cấp quyền giảng dạy
+                            </button>
+                            {(t.testScore || 0) < 80 && (
+                              <p className="text-[11px] text-red-500 font-semibold">Chưa đủ 80 điểm</p>
+                            )}
+                            {t.practicalStatus !== 'reviewed' && (
+                              <p className="text-[11px] text-amber-600 font-semibold">Chưa duyệt bài thực hành</p>
+                            )}
+                          </>
+                        )}
+
                         {active && (
                           <button
                             type="button"
@@ -279,6 +241,9 @@ export default function AdminTeachersTab() {
                             <DollarSign size={14} /> Thanh toán
                           </button>
                         )}
+                      </div>
+
+                      <div className="cms-teacher-card__footer-tools">
                         <button
                           type="button"
                           onClick={() => setEditTeacher(t)}
@@ -303,7 +268,7 @@ export default function AdminTeachersTab() {
                 </article>
               );
             }) : (
-              <div className="py-16 text-center space-y-3">
+              <div className="py-14 text-center space-y-3">
                 <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
                   <User size={28} />
                 </div>
@@ -320,7 +285,6 @@ export default function AdminTeachersTab() {
         </div>
       </div>
 
-      {/* Review modal → bottom sheet */}
       {reviewModal && (
         <>
           <div className="cms-sheet-backdrop" onClick={() => setReviewModal(null)} aria-hidden="true" />
@@ -368,7 +332,6 @@ export default function AdminTeachersTab() {
         </>
       )}
 
-      {/* Approve modal → bottom sheet */}
       {approveModal && (
         <>
           <div className="cms-sheet-backdrop" onClick={() => setApproveModal(null)} aria-hidden="true" />

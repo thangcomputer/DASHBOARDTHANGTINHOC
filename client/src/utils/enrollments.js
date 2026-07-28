@@ -79,6 +79,8 @@ export function getClientEnrollments(student) {
       nextClass: e.nextClass || '', nextClassTime: e.nextClassTime || '',
       paid: e.paid, price: e.price, status: e.status || 'active',
       registeredAt: e.registeredAt, isPrimary: e.isPrimary,
+      requireWebcam: e.requireWebcam !== false,
+      examUnlocked: e.examUnlocked === true,
     }));
   }
   if (student.course) {
@@ -92,7 +94,10 @@ export function getClientEnrollments(student) {
       nextClass: student.nextClass || '', nextClassTime: student.nextClassTime || '',
       paid: student.paid, price: student.price,
       status: student.status === 'Ho\u00E0n th\u00E0nh' ? 'completed' : 'active',
-      registeredAt: student.createdAt, isPrimary: true }];
+      registeredAt: student.createdAt, isPrimary: true,
+      requireWebcam: student.requireWebcam !== false,
+      examUnlocked: !!student.studentExamUnlocked,
+    }];
   }
   return [];
 }

@@ -32,6 +32,8 @@ function legacyEnrollmentFromStudent(student) {
     isPrimary: true,
     registeredAt: doc.createdAt,
     examSubjects: [],
+    requireWebcam: doc.requireWebcam !== false,
+    examUnlocked: !!doc.studentExamUnlocked,
   };
 }
 
@@ -94,6 +96,8 @@ function toClientCourse(enrollment, index) {
     status: enrollment.status || (completed >= (enrollment.totalSessions || 12) ? 'completed' : 'active'),
     registeredAt: enrollment.registeredAt,
     isPrimary: enrollment.isPrimary,
+    requireWebcam: enrollment.requireWebcam !== false,
+    examUnlocked: enrollment.examUnlocked === true,
   };
 }
 
@@ -268,6 +272,8 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
     const enrGrades = (e.grades && e.grades.length)
       ? e.grades
       : ((e.isPrimary || enrollments.length === 1) ? (doc.grades || []) : (e.grades || []));
+    const inheritUnlock = e.examUnlocked == null && !!(e.isPrimary || enrollments.length === 1) && !!doc.studentExamUnlocked;
+    const inheritWebcamOff = e.requireWebcam == null && !!(e.isPrimary || enrollments.length === 1) && doc.requireWebcam === false;
     return {
       ...e,
       _id: e._id,
@@ -279,6 +285,8 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
       remainingSessions: Math.max(0, total - completed),
       status: completed >= total ? 'completed' : (e.status || 'active'),
       grades: enrGrades,
+      requireWebcam: inheritWebcamOff ? false : (e.requireWebcam !== false),
+      examUnlocked: e.examUnlocked === true || inheritUnlock,
     };
   });
 

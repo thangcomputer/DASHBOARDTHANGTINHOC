@@ -38,16 +38,30 @@ const enrollmentRemaining = (enr) => {
 };
 const summarizeEnrollments = (list) => {
   const items = Array.isArray(list) ? list : [];
+  const isPaid = (e) =>
+    e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
   const totalSessions = items.reduce((s, e) => s + (Number(e.totalSessions) || 12), 0);
   const completedSessions = items.reduce((s, e) => s + (Number(e.completedSessions) || 0), 0);
   const remainingSessions = items.reduce((s, e) => s + enrollmentRemaining(e), 0);
   const price = items.reduce((s, e) => s + (Number(e.price) || 0), 0);
+  const paidPrice = items.filter(isPaid).reduce((s, e) => s + (Number(e.price) || 0), 0);
+  const paidCount = items.filter(isPaid).length;
   const progressPercent = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
   const grades = items.map((e) => Number(e.avgGrade)).filter((g) => Number.isFinite(g) && g > 0);
   const avgGrade = grades.length
     ? Math.round((grades.reduce((a, b) => a + b, 0) / grades.length) * 10) / 10
     : null;
-  return { totalSessions, completedSessions, remainingSessions, price, progressPercent, avgGrade };
+  return {
+    totalSessions,
+    completedSessions,
+    remainingSessions,
+    price,
+    paidPrice,
+    paidCount,
+    enrollmentCount: items.length,
+    progressPercent,
+    avgGrade,
+  };
 };
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
 const fmtDateTimeVN = (input) => {
@@ -199,22 +213,29 @@ export default function StudentDetailModal({ studentId, onClose }) {
     } catch (err) {}
   };
 
-  const toggleWebcam = async () => {
-    if (!updateStudent || !data?.student) return;
-    const newVal = data.student.requireWebcam === false ? true : false;
+  const toggleEnrollmentSetting = async (enr, field) => {
+    const sid = data?.student?._id || data?.student?.id || studentId;
+    const enrId = enr?.enrollmentId || enr?.id;
+    if (!sid || !enrId || enrId === 'main') {
+      toast.error('Không xác định được khóa học. Thử tải lại trang.');
+      return;
+    }
+    const curWebcam = enr.requireWebcam !== false;
+    const curUnlock = enr.examUnlocked === true;
+    const payload = field === 'requireWebcam'
+      ? { requireWebcam: !curWebcam }
+      : { examUnlocked: !curUnlock };
     try {
-      await updateStudent(data.student._id || data.student.id, { requireWebcam: newVal });
-      setData({ ...data, student: { ...data.student, requireWebcam: newVal } });
-    } catch (err) {}
-  };
-
-  const toggleExamUnlocked = async () => {
-    if (!updateStudent || !data?.student) return;
-    const newVal = !data.student.studentExamUnlocked;
-    try {
-      await updateStudent(data.student._id || data.student.id, { studentExamUnlocked: newVal });
-      setData({ ...data, student: { ...data.student, studentExamUnlocked: newVal } });
-    } catch (err) {}
+      const res = await api.students.updateEnrollmentSettings(sid, enrId, payload);
+      if (res?.success && res.data) {
+        // settings API trả student doc; full-detail bọc trong { student, ... }
+        setData((prev) => ({ ...(prev || {}), student: res.data }));
+        return;
+      }
+      toast.error(res?.message || 'Không cập nhật được quyền khóa');
+    } catch {
+      toast.error('Lỗi kết nối API');
+    }
   };
 
   useEffect(() => {
@@ -224,10 +245,6 @@ export default function StudentDetailModal({ studentId, onClose }) {
       .then(res => {
         if (res.success) {
           setData(res.data);
-          // Auto fetch assignments for the course
-          if (res.data.student?.course) {
-            fetchAssignments(res.data.student.course);
-          }
         }
       })
       .catch(err => void 0)
@@ -238,31 +255,118 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const [loadingAssign, setLoadingAssign] = useState(false);
   const [showAddAssign, setShowAddAssign] = useState(false);
   const [newAssign, setNewAssign] = useState({ title: '', deadline: '', fileUrl: '', description: '' });
+  const [assignTargetCourse, setAssignTargetCourse] = useState('');
+
+  const liveEnrollments = data?.student ? getClientEnrollments(data.student) : [];
+  const liveFilterValid = courseFilter === 'all'
+    || liveEnrollments.some((e) => String(e.enrollmentId || e.id) === String(courseFilter));
+  const liveCourseFilter = liveFilterValid ? courseFilter : 'all';
+  const liveActiveEnrollment = liveCourseFilter !== 'all'
+    ? liveEnrollments.find((e) => String(e.enrollmentId || e.id) === String(liveCourseFilter)) || null
+    : null;
+  const liveAssignCourseName = liveActiveEnrollment
+    ? (liveActiveEnrollment.courseName || liveActiveEnrollment.name || '')
+    : assignTargetCourse;
+
+  useEffect(() => {
+    if (liveActiveEnrollment) {
+      setAssignTargetCourse(liveActiveEnrollment.courseName || liveActiveEnrollment.name || '');
+      return;
+    }
+    if (!assignTargetCourse && liveEnrollments[0]) {
+      setAssignTargetCourse(liveEnrollments[0].courseName || liveEnrollments[0].name || '');
+    }
+  }, [liveCourseFilter, liveActiveEnrollment?.enrollmentId, liveActiveEnrollment?.id, liveEnrollments.length]);
 
   const fetchAssignments = async (course) => {
+    if (!studentId || !course) {
+      setAssignments([]);
+      return;
+    }
     setLoadingAssign(true);
     try {
       const res = await api.assignments.getByStudentAndCourse(studentId, course);
-      if (res.success) setAssignments(res.data);
-    } catch (err) { void 0 }
+      if (res.success) setAssignments(res.data || []);
+      else setAssignments([]);
+    } catch (err) { void 0; setAssignments([]); }
     finally { setLoadingAssign(false); }
   };
 
+  const fetchAssignmentsForCourses = async (courseNames) => {
+    const names = [...new Set((courseNames || []).map((n) => String(n || '').trim()).filter(Boolean))];
+    if (!studentId || names.length === 0) {
+      setAssignments([]);
+      return;
+    }
+    setLoadingAssign(true);
+    try {
+      const results = await Promise.all(
+        names.map((name) => api.assignments.getByStudentAndCourse(studentId, name).catch(() => null)),
+      );
+      const merged = [];
+      const seen = new Set();
+      results.forEach((res) => {
+        (res?.success ? res.data : []).forEach((a) => {
+          const id = String(a._id || a.id || '');
+          if (!id || seen.has(id)) return;
+          seen.add(id);
+          merged.push(a);
+        });
+      });
+      merged.sort((a, b) => new Date(b.deadline || b.createdAt || 0) - new Date(a.deadline || a.createdAt || 0));
+      setAssignments(merged);
+    } catch (err) { void 0; setAssignments([]); }
+    finally { setLoadingAssign(false); }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'assignments' || !studentId || !data?.student) return;
+    if (liveCourseFilter === 'all') {
+      fetchAssignmentsForCourses(liveEnrollments.map((e) => e.courseName || e.name));
+    } else {
+      fetchAssignments(liveActiveEnrollment?.courseName || liveActiveEnrollment?.name || '');
+    }
+  }, [activeTab, studentId, liveCourseFilter, liveActiveEnrollment?.enrollmentId, liveActiveEnrollment?.id, liveEnrollments.length, data?.student?._id]);
+
   const handleAddAssignment = async () => {
-    if (!newAssign.title || !newAssign.deadline) return;
+    const courseName = String(
+      liveActiveEnrollment
+        ? (liveActiveEnrollment.courseName || liveActiveEnrollment.name)
+        : assignTargetCourse,
+    ).trim();
+    if (!courseName) {
+      toast.error('Chọn khóa học để giao bài tập');
+      return;
+    }
+    if (!newAssign.title || !newAssign.deadline) {
+      toast.error('Nhập tiêu đề và hạn nộp');
+      return;
+    }
+    const enr = liveEnrollments.find(
+      (e) => String(e.courseName || e.name).trim() === courseName,
+    );
     try {
       const res = await api.assignments.create({
         ...newAssign,
-        courseId: data.student.course,
-        teacherId: data.student.teacherId?._id || 'admin', // default to admin or current teacher
-        studentId: data.student._id || data.student.id || studentId,
+        courseId: courseName,
+        teacherId: enr?.teacherId || data?.student?.teacherId?._id || data?.student?.teacherId || 'admin',
+        studentId: data?.student?._id || data?.student?.id || studentId,
       });
       if (res.success) {
         setShowAddAssign(false);
         setNewAssign({ title: '', deadline: '', fileUrl: '', description: '' });
-        fetchAssignments(data.student.course);
+        toast.success('Đã giao bài tập');
+        if (liveCourseFilter === 'all') {
+          fetchAssignmentsForCourses(liveEnrollments.map((e) => e.courseName || e.name));
+        } else {
+          fetchAssignments(courseName);
+        }
+      } else {
+        toast.error(res?.message || 'Không giao được bài tập');
       }
-    } catch (err) { void 0 }
+    } catch (err) {
+      toast.error('Lỗi kết nối khi giao bài tập');
+    }
   };
 
   if (!studentId) return null;
@@ -294,6 +398,57 @@ export default function StudentDetailModal({ studentId, onClose }) {
       : (activeEnrollment.status === 'active' ? 'Đang học' : (activeEnrollment.status || data?.student?.status || '—')))
     : (data?.student?.status || '—');
   const avgGradeDisplay = summaryMetrics.avgGrade ?? data?.student?.avgGrade ?? '—';
+  const financePaidTotal = summaryMetrics.paidPrice > 0
+    ? summaryMetrics.paidPrice
+    : (Number(data?.student?.paidAmount) > 0 && effectiveCourseFilter === 'all'
+      ? Number(data.student.paidAmount)
+      : 0);
+  const financeListedTotal = summaryMetrics.price;
+  const financeAllPaid = summaryMetrics.enrollmentCount > 0
+    && summaryMetrics.paidCount >= summaryMetrics.enrollmentCount;
+  const financePartialPaid = summaryMetrics.paidCount > 0 && !financeAllPaid;
+  const financeStatusLabel = financeAllPaid
+    ? 'ĐÃ HOÀN TẤT'
+    : financePartialPaid
+      ? 'THU MỘT PHẦN'
+      : (data?.student?.paid ? 'ĐÃ HOÀN TẤT' : 'CÒN NỢ');
+
+  const invoiceList = Array.isArray(data?.invoices) ? data.invoices : [];
+  const paidScopedEnrollments = scopedEnrollments.filter(
+    (e) => e.paid === true || e.paid === 'Đã đóng phí' || e.paid === 'true' || e.paid === 1,
+  );
+  const financeHistory = (() => {
+    const rows = invoiceList.map((inv) => ({
+      key: String(inv._id || inv.maHoaDon),
+      maHoaDon: inv.maHoaDon || '—',
+      createdAt: inv.createdAt || inv.ngayXuat,
+      khoaHoc: inv.khoaHoc || '—',
+      ghiChu: inv.ghiChu || 'Thu học phí',
+      hocPhi: Number(inv.hocPhi) || 0,
+      synthetic: false,
+    }));
+    paidScopedEnrollments.forEach((enr, idx) => {
+      const courseName = enr.courseName || enr.name || '';
+      const amount = Number(enr.price) || 0;
+      const matched = rows.some((r) => {
+        const sameCourse = String(r.khoaHoc || '').trim().toLowerCase() === String(courseName).trim().toLowerCase();
+        const sameAmount = Math.abs(Number(r.hocPhi) - amount) < 1;
+        return sameCourse && sameAmount;
+      });
+      if (matched) return;
+      rows.push({
+        key: `enr-${enr.enrollmentId || enr.id || idx}`,
+        maHoaDon: '—',
+        createdAt: enr.paidAt || enr.registeredAt || data?.student?.paidAt,
+        khoaHoc: courseName || 'Khóa học',
+        ghiChu: 'Thanh toán khóa học',
+        hocPhi: amount,
+        synthetic: true,
+      });
+    });
+    rows.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    return rows;
+  })();
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -629,6 +784,46 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                             </button>
                                           )}
                                         </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                          {(() => {
+                                            const webcamOn = enr.requireWebcam !== false;
+                                            const unlocked = enr.examUnlocked === true;
+                                            return (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => toggleEnrollmentSetting(enr, 'requireWebcam')}
+                                                  className={`p-3 rounded-xl border text-left transition-all ${webcamOn ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}
+                                                >
+                                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                                    <p className={`text-[10px] font-black uppercase tracking-tighter ${webcamOn ? 'text-emerald-700' : 'text-amber-700'}`}>Yêu cầu camera</p>
+                                                    <div className={`w-8 h-4 rounded-full flex items-center p-0.5 shrink-0 ${webcamOn ? 'bg-emerald-500' : 'bg-amber-200'}`}>
+                                                      <div className={`w-3 h-3 bg-white rounded-full transition-transform ${webcamOn ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                    </div>
+                                                  </div>
+                                                  <p className={`text-[9px] font-bold leading-snug ${webcamOn ? 'text-emerald-600/70' : 'text-amber-600/70'}`}>
+                                                    {webcamOn ? 'Bắt buộc webcam khi thi khóa này.' : 'Không cần webcam khi thi khóa này.'}
+                                                  </p>
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => toggleEnrollmentSetting(enr, 'examUnlocked')}
+                                                  className={`p-3 rounded-xl border text-left transition-all ${unlocked ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}
+                                                >
+                                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                                    <p className={`text-[10px] font-black uppercase tracking-tighter ${unlocked ? 'text-emerald-700' : 'text-slate-600'}`}>Mở khóa thi</p>
+                                                    <div className={`w-8 h-4 rounded-full flex items-center p-0.5 shrink-0 ${unlocked ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                                                      <div className={`w-3 h-3 bg-white rounded-full transition-transform ${unlocked ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                    </div>
+                                                  </div>
+                                                  <p className={`text-[9px] font-bold leading-snug ${unlocked ? 'text-emerald-600/70' : 'text-slate-500/70'}`}>
+                                                    {unlocked ? 'Đã mở. Có thể làm mọi bài thi khóa này.' : 'Đang tắt. Theo lộ trình buổi học.'}
+                                                  </p>
+                                                </button>
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -637,36 +832,6 @@ export default function StudentDetailModal({ studentId, onClose }) {
                             );
                           })()}
 
-                          <div className="pt-6 mt-4 border-t border-slate-100">
-                             <h4 className="font-black text-slate-800 text-[11px] uppercase tracking-wider mb-4 flex items-center gap-2">
-                               <ShieldCheck size={14} className="text-indigo-500" /> QUYỀN HẠN HỌC VIÊN
-                             </h4>
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <button onClick={toggleWebcam} className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between h-full ${data.student.requireWebcam === false ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                                   <div className="flex items-center justify-between w-full mb-2">
-                                      <p className={`text-xs font-black uppercase tracking-tighter ${data.student.requireWebcam === false ? 'text-amber-700' : 'text-emerald-700'}`}>YÊU CẦU CAMERA</p>
-                                      <div className={`w-8 h-4 rounded-full flex items-center p-0.5 transition-colors ${data.student.requireWebcam === false ? 'bg-amber-200' : 'bg-emerald-500'}`}>
-                                        <div className={`w-3 h-3 bg-white rounded-full transition-transform ${data.student.requireWebcam === false ? 'translate-x-0' : 'translate-x-4'}`} />
-                                      </div>
-                                   </div>
-                                   <p className={`text-[10px] font-bold ${data.student.requireWebcam === false ? 'text-amber-600/70' : 'text-emerald-600/70'}`}>
-                                      {data.student.requireWebcam === false ? 'Đã tắt. Học viên có thể thi mà không cần webcam.' : 'Đang bật. Yêu cầu bật webcam khi thi.'}
-                                   </p>
-                                </button>
-                                
-                                <button onClick={toggleExamUnlocked} className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between h-full ${data.student.studentExamUnlocked ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                                   <div className="flex items-center justify-between w-full mb-2">
-                                      <p className={`text-xs font-black uppercase tracking-tighter ${data.student.studentExamUnlocked ? 'text-emerald-700' : 'text-slate-600'}`}>MỞ KHÓA THI TOÀN BỘ</p>
-                                      <div className={`w-8 h-4 rounded-full flex items-center p-0.5 transition-colors ${data.student.studentExamUnlocked ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                                        <div className={`w-3 h-3 bg-white rounded-full transition-transform ${!data.student.studentExamUnlocked ? 'translate-x-0' : 'translate-x-4'}`} />
-                                      </div>
-                                   </div>
-                                   <p className={`text-[10px] font-bold ${data.student.studentExamUnlocked ? 'text-emerald-600/70' : 'text-slate-500/70'}`}>
-                                      {data.student.studentExamUnlocked ? 'Đã mở khóa. Có thể làm mọi bài thi.' : 'Đang tắt. Phải tuân theo lộ trình.'}
-                                   </p>
-                                </button>
-                             </div>
-                          </div>
                        </div>
                     </div>
 
@@ -760,32 +925,40 @@ export default function StudentDetailModal({ studentId, onClose }) {
               {activeTab === 'finance' && (
                 <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                     <div className="bg-emerald-600 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] sm:h-48">
+                     <div className={`${financeAllPaid || (data.student.paid && !financePartialPaid) ? 'bg-emerald-600' : financePartialPaid ? 'bg-amber-600' : 'bg-red-600'} rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] sm:h-48`}>
                         <DollarSign className="absolute -right-8 -bottom-8 w-40 h-40 opacity-10" />
                         <div>
                           <p className="text-[11px] font-black opacity-60 uppercase tracking-widest mb-1">Trạng thái đóng phí</p>
-                          <h4 className="text-2xl sm:text-3xl font-black">{data.student.paid ? 'ĐÃ HOÀN TẤT' : 'CÒN NỢ'}</h4>
+                          <h4 className="text-2xl sm:text-3xl font-black">{financeStatusLabel}</h4>
+                          <p className="text-[12px] font-semibold opacity-80 mt-2">
+                            {summaryMetrics.paidCount}/{summaryMetrics.enrollmentCount || 1} khóa đã thu
+                            {activeEnrollment ? ` · ${activeEnrollment.courseName || activeEnrollment.name}` : ''}
+                          </p>
                         </div>
                         <div className="flex justify-between items-end gap-3">
                           <div>
                             <p className="text-[10px] font-bold opacity-60">Đăng ký ngày</p>
                             <p className="text-sm font-black">{fmtDate(data.student.createdAt)}</p>
                           </div>
-                          {!data.student.paid && (
+                          {financePaidTotal < financeListedTotal && (
                             <button type="button" onClick={() => showModal({ 
                                 title: 'Hướng dẫn nghiệp vụ', 
-                                content: 'Chức năng "Thu Học Phí" vui lòng thực hiện tại tab "Giao dịch" để đảm bảo tính đồng nhất của dữ liệu kế toán!', 
+                                content: 'Thu từng khóa tại danh sách "Các khóa học đang theo" (Tổng quan) hoặc tab Giao dịch để đồng bộ hóa đơn.', 
                                 type: 'info' 
-                            })} className="bg-white text-emerald-600 px-4 sm:px-6 py-2 rounded-xl font-black text-[11px] uppercase tracking-wider hover:bg-emerald-50 transition-all shrink-0">
-                              Thu học phí ngay
+                            })} className="bg-white/95 text-slate-800 px-4 sm:px-6 py-2 rounded-xl font-black text-[11px] uppercase tracking-wider hover:bg-white transition-all shrink-0">
+                              Hướng dẫn thu
                             </button>
                           )}
                         </div>
                      </div>
                      <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-100 flex flex-col justify-between min-h-[9.5rem] sm:h-48 shadow-sm">
                         <div>
-                          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Số tiền thanh toán</p>
-                          <h4 className="text-2xl sm:text-3xl font-black text-slate-800">{fmt(data.student.price)}</h4>
+                          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Số tiền đã thanh toán</p>
+                          <h4 className="text-2xl sm:text-3xl font-black text-slate-800 break-words">{fmt(financePaidTotal)}</h4>
+                          <p className="text-[12px] font-semibold text-slate-400 mt-1.5">
+                            Học phí gốc: {fmt(financeListedTotal)}
+                            {financeListedTotal > financePaidTotal ? ` · Còn nợ ${fmt(financeListedTotal - financePaidTotal)}` : ''}
+                          </p>
                         </div>
                         <div className="flex gap-4">
                            <div className="flex-1 p-3 bg-slate-50 rounded-2xl border border-slate-100">
@@ -802,33 +975,37 @@ export default function StudentDetailModal({ studentId, onClose }) {
                      </div>
                   </div>
 
-                  <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider pt-4">Lịch sử hóa đơn</h3>
+                  <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider pt-4">Lịch sử thanh toán / hóa đơn</h3>
                   <div className="bg-white rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
-                    {data.invoices.length === 0 ? (
-                      <p className="cms-empty-cell">Chưa phát sinh hóa đơn nào</p>
+                    {financeHistory.length === 0 ? (
+                      <p className="cms-empty-cell">Chưa phát sinh thanh toán nào</p>
                     ) : (
                       <div className="cms-modal-table-scroll">
                         <table className="w-full text-left min-w-[520px]">
                           <thead>
                             <tr className="bg-slate-50">
                               <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Mã HĐ</th>
-                              <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày tạo</th>
+                              <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày</th>
                               <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Nội dung</th>
                               <th className="px-3 sm:px-4 py-3 text-right text-[11px] font-black text-slate-400 tracking-widest uppercase">Số tiền</th>
                               <th className="px-4 sm:px-6 py-3 text-center text-[11px] font-black text-slate-400 tracking-widest uppercase">In</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
-                            {data.invoices.map(inv => (
-                              <tr key={inv._id} className="hover:bg-slate-50/50 transition">
+                            {financeHistory.map((inv) => (
+                              <tr key={inv.key} className="hover:bg-slate-50/50 transition">
                                 <td className="px-4 sm:px-6 py-3.5">
-                                  <span className="text-xs font-black text-indigo-600">{inv.maHoaDon}</span>
+                                  <span className={`text-xs font-black ${inv.synthetic ? 'text-slate-400' : 'text-indigo-600'}`}>
+                                    {inv.maHoaDon}
+                                  </span>
                                 </td>
                                 <td className="px-3 sm:px-4 py-3.5 text-xs font-semibold text-slate-600 whitespace-nowrap">{fmtDate(inv.createdAt)}</td>
-                                <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-400 max-w-[140px] break-words">{inv.khoaHoc} — {inv.ghiChu || 'Thu phí ghi danh'}</td>
+                                <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-500 max-w-[180px] break-words">
+                                  {inv.khoaHoc}{inv.ghiChu ? ` — ${inv.ghiChu}` : ''}
+                                </td>
                                 <td className="px-3 sm:px-4 py-3.5 text-right font-black text-slate-800 text-sm whitespace-nowrap">{fmt(inv.hocPhi)}</td>
                                 <td className="px-4 sm:px-6 py-3.5 text-center">
-                                  <button type="button" onClick={() => window.print()} className="w-9 h-9 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 inline-flex items-center justify-center transition-all">
+                                  <button type="button" onClick={() => window.print()} className="w-9 h-9 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 inline-flex items-center justify-center transition-all" aria-label="In">
                                     <Printer size={14} />
                                   </button>
                                 </td>
@@ -860,11 +1037,39 @@ export default function StudentDetailModal({ studentId, onClose }) {
 
                     {showAddAssign && (
                       <div className="bg-white rounded-3xl p-6 border-2 border-indigo-100 shadow-xl space-y-4 animate-in zoom-in-95">
-                        <div className="flex items-center justify-between border-b border-indigo-50 pb-3">
-                           <p className="text-xs font-black text-indigo-700 uppercase tracking-widest">Thiết lập bài tập ({data?.student?.course})</p>
-                           <button onClick={() => setShowAddAssign(false)} className="text-slate-400 hover:text-red-500"><X size={16} /></button>
+                        <div className="flex items-center justify-between border-b border-indigo-50 pb-3 gap-3">
+                           <p className="text-xs font-black text-indigo-700 uppercase tracking-widest min-w-0">
+                             Thiết lập bài tập
+                             {liveAssignCourseName ? (
+                               <span className="block sm:inline sm:ml-1 normal-case tracking-normal text-slate-500 font-bold">
+                                 ({liveAssignCourseName})
+                               </span>
+                             ) : null}
+                           </p>
+                           <button type="button" onClick={() => setShowAddAssign(false)} className="text-slate-400 hover:text-red-500 shrink-0" aria-label="Đóng">
+                             <X size={16} />
+                           </button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {liveCourseFilter === 'all' && liveEnrollments.length > 0 && (
+                            <div className="md:col-span-2">
+                              <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Khóa học giao bài</label>
+                              <CmsSelect
+                                value={assignTargetCourse}
+                                onChange={(e) => setAssignTargetCourse(e.target.value)}
+                                aria-label="Chọn khóa học giao bài"
+                              >
+                                {liveEnrollments.map((enr) => {
+                                  const name = enr.courseName || enr.name;
+                                  return (
+                                    <option key={enr.enrollmentId || enr.id || name} value={name}>
+                                      {name}
+                                    </option>
+                                  );
+                                })}
+                              </CmsSelect>
+                            </div>
+                          )}
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Tiêu đề bài tập</label>
                             <input 
@@ -903,6 +1108,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                           </div>
                         </div>
                         <button 
+                          type="button"
                           onClick={handleAddAssignment}
                           className="w-full py-3 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100"
                         >

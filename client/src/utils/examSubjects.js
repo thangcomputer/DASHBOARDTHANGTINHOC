@@ -309,6 +309,32 @@ export function getSubjectIdsForEnrollment(enrollment, catalog) {
   return mapCourseToExamSubjectIds(enrollment?.courseName || enrollment?.name, cat);
 }
 
+/** Các enrollment gắn với một môn thi (theo examSubjects / tên khóa). */
+export function findEnrollmentsForSubject(enrollments, subjectId, catalog) {
+  const sid = String(subjectId || '');
+  if (!sid) return [];
+  return (enrollments || []).filter((e) =>
+    getSubjectIdsForEnrollment(e, catalog).map(String).includes(sid)
+  );
+}
+
+/** Mở khóa thi theo khóa: true nếu bất kỳ enrollment nào của môn đó đã mở. */
+export function isExamUnlockedForSubject(enrollments, subjectId, catalog, fallbackUnlocked = false) {
+  const list = findEnrollmentsForSubject(enrollments, subjectId, catalog);
+  if (list.length) return list.some((e) => e.examUnlocked === true);
+  return !!fallbackUnlocked;
+}
+
+/**
+ * Yêu cầu webcam theo khóa: true nếu còn ít nhất một enrollment của môn đó bắt buộc webcam.
+ * Không khớp enrollment → fallback root student.requireWebcam.
+ */
+export function requireWebcamForSubject(enrollments, subjectId, catalog, fallbackRequire = true) {
+  const list = findEnrollmentsForSubject(enrollments, subjectId, catalog);
+  if (list.length) return list.some((e) => e.requireWebcam !== false);
+  return fallbackRequire !== false;
+}
+
 export function getSubjectIdsForStudent(enrollments, fallbackCourse, catalog) {
   const ids = new Set();
   if (Array.isArray(enrollments) && enrollments.length) {

@@ -71,6 +71,9 @@ const StudentSchema = new mongoose.Schema(
       status: { type: String, enum: ['active', 'completed', 'paused'], default: 'active' },
       isPrimary: { type: Boolean, default: false },
       registeredAt: { type: Date, default: Date.now },
+      // Quyền theo từng khóa (môn cần camera / mở khóa thi riêng)
+      requireWebcam: { type: Boolean, default: true },
+      examUnlocked: { type: Boolean, default: false },
     }],
     price: {
       type: Number,

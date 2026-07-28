@@ -17,6 +17,27 @@ const {
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const { generateTempPassword } = require('../utils/tempPassword');
 
+async function createTuitionInvoice({ student, courseName, amount, note = '' }) {
+  const hocPhi = Number(amount) || 0;
+  if (!student?._id || hocPhi <= 0) return null;
+  try {
+    const count = await Invoice.countDocuments();
+    const now = new Date();
+    const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
+    return await Invoice.create({
+      maHoaDon: maHD,
+      hocVien: student._id,
+      hoTen: student.name,
+      khoaHoc: courseName || student.course || 'Học phí',
+      hocPhi,
+      ghiChu: note || `Thanh toán khóa ${courseName || student.course || ''}`.trim(),
+    });
+  } catch (err) {
+    logger.warn('[INVOICE] create skipped:', err.message);
+    return null;
+  }
+}
+
 // ─── GET /api/students ─────────────────────────────────────────────────────────
 // Lấy danh sách học viên (Admin / Teacher) — hỗ trợ Server-side Pagination
 router.get('/', [authMiddleware, branchFilter], async (req, res) => {
@@ -284,7 +305,11 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) 
     const schedules = await Schedule.find({ studentId: req.params.id }).sort({ date: -1 });
 
     // 2. Lịch sử hóa đơn học phí
-    const invoices = await Invoice.find({ hocVien: req.params.id }).sort({ createdAt: -1 });
+    const mongoose = require('mongoose');
+    const studentOid = mongoose.Types.ObjectId.isValid(req.params.id)
+      ? new mongoose.Types.ObjectId(req.params.id)
+      : req.params.id;
+    const invoices = await Invoice.find({ hocVien: studentOid }).sort({ createdAt: -1 }).lean();
 
     // 3. Kết quả thi (nếu có)
     const ExamResult = require('../models/ExamResult');
@@ -634,6 +659,29 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
           await student.save();
         }
       }
+
+      // Đồng bộ quyền thi/camera xuống từng enrollment khi cập nhật flag root (list/edit modal)
+      if (safeBody.studentExamUnlocked !== undefined || safeBody.requireWebcam !== undefined) {
+        if (!student.enrollments?.length && student.course) {
+          const { legacyEnrollmentFromStudent: legacyEnr } = require('../services/enrollmentService');
+          student.enrollments = [legacyEnr(student)];
+          student.enrollments[0].isPrimary = true;
+        }
+        if (student.enrollments?.length) {
+          if (typeof safeBody.studentExamUnlocked === 'boolean') {
+            student.enrollments.forEach((e) => {
+              e.examUnlocked = !!safeBody.studentExamUnlocked;
+            });
+          }
+          if (typeof safeBody.requireWebcam === 'boolean') {
+            student.enrollments.forEach((e) => {
+              e.requireWebcam = !!safeBody.requireWebcam;
+            });
+          }
+          student.markModified('enrollments');
+          await student.save();
+        }
+      }
     }
 
     const io = req.app.get('io');
@@ -844,18 +892,13 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
     await student.save({ validateModifiedOnly: true });
 
     // Tự động tạo hóa đơn
-    const count = await Invoice.countDocuments();
-    const now = new Date();
-    const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
-
-    const invoice = await Invoice.create({
-      maHoaDon: maHD,
-      hocVien: student._id,
-      hoTen: student.name,
-      khoaHoc: student.course,
-      hocPhi: student.price,
-      ghiChu: note,
+    const invoice = await createTuitionInvoice({
+      student,
+      courseName: student.course,
+      amount: student.paidAmount || student.price,
+      note,
     });
+    const maHD = invoice?.maHoaDon || '';
 
     // Thông báo real-time
     const io = req.app.get('io');
@@ -956,15 +999,20 @@ router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
 // Workflow 2: Admin mở khóa phòng thi thủ công
 router.put('/:id/unlock-exam', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
-    const student = await Student.findByIdAndUpdate(
-      req.params.id,
-      { studentExamUnlocked: true },
-      { returnDocument: 'after' }
-    );
-
+    const student = await Student.findById(req.params.id);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
+
+    student.studentExamUnlocked = true;
+    student.examApproved = true;
+    if (!student.enrollments?.length && student.course) {
+      student.enrollments = [legacyEnrollmentFromStudent(student)];
+      student.enrollments[0].isPrimary = true;
+    }
+    (student.enrollments || []).forEach((e) => { e.examUnlocked = true; });
+    if (student.enrollments?.length) student.markModified('enrollments');
+    await student.save({ validateModifiedOnly: true });
 
     // Thông báo real-time cho học viên
     const io = req.app.get('io');
@@ -1055,15 +1103,15 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
     const reason = String(rawReason || '').trim()
       || `Vi phạm quy chế giám sát thi (${actorLabel} đã đánh trượt)`;
 
-    const student = await Student.findByIdAndUpdate(
-      req.params.id,
-      { studentExamUnlocked: false, examApproved: false },
-      { returnDocument: 'after' }
-    );
-
+    const student = await Student.findById(req.params.id);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
+    student.studentExamUnlocked = false;
+    student.examApproved = false;
+    (student.enrollments || []).forEach((e) => { e.examUnlocked = false; });
+    if (student.enrollments?.length) student.markModified('enrollments');
+    await student.save({ validateModifiedOnly: true });
 
     const io = req.app.get('io');
     if (io) {
@@ -1201,14 +1249,27 @@ router.post('/:id/enrollments', authMiddleware, checkPermission(PERMISSIONS.MANA
       status: 'active',
       isPrimary: false,
       registeredAt: new Date(),
+      requireWebcam: true,
+      examUnlocked: false,
     });
 
     // Cộng doanh thu thực nhận khi khóa phụ được đánh dấu đã thanh toán
     if (isPaid && resolvedPrice > 0) {
       student.paidAmount = (Number(student.paidAmount) || 0) + resolvedPrice;
+      student.paid = true;
+      if (!student.paidAt) student.paidAt = new Date();
     }
 
     await student.save();
+
+    if (isPaid && resolvedPrice > 0) {
+      await createTuitionInvoice({
+        student,
+        courseName: resolvedName,
+        amount: resolvedPrice,
+        note: `Thanh toán khi thêm khóa ${resolvedName}`,
+      });
+    }
 
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
@@ -1240,6 +1301,56 @@ function syncStudentFromPrimaryEnrollment(student) {
   student.remainingSessions = primary.remainingSessions ?? primary.totalSessions ?? 12;
   student.completedSessions = primary.completedSessions || 0;
 }
+
+// ─── PUT /api/students/:id/enrollments/:enrollmentId/settings ─────────────────
+// Cập nhật quyền theo khóa: requireWebcam, examUnlocked
+router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+    if (!student.enrollments?.length && student.course) {
+      student.enrollments = [legacyEnrollmentFromStudent(student)];
+      student.enrollments[0].isPrimary = true;
+    }
+    const idx = (student.enrollments || []).findIndex((e) => String(e._id) === String(req.params.enrollmentId));
+    if (idx < 0) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
+    }
+
+    const { requireWebcam, examUnlocked } = req.body || {};
+    if (typeof requireWebcam === 'boolean') {
+      student.enrollments[idx].requireWebcam = requireWebcam;
+    }
+    if (typeof examUnlocked === 'boolean') {
+      student.enrollments[idx].examUnlocked = examUnlocked;
+    }
+
+    // Đồng bộ flag root để tương thích API cũ / danh sách
+    student.studentExamUnlocked = (student.enrollments || []).some((e) => e.examUnlocked === true);
+    const primary = student.enrollments.find((e) => e.isPrimary) || student.enrollments[0];
+    if (primary) {
+      student.requireWebcam = primary.requireWebcam !== false;
+    }
+
+    student.markModified('enrollments');
+    await student.save({ validateModifiedOnly: true });
+
+    const doc = student.toObject();
+    await applyEnrollmentStats(doc, student._id, Schedule);
+    const io = req.app.get('io');
+    if (io) io.emit('data:refresh', { type: 'student', id: student._id });
+
+    return res.json({
+      success: true,
+      message: 'Đã cập nhật quyền khóa học',
+      data: doc,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/pay ──────────────────────
 // Xác nhận thanh toán học phí cho 1 khóa (enrollment)
@@ -1283,21 +1394,12 @@ router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, checkPermission
 
     let invoice = null;
     if (amount > 0) {
-      try {
-        const count = await Invoice.countDocuments();
-        const now = new Date();
-        const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
-        invoice = await Invoice.create({
-          maHoaDon: maHD,
-          hocVien: student._id,
-          hoTen: student.name,
-          khoaHoc: enr.courseName,
-          hocPhi: amount,
-          ghiChu: note || `Thanh toán khóa ${enr.courseName}`,
-        });
-      } catch (invErr) {
-        logger.warn('[ENROLLMENT PAY] Invoice create skipped:', invErr.message);
-      }
+      invoice = await createTuitionInvoice({
+        student,
+        courseName: enr.courseName,
+        amount,
+        note: note || `Thanh toán khóa ${enr.courseName}`,
+      });
     }
 
     const io = req.app.get('io');

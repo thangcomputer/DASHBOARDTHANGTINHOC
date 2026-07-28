@@ -63,6 +63,18 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         page: currentPage, limit: PAGE_SIZE, search,
         paid: filterPaid, course: filterCourse, branch_id: selectedBranchId,
       });
+      return;
+    }
+    // Tổng quan: lấy 5 HV mới nhất để hiện "Học viên vừa đăng ký"
+    if (activeTab === 'dashboard') {
+      fetchStudentsPaginated({
+        page: 1,
+        limit: 5,
+        search: '',
+        paid: 'all',
+        course: 'all',
+        branch_id: selectedBranchId,
+      });
     }
   }, [activeTab, currentPage, search, filterPaid, filterCourse, fetchStudentsPaginated, selectedBranchId]);
 

@@ -757,6 +757,13 @@ export const studentsAPI = {
     });
     return res.json();
   },
+  updateEnrollmentSettings: async (id, enrollmentId, data = {}) => {
+    const res = await apiFetch(`/students/${id}/enrollments/${encodeURIComponent(enrollmentId)}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
   deleteEnrollment: async (id, enrollmentId) => {
     const res = await apiFetch(`/students/${id}/enrollments/${enrollmentId}`, {
       method: 'DELETE',

@@ -103,44 +103,90 @@ function assertEndAfterStart(startTime, endTime) {
 }
 
 // ─── Helper: Kiểm tra và tự động Unlock Thi cho Học Viên ─────────────────────
-// Workflow 2: Đếm buổi hoàn thành → nếu >= totalSessions thì set studentExamUnlocked = true
-async function checkAndUnlockExam(studentId, io) {
+// Workflow 2: Đếm buổi hoàn thành theo từng khóa → set enrollment.examUnlocked
+async function checkAndUnlockExam(studentId, io, courseNameHint) {
   try {
     const student = await Student.findById(studentId);
-    if (!student || student.studentExamUnlocked) return;
+    if (!student) return;
 
-    // Đếm số buổi đã hoàn thành
-    const completedSessions = await Schedule.countDocuments({
-      studentId,                 // 1. Đúng định danh học viên
-      course: student.course,    // 2. Đúng khóa học hiện tại
-      status: 'completed',       // 3. Trạng thái Đã điểm danh
-    });
+    if (!student.enrollments?.length && student.course) {
+      const { legacyEnrollmentFromStudent } = require('../services/enrollmentService');
+      student.enrollments = [legacyEnrollmentFromStudent(student)];
+      student.enrollments[0].isPrimary = true;
+    }
 
-    // Lấy tổng số buổi cần thiết từ học viên
-    const totalRequired = student.totalSessions || 12;
-
-    if (completedSessions >= totalRequired) {
-      await Student.findByIdAndUpdate(studentId, { studentExamUnlocked: true });
-
-      // Thông báo real-time cho học viên
-      if (io) {
-        const NotificationService = require('../services/NotificationService');
-        NotificationService.send(io, {
-          type: 'EXAM',
-          title: '🎉 Phòng thi đã được mở khóa!',
-          content: `Chúc mừng! Bạn đã hoàn thành ${completedSessions} buổi học. Phòng thi đã được mở khóa!`,
-          receivers: student._id.toString(),
-          link: '/student/exam'
-        });
-
-        io.emit('exam:unlocked', {
-          studentId: student._id.toString(),
-          studentName: student.name,
-        });
-        io.emit('data:refresh', { type: 'student', id: student._id });
+    const enrollments = student.enrollments || [];
+    if (!enrollments.length) {
+      if (student.studentExamUnlocked) return;
+      const completedSessions = await Schedule.countDocuments({
+        studentId,
+        course: student.course,
+        status: 'completed',
+      });
+      const totalRequired = student.totalSessions || 12;
+      if (completedSessions >= totalRequired) {
+        await Student.findByIdAndUpdate(studentId, { studentExamUnlocked: true });
+        if (io) {
+          const NotificationService = require('../services/NotificationService');
+          NotificationService.send(io, {
+            type: 'EXAM',
+            title: '🎉 Phòng thi đã được mở khóa!',
+            content: `Chúc mừng! Bạn đã hoàn thành ${completedSessions} buổi học. Phòng thi đã được mở khóa!`,
+            receivers: student._id.toString(),
+            link: '/student/exam'
+          });
+          io.emit('exam:unlocked', {
+            studentId: student._id.toString(),
+            studentName: student.name,
+          });
+          io.emit('data:refresh', { type: 'student', id: student._id });
+        }
+        logger.info(`✅ [SCHEDULE] Unlock thi cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
       }
+      return;
+    }
 
-      logger.info(`✅ [SCHEDULE] Unlock thi cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
+    let changed = false;
+    const hint = String(courseNameHint || '').trim().toLowerCase();
+    for (let i = 0; i < enrollments.length; i++) {
+      const enr = enrollments[i];
+      if (enr.examUnlocked === true) continue;
+      const courseName = enr.courseName || enr.course || '';
+      if (hint && String(courseName).trim().toLowerCase() !== hint) continue;
+
+      const completedSessions = await Schedule.countDocuments({
+        studentId,
+        course: courseName || student.course,
+        status: 'completed',
+      });
+      const totalRequired = enr.totalSessions || student.totalSessions || 12;
+      if (completedSessions >= totalRequired) {
+        student.enrollments[i].examUnlocked = true;
+        changed = true;
+        logger.info(`✅ [SCHEDULE] Unlock thi khóa "${courseName}" cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
+      }
+    }
+
+    if (!changed) return;
+
+    student.studentExamUnlocked = (student.enrollments || []).some((e) => e.examUnlocked === true);
+    student.markModified('enrollments');
+    await student.save({ validateModifiedOnly: true });
+
+    if (io) {
+      const NotificationService = require('../services/NotificationService');
+      NotificationService.send(io, {
+        type: 'EXAM',
+        title: '🎉 Phòng thi đã được mở khóa!',
+        content: 'Bạn đã hoàn thành đủ buổi học của khóa. Phòng thi khóa học đó đã được mở khóa!',
+        receivers: student._id.toString(),
+        link: '/student/exam'
+      });
+      io.emit('exam:unlocked', {
+        studentId: student._id.toString(),
+        studentName: student.name,
+      });
+      io.emit('data:refresh', { type: 'student', id: student._id });
     }
   } catch (err) {
     logger.error('[SCHEDULE] checkAndUnlockExam error:', err.message);
@@ -649,7 +695,7 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
 
     // BUSINESS LOGIC: Nếu đánh dấu hoàn thành → kiểm tra unlock thi
     if (status === 'completed' && schedule.studentId) {
-      await checkAndUnlockExam(schedule.studentId.toString(), io);
+      await checkAndUnlockExam(schedule.studentId.toString(), io, schedule.course);
 
       // Cập nhật remainingSessions của học viên (Tách biệt logic trừ buổi và cộng buổi)
       const student = await Student.findById(schedule.studentId);

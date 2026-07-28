@@ -14,6 +14,7 @@ import {
   buildExamSubjectsFromProgress,
   getExamSubjectMeta,
   getExamSubjectInitials,
+  isExamUnlockedForSubject,
 } from '../utils/examSubjects';
 import { useIsDesktopExamDevice } from '../utils/examDevice';
 
@@ -331,9 +332,6 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
     setSubjects(buildSubjects(student?.examProgress));
   }, [student?.examProgress, buildSubjects]);
 
-  // Luồng 1: Admin ghi đè mở toàn bộ
-  const isAdminApproved = student?.studentExamUnlocked === true;
-
   const progressScope = useMemo(() => {
     if (filterCourse === 'all') {
       return {
@@ -355,6 +353,20 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
     () => getSubjectIdsForCourseFilter(enrollments, filterCourse, student?.course, examSubjectsCatalog),
     [filterCourse, enrollments, student?.course, examSubjectsCatalog]
   );
+
+  // Luồng 1: Admin mở khóa theo từng khóa học (fallback root studentExamUnlocked)
+  const isSubjectCourseUnlocked = useMemo(() => {
+    const map = {};
+    allowedSubjectIds.forEach((id) => {
+      map[id] = isExamUnlockedForSubject(
+        enrollments,
+        id,
+        examSubjectsCatalog,
+        student?.studentExamUnlocked === true
+      );
+    });
+    return map;
+  }, [allowedSubjectIds, enrollments, examSubjectsCatalog, student?.studentExamUnlocked]);
 
   const subjectFilterOptions = useMemo(
     () => allowedSubjectIds.map((id) => ({ id, label: getExamSubjectMeta(id, examSubjectsCatalog).label })),
@@ -521,7 +533,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
         {filteredSubjects.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5">
           {filteredSubjects.map(s => (
-            <SubjectCard key={s.id} subject={s} onStart={handleStart} isGlobalApproved={isAdminApproved} examSubjectsCatalog={examSubjectsCatalog} allowStartExam={allowStartExam} />
+            <SubjectCard key={s.id} subject={s} onStart={handleStart} isGlobalApproved={!!isSubjectCourseUnlocked[s.id]} examSubjectsCatalog={examSubjectsCatalog} allowStartExam={allowStartExam} />
           ))}
         </div>
         ) : (
