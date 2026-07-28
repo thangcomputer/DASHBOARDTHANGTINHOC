@@ -836,14 +836,14 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         )}
 
         {/* TOP TABS FOR TEACHER */}
-        <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto mb-6">
+        <div className="grid grid-cols-3 gap-2 border-b border-slate-200 pb-2 mb-6">
           {[
             { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0 },
             { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0 },
           ].map(t => (
             <button key={t.key} onClick={() => setMainTab(t.key)}
-              className={`relative flex min-w-[88px] max-w-[96px] shrink-0 flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
+              className={`relative flex w-full min-w-0 flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
                 mainTab === t.key
                   ? 'bg-red-500 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'

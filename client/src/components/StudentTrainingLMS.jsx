@@ -678,7 +678,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto w-full mb-5 relative z-10">
+        <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-2 w-full mb-5 relative z-10">
           {[
             { key: 'courses', icon: PlayCircle, label: 'Video học tập', count: courses.length },
             { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
@@ -691,7 +691,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               onClick={() => setMainTab(t.key)}
               title={t.label}
               aria-label={t.label}
-              className={`relative flex min-w-[88px] max-w-[96px] shrink-0 flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${mainTab === t.key
+              className={`relative flex w-full min-w-0 flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-sm font-semibold transition-all ${mainTab === t.key
                 ? 'bg-red-500 text-white shadow-sm'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
@@ -878,11 +878,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
 
         {/* ASSIGNMENTS TAB */}
         {mainTab === 'assignments' && (
-          <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+          <div className="bg-white rounded-[24px] p-4 sm:p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2.5">
               <BookOpen className="text-green-600" /> Bài tập từ Giảng viên
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {trainingData?.assignments?.map((a, idx) => {
                 const submission = a.mySubmission || localSubmissions[idx];
                 let targetDate = null;
@@ -901,29 +901,29 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                 const aShowToggle = aPlain.length > 160 || aHasHtml;
                 const aDefault = 'Hoàn thành và nộp file bài tập theo đúng định dạng được yêu cầu (.zip, .rar, .pdf).';
                 return (
-                  <div key={aKey} className="p-5 rounded-2xl border border-slate-100 hover:shadow-md transition-all flex flex-col md:flex-row gap-5 items-start bg-slate-50/50">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-100 to-indigo-100 flex items-center justify-center text-green-600 shrink-0 border border-green-200 shadow-inner">
-                      <FileUp size={24} />
+                  <div key={aKey} className="p-4 rounded-2xl border border-slate-100 transition-all flex gap-3 items-start bg-slate-50/40">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-green-100 to-indigo-100 flex items-center justify-center text-green-600 shrink-0 border border-green-200 shadow-inner">
+                      <FileUp size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
-                        <h3 className="font-extrabold text-slate-800 text-lg leading-tight">{a.title}</h3>
+                      <div className="flex flex-col gap-2 mb-2">
+                        <h3 className="font-bold text-slate-800 text-base leading-tight line-clamp-2">{a.title}</h3>
                         {!submission && a.deadline && (
-                          <div className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 whitespace-nowrap w-fit ${isLate ? 'bg-red-50 text-red-600 border-red-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
-                            <Timer size={14} className={isLate ? '' : 'animate-pulse'} />
+                          <div className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border flex items-center gap-1.5 whitespace-nowrap w-fit ${isLate ? 'bg-red-50 text-red-600 border-red-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
+                            <Timer size={13} className={isLate ? '' : 'animate-pulse'} />
                             <CountdownTimer deadline={a.deadline} />
                           </div>
                         )}
                       </div>
                       {!aDesc && !aPlain ? (
-                        <p className="text-[13px] text-slate-600 mb-4">{aDefault}</p>
+                        <p className="text-xs text-slate-600 mb-3 line-clamp-2">{aDefault}</p>
                       ) : aExpanded && aHasHtml ? (
                         <div
-                          className="text-[13px] text-slate-600 mb-4 max-h-[280px] overflow-y-auto leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_b]:font-semibold [&_a]:text-green-600"
+                          className="text-xs text-slate-600 mb-3 max-h-[220px] overflow-y-auto leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_b]:font-semibold [&_a]:text-green-600"
                           dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(aDesc) }}
                         />
                       ) : (
-                        <p className={`text-[13px] text-slate-600 mb-4 ${aShowToggle && !aExpanded ? 'line-clamp-3' : ''} whitespace-pre-wrap`}>
+                        <p className={`text-xs text-slate-600 mb-3 ${aShowToggle && !aExpanded ? 'line-clamp-2' : ''} whitespace-pre-wrap`}>
                           {aPlain || aDefault}
                         </p>
                       )}
@@ -931,21 +931,21 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         <button
                           type="button"
                           onClick={() => setExpandedAssignKey(aExpanded ? null : aKey)}
-                          className="text-[11px] font-bold text-green-600 hover:text-green-800 -mt-2 mb-4"
+                          className="text-[11px] font-bold text-green-600 hover:text-green-800 -mt-1 mb-3"
                         >
                           {aExpanded ? 'Thu gọn' : 'Xem thêm hướng dẫn'}
                         </button>
                       ) : null}
 
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <a href={a.fileUrl || '#'} target="_blank" className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white border-2 border-slate-200 text-slate-700 rounded-xl hover:border-slate-300 hover:bg-slate-50 font-bold text-sm transition-all shadow-sm">
-                          <LinkIcon size={16} /> Tải đề bài
+                      <div className="grid grid-cols-1 gap-2">
+                        <a href={a.fileUrl || '#'} target="_blank" className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:border-slate-300 hover:bg-slate-50 font-semibold text-sm transition-all shadow-sm">
+                          <LinkIcon size={15} /> Tải đề bài
                         </a>
                         {(() => {
                           if (!submission) {
                             return (
-                              <label className={`flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-sm transition-all shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] ${uploadingAssignId === idx ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
-                                {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <UploadCloud size={18} />}
+                              <label className={`flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm transition-all shadow-sm ${uploadingAssignId === idx ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
+                                {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <UploadCloud size={16} />}
                                 {uploadingAssignId === idx ? 'Đang tải...' : 'Nộp bài tập'}
                                 <input type="file" className="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => handleFileChange(a, idx, e.target.files[0])} disabled={uploadingAssignId === idx} />
                               </label>
@@ -955,18 +955,18 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                           return (
                             <>
                               {isGraded ? (
-                                <div className={`flex items-center justify-center gap-2 px-5 py-2.5 border rounded-xl font-bold text-sm shadow-sm opacity-100 ${getGradeBadgeClasses(submission.grade)}`}>
-                                  <CheckCircle2 size={18} className={getGradeIconClasses(submission.grade)} />
+                                <div className={`flex items-center justify-center gap-2 px-4 py-2 border rounded-xl font-semibold text-sm shadow-sm opacity-100 ${getGradeBadgeClasses(submission.grade)}`}>
+                                  <CheckCircle2 size={16} className={getGradeIconClasses(submission.grade)} />
                                   Điểm: {submission.grade}/10
                                 </div>
                               ) : (
-                                <div className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-400 border border-slate-200 rounded-xl font-bold text-sm cursor-not-allowed shadow-inner opacity-80">
-                                  <CheckCircle2 size={18} />
+                                <div className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-400 border border-slate-200 rounded-xl font-semibold text-sm cursor-not-allowed shadow-inner opacity-80">
+                                  <CheckCircle2 size={16} />
                                   Đã nộp bài
                                 </div>
                               )}
-                              <label className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${isGraded ? 'bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed opacity-60' : uploadingAssignId === idx ? 'bg-orange-50 border border-orange-200 text-orange-600 cursor-not-allowed opacity-50' : 'bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 cursor-pointer shadow-sm'}`}>
-                                {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /> : <RefreshCw size={18} />}
+                              <label className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all ${isGraded ? 'bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed opacity-60' : uploadingAssignId === idx ? 'bg-orange-50 border border-orange-200 text-orange-600 cursor-not-allowed opacity-50' : 'bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 cursor-pointer shadow-sm'}`}>
+                                {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /> : <RefreshCw size={16} />}
                                 {uploadingAssignId === idx ? 'Đang tải...' : 'Nộp lại'}
                                 <input type="file" className="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => handleFileChange(a, idx, e.target.files[0])} disabled={uploadingAssignId === idx || isGraded} />
                               </label>
