@@ -7,8 +7,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import CmsSelect from './ui/CmsSelect';
 import {
   Users, Plus, Edit3, Trash2, DollarSign, Search, RefreshCw,
-  CheckCircle2, XCircle, Calendar, Building2, ClipboardList,
-  ChevronDown, Briefcase, Loader2, AlertCircle, X, CreditCard, QrCode
+  CheckCircle2, Calendar, ClipboardList,
+  Briefcase, Loader2, AlertCircle, X, CreditCard, QrCode
 } from 'lucide-react';
 import { useBranch } from '../context/BranchContext';
 import { useSocket } from '../context/SocketContext';
@@ -278,31 +278,44 @@ export default function EmployeeManagementTab() {
 
   const hasBankInfo = showPayModal?.bankAccount?.bankCode && showPayModal?.bankAccount?.accountNumber;
 
+  const statusLabel = (status) => {
+    if (status === 'active') return { text: 'Đang làm', cls: 'cms-hr-status-active' };
+    if (status === 'pending') return { text: 'Chờ', cls: 'cms-hr-status-pending' };
+    return { text: 'Nghỉ / Khóa', cls: 'cms-hr-status-off' };
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="cms-hr space-y-3 sm:space-y-4 md:space-y-6">
       {/* ── Header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
-            <Briefcase size={22} className="text-violet-600" />
-            Quản lý Nhân sự & Lương
+      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
+        <div className="min-w-0">
+          <h2 className="cms-hr-title flex items-center gap-2">
+            <span className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center flex-shrink-0">
+              <Briefcase size={20} aria-hidden="true" />
+            </span>
+            <span className="truncate">Quản lý Nhân sự & Lương</span>
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="cms-hr-caption mt-1 pl-12">
             {isSuperAdmin ? 'Toàn bộ chi nhánh' : `Chi nhánh ${sess?.branchCode || ''}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* 👁️ Nút ẩn hiện lương */}
-          <button onClick={() => setShowSalaries(!showSalaries)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
-              showSalaries ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-600 border border-gray-200'
-            }`}>
+        <div className="flex flex-wrap items-stretch gap-2 w-full min-[480px]:w-auto">
+          <button
+            type="button"
+            onClick={() => setShowSalaries(!showSalaries)}
+            className={`cms-hr-btn flex-1 min-[480px]:flex-none ${
+              showSalaries ? 'cms-hr-btn-amber' : 'cms-hr-btn-muted'
+            }`}
+          >
             {showSalaries ? <X size={14} /> : <QrCode size={14} />}
             {showSalaries ? 'Khóa bảo mật' : 'Xem số liệu'}
           </button>
-          
-          <button onClick={fetchAll} disabled={loading}
-            className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-50">
+          <button
+            type="button"
+            onClick={fetchAll}
+            disabled={loading}
+            className="cms-hr-btn cms-hr-btn-outline flex-1 min-[480px]:flex-none disabled:opacity-50"
+          >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Làm mới
           </button>
         </div>
@@ -310,87 +323,161 @@ export default function EmployeeManagementTab() {
 
       {/* ── Stats Cards ── */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center"><Users size={18} className="text-violet-600" /></div>
-            </div>
-            <p className="text-2xl font-black text-gray-800">{stats.total}</p>
-            <p className="text-xs text-gray-400 mt-1">Nhân viên đang làm</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="cms-hr-stat">
+            <div className="cms-hr-stat-icon bg-violet-100 text-violet-600"><Users size={16} /></div>
+            <p className="cms-hr-stat-value">{stats.total}</p>
+            <p className="cms-hr-stat-label">Nhân viên đang làm</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center"><DollarSign size={18} className="text-emerald-600" /></div>
-            </div>
-            <p className="text-2xl font-black text-gray-800">{fmtSalary(stats.totalSalary)}</p>
-            <p className="text-xs text-gray-400 mt-1">Tổng quỹ lương/tháng</p>
+          <div className="cms-hr-stat">
+            <div className="cms-hr-stat-icon bg-emerald-100 text-emerald-600"><DollarSign size={16} /></div>
+            <p className="cms-hr-stat-value">{fmtSalary(stats.totalSalary)}</p>
+            <p className="cms-hr-stat-label">Tổng quỹ lương/tháng</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center"><CheckCircle2 size={18} className="text-amber-600" /></div>
-            </div>
-            <p className="text-2xl font-black text-gray-800">{fmtSalary(stats.paidThisMonth)}</p>
-            <p className="text-xs text-gray-400 mt-1">Đã trả tháng này</p>
+          <div className="cms-hr-stat">
+            <div className="cms-hr-stat-icon bg-amber-100 text-amber-600"><CheckCircle2 size={16} /></div>
+            <p className="cms-hr-stat-value">{fmtSalary(stats.paidThisMonth)}</p>
+            <p className="cms-hr-stat-label">Đã trả tháng này</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center"><AlertCircle size={18} className="text-red-500" /></div>
-            </div>
-            <p className="text-2xl font-black text-gray-800 text-red-600">
+          <div className="cms-hr-stat">
+            <div className="cms-hr-stat-icon bg-red-100 text-red-500"><AlertCircle size={16} /></div>
+            <p className="cms-hr-stat-value text-red-600">
               {fmtSalary(Math.max(0, (stats.totalSalary || 0) - (stats.paidThisMonth || 0)))}
             </p>
-            <p className="text-xs text-gray-400 mt-1">Còn nợ tháng này</p>
+            <p className="cms-hr-stat-label">Còn nợ tháng này</p>
           </div>
         </div>
       )}
 
       {/* ── Tab switcher ── */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="cms-hr-tabs" role="tablist" aria-label="Nhân sự">
         {[
-          { id: 'list', label: '📋 Danh sách nhân sự', icon: ClipboardList },
-          { id: 'payroll', label: '💰 Trả lương', icon: DollarSign },
-        ].map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            className={`pb-2 px-4 text-sm font-bold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === t.id ? 'border-violet-600 text-violet-700' : 'border-transparent text-gray-400 hover:text-gray-600'
-            }`}>
-            {t.label}
-          </button>
-        ))}
+          { id: 'list', label: 'Danh sách nhân sự', icon: ClipboardList },
+          { id: 'payroll', label: 'Trả lương', icon: DollarSign },
+        ].map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`cms-hr-tab ${activeTab === t.id ? 'is-active' : ''}`}
+            >
+              <Icon size={16} aria-hidden="true" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-sm text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-[15px] text-red-700">
           <AlertCircle size={16} /> {error}
-          <button onClick={() => setError('')} className="ml-auto"><X size={14} /></button>
+          <button type="button" onClick={() => setError('')} className="ml-auto w-11 h-11 flex items-center justify-center" aria-label="Đóng lỗi">
+            <X size={14} />
+          </button>
         </div>
       )}
 
       {/* ═══════════════ TAB 1: DANH SÁCH NHÂN SỰ ═══════════════ */}
       {activeTab === 'list' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Toolbar */}
-          <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="text" placeholder="Tìm nhân viên..." value={search} onChange={e => setSearch(e.target.value)}
-                  className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-300 w-52" />
-              </div>
-              <CmsSelect value={posFilter} onChange={e => setPosFilter(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none bg-white">
-                <option value="all">Tất cả chức vụ</option>
-                {POSITIONS.map(p => <option key={p.value} value={p.value}>{p.emoji} {p.label}</option>)}
-              </CmsSelect>
+        <div className="cms-hr-panel">
+          <div className="cms-hr-toolbar">
+            <div className="relative w-full md:w-auto md:min-w-[220px]">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Tìm nhân viên..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="cms-hr-input pl-10 w-full"
+                aria-label="Tìm nhân viên"
+              />
             </div>
-            <button onClick={openAdd}
-              className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-purple-500 text-white px-4 py-2.5 rounded-xl text-sm font-black shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all active:scale-95">
-              <Plus size={16} /> THÊM NHÂN SỰ
+            <CmsSelect
+              value={posFilter}
+              onChange={(e) => setPosFilter(e.target.value)}
+              className="cms-hr-input w-full md:w-auto md:min-w-[180px]"
+            >
+              <option value="all">Tất cả chức vụ</option>
+              {POSITIONS.map((p) => (
+                <option key={p.value} value={p.value}>{p.emoji} {p.label}</option>
+              ))}
+            </CmsSelect>
+            <button type="button" onClick={openAdd} className="cms-hr-btn cms-hr-btn-primary w-full md:w-auto md:ml-auto">
+              <Plus size={16} /> Thêm nhân sự
             </button>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
+          {/* Mobile cards */}
+          <div className="md:hidden p-3 space-y-3">
+            {loading && !filteredEmployees.length ? (
+              <div className="text-center py-12 text-slate-400">
+                <Loader2 size={24} className="animate-spin mx-auto mb-2" />
+                <p className="text-[15px]">Đang tải...</p>
+              </div>
+            ) : filteredEmployees.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <Briefcase size={32} className="mx-auto mb-2 opacity-20" />
+                <p className="text-[15px]">Chưa có nhân viên nào</p>
+              </div>
+            ) : filteredEmployees.map((emp) => {
+              const st = statusLabel(emp.status);
+              return (
+                <article key={emp._id} className="cms-hr-emp-card">
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-base font-bold flex-shrink-0">
+                      {emp.name?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[16px] font-semibold text-slate-900 truncate">{emp.name}</p>
+                          {emp.phone && <p className="text-[13px] text-slate-500 font-mono">{emp.phone}</p>}
+                        </div>
+                        <span className={`cms-hr-status ${st.cls}`}>{st.text}</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-1.5 text-[14px]">
+                        <p className="text-slate-600">
+                          <span className="text-slate-400 text-[12px] font-semibold uppercase tracking-wide mr-1">Chức vụ</span>
+                          {POSITION_MAP[emp.position]?.emoji || '📋'} {POSITION_MAP[emp.position]?.label || emp.position}
+                        </p>
+                        {(isSuperAdmin || emp.branchCode) && (
+                          <p className="text-slate-600">
+                            <span className="text-slate-400 text-[12px] font-semibold uppercase tracking-wide mr-1">Chi nhánh</span>
+                            {emp.branchCode || '—'}
+                          </p>
+                        )}
+                        <p className="text-slate-800 font-semibold">
+                          <span className="text-slate-400 text-[12px] font-semibold uppercase tracking-wide mr-1">Mức lương</span>
+                          {fmtSalary(emp.baseSalary)}
+                        </p>
+                        <p className="text-slate-600">
+                          <span className="text-slate-400 text-[12px] font-semibold uppercase tracking-wide mr-1">Ngân hàng</span>
+                          {emp.bankAccount?.bankCode
+                            ? (BANK_MAP[emp.bankAccount.bankCode]?.shortName || emp.bankAccount.bankCode)
+                            : 'Chưa có'}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button type="button" onClick={() => openEdit(emp)} className="cms-hr-btn cms-hr-btn-outline flex-1" title="Sửa">
+                          <Edit3 size={15} /> Sửa
+                        </button>
+                        <button type="button" onClick={() => setDeleteConfirm(emp)} className="cms-hr-btn cms-hr-btn-danger-ghost flex-1" title="Xóa">
+                          <Trash2 size={15} /> Xóa
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
@@ -410,7 +497,7 @@ export default function EmployeeManagementTab() {
                     <Briefcase size={32} className="mx-auto mb-2 opacity-20" />
                     <p className="text-sm">Chưa có nhân viên nào</p>
                   </td></tr>
-                ) : filteredEmployees.map(emp => (
+                ) : filteredEmployees.map((emp) => (
                   <tr key={emp._id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -447,10 +534,10 @@ export default function EmployeeManagementTab() {
                     </td>
                     <td className="px-4 py-4 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openEdit(emp)} className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition" title="Sửa">
+                        <button type="button" onClick={() => openEdit(emp)} className="min-w-11 min-h-11 p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition" title="Sửa">
                           <Edit3 size={15} />
                         </button>
-                        <button onClick={() => setDeleteConfirm(emp)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Xóa">
+                        <button type="button" onClick={() => setDeleteConfirm(emp)} className="min-w-11 min-h-11 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Xóa">
                           <Trash2 size={15} />
                         </button>
                       </div>
@@ -461,12 +548,11 @@ export default function EmployeeManagementTab() {
             </table>
           </div>
 
-          {/* Position breakdown */}
           {stats?.byPosition?.length > 0 && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+            <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100">
               <p className="text-xs font-bold text-gray-500 mb-2">PHÂN BỔ CHỨC VỤ</p>
               <div className="flex flex-wrap gap-2">
-                {stats.byPosition.map(bp => (
+                {stats.byPosition.map((bp) => (
                   <span key={bp._id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-white border border-gray-200 text-gray-600">
                     {POSITION_MAP[bp._id]?.emoji || '📋'} {POSITION_MAP[bp._id]?.label || bp._id}: {bp.count} ({fmtSalary(bp.salary)})
                   </span>
@@ -479,26 +565,25 @@ export default function EmployeeManagementTab() {
 
       {/* ═══════════════ TAB 2: TRẢ LƯƠNG ═══════════════ */}
       {activeTab === 'payroll' && (
-        <div className="space-y-4">
-          {/* Active employees — pay buttons */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-700 flex items-center gap-2">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="cms-hr-panel overflow-hidden">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+              <h3 className="cms-hr-heading flex items-center gap-2">
                 <DollarSign size={16} className="text-emerald-500" /> Thanh toán lương nhân viên
               </h3>
             </div>
             <div className="divide-y divide-gray-50">
-              {employees.filter(e => e.status === 'active').length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">Chưa có nhân viên</div>
-              ) : employees.filter(e => e.status === 'active').map(emp => (
-                <div key={emp._id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-black flex-shrink-0">
+              {employees.filter((e) => e.status === 'active').length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-[15px]">Chưa có nhân viên</div>
+              ) : employees.filter((e) => e.status === 'active').map((emp) => (
+                <div key={emp._id} className="px-4 sm:px-6 py-3.5 flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between hover:bg-gray-50 transition">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-black flex-shrink-0">
                       {POSITION_MAP[emp.position]?.emoji || '📋'}
                     </div>
-                    <div>
-                      <p className="font-bold text-gray-800 text-sm">{emp.name}</p>
-                      <p className="text-xs text-gray-400">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 text-[15px] truncate">{emp.name}</p>
+                      <p className="text-[13px] text-slate-500 leading-snug">
                         {POSITION_MAP[emp.position]?.label || emp.position}
                         {emp.branchCode && ` · ${emp.branchCode}`}
                         {emp.baseSalary > 0 && ` · Lương: ${fmtSalary(emp.baseSalary)}`}
@@ -507,8 +592,9 @@ export default function EmployeeManagementTab() {
                     </div>
                   </div>
                   <button
-                    onClick={() => { setShowPayModal(emp); setPayForm({ amount: String(emp.baseSalary || ''), payDate: new Date().toISOString().split('T')[0], note:'', monthLabel: `Tháng ${new Date().getMonth()+1}/${new Date().getFullYear()}` }); }}
-                    className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white px-4 py-2 rounded-xl text-xs font-black shadow-md hover:shadow-lg transition-all active:scale-95"
+                    type="button"
+                    onClick={() => { setShowPayModal(emp); setPayForm({ amount: String(emp.baseSalary || ''), payDate: new Date().toISOString().split('T')[0], note: '', monthLabel: `Tháng ${new Date().getMonth() + 1}/${new Date().getFullYear()}` }); }}
+                    className="cms-hr-btn cms-hr-btn-pay w-full min-[480px]:w-auto"
                   >
                     <DollarSign size={14} /> Thanh toán
                   </button>
@@ -517,14 +603,41 @@ export default function EmployeeManagementTab() {
             </div>
           </div>
 
-          {/* Payroll history */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-700 flex items-center gap-2">
+          <div className="cms-hr-panel overflow-hidden">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+              <h3 className="cms-hr-heading flex items-center gap-2">
                 <Calendar size={16} className="text-blue-500" /> Lịch sử trả lương
               </h3>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* Mobile payroll cards */}
+            <div className="md:hidden p-3 space-y-3">
+              {payrollLogs.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-[15px]">Chưa có lịch sử trả lương</div>
+              ) : payrollLogs.map((log) => (
+                <article key={log._id} className="cms-hr-emp-card space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[15px] font-semibold text-slate-900">{log.employeeName}</p>
+                    <p className="text-[15px] font-bold text-emerald-700 whitespace-nowrap">{fmtSalary(log.amount)}</p>
+                  </div>
+                  <p className="text-[13px] text-slate-500">
+                    {POSITION_MAP[log.position]?.emoji || ''} {POSITION_MAP[log.position]?.label || log.position}
+                  </p>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${log.salaryType === 'LUONG_CUNG' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {log.salaryType === 'LUONG_CUNG' ? '💼 Lương cứng' : '🏫 Ca dạy'}
+                    </span>
+                    <span className="text-[12px] text-slate-500">{fmtDate(log.payDate)}</span>
+                  </div>
+                  {(log.monthLabel || log.note) && (
+                    <p className="text-[13px] text-slate-500">{log.monthLabel}{log.note ? ` — ${log.note}` : ''}</p>
+                  )}
+                </article>
+              ))}
+            </div>
+
+            {/* Desktop payroll table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
@@ -539,7 +652,7 @@ export default function EmployeeManagementTab() {
                 <tbody className="divide-y divide-gray-50">
                   {payrollLogs.length === 0 ? (
                     <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">Chưa có lịch sử trả lương</td></tr>
-                  ) : payrollLogs.map(log => (
+                  ) : payrollLogs.map((log) => (
                     <tr key={log._id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-3 font-medium text-gray-800">{log.employeeName}</td>
                       <td className="px-4 py-3">
@@ -566,250 +679,278 @@ export default function EmployeeManagementTab() {
 
       {/* ═══════════════ MODAL: THÊM/SỬA NHÂN SỰ ═══════════════ */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-violet-600 to-purple-500 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-              <h3 className="text-white font-bold flex items-center gap-2">
-                <Briefcase size={18} /> {editingEmp ? 'Chỉnh sửa Nhân viên' : 'Thêm Nhân viên mới'}
+        <>
+          <div className="cms-sheet-backdrop" onClick={() => setShowForm(false)} aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingEmp ? 'Chỉnh sửa Nhân viên' : 'Thêm Nhân viên mới'}
+            className="cms-sheet cms-hr-sheet w-full md:max-w-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
+            <div className="cms-hr-sheet-header">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-900 flex items-center gap-2 min-w-0">
+                <Briefcase size={18} className="text-violet-600 flex-shrink-0" />
+                <span className="truncate">{editingEmp ? 'Chỉnh sửa Nhân viên' : 'Thêm Nhân viên mới'}</span>
               </h3>
-              <button onClick={() => setShowForm(false)} className="text-white/70 hover:text-white"><X size={18} /></button>
+              <button type="button" onClick={() => setShowForm(false)} className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500" aria-label="Đóng">
+                <X size={18} />
+              </button>
             </div>
-            <div className="p-6 space-y-5">
-              {/* ── Thông tin cơ bản ── */}
+            <div className="cms-sheet-body space-y-5">
               <div>
                 <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <Users size={13} /> Thông tin cơ bản
                 </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Họ tên *</label>
-                    <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none" placeholder="Nguyễn Văn A" />
+                <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="min-[480px]:col-span-2">
+                    <label className="cms-hr-label">Họ tên *</label>
+                    <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      className="cms-hr-input w-full" placeholder="Nguyễn Văn A" />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Số điện thoại</label>
-                    <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none" placeholder="0912345678" />
+                    <label className="cms-hr-label">Số điện thoại</label>
+                    <input type="text" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                      className="cms-hr-input w-full" placeholder="0912345678" />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Chức vụ</label>
-                    <CmsSelect value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none bg-white">
-                      {POSITIONS.map(p => <option key={p.value} value={p.value}>{p.emoji} {p.label}</option>)}
+                    <label className="cms-hr-label">Chức vụ</label>
+                    <CmsSelect value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
+                      className="cms-hr-input w-full">
+                      {POSITIONS.map((p) => <option key={p.value} value={p.value}>{p.emoji} {p.label}</option>)}
                     </CmsSelect>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Mức lương (VNĐ/tháng)</label>
-                    <input type="number" value={form.baseSalary} onChange={e => setForm(f => ({ ...f, baseSalary: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none" placeholder="5000000" />
+                    <label className="cms-hr-label">Mức lương (VNĐ/tháng)</label>
+                    <input type="number" value={form.baseSalary} onChange={(e) => setForm((f) => ({ ...f, baseSalary: e.target.value }))}
+                      className="cms-hr-input w-full" placeholder="5000000" />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Ngày vào làm</label>
-                    <input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none" />
+                    <label className="cms-hr-label">Ngày vào làm</label>
+                    <input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                      className="cms-hr-input w-full" />
                   </div>
                   {isSuperAdmin && (
-                    <div className="col-span-2">
-                      <label className="text-xs font-bold text-gray-500 block mb-1">Chi nhánh</label>
-                      <CmsSelect value={form.branchId} onChange={e => {
-                        const br = branches.find(b => String(b._id) === e.target.value);
-                        setForm(f => ({ ...f, branchId: e.target.value, branchCode: br?.code || br?.name || '' }));
+                    <div className="min-[480px]:col-span-2">
+                      <label className="cms-hr-label">Chi nhánh</label>
+                      <CmsSelect value={form.branchId} onChange={(e) => {
+                        const br = branches.find((b) => String(b._id) === e.target.value);
+                        setForm((f) => ({ ...f, branchId: e.target.value, branchCode: br?.code || br?.name || '' }));
                       }}
-                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none bg-white">
+                        className="cms-hr-input w-full">
                         <option value="">— Chọn chi nhánh —</option>
-                        {branches.map(b => <option key={b._id} value={b._id}>🏢 {b.name} ({b.code})</option>)}
+                        {branches.map((b) => <option key={b._id} value={b._id}>🏢 {b.name} ({b.code})</option>)}
                       </CmsSelect>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* ── Thông tin thanh toán ── */}
               <div>
                 <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <CreditCard size={13} /> Thông tin thanh toán (VietQR)
                 </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Ngân hàng</label>
-                    <CmsSelect value={form.bankCode} onChange={e => setForm(f => ({ ...f, bankCode: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none bg-white">
+                <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="min-[480px]:col-span-2">
+                    <label className="cms-hr-label">Ngân hàng</label>
+                    <CmsSelect value={form.bankCode} onChange={(e) => setForm((f) => ({ ...f, bankCode: e.target.value }))}
+                      className="cms-hr-input w-full">
                       <option value="">— Chọn ngân hàng —</option>
-                      {VN_BANKS.map(b => <option key={`${b.code}-${b.shortName}`} value={b.code}>🏦 {b.shortName} — {b.name}</option>)}
+                      {VN_BANKS.map((b) => <option key={`${b.code}-${b.shortName}`} value={b.code}>🏦 {b.shortName} — {b.name}</option>)}
                     </CmsSelect>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Số tài khoản</label>
-                    <input type="text" value={form.bankAccountNumber} onChange={e => setForm(f => ({ ...f, bankAccountNumber: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none" placeholder="0123456789" />
+                    <label className="cms-hr-label">Số tài khoản</label>
+                    <input type="text" value={form.bankAccountNumber} onChange={(e) => setForm((f) => ({ ...f, bankAccountNumber: e.target.value }))}
+                      className="cms-hr-input w-full" placeholder="0123456789" />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Tên chủ tài khoản</label>
-                    <input type="text" value={form.bankAccountName} onChange={e => setForm(f => ({ ...f, bankAccountName: e.target.value.toUpperCase() }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none uppercase" placeholder="NGUYEN VAN A" />
+                    <label className="cms-hr-label">Tên chủ tài khoản</label>
+                    <input type="text" value={form.bankAccountName} onChange={(e) => setForm((f) => ({ ...f, bankAccountName: e.target.value.toUpperCase() }))}
+                      className="cms-hr-input w-full uppercase" placeholder="NGUYEN VAN A" />
                   </div>
                 </div>
               </div>
 
-              {/* ── Ghi chú ── */}
               <div>
-                <label className="text-xs font-bold text-gray-500 block mb-1">Ghi chú</label>
-                <textarea value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-violet-400 outline-none resize-none h-16" placeholder="Ghi chú tùy ý..." />
+                <label className="cms-hr-label">Ghi chú</label>
+                <textarea value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                  className="cms-hr-input w-full !h-auto py-3 resize-none min-h-[64px]" placeholder="Ghi chú tùy ý..." />
               </div>
 
               {form.position === 'GIANG_VIEN' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[13px] text-amber-700">
                   💡 Chức vụ <strong>Giảng viên</strong>: Đây là lương cứng hàng tháng. Tiền ca dạy sẽ được tính riêng ở module Giảng viên.
                 </div>
               )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Hủy</button>
-                <button onClick={handleSave} disabled={saving || !form.name.trim()}
-                  className="flex items-center gap-2 bg-violet-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-violet-700 transition disabled:opacity-50">
-                  {saving && <Loader2 size={14} className="animate-spin" />}
-                  {editingEmp ? 'Cập nhật' : 'Thêm nhân viên'}
-                </button>
-              </div>
+            </div>
+            <div className="cms-sheet-footer">
+              <button type="button" onClick={() => setShowForm(false)} className="cms-hr-btn cms-hr-btn-outline flex-1">Hủy</button>
+              <button type="button" onClick={handleSave} disabled={saving || !form.name.trim()}
+                className="cms-hr-btn cms-hr-btn-primary flex-[1.4] disabled:opacity-50">
+                {saving && <Loader2 size={14} className="animate-spin" />}
+                {editingEmp ? 'Cập nhật' : 'Thêm nhân viên'}
+              </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ═══════════════ MODAL: THANH TOÁN LƯƠNG + VIETQR ═══════════════ */}
       {showPayModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => setShowPayModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-white font-bold flex items-center gap-2">
-                <DollarSign size={18} /> Thanh toán lương — {showPayModal.name}
+        <>
+          <div className="cms-sheet-backdrop" onClick={() => setShowPayModal(null)} aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Thanh toán lương — ${showPayModal.name}`}
+            className="cms-sheet cms-hr-sheet w-full md:max-w-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
+            <div className="cms-hr-sheet-header cms-hr-sheet-header-pay">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2 min-w-0">
+                <DollarSign size={18} className="flex-shrink-0" />
+                <span className="truncate">Thanh toán — {showPayModal.name}</span>
               </h3>
-              <button onClick={() => setShowPayModal(null)} className="text-white/70 hover:text-white"><X size={18} /></button>
+              <button type="button" onClick={() => setShowPayModal(null)} className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center text-white" aria-label="Đóng">
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-              {/* ── CỘT TRÁI: MÃ QR ── */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 flex flex-col items-center justify-center border-r border-gray-100">
-                {hasBankInfo ? (
-                  <>
-                    <div className="bg-white rounded-2xl shadow-lg p-3 mb-4">
-                      <img
-                        key={getVietQRUrl}
-                        src={getVietQRUrl}
-                        alt="VietQR Code"
-                        className="w-56 h-56 object-contain"
-                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                      />
-                      <div className="w-56 h-56 items-center justify-center text-gray-400 text-sm text-center" style={{ display: 'none' }}>
-                        <QrCode size={40} className="mx-auto mb-2 opacity-30" />
-                        <p>Không tải được QR</p>
+            <div className="cms-sheet-body !p-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-6 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-gray-100">
+                  {hasBankInfo ? (
+                    <>
+                      <div className="bg-white rounded-2xl shadow-lg p-3 mb-4">
+                        <img
+                          key={getVietQRUrl}
+                          src={getVietQRUrl}
+                          alt="VietQR Code"
+                          className="w-52 h-52 sm:w-56 sm:h-56 object-contain"
+                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
+                        <div className="w-52 h-52 sm:w-56 sm:h-56 items-center justify-center text-gray-400 text-sm text-center" style={{ display: 'none' }}>
+                          <QrCode size={40} className="mx-auto mb-2 opacity-30" />
+                          <p>Không tải được QR</p>
+                        </div>
                       </div>
+                      <div className="text-center space-y-1.5 w-full max-w-[240px]">
+                        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
+                          <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Ngân hàng</p>
+                          <p className="text-sm font-black text-gray-800">
+                            {BANK_MAP[showPayModal.bankAccount.bankCode]?.shortName || showPayModal.bankAccount.bankCode}
+                          </p>
+                        </div>
+                        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
+                          <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Số tài khoản</p>
+                          <p className="text-sm font-black text-gray-800 tracking-wider">{showPayModal.bankAccount.accountNumber}</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
+                          <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Người nhận</p>
+                          <p className="text-sm font-black text-gray-800 uppercase">{showPayModal.bankAccount.accountName || showPayModal.name}</p>
+                        </div>
+                      </div>
+                      <p className="text-[9px] text-gray-400 mt-3 text-center">QR tự động cập nhật khi thay đổi số tiền / ghi chú</p>
+                    </>
+                  ) : (
+                    <div className="text-center py-8 px-2">
+                      <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                        <AlertCircle size={28} className="text-amber-500" />
+                      </div>
+                      <p className="text-sm font-bold text-amber-700 mb-1">Chưa có thông tin ngân hàng</p>
+                      <p className="text-xs text-gray-400 max-w-[220px] mx-auto">
+                        Nhân viên này chưa cập nhật thông tin ngân hàng. Vui lòng cập nhật hồ sơ để sử dụng mã QR.
+                      </p>
+                      <button type="button" onClick={() => { setShowPayModal(null); openEdit(showPayModal); }}
+                        className="mt-3 min-h-11 text-xs text-violet-600 font-bold hover:underline">
+                        → Cập nhật hồ sơ ngay
+                      </button>
                     </div>
-                    <div className="text-center space-y-1.5 w-full max-w-[240px]">
-                      <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
-                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Ngân hàng</p>
-                        <p className="text-sm font-black text-gray-800">
-                          {BANK_MAP[showPayModal.bankAccount.bankCode]?.shortName || showPayModal.bankAccount.bankCode}
-                        </p>
-                      </div>
-                      <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
-                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Số tài khoản</p>
-                        <p className="text-sm font-black text-gray-800 tracking-wider">{showPayModal.bankAccount.accountNumber}</p>
-                      </div>
-                      <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
-                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Người nhận</p>
-                        <p className="text-sm font-black text-gray-800 uppercase">{showPayModal.bankAccount.accountName || showPayModal.name}</p>
-                      </div>
-                    </div>
-                    <p className="text-[9px] text-gray-400 mt-3 text-center">QR tự động cập nhật khi thay đổi số tiền / ghi chú</p>
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                      <AlertCircle size={28} className="text-amber-500" />
-                    </div>
-                    <p className="text-sm font-bold text-amber-700 mb-1">Chưa có thông tin ngân hàng</p>
-                    <p className="text-xs text-gray-400 max-w-[220px] mx-auto">
-                      Nhân viên này chưa cập nhật thông tin ngân hàng. Vui lòng cập nhật hồ sơ để sử dụng mã QR.
-                    </p>
-                    <button onClick={() => { setShowPayModal(null); openEdit(showPayModal); }}
-                      className="mt-3 text-xs text-violet-600 font-bold hover:underline">
-                      → Cập nhật hồ sơ ngay
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* ── CỘT PHẢI: FORM THANH TOÁN ── */}
-              <div className="p-6 space-y-4">
-                <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-sm font-black text-emerald-700">
-                    {showPayModal.name?.charAt(0)?.toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-800">{showPayModal.name}</p>
-                    <p className="text-xs text-gray-400">{POSITION_MAP[showPayModal.position]?.label || showPayModal.position} · Lương: {fmt(showPayModal.baseSalary)}</p>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 block mb-1">Số tiền trả (VNĐ) *</label>
-                  <input type="number" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 outline-none" />
-                  {payForm.amount && (
-                    <p className="text-xs text-emerald-600 font-bold mt-1">
-                      = {fmt(payForm.amount)}
-                    </p>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Ngày trả</label>
-                    <input type="date" value={payForm.payDate} onChange={e => setPayForm(f => ({ ...f, payDate: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 outline-none" />
+
+                <div className="p-4 sm:p-6 space-y-4">
+                  <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-sm font-black text-emerald-700">
+                      {showPayModal.name?.charAt(0)?.toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800">{showPayModal.name}</p>
+                      <p className="text-xs text-gray-400">{POSITION_MAP[showPayModal.position]?.label || showPayModal.position} · Lương: {fmt(showPayModal.baseSalary)}</p>
+                    </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-1">Tháng lương</label>
-                    <input type="text" value={payForm.monthLabel} onChange={e => setPayForm(f => ({ ...f, monthLabel: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 outline-none" placeholder="Tháng 4/2026" />
+                    <label className="cms-hr-label">Số tiền trả (VNĐ) *</label>
+                    <input type="number" value={payForm.amount} onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
+                      className="cms-hr-input w-full" />
+                    {payForm.amount && (
+                      <p className="text-xs text-emerald-600 font-bold mt-1">= {fmt(payForm.amount)}</p>
+                    )}
                   </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 block mb-1">Ghi chú</label>
-                  <textarea value={payForm.note} onChange={e => setPayForm(f => ({ ...f, note: e.target.value }))}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 outline-none resize-none h-16" placeholder="VD: Đã trừ 1 ngày nghỉ..." />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button onClick={() => setShowPayModal(null)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Hủy</button>
-                  <button onClick={handlePay} disabled={saving || !payForm.amount}
-                    className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                    {saving && <Loader2 size={14} className="animate-spin" />}
-                    Xác nhận thanh toán
-                  </button>
+                  <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-3">
+                    <div>
+                      <label className="cms-hr-label">Ngày trả</label>
+                      <input type="date" value={payForm.payDate} onChange={(e) => setPayForm((f) => ({ ...f, payDate: e.target.value }))}
+                        className="cms-hr-input w-full" />
+                    </div>
+                    <div>
+                      <label className="cms-hr-label">Tháng lương</label>
+                      <input type="text" value={payForm.monthLabel} onChange={(e) => setPayForm((f) => ({ ...f, monthLabel: e.target.value }))}
+                        className="cms-hr-input w-full" placeholder="Tháng 4/2026" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="cms-hr-label">Ghi chú</label>
+                    <textarea value={payForm.note} onChange={(e) => setPayForm((f) => ({ ...f, note: e.target.value }))}
+                      className="cms-hr-input w-full !h-auto py-3 resize-none min-h-[64px]" placeholder="VD: Đã trừ 1 ngày nghỉ..." />
+                  </div>
                 </div>
               </div>
             </div>
+            <div className="cms-sheet-footer">
+              <button type="button" onClick={() => setShowPayModal(null)} className="cms-hr-btn cms-hr-btn-outline flex-1">Hủy</button>
+              <button type="button" onClick={handlePay} disabled={saving || !payForm.amount}
+                className="cms-hr-btn cms-hr-btn-pay flex-[1.4] disabled:opacity-50">
+                {saving && <Loader2 size={14} className="animate-spin" />}
+                Xác nhận thanh toán
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ═══════════════ MODAL: XÁC NHẬN XÓA ═══════════════ */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => setDeleteConfirm(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-red-600 to-red-500 px-6 py-4">
-              <h3 className="text-white font-bold flex items-center gap-2"><Trash2 size={18} /> Xác nhận xóa</h3>
+        <>
+          <div className="cms-sheet-backdrop" onClick={() => setDeleteConfirm(null)} aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Xác nhận xóa"
+            className="cms-sheet cms-hr-sheet w-full md:max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
+            <div className="cms-hr-sheet-header cms-hr-sheet-header-danger">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2"><Trash2 size={18} /> Xác nhận xóa</h3>
+              <button type="button" onClick={() => setDeleteConfirm(null)} className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center text-white" aria-label="Đóng">
+                <X size={18} />
+              </button>
             </div>
-            <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">Bạn có chắc muốn xóa nhân viên <strong>{deleteConfirm.name}</strong>?</p>
-              <div className="flex justify-end gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm">Hủy</button>
-                <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition">Xóa</button>
-              </div>
+            <div className="cms-sheet-body">
+              <p className="text-[15px] text-gray-600">Bạn có chắc muốn xóa nhân viên <strong>{deleteConfirm.name}</strong>?</p>
+            </div>
+            <div className="cms-sheet-footer">
+              <button type="button" onClick={() => setDeleteConfirm(null)} className="cms-hr-btn cms-hr-btn-outline flex-1">Hủy</button>
+              <button type="button" onClick={handleDelete} className="cms-hr-btn cms-hr-btn-danger flex-1">Xóa</button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 }
+

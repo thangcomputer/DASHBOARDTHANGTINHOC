@@ -37,8 +37,17 @@ const PERIODS = [
 const BRANCH_COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
 
 // ── Sparkline bar chart (CSS-based, no library needed) ─────────────────────────
-function BarChart({ data = [], color = '#6366f1', height = 80 }) {
-  if (!data.length) return null;
+function BarChart({ data = [], color = '#6366f1', height = 80, emptyMessage = 'Chưa có dữ liệu' }) {
+  if (!data.length) {
+    return (
+      <div
+        className="flex items-center justify-center w-full text-gray-400 text-sm"
+        style={{ minHeight: Math.max(height, 120) }}
+      >
+        {emptyMessage}
+      </div>
+    );
+  }
   const max = Math.max(...data.map(d => d.value), 1);
   return (
     <div className="flex items-end gap-1 w-full" style={{ height }}>
@@ -88,24 +97,24 @@ function DonutChart({ segments = [], size = 100 }) {
 // ── StatCard ───────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, icon: Icon, color = '#6366f1', trend, loading }) {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${color}20` }}>
+    <div className="bg-white rounded-2xl p-3 md:p-5 shadow-sm border border-gray-100 min-h-[112px] flex flex-col">
+      <div className="flex items-center justify-between mb-2 md:mb-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}20` }}>
           <Icon size={18} style={{ color }} />
         </div>
         {trend !== null && trend !== undefined && (
-          <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${trend > 0 ? 'bg-emerald-50 text-emerald-600' : trend < 0 ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
+          <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full flex-shrink-0 ${trend > 0 ? 'bg-emerald-50 text-emerald-600' : trend < 0 ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
             {trend > 0 ? <TrendingUp size={12} /> : trend < 0 ? <TrendingDown size={12} /> : null}
             {trend > 0 ? `+${trend}%` : trend < 0 ? `${trend}%` : 'Không đổi'}
           </div>
         )}
       </div>
       {loading
-        ? <div className="h-7 w-28 bg-gray-100 rounded animate-pulse mb-1" />
-        : <p className="text-2xl font-black text-gray-800">{value}</p>
+        ? <div className="h-8 w-28 bg-gray-100 rounded animate-pulse mb-1" />
+        : <p className="text-[1.625rem] leading-tight font-extrabold tracking-tight text-gray-900">{value}</p>
       }
-      <p className="text-xs text-gray-400 mt-1">{label}</p>
-      {sub && <p className="text-[11px] text-gray-300 mt-0.5">{sub}</p>}
+      <p className="text-xs text-gray-500 mt-1 font-medium">{label}</p>
+      {sub && <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-2">{sub}</p>}
     </div>
   );
 }
@@ -181,7 +190,7 @@ export default function RevenueAnalyticsTab() {
           )}
           {/* Refresh */}
           <button onClick={() => fetchAll(period, selectedBranchId)} disabled={loading}
-            className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-50">
+            className="flex items-center justify-center gap-1.5 border border-gray-200 rounded-xl px-4 min-h-[44px] text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-50 touch-manipulation">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Làm mới
           </button>
@@ -189,14 +198,13 @@ export default function RevenueAnalyticsTab() {
       </div>
 
       {/* ── Period Selector ─────────────────────────────────────────── */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="cms-m-filter-scroll flex gap-2 flex-nowrap overflow-x-auto pb-1 -mx-1 px-1">
         {PERIODS.map(p => (
           <button key={p.value}
+            type="button"
             onClick={() => setPeriod(p.value)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition ${
-              period === p.value
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-indigo-300'
+            className={`cms-m-filter-chip flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition ${
+              period === p.value ? 'is-active' : ''
             }`}>
             <span>{p.icon}</span> {p.label}
           </button>
@@ -211,7 +219,7 @@ export default function RevenueAnalyticsTab() {
       )}
 
       {/* ── Stat Cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label={`Doanh thu ${selectedPeriodLabel}`} value={fmt(data?.totalRevenue)}
           icon={DollarSign} color="#6366f1" trend={data?.growthPct} loading={loading}
           sub={`So với kỳ trước: ${fmt(data?.prevRevenue)}`} />
@@ -227,19 +235,21 @@ export default function RevenueAnalyticsTab() {
       </div>
 
       {/* ── Sub-tabs ───────────────────────────────────────────────── */}
-      <div className="flex gap-2 border-b border-gray-200">
-        {[
-          { id: 'revenue',  label: '📈 Doanh thu theo thời gian' },
-          ...(isSuperAdmin ? [{ id: 'branches', label: '🏢 Theo chi nhánh' }] : []),
-          { id: 'enrollment', label: '👥 Học viên đăng ký' },
-        ].map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            className={`pb-2 px-3 text-sm font-bold border-b-2 transition ${
-              activeTab === t.id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-400 hover:text-gray-600'
-            }`}>
-            {t.label}
-          </button>
-        ))}
+      <div className="border-b border-gray-200 -mx-1">
+        <div className="flex gap-1 flex-nowrap overflow-x-auto">
+          {[
+            { id: 'revenue',  label: '📈 Doanh thu theo thời gian' },
+            ...(isSuperAdmin ? [{ id: 'branches', label: '🏢 Theo chi nhánh' }] : []),
+            { id: 'enrollment', label: '👥 Học viên đăng ký' },
+          ].map(t => (
+            <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}
+              className={`flex-shrink-0 min-h-[48px] px-4 text-[15px] font-bold border-b-2 -mb-px transition whitespace-nowrap ${
+                activeTab === t.id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Tab: Revenue Timeline ──────────────────────────────────── */}
@@ -249,21 +259,27 @@ export default function RevenueAnalyticsTab() {
             <BarChart3 size={16} className="text-indigo-500" />
             Biểu đồ doanh thu — {selectedPeriodLabel}
           </h3>
-          {loading ? (
-            <div className="flex items-center justify-center h-24 text-gray-400">
-              <Loader2 size={24} className="animate-spin" />
-            </div>
-          ) : data?.timeSeries?.length ? (
-            <>
-              <BarChart data={data.timeSeries} color="#6366f1" height={120} />
-              <div className="flex justify-between text-[10px] text-gray-400 mt-2">
-                <span>{data.timeSeries[0]?.label}</span>
-                <span>{data.timeSeries[data.timeSeries.length - 1]?.label}</span>
+          <div className="cms-m-chart min-h-[300px] flex flex-col">
+            {loading ? (
+              <div className="flex flex-1 items-center justify-center text-gray-400 min-h-[300px]">
+                <Loader2 size={24} className="animate-spin" />
               </div>
-            </>
-          ) : (
-            <div className="text-center text-gray-400 py-8 text-sm">Chưa có dữ liệu trong khoảng này</div>
-          )}
+            ) : data?.timeSeries?.length ? (
+              <>
+                <div className="flex-1 flex flex-col justify-end min-h-[260px]">
+                  <BarChart data={data.timeSeries} color="#6366f1" height={120} />
+                </div>
+                <div className="flex justify-between text-[10px] text-gray-400 mt-2">
+                  <span>{data.timeSeries[0]?.label}</span>
+                  <span>{data.timeSeries[data.timeSeries.length - 1]?.label}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-center text-gray-400 text-sm min-h-[300px]">
+                Chưa có dữ liệu trong khoảng này
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -328,7 +344,7 @@ export default function RevenueAnalyticsTab() {
       {activeTab === 'enrollment' && (
         <div className="space-y-4">
           {/* Summary row */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               { label: 'Học viên mới', value: enrollment?.total ?? '—', color: '#6366f1' },
               { label: 'Đã đóng học phí', value: enrollment?.paid ?? '—', color: '#10b981' },
@@ -344,12 +360,23 @@ export default function RevenueAnalyticsTab() {
           {/* Enrollment chart */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="font-black text-gray-700 mb-4">Đăng ký theo thời gian — {selectedPeriodLabel}</h3>
-            {loading
-              ? <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
-              : enrollment?.timeSeries?.length
-                ? <BarChart data={enrollment.timeSeries.map(d => ({ ...d, value: d.value || 0 }))} color="#10b981" height={100} />
-                : <div className="text-center text-gray-400 py-4 text-sm">Chưa có dữ liệu</div>
-            }
+            <div className="cms-m-chart min-h-[300px] flex flex-col">
+              {loading
+                ? <div className="flex flex-1 items-center justify-center min-h-[300px]"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
+                : enrollment?.timeSeries?.length
+                  ? (
+                    <div className="flex-1 flex flex-col justify-end min-h-[260px]">
+                      <BarChart
+                        data={enrollment.timeSeries.map(d => ({ ...d, value: d.value || 0 }))}
+                        color="#10b981"
+                        height={100}
+                        emptyMessage="Chưa có dữ liệu"
+                      />
+                    </div>
+                  )
+                  : <div className="flex flex-1 items-center justify-center text-center text-gray-400 text-sm min-h-[300px]">Chưa có dữ liệu</div>
+              }
+            </div>
           </div>
 
           {/* By branch table */}
@@ -397,7 +424,7 @@ export default function RevenueAnalyticsTab() {
                   const maxCount = enrollment.byCourse[0]?.count || 1;
                   return (
                     <div key={i} className="flex items-center gap-3">
-                      <div className="w-28 text-xs text-gray-600 font-medium truncate">{c.course}</div>
+                      <div className="w-28 min-w-[5rem] flex-shrink-0 text-xs text-gray-600 font-medium line-clamp-2 break-words leading-snug">{c.course}</div>
                       <div className="flex-1 bg-gray-100 rounded-full h-2">
                         <div className="h-2 rounded-full transition-all" style={{ width: `${(c.count/maxCount)*100}%`, background: BRANCH_COLORS[i % BRANCH_COLORS.length] }} />
                       </div>

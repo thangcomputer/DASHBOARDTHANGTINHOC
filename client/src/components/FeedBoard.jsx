@@ -371,7 +371,7 @@ export default function FeedBoard({ session, role }) {
     isAdminLike(meRole, meId) || String(c.authorId) === meId || String(post.authorId) === meId;
 
   return (
-    <div className="max-w-2xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 space-y-4">
+    <div className="cms-feed max-w-2xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
@@ -387,10 +387,10 @@ export default function FeedBoard({ session, role }) {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-        <div className="flex gap-3">
-          <img src={resolveAvatarUrl({ avatar: session?.avatar, role: meRole, adminRole: session?.adminRole })} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-slate-100" />
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} maxLength={5000} placeholder="Bạn muốn hỏi gì về bài học? Viết câu hỏi tại đây..." className="flex-1 resize-none bg-slate-50 border-0 rounded-2xl px-4 py-3 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100" />
+      <div className="cms-feed-composer">
+        <div className="cms-feed-composer__row">
+          <img src={resolveAvatarUrl({ avatar: session?.avatar, role: meRole, adminRole: session?.adminRole })} alt="" className="cms-feed-composer__avatar" />
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2} maxLength={5000} placeholder="Bạn muốn hỏi gì về bài học? Viết câu hỏi tại đây..." className="cms-feed-composer__input" />
         </div>
         {previews.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -402,22 +402,35 @@ export default function FeedBoard({ session, role }) {
             ))}
           </div>
         )}
-        <div className="flex items-center justify-between gap-2">
+        <div className="cms-feed-composer__actions">
           <div>
             <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
-            <button type="button" onClick={() => fileRef.current?.click()} disabled={pendingFiles.length >= 6} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40">
-              <ImagePlus size={14} /> Thêm ảnh
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={pendingFiles.length >= 6} className="cms-btn cms-btn--media">
+              <ImagePlus size={16} /> Thêm ảnh
             </button>
           </div>
-          <button type="button" onClick={handlePost} disabled={posting} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
-            {posting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+          <button type="button" onClick={handlePost} disabled={posting} className="cms-btn cms-btn-primary">
+            {posting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             Đăng bài
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="py-16 text-center text-slate-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={18} /> Đang tải bảng tin...</div>
+        <div className="cms-feed-skeleton-list" aria-busy="true" aria-label="Đang tải bảng tin">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="cms-feed-card cms-feed-skeleton-card">
+              <div className="cms-feed-skeleton-head">
+                <div className="cms-skeleton cms-skeleton--avatar" />
+                <div className="cms-feed-skeleton-lines">
+                  <div className="cms-skeleton cms-skeleton--line cms-skeleton--short" />
+                  <div className="cms-skeleton cms-skeleton--line" />
+                </div>
+              </div>
+              <div className="cms-skeleton cms-skeleton--block" />
+            </div>
+          ))}
+        </div>
       ) : posts.length === 0 ? (
         <div className="py-16 text-center bg-white rounded-2xl border border-dashed border-slate-200">
           <Newspaper className="mx-auto text-slate-300 mb-2" size={36} />
@@ -425,18 +438,18 @@ export default function FeedBoard({ session, role }) {
           <p className="text-xs text-slate-400 mt-1">Hãy là người đầu tiên đặt câu hỏi!</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="cms-feed-list">
           {posts.map((post) => (
-            <article key={post.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="p-4 flex items-start gap-3">
-                <img src={resolveAvatarUrl({ avatar: post.authorAvatar, role: post.authorRole })} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+            <article key={post.id} className="cms-feed-card">
+              <div className="cms-feed-card__head">
+                <img src={resolveAvatarUrl({ avatar: post.authorAvatar, role: post.authorRole })} alt="" className="cms-feed-card__avatar" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-black text-sm text-slate-900 truncate">{post.authorName}</span>
-                    <span className={'text-[9px] font-black px-1.5 py-0.5 rounded ' + (ROLE_BADGE[post.authorRole] || ROLE_BADGE.student)}>{ROLE_LABEL[post.authorRole] || post.authorRole}</span>
-                    <span className="text-[11px] text-slate-400 font-medium">{formatTime(post.createdAt)}</span>
+                  <div className="cms-feed-card__meta">
+                    <span className="cms-feed-card__author truncate">{post.authorName}</span>
+                    <span className={'cms-feed-card__role ' + (ROLE_BADGE[post.authorRole] || ROLE_BADGE.student)}>{ROLE_LABEL[post.authorRole] || post.authorRole}</span>
+                    <span className="cms-feed-card__time">{formatTime(post.createdAt)}</span>
                   </div>
-                  {post.content ? <p className="mt-2 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">{post.content}</p> : null}
+                  {post.content ? <p className="cms-feed-card__body">{post.content}</p> : null}
                 </div>
                 {canDeletePost(post) ? (
                   <button type="button" onClick={() => handleDelete(post.id)} disabled={busyId === post.id} className="text-slate-300 hover:text-red-500 p-1" title="Xóa bài"><Trash2 size={16} /></button>
@@ -456,12 +469,12 @@ export default function FeedBoard({ session, role }) {
                 </div>
               ) : null}
 
-                            <div className="px-4 py-2 flex items-center gap-4 border-t border-slate-50 relative">
+              <div className="cms-feed-action">
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setReactOpen((id) => (id === post.id ? null : post.id))}
-                    className={'inline-flex items-center gap-1.5 text-xs font-bold ' + (post.myReaction ? (REACTIONS.find((r) => r.type === post.myReaction)?.active || 'text-rose-600') : 'text-slate-500 hover:text-rose-600')}
+                    className={'cms-feed-action__btn ' + (post.myReaction ? (REACTIONS.find((r) => r.type === post.myReaction)?.active || 'text-rose-600') : 'cms-feed-action__btn--idle')}
                   >
                     {(() => {
                       const cur = REACTIONS.find((r) => r.type === post.myReaction) || REACTIONS[0];
@@ -493,7 +506,7 @@ export default function FeedBoard({ session, role }) {
                 <button
                   type="button"
                   onClick={() => setCommentsOpen((d) => ({ ...d, [post.id]: !d[post.id] }))}
-                  className={'inline-flex items-center gap-1.5 text-xs font-bold ' + (commentsOpen[post.id] ? 'text-indigo-600' : 'text-slate-500 hover:text-indigo-600')}
+                  className={'cms-feed-action__btn cms-feed-action__btn--comment ' + (commentsOpen[post.id] ? 'cms-feed-action__btn--active' : 'cms-feed-action__btn--idle')}
                 >
                   <MessageCircle size={16} />
                   {commentsOpen[post.id]
@@ -758,7 +771,7 @@ export default function FeedBoard({ session, role }) {
           ))}
 
           {page < totalPages ? (
-            <button type="button" onClick={() => load(page + 1, true)} disabled={loadingMore} className="w-full py-3 rounded-2xl border border-slate-200 text-xs font-black text-slate-600 hover:bg-white disabled:opacity-50">
+            <button type="button" onClick={() => load(page + 1, true)} disabled={loadingMore} className="cms-btn cms-btn-outline cms-btn--block">
               {loadingMore ? 'Đang tải...' : 'Xem thêm bài cũ'}
             </button>
           ) : null}

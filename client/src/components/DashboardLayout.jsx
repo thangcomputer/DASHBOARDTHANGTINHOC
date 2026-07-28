@@ -6,7 +6,7 @@ import { LmsGuideHost } from './LmsGuideTour';
 import { useData } from '../context/DataContext';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
-  Bell, LogOut, CheckCircle2, Clock, X, Lock,
+  Bell, LogOut, CheckCircle2, Clock, X, Lock, MoreVertical,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, MessageSquare,
 } from 'lucide-react';
 
@@ -233,6 +233,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         : currentTeacher?.email || currentTeacher?.phone || session?.name || 'Giảng viên')
     : (session?.name || 'Admin');
   const pageTitle = resolvePageTitle(role, location.pathname, location.hash);
+  const adminHash = (location.hash || '').replace('#', '') || (location.pathname === '/admin' ? 'dashboard' : '');
+  const isStudentsTab = adminHash === 'students';
+  const showAdminBranch = role === 'admin';
+  const roleLabel = role === 'admin'
+    ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')
+    : role;
 
   return (
     <div className="flex h-[100dvh] max-h-[100dvh] bg-[#f8fafc] relative font-sans overflow-hidden">
@@ -254,152 +260,206 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       />
 
       <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
-        <header className={`h-14 sm:h-16 flex items-center gap-2 sm:gap-3 bg-white border-b border-slate-100 pl-[4.5rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-4 flex-shrink-0 z-40 safe-pad-top ${
+        <header className={`flex flex-col bg-white border-b border-slate-100 flex-shrink-0 z-40 safe-pad-top ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-[15px] sm:text-base font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
-            <p className="text-[11px] text-slate-500 truncate leading-none mt-0.5 hidden min-[390px]:block">{displayName}</p>
-          </div>
-
-          <div className="flex items-center flex-nowrap justify-end gap-1.5 sm:gap-2 min-w-0 flex-shrink-0">
-            {role === 'admin' && (
-              <div className={((location.hash || '').replace('#', '') || 'dashboard') === 'students' ? 'hidden lg:block' : ''}>
-                <BranchFilterDropdown />
-              </div>
-            )}
-
-            {(role === 'student' || role === 'teacher') && (
-              <LmsGuideHost
-                role={role}
-                userId={session?.id || session?._id || ''}
-                pathname={location.pathname}
-                hash={location.hash}
-                hideButton
-                isFirstLogin={session?.isFirstLogin === true}
-              />
-            )}
-
-            <div className="relative">
-              <button 
-                ref={bellRef}
-                type="button"
-                onClick={() => { setShowNotif(!showNotif); setNotifLimit(5); }}
-                aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
-                aria-expanded={showNotif}
-                aria-haspopup="true"
-                className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors ${showNotif ? 'bg-red-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
-              >
-                <Bell size={18} aria-hidden="true" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white" aria-hidden="true">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {showNotif && (
-                  <div ref={notifRef} role="dialog" aria-label="Danh sách thông báo" className="absolute right-0 mt-4 w-[min(24rem,calc(100vw-1.25rem))] max-w-[calc(100vw-1rem)] bg-white rounded-3xl shadow-cms-lg border border-gray-100 z-[70] overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
-                    <div className="p-4 sm:p-6 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between gap-2">
-                      <h3 className="font-black text-gray-800 text-base">Thông báo mới</h3>
-                      <button type="button" onClick={() => setShowNotif(false)} aria-label="Đóng thông báo" className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-500 hover:text-red-600 shadow-sm transition-all"><X size={16} aria-hidden="true"/></button>
-                    </div>
-                    <div className="max-h-[450px] overflow-y-auto">
-                      {myNotifications.length === 0 ? (
-                        <div className="p-12 text-center">
-                          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Bell size={32} className="text-gray-200" />
-                          </div>
-                          <p className="text-sm font-bold text-gray-400">Không có thông báo mới nào</p>
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-gray-50">
-                          {myNotifications.slice(0, notifLimit).map(n => {
-                            const style = getNotifStyle(n.type);
-                            const Icon = style.icon;
-                            return (
-                              <div 
-                                key={n.id || n._id} 
-                                onClick={() => { 
-                                  markNotificationRead(n.id || n._id); 
-                                  if (n.payload?.action === 'RESET_PASSWORD') {
-                                    window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
-                                  } else if (n.path) {
-                                    // ⭐ Tự động chuyển đổi các đường dẫn cũ sang cấu trúc Hash mới để tránh logout/redirect
-                                    let targetPath = n.path;
-                                    
-                                    // Xử lý nếu là URL tuyệt đối
-                                    if (targetPath.startsWith('http')) {
-                                      try {
-                                        const urlObj = new URL(targetPath);
-                                        targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                                      } catch (e) {}
-                                    }
-
-                                    if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && !targetPath.includes('#')) {
-                                      targetPath = '/admin#' + targetPath.replace('/admin/', '');
-                                    } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox'].includes(targetPath) && !targetPath.includes('#')) {
-                                      targetPath = '/student#' + targetPath.replace('/student/', '');
-                                    } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile'].includes(targetPath) && !targetPath.includes('#')) {
-                                      targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
-                                    }
-                                    
-                                    navigate(targetPath); 
-                                  }
-                                  setShowNotif(false); 
-                                }}
-                                className={`p-4 sm:p-5 hover:bg-gray-50 transition-all cursor-pointer flex gap-3 sm:gap-4 border-l-4 min-w-0 ${!n.read ? `bg-white ${style.border.replace('border-', 'border-l-')}` : 'bg-white border-l-transparent opacity-80'}`}
-                              >
-                                <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
-                                  <Icon size={20} aria-hidden="true" />
-                                  {!n.read && (
-                                    <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${style.bg.replace('bg-', 'bg-')}`} style={{backgroundColor: 'currentColor'}} aria-hidden="true" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-2 mb-1">
-                                    <span className={`text-[10px] font-black uppercase tracking-widest ${style.color}`}>{style.label}</span>
-                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
-                                  </div>
-                                  {n.title && <h4 className={`text-sm font-bold mb-0.5 break-anywhere ${!n.read ? 'text-gray-900' : 'text-gray-600'}`}>{n.title}</h4>}
-                                  <p className={`text-[13px] leading-relaxed break-anywhere ${!n.read && !n.title ? 'text-gray-900 font-bold' : !n.read ? 'text-gray-700 font-semibold' : 'text-gray-500 font-medium'}`}>{n.text || n.message || n.content}</p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2">
-                      <button onClick={() => markNotificationRead()} className="text-[11px] font-black text-gray-500 hover:text-red-600 transition-colors uppercase tracking-tight">Đọc tất cả</button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowNotif(false);
-                          const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
-                          navigate(`${base}/notifications`);
-                        }}
-                        className="text-[11px] font-black text-red-600 hover:underline uppercase tracking-tight"
-                      >
-                        Xem tất cả
-                      </button>
-                    </div>
-                  </div>
-              )}
+          <div className="h-14 sm:h-16 flex items-center gap-2 sm:gap-3 pl-[4.5rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-4 min-w-0">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[16px] sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
+              <p className="text-[12px] text-slate-500 truncate leading-none mt-0.5">
+                <span className="font-medium text-slate-600">{displayName}</span>
+                <span className="text-slate-300 mx-1">·</span>
+                <span>{roleLabel}</span>
+              </p>
             </div>
 
-            <div className="h-10 w-px bg-gray-100 mx-1 hidden sm:block" />
+            <div className="flex items-center flex-nowrap justify-end gap-1 sm:gap-2 min-w-0 flex-shrink-0">
+              {showAdminBranch && (
+                <div className={isStudentsTab ? 'hidden lg:block' : 'hidden md:block'}>
+                  <BranchFilterDropdown />
+                </div>
+              )}
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Đăng xuất"
-              className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors flex items-center gap-1.5"
-            >
-              <LogOut size={15} aria-hidden="true" />
-              <span className="hidden md:inline">Đăng xuất</span>
-            </button>
+              {(role === 'student' || role === 'teacher') && (
+                <LmsGuideHost
+                  role={role}
+                  userId={session?.id || session?._id || ''}
+                  pathname={location.pathname}
+                  hash={location.hash}
+                  hideButton
+                  isFirstLogin={session?.isFirstLogin === true}
+                />
+              )}
+
+              <div className="relative">
+                <button 
+                  ref={bellRef}
+                  type="button"
+                  onClick={() => { setShowNotif(!showNotif); setNotifLimit(5); }}
+                  aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
+                  aria-expanded={showNotif}
+                  aria-haspopup="dialog"
+                  className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-colors duration-200 ${showNotif ? 'bg-red-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+                >
+                  <Bell size={18} aria-hidden="true" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white" aria-hidden="true">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotif && (
+                  <>
+                    <div
+                      className="cms-notif-backdrop md:hidden"
+                      aria-hidden="true"
+                      onClick={() => setShowNotif(false)}
+                    />
+                    <div
+                      ref={notifRef}
+                      role="dialog"
+                      aria-modal="true"
+                      aria-label="Danh sách thông báo"
+                      className="cms-notif-sheet"
+                    >
+                      <div className="md:hidden flex justify-center pt-2 pb-1" aria-hidden="true">
+                        <span className="w-10 h-1 rounded-full bg-slate-200" />
+                      </div>
+                      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
+                        <h3 className="font-semibold text-slate-900 text-base">Thông báo mới</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowNotif(false)}
+                          aria-label="Đóng thông báo"
+                          className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                        {myNotifications.length === 0 ? (
+                          <div className="p-10 text-center">
+                            <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                              <Bell size={28} className="text-slate-300" aria-hidden="true" />
+                            </div>
+                            <p className="text-sm font-semibold text-slate-400">Không có thông báo mới nào</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-slate-50">
+                            {myNotifications.slice(0, notifLimit).map(n => {
+                              const style = getNotifStyle(n.type);
+                              const Icon = style.icon;
+                              return (
+                                <div 
+                                  key={n.id || n._id} 
+                                  onClick={() => { 
+                                    markNotificationRead(n.id || n._id); 
+                                    if (n.payload?.action === 'RESET_PASSWORD') {
+                                      window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
+                                    } else if (n.path) {
+                                      let targetPath = n.path;
+                                      
+                                      if (targetPath.startsWith('http')) {
+                                        try {
+                                          const urlObj = new URL(targetPath);
+                                          targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                                        } catch (e) {}
+                                      }
+
+                                      if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && !targetPath.includes('#')) {
+                                        targetPath = '/admin#' + targetPath.replace('/admin/', '');
+                                      } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox'].includes(targetPath) && !targetPath.includes('#')) {
+                                        targetPath = '/student#' + targetPath.replace('/student/', '');
+                                      } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile'].includes(targetPath) && !targetPath.includes('#')) {
+                                        targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
+                                      }
+                                      
+                                      navigate(targetPath); 
+                                    }
+                                    setShowNotif(false); 
+                                  }}
+                                  className={`px-4 py-3 hover:bg-slate-50 active:bg-slate-50 transition-colors duration-200 cursor-pointer flex gap-3 border-l-[3px] min-w-0 ${!n.read ? `bg-white ${style.border.replace('border-', 'border-l-')}` : 'bg-white border-l-transparent opacity-80'}`}
+                                >
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
+                                    <Icon size={18} aria-hidden="true" />
+                                    {!n.read && (
+                                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-red-500" aria-hidden="true" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                                      <span className={`text-[11px] font-semibold ${style.color}`}>{style.label}</span>
+                                      <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
+                                    </div>
+                                    {n.title && <h4 className={`text-sm font-semibold mb-0.5 break-anywhere ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</h4>}
+                                    <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>{n.text || n.message || n.content}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
+                        <button type="button" onClick={() => markNotificationRead()} className="text-[12px] font-semibold text-slate-500 hover:text-red-600 transition-colors duration-200">Đọc tất cả</button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowNotif(false);
+                            const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
+                            navigate(`${base}/notifications`);
+                          }}
+                          className="text-[12px] font-semibold text-red-600 hover:underline"
+                        >
+                          Xem tất cả
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="h-8 w-px bg-slate-100 mx-0.5 hidden md:block" />
+
+              {/* Desktop logout */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Đăng xuất"
+                className="hidden md:inline-flex h-11 px-3 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors duration-200 items-center gap-1.5"
+              >
+                <LogOut size={15} aria-hidden="true" />
+                <span>Đăng xuất</span>
+              </button>
+
+              {/* Mobile overflow: logout */}
+              <details className="relative md:hidden">
+                <summary
+                  className="w-11 h-11 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center list-none cursor-pointer [&::-webkit-details-marker]:hidden"
+                  aria-label="Thêm tùy chọn"
+                >
+                  <MoreVertical size={18} aria-hidden="true" />
+                </summary>
+                <div className="absolute right-0 top-[calc(100%+6px)] z-50 min-w-[160px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_6px_20px_rgba(15,23,42,0.08)]">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full min-h-11 px-3 rounded-lg text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <LogOut size={15} aria-hidden="true" /> Đăng xuất
+                  </button>
+                </div>
+              </details>
+            </div>
           </div>
+
+          {/* Mobile: branch full-width row (not students — students keeps prior lg-only behavior) */}
+          {showAdminBranch && !isStudentsTab && (
+            <div className="md:hidden w-full pl-[4.5rem] sm:pl-20 pr-3 pb-2.5">
+              <BranchFilterDropdown fullWidth />
+            </div>
+          )}
         </header>
 
         <div

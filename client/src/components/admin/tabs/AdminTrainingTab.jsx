@@ -30,7 +30,7 @@ export default function AdminTrainingTab() {
   return (
             <div className="space-y-6">
               <div className="cms-toolbar">
-                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 min-w-0">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
                   <BookOpen size={20} className="text-purple-600" /> Quản lý Đào tạo Giảng viên
                 </h2>
               </div>
@@ -67,25 +67,25 @@ export default function AdminTrainingTab() {
               {/* Add button */}
               {trainingTab !== 'questions' && trainingTab !== 'exam-results-gv' && (
                 <button onClick={() => setTrainingForm({ examSubjects: [] })}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                  className="w-full sm:w-auto min-h-11 justify-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
                   <Plus size={15} /> {trainingTab === 'videos' ? 'Thêm Khóa học' : trainingTab === 'guides' ? 'Thêm quy trình' : 'Thêm tài liệu'}
                 </button>
               )}
               {trainingTab === 'exam-results-gv' && (
                 <button onClick={() => setErGvForm({ ...BLANK_ER_GV })}
-                  className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md transition flex items-center gap-2">
+                  className="w-full sm:w-auto min-h-11 justify-center bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-2xl text-sm font-bold shadow-md transition flex items-center gap-2">
                   <Plus size={15} /> Thêm kết quả thi
                 </button>
               )}
 
               {/* Add/Edit Form */}
               {trainingForm && (
-                <div className="bg-white rounded-2xl shadow-sm border border-purple-200 p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-purple-700 flex items-center gap-2">
+                <div className="bg-white rounded-2xl shadow-sm border border-purple-200 p-4 sm:p-6 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-bold text-purple-700 flex items-center gap-2 min-w-0">
                       <Edit3 size={16} /> {trainingForm.id ? 'Chỉnh sửa' : 'Thêm mới'}
                     </h3>
-                    <button onClick={() => setTrainingForm(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                    <button type="button" onClick={() => setTrainingForm(null)} className="shrink-0 inline-flex items-center justify-center min-w-11 min-h-11 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"><X size={18} /></button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {trainingTab !== 'files' && (
@@ -176,7 +176,7 @@ export default function AdminTrainingTab() {
                       addTrainingItem(trainingTab, { ...trainingPayload, createdAt: new Date().toISOString().split('T')[0] });
                     }
                     setTrainingForm(null);
-                  }} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2">
+                  }} className="w-full sm:w-auto min-h-11 justify-center bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-2xl font-bold text-[15px] shadow-md transition flex items-center gap-2">
                     <Save size={15} /> {trainingForm.id ? 'Cập nhật' : 'Thêm mới'}
                   </button>
                 </div>
@@ -191,14 +191,14 @@ export default function AdminTrainingTab() {
                 );
                 return (
                   <div className="space-y-4 animate-in fade-in duration-300">
-                    <div className="flex flex-wrap gap-3 items-center">
-                      <div className="relative">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                      <div className="relative w-full sm:w-56">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input value={erGvSearch} onChange={e => setErGvSearch(e.target.value)}
-                          className="pl-8 pr-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-amber-400 outline-none w-56"
+                          className="w-full pl-8 pr-4 py-2.5 min-h-11 border-2 border-gray-200 rounded-2xl text-[15px] focus:border-amber-400 outline-none"
                           placeholder="Tìm theo tên giảng viên..." />
                       </div>
-                      <span className="text-xs text-gray-400 font-bold ml-auto">{filteredGv.length} bản ghi</span>
+                      <span className="text-xs text-gray-400 font-bold sm:ml-auto">{filteredGv.length} bản ghi</span>
                     </div>
                     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
                       <div className="cms-table-wrap">
@@ -337,8 +337,8 @@ export default function AdminTrainingTab() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="divide-y divide-gray-50">
                     {(trainingData?.[trainingTab] || []).slice(0, trainingTab === 'videos' ? 4 : 20).map(item => (
-                    <div key={item.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50/50 transition">
-                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div key={item.id} className="px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                         {trainingTab === 'videos' && (
                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition" onClick={() => setCourseBuilderMode(item)}>
                             <BookOpen size={20} className="text-white" />
@@ -355,23 +355,23 @@ export default function AdminTrainingTab() {
                             {item.fileType || 'FILE'}
                           </div>
                         )}
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm text-gray-800 truncate">{item.title}</p>
-                          <p className="text-xs text-gray-400 truncate">{(item.desc?.replace(/<[^>]*>/g, '') || '').slice(0, 80)}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-[15px] sm:text-base text-gray-800 line-clamp-2">{item.title}</p>
+                          <p className="text-xs sm:text-[13px] text-gray-400 line-clamp-2">{(item.desc?.replace(/<[^>]*>/g, '') || '').slice(0, 80)}</p>
                           {item.duration && <p className="text-xs text-purple-500 mt-0.5">⏱ {item.duration}</p>}
                           {item.fileSize && <p className="text-xs text-gray-400 mt-0.5">{item.fileSize}</p>}
                         </div>
                       </div>
-                      <div className="flex gap-2 ml-3 flex-shrink-0 items-center">
+                      <div className="flex flex-wrap gap-2 sm:ml-3 shrink-0 items-center self-end sm:self-auto">
                         {trainingTab === 'videos' && (
-                           <button onClick={() => setCourseBuilderMode(item)} className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-600 text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5">
+                           <button type="button" onClick={() => setCourseBuilderMode(item)} className="min-h-11 px-3 py-2 rounded-2xl bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-600 text-xs font-bold transition whitespace-nowrap inline-flex items-center gap-1.5">
                              <Layers size={13} /> Giáo trình
                            </button>
                         )}
-                        <button onClick={() => setTrainingForm({ ...item })}
-                          className="p-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition"><Edit3 size={14} /></button>
-                        <button onClick={() => setDeleteConfirm({ category: trainingTab, id: item.id, title: item.title })}
-                          className="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition"><Trash2 size={14} /></button>
+                        <button type="button" onClick={() => setTrainingForm({ ...item })}
+                          className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-600 transition"><Edit3 size={16} /></button>
+                        <button type="button" onClick={() => setDeleteConfirm({ category: trainingTab, id: item.id, title: item.title })}
+                          className="inline-flex items-center justify-center min-w-11 min-h-11 p-3 rounded-2xl bg-red-50 hover:bg-red-100 text-red-500 transition"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}
@@ -392,13 +392,13 @@ export default function AdminTrainingTab() {
           {erGvForm && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
               <div className="bg-white rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in duration-300">
-                <div className="bg-gradient-to-r from-blue-700 to-blue-500 px-8 py-5 flex items-center justify-between text-white">
-                  <h3 className="font-bold text-lg flex items-center gap-3">
-                    <GraduationCap size={22} /> {erGvForm.id ? 'Chỉnh sửa kết quả' : 'Thêm kết quả thi Giảng viên'}
+                <div className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between gap-3 text-white">
+                  <h3 className="font-bold text-lg sm:text-xl flex items-center gap-2 sm:gap-3 min-w-0">
+                    <GraduationCap size={22} className="shrink-0" /> {erGvForm.id ? 'Chỉnh sửa kết quả' : 'Thêm kết quả thi Giảng viên'}
                   </h3>
-                  <button onClick={() => setErGvForm(null)} className="p-2 hover:bg-white/10 rounded-full transition"><X size={20} /></button>
+                  <button type="button" onClick={() => setErGvForm(null)} className="shrink-0 inline-flex items-center justify-center min-w-11 min-h-11 hover:bg-white/10 rounded-full transition"><X size={20} /></button>
                 </div>
-                <div className="p-8 space-y-5 max-h-[75vh] overflow-y-auto">
+                <div className="p-4 sm:p-8 space-y-5 max-h-[75vh] overflow-y-auto">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Giảng viên</label>
@@ -430,9 +430,9 @@ export default function AdminTrainingTab() {
                     <p className="text-xs font-black text-purple-700 uppercase tracking-widest">✍️ BÀI TỰ LUẬN & GHI CHÚ</p>
                     <div><label className="text-xs font-bold text-gray-500 uppercase block mb-1">Đánh giá chung (Ghi chú)</label><textarea value={erGvForm.testNotes || ''} onChange={e => setErGvForm({ ...erGvForm, testNotes: e.target.value })} rows={2} className="w-full border-2 border-purple-100 rounded-xl p-3 focus:border-purple-500 outline-none text-sm resize-none" placeholder="Đánh giá kết quả của giảng viên..." /></div>
                   </div>
-                  <div className="flex items-center gap-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                    <p className="text-sm font-black text-gray-700 flex-1">Kết quả: Xét duyệt Giảng dạy?</p>
-                    <div className="flex gap-3">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                    <p className="text-[15px] font-black text-gray-700 flex-1">Kết quả: Xét duyệt Giảng dạy?</p>
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                        <button onClick={() => setErGvForm({ ...erGvForm, status: 'active' })} 
                          className={`flex-1 px-5 py-3 rounded-2xl text-[12px] font-black transition-all duration-300 border-2 ${
                            erGvForm.status === 'active' 
@@ -448,9 +448,9 @@ export default function AdminTrainingTab() {
                     </div>
                   </div>
                 </div>
-                <div className="px-8 pb-8 flex gap-3">
-                  <button onClick={() => setErGvForm(null)} className="flex-1 py-3 border-2 border-gray-200 rounded-xl font-semibold text-gray-600">Huỷ</button>
-                  <button onClick={async () => {
+                <div className="px-4 sm:px-8 pb-4 sm:pb-8 flex flex-col sm:flex-row gap-3">
+                  <button type="button" onClick={() => setErGvForm(null)} className="flex-1 min-h-11 py-3 border-2 border-gray-200 rounded-2xl font-semibold text-gray-600">Huỷ</button>
+                  <button type="button" onClick={async () => {
                     if (!erGvForm.teacherId) { toast.error('Vui lòng chọn giảng viên!'); return; }
                     try {
                       await ctxUpdateTeacher(erGvForm.teacherId, {
@@ -466,7 +466,7 @@ export default function AdminTrainingTab() {
                     } catch (err) {
                       toast.error('Lỗi cập nhật: ' + (err.message || 'Không xác định'));
                     }
-                  }} className="flex-1 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-xl font-bold flex items-center justify-center gap-2">
+                  }} className="flex-1 min-h-11 py-3 bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
                     <Save size={16} /> Lưu & Áp dụng
                   </button>
                 </div>
@@ -478,12 +478,12 @@ export default function AdminTrainingTab() {
           {gvReviewModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-                <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4 rounded-t-2xl">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-4 sm:px-6 py-4 rounded-t-2xl">
+                  <h3 className="text-white font-bold text-lg sm:text-xl flex items-center gap-2">
                     <FileSpreadsheet size={20} /> Kiểm Tra Bài Thực Hành
                   </h3>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-4 sm:p-6 space-y-4">
                   <div className="bg-gray-50 rounded-xl p-4 space-y-1">
                     <p className="text-sm"><strong>Giảng viên:</strong> {gvReviewModal.name}</p>
                     <p className="text-sm break-all"><strong>File:</strong> {practicalFileDisplayName(gvReviewModal.practicalFile)}</p>
@@ -506,8 +506,8 @@ export default function AdminTrainingTab() {
                     </a>
                   </div>
                 </div>
-                <div className="px-6 pb-6 flex gap-3">
-                  <button type="button" onClick={() => setGvReviewModal(null)} className="flex-1 py-3 border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50">
+                <div className="px-4 sm:px-6 pb-4 sm:pb-6 flex flex-col sm:flex-row gap-3">
+                  <button type="button" onClick={() => setGvReviewModal(null)} className="flex-1 min-h-11 py-3 border-2 border-gray-200 rounded-2xl font-semibold text-gray-600 hover:bg-gray-50">
                     Đóng
                   </button>
                   {String(gvReviewModal.status || '').toLowerCase() === 'pending' && (
@@ -523,7 +523,7 @@ export default function AdminTrainingTab() {
                           toast.error(e?.message || 'Không cập nhật được.');
                         }
                       }}
-                      className="flex-1 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold hover:from-green-700 flex items-center justify-center gap-2 text-sm"
+                      className="flex-1 min-h-11 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-2xl font-bold hover:from-green-700 flex items-center justify-center gap-2 text-[15px]"
                     >
                       <CheckCircle2 size={16} /> Chấm đạt
                     </button>

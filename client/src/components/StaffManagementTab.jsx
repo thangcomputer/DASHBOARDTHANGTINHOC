@@ -5,12 +5,12 @@
  * Chỉ hiển thị trong Admin Sidebar khi user.adminRole === 'SUPER_ADMIN'
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import CmsSelect from './ui/CmsSelect';
 import {
   ShieldCheck, UserPlus, Edit2, Trash2, Save, X, Loader2,
   CheckSquare, Square, Key, Phone, User, Shield, Users,
-  AlertTriangle, CheckCircle2, Crown, UserCog, Building2
+  AlertTriangle, CheckCircle2, Crown, UserCog, Building2, MoreVertical, ChevronDown, Search,
 } from 'lucide-react';
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
@@ -19,7 +19,16 @@ import { resolveAvatarUrl } from '../utils/defaultAvatars';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 
-
+/** Nhóm quyền để Accordion UI — không đổi key/API */
+const PERMISSION_GROUPS = [
+  { id: 'students', title: 'Học viên', icon: '📚', keys: ['manage_students'] },
+  { id: 'teachers', title: 'Giảng viên', icon: '👨‍🏫', keys: ['view_teachers'] },
+  { id: 'schedule', title: 'Lịch dạy', icon: '📅', keys: ['manage_schedule'] },
+  { id: 'finance', title: 'Tài chính', icon: '💰', keys: ['manage_finance', 'view_branch_revenue'] },
+  { id: 'training', title: 'Đào tạo', icon: '🎓', keys: ['manage_training', 'manage_student_training'] },
+  { id: 'hr', title: 'Nhân sự', icon: '👤', keys: ['manage_hr', 'manage_staff'] },
+  { id: 'system', title: 'Hệ thống', icon: '⚙️', keys: ['system_settings', 'view_logs', 'view_evaluations'] },
+];
 
 function getToken() {
   for (const role of ['admin','staff','teacher']) {
@@ -31,20 +40,29 @@ function getToken() {
   return '';
 }
 
-// ── Badge phân quyền ──────────────────────────────────────────────────────────
 function RoleBadge({ adminRole }) {
   if (adminRole === 'SUPER_ADMIN') {
     return (
-      <span className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full">
-        <Crown size={10} /> SUPER ADMIN
+      <span className="cms-rbac-badge cms-rbac-badge-admin">
+        <Crown size={10} aria-hidden="true" /> SUPER ADMIN
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-[10px] font-black px-2.5 py-1 rounded-full">
-      <UserCog size={10} /> STAFF
+    <span className="cms-rbac-badge cms-rbac-badge-staff">
+      <UserCog size={10} aria-hidden="true" /> STAFF
     </span>
   );
+}
+
+function StatusBadge({ status }) {
+  if (status === 'active') {
+    return <span className="cms-rbac-badge cms-rbac-badge-success">🟢 Hoạt động</span>;
+  }
+  if (status === 'pending') {
+    return <span className="cms-rbac-badge cms-rbac-badge-warning">🟠 Chờ</span>;
+  }
+  return <span className="cms-rbac-badge cms-rbac-badge-danger">🔴 Khóa</span>;
 }
 
 // ── Modal Thêm/Sửa ────────────────────────────────────────────────────────────
@@ -65,8 +83,8 @@ function StaffModal({ staff, onClose, onSaved }) {
     status:      staff?.status || 'active',
   });
   const [saving, setSaving] = useState(false);
+  const [permQuery, setPermQuery] = useState('');
 
-  // Fetch danh sách chi nhánh khi mở modal
   useEffect(() => {
     setBranchLoading(true);
     fetch(`${API}/api/branches/all`, {
@@ -94,7 +112,6 @@ function StaffModal({ staff, onClose, onSaved }) {
     if (!isEdit && !form.password) {
       toast.error('Vui lòng nhập mật khẩu'); return;
     }
-    // STAFF phải chọn chi nhánh
     if (form.adminRole === 'STAFF' && !form.branchId) {
       toast.error('Nhân viên (STAFF) phải được gán vào một chi nhánh!'); return;
     }
@@ -127,253 +144,483 @@ function StaffModal({ staff, onClose, onSaved }) {
   };
 
   const isStaff = form.adminRole === 'STAFF';
+  const q = permQuery.trim().toLowerCase();
 
-  const fieldClass =
-    'w-full bg-gray-50 border-2 border-transparent focus:border-gray-800 focus:bg-white rounded-[20px] p-4 font-bold text-gray-800 outline-none transition-all shadow-sm';
+  const groupedPerms = useMemo(() => {
+    return PERMISSION_GROUPS.map((g) => {
+      const items = ALL_PERMISSIONS.filter((p) => g.keys.includes(p.key));
+      const filtered = !q
+        ? items
+        : items.filter((p) =>
+          p.label.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.key.includes(q)
+        );
+      return { ...g, items: filtered };
+    }).filter((g) => g.items.length > 0);
+  }, [q]);
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-    >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col">
-        {/* Header giống kiểu modal học viên */}
-        <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-8 py-6 flex items-center justify-between">
-          <h3 className="text-white font-black text-2xl flex items-center gap-4">
-            <div className="p-2 bg-white/20 rounded-2xl backdrop-blur-md">
-              <UserPlus size={28} />
-            </div>
-            {isEdit ? 'Chỉnh sửa quyền' : 'Tạo tài khoản nội bộ'}
-          </h3>
+    <>
+      <div className="cms-sheet-backdrop" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEdit ? 'Chỉnh sửa quyền' : 'Tạo tài khoản nội bộ'}
+        className="cms-sheet cms-rbac-sheet w-full md:max-w-3xl"
+      >
+        <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
+
+        <div className="cms-rbac-sheet-header">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
+              <UserPlus size={20} aria-hidden="true" />
+            </span>
+            <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+              {isEdit ? 'Chỉnh sửa quyền' : 'Tạo tài khoản nội bộ'}
+            </h3>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center text-white transition-all cursor-pointer"
+            aria-label="Đóng"
+            className="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 hover:text-red-600 flex items-center justify-center transition-all duration-200"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="p-10 max-h-[75vh] overflow-y-auto w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* Cột trái */}
-            <div className="space-y-6 md:border-r border-gray-100 md:pr-10">
-              <h4 className="font-black text-gray-400 text-xs mb-6 flex items-center gap-2 uppercase tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-gray-800 text-white flex items-center justify-center text-xs shadow-lg shadow-slate-200">1</span>
-                Thông tin tài khoản
-              </h4>
-
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
-                  Họ tên <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className={`${fieldClass} pl-11`}
-                    placeholder="Nguyễn Văn A"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
-                  Số điện thoại <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                    className={`${fieldClass} pl-11 font-mono`}
-                    placeholder="09xxxxxxxx"
-                    readOnly={isEdit}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
-                  {isEdit ? 'Mật khẩu mới (để trống = giữ nguyên)' : <>Mật khẩu <span className="text-red-500">*</span></>}
-                </label>
-                <div className="relative">
-                  <Key size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  <input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                    className={`${fieldClass} pl-11`}
-                    placeholder={isEdit ? '••••••' : 'Tối thiểu 6 ký tự'}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-3">Vai trò</label>
-                <div className="flex gap-4">
-                  {[
-                    { val: 'SUPER_ADMIN', label: 'Super Admin', desc: 'Toàn quyền hệ thống', icon: Crown, active: 'border-amber-500 bg-amber-50 shadow-md shadow-amber-100', iconCls: 'text-amber-600' },
-                    { val: 'STAFF', label: 'Nhân viên', desc: 'Quyền theo cấu hình + chi nhánh', icon: UserCog, active: 'border-blue-600 bg-blue-50 shadow-md shadow-blue-100', iconCls: 'text-blue-600' },
-                  ].map(({ val, label, desc, icon: Icon, active, iconCls }) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setForm((f) => ({
-                        ...f,
-                        adminRole: val,
-                        permissions: val === 'SUPER_ADMIN' ? [] : f.permissions,
-                        branchId: val === 'SUPER_ADMIN' ? '' : f.branchId,
-                      }))}
-                      className={`flex-1 flex flex-col gap-1 cursor-pointer border-2 p-4 rounded-2xl transition-all text-left ${
-                        form.adminRole === val ? active : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
-                      }`}
-                    >
-                      <Icon size={18} className={form.adminRole === val ? iconCls : 'text-gray-400'} />
-                      <span className={`font-black text-sm ${form.adminRole === val ? 'text-gray-900' : ''}`}>{label}</span>
-                      <span className="text-[11px] text-gray-400 font-medium leading-snug">{desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {!isStaff && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-700 flex items-start gap-2">
-                  <Crown size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                  <span>Super Admin quản lý <strong>toàn bộ hệ thống</strong>, không bị giới hạn theo chi nhánh.</span>
-                </div>
-              )}
-            </div>
-
-            {/* Cột phải */}
-            <div className="space-y-6 md:pl-2">
-              <h4 className="font-black text-gray-400 text-xs mb-6 flex items-center gap-2 uppercase tracking-[0.2em]">
-                <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs shadow-lg shadow-blue-200">2</span>
-                {isStaff ? 'Chi nhánh & Phân quyền' : 'Phạm vi quản lý'}
-              </h4>
-
-              {isStaff && (
-                <div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2 flex items-center gap-1.5">
-                    <Building2 size={12} />
-                    Chi nhánh quản lý <span className="text-red-500">*</span>
-                  </label>
-                  {branchLoading ? (
-                    <div className="flex items-center gap-2 bg-gray-50 rounded-[20px] p-4 text-gray-400 text-sm font-bold">
-                      <Loader2 size={14} className="animate-spin" /> Đang tải chi nhánh...
-                    </div>
-                  ) : branches.length === 0 ? (
-                    <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 text-xs text-amber-700 flex items-center gap-2">
-                      <AlertTriangle size={14} /> Chưa có chi nhánh nào. Vui lòng tạo chi nhánh trong Cài đặt trước.
-                    </div>
-                  ) : (
-                    <>
-                      <CmsSelect
-                        value={form.branchId}
-                        onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value }))}
-                        className={`w-full rounded-[20px] p-4 text-sm font-black outline-none transition shadow-sm cursor-pointer ${
-                          !form.branchId
-                            ? 'border-2 border-red-300 bg-red-50'
-                            : 'border-2 border-emerald-300 bg-emerald-50 text-emerald-800'
-                        }`}
-                      >
-                        <option value="">-- Chọn chi nhánh (bắt buộc) --</option>
-                        {branches.filter((b) => b.isActive !== false).map((b) => (
-                          <option key={b._id} value={b._id}>
-                            {b.name}{b.code ? ` [${b.code}]` : ''}
-                          </option>
-                        ))}
-                      </CmsSelect>
-                      {!form.branchId && (
-                        <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1 font-semibold">
-                          <AlertTriangle size={11} /> Bắt buộc chọn chi nhánh cho nhân viên
-                        </p>
-                      )}
-                      {form.branchId && (() => {
-                        const b = branches.find((x) => String(x._id) === String(form.branchId));
-                        return b ? (
-                          <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1 font-semibold">
-                            <CheckCircle2 size={11} /> Gán vào: <strong>{b.name}</strong>
-                            {b.code ? ` (mã QR: ${b.code})` : ''}
-                          </p>
-                        ) : null;
-                      })()}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {isStaff && (
-                <div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-3">
-                    Phân quyền module ({form.permissions.length}/{ALL_PERMISSIONS.length} quyền)
-                  </label>
-                  <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                    {ALL_PERMISSIONS.map(({ key, label, desc }) => {
-                      const checked = form.permissions.includes(key);
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => togglePerm(key)}
-                          className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border-2 text-left transition ${
-                            checked ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-white hover:border-gray-200'
-                          }`}
-                        >
-                          {checked
-                            ? <CheckSquare size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                            : <Square size={18} className="text-gray-300 flex-shrink-0 mt-0.5" />}
-                          <div>
-                            <p className={`text-sm font-bold ${checked ? 'text-blue-800' : 'text-gray-700'}`}>{label}</p>
-                            <p className="text-[11px] text-gray-400">{desc}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {form.permissions.length === 0 && (
-                    <p className="text-xs text-amber-600 flex items-center gap-1 mt-2 font-semibold">
-                      <AlertTriangle size={12} /> Nhân viên chưa có quyền nào — sẽ không thấy menu sau khi đăng nhập
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {!isStaff && (
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-sm text-gray-500 font-medium leading-relaxed">
-                  Tài khoản Super Admin không cần gán chi nhánh hay tick quyền module — mặc định toàn quyền.
-                </div>
-              )}
-            </div>
+        {/* Stepper (visual) */}
+        <div className="cms-rbac-stepper" aria-hidden="true">
+          <div className="cms-rbac-step cms-rbac-step-active">
+            <span className="cms-rbac-step-dot" />
+            <span className="cms-rbac-step-label">Thông tin</span>
           </div>
-
-          {/* Footer giống modal học viên */}
-          <div className="mt-12 pt-10 border-t border-gray-100 flex flex-col md:flex-row items-center justify-end gap-4 bg-gray-50/50 -mx-10 -mb-10 px-10 pb-10 pt-8 rounded-b-[40px]">
-            <div className="flex gap-4 w-full md:w-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-10 py-4 bg-white border-2 border-gray-100 rounded-[22px] text-xs font-black text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all uppercase"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={saving}
-                className="flex-1 md:flex-none px-12 py-4 bg-gradient-to-r from-gray-800 to-gray-900 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-slate-300 hover:-translate-y-1 transition-all flex items-center justify-center gap-3 uppercase active:scale-95 disabled:opacity-50"
-              >
-                {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật quyền' : 'Tạo tài khoản')}
-              </button>
-            </div>
+          <div className="cms-rbac-step-line" />
+          <div className={`cms-rbac-step ${isStaff ? 'cms-rbac-step-active' : ''}`}>
+            <span className="cms-rbac-step-dot" />
+            <span className="cms-rbac-step-label">Chi nhánh</span>
+          </div>
+          <div className="cms-rbac-step-line" />
+          <div className="cms-rbac-step">
+            <span className="cms-rbac-step-dot" />
+            <span className="cms-rbac-step-label">Hoàn tất</span>
           </div>
         </div>
+
+        <div className="cms-sheet-body cms-rbac-sheet-body space-y-4">
+          <section className="space-y-3">
+            <h4 className="cms-rbac-section-title">
+              <span className="cms-rbac-section-num">1</span>
+              Thông tin tài khoản
+            </h4>
+
+            <div>
+              <label className="cms-rbac-label">Họ tên <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className="cms-input pl-10"
+                  placeholder="Nguyễn Văn A"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="cms-rbac-label">Số điện thoại <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+                <input
+                  type="text"
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="cms-input pl-10 font-mono"
+                  placeholder="09xxxxxxxx"
+                  readOnly={isEdit}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="cms-rbac-label">
+                {isEdit ? 'Mật khẩu mới (để trống = giữ nguyên)' : <>Mật khẩu <span className="text-red-500">*</span></>}
+              </label>
+              <div className="relative">
+                <Key size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  className="cms-input pl-10"
+                  placeholder={isEdit ? '••••••' : 'Tối thiểu 6 ký tự'}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="cms-rbac-label" id="rbac-role-label">Vai trò</label>
+              <div
+                className="cms-rbac-segment"
+                role="radiogroup"
+                aria-labelledby="rbac-role-label"
+              >
+                {[
+                  { val: 'SUPER_ADMIN', label: 'Super Admin', icon: Crown },
+                  { val: 'STAFF', label: 'Nhân viên', icon: UserCog },
+                ].map(({ val, label, icon: Icon }) => (
+                  <button
+                    key={val}
+                    type="button"
+                    role="radio"
+                    aria-checked={form.adminRole === val}
+                    onClick={() => setForm((f) => ({
+                      ...f,
+                      adminRole: val,
+                      permissions: val === 'SUPER_ADMIN' ? [] : f.permissions,
+                      branchId: val === 'SUPER_ADMIN' ? '' : f.branchId,
+                    }))}
+                    className={`cms-rbac-segment-item ${form.adminRole === val ? 'is-active' : ''}`}
+                  >
+                    <Icon size={14} aria-hidden="true" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {!isStaff && (
+              <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-[13px] text-amber-800 flex items-start gap-2">
+                <Crown size={14} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <span>Super Admin quản lý <strong>toàn bộ hệ thống</strong>, không bị giới hạn theo chi nhánh.</span>
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <h4 className="cms-rbac-section-title">
+              <span className="cms-rbac-section-num cms-rbac-section-num-info">2</span>
+              {isStaff ? 'Chi nhánh & Phân quyền' : 'Phạm vi quản lý'}
+            </h4>
+
+            {isStaff && (
+              <div>
+                <label className="cms-rbac-label flex items-center gap-1.5">
+                  <Building2 size={12} aria-hidden="true" />
+                  Chi nhánh quản lý <span className="text-red-500">*</span>
+                </label>
+                {branchLoading ? (
+                  <div className="cms-input flex items-center gap-2 text-slate-400">
+                    <Loader2 size={14} className="animate-spin" /> Đang tải chi nhánh...
+                  </div>
+                ) : branches.length === 0 ? (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[12px] text-amber-700 flex items-center gap-2">
+                    <AlertTriangle size={14} /> Chưa có chi nhánh nào. Vui lòng tạo chi nhánh trong Cài đặt trước.
+                  </div>
+                ) : (
+                  <>
+                    <CmsSelect
+                      value={form.branchId}
+                      onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value }))}
+                      className={`cms-input cursor-pointer ${
+                        !form.branchId
+                          ? 'border-amber-400 bg-amber-50'
+                          : 'border-emerald-300 bg-emerald-50/50 text-emerald-900'
+                      }`}
+                      aria-invalid={!form.branchId}
+                    >
+                      <option value="">-- Chọn chi nhánh (bắt buộc) --</option>
+                      {branches.filter((b) => b.isActive !== false).map((b) => (
+                        <option key={b._id} value={b._id}>
+                          {b.name}{b.code ? ` [${b.code}]` : ''}
+                        </option>
+                      ))}
+                    </CmsSelect>
+                    {!form.branchId && (
+                      <p className="text-[12px] text-amber-700 mt-1.5 flex items-center gap-1 font-medium">
+                        <AlertTriangle size={11} /> Bắt buộc chọn chi nhánh cho nhân viên
+                      </p>
+                    )}
+                    {form.branchId && (() => {
+                      const b = branches.find((x) => String(x._id) === String(form.branchId));
+                      return b ? (
+                        <p className="text-[12px] text-emerald-700 mt-1.5 flex items-center gap-1 font-medium">
+                          <CheckCircle2 size={11} /> Gán vào: <strong>{b.name}</strong>
+                          {b.code ? ` (mã QR: ${b.code})` : ''}
+                        </p>
+                      ) : null;
+                    })()}
+                  </>
+                )}
+              </div>
+            )}
+
+            {isStaff && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="cms-rbac-label !mb-0">
+                    Phân quyền module ({form.permissions.length}/{ALL_PERMISSIONS.length})
+                  </label>
+                </div>
+
+                <div className="cms-rbac-perm-search">
+                  <div className="cms-rbac-perm-search-inner">
+                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+                    <input
+                      type="search"
+                      value={permQuery}
+                      onChange={(e) => setPermQuery(e.target.value)}
+                      className="cms-input pl-10"
+                      placeholder="Tìm quyền..."
+                      aria-label="Tìm quyền"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {groupedPerms.map((g) => (
+                    <details key={g.id} className="cms-rbac-accordion">
+                      <summary className="cms-rbac-accordion-summary">
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span aria-hidden="true">{g.icon}</span>
+                          <span className="font-semibold text-slate-800 truncate">{g.title}</span>
+                          <span className="text-[11px] text-slate-400 font-medium">
+                            {g.items.filter((p) => form.permissions.includes(p.key)).length}/{g.items.length}
+                          </span>
+                        </span>
+                        <ChevronDown size={16} className="cms-rbac-accordion-chevron text-slate-400" aria-hidden="true" />
+                      </summary>
+                      <div className="cms-rbac-accordion-body">
+                        {g.items.map(({ key, label, desc }) => {
+                          const checked = form.permissions.includes(key);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => togglePerm(key)}
+                              className={`cms-rbac-perm-row ${checked ? 'is-checked' : ''}`}
+                            >
+                              {checked
+                                ? <CheckSquare size={18} className="text-sky-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                                : <Square size={18} className="text-slate-300 flex-shrink-0 mt-0.5" aria-hidden="true" />}
+                              <div className="min-w-0 text-left">
+                                <p className={`text-sm font-semibold ${checked ? 'text-sky-900' : 'text-slate-700'}`}>{label}</p>
+                                <p className="text-[12px] text-slate-500 leading-snug">{desc}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  ))}
+                  {groupedPerms.length === 0 && (
+                    <p className="text-[13px] text-slate-400 text-center py-4">Không tìm thấy quyền phù hợp</p>
+                  )}
+                </div>
+
+                {form.permissions.length === 0 && (
+                  <p className="text-[12px] text-amber-700 flex items-center gap-1 font-medium">
+                    <AlertTriangle size={12} /> Nhân viên chưa có quyền nào — sẽ không thấy menu sau khi đăng nhập
+                  </p>
+                )}
+              </div>
+            )}
+
+            {!isStaff && (
+              <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-[13px] text-slate-500 leading-relaxed">
+                Tài khoản Super Admin không cần gán chi nhánh hay tick quyền module — mặc định toàn quyền.
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="cms-sheet-footer">
+          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline flex-1">
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saving}
+            className="cms-btn cms-btn-secondary flex-[1.4]"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            {saving ? 'Đang lưu...' : (isEdit ? 'Lưu' : 'Tạo tài khoản')}
+          </button>
+        </div>
       </div>
-    </div>
+    </>
+  );
+}
+
+function StaffCard({ s, deleting, onEdit, onDelete }) {
+  const perms = s.permissions || [];
+  const visible = perms.slice(0, 3);
+  const rest = perms.slice(3);
+  const sheetId = `staff-perms-${s._id}`;
+
+  return (
+    <article className="cms-rbac-card">
+      <div className="flex items-start gap-3">
+        <img
+          src={resolveAvatarUrl({
+            avatar: s.avatar,
+            role: 'admin',
+            adminRole: s.adminRole,
+          })}
+          alt=""
+          className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-slate-100 bg-white"
+        />
+
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 space-y-1">
+              <p className="text-base font-semibold text-slate-900 truncate leading-snug">{s.name}</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <RoleBadge adminRole={s.adminRole} />
+                <StatusBadge status={s.status} />
+              </div>
+            </div>
+
+            {/* Action menu — details, no extra React state */}
+            <details className="cms-rbac-menu relative flex-shrink-0">
+              <summary
+                className="cms-rbac-menu-trigger"
+                aria-label={`Thao tác ${s.name}`}
+              >
+                <MoreVertical size={18} aria-hidden="true" />
+              </summary>
+              <div className="cms-rbac-menu-panel" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="cms-rbac-menu-item"
+                  onClick={(e) => {
+                    e.currentTarget.closest('details')?.removeAttribute('open');
+                    onEdit();
+                  }}
+                >
+                  <Edit2 size={14} /> Sửa
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="cms-rbac-menu-item"
+                  disabled
+                  aria-disabled="true"
+                  title="Sắp có"
+                >
+                  <Key size={14} /> Reset mật khẩu
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="cms-rbac-menu-item"
+                  onClick={(e) => {
+                    e.currentTarget.closest('details')?.removeAttribute('open');
+                    onEdit();
+                  }}
+                >
+                  <Shield size={14} /> Đổi quyền
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="cms-rbac-menu-item"
+                  disabled
+                  aria-disabled="true"
+                  title="Sắp có"
+                >
+                  <AlertTriangle size={14} /> Khóa
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.currentTarget.closest('details')?.removeAttribute('open');
+                    onDelete();
+                  }}
+                  disabled={deleting}
+                  className="cms-rbac-menu-item cms-rbac-menu-item-danger"
+                >
+                  {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Xóa
+                </button>
+              </div>
+            </details>
+          </div>
+
+          <p className="text-[13px] text-slate-500 font-mono">{s.phone}</p>
+
+          {s.adminRole === 'STAFF' && s.branchId && (
+            <p className="text-[13px] text-sky-700 flex items-center gap-1.5 font-medium">
+              <Building2 size={12} aria-hidden="true" />
+              {s.branchCode || 'Chi nhánh'}
+              {s.branchCode ? <span className="text-slate-400 font-normal">— mã QR prefix</span> : null}
+            </p>
+          )}
+          {s.adminRole === 'STAFF' && !s.branchId && (
+            <p className="text-[13px] text-amber-600 flex items-center gap-1.5">
+              <AlertTriangle size={12} /> Chưa gán chi nhánh
+            </p>
+          )}
+
+          {s.adminRole === 'SUPER_ADMIN' ? (
+            <p className="text-[13px] text-amber-700 font-medium flex items-center gap-1.5">
+              <Crown size={12} /> Toàn quyền hệ thống
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {perms.length === 0 ? (
+                <span className="text-[12px] text-slate-400 italic">Chưa có quyền nào</span>
+              ) : (
+                <>
+                  {visible.map((pk) => {
+                    const perm = ALL_PERMISSIONS.find((p) => p.key === pk);
+                    return (
+                      <span key={pk} className="cms-rbac-perm-chip">
+                        {perm?.label || pk}
+                      </span>
+                    );
+                  })}
+                  {rest.length > 0 && (
+                    <>
+                      <input type="checkbox" id={sheetId} className="peer/perms sr-only" />
+                      <label htmlFor={sheetId} className="cms-rbac-perm-more">
+                        +{rest.length} quyền khác
+                      </label>
+                      <div className="cms-rbac-perm-sheet-root peer-checked/perms:pointer-events-auto">
+                        <label htmlFor={sheetId} className="cms-rbac-perm-sheet-backdrop" aria-hidden="true" />
+                        <div className="cms-rbac-perm-sheet" role="dialog" aria-label="Toàn bộ quyền">
+                          <div className="cms-sheet-handle" aria-hidden="true" />
+                          <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100">
+                            <h4 className="text-sm font-semibold text-slate-900">Quyền của {s.name}</h4>
+                            <label htmlFor={sheetId} className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 cursor-pointer" aria-label="Đóng">
+                              <X size={16} />
+                            </label>
+                          </div>
+                          <ul className="px-4 py-3 space-y-2 max-h-[50dvh] overflow-y-auto">
+                            {perms.map((pk) => {
+                              const perm = ALL_PERMISSIONS.find((p) => p.key === pk);
+                              return (
+                                <li key={pk} className="rounded-xl border border-slate-100 px-3 py-2.5">
+                                  <p className="text-sm font-semibold text-slate-800">{perm?.label || pk}</p>
+                                  {perm?.desc && <p className="text-[12px] text-slate-500 mt-0.5">{perm.desc}</p>}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -434,122 +681,64 @@ export default function StaffManagementTab() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="cms-rbac space-y-3 sm:space-y-4">
       {modal !== undefined && (
         <StaffModal staff={modal} onClose={() => setModal(undefined)} onSaved={handleSaved} />
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <ShieldCheck size={16} className="text-gray-700" /> Tài khoản & Phân quyền Nội bộ
+      <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <span className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck size={16} aria-hidden="true" />
+            </span>
+            <span className="truncate">Tài khoản & Phân quyền nội bộ</span>
           </h3>
-          <p className="text-xs text-gray-400 mt-0.5">Chỉ Super Admin mới quản lý được trang này</p>
+          <p className="text-[12px] text-slate-500 mt-1 pl-11">Chỉ Super Admin quản lý trang này</p>
         </div>
-        <button onClick={() => setModal(null)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-700 transition">
+        <button
+          type="button"
+          onClick={() => setModal(null)}
+          className="cms-btn cms-btn-secondary cms-btn-sm w-full min-[390px]:w-auto"
+        >
           <UserPlus size={15} /> Tạo tài khoản
         </button>
       </div>
 
-      {/* Info box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800 flex items-start gap-2">
-        <Shield size={13} className="flex-shrink-0 mt-0.5 text-blue-600" />
-        <span>
+      {/* RBAC policy accordion — native details, no React state */}
+      <details className="cms-rbac-policy">
+        <summary className="cms-rbac-policy-summary">
+          <span className="flex items-center gap-2 font-semibold text-sky-900">
+            <Shield size={14} className="text-sky-600" aria-hidden="true" />
+            Chính sách RBAC
+          </span>
+          <ChevronDown size={16} className="cms-rbac-accordion-chevron text-sky-600" aria-hidden="true" />
+        </summary>
+        <div className="cms-rbac-policy-body text-[13px] text-sky-900/90 leading-relaxed">
           <strong>RBAC:</strong> Super Admin thấy toàn bộ menu. Nhân viên (Staff) chỉ thấy menu tương ứng với quyền đã được cấp.
           Backend cũng chặn API 403 nếu Staff truy cập route không có quyền.
-        </span>
-      </div>
+        </div>
+      </details>
 
-      {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
-          <Loader2 size={22} className="animate-spin" /> <span className="text-sm">Đang tải...</span>
+        <div className="flex items-center justify-center py-14 gap-3 text-slate-400">
+          <Loader2 size={20} className="animate-spin" /> <span className="text-sm">Đang tải...</span>
         </div>
       ) : staffList.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <Users size={40} className="mx-auto mb-3 opacity-20" />
-          <p className="text-sm">Chưa có tài khoản nội bộ nào.</p>
+        <div className="text-center py-14 text-slate-400">
+          <Users size={36} className="mx-auto mb-3 opacity-25" />
+          <p className="text-sm font-medium">Chưa có tài khoản nội bộ nào.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {staffList.map(s => (
-            <div key={s._id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-gray-200 transition">
-              <div className="flex items-start gap-4">
-                {/* Avatar */}
-                <img
-                  src={resolveAvatarUrl({
-                    avatar: s.avatar,
-                    role: 'admin',
-                    adminRole: s.adminRole,
-                  })}
-                  alt={s.name}
-                  className="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-gray-100 shadow-sm bg-white"
-                />
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-bold text-gray-800">{s.name}</p>
-                    <RoleBadge adminRole={s.adminRole} />
-                    {s.status === 'active'
-                      ? <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">● Hoạt động</span>
-                      : <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">● Tắt</span>
-                    }
-                  </div>
-                  <p className="text-xs text-gray-400 font-mono mt-0.5">{s.phone}</p>
-                  {/* Branch info for STAFF */}
-                  {s.adminRole === 'STAFF' && s.branchId && (
-                    <p className="text-xs text-blue-600 mt-0.5 flex items-center gap-1">
-                      <Building2 size={10} />
-                      <span className="font-medium">{s.branchCode || 'Chi nhánh'}</span>
-                      {s.branchCode && <span className="text-gray-400">— mã QR prefix</span>}
-                    </p>
-                  )}
-                  {s.adminRole === 'STAFF' && !s.branchId && (
-                    <p className="text-xs text-amber-500 mt-0.5 flex items-center gap-1">
-                      <AlertTriangle size={10} /> Chưa gán chi nhánh
-                    </p>
-                  )}
-                  {/* Permissions list */}
-                  {s.adminRole === 'SUPER_ADMIN' ? (
-                    <p className="text-xs text-amber-600 font-medium mt-2 flex items-center gap-1">
-                      <Crown size={11} /> Toàn quyền hệ thống
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {(s.permissions || []).length === 0 ? (
-                        <span className="text-xs text-gray-400 italic">Chưa có quyền nào</span>
-                      ) : (
-                        s.permissions.map(pk => {
-                          const perm = ALL_PERMISSIONS.find(p => p.key === pk);
-                          return (
-                            <span key={pk} className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-200">
-                              {perm?.label || pk}
-                            </span>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button onClick={() => setModal(s)}
-                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
-                    title="Chỉnh sửa quyền">
-                    <Edit2 size={15} />
-                  </button>
-                  <button onClick={() => handleDelete(s)} disabled={deleting === s._id}
-                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50"
-                    title="Xóa tài khoản">
-                    {deleting === s._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={15} />}
-                  </button>
-                </div>
-              </div>
-            </div>
+          {staffList.map((s) => (
+            <StaffCard
+              key={s._id}
+              s={s}
+              deleting={deleting === s._id}
+              onEdit={() => setModal(s)}
+              onDelete={() => handleDelete(s)}
+            />
           ))}
         </div>
       )}

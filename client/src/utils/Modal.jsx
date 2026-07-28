@@ -4,7 +4,7 @@ import { X, AlertCircle, CheckCircle, Info, HelpCircle } from 'lucide-react';
 const ModalContext = createContext(null);
 
 export const ModalProvider = ({ children }) => {
-  const [modal, setModal] = useState(null); // { title, content, type, onConfirm, onCancel, confirmText, cancelText }
+  const [modal, setModal] = useState(null);
 
   const showModal = useCallback(({ title, content, type = 'info', onConfirm, onCancel, confirmText = 'Đóng', cancelText = null, size = 'sm' }) => {
     setModal({ title, content, type, onConfirm, onCancel, confirmText, cancelText, size });
@@ -34,82 +34,76 @@ export const ModalProvider = ({ children }) => {
 
 const ModalUI = ({ modal, onConfirm, onCancel }) => {
   const typeConfigs = {
-    info:    { icon: Info,        color: 'blue',   gradient: 'from-blue-600 to-indigo-600' },
-    success: { icon: CheckCircle, color: 'emerald',gradient: 'from-emerald-500 to-teal-600' },
-    warning: { icon: AlertCircle, color: 'amber',  gradient: 'from-amber-500 to-orange-600' },
-    error:   { icon: AlertCircle, color: 'rose',   gradient: 'from-rose-500 to-red-600' },
-    question:{ icon: HelpCircle,  color: 'violet', gradient: 'from-violet-500 to-purple-600' },
+    info:     { icon: Info,        tone: 'text-sky-600 bg-sky-50' },
+    success:  { icon: CheckCircle, tone: 'text-emerald-600 bg-emerald-50' },
+    warning:  { icon: AlertCircle, tone: 'text-amber-600 bg-amber-50' },
+    error:    { icon: AlertCircle, tone: 'text-red-600 bg-red-50' },
+    question: { icon: HelpCircle,  tone: 'text-violet-600 bg-violet-50' },
   };
 
   const config = typeConfigs[modal.type] || typeConfigs.info;
   const Icon = config.icon;
 
   const sizeClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-    '3xl': 'max-w-3xl',
-    'full': 'max-w-[95vw]'
+    sm: 'md:max-w-sm',
+    md: 'md:max-w-md',
+    lg: 'md:max-w-lg',
+    xl: 'md:max-w-xl',
+    '2xl': 'md:max-w-2xl',
+    '3xl': 'md:max-w-3xl',
+    full: 'md:max-w-[95vw]',
   };
   const sizeClass = sizeClasses[modal.size] || sizeClasses.sm;
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300"
-        onClick={onCancel}
-      />
-      
-      {/* Modal Card */}
-      <div className={`relative bg-white dark:bg-slate-900 w-full ${sizeClass} rounded-[2.5rem] shadow-2xl shadow-indigo-500/10 overflow-hidden animate-in zoom-in duration-300`}>
-        {/* Top Header/Icon */}
-        <div className={`h-24 bg-gradient-to-br ${config.gradient} flex items-center justify-center relative`}>
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white shadow-xl">
-                <Icon size={32} />
-            </div>
-            
-            <button 
-                onClick={onCancel}
-                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
-            >
-                <X size={20} />
-            </button>
+    <>
+      <div className="cms-sheet-backdrop" onClick={onCancel} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={modal.title || 'Thông báo'}
+        className={`cms-sheet w-full ${sizeClass}`}
+      >
+        <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
+        <div className="cms-sheet-header">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${config.tone}`}>
+              <Icon size={20} aria-hidden="true" />
+            </span>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 truncate">
+              {modal.title || 'Thông báo'}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Đóng"
+            className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 hover:text-red-600 flex items-center justify-center transition-colors duration-200"
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        {/* Body */}
-        <div className="p-8 text-center">
-          <h3 className="text-xl font-black text-slate-800 dark:text-white mb-3">
-            {modal.title || 'Thông báo'}
-          </h3>
-          <div className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-8">
+        <div className="cms-sheet-body">
+          <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
             {modal.content}
           </div>
+        </div>
 
-          <div className="flex flex-col gap-3">
-            {modal.confirmText && (
-              <button
-                onClick={onConfirm}
-                className={`w-full py-4 bg-gradient-to-r ${config.gradient} text-white font-black rounded-2xl shadow-xl shadow-${config.color}-500/20 hover:shadow-${config.color}-500/40 transition-all active:scale-[0.98]`}
-              >
-                {modal.confirmText}
-              </button>
-            )}
-            
-            {modal.cancelText && (
-              <button
-                onClick={onCancel}
-                className="w-full py-3 text-slate-400 font-bold hover:text-slate-600 transition-colors"
-              >
-                {modal.cancelText}
-              </button>
-            )}
-          </div>
+        <div className="cms-sheet-footer">
+          {modal.cancelText ? (
+            <button type="button" onClick={onCancel} className="cms-btn cms-btn-outline flex-1">
+              {modal.cancelText}
+            </button>
+          ) : null}
+          {modal.confirmText ? (
+            <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary flex-[1.4]">
+              {modal.confirmText}
+            </button>
+          ) : null}
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

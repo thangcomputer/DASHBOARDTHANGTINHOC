@@ -670,9 +670,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   }, [location.state?.selectUserId, conversations.length]);
 
   return (
-    <div className="h-[calc(100dvh-11rem)] sm:h-[calc(100dvh-9rem)] min-h-[360px] sm:min-h-[420px] flex flex-col bg-gray-50 rounded-2xl sm:rounded-3xl shadow-cms border border-gray-100 overflow-hidden min-w-0 max-w-full">
-      <div className="pt-2"></div>
-
+    <div className="cms-chat-shell">
       {/* ═══════ MAIN AREA ═══════ */}
       <div className="flex-1 flex overflow-hidden min-h-0">
 
@@ -682,22 +680,22 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           ${activeConv ? 'hidden md:flex' : 'flex'}
         `}>
           {/* Search & Add Group */}
-          <div className="p-4 border-b border-gray-100 space-y-3">
+          <div className="cms-chat-search-sticky">
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div className="relative flex-1 min-w-0">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Tìm kiếm danh bạ..."
-                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all font-bold text-slate-800"
+                  className="cms-input pl-10 pr-3"
                 />
               </div>
               {currentUserRole !== 'student' && (
                 <button
                   onClick={() => setShowCreateGroup(true)}
-                  className="w-10 h-10 flex flex-shrink-0 items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
+                  className="w-12 h-12 flex shrink-0 items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
                   title="Tạo nhóm chat"
                 >
                   <Plus size={20} />
@@ -706,7 +704,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             </div>
 
             {/* Hàng Tabs (Pills) Phân loại danh bạ */}
-            <div className="flex flex-wrap items-center gap-1.5 pb-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               {[
                 { id: 'all', label: 'Tất cả' },
                 { id: 'student', label: 'Học viên' },
@@ -717,11 +715,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 <button
                   key={tab.id}
                   onClick={() => setContactTab(tab.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center justify-center
-                    ${contactTab === tab.id 
-                      ? 'bg-slate-800 text-white shadow-sm' 
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700 border border-slate-100'
-                    }`}
+                  className={contactTab === tab.id ? 'cms-chip cms-chip-active' : 'cms-chip'}
                 >
                   {tab.label}
                 </button>
@@ -745,12 +739,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       selectConversation({ ...conv, isGroup });
                     }
                   }}
-                  className={`group w-full flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer ${
-                    activeConv?.id === conv.id ? 'bg-[#F0F7FF] shadow-sm' : 'hover:bg-gray-50'
+                  className={`cms-chat-conv-row ${
+                    activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'
                   }`}
                 >
-                  <div className="relative flex-shrink-0">
-                    <div className={`w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-white text-sm font-black shadow-md relative z-10 overflow-hidden ${
+                  <div className="relative shrink-0">
+                    <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md relative z-10 overflow-hidden ${
                       isGroup ? 'bg-indigo-500' : 'bg-white ring-2 ' + (
                         conv.user.role === 'teacher' ? 'ring-amber-400/80'
                           : conv.user.role === 'student' ? 'ring-sky-400/80'
@@ -759,7 +753,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       )
                     }`}>
                       {isGroup ? (
-                        <Users size={18} />
+                        <Users size={20} />
                       ) : (
                         <img
                           src={resolveAvatarUrl({ avatar: conv.user.avatar, role: conv.user.role })}
@@ -785,16 +779,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     )}
                   </div>
                   <div className="flex-1 text-left min-w-0 pr-1">
-                    <div className="flex justify-between items-baseline mb-0.5">
-                      <div className="flex items-center gap-1 min-w-0 pr-2">
-                        <h4 className="font-extrabold text-[#1E293B] text-[13px] truncate">{conv.user.name}</h4>
+                    <div className="flex justify-between items-center gap-2 mb-0.5">
+                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                        <h4 className="font-semibold text-[#1E293B] text-base truncate">{conv.user.name}</h4>
                         {conv.unread > 0 && (
                           <span className="ml-1 min-w-[16px] h-4 px-1 bg-blue-600 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-sm">
                             {conv.unread > 99 ? '99+' : conv.unread}
                           </span>
                         )}
                         {conv.user.branchCode && (
-                          <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-tighter shrink-0">
+                          <span className="bg-emerald-100 text-emerald-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0">
                             {conv.user.branchCode}
                           </span>
                         )}
@@ -811,24 +805,24 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           </a>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button 
                           onClick={(e) => handleHideConversation(e, conv.id)}
-                          className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded"
+                          className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg"
                           title="Ẩn cuộc trò chuyện"
                         >
                           <EyeOff size={14} />
                         </button>
-                        <span className="text-[10px] text-gray-400 font-bold ml-1">{formatTime(conv.lastTime)}</span>
+                        <span className="text-xs text-slate-400 font-medium tabular-nums">{formatTime(conv.lastTime)}</span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-1 overflow-hidden">
-                      <p className={`text-[11px] truncate flex-1 font-bold ${conv.unread > 0 ? 'text-blue-600 border-l-[3px] border-blue-600 pl-1.5' : 'text-gray-400'}`}>
+                      <p className={`text-[13px] truncate flex-1 font-medium ${conv.unread > 0 ? 'text-blue-600 border-l-[3px] border-blue-600 pl-1.5' : 'text-slate-500'}`}>
                         {conv.lastMessage || 'Bắt đầu trò chuyện...'}
                       </p>
                       {conv.unread > 0 && (
-                        <div className="flex gap-1 items-center flex-shrink-0">
-                          <span className="px-1.5 py-0.5 bg-red-500 rounded text-white text-[9px] font-black tracking-widest uppercase animate-pulse shadow-sm">
+                        <div className="flex gap-1 items-center shrink-0">
+                          <span className="px-1.5 py-0.5 bg-red-500 rounded-md text-white text-[10px] font-semibold animate-pulse shadow-sm">
                             Mới
                           </span>
                         </div>
@@ -895,16 +889,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           ) : (
             <>
               {/* Chat header */}
-              <div className="bg-white px-4 md:px-6 py-2.5 border-b border-gray-100 flex items-center justify-between shadow-sm flex-shrink-0">
-                <div className="flex items-center gap-2 md:gap-3">
+              <div className="cms-chat-header">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
                   <button
                     onClick={() => setActiveConv(null)}
-                    className="md:hidden p-1 hover:bg-gray-100 rounded-lg"
+                    className="md:hidden shrink-0 w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-xl text-slate-700 transition-colors"
+                    aria-label="Quay lại danh sách"
                   >
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={22} />
                   </button>
-                  <div className="relative">
-                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white text-xs font-bold overflow-hidden ${
+                  <div className="relative shrink-0">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ring-2 ring-white shadow-sm ${
                       activeConv.isGroup ? 'bg-indigo-500' : 'bg-white'
                     }`}>
                       {activeConv.isGroup ? (
@@ -918,14 +913,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       )}
                     </div>
                     {!activeConv.isGroup && activeConv.user.online && (
-                      <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-2 border-white" />
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
                     )}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-gray-800 text-xs md:text-sm">{activeConv.user.name}</p>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-slate-900 text-base truncate">{activeConv.user.name}</p>
                       {activeConv.user.branchCode && (
-                        <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest shadow-sm">
+                        <span className="bg-emerald-100 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-md shadow-sm">
                           Cơ sở: {activeConv.user.branchCode}
                         </span>
                       )}
@@ -941,9 +936,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         </a>
                       )}
                     </div>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
+                    <p className="text-xs text-slate-500 font-medium">
                       {activeConv.isGroup ? 'Nhóm trò chuyện' : activeConv.user.online ? (
-                        <span className="text-green-600 font-black">● Online</span>
+                        <span className="text-emerald-600 font-semibold">● Đang hoạt động</span>
                       ) : 'Offline'}
                     </p>
                   </div>
@@ -960,17 +955,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-3 md:px-6 pt-6 pb-4 space-y-4 min-h-0 bg-[#F0F2F5]">
+              <div className="cms-chat-messages">
                 {messages.map(msg => {
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
                   const role = normalizeRole(msg.senderRole);
 
-                  let bubbleBg = isMine ? 'bg-brand-zalo text-white' : 'bg-white text-gray-800';
-                  if (!isMine) {
-                    if (role === 'admin') bubbleBg = 'bg-[#FFF0F0] text-red-900 border border-red-100';
-                    else if (role === 'teacher') bubbleBg = 'bg-[#F0F7FF] text-blue-900 border border-blue-100';
-                    else if (role === 'student') bubbleBg = 'bg-[#F0FFF4] text-emerald-900 border border-emerald-100';
-                  }
+                  const bubbleRoleClass =
+                    !isMine && role === 'admin'
+                      ? 'cms-bubble-other-admin'
+                      : !isMine && role === 'teacher'
+                        ? 'cms-bubble-other-teacher'
+                        : !isMine && role === 'student'
+                          ? 'cms-bubble-other-student'
+                          : '';
 
                   const heartCount = (msg.reactions || []).filter(r => r.type === 'heart').length;
                   const likeCount = (msg.reactions || []).filter(r => r.type === 'like').length;
@@ -981,8 +978,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       <div className={`max-w-[85%] md:max-w-[70%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
                         {!isMine && (
                           <div className="flex items-center gap-2 mb-1 ml-1">
-                             <p className="text-[10px] text-gray-500 font-black uppercase tracking-tight">{msg.senderName}</p>
-                             <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-sm uppercase ${
+                             <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
+                             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
                                role === 'admin' ? 'bg-red-500 text-white' :
                                role === 'teacher' ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'
                              }`}>
@@ -995,9 +992,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                           {/* Message bubble */}
-                          <div className={`relative px-4 py-2.5 rounded-[22px] text-[14px] leading-relaxed shadow-sm transition-all ${bubbleBg} ${
-                            isMine ? 'rounded-tr-none' : 'rounded-tl-none'
-                          }`}>
+                          <div className={`relative px-4 py-2.5 text-[14px] leading-relaxed transition-all ${
+                            isMine ? 'cms-bubble-mine' : 'cms-bubble-other'
+                          } ${bubbleRoleClass}`}>
                             {msg.isRecalled ? (
                                <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
                                  <RotateCcw size={12} /> Tin nhắn đã được thu hồi
@@ -1040,15 +1037,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                       <Paperclip size={18} />
                                     </div>
                                     <div className="flex flex-col min-w-0">
-                                      <span className="font-bold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
-                                      <span className="text-[9px] uppercase font-black opacity-50">Tài liệu đính kèm</span>
+                                      <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
+                                      <span className="text-[10px] font-medium opacity-50">Tài liệu đính kèm</span>
                                     </div>
                                   </a>
                                 ) : msg.content}
 
                             {/* Reaction badge */}
                             {!msg.isRecalled && (heartCount > 0 || likeCount > 0) && (
-                              <div className={`absolute -bottom-3 ${isMine ? 'right-2' : 'left-2'} flex gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-md border border-gray-100`}>
+                              <div className={`cms-bubble-reactions absolute -bottom-3 ${isMine ? 'right-2' : 'left-2'}`}>
                                  {heartCount > 0 && (
                                    <span className="flex items-center gap-0.5 text-[11px]">
                                      <span>❤️</span>
@@ -1128,7 +1125,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                         {/* Time & read status */}
                         <div className={`flex items-center gap-1.5 mt-1.5 ${isMine ? 'justify-end' : ''}`}>
-                          <span className="text-[9px] text-gray-400 font-black uppercase tracking-widest">{formatTime(msg.time)}</span>
+                          <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
                           {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
                             <span title="Chưa gửi được (Kết nối yếu)">
                               <AlertCircle size={10} className="text-red-500 animate-pulse" />
@@ -1151,7 +1148,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               </div>
 
               {/* Input area */}
-              <div className="bg-white px-3 md:px-6 py-4 border-t border-gray-200 flex-shrink-0 relative z-10">
+              <div className="cms-chat-input-bar relative z-10">
                 {uploadError && (
                   <div className="mb-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium flex items-center gap-2">
                     <span>⚠️</span>
@@ -1194,20 +1191,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       value={newMsg}
                       onChange={e => setNewMsg(e.target.value)}
                       onKeyDown={handleKeyPress}
-                      className="w-full bg-gray-100 rounded-xl px-3 py-2 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all pr-8"
+                      className="cms-input pl-4 pr-10"
                       placeholder="Nhập tin nhắn..."
                     />
                     <button
                       onClick={() => setShowEmojis(!showEmojis)}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 transition-colors ${showEmojis ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 transition-colors ${showEmojis ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`}
                     >
-                      <Smile size={16} />
+                      <Smile size={18} />
                     </button>
                   </div>
                   <button
                     onClick={handleSend}
                     disabled={!newMsg.trim()}
-                    className="p-3.5 bg-gradient-to-br from-[#203DB5] to-[#1E3A8A] hover:bg-blue-800 text-white rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-blue-900/20 active:scale-95"
+                    className="cms-btn cms-btn-primary cms-btn-icon"
                     title="Gửi tin nhắn"
                   >
                     <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />
