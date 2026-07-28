@@ -98,10 +98,10 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
   return (
     <div className="flex flex-col xl:flex-row gap-6 items-start">
       {/* ─ CALENDAR GRID ─ */}
-      <div className="bg-white rounded-[2rem] shadow-sm border-0 p-3 sm:p-5 w-full xl:w-[420px] flex-shrink-0">
+      <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-sm border-0 p-3 sm:p-5 w-full xl:w-[420px] flex-shrink-0">
         {/* Header Nav */}
-        <div className="px-2 py-4 flex items-center justify-between mb-2">
-          <h3 className="font-extrabold text-teal-800 text-base sm:text-lg tracking-wide">
+        <div className="px-1 sm:px-2 py-3 sm:py-4 flex items-center justify-between mb-1 sm:mb-2 gap-2 min-w-0">
+          <h3 className="font-extrabold text-slate-800 text-sm sm:text-lg tracking-wide shrink-0">
             Lịch theo tháng
           </h3>
           <div className="flex items-center gap-1.5 sm:gap-3">
@@ -128,7 +128,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
         </div>
 
         {/* Calendar cells */}
-        <div className="grid grid-cols-7 px-1 gap-y-2 gap-x-1 sm:gap-y-3 sm:gap-x-2">
+        <div className="grid grid-cols-7 px-0.5 sm:px-1 gap-y-1.5 gap-x-1 sm:gap-y-2 sm:gap-x-1.5">
           {days.map((day, idx) => {
             if (!day) return <div key={`e-${idx}`} />;
 
@@ -145,6 +145,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
             return (
               <button
                 key={day}
+                type="button"
                 onClick={() => {
                   if (past && !hasData) return;
                   setSelectedDay(day === selectedDay ? null : day);
@@ -155,47 +156,51 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                   : past ? 'Ngày đã qua, không thể sắp lịch' 
                   : 'Click để sắp lịch hôm này'
                 }
-                className={`relative w-full h-[3.25rem] sm:h-14 rounded-[1.25rem] flex flex-col items-center justify-center text-sm font-bold transition-all border-2
+                className={`relative aspect-square w-full min-h-[2.75rem] sm:min-h-[3.25rem] rounded-xl sm:rounded-[1.25rem] flex flex-col items-center justify-center text-sm font-medium transition-all border
                   ${
                     selected
-                      ? 'bg-teal-50/50 border-teal-600 shadow-sm text-teal-800'
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                     : todayDay && !hasData
-                      ? 'bg-white border-slate-200 text-slate-800 ring-2 ring-slate-100 ring-offset-2'
+                      ? 'bg-white border-slate-200 text-slate-900 ring-2 ring-blue-100'
                     : past && !hasData
-                      ? 'opacity-30 cursor-not-allowed border-transparent text-slate-400'
+                      ? 'opacity-40 cursor-not-allowed border-transparent text-slate-500'
                     : hasData 
-                      ? 'bg-[#B2DFDB]/50 border-transparent hover:bg-[#B2DFDB]/70 text-slate-700'
-                    : 'text-slate-600 hover:bg-slate-50 border-transparent hover:border-slate-100 cursor-pointer'
+                      ? 'bg-teal-50/80 border-transparent hover:bg-teal-100/80 text-slate-800'
+                    : 'text-slate-800 hover:bg-slate-50 border-transparent hover:border-slate-100 cursor-pointer'
                   }
                 `}
               >
-                <span className={`${isSunday ? 'text-orange-500' : ''} ${(todayDay && !selected) ? 'text-blue-600 font-black' : ''}`}>
+                <span className={`leading-none ${
+                  selected ? 'text-white font-bold' :
+                  isSunday && !selected ? 'text-orange-600 font-semibold' :
+                  (todayDay && !selected) ? 'text-blue-700 font-bold' :
+                  'text-slate-800 font-medium'
+                }`}>
                   {day}
                 </span>
 
                 {/* Status dots container - stacked below number */}
                 {hasData && (
-                  <div className="flex gap-1 mt-0.5 flex-wrap justify-center px-1">
-                    {/* Render different color dots depending on status */}
+                  <div className="flex gap-0.5 mt-1 flex-wrap justify-center px-0.5">
                     {daySchs.filter(s => s.status === 'scheduled').slice(0,2).map(s => (
-                      <div key={'s-'+s._id} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : 'bg-amber-400'} shadow-sm`} />
+                      <div key={'s-'+s._id} className={`w-1.5 h-1.5 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : selected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
                     ))}
                     {daySchs.filter(s => s.status === 'completed').slice(0,2).map(s => (
-                      <div key={'c-'+s._id} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : 'bg-emerald-400'} shadow-sm`} />
+                      <div key={'c-'+s._id} className={`w-1.5 h-1.5 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-emerald-200' : 'bg-emerald-400'} shadow-sm`} />
                     ))}
                     {daySchs.filter(s => s.status === 'cancelled').slice(0,2).map(s => (
-                      <div key={'x-'+s._id} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : 'bg-red-400'} shadow-sm`} />
+                      <div key={'x-'+s._id} className={`w-1.5 h-1.5 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-rose-200' : 'bg-red-400'} shadow-sm`} />
                     ))}
                     {daySchs.length > 4 && (
-                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-slate-400 shadow-sm" />
+                      <div className={`w-1.5 h-1.5 rounded-full shadow-sm ${selected ? 'bg-white/70' : 'bg-slate-400'}`} />
                     )}
                   </div>
                 )}
                 
                 {/* Quick-add hint on empty future day */}
-                {canAddNew && (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-white/50 backdrop-blur-[1px] rounded-xl border border-dashed border-teal-300">
-                    <Plus size={16} className="text-teal-600" />
+                {canAddNew && !selected && (
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-white/60 backdrop-blur-[1px] rounded-xl border border-dashed border-blue-300">
+                    <Plus size={14} className="text-blue-600" />
                   </div>
                 )}
                 {/* Diagonal line for full-cancelled days */}
@@ -209,13 +214,17 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
           })}
         </div>
 
-        {/* Legend */}
-        <div className="px-3 sm:px-6 pb-4 flex flex-wrap gap-3 sm:gap-5 text-xs text-gray-500 border-t border-gray-50 pt-3">
-          <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-400" /> Đã dạy</span>
-          <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-400" /> Sắp tới</span>
-          <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-green-500" /> Đang diễn ra</span>
-          <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-400" /> Đã hủy</span>
-          <span className="flex items-center gap-1.5 text-blue-500"><Plus size={10} /> Click ngày trống để sắp lịch</span>
+        {/* Legend — 2x2 on mobile */}
+        <div className="mt-3 px-1 sm:px-2 pt-3 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-400 shrink-0" /> Đã dạy</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-400 shrink-0" /> Sắp tới</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-green-500 shrink-0" /> Đang diễn ra</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-red-400 shrink-0" /> Đã hủy</span>
+          </div>
+          <p className="mt-2 text-[11px] text-blue-600 font-medium flex items-center gap-1">
+            <Plus size={11} className="shrink-0" /> Click ngày trống để sắp lịch
+          </p>
         </div>
       </div>
 
@@ -236,11 +245,15 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
 
           {selectedSchedules.length === 0 ? (
             <div className="p-6 text-center">
-              <p className="text-gray-400 text-sm mb-3">Không có lịch ngày này.</p>
+              <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
+                <Calendar size={22} aria-hidden="true" />
+              </div>
+              <p className="text-slate-400 text-sm mb-3">Không có lịch ngày này.</p>
               {!isPast(selectedDay) && (
                 <button
+                  type="button"
                   onClick={() => { setSelectedDay(null); if (onAddSchedule) onAddSchedule(new Date(year, month, selectedDay)); }}
-                  className="text-xs bg-red-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-700 transition flex items-center gap-1.5 mx-auto"
+                  className="text-xs border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 mx-auto"
                 >
                   <Plus size={12} /> Sắp lịch ngày này
                 </button>
@@ -382,14 +395,14 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
       {/* ─ STATS ROW ─ */}
       <div className="grid grid-cols-4 gap-2">
         {[
-          { label: 'Tổng', value: schedules.filter(s => new Date(s.date).getMonth() === month).length, color: 'bg-blue-50 text-blue-600' },
-          { label: 'Đã dạy', value: schedules.filter(s => s.status === 'completed' && new Date(s.date).getMonth() === month).length, color: 'bg-emerald-50 text-emerald-600' },
-          { label: 'Sắp tới', value: schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length, color: 'bg-amber-50 text-amber-600' },
-          { label: 'Đã hủy', value: schedules.filter(s => s.status === 'cancelled' && new Date(s.date).getMonth() === month).length, color: 'bg-red-50 text-red-500' },
+          { label: 'Tổng', value: schedules.filter(s => new Date(s.date).getMonth() === month).length, color: 'bg-blue-50 text-blue-700' },
+          { label: 'Đã dạy', value: schedules.filter(s => s.status === 'completed' && new Date(s.date).getMonth() === month).length, color: 'bg-emerald-50 text-emerald-700' },
+          { label: 'Sắp tới', value: schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length, color: 'bg-amber-50 text-amber-700' },
+          { label: 'Đã hủy', value: schedules.filter(s => s.status === 'cancelled' && new Date(s.date).getMonth() === month).length, color: 'bg-rose-50 text-rose-600' },
         ].map((st, i) => (
-          <div key={i} className={`${st.color} rounded-xl p-3 text-center border border-current/10`}>
-            <p className="text-xl font-black">{st.value}</p>
-            <p className="text-xs font-bold uppercase">{st.label}</p>
+          <div key={i} className={`${st.color} rounded-xl py-2.5 px-1.5 sm:p-3 text-center shadow-sm border border-white/60`}>
+            <p className="text-lg font-bold tabular-nums leading-none">{st.value}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mt-1 opacity-80">{st.label}</p>
           </div>
         ))}
       </div>
