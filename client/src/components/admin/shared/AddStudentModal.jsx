@@ -7,7 +7,6 @@ import {
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useSocket } from '../../../context/SocketContext';
-import { uniqueCoursesByName } from '../../../utils/uniqueCourses';
 
 export default function AddStudentModal({ onAdd, onClose, teachers }) {
   const toast    = useToast();
@@ -34,10 +33,8 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       .then(r => r.json())
       .then(res => {
         if (res.success && res.data.length) {
-          const unique = uniqueCoursesByName(res.data);
-          setDbCourses(unique);
-          const first = unique[0];
-          if (!first) return;
+          setDbCourses(res.data);
+          const first = res.data[0];
           const ep = Math.round(first.price * (1 - (first.discountPercent || 0) / 100));
           let defaultBranchId = '';
           if (selectedBranchId && selectedBranchId !== 'all') {
@@ -356,7 +353,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
         role="dialog"
         aria-modal="true"
         aria-label="Thêm học viên mới"
-        className="cms-sheet cms-sheet--wide w-full"
+        className="cms-sheet cms-sheet--wide cms-sheet--compact w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
@@ -375,7 +372,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
           </button>
         </div>
 
-        <div className="cms-sheet-body space-y-6">
+        <div className="cms-sheet-body space-y-3">
           <section className="cms-form">
             <div className="cms-step">
               <span className="cms-step__num">1</span>
@@ -446,11 +443,11 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
               <div className="cms-chip-grid">
                 <label className={`cms-chip-option ${form.learningMode === 'OFFLINE' ? 'is-on' : ''}`}>
                   <input type="radio" name="learningMode" value="OFFLINE" checked={form.learningMode === 'OFFLINE'} onChange={handleChange} className="sr-only" />
-                  🏢 Tại cơ sở
+                  Tại cơ sở
                 </label>
                 <label className={`cms-chip-option ${form.learningMode === 'ONLINE' ? 'is-on' : ''}`}>
                   <input type="radio" name="learningMode" value="ONLINE" checked={form.learningMode === 'ONLINE'} onChange={handleChange} className="sr-only" />
-                  🌐 Online
+                  Online
                 </label>
               </div>
             </div>
@@ -473,12 +470,12 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                 <div className="cms-input flex items-center text-slate-400">Đang tải dữ liệu khóa học...</div>
               )}
               {form.price > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-100 text-[12px] font-bold">
-                    <DollarSign size={13} /> Học phí: {form.price.toLocaleString('vi-VN')}đ
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-100 text-[11px] font-bold">
+                    <DollarSign size={11} /> {form.price.toLocaleString('vi-VN')}đ
                   </span>
-                  <span className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-700 px-3 py-1.5 rounded-xl border border-sky-100 text-[12px] font-bold">
-                    Số buổi: {form.totalSessions}
+                  <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-0.5 rounded-lg border border-sky-100 text-[11px] font-bold">
+                    {form.totalSessions} buổi
                   </span>
                 </div>
               )}
@@ -495,15 +492,15 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                 ))}
               </CmsSelect>
               {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').length === 0 && (
-                <p className="text-[12px] text-amber-600 mt-1.5">Chưa có giảng viên Active để phân công.</p>
+                <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên Active để phân công.</p>
               )}
             </div>
 
-            <label className="flex items-start gap-3 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-              <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="mt-1 w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500" />
-              <span>
-                <span className="block text-[14px] font-semibold text-slate-800">Thanh toán tiền mặt</span>
-                <span className="block text-[12px] text-slate-500 mt-0.5">Học sinh đã nộp tiền mặt trực tiếp</span>
+            <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold text-slate-800 leading-tight">Thanh toán tiền mặt</span>
+                <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp</span>
               </span>
             </label>
           </section>

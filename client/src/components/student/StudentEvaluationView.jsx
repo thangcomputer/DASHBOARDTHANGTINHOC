@@ -27,6 +27,7 @@ export const EvaluationView = ({
   const { showModal } = useModal();
   const [privateForm, setPrivateForm] = useState({ satisfied: 'yes', lessonClear: 'yes', comment: '' });
   const [activeTab, setActiveTab] = useState('admin'); // 'admin' | 'teacher'
+  const [selectedRateTeacherId, setSelectedRateTeacherId] = useState('');
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-8 py-4 sm:py-6 space-y-5 sm:space-y-8 animate-in fade-in duration-500">
@@ -104,7 +105,7 @@ export const EvaluationView = ({
                                </span>
                              )}
                            </div>
-                           <p className="text-xs text-slate-400 font-medium truncate">GV: {c.teacherName || studentData.teacher}</p>
+                           <p className="text-xs text-slate-400 font-medium truncate">GV: {c.teacherName || 'Chưa phân công'}</p>
                          </div>
                        </div>
                        <button 
@@ -226,24 +227,96 @@ export const EvaluationView = ({
               <Star size={24} className="text-yellow-500 fill-yellow-500 hidden sm:block" />
               Đánh giá Giảng viên (Công khai)
             </h3>
-            
-            {studentData.teacherId && (() => {
+
+            {(() => {
+              const courseTeachers = [];
+              const seen = new Set();
+              (studentData.courses || []).forEach((c) => {
+                const tid = String(c.teacherId || '');
+                const tname = String(c.teacherName || '').trim();
+                if (!tid || !tname) return;
+                if (seen.has(tid)) return;
+                seen.add(tid);
+                courseTeachers.push({ id: tid, name: tname, courseName: c.courseName || c.name });
+              });
+              if (!courseTeachers.length && studentData.teacherId && studentData.teacher && studentData.teacher !== 'Chưa phân công') {
+                courseTeachers.push({
+                  id: String(studentData.teacherId),
+                  name: String(studentData.teacher).replace(/^Thầy\s+/i, ''),
+                  courseName: studentData.course,
+                });
+              }
+
+              if (!courseTeachers.length) {
+                return (
+                  <div className="bg-white rounded-2xl p-8 text-center border-2 border-dashed border-slate-100">
+                    <User size={40} className="mx-auto text-slate-200 mb-3" />
+                    <p className="text-slate-400 font-bold text-sm">Chưa có giảng viên được phân công để đánh giá.</p>
+                  </div>
+                );
+              }
+
+              const activeTeacher = courseTeachers.find((t) => String(t.id) === String(selectedRateTeacherId))
+                || courseTeachers[0];
+              const teacherLabel = activeTeacher.name.startsWith('Thầy ') || activeTeacher.name.startsWith('Cô ')
+                ? activeTeacher.name
+                : `Thầy ${activeTeacher.name}`;
+              const teacherInitial = (activeTeacher.name.split(/\s+/).filter(Boolean).pop()?.[0] || 'G').toUpperCase();
               const existingRating = teacherRatingData.ratings.find(r => String(r.studentId) === String(STUDENT_ID));
               const hasRated = existingRating || ratingSubmitted;
               const isEditing = isEditingRating;
               const showForm = !hasRated || isEditing;
-              const teacherInitial = (studentData.teacher?.split(' ').filter(Boolean).pop()?.[0] || 'G').toUpperCase();
 
               return (
                 <div className="bg-white rounded-2xl sm:rounded-[32px] p-4 sm:p-6 md:p-8 border border-slate-100 shadow-xl space-y-5 sm:space-y-6">
+                  {courseTeachers.length > 1 && (
+                    <div className="flex flex-wrap gap-2">
+                      {courseTeachers.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedRateTeacherId(t.id);
+                            setRatingSubmitted(false);
+                            setIsEditingRating(false);
+                            if (typeof getTeacherRating === 'function') {
+                              // parent often loads by teacherId via effect; trigger refetch if api present
+                            }
+                            if (api?.evaluations?.getByTeacher) {
+                              api.evaluations.getByTeacher(t.id).then((res) => {
+                                if (res.success && res.data) {
+                                  const validRatings = res.data.filter((r) => r.criteria && r.criteria.stars);
+                                  const count = validRatings.length;
+                                  const avg = count > 0
+                                    ? (Math.round((validRatings.reduce((s, r) => s + r.criteria.stars, 0) / count) * 10) / 10)
+                                    : 0;
+                                  setTeacherRatingData({ avg, count, ratings: res.data });
+                                }
+                              }).catch(() => {});
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wide border transition-all ${
+                            String(activeTeacher.id) === String(t.id)
+                              ? 'bg-yellow-50 border-yellow-300 text-yellow-800'
+                              : 'bg-slate-50 border-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Teacher header */}
                   <div className="flex items-center gap-3 sm:gap-4 pb-4 sm:pb-5 border-b border-slate-100">
                     <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 bg-gradient-to-br from-yellow-100 to-orange-50 rounded-2xl flex items-center justify-center text-yellow-600 font-black text-xl sm:text-2xl shadow-inner border border-yellow-200/50">
                       {teacherInitial}
                     </div>
                     <div className="min-w-0 text-left">
-                      <h4 className="text-base sm:text-lg font-black text-slate-800 truncate">{studentData.teacher}</h4>
-                      <p className="text-[10px] sm:text-xs text-slate-400 font-black uppercase tracking-[0.15em] mt-0.5">Giảng viên trực tiếp</p>
+                      <h4 className="text-base sm:text-lg font-black text-slate-800 truncate">{teacherLabel}</h4>
+                      <p className="text-[10px] sm:text-xs text-slate-400 font-black uppercase tracking-[0.15em] mt-0.5">
+                        Giảng viên · {activeTeacher.courseName || 'Khóa học'}
+                      </p>
                     </div>
                   </div>
 
@@ -332,9 +405,10 @@ export const EvaluationView = ({
                             setRatingSubmitted(true);
                             setIsEditingRating(false);
 
-                            if (studentData.teacherId) {
-                              await rateTeacher(studentData.teacherId, STUDENT_ID, ratingCriteria, ratingComment);
-                              api.evaluations.getByTeacher(studentData.teacherId).then(res => {
+                            const targetTeacherId = activeTeacher.id;
+                            if (targetTeacherId) {
+                              await rateTeacher(targetTeacherId, STUDENT_ID, ratingCriteria, ratingComment);
+                              api.evaluations.getByTeacher(targetTeacherId).then(res => {
                                 if (res.success && res.data) {
                                   const validRatings = res.data.filter(r => r.criteria && r.criteria.stars);
                                   const count = validRatings.length;

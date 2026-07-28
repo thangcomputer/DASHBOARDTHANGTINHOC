@@ -78,7 +78,9 @@ function toClientCourse(enrollment, index) {
     courseId: enrollment.courseId ? String(enrollment.courseId) : '',
     examSubjects: Array.isArray(enrollment.examSubjects) ? enrollment.examSubjects : [],
     teacherId: teacherIdStr(enrollment.teacherId),
-    teacherName: enrollment.teacherName || '',
+    teacherName: enrollment.teacherName
+      || (enrollment.teacherId && typeof enrollment.teacherId === 'object' ? (enrollment.teacherId.name || '') : '')
+      || '',
     completedSessions: completed,
     totalSessions: enrollment.totalSessions || 12,
     remainingSessions: enrollment.remainingSessions ?? Math.max(0, (enrollment.totalSessions || 12) - completed),
@@ -239,6 +241,26 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
     }
   }
 
+  // Backfill teacherName khi chỉ có teacherId (HV không load danh sách GV)
+  const missingNameIds = [...new Set(
+    enrollments
+      .filter((e) => teacherIdStr(e.teacherId) && !String(e.teacherName || '').trim())
+      .map((e) => teacherIdStr(e.teacherId)),
+  )].filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+  if (missingNameIds.length) {
+    try {
+      const Teacher = require('../models/Teacher');
+      const rows = await Teacher.find({ _id: { $in: missingNameIds } }).select('name').lean();
+      const nameById = Object.fromEntries(rows.map((t) => [String(t._id), t.name || '']));
+      enrollments.forEach((e, i) => {
+        if (String(e.teacherName || '').trim()) return;
+        const tid = teacherIdStr(e.teacherId);
+        if (tid && nameById[tid]) enrollments[i] = { ...e, teacherName: nameById[tid] };
+      });
+    } catch (_) { /* ignore */ }
+  }
+
   doc.enrollments = enrollments.map((e, idx) => {
     const courseName = e.courseName || e.course;
     const completed = sessionByCourse[courseName] ?? e.completedSessions ?? 0;
@@ -250,6 +272,9 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
       ...e,
       _id: e._id,
       courseName,
+      teacherName: e.teacherName
+        || (e.teacherId && typeof e.teacherId === 'object' ? (e.teacherId.name || '') : '')
+        || '',
       completedSessions: completed,
       remainingSessions: Math.max(0, total - completed),
       status: completed >= total ? 'completed' : (e.status || 'active'),
@@ -263,10 +288,26 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
   if (primary) {
     doc.course = primary.courseName;
     doc.teacherId = primary.teacherId;
+    doc.teacherName = primary.teacherName || doc.teacherName || '';
     doc.completedSessions = primary.completedSessions;
     doc.remainingSessions = primary.remainingSessions;
     doc.totalSessions = primary.totalSessions;
     doc.grades = primary.grades?.length ? primary.grades : doc.grades;
+  }
+
+  const allNames = [];
+  const seenN = new Set();
+  doc.enrollments.forEach((e) => {
+    const n = String(e.teacherName || '').trim();
+    if (!n) return;
+    const key = n.toLowerCase();
+    if (seenN.has(key)) return;
+    seenN.add(key);
+    allNames.push(n);
+  });
+  if (allNames.length) {
+    doc.teacherNames = allNames;
+    if (!doc.teacherName) doc.teacherName = allNames[0];
   }
 
   return doc;

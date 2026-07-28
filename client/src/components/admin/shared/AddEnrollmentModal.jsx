@@ -6,7 +6,6 @@ import {
 import { useToast } from '../../../utils/toast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
-import { uniqueCoursesByName } from '../../../utils/uniqueCourses';
 
 function courseEffectivePrice(c) {
   return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
@@ -67,10 +66,9 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
       .then((r) => r.json())
       .then((res) => {
         if (res.success && res.data?.length) {
-          const unique = uniqueCoursesByName(res.data);
-          setDbCourses(unique);
-          const first = unique[0];
-          if (first) setForm((f) => ({ ...f, ...applyCourseToForm(first) }));
+          setDbCourses(res.data);
+          const first = res.data[0];
+          setForm((f) => ({ ...f, ...applyCourseToForm(first) }));
         }
       })
       .catch(() => {});
@@ -386,7 +384,7 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
         role="dialog"
         aria-modal="true"
         aria-label="Thêm khóa học"
-        className="cms-sheet w-full"
+        className="cms-sheet cms-sheet--compact w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
@@ -431,12 +429,12 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
                   })}
                 </CmsSelect>
                 {Number(form.price) > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-100 text-[12px] font-bold">
-                      <DollarSign size={13} /> Học phí: {Number(form.price).toLocaleString('vi-VN')}đ
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-100 text-[11px] font-bold">
+                      <DollarSign size={11} /> {Number(form.price).toLocaleString('vi-VN')}đ
                     </span>
-                    <span className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-700 px-3 py-1.5 rounded-xl border border-sky-100 text-[12px] font-bold">
-                      Số buổi: {form.totalSessions}
+                    <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-0.5 rounded-lg border border-sky-100 text-[11px] font-bold">
+                      {form.totalSessions} buổi
                     </span>
                   </div>
                 )}
@@ -490,16 +488,16 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
                 </div>
               </div>
 
-              <label className="flex items-start gap-3 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                 <input
                   type="checkbox"
                   checked={form.paid}
                   onChange={(e) => setForm((f) => ({ ...f, paid: e.target.checked }))}
-                  className="mt-1 w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
                 />
-                <span>
-                  <span className="block text-[14px] font-semibold text-slate-800">Thanh toán tiền mặt</span>
-                  <span className="block text-[12px] text-slate-500 mt-0.5">Học viên đã nộp tiền mặt trực tiếp</span>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-semibold text-slate-800 leading-tight">Thanh toán tiền mặt</span>
+                  <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp</span>
                 </span>
               </label>
             </div>

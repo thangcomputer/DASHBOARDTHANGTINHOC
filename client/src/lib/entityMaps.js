@@ -42,6 +42,36 @@ export function mapStudent(s) {
     teacherId = String(teacherIdRaw || '');
   }
 
+  // Bổ sung GV từ từng enrollment/course (Admin gán theo khóa)
+  const seenIds = new Set(teacherIds.map(String));
+  const seenNames = new Set(teacherNames.map((n) => String(n).toLowerCase()));
+  const pushTeacher = (tid, tname) => {
+    if (tid && !seenIds.has(String(tid))) {
+      seenIds.add(String(tid));
+      teacherIds.push(String(tid));
+    }
+    const name = String(tname || '').trim();
+    if (name && !seenNames.has(name.toLowerCase())) {
+      seenNames.add(name.toLowerCase());
+      teacherNames.push(name);
+    }
+  };
+
+  [...(Array.isArray(s.enrollments) ? s.enrollments : []), ...(Array.isArray(s.courses) ? s.courses : [])]
+    .forEach((e) => {
+      if (!e) return;
+      const tid = typeof e.teacherId === 'object' && e.teacherId
+        ? String(e.teacherId._id || e.teacherId.id || '')
+        : String(e.teacherId || '');
+      const tname = e.teacherName
+        || (typeof e.teacherId === 'object' ? (e.teacherId?.name || '') : '')
+        || '';
+      pushTeacher(tid, tname);
+    });
+
+  if (!teacherId && teacherIds.length) teacherId = teacherIds[0];
+  if (!teacherNames.length && s.teacherName) teacherNames = [String(s.teacherName)];
+
   const teacherName = teacherNames[0] || s.teacherName || '';
   return {
     ...s,

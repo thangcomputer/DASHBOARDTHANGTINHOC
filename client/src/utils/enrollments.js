@@ -6,9 +6,64 @@ export function teacherIdStr(teacherId) {
   if (typeof teacherId === 'object') return String(teacherId._id || teacherId.id || '');
   return String(teacherId);
 }
+
+export function teacherNameFromRef(teacherId, teacherName) {
+  if (teacherName && String(teacherName).trim()) return String(teacherName).trim();
+  if (teacherId && typeof teacherId === 'object') {
+    return String(teacherId.name || teacherId.teacherName || '').trim();
+  }
+  return '';
+}
+
+/** Gắn tên GV từ danh sách teachers khi enrollment chỉ có teacherId */
+export function enrichEnrollmentsWithTeachers(enrollments, teachers) {
+  const list = Array.isArray(enrollments) ? enrollments : [];
+  const teacherList = Array.isArray(teachers) ? teachers : [];
+  return list.map((e) => {
+    const tid = teacherIdStr(e.teacherId);
+    let name = teacherNameFromRef(e.teacherId, e.teacherName);
+    if (!name && tid) {
+      const found = teacherList.find((t) => String(t.id || t._id) === tid);
+      name = found?.name || '';
+    }
+    return { ...e, teacherId: tid, teacherName: name };
+  });
+}
+
+/** Tên GV duy nhất (trùng thì 1, khác thì phẩy) */
+export function uniqueTeacherNames(enrollments) {
+  const names = [];
+  const seen = new Set();
+  (enrollments || []).forEach((e) => {
+    const n = String(e?.teacherName || '').trim();
+    if (!n) return;
+    const key = n.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    names.push(n);
+  });
+  return names;
+}
+
+export function formatTeacherDisplay(names, { prefix = 'Thầy ' } = {}) {
+  const list = (Array.isArray(names) ? names : []).filter(Boolean);
+  if (!list.length) return 'Chưa phân công';
+  return list.map((n) => (n.startsWith('Thầy ') || n.startsWith('Cô ') ? n : `${prefix}${n}`)).join(', ');
+}
+
 export function getClientEnrollments(student) {
   if (!student) return [];
-  if (Array.isArray(student.courses) && student.courses.length > 0) return student.courses.map((c) => ({ ...c, courseName: c.courseName || c.name, name: c.name || c.courseName }));
+  if (Array.isArray(student.courses) && student.courses.length > 0) {
+    return student.courses.map((c, idx) => ({
+      ...c,
+      id: c.id || c.enrollmentId || `course-${idx}`,
+      enrollmentId: c.enrollmentId || c.id || `course-${idx}`,
+      courseName: c.courseName || c.name,
+      name: c.name || c.courseName,
+      teacherId: teacherIdStr(c.teacherId),
+      teacherName: teacherNameFromRef(c.teacherId, c.teacherName),
+    }));
+  }
   if (Array.isArray(student.enrollments) && student.enrollments.length > 0) {
     return student.enrollments.map((e, idx) => ({
       id: e._id ? String(e._id) : `enr-${idx}`,
@@ -16,7 +71,8 @@ export function getClientEnrollments(student) {
       name: e.courseName, courseName: e.courseName,
       courseId: e.courseId ? String(e.courseId) : '',
       examSubjects: Array.isArray(e.examSubjects) ? e.examSubjects : [],
-      teacherId: teacherIdStr(e.teacherId), teacherName: e.teacherName || '',
+      teacherId: teacherIdStr(e.teacherId),
+      teacherName: teacherNameFromRef(e.teacherId, e.teacherName),
       completedSessions: e.completedSessions ?? Math.max(0, (e.totalSessions || 12) - (e.remainingSessions ?? 0)),
       totalSessions: e.totalSessions || 12, remainingSessions: e.remainingSessions,
       avgGrade: e.avgGrade || 0, grades: e.grades || [], linkHoc: e.linkHoc || '',
@@ -30,7 +86,7 @@ export function getClientEnrollments(student) {
     const completed = student.completedSessions ?? Math.max(0, (student.totalSessions || 12) - (student.remainingSessions ?? 0));
     return [{ id: 'main', enrollmentId: 'main', name: student.course, courseName: student.course,
       courseId: '', examSubjects: [], teacherId: tid,
-      teacherName: student.teacherName || (typeof student.teacherId === 'object' ? student.teacherId?.name : '') || '',
+      teacherName: teacherNameFromRef(student.teacherId, student.teacherName),
       completedSessions: completed, totalSessions: student.totalSessions || 12, remainingSessions: student.remainingSessions,
       avgGrade: student.avgGrade || 0, grades: student.grades || [], linkHoc: student.linkHoc || '',
       nextClass: student.nextClass || '', nextClassTime: student.nextClassTime || '',
@@ -65,20 +121,18 @@ export function expandStudentsForTeacher(students, teacherId) {
 }
 export function scopeStudentToEnrollment(student, enrollment) {
   if (!student || !enrollment) return student;
-  const teacherLabel = enrollment.teacherName ? `Th\u1EA7y ${enrollment.teacherName}` : (student.teacher || 'Ch\u01B0a ph\u00E2n c\u00F4ng');
-  return { ...student, course: enrollment.courseName || enrollment.name, teacherId: enrollment.teacherId,
-    teacher: teacherLabel, teacherName: enrollment.teacherName,
-    completedSessions: enrollment.completedSessions ?? student.completedSessions,
-    totalSessions: enrollment.totalSessions ?? student.totalSessions,
-    remainingSessions: enrollment.remainingSessions ?? student.remainingSessions,
+  const name = String(enrollment.teacherName || '').trim();
+  const teacherLabel = name
+    ? (name.startsWith('Thầy ') || name.startsWith('Cô ') ? name : `Thầy ${name}`)
+    : 'Chưa phân công';
+  return { ...student, course: enrollment.courseName || enrollment.name, teacherId: enrollment.teacherId || '',
+    teacher: teacherLabel, teacherName: name,
+    completedSessions: enrollment.completedSessions ?? 0,
+    totalSessions: enrollment.totalSessions ?? 12,
+    remainingSessions: enrollment.remainingSessions ?? Math.max(0, (enrollment.totalSessions || 12) - (enrollment.completedSessions || 0)),
     avgGrade: enrollment.avgGrade ?? student.avgGrade,
     lastGrade: enrollment.isPrimary ? student.lastGrade : (enrollment.avgGrade ?? 0),
-    grades: (enrollment.grades && enrollment.grades.length)
-      ? enrollment.grades
-      : (student.grades || []),
-    attendanceHistory: (enrollment.grades && enrollment.grades.length)
-      ? enrollment.grades
-      : (student.grades || student.attendanceHistory || []),
+    grades: enrollment.grades?.length ? enrollment.grades : (enrollment.isPrimary ? student.grades : []),
     linkHoc: enrollment.linkHoc || student.linkHoc, nextClass: enrollment.nextClass || student.nextClass,
     nextClassTime: enrollment.nextClassTime || student.nextClassTime,
     paid: enrollment.paid ?? student.paid, price: enrollment.price ?? student.price,
@@ -148,33 +202,14 @@ export function filterStudentTrainingVideos(videos, { enrollments, fallbackCours
   const accessKeys = getStudentCourseAccessKeys(enrollments, fallbackCourse);
   return list.filter((v) => {
     const id = v.id || v._id;
-    const catalogId = v.courseId || v.catalogCourseId;
     let courseOk = false;
     if (id && accessKeys.has(`id:${String(id)}`)) courseOk = true;
-    else if (catalogId && accessKeys.has(`id:${String(catalogId)}`)) courseOk = true;
     else if (v.title && accessKeys.has(`name:${normCourseKey(v.title)}`)) courseOk = true;
-    else {
-      courseOk = (enrollments || []).some((e) => {
-        if (catalogId && e.courseId && String(e.courseId) === String(catalogId)) return true;
-        if (id && e.courseId && String(e.courseId) === String(id)) return true;
-        const en = e.courseName || e.name;
-        if (!v.title || !en) return false;
-        const a = normCourseKey(v.title);
-        const b = normCourseKey(en);
-        return a === b || a.includes(b) || b.includes(a);
-      }) || (fallbackCourse && v.title && (
-        (() => {
-          const a = normCourseKey(v.title);
-          const b = normCourseKey(fallbackCourse);
-          return a === b || a.includes(b) || b.includes(a);
-        })()
-      ));
-    }
-
-    const subjectOk = itemMatchesSubjectIds(v, allowedSubjectIds, catalog);
-    // Khớp tên khóa HOẶC khớp môn thi đều cho xem (tránh HV mất video admin đã giao)
-    if (courseOk) return subjectOk;
-    if (subjectOk && allowedSubjectIds?.length) return true;
-    return false;
+    else courseOk = (enrollments || []).some((e) => {
+      if (id && e.courseId && String(e.courseId) === String(id)) return true;
+      const en = e.courseName || e.name;
+      return v.title && en && normCourseKey(en) === normCourseKey(v.title);
+    }) || (fallbackCourse && v.title && normCourseKey(fallbackCourse) === normCourseKey(v.title));
+    return courseOk && itemMatchesSubjectIds(v, allowedSubjectIds, catalog);
   });
 }

@@ -12,6 +12,9 @@ import {
   getClientEnrollments, scopeStudentToEnrollment, filterSchedulesByCourse,
   filterStudentTrainingFiles,
   filterStudentTrainingVideos,
+  enrichEnrollmentsWithTeachers,
+  uniqueTeacherNames,
+  formatTeacherDisplay,
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
@@ -39,7 +42,10 @@ const StudentDashboard = ({ onNavigate }) => {
 
   const studentData = useMemo(() => {
     if (!student) return null;
-    
+
+    const courses = enrichEnrollmentsWithTeachers(getClientEnrollments(student), teachers);
+    const namesFromCourses = uniqueTeacherNames(courses);
+
     // Properly handle populated vs unpopulated `teacherId`
     // Backend có thể trả `teacherId` dạng mảng (nhiều môn / nhiều GV)
     const rawTeacherId = student.teacherId;
@@ -47,29 +53,32 @@ const StudentDashboard = ({ onNavigate }) => {
       ? rawTeacherId._id || rawTeacherId.id
       : rawTeacherId;
 
+    const teacherIdsFromCourses = courses.map((c) => String(c.teacherId || '')).filter(Boolean);
     const teacherIds = Array.isArray(student.teacherIds) && student.teacherIds.length
       ? student.teacherIds.map((id) => String(id))
-      : (actualTeacherId ? [String(actualTeacherId)] : []);
+      : (teacherIdsFromCourses.length
+        ? [...new Set(teacherIdsFromCourses)]
+        : (actualTeacherId ? [String(actualTeacherId)] : []));
 
     const teacherNamesFromApi = Array.isArray(student.teacherNames) && student.teacherNames.length
       ? student.teacherNames.map((n) => String(n)).filter(Boolean)
       : [];
 
     const teacherRecords = teacherIds
-      .map((id) => teachers?.find((t) => String(t.id) === String(id)))
+      .map((id) => teachers?.find((t) => String(t.id) === String(id) || String(t._id) === String(id)))
       .filter(Boolean);
 
-    const teacherNames = teacherNamesFromApi.length
-      ? teacherNamesFromApi
-      : teacherRecords.map((t) => t.name).filter(Boolean);
+    const teacherNames = namesFromCourses.length
+      ? namesFromCourses
+      : (teacherNamesFromApi.length
+        ? teacherNamesFromApi
+        : teacherRecords.map((t) => t.name).filter(Boolean));
 
     const extractedTeacherPhone = (typeof rawTeacherId === 'object' && rawTeacherId?.phone)
       ? rawTeacherId.phone
       : (teacherRecords[0]?.phone || student.zalo || '');
 
-    const teacherDisplay = teacherNames.length
-      ? teacherNames.map((n) => `Thầy ${n}`).join(', ')
-      : 'Chưa phân công';
+    const teacherDisplay = formatTeacherDisplay(teacherNames);
 
     const joinClassUrl = [student.linkHoc, student.online_meeting_url]
       .map((u) => (u && String(u).trim()) || '')
@@ -89,10 +98,12 @@ const StudentDashboard = ({ onNavigate }) => {
       joinClassUrl,
       isLikelyLiveClass,
       teacher: teacherDisplay,
-      teacherId: teacherIds[0] || actualTeacherId,
+      teacherId: teacherIds[0] || actualTeacherId || '',
+      teacherIds,
+      teacherNames,
       teacherZalo: extractedTeacherPhone,
       attendanceHistory: student.grades || [],
-      courses: getClientEnrollments(student),
+      courses,
       completedSessions: student.sessionsCompleted || (student.totalSessions - student.remainingSessions) || 0,
       totalSessions: student.totalSessions || 12,
     };

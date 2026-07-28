@@ -1198,6 +1198,68 @@
   .cms-sheet.cms-sheet--wide {
     width: min(96vw, 720px);
   }
+  .cms-sheet.cms-sheet--compact {
+    max-height: min(92vh, 720px);
+  }
+}
+
+/* Modal form g?n ? tránh scrollbar trên viewport ph? bi?n */
+.cms-sheet--compact {
+  --cms-modal-pad: 14px;
+  --cms-field-gap: 10px;
+}
+.cms-sheet--compact .cms-sheet-header {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.cms-sheet--compact .cms-sheet-body {
+  padding-bottom: 12px;
+}
+.cms-sheet--compact .cms-sheet-footer {
+  gap: 8px;
+  padding-top: 10px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+}
+.cms-sheet--compact .cms-sheet-footer > .cms-btn {
+  min-height: 44px;
+}
+.cms-sheet--compact .cms-form {
+  gap: 10px;
+}
+.cms-sheet--compact .cms-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+.cms-sheet--compact .cms-input {
+  min-height: 40px;
+  height: 40px;
+  font-size: 13px;
+  padding: 0 12px;
+  border-radius: 12px;
+}
+.cms-sheet--compact .cms-step {
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 2px;
+}
+.cms-sheet--compact .cms-step__num {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  box-shadow: none;
+}
+.cms-sheet--compact .cms-step__label {
+  font-size: 11px;
+}
+.cms-sheet--compact .cms-chip-option {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+.cms-sheet--compact .cms-chip-grid {
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 /* Chat */

@@ -24,9 +24,33 @@ export default function StudentProfileTab({
   });
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  const teacherValue = Array.isArray(studentData?.teacher)
-    ? studentData.teacher.filter(Boolean).join(', ')
-    : (studentData?.teacher || 'Chưa phân công');
+  const teacherValue = Array.isArray(studentData?.teacherNames) && studentData.teacherNames.length
+    ? studentData.teacherNames.join(', ')
+    : (Array.isArray(studentData?.teacher)
+      ? studentData.teacher.filter(Boolean).join(', ')
+      : (studentData?.teacher || 'Chưa phân công'));
+
+  const courses = Array.isArray(studentData?.courses) ? studentData.courses : [];
+  const tuitionLines = courses.length
+    ? courses.map((c) => {
+      const name = c.courseName || c.name || 'Khóa học';
+      const price = Number(c.price) || 0;
+      return `${name}: ${price.toLocaleString('vi-VN')}đ`;
+    })
+    : [`${Number(studentData?.price || 0).toLocaleString('vi-VN')}đ`];
+
+  const progressCourses = courses.length
+    ? courses
+    : [{
+      id: 'main',
+      name: studentData?.course || 'Khóa học',
+      courseName: studentData?.course,
+      completedSessions: studentData?.completedSessions || 0,
+      totalSessions: studentData?.totalSessions || 12,
+      teacherName: teacherValue === 'Chưa phân công' ? '' : teacherValue.replace(/^Thầy\s+/i, ''),
+      avgGrade: studentData?.avgGrade,
+      remainingSessions: studentData?.remainingSessions,
+    }];
 
   return (
     <div className="cms-sd cms-sd-page cms-sd-stack cms-sd-profile">
@@ -132,19 +156,31 @@ export default function StudentProfileTab({
             </button>
           </div>
           {openSections.summary && <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
-            {[
-              { icon: GraduationCap, label: 'Giáo viên', value: teacherValue },
-              { icon: BadgeDollarSign, label: 'Trạng thái', value: studentData.status },
-              { icon: Wallet, label: 'Học phí', value: studentData.price?.toLocaleString('vi-VN') + 'đ' },
-            ].map((item) => (
-              <li key={item.label} className="flex items-center gap-3 px-4 py-3 min-w-0">
-                <item.icon size={16} className="text-slate-400 shrink-0" aria-hidden="true" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{item.label}</p>
-                  <p className="text-sm font-semibold text-slate-800 truncate">{item.value}</p>
-                </div>
-              </li>
-            ))}
+            <li className="flex items-start gap-3 px-4 py-3 min-w-0 md:col-span-2">
+              <GraduationCap size={16} className="text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Giáo viên</p>
+                <p className="text-sm font-semibold text-slate-800">{teacherValue}</p>
+              </div>
+            </li>
+            <li className="flex items-center gap-3 px-4 py-3 min-w-0">
+              <BadgeDollarSign size={16} className="text-slate-400 shrink-0" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Trạng thái</p>
+                <p className="text-sm font-semibold text-slate-800 truncate">{studentData.status}</p>
+              </div>
+            </li>
+            <li className="flex items-start gap-3 px-4 py-3 min-w-0 md:col-span-2">
+              <Wallet size={16} className="text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Học phí theo khóa</p>
+                <ul className="mt-1 space-y-1">
+                  {tuitionLines.map((line) => (
+                    <li key={line} className="text-sm font-semibold text-slate-800 leading-snug">{line}</li>
+                  ))}
+                </ul>
+              </div>
+            </li>
             <li className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between px-4 py-3 md:col-span-2">
               <div className="flex items-center gap-3 min-w-0">
                 <CheckCircle
@@ -203,7 +239,8 @@ export default function StudentProfileTab({
                     <div className="min-w-0">
                       <h4 className="text-sm font-bold text-slate-800 uppercase tracking-tight line-clamp-2">{c.name}</h4>
                       <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
-                        GV: {c.teacherName} · {new Date(c.registeredAt).toLocaleDateString('vi-VN')}
+                        GV: {c.teacherName || 'Chưa phân công'}
+                        {c.registeredAt ? ` · ${new Date(c.registeredAt).toLocaleDateString('vi-VN')}` : ''}
                       </p>
                     </div>
                     <span
@@ -250,32 +287,45 @@ export default function StudentProfileTab({
             <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.progress ? 'rotate-180' : ''}`} />
           </button>
         </div>
-        {openSections.progress && <div className="p-4">
-          <div className="mb-4">
-            <div className="flex justify-between items-center gap-2 mb-1.5">
-              <span className="text-[11px] font-extrabold text-slate-500 uppercase">Hoàn thành</span>
-              <span className="text-sm font-extrabold text-emerald-600 tabular-nums">{progressPct}%</span>
-            </div>
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-700"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            {[
-              { label: 'Đã học', value: studentData.completedSessions, color: 'text-blue-600 bg-blue-50' },
-              { label: 'Còn lại', value: studentData.remainingSessions, color: 'text-violet-600 bg-violet-50' },
-              { label: 'Điểm TB', value: studentData.avgGrade, color: 'text-orange-600 bg-orange-50' },
-              { label: 'Bài nộp', value: '4/4', color: 'text-teal-600 bg-teal-50' },
-            ].map((s) => (
-              <div key={s.label} className={`${s.color} rounded-[12px] p-3 text-center`}>
-                <p className="text-base font-extrabold tabular-nums">{s.value}</p>
-                <p className="text-[10px] font-bold uppercase mt-1 opacity-80">{s.label}</p>
-              </div>
-            ))}
-          </div>
+        {openSections.progress && <div className="p-4 space-y-4">
+          {progressCourses.map((c) => {
+            const total = Number(c.totalSessions) || 12;
+            const done = Number(c.completedSessions) || 0;
+            const remain = c.remainingSessions != null ? Number(c.remainingSessions) : Math.max(0, total - done);
+            const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+            const title = c.courseName || c.name || 'Khóa học';
+            return (
+              <article key={c.id || c.enrollmentId || title} className="rounded-[14px] border border-slate-100 bg-slate-50/50 p-3">
+                <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-tight line-clamp-2">{title}</h4>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+                      GV: {c.teacherName || 'Chưa phân công'}
+                    </p>
+                  </div>
+                  <span className="text-sm font-extrabold text-emerald-600 tabular-nums shrink-0">{pct}%</span>
+                </div>
+                <div className="w-full h-2 bg-white border border-slate-100 rounded-full overflow-hidden mb-2.5">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-700"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Đã học', value: done, color: 'text-blue-600 bg-blue-50' },
+                    { label: 'Còn lại', value: remain, color: 'text-violet-600 bg-violet-50' },
+                    { label: 'Tổng buổi', value: total, color: 'text-teal-600 bg-teal-50' },
+                  ].map((s) => (
+                    <div key={s.label} className={`${s.color} rounded-[12px] p-2.5 text-center`}>
+                      <p className="text-sm font-extrabold tabular-nums">{s.value}</p>
+                      <p className="text-[10px] font-bold uppercase mt-0.5 opacity-80">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            );
+          })}
         </div>}
       </section>
     </div>
