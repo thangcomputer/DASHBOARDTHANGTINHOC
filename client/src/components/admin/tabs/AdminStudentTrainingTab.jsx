@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
@@ -12,19 +12,18 @@ import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 import api, { apiFetch, buildMediaDownloadUrl } from '../../../services/api';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
-import { uniqueCoursesByName } from '../../../utils/uniqueCourses';
 
 function mergeDocumentCourseOptions(dbCourses, lmsVideos) {
   const merged = [];
   const seen = new Set();
-  uniqueCoursesByName(dbCourses || []).forEach((c) => {
+  (dbCourses || []).forEach((c) => {
     const id = String(c._id);
     const title = String(c.name || '').trim();
     if (!title) return;
     const key = title.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    merged.push({ id, title, source: 'db', examSubjects: c.examSubjects || [] });
+    merged.push({ id, title, source: 'db' });
   });
   (lmsVideos || []).forEach((c) => {
     const title = String(c.title || '').trim();
@@ -32,7 +31,7 @@ function mergeDocumentCourseOptions(dbCourses, lmsVideos) {
     const key = title.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    merged.push({ id: String(c.id), title, source: 'lms', examSubjects: c.examSubjects || [] });
+    merged.push({ id: String(c.id), title, source: 'lms' });
   });
   return merged;
 }
@@ -60,10 +59,8 @@ export default function AdminStudentTrainingTab() {
     (async () => {
       try {
         const res = await apiFetch('/courses');
-        const data = res?.data || (Array.isArray(res) ? res : null);
-        // apiFetch may return parsed JSON { success, data } or raw
-        const list = res?.success ? (res.data || []) : (data || []);
-        if (!cancelled) setDbCourses(uniqueCoursesByName(list));
+        const json = await res.json();
+        if (!cancelled && json?.success) setDbCourses(json.data || []);
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
@@ -73,25 +70,6 @@ export default function AdminStudentTrainingTab() {
     () => mergeDocumentCourseOptions(dbCourses, studentTrainingData?.videos),
     [dbCourses, studentTrainingData?.videos],
   );
-
-  const applyCatalogToStudentForm = (courseId) => {
-    const opt = documentCourseOptions.find((c) => String(c.id) === String(courseId));
-    const db = dbCourses.find((c) => String(c._id) === String(courseId));
-    if (!opt && !db) {
-      setSTrainingForm((prev) => ({ ...prev, courseId: '', catalogCourseId: '' }));
-      return;
-    }
-    const title = db?.name || opt?.title || '';
-    const examSubjects = (db?.examSubjects?.length ? db.examSubjects : opt?.examSubjects) || [];
-    setSTrainingForm((prev) => ({
-      ...prev,
-      courseId: String(courseId),
-      catalogCourseId: String(courseId),
-      courseName: title,
-      title: prev?.title || title,
-      examSubjects: examSubjects.length ? examSubjects : (prev?.examSubjects || []),
-    }));
-  };
 
   return (
     <>
@@ -163,21 +141,6 @@ export default function AdminStudentTrainingTab() {
                     <button type="button" onClick={() => setSTrainingForm(null)} className="shrink-0 inline-flex items-center justify-center min-w-11 min-h-11 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"><X size={18} /></button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {sTrainingTab === 'videos' && (
-                      <div className="sm:col-span-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Chọn khóa học từ danh mục Admin</label>
-                        <CmsSelect
-                          value={sTrainingForm.courseId || sTrainingForm.catalogCourseId || ''}
-                          onChange={(e) => applyCatalogToStudentForm(e.target.value)}
-                          className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none bg-white"
-                        >
-                          <option value="">— Nhập tay / chọn khóa đã tạo —</option>
-                          {documentCourseOptions.map((c) => (
-                            <option key={c.id} value={c.id}>{c.title}</option>
-                          ))}
-                        </CmsSelect>
-                      </div>
-                    )}
                     {sTrainingTab !== 'files' && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tiêu đề</label>

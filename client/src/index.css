@@ -1598,6 +1598,52 @@
   100% { background-position: 0 0; }
 }
 
+/* Feed: tablet+ denser composition, mobile unchanged */
+@media (min-width: 768px) {
+  .cms-feed-composer {
+    padding: 18px 20px;
+    gap: 14px;
+  }
+  .cms-feed-composer__input {
+    min-height: 88px;
+    font-size: 15px;
+    padding: 14px 16px;
+  }
+  .cms-feed-card {
+    padding: 16px 0 10px;
+  }
+  .cms-feed-card__head {
+    padding: 0 18px 12px;
+    gap: 14px;
+  }
+  .cms-feed-card__author {
+    font-size: 15px;
+  }
+  .cms-feed-card__body {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .cms-feed-list,
+  .cms-feed-skeleton-list {
+    gap: 14px;
+  }
+  .cms-feed-action {
+    padding: 6px 14px 10px;
+    gap: 8px;
+  }
+}
+@media (min-width: 1024px) {
+  .cms-feed-composer {
+    padding: 20px 22px;
+  }
+  .cms-feed-card__head {
+    padding: 0 20px 14px;
+  }
+  .cms-feed-action {
+    padding: 8px 16px 12px;
+  }
+}
+
 /* Teacher cards */
 .cms-teacher-toolbar {
   position: sticky;

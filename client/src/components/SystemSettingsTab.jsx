@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SystemSettingsTab.jsx
  * Trang Cài đặt hệ thống cho Admin — 3 tab:
  *  1. Tài khoản thu học phí (ngân hàng trung tâm)

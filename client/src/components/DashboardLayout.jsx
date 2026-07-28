@@ -268,10 +268,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <header className={`cms-topbar-glass flex flex-col border-b border-slate-100/80 flex-shrink-0 z-40 safe-pad-top ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="h-14 sm:h-16 flex items-center gap-1.5 sm:gap-3 pl-[4.25rem] sm:pl-20 md:pl-6 lg:pl-6 pr-2 sm:pr-4 min-w-0">
+          <div className="h-14 sm:h-16 flex items-center gap-1.5 sm:gap-3 pl-[max(5.5rem,calc(env(safe-area-inset-left,0px)+3.75rem))] sm:pl-[max(6rem,calc(env(safe-area-inset-left,0px)+4.25rem))] md:pl-6 lg:pl-6 pr-2 sm:pr-4 min-w-0">
             <div className="min-w-0 flex-1">
               <h1 className="text-base sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
-              <p className="text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5">
+              {/* Tên user đẩy khỏi nav khi có hamburger (mobile/tablet hẹp); hiện từ md+ */}
+              <p className="hidden md:block text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5">
                 <span className="font-medium text-slate-600">{displayName}</span>
                 <span className="text-slate-300 mx-1">·</span>
                 <span>{roleLabel}</span>
@@ -461,7 +462,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
           {/* Mobile: branch full-width row (not students — students keeps prior lg-only behavior) */}
           {showAdminBranch && !isStudentsTab && (
-            <div className="md:hidden w-full pl-[4.5rem] sm:pl-20 pr-3 pb-2.5">
+            <div className="md:hidden w-full pl-[max(5.5rem,calc(env(safe-area-inset-left,0px)+3.75rem))] sm:pl-[max(6rem,calc(env(safe-area-inset-left,0px)+4.25rem))] pr-3 pb-2.5">
               <BranchFilterDropdown fullWidth />
             </div>
           )}

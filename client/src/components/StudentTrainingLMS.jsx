@@ -650,7 +650,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               </button>
             )}
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight leading-snug">
+              <h1 className="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight leading-snug">
                 Trung tâm đào tạo nội bộ</h1>
               <p className="text-slate-500 font-medium mt-1 text-xs sm:text-sm leading-relaxed">
                 Hoàn thành chương trình để được chứng nhận đủ điều kiện nhận lớp
@@ -711,8 +711,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
 
         {mainTab === 'courses' && (
           loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3].map(i => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+              {[1, 2, 3, 4].map(i => (
                 <div key={i} className="bg-gray-100 animate-pulse rounded-[32px] h-64" />
               ))}
             </div>
@@ -723,7 +723,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
               {courses.map((course, idx) => {
                 const gradients = [
                   "from-blue-600 to-indigo-700",
@@ -739,9 +739,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                     setSelectedCourse(course);
                     setCourseTab('video');
                     fetchLessons(course.id || course._id);
-                  }} key={course.id || course._id} className="bg-white rounded-2xl border border-slate-100 shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer group flex flex-col overflow-hidden">
+                  }} key={course.id || course._id} className="bg-white rounded-2xl border border-slate-100 shadow-md transition-all duration-200 cursor-pointer group flex flex-col overflow-hidden hover:shadow-xl lg:hover:-translate-y-1 lg:hover:shadow-xl">
 
-                    <div className={`h-32 bg-gradient-to-r ${bgClass} relative overflow-hidden`}>
+                    <div className={`relative aspect-video bg-gradient-to-r ${bgClass} overflow-hidden`}>
                       <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors pointer-events-none" />
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%)] pointer-events-none" />
 
@@ -1150,7 +1150,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       <div className="flex flex-1 min-h-0">
 
         {/* ══ LEFT COLUMN ══ */}
-        <div className="flex flex-col flex-1 min-w-0 lg:flex-[7] overflow-hidden">
+        <div className="flex flex-col flex-1 min-w-0 lg:flex-[0_0_75%] overflow-hidden">
 
           {/* VIDEO WRAPPER — 16:9 */}
           <div className="flex-shrink-0 px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 flex justify-center">
@@ -1384,7 +1384,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         </div>
 
         {/* ══ RIGHT SIDEBAR ══ */}
-        <div className="hidden lg:flex flex-col lg:flex-[3] border-l" style={{ borderColor: 'rgba(255,255,255,0.06)', background: '#0b1018' }}>
+        <div
+          className="hidden lg:flex flex-col lg:w-80 flex-shrink-0 border-l sticky top-4 h-[calc(100vh-100px)] overflow-hidden"
+          style={{ borderColor: 'rgba(255,255,255,0.06)', background: '#0b1018' }}
+        >
 
           {/* Sidebar Header */}
           <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>

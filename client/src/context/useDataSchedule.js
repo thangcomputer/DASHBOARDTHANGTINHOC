@@ -38,76 +38,13 @@ export function useDataSchedule({
       if (expanded) targetStudentSync = expanded;
     }
 
-    // 🔐 COOLDOWN 12H: Cho phép CẬP NHẬT ĐIỂM hôm nay, chặn điểm danh buổi mới
-    const alreadyCheckedIn = targetStudentSync.can_check_in === false;
-    if (alreadyCheckedIn) {
-      const todayVN = new Date().toLocaleDateString('vi-VN');
-      const todayISO = new Date().toISOString().split('T')[0];
-      const gradeNum = Number(grade) || 0;
-      const noteText = note || 'Đã điểm danh';
-      const priorGrades = [...(targetStudentSync.grades || [])];
-      const sameDayIdx = priorGrades.findIndex((g) => {
-        const raw = String(g.date || '');
-        return raw === todayVN || raw.startsWith(todayISO) || (
-          (() => {
-            const d = new Date(g.date);
-            return !Number.isNaN(d.getTime()) && d.toLocaleDateString('vi-VN') === todayVN;
-          })()
-        );
-      });
-      if (sameDayIdx < 0) {
-        const remain = targetStudentSync.remaining_cooldown_hours || 0;
-        const err = new Error(`Học viên này đã được điểm danh. Vui lòng thử lại sau ${remain} tiếng.`);
-        err.cooldown = true;
-        err.remainingHours = remain;
-        throw err;
-      }
-
-      const newGrade = { date: todayVN, note: noteText, grade: gradeNum };
-      const newGrades = priorGrades.map((g, i) => (i === sameDayIdx ? { ...g, ...newGrade } : g));
-      const validGrades = newGrades.filter((g) => g.grade > 0);
-      const avg = validGrades.length > 0
-        ? Math.round((validGrades.reduce((sum, g) => sum + g.grade, 0) / validGrades.length) * 10) / 10
-        : 0;
-
-      setStudents((prev) => prev.map((s) => {
-        if (String(s._id || s.id) !== String(studentId)) return s;
-        const patch = { lastGrade: gradeNum || s.lastGrade, avgGrade: avg, grades: newGrades };
-        if (courseName && Array.isArray(s.enrollments) && s.enrollments.length) {
-          return {
-            ...s,
-            ...patch,
-            enrollments: s.enrollments.map((e) =>
-              e.courseName === courseName ? { ...e, grades: newGrades, avgGrade: avg } : e
-            ),
-          };
-        }
-        return { ...s, ...patch };
-      }));
-
-      const existSch = schedules.find((sch) => {
-        const schDate = new Date(sch.date).toISOString().split('T')[0];
-        const courseOk = !courseName || !sch.course || sch.course === courseName;
-        return String(sch.studentId) === String(studentId) && schDate === todayISO && sch.status === 'completed' && courseOk;
-      });
-      if (existSch) {
-        await api.schedules?.update(existSch._id || existSch.id, {
-          status: 'completed',
-          note: noteText,
-          grade: gradeNum,
-        });
-      }
-
-      const resStud = await api.students?.update(studentId, {
-        lastGrade: gradeNum || targetStudentSync.lastGrade,
-        avgGrade: avg,
-        grades: newGrades,
-        ...(courseName ? { courseName } : {}),
-      });
-      if (!resStud?.success) throw new Error(resStud?.message || 'Lỗi cập nhật điểm');
-      addNotification(studentId, 'student', `Giảng viên đã cập nhật điểm buổi học: ${gradeNum}/10`);
-      triggerBackgroundSync();
-      return true;
+    // 🔐 COOLDOWN 12H: Chặn ngay nếu cờ can_check_in = false
+    if (targetStudentSync.can_check_in === false) {
+      const remain = targetStudentSync.remaining_cooldown_hours || 0;
+      const err = new Error(`Học viên này đã được điểm danh. Vui lòng thử lại sau ${remain} tiếng.`);
+      err.cooldown = true;
+      err.remainingHours = remain;
+      throw err;
     }
 
     if (targetStudentSync.remainingSessions <= 0) {
@@ -120,27 +57,14 @@ export function useDataSchedule({
     try {
       const todayVN = new Date().toLocaleDateString('vi-VN');
       const todayISO = new Date().toISOString().split('T')[0];
-      const gradeNum = Number(grade) || 0;
 
       const newGrade = {
         date: todayVN,
         note: note || 'Đã điểm danh',
-        grade: gradeNum,
+        grade: grade || 0,
       };
 
-      const priorGrades = [...(targetStudentSync.grades || [])];
-      const sameDayIdx = priorGrades.findIndex((g) => {
-        const raw = String(g.date || '');
-        return raw === todayVN || raw.startsWith(todayISO) || (
-          (() => {
-            const d = new Date(g.date);
-            return !Number.isNaN(d.getTime()) && d.toLocaleDateString('vi-VN') === todayVN;
-          })()
-        );
-      });
-      const newGrades = sameDayIdx >= 0
-        ? priorGrades.map((g, i) => (i === sameDayIdx ? { ...g, ...newGrade } : g))
-        : [newGrade, ...priorGrades];
+      const newGrades = [newGrade, ...(targetStudentSync.grades || [])];
       const validGrades = newGrades.filter(g => g.grade > 0);
       const avg = validGrades.length > 0
         ? Math.round((validGrades.reduce((sum, g) => sum + g.grade, 0) / validGrades.length) * 10) / 10
@@ -155,7 +79,7 @@ export function useDataSchedule({
         const patch = {
           completedSessions: newCompleted,
           remainingSessions: newRemaining,
-          lastGrade: gradeNum || s.lastGrade,
+          lastGrade: grade || s.lastGrade,
           avgGrade: avg,
           grades: newGrades,
           status: newRemaining <= 0 ? 'Hoàn thành' : 'Đang học',
@@ -187,11 +111,7 @@ export function useDataSchedule({
         // Optimistic Schedule Update
         setSchedules(prev => prev.map(s => (s._id || s.id) === (existSch._id || existSch.id) ? { ...s, status: 'completed' } : s));
 
-        const resSch = await api.schedules?.update(existSch._id || existSch.id, {
-          status: 'completed',
-          note: note || existSch.note || 'Đã điểm danh hoàn thành buổi học',
-          grade: gradeNum,
-        });
+        const resSch = await api.schedules?.update(existSch._id || existSch.id, { status: 'completed' });
         if (!resSch?.success) throw new Error(resSch?.message || 'Lỗi cập nhật lịch học');
       } else {
         // Create new schedule
@@ -212,13 +132,10 @@ export function useDataSchedule({
           studentName: targetStudentSync.name,
           date: now.toISOString().split('T')[0],
           startTime: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          endTime: new Date(now.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          endTime: new Date(now.getTime() + 90 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           course: courseName || targetStudentSync.course || '',
-          note: note || 'Đã điểm danh hoàn thành buổi học',
           status: 'completed',
           paymentStatus: 'pending',
-          grade: gradeNum,
-          sessionGrade: gradeNum,
         };
 
         setSchedules(prev => [...prev, newSch]);
@@ -232,7 +149,7 @@ export function useDataSchedule({
 
       // Finalize Student on Server (Already did optimistic UI)
       const resStud = await api.students?.update(studentId, {
-        lastGrade: gradeNum || targetStudentSync.lastGrade,
+        lastGrade: grade || targetStudentSync.lastGrade,
         avgGrade: avg,
         grades: newGrades,
         completedSessions: newCompleted,
@@ -243,7 +160,7 @@ export function useDataSchedule({
 
       if (!resStud?.success) throw new Error(resStud?.message || 'Lỗi đồng bộ thông tin học viên');
 
-      addNotification(studentId, 'student', `Giảng viên đã điểm danh buổi học. Điểm: ${gradeNum}/10`);
+      addNotification(studentId, 'student', `Giảng viên đã điểm danh buổi học. Điểm: ${grade || 0}/10`);
       triggerBackgroundSync();
       return true;
 

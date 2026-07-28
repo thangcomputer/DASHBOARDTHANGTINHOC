@@ -31,24 +31,8 @@ export function useDataSync({
 
   const triggerBackgroundSync = useCallback(async (opts = {}) => {
     if (!currentUser) return;
-    // HV/GV phải có token mới sync, Tránh gọi bị 401 khi chưa login xong.
-    // Một số luồng lưu token trong `${role}_user` chứ không phải `${role}_access_token`,
-    // nên cần check cả 2 nơi để đảm bảo sync trainingData/studentTrainingData.
-    if (currentUser.role !== 'admin') {
-      const directAccessToken = localStorage.getItem(`${currentUser.role}_access_token`);
-      if (directAccessToken) {
-        // ok
-      } else {
-        let tokenFromUser = null;
-        try {
-          const parsed = JSON.parse(localStorage.getItem(`${currentUser.role}_user`) || '{}');
-          tokenFromUser = parsed?.accessToken || parsed?.token || null;
-        } catch {
-          tokenFromUser = null;
-        }
-        if (!tokenFromUser) return;
-      }
-    }
+    // HV/GV phải có token mới sync, Tránh gọi bị 401 khi chưa login xong
+    if (currentUser.role !== 'admin' && !localStorage.getItem(`${currentUser.role}_access_token`)) return;
 
     const force = opts === true || opts?.force === true;
     const now = Date.now();

@@ -6,7 +6,6 @@ const Teacher  = require('../models/Teacher');
 const ScheduleHistory = require('../models/ScheduleHistory');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const logger = require('../config/logger');
-const { recordAttendanceGrade } = require('../services/enrollmentService');
 
 function parseTimeToMinutes(raw) {
   if (raw == null || raw === '') return null;
@@ -18,13 +17,30 @@ function parseTimeToMinutes(raw) {
   return h * 60 + min;
 }
 
+const SESSION_DURATION_MINS = 90;
+
+function addMinutesToTimeHHmm(time, addMins) {
+  const mins = parseTimeToMinutes(time);
+  if (mins == null) return '';
+  const total = Math.min(mins + addMins, 23 * 60 + 59);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/** Buổi học cố định 1h30 — luôn suy ra end từ start */
+function endTimeFromStartOrDefault(startTime, endTime) {
+  const fromStart = addMinutesToTimeHHmm(startTime, SESSION_DURATION_MINS);
+  if (!fromStart) return String(endTime || '').trim();
+  return fromStart;
+}
+
 function timeRangesOverlap(start1, end1, start2, end2) {
   const s1 = parseTimeToMinutes(start1);
   const s2 = parseTimeToMinutes(start2);
   if (s1 == null || s2 == null) return false;
-  const defaultDuration = 90;
-  const e1 = parseTimeToMinutes(end1) ?? (s1 + defaultDuration);
-  const e2 = parseTimeToMinutes(end2) ?? (s2 + defaultDuration);
+  const e1 = parseTimeToMinutes(end1) ?? (s1 + SESSION_DURATION_MINS);
+  const e2 = parseTimeToMinutes(end2) ?? (s2 + SESSION_DURATION_MINS);
   return s1 < e2 && s2 < e1;
 }
 
@@ -290,13 +306,16 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Thiếu thông tin khóa học (course)' });
     }
 
-    const timeErr = assertEndAfterStart(startTime, endTime);
+    // Mỗi buổi cố định 1h30 — nếu thiếu/lệch endTime thì chuẩn hóa theo startTime
+    const resolvedEndTime = endTimeFromStartOrDefault(startTime, endTime);
+
+    const timeErr = assertEndAfterStart(startTime, resolvedEndTime);
     if (timeErr) {
       return res.status(400).json({ success: false, message: timeErr });
     }
 
     const studentClash = await findStudentScheduleClash({
-      studentId, date, startTime, endTime,
+      studentId, date, startTime, endTime: resolvedEndTime,
     });
     if (studentClash) {
       return res.status(409).json({ success: false, message: formatStudentClashMessage(studentClash) });
@@ -355,16 +374,13 @@ router.post('/', authMiddleware, async (req, res) => {
       teacherId, teacherName,
       studentId, studentName,
       date: new Date(date),
-      startTime, endTime: endTime || '',
+      startTime, endTime: resolvedEndTime,
       course: courseFinal, 
       linkHoc: linkHoc || '',
       note: note || topic || '',
       status: status || 'scheduled',
       is_paid_to_teacher: finalPaidToTeacher,
       paymentStatus: paymentStatus,
-      sessionGrade: (req.body.grade !== undefined && req.body.grade !== null && req.body.grade !== '')
-        ? Math.max(0, Math.min(10, Number(req.body.grade)))
-        : null,
     });
 
     // Populate để trả về đầy đủ
@@ -379,25 +395,13 @@ router.post('/', authMiddleware, async (req, res) => {
       const NotificationService = require('../services/NotificationService');
       if (studentId) {
          const notifDate = new Date(date).toLocaleDateString('vi-VN');
-         if (schedule.status === 'completed') {
-           const g = schedule.sessionGrade;
-           const gradeText = g != null && Number.isFinite(Number(g)) ? ` Điểm buổi học: ${Number(g)}/10.` : '';
-           NotificationService.send(io, {
-             type: 'SCHEDULE',
-             title: '✅ Điểm danh & chấm điểm',
-             content: `Giảng viên đã điểm danh buổi học ngày ${notifDate}.${gradeText}`,
-             receivers: studentId.toString(),
-             link: '/student#schedule'
-           });
-         } else {
-           NotificationService.send(io, {
-             type: 'SCHEDULE',
-             title: '📅 Lịch học mới',
-             content: `Lịch học mới vào ngày ${notifDate} lúc ${startTime} đã được thêm.`,
-             receivers: studentId.toString(),
-             link: '/student#schedule'
-           });
-         }
+         NotificationService.send(io, {
+           type: 'SCHEDULE',
+           title: '📅 Lịch học mới',
+           content: `Lịch học mới vào ngày ${notifDate} lúc ${startTime} đã được thêm.`,
+           receivers: studentId.toString(),
+           link: '/student#schedule'
+         });
       }
       
       io.emit('schedule:new', {
@@ -420,27 +424,6 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.status(201).json({ success: true, data: schedule });
 
-    // Điểm danh qua tạo lịch completed → ghi nhật ký grades cho HV
-    if (schedule.status === 'completed' && studentId) {
-      try {
-        const student = await Student.findById(studentId);
-        if (student) {
-          const changed = recordAttendanceGrade(student, {
-            courseName: courseFinal,
-            note: note || topic || 'Đã điểm danh hoàn thành buổi học',
-            grade: schedule.sessionGrade != null ? schedule.sessionGrade : (Number(req.body.grade) || 0),
-            date: schedule.date || new Date(),
-          });
-          if (changed) {
-            await student.save();
-            if (io) io.emit('student:updated', student._id);
-          }
-        }
-      } catch (gradeErr) {
-        logger.error('[SCHEDULE] recordAttendanceGrade on create:', gradeErr);
-      }
-    }
-
     // 📝 GHI AUDIT LOG: CREATED
     ScheduleHistory.create({
       scheduleId: schedule._id,
@@ -450,7 +433,7 @@ router.post('/', authMiddleware, async (req, res) => {
       action: 'CREATED',
       reason: '',
       oldValue: null,
-      newValue: { status: schedule.status, date: schedule.date, startTime, endTime: endTime || '', studentId, course: courseFinal },
+      newValue: { status: schedule.status, date: schedule.date, startTime, endTime: resolvedEndTime, studentId, course: courseFinal },
       studentName,
       teacherName,
       scheduledDate: schedule.date,
@@ -485,7 +468,10 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
     }
 
     const effectiveStart = startTime || schedule.startTime;
-    const effectiveEnd = endTime !== undefined ? endTime : schedule.endTime;
+    // Khi đổi giờ bắt đầu (hoặc gửi endTime), luôn khóa kết thúc = start + 1h30
+    const effectiveEnd = (startTime || endTime !== undefined)
+      ? endTimeFromStartOrDefault(effectiveStart, endTime)
+      : (schedule.endTime || endTimeFromStartOrDefault(effectiveStart));
     const effectiveDate = date || schedule.date;
     const timeErr = assertEndAfterStart(effectiveStart, effectiveEnd);
     if (timeErr) {
@@ -528,15 +514,15 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
     const updates = {};
     if (status)    updates.status    = status;
     if (linkHoc)   updates.linkHoc   = linkHoc;
-    if (startTime) updates.startTime = startTime;
-    if (endTime !== undefined) updates.endTime = endTime;
+    if (startTime) {
+      updates.startTime = startTime;
+      updates.endTime = endTimeFromStartOrDefault(startTime);
+    } else if (endTime !== undefined) {
+      updates.endTime = endTimeFromStartOrDefault(schedule.startTime, endTime);
+    }
     if (date)      updates.date      = new Date(date);
     const noteVal = note !== undefined ? note : topic;
     if (noteVal !== undefined) updates.note = String(noteVal).trim();
-    if (req.body.grade !== undefined && req.body.grade !== null && req.body.grade !== '') {
-      const g = Number(req.body.grade);
-      if (Number.isFinite(g)) updates.sessionGrade = Math.max(0, Math.min(10, g));
-    }
     if ('studentNote' in req.body) {
       updates.studentNote = req.body.studentNote;
       updates.hasUnreadStudentNote = true; // Bật cờ có tin nhắn mới cho Giảng viên
@@ -575,29 +561,10 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
          io.emit('schedule:cancelled', { scheduleId: schedule._id.toString(), reason: cancelReason });
       }
       else if (status === 'completed' && schedule.status !== 'completed') {
-         const gradeNum = updates.sessionGrade != null
-           ? Number(updates.sessionGrade)
-           : (req.body.grade !== undefined ? Number(req.body.grade) : null);
-         const gradeText = Number.isFinite(gradeNum)
-           ? ` Điểm buổi học: ${gradeNum}/10.`
-           : '';
          NotificationService.send(io, {
            type: 'SCHEDULE',
-           title: '✅ Điểm danh & chấm điểm',
-           content: `Giảng viên đã điểm danh buổi học ngày ${notifDate}.${gradeText}`,
-           receivers: schedule.studentId.toString(),
-           link: '/student#schedule'
-         });
-      }
-      else if (
-        schedule.status === 'completed'
-        && updates.sessionGrade != null
-        && Number(updates.sessionGrade) !== Number(schedule.sessionGrade)
-      ) {
-         NotificationService.send(io, {
-           type: 'SCHEDULE',
-           title: '📝 Cập nhật điểm buổi học',
-           content: `Giảng viên đã cập nhật điểm buổi ${notifDate}: ${Number(updates.sessionGrade)}/10.`,
+           title: '✅ Hệ thống đã điểm danh',
+           content: `Giảng viên đã điểm danh buổi học ngày ${notifDate}.`,
            receivers: schedule.studentId.toString(),
            link: '/student#schedule'
          });
@@ -622,10 +589,11 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
       { path: 'studentId', select: 'name course totalSessions studentExamUnlocked' },
     ]);
 
-    // BUSINESS LOGIC: Nếu đánh dấu hoàn thành → kiểm tra unlock thi + ghi nhật ký điểm danh
+    // BUSINESS LOGIC: Nếu đánh dấu hoàn thành → kiểm tra unlock thi
     if (status === 'completed' && schedule.studentId) {
       await checkAndUnlockExam(schedule.studentId.toString(), io);
 
+      // Cập nhật remainingSessions của học viên (Tách biệt logic trừ buổi và cộng buổi)
       const student = await Student.findById(schedule.studentId);
       if (student) {
         // Automatically mark as paid if Admin paid in advance
@@ -634,25 +602,6 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
              is_paid_to_teacher: true,
              paymentStatus: 'paid'
            });
-        }
-
-        const attendanceNote = (updates.note !== undefined ? updates.note : schedule.note)
-          || 'Đã điểm danh hoàn thành buổi học';
-        const gradeVal = updates.sessionGrade != null
-          ? updates.sessionGrade
-          : (req.body.grade !== undefined ? Number(req.body.grade) : 0);
-        const changed = recordAttendanceGrade(student, {
-          courseName: schedule.course,
-          note: attendanceNote,
-          grade: Number.isFinite(Number(gradeVal)) ? Number(gradeVal) : 0,
-          date: schedule.date || new Date(),
-        });
-        if (changed) {
-          await student.save();
-          if (io) {
-            io.emit('student:updated', student._id);
-            io.emit('data:refresh', { type: 'student', studentId: String(student._id) });
-          }
         }
       }
     }

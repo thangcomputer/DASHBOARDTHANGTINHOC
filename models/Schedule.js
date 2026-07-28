@@ -45,8 +45,6 @@ const scheduleSchema = new mongoose.Schema({
   reminderSentAt: { type: Date },
 
   note: { type: String, default: '' },
-  /** Điểm buổi học khi điểm danh (0-10), đồng bộ sang nhật ký HV */
-  sessionGrade: { type: Number, default: null, min: 0, max: 10 },
   studentNote: { type: String, default: '' },
   hasUnreadStudentNote: { type: Boolean, default: false },
 

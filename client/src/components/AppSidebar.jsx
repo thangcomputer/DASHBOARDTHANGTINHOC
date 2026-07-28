@@ -152,7 +152,8 @@ const AppSidebar = ({
   useEffect(() => {
     const openForGuide = () => {
       setCollapsed(false);
-      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
+      // Tablet+ dùng sidebar cố định; chỉ mobile mới dùng drawer/hamburger
+      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
         setMobileOpen(true);
       }
     };
@@ -536,8 +537,8 @@ const AppSidebar = ({
   return (
     <>
       {/* ── Desktop Sidebar ── */}
-      <div className={`hidden lg:flex flex-col fixed left-0 top-0 h-screen z-30 transition-all duration-300
-        ${collapsed ? 'w-16' : 'w-60'}
+      <div className={`hidden md:flex flex-col fixed left-0 top-0 h-screen z-30 transition-all duration-300
+        ${collapsed ? 'w-16' : 'w-64'}
       `}>
         {renderSidebarContent()}
       </div>
@@ -547,7 +548,7 @@ const AppSidebar = ({
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="lg:hidden fixed z-[70] w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] bg-white rounded-xl shadow-md border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform duration-200"
+          className="md:hidden fixed z-[70] w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] bg-white rounded-xl shadow-md border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform duration-200"
           style={{
             top: 'calc(env(safe-area-inset-top, 0px) + 0.625rem)',
             left: 'max(0.75rem, env(safe-area-inset-left, 0px))',
@@ -561,7 +562,7 @@ const AppSidebar = ({
 
       {/* ── Mobile: Overlay (above header/branch dropdown) ── */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
+        <div className="md:hidden fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
           <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={() => setMobileOpen(false)} />
           <div className="absolute left-0 top-0 h-full w-[min(88vw,300px)] max-w-[300px] animate-in slide-in-from-left duration-300 pt-[env(safe-area-inset-top,0px)]">
             <div className="h-full relative shadow-2xl overflow-hidden">
@@ -572,7 +573,7 @@ const AppSidebar = ({
       )}
 
       {/* ── Spacer for main content ── */}
-      <div className={`hidden lg:block flex-shrink-0 transition-all duration-300 ${collapsed ? 'w-16' : 'w-60'}`} />
+      <div className={`hidden md:block flex-shrink-0 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`} />
     </>
   );
 };

@@ -77,14 +77,14 @@ function resolveTeacherSubjectIds(teacher) {
 }
 function itemMatchesSubjectIds(item, allowedSubjectIds) {
   const itemSubs = resolveItemExamSubjects(item);
-  if (!itemSubs.length) return true;
-  if (!allowedSubjectIds?.length) return true;
+  if (!itemSubs.length) return false;
+  if (!allowedSubjectIds?.length) return false;
   const set = new Set(allowedSubjectIds);
   return itemSubs.some((id) => set.has(id));
 }
 function filterTrainingItemsBySubject(items, allowedSubjectIds) {
   const list = Array.isArray(items) ? items : [];
-  if (!allowedSubjectIds?.length) return list;
+  if (!allowedSubjectIds?.length) return [];
   return list.filter((item) => itemMatchesSubjectIds(item, allowedSubjectIds));
 }
 module.exports = { resolveTeacherSubjectIds, resolveItemExamSubjects, itemMatchesSubjectIds, filterTrainingItemsBySubject };

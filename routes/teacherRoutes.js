@@ -351,7 +351,7 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
           'branchId', 'branchCode',
         ]
       : [
-          'zalo', 'email', 'specialty', 'bio', 'bankAccount', 'avatar', 'address',
+          'zalo', 'email', 'bio', 'bankAccount', 'avatar', 'address',
           'testScore', 'testStatus', 'testDate', 'faceViolationCount', 'status', 'lockReason',
           'testMcCorrect', 'testMcWrong', 'testMcTotal',
           'practicalFile', 'practicalStatus'
@@ -361,7 +361,8 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
-    if (req.body.subjectIds !== undefined) {
+    // Chuyên môn / subjectIds: chỉ Admin / Staff được sửa
+    if (isAdminRole && req.body.subjectIds !== undefined) {
       updates.subjectIds = Array.isArray(req.body.subjectIds)
         ? [...new Set(req.body.subjectIds.map((id) => String(id).trim()).filter(Boolean))]
         : [];

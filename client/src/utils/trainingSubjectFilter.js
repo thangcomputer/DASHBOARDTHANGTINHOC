@@ -64,16 +64,14 @@ export function resolveTeacherSubjectIds(teacher, catalog = BUILTIN_EXAM_SUBJECT
 
 export function itemMatchesSubjectIds(item, allowedSubjectIds, catalog = BUILTIN_EXAM_SUBJECTS) {
   const itemSubs = resolveItemExamSubjects(item, catalog);
-  // Nội dung chưa gắn môn → hiển thị chung (tránh GV/HV thấy list trống)
-  if (!itemSubs.length) return true;
-  // Người xem chưa có môn chuyên môn → vẫn xem được toàn bộ
-  if (!allowedSubjectIds?.length) return true;
+  if (!itemSubs.length) return false;
+  if (!allowedSubjectIds?.length) return false;
   const set = new Set(allowedSubjectIds);
   return itemSubs.some((id) => set.has(id));
 }
 
 export function filterTrainingItemsBySubject(items, allowedSubjectIds, catalog = BUILTIN_EXAM_SUBJECTS) {
   const list = Array.isArray(items) ? items : [];
-  if (!allowedSubjectIds?.length) return list;
+  if (!allowedSubjectIds?.length) return [];
   return list.filter((item) => itemMatchesSubjectIds(item, allowedSubjectIds, catalog));
 }

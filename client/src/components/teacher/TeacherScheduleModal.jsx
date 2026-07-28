@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import CmsSelect from '../ui/CmsSelect';
 import { X, Save, Calendar } from 'lucide-react';
 import {
@@ -44,23 +44,33 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
     };
   });
 
+  const applyStartTime = (raw) => {
+    const start = normalizeTimeHHmm(raw, getCurrentTimeHHmm());
+    setFormError('');
+    setForm((prev) => ({
+      ...prev,
+      startTime: start,
+      endTime: endTimeFromStart(start),
+    }));
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormError('');
     if (name === 'enrollmentKey') {
       const s = findStudentByKey(value);
-      setForm({
-        ...form,
+      setForm((prev) => ({
+        ...prev,
         enrollmentKey: String(value),
         studentId: String(s?.id || s?._id || ''),
         course: s?.course || '',
-      });
+      }));
     } else if (name === 'date') {
-      setForm({ ...form, date: value, dayOfWeek: getDayOfWeek(value) });
+      setForm((prev) => ({ ...prev, date: value, dayOfWeek: getDayOfWeek(value) }));
     } else if (name === 'startTime') {
-      setForm({ ...form, startTime: value, endTime: endTimeFromStart(value) });
+      applyStartTime(value);
     } else {
-      setForm({ ...form, [name]: value });
+      setForm((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -77,7 +87,10 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
       setFormError('Vui lòng chọn giờ bắt đầu');
       return;
     }
-    if (!isEndTimeAfterStart(form.startTime, form.endTime)) {
+    // Mỗi buổi cố định 1 giờ 30 phút
+    const startTime = normalizeTimeHHmm(form.startTime);
+    const endTime = endTimeFromStart(startTime);
+    if (!isEndTimeAfterStart(startTime, endTime)) {
       setFormError('Giờ kết thúc phải lớn hơn giờ bắt đầu');
       return;
     }
@@ -85,8 +98,8 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
       schedules: allSchedules,
       studentId: form.studentId,
       date: form.date,
-      startTime: form.startTime,
-      endTime: form.endTime,
+      startTime,
+      endTime,
       excludeScheduleId: schedule?.id || schedule?._id,
     });
     if (conflict) {
@@ -94,7 +107,7 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
       return;
     }
     setFormError('');
-    onSubmit(form);
+    onSubmit({ ...form, startTime, endTime });
   };
 
   return (
@@ -148,13 +161,32 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Bắt đầu</label>
-              <input type="time" name="startTime" value={form.startTime} onChange={handleChange} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none" />
+              <input
+                type="time"
+                name="startTime"
+                value={form.startTime}
+                onChange={handleChange}
+                onInput={handleChange}
+                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none"
+              />
             </div>
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Kết thúc</label>
-              <input type="time" name="endTime" value={form.endTime} onChange={handleChange} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none" />
+              <input
+                type="time"
+                name="endTime"
+                value={form.endTime}
+                readOnly
+                tabIndex={-1}
+                aria-readonly="true"
+                title="Tự động = giờ bắt đầu + 1 giờ 30 phút"
+                className="w-full bg-slate-100 border-2 border-gray-100 rounded-xl p-3 text-sm text-slate-600 outline-none cursor-default"
+              />
             </div>
           </div>
+          <p className="text-[11px] text-slate-500 font-medium -mt-2">
+            Mỗi buổi học cố định <span className="font-bold text-slate-700">1 giờ 30 phút</span> — giờ kết thúc tự cập nhật khi đổi giờ bắt đầu.
+          </p>
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chủ đề buổi học</label>
             <input type="text" name="topic" value={form.topic} onChange={handleChange} placeholder="VD: Ôn tập hàm IF, VLOOKUP" className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none" />

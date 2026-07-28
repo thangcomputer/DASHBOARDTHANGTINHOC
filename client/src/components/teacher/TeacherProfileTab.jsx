@@ -89,7 +89,12 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
     setSaving(true);
     setSaveMsg('');
     try {
-      const result = await updateTeacher(teacherId, profileForm);
+      const result = await updateTeacher(teacherId, {
+        zalo: profileForm.zalo,
+        email: profileForm.email,
+        bio: profileForm.bio,
+        address: profileForm.address,
+      });
       if (result && result.success) {
         setSaveMsg('✅ Đã cập nhật thông tin cá nhân!');
         setEditingProfile(false);
@@ -299,26 +304,15 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
               )}
             </div>
 
-            {/* Specialty */}
+            {/* Specialty - Read only (chỉ Admin sửa) */}
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Chuyên môn</label>
-              {editingProfile ? (
-                <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-blue-200 focus-within:border-blue-400 transition">
-                  <Award size={16} className="text-blue-400 flex-shrink-0" />
-                  <input
-                    type="text"
-                    value={profileForm.specialty}
-                    onChange={e => setProfileForm({...profileForm, specialty: e.target.value})}
-                    placeholder="VD: THVP, Excel nâng cao, ..."
-                    className="flex-1 text-sm outline-none bg-transparent"
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                  <Award size={16} className="text-gray-400 flex-shrink-0" />
-                  <span className="text-sm text-gray-700">{profileForm.specialty || '—'}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                <Award size={16} className="text-gray-400 flex-shrink-0" />
+                <span className="text-sm font-bold text-gray-800">{currentTeacher?.specialty || profileForm.specialty || '—'}</span>
+                <Shield size={12} className="text-blue-400 ml-auto flex-shrink-0" title="Chỉ Admin có thể thay đổi" />
+              </div>
+              <p className="text-xs cms-min-text-xs text-red-500 mt-1 pl-1 italic">* Liên hệ Admin để đổi chuyên môn.</p>
             </div>
 
             {/* Bio */}

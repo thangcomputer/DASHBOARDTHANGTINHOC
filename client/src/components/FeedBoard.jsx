@@ -371,18 +371,18 @@ export default function FeedBoard({ session, role }) {
     isAdminLike(meRole, meId) || String(c.authorId) === meId || String(post.authorId) === meId;
 
   return (
-    <div className="cms-feed max-w-2xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
-            <Newspaper size={22} className="text-red-600" />
+    <div className="cms-feed max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto w-full px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 space-y-3 md:space-y-4">
+      <div className="flex items-start justify-between gap-3 md:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
+            <Newspaper size={22} className="text-red-600 md:w-6 md:h-6 shrink-0" />
             Bảng tin hỏi bài
           </h2>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
+          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium md:max-w-2xl">
             Đăng câu hỏi, chia sẻ ảnh bài tập — mọi người cùng xem và trả lời.
           </p>
         </div>
-        <button type="button" onClick={() => load(1, false)} className="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 flex items-center justify-center" title="Tải lại">
+        <button type="button" onClick={() => load(1, false)} className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 flex items-center justify-center" title="Tải lại">
           <RefreshCw size={16} />
         </button>
       </div>

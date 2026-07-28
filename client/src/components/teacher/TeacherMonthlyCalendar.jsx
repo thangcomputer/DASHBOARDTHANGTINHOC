@@ -124,19 +124,19 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
   };
 
   return (
-    <div className="flex flex-col xl:flex-row gap-6 items-start">
+    <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-5 lg:gap-6 w-full min-w-0">
       {/* ─ CALENDAR GRID ─ */}
-      <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-sm border-0 p-3 sm:p-5 w-full xl:w-[420px] flex-shrink-0">
+      <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-sm border-0 p-3 sm:p-5 md:p-6 w-full md:flex-1 md:min-w-0">
         {/* Header Nav */}
         <div className="px-1 sm:px-2 py-3 sm:py-4 flex items-center justify-between mb-1 sm:mb-2 gap-2 min-w-0">
-          <h3 className="font-extrabold text-slate-800 text-sm sm:text-lg tracking-wide shrink-0">
+          <h3 className="font-extrabold text-slate-800 text-sm sm:text-lg md:text-xl tracking-wide shrink-0">
             Lịch theo tháng
           </h3>
           <div className="flex items-center gap-1.5 sm:gap-3">
             <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="p-1 sm:p-2 rounded-xl hover:bg-slate-50 transition text-slate-500 hover:text-slate-800 active:scale-95">
               <ChevronLeft size={18} />
             </button>
-            <div className="flex items-center gap-2 border-2 border-slate-100 rounded-xl px-3 py-1.5 sm:py-2 text-sm font-bold text-slate-700 shadow-sm bg-white">
+            <div className="flex items-center gap-2 border-2 border-slate-100 rounded-xl px-3 py-1.5 sm:py-2 text-sm md:text-base font-bold text-slate-700 shadow-sm bg-white">
               <span className="min-w-[90px] sm:min-w-[110px] text-center">tháng {month + 1} {year}</span>
               <Calendar size={14} className="text-slate-400" />
             </div>
@@ -147,16 +147,16 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
         </div>
 
         {/* Day labels */}
-        <div className="grid grid-cols-7 text-center px-1 border-b border-slate-50 pb-3 mb-3">
+        <div className="grid grid-cols-7 text-center px-1 border-b border-slate-50 pb-3 mb-3 md:pb-4 md:mb-4">
           {['CN','T2','T3','T4','T5','T6','T7'].map((d, i) => (
-            <div key={d} className={`text-xs font-black uppercase tracking-widest ${i === 0 ? 'text-orange-500' : 'text-slate-500'}`}>
+            <div key={d} className={`text-xs md:text-[13px] font-black uppercase tracking-widest ${i === 0 ? 'text-orange-500' : 'text-slate-500'}`}>
               {d}
             </div>
           ))}
         </div>
 
         {/* Calendar cells */}
-        <div className="grid grid-cols-7 px-0.5 sm:px-1 gap-y-1.5 gap-x-1 sm:gap-y-2 sm:gap-x-1.5">
+        <div className="grid grid-cols-7 px-0.5 sm:px-1 gap-y-1.5 gap-x-1 sm:gap-y-2 sm:gap-x-1.5 md:gap-y-2.5 md:gap-x-2">
           {days.map((day, idx) => {
             if (!day) return <div key={`e-${idx}`} />;
 
@@ -184,7 +184,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                   : past ? 'Ngày đã qua, không thể sắp lịch' 
                   : 'Click để sắp lịch hôm này'
                 }
-                className={`relative aspect-square w-full min-h-[2.75rem] sm:min-h-[3.25rem] rounded-xl sm:rounded-[1.25rem] flex flex-col items-center justify-center text-sm font-medium transition-all border
+                className={`relative aspect-square w-full min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.75rem] lg:min-h-[4.25rem] rounded-xl sm:rounded-[1.25rem] flex flex-col items-center justify-center text-sm md:text-base font-medium transition-all border
                   ${
                     selected
                       ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
@@ -257,13 +257,13 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
       </div>
 
       {/* ─ RIGHT COLUMN (Detail Panel & Upcoming) ─ */}
-      <div className="flex-1 w-full flex flex-col gap-6">
+      <div className="w-full md:w-[min(100%,20rem)] lg:w-[22rem] xl:w-[24rem] md:flex-none md:sticky md:top-4 flex flex-col gap-4 md:gap-5">
         
       {/* ─ DETAIL PANEL (khi chọn 1 ngày) Hoặc TRẠNG THÁI TRỐNG ─ */}
       {selectedDay ? (
-        <div className="bg-white rounded-[2rem] border-0 shadow-sm overflow-hidden min-h-[300px]">
+        <div className="bg-white rounded-2xl md:rounded-[1.75rem] border-0 shadow-sm overflow-hidden min-h-[240px] md:min-h-[280px]">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h4 className="font-bold text-gray-800 text-sm">
+            <h4 className="font-bold text-gray-800 text-sm md:text-base">
               Lịch ngày {selectedDay}/{month + 1}/{year}
             </h4>
             <button onClick={() => setSelectedDay(null)} className="p-1 hover:bg-gray-100 rounded-lg">
@@ -361,12 +361,12 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-[2rem] border-0 shadow-sm min-h-[300px] flex flex-col items-center justify-center text-slate-400 p-8 text-center border-dashed border-2 border-slate-100">
+        <div className="bg-white rounded-[2rem] md:rounded-[1.75rem] border-0 shadow-sm min-h-[300px] md:min-h-[280px] flex flex-col items-center justify-center text-slate-400 p-8 text-center border-dashed border-2 border-slate-100">
           <div className="w-20 h-20 bg-slate-50 flex items-center justify-center rounded-[1.5rem] mb-4 text-teal-600/20">
             <Calendar size={40} />
           </div>
           <h3 className="text-lg font-bold text-slate-700 mb-2">Chưa chọn ngày</h3>
-          <p className="text-sm max-w-sm">Vui lòng bấm vào một ngày bất kỳ trên lịch phía trái để xem chi tiết hoặc sắp lịch mới.</p>
+          <p className="text-sm max-w-sm">Vui lòng bấm vào một ngày bất kỳ trên lịch để xem chi tiết hoặc sắp lịch mới.</p>
         </div>
       )}
 

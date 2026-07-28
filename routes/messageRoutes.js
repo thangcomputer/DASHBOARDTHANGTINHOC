@@ -43,8 +43,8 @@ function deptOutboundToStudent(reqUser) {
 // ┌────────────────┼────────────────────────────────────────────┐
 // │ CALLER         │ CÓ THỂ THẤY                                         │
 // ├────────────────┼────────────────────────────────────────────┤
-// │ STUDENT        │ SuperAdmin + STAFF(cùng branch) + Teacher(đang dạy mình)   │
-// │ TEACHER        │ SuperAdmin + STAFF(cùng branch) + Student(được phân công) │
+// │ STUDENT        │ SuperAdmin + STAFF(cùng branch) + Teacher(teacherId + enrollments) │
+// │ TEACHER        │ SuperAdmin + STAFF(cùng branch) + Student(teacherId hoặc enrollments) │
 // │ STAFF          │ SuperAdmin + Teacher(cùng branch) + Student(cùng branch)   │
 // │ SUPER_ADMIN    │ Tất cả (có filter theo branch trên query)                  │
 // └────────────────┴────────────────────────────────────────────┘
@@ -153,8 +153,17 @@ router.get('/contacts', async (req, res) => {
 
     // ══ [4] TEACHER: chỉ thấy STAFF cùng branch + Student được phân công ══
     else if (userRole === 'teacher') {
-      const teacher = await Teacher.findById(userId).select('branchId').lean();
+      const teacher = await Teacher.findById(userId).select('branchId assignedStudents').lean();
       const teacherBranchId = teacher?.branchId ? teacher.branchId.toString() : null;
+      const assignedIds = (teacher?.assignedStudents || []).filter(Boolean);
+
+      const studentQuery = {
+        $or: [
+          { teacherId: userId },
+          { 'enrollments.teacherId': userId },
+          ...(assignedIds.length ? [{ _id: { $in: assignedIds } }] : []),
+        ],
+      };
 
       const [staffDocs, studentDocs] = await Promise.all([
         // STAFF cùng chi nhánh
@@ -164,11 +173,8 @@ router.get('/contacts', async (req, res) => {
               'name phone branchId branchCode avatar'
             ).lean()
           : Promise.resolve([]),
-        // Student được phân công triệt để (teacherId là ObjectId)
-        Student.find(
-          { teacherId: userId },
-          'name phone branchId branchCode avatar'
-        ).lean(),
+        // HV: teacherId cấp hồ sơ HOẶC phân công theo enrollment (đa khóa)
+        Student.find(studentQuery, 'name phone branchId branchCode avatar').lean(),
       ]);
 
       staffContacts   = staffDocs.map(d => ({
@@ -182,11 +188,16 @@ router.get('/contacts', async (req, res) => {
     // ══ [5] STUDENT: chỉ thấy STAFF cùng branch + Teacher đang dạy mình ══
     else if (userRole === 'student') {
       const student = await Student.findById(userId)
-        .select('branchId teacherId')
+        .select('branchId teacherId enrollments.teacherId')
         .lean();
 
       const studentBranchId = student?.branchId ? student.branchId.toString() : null;
-      const myTeacherId     = student?.teacherId ? student.teacherId.toString() : null;
+      const myTeacherIds = new Set();
+      if (student?.teacherId) myTeacherIds.add(String(student.teacherId));
+      (student?.enrollments || []).forEach((e) => {
+        if (e?.teacherId) myTeacherIds.add(String(e.teacherId));
+      });
+      const teacherIdList = [...myTeacherIds].filter(Boolean);
 
       const [staffDocs, teacherDocs] = await Promise.all([
         // STAFF cùng chi nhánh
@@ -196,10 +207,10 @@ router.get('/contacts', async (req, res) => {
               'name phone branchId branchCode avatar'
             ).lean()
           : Promise.resolve([]),
-        // Chỉ GV được phân công trực tiếp
-        myTeacherId
+        // Mọi GV đang dạy (cấp hồ sơ + từng enrollment)
+        teacherIdList.length
           ? Teacher.find(
-              { _id: myTeacherId, role: 'teacher' },
+              { _id: { $in: teacherIdList }, role: 'teacher' },
               'name phone branchId branchCode avatar'
             ).lean()
           : Promise.resolve([]),
