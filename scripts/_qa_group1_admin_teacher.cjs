@@ -120,6 +120,7 @@ async function main() {
   let teacherAccess = null;
 
   // --- Create teacher ---
+  let createWelcome = { queued: false, notified: false };
   {
     const res = await mut('POST', '/api/teachers', {
       token: adminToken,
@@ -133,6 +134,10 @@ async function main() {
       },
     });
     teacherId = res.json?.data?._id || res.json?.data?.id;
+    createWelcome = {
+      queued: !!res.json?.data?.welcomeQueued,
+      notified: !!res.json?.data?.welcomeNotified,
+    };
     record({
       id: 'G1-01',
       name: 'Admin tạo giảng viên',
@@ -152,19 +157,19 @@ async function main() {
     }
   }
 
-  // --- Email / notification on create (product gap check) ---
+  // --- Email / notification on create ---
   record({
     id: 'G1-02',
     name: 'Gửi email khi tạo GV',
     roleAct: 'admin',
     roleRecv: 'teacher',
-    expected: 'Có job/email gửi thông tin đăng nhập (nếu product có)',
-    actual: 'POST /api/teachers không enqueue email / không gọi NotificationService',
-    result: 'FAIL',
+    expected: 'Enqueue welcome (email/Zalo) khi có email/phone',
+    actual: `welcomeQueued=${createWelcome.queued}`,
+    result: createWelcome.queued ? 'PASS' : 'FAIL',
     severity: 'High',
     api: 'POST /api/teachers',
-    file: 'routes/teacherRoutes.js ~98-178',
-    fix: 'Sau Teacher.create: enqueue welcome email + NotificationService.send cho teacherId',
+    file: 'services/accountWelcome.js + queue welcome',
+    fix: createWelcome.queued ? '' : 'enqueueWelcome sau Teacher.create',
   });
   record({
     id: 'G1-03',
@@ -172,12 +177,12 @@ async function main() {
     roleAct: 'admin',
     roleRecv: 'teacher',
     expected: 'Teacher nhận notification tài khoản mới',
-    actual: 'Chỉ io.emit teacher:new cho admin; không tạo Notification cho GV',
-    result: 'FAIL',
+    actual: `welcomeNotified=${createWelcome.notified}`,
+    result: createWelcome.notified ? 'PASS' : 'FAIL',
     severity: 'Medium',
     api: 'POST /api/teachers',
-    file: 'routes/teacherRoutes.js',
-    fix: 'Gửi Notification type ACCOUNT tới teacher receivers',
+    file: 'services/accountWelcome.js',
+    fix: createWelcome.notified ? '' : 'NotificationService.send tới teacherId',
   });
 
   // --- Login while inactive ---

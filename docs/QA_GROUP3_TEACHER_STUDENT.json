@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T13:26:04.102Z",
+  "at": "2026-07-28T13:44:25.420Z",
   "results": [
     {
       "id": "G3-00",
@@ -11,7 +11,7 @@
     {
       "id": "G3-01",
       "name": "Setup GV+HV+assign + login",
-      "actual": "t=true s=true tid=6a68adeb48d89910aca887a9 sid=6a68adeb48d89910aca887ac",
+      "actual": "t=true s=true tid=6a68b239a17818caa4f08a9d sid=6a68b239a17818caa4f08aa2",
       "result": "PASS",
       "severity": "Critical"
     },
@@ -19,7 +19,7 @@
       "id": "G3-02",
       "name": "GV tạo buổi học cho HV được gán",
       "expected": "201 + teacherId=self",
-      "actual": "status=201 id=6a68adec48d89910aca887b5 msg=",
+      "actual": "status=201 id=6a68b239a17818caa4f08aac msg=",
       "result": "PASS",
       "severity": "Critical",
       "api": "POST /api/schedules"
@@ -36,7 +36,7 @@
       "id": "G3-04",
       "name": "GV không spoof teacherId người khác",
       "expected": "403 hoặc 201 với teacherId=self",
-      "actual": "status=201 tid=6a68adeb48d89910aca887a9",
+      "actual": "status=201 tid=6a68b239a17818caa4f08a9d",
       "result": "PASS",
       "severity": "Critical"
     },
@@ -68,11 +68,11 @@
     {
       "id": "G3-08",
       "name": "GV mở danh sách hội thoại",
-      "expected": "200",
-      "actual": "status=403",
-      "result": "FAIL",
+      "expected": "200 contacts + conversations/:userId",
+      "actual": "contacts=200 conv=200",
+      "result": "PASS",
       "severity": "Medium",
-      "api": "GET /api/messages/conversations"
+      "api": "GET /api/messages/contacts + /conversations/:userId"
     },
     {
       "id": "G3-09",

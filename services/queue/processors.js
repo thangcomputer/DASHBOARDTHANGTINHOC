@@ -73,6 +73,41 @@ async function processPasswordJob(data) {
   return results;
 }
 
+async function processWelcomeJob(data) {
+  const { phone, email, password, userName, loginId, role } = data || {};
+  const name = userName || 'ban';
+  const roleLabel = role === 'teacher' ? 'giang vien' : 'hoc vien';
+  const login = loginId || phone || email || '';
+  const text =
+    '[THANG TIN HOC] Tai khoan ' + roleLabel + ' da duoc tao.\n' +
+    'Dang nhap: ' + login + '\n' +
+    'Mat khau tam: ' + password + '\n' +
+    'Vui long dang nhap va doi mat khau ngay.';
+
+  const results = {};
+  if (phone) {
+    results.zalo = await sendZaloText(phone, text);
+  }
+  if (email) {
+    results.email = await sendEmail({
+      to: email,
+      subject: '[Thang Tin Hoc] Chao mung — thong tin dang nhap',
+      text,
+      html:
+        '<p>Xin chao <b>' + name + '</b>,</p>' +
+        '<p>Tai khoan <b>' + roleLabel + '</b> cua ban da duoc tao.</p>' +
+        '<p>Dang nhap: <b>' + login + '</b></p>' +
+        '<p>Mat khau tam: <b>' + password + '</b></p>' +
+        '<p>Vui long dang nhap va doi mat khau ngay.</p>',
+    });
+  }
+  logger.info(
+    { role, phone: phone ? maskSecret(phone) : null, email: email ? maskSecret(email) : null, results },
+    '[Queue] Welcome job done',
+  );
+  return results;
+}
+
 async function processInvoicePdfJob(data) {
   const Invoice = require('../../models/Invoice');
   const invoice = await Invoice.findById(data.invoiceId).lean();
@@ -140,6 +175,8 @@ async function processNotifyJob(jobName, data) {
       return processOtpJob(data);
     case 'password':
       return processPasswordJob(data);
+    case 'welcome':
+      return processWelcomeJob(data);
     case 'invoice-email':
       return processInvoicePdfJob(data);
     case 'backup':
@@ -163,6 +200,7 @@ module.exports = {
   processPdfJob,
   processOtpJob,
   processPasswordJob,
+  processWelcomeJob,
   processInvoicePdfJob,
   processBackupJob,
 };

@@ -13,6 +13,7 @@ const {
   studentMatchesTeacher,
   resolveEnrollmentExamSubjects,
 } = require('../services/enrollmentService');
+const { sendAccountWelcome } = require('../services/accountWelcome');
 
 // ─── GET /api/students ─────────────────────────────────────────────────────────
 // Lấy danh sách học viên (Admin / Teacher) — hỗ trợ Server-side Pagination
@@ -388,7 +389,12 @@ router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
       req.body.status = 'Đang học';
     }
 
+    const plainPassword = req.body.password != null && String(req.body.password).trim() !== ''
+      ? String(req.body.password)
+      : (req.body.zalo || req.body.phone || '');
+
     const student = new Student(req.body);
+    if (!student.password && plainPassword) student.password = plainPassword;
     if (!student.studentCode || !String(student.studentCode).trim()) {
       const seq = String(Date.now()).slice(-8);
       student.studentCode = `HV${seq}`;
@@ -408,6 +414,16 @@ router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
       io.emit('data:refresh', { type: 'student', action: 'create' });
     }
 
+    const welcome = await sendAccountWelcome(io, {
+      role: 'student',
+      userId: student._id,
+      name: student.name,
+      phone: student.phone,
+      zalo: student.zalo,
+      email: student.email,
+      password: plainPassword,
+    });
+
     // Populate branch để logger và frontend có tên chi nhánh (không chỉ ObjectId)
     const Branch = require('../models/Branch');
     const branchDoc = student.branchId
@@ -421,6 +437,8 @@ router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
       studentObj.branchName = branchDoc.name || branchDoc.code || '';
       studentObj.branchCode = studentObj.branchCode || branchDoc.code || '';
     }
+    studentObj.welcomeQueued = welcome.queued;
+    studentObj.welcomeNotified = welcome.notified;
 
     res.status(201).json({ success: true, data: studentObj });
 

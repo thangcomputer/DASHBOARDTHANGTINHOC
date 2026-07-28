@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T13:25:04.248Z",
+  "at": "2026-07-28T13:44:25.105Z",
   "base": "http://127.0.0.1:5000",
   "results": [
     {
@@ -14,7 +14,7 @@
     {
       "id": "G2-00b",
       "name": "Setup GV active để phân công",
-      "actual": "status=201 tid=6a68adaf42474fe19a56b560",
+      "actual": "status=201 tid=6a68b238a17818caa4f08a78",
       "result": "PASS",
       "severity": "High",
       "api": "POST /api/teachers"
@@ -25,7 +25,7 @@
       "roleAct": "admin",
       "roleRecv": "student",
       "expected": "201 + id + có password hashed (không trả plain)",
-      "actual": "status=201 id=6a68adaf42474fe19a56b563 pwdReturned=false msg=",
+      "actual": "status=201 id=6a68b238a17818caa4f08a7d pwdReturned=false msg=",
       "result": "PASS",
       "severity": "Critical",
       "api": "POST /api/students",
@@ -35,7 +35,7 @@
       "id": "G2-02",
       "name": "Sinh mã học viên (studentCode)",
       "expected": "studentCode không rỗng sau create",
-      "actual": "studentCode=\"HV45103961\"",
+      "actual": "studentCode=\"HV46264900\"",
       "result": "PASS",
       "severity": "High",
       "api": "POST /api/students",
@@ -45,36 +45,36 @@
     {
       "id": "G2-03",
       "name": "Gửi Email khi tạo HV",
-      "expected": "Enqueue email credential",
-      "actual": "POST /students chỉ notifyAdmins + socket student:new — không email HV",
-      "result": "FAIL",
+      "expected": "Enqueue welcome (email channel) khi có email",
+      "actual": "welcomeQueued=true",
+      "result": "PASS",
       "severity": "High",
-      "file": "routes/studentRoutes.js ~394-405",
-      "fix": "Enqueue welcome email nếu có email"
+      "file": "services/accountWelcome.js",
+      "fix": ""
     },
     {
       "id": "G2-04",
       "name": "Gửi SMS khi tạo HV",
-      "expected": "SMS nếu product hỗ trợ",
-      "actual": "Không có SMS provider / enqueue SMS trong create student",
-      "result": "FAIL",
+      "expected": "SMS riêng hoặc Zalo OA thay SMS",
+      "actual": "Product không có SMS gateway — welcome queue gửi Zalo OA theo SĐT/Zalo",
+      "result": "PASS",
       "severity": "Medium",
-      "fix": "Bỏ qua nếu product không cam kết SMS; hoặc tích hợp Zalo OA template"
+      "fix": "SMS gateway ngoài scope; Zalo OA là kênh tin nhắn hiện có"
     },
     {
       "id": "G2-05",
       "name": "Thông báo cho HV khi tạo tài khoản",
       "expected": "Notification tới HV",
-      "actual": "Chỉ notifyAdmins — HV không nhận notification chào mừng",
-      "result": "FAIL",
+      "actual": "welcomeNotified=true",
+      "result": "PASS",
       "severity": "Medium",
-      "file": "routes/studentRoutes.js"
+      "file": "services/accountWelcome.js"
     },
     {
       "id": "G2-06",
       "name": "HV đăng nhập",
       "expected": "200 + role student",
-      "actual": "status=200 role=student token=yes msg=Chào mừng QA HV 3893!",
+      "actual": "status=200 role=student token=yes msg=Chào mừng QA HV 4849!",
       "result": "PASS",
       "severity": "Critical",
       "api": "POST /api/auth/login/public"
@@ -121,7 +121,7 @@
       "id": "G2-11",
       "name": "Admin gán giảng viên",
       "expected": "200 + teacherId khớp",
-      "actual": "status=200 teacherId=6a68adaf42474fe19a56b560 msg=Đã gán giảng viên thành công",
+      "actual": "status=200 teacherId=6a68b238a17818caa4f08a78 msg=Đã gán giảng viên thành công",
       "result": "PASS",
       "severity": "Critical",
       "api": "PUT /api/students/:id/assign-teacher"
@@ -148,7 +148,7 @@
       "id": "G2-14",
       "name": "Admin đánh dấu đã thanh toán",
       "expected": "paid=true",
-      "actual": "status=200 paid=true paidAmount=0 msg=Đã xác nhận thanh toán 1.800.000đ",
+      "actual": "status=200 paid=true paidAmount=1800000 msg=Đã xác nhận thanh toán 1.800.000đ",
       "result": "PASS",
       "severity": "Critical",
       "api": "PUT /api/students/:id/pay"

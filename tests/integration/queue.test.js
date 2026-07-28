@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 
 delete process.env.REDIS_URL;
 
-const { initJobQueue, enqueueOtp, getQueueMode, closeJobQueue } = require('../../services/queue/jobQueue');
-const { processOtpJob } = require('../../services/queue/processors');
+const { initJobQueue, enqueueOtp, enqueueWelcome, getQueueMode, closeJobQueue } = require('../../services/queue/jobQueue');
+const { processOtpJob, processWelcomeJob } = require('../../services/queue/processors');
 
 test('queue defaults to inline without REDIS_URL', async () => {
   await initJobQueue();
@@ -27,4 +27,36 @@ test('processOtpJob returns not_configured when no Zalo/SMTP', async () => {
   assert.equal(r.email.reason, 'not_configured');
   if (prevZalo) process.env.ZALO_OA_TOKEN = prevZalo;
   if (prevSmtp) process.env.SMTP_HOST = prevSmtp;
+});
+
+test('enqueueWelcome and processWelcomeJob work inline', async () => {
+  await initJobQueue();
+  const job = await enqueueWelcome({
+    role: 'student',
+    phone: '0900000001',
+    email: 'welcome@example.invalid',
+    password: 'temp123',
+    userName: 'HV Test',
+    loginId: '0900000001',
+  });
+  assert.equal(job.name, 'welcome');
+  assert.equal(job.mode, 'inline');
+
+  const prevZalo = process.env.ZALO_OA_TOKEN;
+  const prevSmtp = process.env.SMTP_HOST;
+  delete process.env.ZALO_OA_TOKEN;
+  delete process.env.SMTP_HOST;
+  const r = await processWelcomeJob({
+    role: 'teacher',
+    phone: '0900000002',
+    email: 'gv@example.invalid',
+    password: 'pass',
+    userName: 'GV',
+    loginId: '0900000002',
+  });
+  assert.equal(r.zalo.ok, false);
+  assert.equal(r.email.ok, false);
+  if (prevZalo) process.env.ZALO_OA_TOKEN = prevZalo;
+  if (prevSmtp) process.env.SMTP_HOST = prevSmtp;
+  await closeJobQueue();
 });

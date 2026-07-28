@@ -239,15 +239,16 @@ async function main() {
     severity: 'High',
   });
 
-  // Chat / messages smoke
-  const conv = await req('GET', '/api/messages/conversations', { token: tTok });
+  // Chat / messages smoke — đúng path conversations/:userId (không có GET /conversations)
+  const contacts = await req('GET', '/api/messages/contacts', { token: tTok });
+  const conv = await req('GET', `/api/messages/conversations/${teacherId}`, { token: tTok });
   record({
     id: 'G3-08', name: 'GV mở danh sách hội thoại',
-    expected: '200',
-    actual: `status=${conv.status}`,
-    result: conv.status === 200 || conv.status === 404 ? (conv.status === 200 ? 'PASS' : 'FAIL') : 'FAIL',
+    expected: '200 contacts + conversations/:userId',
+    actual: `contacts=${contacts.status} conv=${conv.status}`,
+    result: contacts.status === 200 && conv.status === 200 ? 'PASS' : 'FAIL',
     severity: 'Medium',
-    api: 'GET /api/messages/conversations',
+    api: 'GET /api/messages/contacts + /conversations/:userId',
   });
 
   // Training content — teacher cannot upload admin training file

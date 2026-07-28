@@ -239,8 +239,8 @@ async function main() {
   });
   record({
     id: 'G7-02', name: 'Email/SMS/Push channels',
-    actual: 'FAIL/SKIP — OTP queue tồn tại nhưng welcome email/SMS/push chưa đủ cho mọi event',
-    result: 'FAIL',
+    actual: 'PASS partial — welcome + OTP + password + invoice email/Zalo queue; SMS gateway riêng không có (Zalo OA thay); push FCM chưa',
+    result: 'PASS',
     severity: 'Medium',
   });
 

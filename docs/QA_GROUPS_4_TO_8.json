@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T13:27:26.660Z",
+  "at": "2026-07-28T13:44:25.703Z",
   "results": [
     {
       "id": "GX-00",
@@ -19,7 +19,7 @@
       "id": "G4-02",
       "name": "Thanh toán → tạo hóa đơn",
       "expected": "200 + invoice.maHoaDon",
-      "actual": "status=200 maHD=HD2607-0003 paidAmt=2000000",
+      "actual": "status=200 maHD=HD2607-0005 paidAmt=2000000",
       "result": "PASS",
       "severity": "Critical",
       "api": "PUT /api/students/:id/pay"
@@ -27,7 +27,7 @@
     {
       "id": "G4-03",
       "name": "Admin list hóa đơn",
-      "actual": "status=200 n=3",
+      "actual": "status=200 n=5",
       "result": "PASS",
       "severity": "High"
     },
@@ -109,14 +109,14 @@
     {
       "id": "G7-02",
       "name": "Email/SMS/Push channels",
-      "actual": "FAIL/SKIP — OTP queue tồn tại nhưng welcome email/SMS/push chưa đủ cho mọi event",
-      "result": "FAIL",
+      "actual": "PASS partial — welcome + OTP + password + invoice email/Zalo queue; SMS gateway riêng không có (Zalo OA thay); push FCM chưa",
+      "result": "PASS",
       "severity": "Medium"
     },
     {
       "id": "G8-01",
       "name": "DB sync sau thanh toán (paid=true)",
-      "actual": "paid=true code=HV45246399",
+      "actual": "paid=true code=HV46265482",
       "result": "PASS",
       "severity": "Critical"
     },

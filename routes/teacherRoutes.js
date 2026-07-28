@@ -11,6 +11,8 @@ const { authMiddleware, isAdmin, isTeacher, branchFilter } = require('../middlew
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
+const { sendAccountWelcome } = require('../services/accountWelcome');
+const NotificationService = require('../services/NotificationService');
 
 const router = express.Router();
 
@@ -133,6 +135,7 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       ? [...new Set(subjectIds.map((id) => String(id).trim()).filter(Boolean))]
       : [];
 
+    const plainPassword = password || phone;
     const teacher = await Teacher.create({
       name,
       phone,
@@ -141,7 +144,7 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       subjectIds: normalizedSubjectIds,
       startDate: startDate || Date.now(),
       address:   address   || '',
-      password:  password  || phone,
+      password:  plainPassword,
       status:    status || 'inactive',
       testStatus: null,
       role: 'teacher',
@@ -158,12 +161,33 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
         branchCode: teacher.branchCode,
         message: `Giảng viên mới: ${teacher.name} — Chi nhánh: ${teacher.branchCode || 'Chưa phân'}`,
       });
+      NotificationService.notifyAdmins(
+        io,
+        '🆕 Giảng viên mới',
+        `Đã tạo giảng viên ${teacher.name} (${teacher.phone}).`,
+        { teacherId: teacher._id },
+        '/admin/teachers',
+      ).catch((err) => logger.warn('[TEACHERS] notifyAdmins:', err.message));
     }
+
+    const welcome = await sendAccountWelcome(io, {
+      role: 'teacher',
+      userId: teacher._id,
+      name: teacher.name,
+      phone: teacher.phone,
+      email: teacher.email,
+      password: plainPassword,
+    });
 
     return res.status(201).json({
       success: true,
       message: `Đã tạo giảng viên ${teacher.name}`,
-      data: { ...teacher.toObject(), password: undefined },
+      data: {
+        ...teacher.toObject(),
+        password: undefined,
+        welcomeQueued: welcome.queued,
+        welcomeNotified: welcome.notified,
+      },
     });
   } catch (error) {
     if (error.code === 11000) {

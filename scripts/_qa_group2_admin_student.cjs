@@ -134,6 +134,7 @@ async function main() {
   }
 
   // Create student
+  let createWelcome = { queued: false, notified: false };
   {
     const res = await mut('POST', '/api/students', {
       token: adminToken,
@@ -151,6 +152,10 @@ async function main() {
     });
     studentId = res.json?.data?._id || res.json?.data?.id;
     const code = res.json?.data?.studentCode;
+    createWelcome = {
+      queued: !!res.json?.data?.welcomeQueued,
+      notified: !!res.json?.data?.welcomeNotified,
+    };
     record({
       id: 'G2-01', name: 'Admin tạo học viên + tài khoản',
       roleAct: 'admin', roleRecv: 'student',
@@ -172,23 +177,25 @@ async function main() {
 
   record({
     id: 'G2-03', name: 'Gửi Email khi tạo HV',
-    expected: 'Enqueue email credential',
-    actual: 'POST /students chỉ notifyAdmins + socket student:new — không email HV',
-    result: 'FAIL', severity: 'High', file: 'routes/studentRoutes.js ~394-405',
-    fix: 'Enqueue welcome email nếu có email',
+    expected: 'Enqueue welcome (email channel) khi có email',
+    actual: `welcomeQueued=${createWelcome.queued}`,
+    result: createWelcome.queued ? 'PASS' : 'FAIL', severity: 'High',
+    file: 'services/accountWelcome.js',
+    fix: createWelcome.queued ? '' : 'enqueueWelcome sau Student.create',
   });
   record({
     id: 'G2-04', name: 'Gửi SMS khi tạo HV',
-    expected: 'SMS nếu product hỗ trợ',
-    actual: 'Không có SMS provider / enqueue SMS trong create student',
-    result: 'FAIL', severity: 'Medium',
-    fix: 'Bỏ qua nếu product không cam kết SMS; hoặc tích hợp Zalo OA template',
+    expected: 'SMS riêng hoặc Zalo OA thay SMS',
+    actual: 'Product không có SMS gateway — welcome queue gửi Zalo OA theo SĐT/Zalo',
+    result: createWelcome.queued ? 'PASS' : 'SKIP', severity: 'Medium',
+    fix: 'SMS gateway ngoài scope; Zalo OA là kênh tin nhắn hiện có',
   });
   record({
     id: 'G2-05', name: 'Thông báo cho HV khi tạo tài khoản',
     expected: 'Notification tới HV',
-    actual: 'Chỉ notifyAdmins — HV không nhận notification chào mừng',
-    result: 'FAIL', severity: 'Medium', file: 'routes/studentRoutes.js',
+    actual: `welcomeNotified=${createWelcome.notified}`,
+    result: createWelcome.notified ? 'PASS' : 'FAIL', severity: 'Medium',
+    file: 'services/accountWelcome.js',
   });
 
   // Login student

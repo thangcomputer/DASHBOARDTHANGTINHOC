@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T13:19:04.108Z",
+  "at": "2026-07-28T13:44:17.367Z",
   "base": "http://127.0.0.1:5000",
   "results": [
     {
@@ -19,7 +19,7 @@
       "roleAct": "admin",
       "roleRecv": "teacher",
       "expected": "201 + teacher id, không trả password",
-      "actual": "status=201 id=6a68ac4790ae34aa81916a9e hasPwd=false msg=Đã tạo giảng viên QA GV 3967",
+      "actual": "status=201 id=6a68b231a17818caa4f08a6d hasPwd=false msg=Đã tạo giảng viên QA GV 7210",
       "result": "PASS",
       "severity": "Critical",
       "api": "POST /api/teachers",
@@ -31,13 +31,13 @@
       "name": "Gửi email khi tạo GV",
       "roleAct": "admin",
       "roleRecv": "teacher",
-      "expected": "Có job/email gửi thông tin đăng nhập (nếu product có)",
-      "actual": "POST /api/teachers không enqueue email / không gọi NotificationService",
-      "result": "FAIL",
+      "expected": "Enqueue welcome (email/Zalo) khi có email/phone",
+      "actual": "welcomeQueued=true",
+      "result": "PASS",
       "severity": "High",
       "api": "POST /api/teachers",
-      "file": "routes/teacherRoutes.js ~98-178",
-      "fix": "Sau Teacher.create: enqueue welcome email + NotificationService.send cho teacherId"
+      "file": "services/accountWelcome.js + queue welcome",
+      "fix": ""
     },
     {
       "id": "G1-03",
@@ -45,12 +45,12 @@
       "roleAct": "admin",
       "roleRecv": "teacher",
       "expected": "Teacher nhận notification tài khoản mới",
-      "actual": "Chỉ io.emit teacher:new cho admin; không tạo Notification cho GV",
-      "result": "FAIL",
+      "actual": "welcomeNotified=true",
+      "result": "PASS",
       "severity": "Medium",
       "api": "POST /api/teachers",
-      "file": "routes/teacherRoutes.js",
-      "fix": "Gửi Notification type ACCOUNT tới teacher receivers"
+      "file": "services/accountWelcome.js",
+      "fix": ""
     },
     {
       "id": "G1-04",
@@ -73,7 +73,7 @@
       "actual": "status=200 teacherStatus=active",
       "result": "PASS",
       "severity": "Critical",
-      "api": "PUT /api/teachers/6a68ac4790ae34aa81916a9e"
+      "api": "PUT /api/teachers/6a68b231a17818caa4f08a6d"
     },
     {
       "id": "G1-06",
@@ -92,7 +92,7 @@
       "roleAct": "teacher",
       "roleRecv": "-",
       "expected": "200 profile đúng id",
-      "actual": "status=200 id=6a68ac4790ae34aa81916a9e",
+      "actual": "status=200 id=6a68b231a17818caa4f08a6d",
       "result": "PASS",
       "severity": "Critical",
       "api": "GET /api/teachers/:id"
@@ -272,7 +272,7 @@
       "roleAct": "admin",
       "roleRecv": "-",
       "expected": "200 hoặc 204",
-      "actual": "status=200 msg=Đã xóa giảng viên QA GV 3967",
+      "actual": "status=200 msg=Đã xóa giảng viên QA GV 7210",
       "result": "PASS",
       "severity": "Low",
       "api": "DELETE /api/teachers/:id"

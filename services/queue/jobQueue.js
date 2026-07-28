@@ -136,6 +136,10 @@ function enqueuePassword(data, opts) {
   return enqueue('notify', 'password', data, opts);
 }
 
+function enqueueWelcome(data, opts) {
+  return enqueue('notify', 'welcome', data, opts);
+}
+
 function enqueueInvoicePdf(data, opts) {
   return enqueue('pdf', 'invoice', data, opts);
 }
@@ -175,6 +179,7 @@ module.exports = {
   enqueue,
   enqueueOtp,
   enqueuePassword,
+  enqueueWelcome,
   enqueueInvoicePdf,
   enqueueInvoiceEmail,
   enqueueBackup,
