@@ -290,9 +290,9 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
           ) : (
             <div className="divide-y divide-gray-50">
               {selectedSchedules.map(s => {
-                const past = isPast(selectedDay);
                 const displayStatus = getDisplayStatus(s);
-                const isCancellable = !past && s.status === 'scheduled' && displayStatus !== 'ongoing';
+                // Cho phép sửa/hủy mọi buổi còn scheduled (kể cả quá ngày), trừ đang diễn ra
+                const canManage = s.status === 'scheduled' && displayStatus !== 'ongoing';
                 const cfg = STATUS_COLORS[displayStatus] || STATUS_COLORS.scheduled;
                 return (
                   <div key={s._id || s.id} className="px-5 py-4 flex items-center gap-4 group hover:bg-gray-50 transition-colors">
@@ -330,27 +330,29 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                       </span>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {s.status === 'scheduled' && !past && (
+                    {/* Actions — luôn hiện trên mobile (không phụ thuộc hover) */}
+                    {canManage && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
                         <button
+                          type="button"
                           onClick={() => onEditSchedule && onEditSchedule(s)}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                           title="Sửa lịch"
+                          aria-label="Sửa lịch"
                         >
-                          <Edit3 size={14} />
+                          <Edit3 size={15} />
                         </button>
-                      )}
-                      {isCancellable && (
                         <button
+                          type="button"
                           onClick={() => { setCancelTarget(s); setCancelReason(''); }}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                          className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
                           title="Hủy lịch này"
+                          aria-label="Hủy lịch này"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={15} />
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -401,12 +403,13 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0 uppercase ${cfg.badge}`}>
                     {displayStatus === 'ongoing' ? 'Đang diễn ra' : s.startTime}
                   </span>
-                  {/* Hover cancel button */}
-                  {new Date(s.date) >= today && displayStatus !== 'ongoing' && (
+                  {displayStatus !== 'ongoing' && s.status === 'scheduled' && (
                     <button
+                      type="button"
                       onClick={() => { setCancelTarget(s); setCancelReason(''); }}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                      className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-all flex-shrink-0"
                       title="Hủy lịch"
+                      aria-label="Hủy lịch"
                     >
                       <Trash2 size={14} />
                     </button>
