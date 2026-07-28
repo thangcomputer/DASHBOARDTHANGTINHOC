@@ -263,10 +263,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       />
 
       <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
-        <header className={`flex flex-col bg-white border-b border-slate-100 flex-shrink-0 z-40 safe-pad-top ${
+        <header className={`cms-topbar-glass flex flex-col border-b border-slate-100/80 flex-shrink-0 z-40 safe-pad-top ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="h-[3.75rem] sm:h-16 flex items-center gap-1.5 sm:gap-3 pl-[4.25rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-4 min-w-0">
+          <div className="h-14 sm:h-16 flex items-center gap-1.5 sm:gap-3 pl-[4.25rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-4 min-w-0">
             <div className="min-w-0 flex-1">
               <h1 className="text-base sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
               <p className="text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5">
@@ -469,7 +469,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           className={
             isImmersivePage
               ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-              : 'flex-1 min-h-0 px-2.5 py-1.5 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
+              : role === 'student'
+                ? 'flex-1 min-h-0 px-0 py-0 sm:px-4 sm:py-3 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
+                : 'flex-1 min-h-0 px-2.5 py-1.5 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
           }
         >
           <div

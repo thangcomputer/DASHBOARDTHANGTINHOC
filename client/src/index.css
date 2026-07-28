@@ -221,18 +221,148 @@
   }
 
   .cms-stat-grid {
-    @apply grid grid-cols-2 lg:grid-cols-4 gap-3;
+    @apply grid grid-cols-2 lg:grid-cols-4 gap-4;
   }
 
-  /* Student dashboard mobile density */
+  /* ?? Student dashboard design system (Notion/Classroom density) ?? */
   .cms-sd {
-    --cms-sd-gap: 1rem;
-    --cms-sd-radius: 1rem;
+    --sd-page: 20px;
+    --sd-card: 16px;
+    --sd-section: 24px;
+    --sd-gap: 16px;
+    --sd-radius: 16px;
+    --sd-btn-h: 48px;
+    --sd-btn-r: 12px;
+    --sd-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+    --sd-h1: 24px;
+    --sd-section-title: 18px;
+    --sd-card-title: 16px;
+    --sd-body: 14px;
+    --sd-caption: 12px;
   }
-  @media (max-width: 639.98px) {
-    .cms-sd {
-      --cms-sd-gap: 0.875rem;
+
+  .cms-sd-page {
+    width: 100%;
+    max-width: 80rem;
+    margin-inline: auto;
+    min-width: 0;
+    padding-inline: var(--sd-page);
+    padding-block: 12px 20px;
+  }
+
+  .cms-sd-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sd-section);
+    min-width: 0;
+  }
+
+  .cms-sd-card {
+    background: #fff;
+    border: 1px solid #f1f5f9;
+    border-radius: var(--sd-radius);
+    box-shadow: var(--sd-shadow);
+    padding: var(--sd-card);
+    min-width: 0;
+    transition: box-shadow 200ms ease, transform 200ms ease;
+  }
+
+  .cms-sd-card:active {
+    transform: scale(0.99);
+  }
+
+  .cms-sd-h1 {
+    font-size: var(--sd-h1);
+    line-height: 1.25;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+  }
+
+  .cms-sd-section-title {
+    font-size: var(--sd-section-title);
+    line-height: 1.3;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .cms-sd-card-title {
+    font-size: var(--sd-card-title);
+    line-height: 1.35;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .cms-sd-body {
+    font-size: var(--sd-body);
+    line-height: 1.45;
+    color: #475569;
+  }
+
+  .cms-sd-caption {
+    font-size: var(--sd-caption);
+    line-height: 1.4;
+    color: #94a3b8;
+  }
+
+  .cms-sd-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: var(--sd-btn-h);
+    min-width: 44px;
+    padding: 0 16px;
+    border-radius: var(--sd-btn-r);
+    font-size: var(--sd-body);
+    font-weight: 700;
+    transition: transform 200ms ease, background-color 200ms ease, opacity 200ms ease;
+  }
+
+  .cms-sd-btn:active {
+    transform: scale(0.98);
+  }
+
+  .cms-sd-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sd-gap);
+  }
+
+  @media (min-width: 1024px) {
+    .cms-sd-stat-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
+  }
+
+  .cms-sd-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 28px 16px;
+    gap: 8px;
+  }
+
+  .cms-sd-empty__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cbd5e1;
+  }
+
+  .cms-topbar-glass {
+    position: sticky;
+    top: 0;
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .cms-toolbar {

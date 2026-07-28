@@ -14,34 +14,33 @@ export default function StudentScheduleTab({
   displayGrades,
 }) {
   return (
-          <div className="w-full max-w-5xl mx-auto px-0.5 sm:px-4 md:px-8 py-3 sm:py-5 space-y-3 sm:space-y-4 min-w-0">
+          <div className="cms-sd cms-sd-page cms-sd-stack max-w-5xl">
             <CourseSwitcher
               courses={enrollments}
               activeCourseName={activeCourseName || viewStudent.course}
               onChange={setActiveCourseName}
             />
-            <div className="flex flex-col gap-1 sm:gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
-              <h2 className="text-lg font-black text-gray-800 flex items-start sm:items-center gap-2 min-w-0">
-                <Calendar size={18} className="text-blue-500 shrink-0 mt-0.5 sm:mt-0" aria-hidden="true" />
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between min-w-0">
+              <h2 className="cms-sd-section-title flex items-start sm:items-center gap-2 min-w-0">
+                <Calendar size={20} className="text-blue-500 shrink-0 mt-0.5 sm:mt-0" aria-hidden="true" />
                 <span className="min-w-0 leading-snug">
                   Lịch học — <span className="line-clamp-2 sm:line-clamp-none">{viewStudent.course}</span>
                 </span>
               </h2>
-              <span className="text-xs text-gray-400 sm:text-right tabular-nums pl-7 sm:pl-0">
+              <span className="cms-sd-caption sm:text-right tabular-nums pl-7 sm:pl-0">
                 {mySchedules?.filter(s => s.status === 'completed').length || 0}/{viewStudent.totalSessions} buổi hoàn thành
               </span>
             </div>
             <ScheduleView schedules={mySchedules} student={viewStudent} setNoteModalSched={setNoteModalSched} />
 
-            {/* Nhật ký điểm danh & nhận xét */}
-            <div className="mt-4 sm:mt-6">
+            <div>
               <div className="flex items-center gap-2 mb-3">
-                <FileText size={18} className="text-emerald-500 shrink-0" aria-hidden="true" />
-                <h3 className="font-bold text-gray-800 text-base sm:text-lg">Nhật ký học tập &amp; Điểm số</h3>
+                <FileText size={20} className="text-emerald-500 shrink-0" aria-hidden="true" />
+                <h3 className="cms-sd-section-title">Nhật ký học tập &amp; Điểm số</h3>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="cms-sd-card !p-0 overflow-hidden">
                 {displayGrades.length > 0 ? (
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-slate-100">
                     {displayGrades.map((g, idx) => {
                       let parsedDate = g.date;
                       if (parsedDate && parsedDate.includes('T')) {
@@ -51,22 +50,22 @@ export default function StudentScheduleTab({
                       const isUpdated = noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm');
                       const isHomework = noteLower.includes('bài nộp') || isUpdated;
                       return (
-                      <div key={g._idx ?? idx} className="p-3.5 sm:p-4 hover:bg-gray-50 flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between transition-colors duration-200">
+                      <div key={g._idx ?? idx} className="p-4 hover:bg-slate-50 flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between transition-colors duration-200">
                         <div className="min-w-0">
-                          <p className="font-bold text-sm text-gray-800 flex items-center gap-2 flex-wrap">
+                          <p className="cms-sd-body font-bold text-slate-800 flex items-center gap-2 flex-wrap">
                             {g.time ? `${g.time} - ${parsedDate}` : parsedDate}
                             {isUpdated ? (
-                              <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full uppercase">Cập nhật điểm</span>
+                              <span className="cms-sd-caption bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full uppercase">Cập nhật điểm</span>
                             ) : isHomework ? (
-                              <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full uppercase">Nộp bài</span>
+                              <span className="cms-sd-caption bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full uppercase">Nộp bài</span>
                             ) : (
-                              <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full uppercase">Điểm danh</span>
+                              <span className="cms-sd-caption bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full uppercase">Điểm danh</span>
                             )}
                           </p>
-                          <p className="text-sm text-gray-600 mt-1 break-words leading-snug">{g.note}</p>
+                          <p className="cms-sd-body text-slate-600 mt-1 break-words">{g.note}</p>
                         </div>
                         <div className="text-left sm:text-right shrink-0">
-                          <span className={`text-lg font-black tabular-nums ${getGradeTextClasses(g.grade)}`}>
+                          <span className={`text-[15px] font-extrabold tabular-nums ${getGradeTextClasses(g.grade)}`}>
                             {g.grade > 0 ? `${g.grade}/10` : '--'}
                           </span>
                         </div>
@@ -74,12 +73,12 @@ export default function StudentScheduleTab({
                     )})}
                   </div>
                 ) : (
-                  <div className="px-4 py-8 text-center">
-                    <div className="w-12 h-12 mx-auto mb-2.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
-                      <FileText size={22} className="text-slate-300" aria-hidden="true" />
+                  <div className="cms-sd-empty">
+                    <div className="cms-sd-empty__icon">
+                      <FileText size={22} aria-hidden="true" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-500">Chưa có dữ liệu điểm danh.</p>
-                    <p className="text-xs text-slate-400 mt-1">Dữ liệu sẽ xuất hiện sau khi bắt đầu học.</p>
+                    <p className="cms-sd-body font-semibold text-slate-600">Chưa có dữ liệu điểm danh.</p>
+                    <p className="cms-sd-caption">Dữ liệu sẽ xuất hiện sau khi bắt đầu học.</p>
                   </div>
                 )}
               </div>

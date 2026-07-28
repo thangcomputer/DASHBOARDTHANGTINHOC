@@ -12,7 +12,7 @@ export default function StudentMaterialsTab({
   studentTrainingData,
 }) {
   return (
-          <div className="w-full bg-slate-50 min-h-full px-4 md:px-8 py-6">
+          <div className="cms-sd cms-sd-page bg-slate-50 min-h-full">
             <CourseSwitcher
               courses={enrollments}
               activeCourseName={activeCourseName || viewStudent.course}
