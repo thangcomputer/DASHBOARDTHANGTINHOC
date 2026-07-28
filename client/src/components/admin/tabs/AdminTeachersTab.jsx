@@ -122,12 +122,14 @@ export default function AdminTeachersTab() {
                       </div>
 
                       {(t.specialty || t.branchCode) && (
-                        <div className="flex flex-wrap gap-1.5 mt-2.5">
+                        <div className="flex flex-wrap gap-1.5 mt-2.5 min-w-0">
                           {t.specialty && (
-                            <span className="cms-dash-badge-info max-w-full truncate">{t.specialty}</span>
+                            <span className="cms-dash-badge-info max-w-full line-clamp-2 break-words whitespace-normal text-left">
+                              {t.specialty}
+                            </span>
                           )}
                           {t.branchCode && (
-                            <span className="cms-dash-badge-neutral">{t.branchCode}</span>
+                            <span className="cms-dash-badge-neutral shrink-0">{t.branchCode}</span>
                           )}
                         </div>
                       )}

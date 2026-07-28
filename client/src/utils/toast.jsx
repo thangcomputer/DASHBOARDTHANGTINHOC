@@ -145,17 +145,12 @@ function ToastItem({ toast: t, onDismiss }) {
   return (
     <div
       role="status"
-      title="Nhấn để đóng"
-      onClick={() => onDismiss(t.id)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onDismiss(t.id); }}
-      tabIndex={0}
       style={{
         position: 'relative',
         background: v.bg,
         color: v.color,
         borderRadius: '14px',
-        padding: '14px 18px 14px 16px',
-        cursor: 'pointer',
+        padding: '12px 12px 12px 16px',
         pointerEvents: 'all',
         border: `1px solid ${v.ring}`,
         boxShadow: `
@@ -168,9 +163,11 @@ function ToastItem({ toast: t, onDismiss }) {
           : 'toastIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         overflow: 'hidden',
         fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px',
       }}
     >
-      {/* Thanh nhấn trái — không dùng icon */}
       <span
         aria-hidden
         style={{
@@ -184,7 +181,7 @@ function ToastItem({ toast: t, onDismiss }) {
         }}
       />
 
-      <div style={{ paddingLeft: '10px' }}>
+      <div style={{ paddingLeft: '10px', flex: 1, minWidth: 0 }}>
         <p
           style={{
             margin: 0,
@@ -211,6 +208,34 @@ function ToastItem({ toast: t, onDismiss }) {
           />
         )}
       </div>
+
+      <button
+        type="button"
+        aria-label="Đóng thông báo"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDismiss(t.id);
+        }}
+        style={{
+          flexShrink: 0,
+          width: 36,
+          height: 36,
+          border: 0,
+          borderRadius: 10,
+          background: 'transparent',
+          color: v.color,
+          opacity: 0.55,
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 18,
+          lineHeight: 1,
+          fontWeight: 500,
+        }}
+      >
+        ×
+      </button>
     </div>
   );
 }

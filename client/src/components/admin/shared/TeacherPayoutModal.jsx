@@ -32,36 +32,34 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
 
         <div className="cms-sheet-header">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <span className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-              <DollarSign size={18} aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-base font-semibold text-slate-900 truncate">Thanh toán lương GV</h3>
-              <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
-                {['Nhập thông tin', 'Quét QR'].map((label, i) => {
-                  const active = pm.step === i + 1;
-                  return (
-                    <span
-                      key={label}
-                      className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-                        active
-                          ? 'bg-red-600 text-white'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      {i + 1}. {label}
-                    </span>
-                  );
-                })}
-              </div>
+          <span className="cms-sheet-header__side bg-red-50 text-red-600" aria-hidden="true">
+            <DollarSign size={18} />
+          </span>
+          <div className="min-w-0 px-1">
+            <h3 className="cms-sheet-header__title">Thanh toán lương GV</h3>
+            <div className="mt-1.5 flex items-center justify-center gap-1.5 overflow-x-auto hide-scrollbar">
+              {['Nhập thông tin', 'Quét QR'].map((label, i) => {
+                const active = pm.step === i + 1;
+                return (
+                  <span
+                    key={label}
+                    className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                      active
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {i + 1}. {label}
+                  </span>
+                );
+              })}
             </div>
           </div>
           <button
             type="button"
             onClick={close}
-            className="cms-btn cms-btn-ghost cms-btn-icon shrink-0"
             aria-label="Đóng"
+            className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <X size={18} />
           </button>
@@ -224,15 +222,15 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
               )}
             </div>
 
-            <div className="cms-sheet-footer gap-2">
-              <button type="button" onClick={close} className="cms-btn cms-btn-outline flex-1">
+            <div className="cms-sheet-footer">
+              <button type="button" onClick={close} className="cms-btn cms-btn-outline">
                 Huỷ
               </button>
               <button
                 type="button"
                 onClick={onGoToQR}
                 disabled={!canGoQr}
-                className="cms-btn cms-btn-primary flex-[1.4]"
+                className="cms-btn cms-btn-primary"
               >
                 <CreditCard size={16} /> Xem QR
               </button>
@@ -314,15 +312,15 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
               </div>
             </div>
 
-            <div className="cms-sheet-footer gap-2">
+            <div className="cms-sheet-footer">
               <button
                 type="button"
                 onClick={() => setPayoutModal((prev) => ({ ...prev, step: 1 }))}
-                className="cms-btn cms-btn-outline flex-1"
+                className="cms-btn cms-btn-outline"
               >
                 ← Quay lại
               </button>
-              <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary flex-[1.4]">
+              <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary">
                 <CheckCircle2 size={16} /> Đã chuyển xong
               </button>
             </div>

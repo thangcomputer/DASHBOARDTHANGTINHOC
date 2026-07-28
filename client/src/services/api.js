@@ -94,7 +94,10 @@ async function parseApiJson(res, fallbackMessage = 'Máy chủ không phản h�
     try { data = JSON.parse(text); } catch { /* noop */ }
   }
   if (!res.ok) {
-    const msg = data?.message || `${fallbackMessage} (HTTP ${res.status})`;
+    let msg = data?.message || `${fallbackMessage} (HTTP ${res.status})`;
+    if ([502, 503, 504].includes(res.status)) {
+      msg = `${fallbackMessage}. Máy chủ đang khởi động lại — vui lòng đợi vài giây rồi tải lại.`;
+    }
     const err = new Error(msg);
     err.status = res.status;
     err.data = data;
@@ -487,12 +490,14 @@ export const apiFetch = async (endpoint, options = {}) => {
     });
   }
 
-  // Server tạm thời (502/503/504) → retry ngắn, không logout
-  if ([502, 503, 504].includes(res.status) && (options._serverRetryCount || 0) < 2) {
-    await sleep(800 * (1 + (options._serverRetryCount || 0)));
+  // Server tạm thời (502/503/504) — thường gặp lúc PM2 restart / deploy
+  // Retry dài hơn để tránh toast lỗi khi app đang warm-up (~3–8s)
+  if ([502, 503, 504].includes(res.status) && (options._serverRetryCount || 0) < 4) {
+    const n = options._serverRetryCount || 0;
+    await sleep(Math.min(1200 * (n + 1), 5000));
     return apiFetch(endpoint, {
       ...options,
-      _serverRetryCount: (options._serverRetryCount || 0) + 1,
+      _serverRetryCount: n + 1,
     });
   }
 
