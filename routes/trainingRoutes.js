@@ -15,6 +15,17 @@ router.get('/courses', authMiddleware, async (req, res) => {
   }
 });
 
+function findCourseInSettings(settings, courseId) {
+  const id = String(courseId);
+  const teacherVideos = (settings.trainingRawData && settings.trainingRawData.videos) || [];
+  const studentVideos = (settings.studentTrainingRawData && settings.studentTrainingRawData.videos) || [];
+  return (
+    teacherVideos.find((c) => String(c.id || c._id) === id)
+    || studentVideos.find((c) => String(c.id || c._id) === id)
+    || null
+  );
+}
+
 // Lấy danh sách bài học của 1 khóa (Kèm trạng thái khóa/mở)
 router.get('/courses/:id/lessons', authMiddleware, async (req, res) => {
   try {
@@ -23,8 +34,7 @@ router.get('/courses/:id/lessons', authMiddleware, async (req, res) => {
 
     const SystemSettings = require('../models/SystemSettings');
     const settings = await SystemSettings.findOne() || {};
-    const data = settings.trainingRawData || { videos: [] };
-    const course = data.videos.find(c => String(c.id || c._id) === courseId);
+    const course = findCourseInSettings(settings, courseId);
     if (!course) return res.status(404).json({ success: false, message: 'Khóa học không tồn tại' });
 
     if (req.user.role === 'teacher') {
@@ -177,7 +187,9 @@ router.get('/progress/me', authMiddleware, async (req, res) => {
 
     const SystemSettings = require('../models/SystemSettings');
     const settings = await SystemSettings.findOne() || {};
-    const courses = (settings.trainingRawData && settings.trainingRawData.videos) || [];
+    const teacherCourses = (settings.trainingRawData && settings.trainingRawData.videos) || [];
+    const studentCourses = (settings.studentTrainingRawData && settings.studentTrainingRawData.videos) || [];
+    const courses = [...teacherCourses, ...studentCourses];
 
     const progressMap = {};
     courses.forEach((course) => {

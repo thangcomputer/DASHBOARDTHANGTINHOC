@@ -13,6 +13,7 @@ const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const NotificationService = require('../services/NotificationService');
+const { generateTempPassword } = require('../utils/tempPassword');
 
 const router = express.Router();
 
@@ -109,8 +110,8 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
     if (exists) {
       return res.status(409).json({ success: false, message: 'Số điện thoại này đã được đăng ký' });
     }
-    if (!password && phone.length < 6) {
-      return res.status(400).json({ success: false, message: 'Số điện thoại làm mật khẩu mặc định phải ít nhất 6 ký tự' });
+    if (password && String(password).trim().length > 0 && String(password).trim().length < 6) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu phải ít nhất 6 ký tự' });
     }
 
     // ⭐ Xác định branchId:
@@ -135,7 +136,9 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       ? [...new Set(subjectIds.map((id) => String(id).trim()).filter(Boolean))]
       : [];
 
-    const plainPassword = password || phone;
+    const plainPassword = password && String(password).trim()
+      ? String(password).trim()
+      : generateTempPassword(8);
     const teacher = await Teacher.create({
       name,
       phone,
@@ -148,6 +151,7 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       status:    status || 'inactive',
       testStatus: null,
       role: 'teacher',
+      isFirstLogin: true,
       branchId:   finalBranchId,
       branchCode: finalBranchCode,
     });
@@ -185,6 +189,7 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       data: {
         ...teacher.toObject(),
         password: undefined,
+        tempPassword: plainPassword,
         welcomeQueued: welcome.queued,
         welcomeNotified: welcome.notified,
       },

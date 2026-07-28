@@ -267,20 +267,27 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     if (phase !== 'hardware_check') return;
     if (student?.requireWebcam === false) return;
 
+    let cancelled = false;
     let stream = null;
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       .then(s => {
+        if (cancelled) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
         stream = s;
         if (previewRef.current) previewRef.current.srcObject = s;
         setCameraReady(true);
         setCameraError('');
       })
       .catch(err => {
+        if (cancelled) return;
         setCameraReady(false);
         setCameraError(err.message);
       });
 
     return () => {
+      cancelled = true;
       if (stream) stream.getTracks().forEach(t => t.stop());
     };
   }, [phase, student?.requireWebcam]);

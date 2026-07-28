@@ -434,27 +434,18 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
     return list.filter((a, idx) => !a.mySubmission && !localSubmissions[idx]).length;
   }, [trainingData?.assignments, localSubmissions]);
 
-  // Lấy tiến độ các khóa học của Học viên từ LocalStorage tính toán động
+  // Lấy tiến độ khóa học từ server (TrainingProgress) — không dùng localStorage SoT
   useEffect(() => {
     if (isAdmin) return;
-    if (courses && courses.length > 0) {
-      const progressMap = {};
-      courses.forEach(c => {
-        let total = 0;
-        let completed = 0;
-        (c.chapters || [{ lessons: c.lessons || c.videos || [] }]).forEach(chap => {
-          (chap.lessons || []).forEach(l => {
-            total++;
-            const lId = l.id || l._id;
-            if (lId && localStorage.getItem(`student_lms_completed_${lId}`) === 'true') {
-              completed++;
-            }
-          });
-        });
-        progressMap[c.id || c._id] = total > 0 ? Math.round((completed / total) * 100) : 0;
-      });
-      setCourseProgressMap(progressMap);
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await lmsApiFetch('/progress/me');
+        if (cancelled || !res?.success || !res.data) return;
+        setCourseProgressMap(res.data);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
   }, [isAdmin, mainTab, selectedCourse, courses]);
 
   // Sync with trainingData from props
@@ -465,23 +456,48 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
     }
   }, [trainingData]);
 
-  // Load lessons khi chọn khoá học
+  // Load lessons khi chọn khoá học — ưu tiên API server (completed/unlocked)
   useEffect(() => {
-    if (selectedCourse) {
-      let list = [];
-      (selectedCourse.chapters || [{ title: 'Danh mục', lessons: selectedCourse.lessons || selectedCourse.videos || [] }]).forEach((chap) => {
-        (chap.lessons || []).forEach(l => {
-          const lId = l.id || l._id || Date.now() + Math.random().toString();
-          const isDone = localStorage.getItem(`student_lms_completed_${lId}`) === 'true';
-          list.push({ ...l, chapterTitle: chap.title, isUnlocked: true, isCompleted: isDone, _id: lId });
-        });
-      });
-      setLessons(list);
-      const chapters = {};
-      list.forEach(l => { chapters[l.chapterTitle || 'Danh mục'] = true; });
-      setExpandedChapters(chapters);
-      setCurrentLesson(list[0]);
-    }
+    if (!selectedCourse) return;
+    const courseId = selectedCourse._id || selectedCourse.id;
+    if (!courseId) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await lmsApiFetch(`/courses/${courseId}/lessons`);
+        if (cancelled) return;
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setLessons(res.data);
+          const chapters = {};
+          res.data.forEach((l) => { chapters[l.chapterTitle || 'Danh mục'] = true; });
+          setExpandedChapters(chapters);
+          const savedLessonId = sessionStorage.getItem('lms_lessonId');
+          const firstActive = (savedLessonId && res.data.find((l) => String(l._id) === savedLessonId && l.isUnlocked))
+            || res.data.find((l) => l.isUnlocked && !l.isCompleted)
+            || res.data[0];
+          setCurrentLesson(firstActive);
+        } else {
+          // Fallback cấu trúc từ props — completed chỉ từ server khi có API
+          let list = [];
+          (selectedCourse.chapters || [{ title: 'Danh mục', lessons: selectedCourse.lessons || selectedCourse.videos || [] }]).forEach((chap) => {
+            (chap.lessons || []).forEach((l) => {
+              const lId = l.id || l._id || `${courseId}-${list.length}`;
+              list.push({ ...l, chapterTitle: chap.title, isUnlocked: true, isCompleted: false, _id: lId });
+            });
+          });
+          setLessons(list);
+          const chapters = {};
+          list.forEach((l) => { chapters[l.chapterTitle || 'Danh mục'] = true; });
+          setExpandedChapters(chapters);
+          setCurrentLesson(list[0]);
+        }
+      } catch {
+        /* keep prior lessons */
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [selectedCourse]);
 
   // ── Persist session khi reload (Issue #3) ──
@@ -502,19 +518,16 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   }, [currentLesson]);
 
   const fetchLessons = async (courseId) => {
-    // Disabled fetching from backend for student view since lessons are set from props.
     setLoading(true);
     try {
-      const res = { success: false };
-      if (res.success) {
+      const res = await lmsApiFetch(`/courses/${courseId}/lessons`);
+      if (res?.success && Array.isArray(res.data)) {
         setLessons(res.data);
-        // Khôi phục lesson đang xem nếu có savedLessonId
         const savedLessonId = sessionStorage.getItem('lms_lessonId');
         const firstActive = (savedLessonId && res.data.find(l => String(l._id) === savedLessonId && l.isUnlocked))
           || res.data.find(l => l.isUnlocked && !l.isCompleted)
           || res.data[0];
         setCurrentLesson(firstActive);
-        // Expand all chapters by default
         const chapters = {};
         res.data.forEach(l => { chapters[l.chapterTitle || 'Chương 1'] = true; });
         setExpandedChapters(chapters);
@@ -553,11 +566,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           watchedSeconds: actualWatched,
         }),
       });
-      // Tải lại bài giảng để UI gỡ bỏ ổ khóa bài tiếp theo ở sidebar
-      const res = { success: false };
-      if (res.success) {
-        setLessons(res.data);
-      }
+      const courseId = selectedCourse._id || selectedCourse.id;
+      await fetchLessons(courseId);
+      try {
+        const prog = await lmsApiFetch('/progress/me');
+        if (prog?.success && prog.data) setCourseProgressMap(prog.data);
+      } catch { /* ignore */ }
     } catch (e) { }
   }, [currentLesson, selectedCourse]);
 
@@ -590,18 +604,21 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           watchedSeconds: actualWatched, // Lưu luôn giây thực tế lúc complete
         }),
       });
-      // Reload để mở khóa bài tiếp theo
-      const res = { success: false };
-      if (res.success) {
+      const courseId = selectedCourse._id || selectedCourse.id;
+      const res = await lmsApiFetch(`/courses/${courseId}/lessons`);
+      if (res?.success && Array.isArray(res.data)) {
         const updatedLessons = res.data;
         setLessons(updatedLessons);
-        // Tự động chuyển sang bài tiếp theo nếu có
         const currentIdx = updatedLessons.findIndex(l => String(l._id) === String(currentLesson._id));
         const next = updatedLessons[currentIdx + 1];
         if (next?.isUnlocked) {
           setTimeout(() => setCurrentLesson(next), 800);
         }
       }
+      try {
+        const prog = await lmsApiFetch('/progress/me');
+        if (prog?.success && prog.data) setCourseProgressMap(prog.data);
+      } catch { /* ignore */ }
     } catch (e) { void 0 }
     setCompleting(false);
   }, [currentLesson, selectedCourse, completing]);
@@ -1289,10 +1306,6 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                               onClick={() => {
                                 if (!lesson.isUnlocked) return;
                                 setCurrentLesson(lesson);
-                                if (!lesson.isCompleted) {
-                                  localStorage.setItem(`student_lms_completed_${lesson._id}`, 'true');
-                                  setLessons(prev => prev.map(l => l._id === lesson._id ? { ...l, isCompleted: true } : l));
-                                }
                                 setCourseTab('video');
                               }}
                               onKeyDown={(e) => {
@@ -1448,10 +1461,6 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         onClick={() => {
                           if (!lesson.isUnlocked) return;
                           setCurrentLesson(lesson);
-                          if (!lesson.isCompleted) {
-                            localStorage.setItem(`student_lms_completed_${lesson._id}`, 'true');
-                            setLessons(prev => prev.map(l => l._id === lesson._id ? { ...l, isCompleted: true } : l));
-                          }
                         }}
                         className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-all relative ${!lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
                           } ${isCurrent

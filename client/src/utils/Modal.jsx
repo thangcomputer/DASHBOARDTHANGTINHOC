@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { X, AlertCircle, CheckCircle, Info, HelpCircle } from 'lucide-react';
 
 const ModalContext = createContext(null);
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export const ModalProvider = ({ children }) => {
   const [modal, setModal] = useState(null);
@@ -33,6 +36,9 @@ export const ModalProvider = ({ children }) => {
 };
 
 const ModalUI = ({ modal, onConfirm, onCancel }) => {
+  const dialogRef = useRef(null);
+  const previouslyFocused = useRef(null);
+
   const typeConfigs = {
     info:     { icon: Info,        tone: 'text-sky-600 bg-sky-50' },
     success:  { icon: CheckCircle, tone: 'text-emerald-600 bg-emerald-50' },
@@ -44,13 +50,63 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
   const config = typeConfigs[modal.type] || typeConfigs.info;
   const Icon = config.icon;
 
+  useEffect(() => {
+    previouslyFocused.current = document.activeElement;
+    const node = dialogRef.current;
+    if (!node) return undefined;
+
+    const focusables = () => Array.from(node.querySelectorAll(FOCUSABLE))
+      .filter((el) => el.offsetParent !== null || el === document.activeElement);
+
+    const list = focusables();
+    const initial = list.find((el) => el.classList.contains('cms-btn-primary')) || list[0];
+    if (initial) initial.focus();
+    else node.focus();
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancel();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || !node.contains(document.activeElement)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      const prev = previouslyFocused.current;
+      if (prev && typeof prev.focus === 'function') {
+        try { prev.focus(); } catch { /* ignore */ }
+      }
+    };
+  }, [onCancel]);
+
   return (
     <>
       <div className="cms-sheet-backdrop" onClick={onCancel} aria-hidden="true" />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={modal.title || 'Thông báo'}
+        tabIndex={-1}
         className="cms-sheet w-full"
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />

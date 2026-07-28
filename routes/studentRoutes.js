@@ -14,6 +14,7 @@ const {
   resolveEnrollmentExamSubjects,
 } = require('../services/enrollmentService');
 const { sendAccountWelcome } = require('../services/accountWelcome');
+const { generateTempPassword } = require('../utils/tempPassword');
 
 // ─── GET /api/students ─────────────────────────────────────────────────────────
 // Lấy danh sách học viên (Admin / Teacher) — hỗ trợ Server-side Pagination
@@ -353,9 +354,12 @@ router.post('/import', [authMiddleware, isAdmin, branchFilter], async (req, res)
 // ─── POST /api/students ──────────────────────────────────────────────────────────────────
 router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
   try {
-    if (req.body.password === undefined && req.body.zalo) {
-      req.body.password = req.body.zalo;
-    }
+    // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) — random + isFirstLogin
+    const plainPassword = req.body.password != null && String(req.body.password).trim() !== ''
+      ? String(req.body.password).trim()
+      : generateTempPassword(8);
+    req.body.password = plainPassword;
+    req.body.isFirstLogin = true;
 
     // Bảo mật: STAFF chỉ được tạo HV thuộc chi nhánh của mình
     // SUPER_ADMIN tự đặt branchId hoặc để trống
@@ -389,12 +393,7 @@ router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
       req.body.status = 'Đang học';
     }
 
-    const plainPassword = req.body.password != null && String(req.body.password).trim() !== ''
-      ? String(req.body.password)
-      : (req.body.zalo || req.body.phone || '');
-
     const student = new Student(req.body);
-    if (!student.password && plainPassword) student.password = plainPassword;
     if (!student.studentCode || !String(student.studentCode).trim()) {
       const seq = String(Date.now()).slice(-8);
       student.studentCode = `HV${seq}`;
@@ -439,6 +438,7 @@ router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
     }
     studentObj.welcomeQueued = welcome.queued;
     studentObj.welcomeNotified = welcome.notified;
+    studentObj.tempPassword = plainPassword;
 
     res.status(201).json({ success: true, data: studentObj });
 

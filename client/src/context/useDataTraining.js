@@ -36,14 +36,15 @@ export function useDataTraining(currentUser) {
   const [studentTrainingData, setStudentTrainingData] = useState(() =>
     loadState('thvp_studentTrainingData', INITIAL_TRAINING),
   );
-  const [questions, setQuestions] = useState(() => loadState('thvp_questions', []));
+  // Ngân hàng câu hỏi: khởi tạo rỗng — hydrate từ server (tránh localStorage SoT cũ)
+  const [questions, setQuestions] = useState([]);
   const [teacherExamBankHydrated, setTeacherExamBankHydrated] = useState(false);
   const [teacherExamTimeLimitMinutes, setTeacherExamTimeLimitMinutes] = useState(() =>
     loadState(TEACHER_EXAM_TIME_LIMIT_KEY, null),
   );
   const [teacherExamMinutes, setTeacherExamMinutes] = useState(loadInitialTeacherExamMinutes);
   const [teacherEssayExamMinutes, setTeacherEssayExamMinutes] = useState(loadInitialTeacherEssayExamMinutes);
-  const [studentQuestions, setStudentQuestions] = useState(loadInitialStudentQuestions);
+  const [studentQuestions, setStudentQuestions] = useState([]);
   const [studentExamMinutes, setStudentExamMinutes] = useState(loadInitialStudentExamMinutes);
   const [studentEssayExamMinutes, setStudentEssayExamMinutes] = useState(loadInitialStudentEssayExamMinutes);
   const [studentExamFiles, setStudentExamFiles] = useState(() => loadState(STUDENT_EXAM_FILES_KEY, {}));
@@ -278,38 +279,15 @@ export function useDataTraining(currentUser) {
     return () => { cancelled = true; };
   }, [currentUser?.id, currentUser?.role, applyStudentExamConfigFromServer]);
 
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(HV_QUESTIONS_LEGACY_SEED)) return;
-      const raw = localStorage.getItem(STUDENT_QUESTIONS_KEY);
-      if (raw == null) {
-        localStorage.setItem(HV_QUESTIONS_LEGACY_SEED, '1');
-        return;
-      }
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        localStorage.setItem(HV_QUESTIONS_LEGACY_SEED, '1');
-        return;
-      }
-      if (!Array.isArray(parsed) || parsed.length > 0) {
-        localStorage.setItem(HV_QUESTIONS_LEGACY_SEED, '1');
-        return;
-      }
-      const tq = loadState('thvp_questions', []);
-      if (Array.isArray(tq) && tq.length > 0) {
-        setStudentQuestions(JSON.parse(JSON.stringify(tq)));
-      }
-      localStorage.setItem(HV_QUESTIONS_LEGACY_SEED, '1');
-    } catch {
-      try { localStorage.setItem(HV_QUESTIONS_LEGACY_SEED, '1'); } catch { /* ignore */ }
-    }
-  }, []);
+  // Không seed ngân hàng HV từ localStorage/thvp_questions — server là SoT
 
   useEffect(() => { localStorage.setItem('thvp_trainingData', JSON.stringify(trainingData)); }, [trainingData]);
   useEffect(() => { localStorage.setItem('thvp_studentTrainingData', JSON.stringify(studentTrainingData)); }, [studentTrainingData]);
-  useEffect(() => { localStorage.setItem('thvp_questions', JSON.stringify(questions)); }, [questions]);
+  // Cache ngân hàng sau khi đã hydrate từ server (không dùng làm SoT lúc boot)
+  useEffect(() => {
+    if (!teacherExamBankHydrated) return;
+    localStorage.setItem('thvp_questions', JSON.stringify(questions));
+  }, [questions, teacherExamBankHydrated]);
   useEffect(() => {
     localStorage.setItem(TEACHER_EXAM_TIME_LIMIT_KEY, JSON.stringify(teacherExamTimeLimitMinutes));
   }, [teacherExamTimeLimitMinutes]);
@@ -319,7 +297,10 @@ export function useDataTraining(currentUser) {
   useEffect(() => {
     localStorage.setItem(TEACHER_ESSAY_EXAM_MINUTES_KEY, JSON.stringify(teacherEssayExamMinutes));
   }, [teacherEssayExamMinutes]);
-  useEffect(() => { localStorage.setItem('thvp_studentQuestions', JSON.stringify(studentQuestions)); }, [studentQuestions]);
+  useEffect(() => {
+    if (!studentExamBankHydrated && currentUser?.role !== 'student') return;
+    localStorage.setItem('thvp_studentQuestions', JSON.stringify(studentQuestions));
+  }, [studentQuestions, studentExamBankHydrated, currentUser?.role]);
   useEffect(() => { localStorage.setItem(STUDENT_EXAM_MINUTES_KEY, JSON.stringify(studentExamMinutes)); }, [studentExamMinutes]);
   useEffect(() => {
     localStorage.setItem(STUDENT_ESSAY_EXAM_MINUTES_KEY, JSON.stringify(studentEssayExamMinutes));
