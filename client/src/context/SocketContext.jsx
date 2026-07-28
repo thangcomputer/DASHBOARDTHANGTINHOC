@@ -83,13 +83,51 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
     const newSocket = io(SOCKET_URL, {
       transports: ['polling', 'websocket'],
-      reconnectionAttempts: 8,
-      reconnectionDelay: 1500,
+      // Không giới hạn số lần reconnect — blip mạng không được “chết” socket vĩnh viễn
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 15000,
+      randomizationFactor: 0.4,
+      timeout: 20000,
       auth: { token: effectiveToken },
     });
 
+    const pauseReconnectIfOffline = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        try { newSocket.io.opts.reconnection = false; } catch { /* ignore */ }
+      }
+    };
+    const resumeReconnectIfOnline = () => {
+      try {
+        newSocket.io.opts.reconnection = true;
+        if (!newSocket.connected) newSocket.connect();
+      } catch { /* ignore */ }
+    };
+
+    const onBrowserOffline = () => {
+      setIsConnected(false);
+      pauseReconnectIfOffline();
+      try {
+        window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: false } }));
+      } catch { /* ignore */ }
+    };
+    const onBrowserOnline = () => {
+      resumeReconnectIfOnline();
+      try {
+        window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: true } }));
+      } catch { /* ignore */ }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('offline', onBrowserOffline);
+      window.addEventListener('online', onBrowserOnline);
+    }
+
     newSocket.on('connect', () => {
       setIsConnected(true);
+      try {
+        window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: true } }));
+      } catch { /* ignore */ }
 
       // Đăng ký user
       if (userId && role && name) {
@@ -104,6 +142,11 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       if (role === 'admin' || role === 'staff') {
         newSocket.emit('admin:join');
       }
+    });
+
+    newSocket.on('connect_error', () => {
+      setIsConnected(false);
+      pauseReconnectIfOffline();
     });
 
     if (userId) {
@@ -272,6 +315,10 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
     return () => {
       if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('offline', onBrowserOffline);
+        window.removeEventListener('online', onBrowserOnline);
+      }
       newSocket.offAny(onAnyEvent);
       newSocket.removeAllListeners();
       if (socketRef.current === newSocket) socketRef.current = null;

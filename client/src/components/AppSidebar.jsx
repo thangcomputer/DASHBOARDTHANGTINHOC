@@ -520,7 +520,11 @@ const AppSidebar = ({
       {/* ── Mobile: Hamburger button ── */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-50 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white rounded-xl shadow-lg border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform"
+        className="lg:hidden fixed z-50 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white rounded-xl shadow-lg border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform"
+        style={{
+          top: 'max(0.75rem, env(safe-area-inset-top, 0px))',
+          left: 'max(0.75rem, env(safe-area-inset-left, 0px))',
+        }}
         aria-label="Mở menu điều hướng"
         aria-expanded={mobileOpen}
       >

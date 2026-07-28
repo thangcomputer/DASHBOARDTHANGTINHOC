@@ -27,7 +27,7 @@ export default function StudentOverviewTab({
   return (
     <>
             {/* Greeting */}
-            <div className="px-4 md:px-8 pt-5 pb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
+            <div className="px-1 sm:px-4 md:px-8 pt-3 sm:pt-5 pb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
                 <h2 className="text-lg md:text-xl font-black text-slate-800 truncate">Chào mừng, {studentData.name}! 👋</h2>
                 <p className="text-slate-400 text-xs md:text-sm italic">"Học hôm nay, thành công mai sau."</p>
@@ -37,7 +37,7 @@ export default function StudentOverviewTab({
               </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12 py-4 md:py-6">
+            <div className="w-full max-w-7xl mx-auto px-1 sm:px-4 md:px-8 lg:px-12 py-3 sm:py-4 md:py-6">
               <CourseSwitcher
                 courses={enrollments}
                 activeCourseName={activeCourseName || viewStudent.course}

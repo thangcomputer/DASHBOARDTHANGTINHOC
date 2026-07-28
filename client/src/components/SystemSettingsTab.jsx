@@ -409,7 +409,7 @@ export default function SystemSettingsTab() {
         <div className="flex-1 min-w-0">
       {/* ── TAB 1: NGÂN HÀNG ───────────────────────────────────────────── */}
       {activeSubTab === 'bank' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 max-w-2xl">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 w-full max-w-full lg:max-w-2xl">
           <div className="flex items-center gap-2 mb-1">
             <Landmark size={16} className="text-emerald-600" />
             <h3 className="font-bold text-gray-800">Tài khoản ngân hàng thu học phí</h3>
@@ -495,7 +495,7 @@ export default function SystemSettingsTab() {
       )}
 
       {activeSubTab === 'popup' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 max-w-2xl">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 w-full max-w-full lg:max-w-2xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell size={16} className="text-violet-600" />
@@ -639,7 +639,7 @@ export default function SystemSettingsTab() {
 
       {/* ── TAB: HÓA ĐƠN (INVOICE) ────────────────────────────────────────── */}
       {activeSubTab === 'invoice' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 max-w-2xl">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-6 w-full max-w-full lg:max-w-2xl">
           <div className="flex items-center gap-2">
             <FileText size={16} className="text-blue-600" />
             <h3 className="font-bold text-gray-800">Cấu hình Hóa đơn (Phiếu thu)</h3>
@@ -731,7 +731,7 @@ export default function SystemSettingsTab() {
 
       {/* ── TAB 6: TÀI KHOẢN ADMIN ──────────────────────────────────────────── */}
       {activeSubTab === 'account' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 max-w-2xl">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-6 w-full max-w-full lg:max-w-2xl">
           <div className="flex items-center gap-2 mb-1">
             <Lock size={16} className="text-violet-600" />
             <h3 className="font-bold text-gray-800">Thay đổi thông tin Admin</h3>

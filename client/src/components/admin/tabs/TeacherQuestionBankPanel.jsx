@@ -356,9 +356,9 @@ export default function TeacherQuestionBankPanel() {
   return (
     <div className="space-y-4">
       {/* Header — chọn môn */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[12rem]">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-4">
+        <div className="flex flex-col gap-3">
+          <div className="w-full min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
               Môn thi
             </label>
@@ -377,7 +377,8 @@ export default function TeacherQuestionBankPanel() {
               </p>
             )}
           </div>
-          <div className="w-28">
+          <div className="grid grid-cols-2 gap-3 w-full">
+          <div className="min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wide text-amber-700 block mb-1.5">
               Phút TN
             </label>
@@ -407,7 +408,7 @@ export default function TeacherQuestionBankPanel() {
               />
             </div>
           </div>
-          <div className="w-28">
+          <div className="min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wide text-violet-700 block mb-1.5">
               Phút TL
             </label>
@@ -437,14 +438,16 @@ export default function TeacherQuestionBankPanel() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs font-bold text-slate-500 hidden sm:inline">
+          </div>
+          <div className="flex flex-col min-[400px]:flex-row items-stretch min-[400px]:items-center gap-2 w-full">
+            <span className="text-xs font-bold text-slate-500">
               {mcQuestions.length} TN · {essayQuestions.length} TL
             </span>
+            <div className="flex flex-col min-[400px]:flex-row gap-2 min-[400px]:ml-auto w-full min-[400px]:w-auto">
             <button
               type="button"
               onClick={() => persistExamMinutes(teacherExamMinutesRef.current, teacherEssayExamMinutesRef.current)}
-              className="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 text-xs font-bold hover:bg-emerald-100"
+              className="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 text-xs font-bold hover:bg-emerald-100 w-full min-[400px]:w-auto"
             >
               Lưu thời gian
             </button>
@@ -460,10 +463,11 @@ export default function TeacherQuestionBankPanel() {
                   onConfirm: () => resetQuestions(),
                 });
               }}
-              className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center gap-1.5"
+              className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-1.5 w-full min-[400px]:w-auto"
             >
               <Trash2 size={14} /> Xóa toàn bộ
             </button>
+            </div>
           </div>
         </div>
         <p className="mt-2 text-[11px] font-semibold leading-snug text-slate-500">
@@ -492,22 +496,22 @@ export default function TeacherQuestionBankPanel() {
               <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold">{mcQuestions.length}</span>
             </div>
           </header>
-          <div className="px-3 py-2.5 border-b border-blue-50 flex flex-wrap gap-2 bg-blue-50/40">
+          <div className="px-3 py-2.5 border-b border-blue-50 flex flex-col min-[480px]:flex-row flex-wrap gap-2 bg-blue-50/40">
             <button
               type="button"
               onClick={() => openAddForm('multiple')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm w-full min-[480px]:w-auto"
             >
               <Plus size={14} /> Thêm câu
             </button>
             <button
               type="button"
               onClick={() => downloadTeacherQuestionsExcelTemplate(qSection, activeSection?.label, 'multiple')}
-              className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-blue-50"
+              className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-50 w-full min-[480px]:w-auto"
             >
               <Download size={14} /> Mẫu Excel
             </button>
-            <label className="bg-white border border-dashed border-blue-300 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer hover:bg-blue-50">
+            <label className="bg-white border border-dashed border-blue-300 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:bg-blue-50 w-full min-[480px]:w-auto">
               <FileSpreadsheet size={14} /> Nhập Excel
               <input
                 ref={teacherQuestionsExcelInputRef}

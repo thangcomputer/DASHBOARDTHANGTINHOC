@@ -131,51 +131,51 @@ export default function FileCenterPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <HardDrive className="text-indigo-600" size={22} /> Quản lý file
+    <div className="w-full max-w-full space-y-3 sm:space-y-4">
+      <div className="cms-toolbar">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-black text-gray-900 flex items-center gap-2">
+            <HardDrive className="text-indigo-600 flex-shrink-0" size={22} /> Quản lý file
           </h1>
           <p className="text-xs text-gray-500 font-medium mt-1">
             {stats?.totals?.count ?? total} file · {stats?.totals?.totalSizeLabel || '—'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button type="button" onClick={() => { load(page); loadStats(); }} className="p-2.5 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100">
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button type="button" onClick={onPurge} className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-bold">
+          <button type="button" onClick={onPurge} className="flex-1 sm:flex-none px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-bold">
             Dọn hết hạn
           </button>
         </div>
       </div>
 
       {stats?.byCategory?.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
           {stats.byCategory.map((c) => (
             <button
               key={c.category}
               type="button"
               onClick={() => setCategory(c.category === category ? '' : c.category)}
-              className={`text-left p-3 rounded-xl border text-xs ${
+              className={`text-left p-3 rounded-xl border text-xs min-w-0 ${
                 category === c.category ? 'border-indigo-400 bg-indigo-50' : 'border-gray-100 bg-white'
               }`}
             >
-              <p className="font-black text-gray-800 uppercase">{c.category}</p>
+              <p className="font-black text-gray-800 uppercase truncate">{c.category}</p>
               <p className="text-gray-500 font-bold mt-0.5">{c.count} file · {c.totalSizeLabel}</p>
             </button>
           ))}
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-wrap items-end gap-3">
-        <div>
+      <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 cms-mobile-stack sm:flex sm:flex-row sm:flex-wrap sm:items-end gap-3">
+        <div className="w-full sm:w-auto sm:min-w-[12rem] flex-1">
           <label className="text-[10px] font-black text-gray-400 uppercase">Category upload</label>
           <CmsSelect
             value={uploadCat}
             onChange={(e) => setUploadCat(e.target.value)}
-            className="block mt-1 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
+            className="block mt-1 w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
           >
             {(categories.length ? categories : [{ key: 'general' }]).map((c) => (
               <option key={c.key} value={c.key}>{c.key}{c.maxLabel ? ` (${c.maxLabel})` : ''}</option>
@@ -186,7 +186,7 @@ export default function FileCenterPage() {
           type="button"
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
-          className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-40"
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40"
         >
           {uploading ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
           Upload file
@@ -194,28 +194,30 @@ export default function FileCenterPage() {
         <input ref={inputRef} type="file" className="hidden" onChange={onUpload} />
       </div>
 
-      <form onSubmit={onSearch} className="flex flex-wrap gap-2 items-center">
-        <Filter size={14} className="text-gray-400" />
-        <CmsSelect
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white"
-        >
-          <option value="">Tất cả category</option>
-          {(categories.length ? categories : Object.keys({})).map((c) => (
-            <option key={c.key || c} value={c.key || c}>{c.key || c}</option>
-          ))}
-        </CmsSelect>
-        <div className="flex-1 min-w-[160px] flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white">
-          <Search size={14} className="text-gray-400" />
+      <form onSubmit={onSearch} className="cms-mobile-stack sm:flex sm:flex-row sm:flex-wrap gap-2 sm:items-center">
+        <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+          <Filter size={14} className="text-gray-400 flex-shrink-0" />
+          <CmsSelect
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full sm:w-auto border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white"
+          >
+            <option value="">Tất cả category</option>
+            {(categories.length ? categories : Object.keys({})).map((c) => (
+              <option key={c.key || c} value={c.key || c}>{c.key || c}</option>
+            ))}
+          </CmsSelect>
+        </div>
+        <div className="w-full flex-1 min-w-0 flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white">
+          <Search size={14} className="text-gray-400 flex-shrink-0" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Tìm tên file..."
-            className="flex-1 text-sm outline-none font-medium"
+            className="flex-1 min-w-0 text-sm outline-none font-medium"
           />
         </div>
-        <button type="submit" className="px-3 py-2 rounded-xl bg-gray-900 text-white text-xs font-bold">Tìm</button>
+        <button type="submit" className="w-full sm:w-auto px-3 py-2 rounded-xl bg-gray-900 text-white text-xs font-bold">Tìm</button>
       </form>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -226,7 +228,7 @@ export default function FileCenterPage() {
         ) : (
           <ul className="divide-y divide-gray-50">
             {items.map((f) => (
-              <li key={f._id} className="p-4 flex gap-3 items-center hover:bg-gray-50">
+              <li key={f._id} className="p-3 sm:p-4 flex gap-3 items-start sm:items-center hover:bg-gray-50 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
                   <FileText size={18} />
                 </div>
@@ -235,11 +237,11 @@ export default function FileCenterPage() {
                     href={publicUrl(f.url)}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm font-bold text-gray-900 hover:text-indigo-600 truncate block"
+                    className="text-sm font-bold text-gray-900 hover:text-indigo-600 break-anywhere block"
                   >
                     {displayFileName(f.originalName || f.filename)}
                   </a>
-                  <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  <p className="text-[11px] text-gray-500 font-medium mt-0.5 break-anywhere">
                     <span className="uppercase font-black text-indigo-600">{f.category}</span>
                     {' · '}{f.sizeLabel || f.size}
                     {' · '}{formatTime(f.createdAt)}
@@ -251,7 +253,7 @@ export default function FileCenterPage() {
                   type="button"
                   disabled={busyId === f._id}
                   onClick={() => onDelete(f._id)}
-                  className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                  className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
                   title="Xóa"
                 >
                   <Trash2 size={16} />

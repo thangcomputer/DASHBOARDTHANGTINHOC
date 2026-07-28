@@ -4,6 +4,63 @@ export const SOCKET_BASE = import.meta.env.VITE_API_URL || '';
 export const BASE_URL = SOCKET_BASE;
 export const API_BASE = BASE_URL ? (BASE_URL + '/api') : '/api';
 
+export class NetworkOfflineError extends Error {
+  constructor(message = 'Mất kết nối máy chủ. Đang thử lại…') {
+    super(message);
+    this.name = 'NetworkOfflineError';
+    this.isNetworkError = true;
+  }
+}
+
+function isNetworkFetchError(err) {
+  if (!err) return false;
+  if (err.isNetworkError || err.name === 'NetworkOfflineError') return true;
+  if (err.name === 'TypeError') return true;
+  const msg = String(err.message || err).toLowerCase();
+  return (
+    msg.includes('failed to fetch')
+    || msg.includes('networkerror')
+    || msg.includes('network request failed')
+    || msg.includes('load failed')
+    || msg.includes('err_address_unreachable')
+    || msg.includes('err_connection')
+    || msg.includes('err_name_not_resolved')
+    || msg.includes('err_internet_disconnected')
+  );
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function notifyConnectivity(ok) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: ok } }));
+  } catch { /* ignore */ }
+}
+
+/** fetch có retry khi mạng tụt (không retry response HTTP đã nhận) */
+async function fetchWithNetworkRetry(url, options = {}, maxAttempts = 3) {
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false && attempt === 0) {
+        await sleep(400);
+      }
+      const res = await fetch(url, options);
+      notifyConnectivity(true);
+      return res;
+    } catch (err) {
+      lastErr = err;
+      notifyConnectivity(false);
+      if (!isNetworkFetchError(err) || attempt >= maxAttempts - 1) break;
+      await sleep(Math.min(1000 * (2 ** attempt), 8000));
+    }
+  }
+  throw new NetworkOfflineError(lastErr?.message || 'Không kết nối được máy chủ');
+}
+
 /** CSRF double-submit (cookie csrf_token + header X-CSRF-Token) */
 let _csrfToken = null;
 let _csrfPromise = null;
@@ -12,7 +69,7 @@ export async function ensureCsrfToken(force = false) {
   if (_csrfToken && !force) return _csrfToken;
   if (_csrfPromise) return _csrfPromise;
   _csrfPromise = (async () => {
-    const res = await fetch(`${API_BASE}/auth/csrf-token`, { credentials: 'include' });
+    const res = await fetchWithNetworkRetry(`${API_BASE}/auth/csrf-token`, { credentials: 'include' });
     const body = await res.json().catch(() => ({}));
     _csrfToken = body.csrfToken || null;
     return _csrfToken;
@@ -57,14 +114,14 @@ export async function csrfFetch(url, options = {}) {
     const csrf = await ensureCsrfToken();
     if (csrf) headers['X-CSRF-Token'] = csrf;
   }
-  return fetch(url, { ...options, credentials: 'include', headers });
+  return fetchWithNetworkRetry(url, { ...options, credentials: 'include', headers });
 }
 
 /** POST FormData (upload) với CSRF + Bearer */
 async function uploadWithAuth(path, formData, roleHint = null) {
   const token = roleHint ? getAccessToken(roleHint) : getAccessToken();
   const csrf = await ensureCsrfToken();
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetchWithNetworkRetry(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -275,6 +332,14 @@ export const getRefreshToken = (role = null) => {
  */
 let _refreshPromise = null;
 
+const FATAL_AUTH_CODES = new Set([
+  'TOKEN_VERSION_MISMATCH',
+  'UNAUTHORIZED',
+  'TOKEN_REVOKED',
+  'REFRESH_REUSE',
+  'DEVICE_CONFLICT',
+]);
+
 const redirectToLogin = (prefix) => {
   if (typeof window === 'undefined') return;
   const target = prefix === 'admin' || prefix === 'staff' ? '/admin/login' : '/login';
@@ -289,11 +354,11 @@ const tryRefreshAccessToken = async () => {
   _refreshPromise = (async () => {
     const role = getRolePrefix();
     const refresh = getRefreshToken(role);
-    if (!refresh) return null;
+    if (!refresh) return { ok: false, fatal: true };
 
     try {
       const csrf = await ensureCsrfToken();
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
+      const res = await fetchWithNetworkRetry(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -303,7 +368,12 @@ const tryRefreshAccessToken = async () => {
         body: JSON.stringify({ refreshToken: refresh }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok || !body?.success || !body.accessToken) return null;
+      if (!res.ok || !body?.success || !body.accessToken) {
+        return {
+          ok: false,
+          fatal: !!(body?.code && FATAL_AUTH_CODES.has(body.code)) || res.status === 401 || res.status === 403,
+        };
+      }
 
       const nextRefresh = body.refreshToken || refresh;
       setTokens(body.accessToken, nextRefresh, role);
@@ -320,9 +390,12 @@ const tryRefreshAccessToken = async () => {
         }
       } catch { /* noop */ }
 
-      return body.accessToken;
-    } catch {
-      return null;
+      return { ok: true, accessToken: body.accessToken };
+    } catch (err) {
+      if (isNetworkFetchError(err)) {
+        return { ok: false, network: true };
+      }
+      return { ok: false, fatal: false, network: true };
     }
   })();
 
@@ -332,14 +405,6 @@ const tryRefreshAccessToken = async () => {
     _refreshPromise = null;
   }
 };
-
-const FATAL_AUTH_CODES = new Set([
-  'TOKEN_VERSION_MISMATCH',
-  'UNAUTHORIZED',
-  'TOKEN_REVOKED',
-  'REFRESH_REUSE',
-  'DEVICE_CONFLICT',
-]);
 
 /** Xóa tenant filter lỗi trên trình duyệt + báo UI reset về "Tất cả" */
 export function clearSelectedTenantId() {
@@ -377,11 +442,17 @@ export const apiFetch = async (endpoint, options = {}) => {
   };
 
   const activeToken = getAccessToken();
-  let res = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: await buildHeaders(activeToken),
-  });
+  let res;
+  try {
+    res = await fetchWithNetworkRetry(url, {
+      ...options,
+      credentials: 'include',
+      headers: await buildHeaders(activeToken),
+    });
+  } catch (err) {
+    if (isNetworkFetchError(err)) throw err;
+    throw new NetworkOfflineError(err?.message || 'Không kết nối được máy chủ');
+  }
 
   // Tenant lưu localStorage không còn tồn tại / bị khóa → xóa để dừng spam 400
   if (res.status === 400) {
@@ -409,10 +480,19 @@ export const apiFetch = async (endpoint, options = {}) => {
     const raw = parseInt(res.headers.get('Retry-After') || '', 10);
     const waitSec = Number.isFinite(raw) && raw > 0 ? raw : 2 + (options._rateRetryCount || 0);
     const waitMs = Math.min(Math.max(waitSec * 1000, 1000), 12000);
-    await new Promise((r) => setTimeout(r, waitMs));
+    await sleep(waitMs);
     return apiFetch(endpoint, {
       ...options,
       _rateRetryCount: (options._rateRetryCount || 0) + 1,
+    });
+  }
+
+  // Server tạm thời (502/503/504) → retry ngắn, không logout
+  if ([502, 503, 504].includes(res.status) && (options._serverRetryCount || 0) < 2) {
+    await sleep(800 * (1 + (options._serverRetryCount || 0)));
+    return apiFetch(endpoint, {
+      ...options,
+      _serverRetryCount: (options._serverRetryCount || 0) + 1,
     });
   }
 
@@ -434,20 +514,19 @@ export const apiFetch = async (endpoint, options = {}) => {
   }
 
   // TOKEN_EXPIRED hoặc 401 thường → thử refresh
-  const newToken = await tryRefreshAccessToken();
-  if (!newToken) {
+  const refreshed = await tryRefreshAccessToken();
+  if (refreshed?.network) {
+    // Mất mạng khi refresh → giữ phiên, báo UI, không đá về login
+    throw new NetworkOfflineError('Mất kết nối khi làm mới phiên đăng nhập');
+  }
+  if (!refreshed?.ok || !refreshed.accessToken) {
     const prefix = getRolePrefix();
     clearTokens(prefix);
     redirectToLogin(prefix);
     return res;
   }
 
-  return fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: await buildHeaders(newToken),
-    _retried: true,
-  });
+  return apiFetch(endpoint, { ...options, _retried: true });
 };
 
 // ─── AUTH API ───────────────────────────────────────────────────────────────

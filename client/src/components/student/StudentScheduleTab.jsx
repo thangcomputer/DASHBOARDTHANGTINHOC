@@ -14,7 +14,7 @@ export default function StudentScheduleTab({
   displayGrades,
 }) {
   return (
-          <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 space-y-4">
+          <div className="w-full max-w-5xl mx-auto px-1 sm:px-4 md:px-8 py-4 sm:py-6 space-y-4">
             <CourseSwitcher
               courses={enrollments}
               activeCourseName={activeCourseName || viewStudent.course}

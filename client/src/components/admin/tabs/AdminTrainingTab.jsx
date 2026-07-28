@@ -43,7 +43,7 @@ export default function AdminTrainingTab() {
               ) : (
                 <>
               {/* Sub-tabs */}
-              <div className="cms-table-wrap rounded-2xl p-1.5 shadow-sm border border-gray-100">
+              <div className="cms-hscroll-tabs rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
                 <div className="flex gap-2 min-w-max">
                 {[
                   { key: 'videos', icon: Video, label: 'Quản lý Khóa học', count: trainingData?.videos?.length || 0 },
@@ -53,7 +53,7 @@ export default function AdminTrainingTab() {
                   { key: 'exam-results-gv', icon: Trophy, label: 'Kết quả thi', count: (teachers || []).filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked').length },
                 ].map(t => (
                   <button key={t.key} onClick={() => { setTrainingTab(t.key); setTrainingForm(null); }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
                       trainingTab === t.key
                         ? t.key === 'exam-results-gv' ? 'bg-amber-600 text-white shadow-md' : 'bg-purple-600 text-white shadow-md'
                         : 'text-gray-500 hover:bg-gray-100'

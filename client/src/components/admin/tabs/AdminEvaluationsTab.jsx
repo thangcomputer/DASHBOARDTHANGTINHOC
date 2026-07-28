@@ -10,18 +10,18 @@ export default function AdminEvaluationsTab() {
   const navigate = useNavigate();
 
   return (
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-red-50 to-white">
-                  <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <AlertTriangle size={20} className="text-red-500" />
-                    Báo Cáo Đánh Giá Chất Lượng Nội Bộ (Milestone)
+            <div className="space-y-4 sm:space-y-6">
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full max-w-full">
+                <div className="px-3 sm:px-6 py-4 sm:py-5 border-b border-gray-100 bg-gradient-to-r from-red-50 to-white">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-800 flex items-start sm:items-center gap-2 min-w-0">
+                    <AlertTriangle size={20} className="text-red-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+                    <span className="break-anywhere">Báo Cáo Đánh Giá Chất Lượng Nội Bộ (Milestone)</span>
                   </h2>
                   <p className="text-xs text-gray-400 mt-1">Đây là các đánh giá riêng tư từ học viên được gửi trực tiếp cho Admin tại các mốc Buổi 1 và 50% khóa học.</p>
                 </div>
                 <div className="divide-y divide-gray-50">
                   {getPrivateEvaluationsForAdmin().length === 0 ? (
-                    <div className="p-20 text-center animate-in fade-in duration-700">
+                    <div className="p-10 sm:p-20 text-center animate-in fade-in duration-700">
                       <div className="w-20 h-20 bg-gray-50 rounded-[32px] flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-sm">
                         <ShieldAlert size={32} className="text-gray-200" />
                       </div>
@@ -29,10 +29,10 @@ export default function AdminEvaluationsTab() {
                       <p className="text-gray-400 text-sm max-w-xs mx-auto">Phản hồi bí mật từ học viên về chất lượng giảng dạy sẽ xuất hiện tại đây.</p>
                     </div>
                   ) : getPrivateEvaluationsForAdmin().map(ev => (
-                    <div key={ev.id} className={`p-6 transition-colors border-l-4 ${ev.read ? 'border-transparent hover:bg-gray-50' : 'border-red-500 bg-red-50/30'}`}>
-                      <div className="flex flex-col md:flex-row justify-between gap-4">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-2">
+                    <div key={ev.id} className={`p-3 sm:p-6 transition-colors border-l-4 ${ev.read ? 'border-transparent hover:bg-gray-50' : 'border-red-500 bg-red-50/30'}`}>
+                      <div className="flex flex-col md:flex-row justify-between gap-4 min-w-0">
+                        <div className="space-y-2 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
                             {!ev.read && <span className="bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded animate-pulse">MỚI</span>}
                             <span className={`text-xs font-black px-2 py-0.5 rounded-full ${ev.milestone === 'lesson_1' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                               {ev.milestone === 'lesson_1' ? 'BUỔI ĐẦU TIÊN' : ev.milestone === 'manual_feedback' ? 'PHẢN HỒI TỰ NGUYỆN' : 'MỐC 50% KHÓA'}

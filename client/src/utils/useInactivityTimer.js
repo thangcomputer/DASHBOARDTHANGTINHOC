@@ -51,6 +51,11 @@ export function useInactivityTimer({ onLogout, enabled = true }) {
     timerRef.current = setTimeout(() => {
       setWarningVisible(false);
       if (countdownRef.current) clearInterval(countdownRef.current);
+      // Offline: hoãn logout, reset mốc hoạt động để không đá user vì blip mạng
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        resetActivity();
+        return;
+      }
       onLogout('inactivity');
     }, INACTIVITY_LIMIT);
   }, [enabled, onLogout]);
@@ -59,13 +64,17 @@ export function useInactivityTimer({ onLogout, enabled = true }) {
   useEffect(() => {
     if (!enabled) return;
 
-    // Kiểm tra khi load: nếu đã quá hạn → logout ngay
+    // Kiểm tra khi load: nếu đã quá hạn → logout ngay (trừ khi đang offline)
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const elapsed = Date.now() - Number(saved);
       if (elapsed >= INACTIVITY_LIMIT) {
-        onLogout('inactivity');
-        return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          resetActivity();
+        } else {
+          onLogout('inactivity');
+          return;
+        }
       }
     }
 

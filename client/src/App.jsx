@@ -31,11 +31,12 @@ const TenantManagementPage = lazy(() => import('./components/TenantManagementPag
 const PublicPaymentPage = lazy(() => import('./components/PublicPaymentPage'));
 const FeedBoard = lazy(() => import('./components/FeedBoard'));
 import DashboardLayout                       from './components/DashboardLayout';
-import api, { clearTokens, getRolePrefix } from './services/api';
+import api, { clearTokens, getRolePrefix, NetworkOfflineError } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
 import { BranchProvider }                    from './context/BranchContext';
 import LoadingScreen                         from './components/LoadingScreen';
 import PopupBanner                           from './components/PopupBanner';
+import OfflineBanner                         from './components/OfflineBanner';
 import { ModalProvider, useModal }           from './utils/Modal.jsx';
 import SecurityGuard                         from './components/SecurityGuard';
 import FaviconSwitcher                       from './components/FaviconSwitcher';
@@ -381,6 +382,8 @@ function App() {
 
   // ── Inactivity Timer: tự động logout sau 60 phút không dùng ────────────────
   const handleInactivityLogout = useCallback(async () => {
+    // Đang offline → không logout (tránh đá user khi mạng tụt giữa phiên)
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
     const role = session?.role;
     try { await api.auth.logout(); } catch { /* ignore */ }
@@ -430,7 +433,10 @@ function App() {
           setSession(null);
         }
       } catch (err) {
-        if (err.status === 401) {
+        // Mất mạng / server unreachable → giữ phiên local, không đá về login
+        if (err?.name === 'NetworkOfflineError' || err instanceof NetworkOfflineError || err?.isNetworkError) {
+          setSession(savedUser);
+        } else if (err.status === 401) {
           clearTokens(savedUser.role);
           setSession(null);
         } else {
@@ -490,6 +496,7 @@ function App() {
   return (
     <ErrorBoundary>
         <LoadingScreen />
+        <OfflineBanner />
         {/* ── Cảnh báo sắp hết phiên (5 phút cuối) ── */}
         <InactivityWarning
           visible={warningVisible}

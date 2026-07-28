@@ -16,6 +16,15 @@ function getRedis() {
       maxRetriesPerRequest: 2,
       enableReadyCheck: true,
       lazyConnect: false,
+      // Blip Redis không được crash Node — tự reconnect với backoff
+      retryStrategy(times) {
+        if (times > 30) return Math.min(times * 200, 10000);
+        return Math.min(times * 150, 3000);
+      },
+      reconnectOnError(err) {
+        const msg = String(err?.message || '');
+        return msg.includes('READONLY') || msg.includes('ECONNRESET') || msg.includes('ETIMEDOUT');
+      },
     });
     client.on('connect', () => logger.info('Redis connected'));
     client.on('error', (err) => {
