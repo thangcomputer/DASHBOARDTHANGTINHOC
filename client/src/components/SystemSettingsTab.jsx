@@ -341,7 +341,7 @@ export default function SystemSettingsTab() {
     { key: 'pricing',  label: 'Học phí Khóa học',       icon: DollarSign  },
     { key: 'branches', label: 'Chi nhánh / Cơ sở',      icon: Building2   },
     { key: 'popup',    label: 'Popup Thông báo',         icon: Bell        },
-    { key: 'invoice',  label: 'Hóa đơn (Invoice)',       icon: FileText    },
+    { key: 'invoice',  label: 'Hóa đơn',                 icon: FileText    },
     { key: 'web',      label: 'Cài đặt Web',             icon: Settings    },
     { key: 'account',  label: 'Tài khoản Admin',         icon: Lock        },
   ];
@@ -378,28 +378,30 @@ export default function SystemSettingsTab() {
         </button>
       </div>
 
-      {/* Sub-nav dọc + nội dung */}
-      <div className="flex flex-col md:flex-row gap-4 md:gap-5 items-stretch">
+      {/* Sub-nav ngang + nội dung */}
+      <div className="flex flex-col gap-4">
         <nav
           aria-label="Mục cài đặt"
-          className="md:w-56 lg:w-60 flex-shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-2 md:sticky md:top-4 md:self-start"
+          className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5"
         >
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-wrap gap-1 w-full">
             {TABS.map(t => {
               const active = activeSubTab === t.key;
               return (
                 <button
                   key={t.key}
                   type="button"
+                  title={t.label}
+                  aria-label={t.label}
                   onClick={() => setActiveSubTab(t.key)}
-                  className={`flex items-center gap-2.5 w-full text-left px-3.5 py-2.5 text-sm font-bold rounded-xl transition ${
+                  className={`inline-flex items-center justify-center gap-1.5 flex-1 basis-0 min-w-[2.75rem] px-2 sm:px-3 py-2.5 text-sm font-bold rounded-xl transition ${
                     active
                       ? 'text-red-700 bg-red-50 ring-1 ring-red-200'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <t.icon size={15} className={`flex-shrink-0 ${active ? 'text-red-600' : 'text-gray-400'}`} />
-                  <span className="leading-snug">{t.label}</span>
+                  <t.icon size={16} className={`flex-shrink-0 ${active ? 'text-red-600' : 'text-gray-400'}`} aria-hidden="true" />
+                  <span className="hidden min-[640px]:inline leading-snug truncate">{t.label}</span>
                 </button>
               );
             })}

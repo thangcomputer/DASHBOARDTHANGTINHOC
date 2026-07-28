@@ -788,7 +788,9 @@
   border-top: 1px solid var(--cms-border);
   background: var(--cms-surface);
   flex-shrink: 0;
+  margin-top: auto;
   z-index: 2;
+  position: relative;
 }
 .cms-sheet-footer > .cms-btn {
   flex: 1 1 0;
@@ -881,8 +883,13 @@
 }
 .cms-chip-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+@media (max-width: 379.98px) {
+  .cms-chip-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .cms-chip-option {
   display: inline-flex;
@@ -898,7 +905,14 @@
   color: var(--cms-neutral-800);
   cursor: pointer;
   text-align: left;
+  min-width: 0;
   transition: border-color var(--cms-duration) ease, background var(--cms-duration) ease;
+}
+.cms-chip-option > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cms-chip-check {
   width: 16px;
@@ -1005,11 +1019,13 @@
     right: auto;
     bottom: auto;
     top: 50%;
+    /* Prefer inset centering without sticky/transform clash on iPad */
     transform: translate(-50%, -50%);
     width: min(96vw, var(--cms-modal-max));
     max-height: min(88vh, 880px);
     border-radius: var(--cms-r-sheet);
     animation: cms-modal-pop var(--cms-duration) var(--cms-ease);
+    overflow: hidden;
   }
   .cms-sheet-handle { display: none; }
   .cms-sheet.md\:max-w-2xl,
@@ -1776,11 +1792,9 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 .cms-rbac-perm-search {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 2;
-  background: color-mix(in srgb, var(--cms-surface) 92%, transparent);
-  backdrop-filter: blur(8px);
+  background: var(--cms-surface);
   padding-bottom: 8px;
 }
 .cms-rbac-perm-search-inner { position: relative; }

@@ -74,7 +74,7 @@ export default function AddTeacherModal({
                 value={teacherForm.email || ''}
                 onChange={(e) => setTeacherForm((p) => ({ ...p, email: e.target.value }))}
                 className={inputClass}
-                placeholder="email@example.com"
+                placeholder="vd: ten@email.com"
               />
             </div>
 
@@ -162,7 +162,7 @@ export default function AddTeacherModal({
             )}
 
             <p className="text-[13px] text-slate-600 bg-sky-50 border border-sky-100 rounded-xl p-3.5 leading-relaxed">
-              Giảng viên sau khi được tạo sẽ ở trạng thái <strong>&quot;Chưa cấp quyền&quot; (Inactive)</strong>.
+              Giảng viên sau khi được tạo sẽ ở trạng thái <strong>&quot;Chưa cấp quyền&quot;</strong>.
               Admin cần duyệt cấp quyền thì họ mới có thể đăng nhập bằng SĐT.
             </p>
           </section>

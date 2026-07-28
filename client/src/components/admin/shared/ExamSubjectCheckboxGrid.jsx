@@ -48,7 +48,7 @@ export default function ExamSubjectCheckboxGrid({
               >
                 ✓
               </span>
-              <span className="min-w-0 leading-snug">{label}</span>
+              <span className="min-w-0 truncate leading-snug" title={label}>{label}</span>
             </label>
           );
         })}

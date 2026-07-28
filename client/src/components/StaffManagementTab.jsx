@@ -250,7 +250,7 @@ function StaffModal({ staff, onClose, onSaved }) {
                 aria-labelledby="rbac-role-label"
               >
                 {[
-                  { val: 'SUPER_ADMIN', label: 'Super Admin', icon: Crown },
+                  { val: 'SUPER_ADMIN', label: 'Quản trị viên', icon: Crown },
                   { val: 'STAFF', label: 'Nhân viên', icon: UserCog },
                 ].map(({ val, label, icon: Icon }) => (
                   <button
@@ -276,7 +276,7 @@ function StaffModal({ staff, onClose, onSaved }) {
             {!isStaff && (
               <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-[13px] text-amber-800 flex items-start gap-2">
                 <Crown size={14} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <span>Super Admin quản lý <strong>toàn bộ hệ thống</strong>, không bị giới hạn theo chi nhánh.</span>
+                <span>Quản trị viên quản lý <strong>toàn bộ hệ thống</strong>, không bị giới hạn theo chi nhánh.</span>
               </div>
             )}
           </section>
@@ -412,7 +412,7 @@ function StaffModal({ staff, onClose, onSaved }) {
 
             {!isStaff && (
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-[13px] text-slate-500 leading-relaxed">
-                Tài khoản Super Admin không cần gán chi nhánh hay tick quyền module — mặc định toàn quyền.
+                Tài khoản quản trị viên không cần gán chi nhánh hay tick quyền module — mặc định toàn quyền.
               </div>
             )}
           </section>

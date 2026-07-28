@@ -575,7 +575,7 @@ export default function CoursePricingTab() {
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3 text-[13px] text-amber-900 flex items-start gap-2.5 leading-relaxed">
         <AlertCircle size={15} className="flex-shrink-0 mt-0.5 text-amber-600" />
         <span>
-          <strong className="font-semibold">Price Snapshot:</strong> Học viên đã đăng ký trước giữ nguyên giá cũ.
+          <strong className="font-semibold">Lưu ý giá cũ:</strong> Học viên đã đăng ký trước giữ nguyên giá cũ.
           Điều chỉnh từng học viên → Quản lý Học viên.
         </span>
       </div>
