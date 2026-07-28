@@ -16,8 +16,7 @@ import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
 import { ALL_PERMISSIONS } from '../constants/permissions';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
-
-const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
+import { staffAPI, apiFetch } from '../services/api';
 
 /** Nhóm quyền để Accordion UI — không đổi key/API */
 const PERMISSION_GROUPS = [
@@ -29,16 +28,6 @@ const PERMISSION_GROUPS = [
   { id: 'hr', title: 'Nhân sự', icon: '👤', keys: ['manage_hr', 'manage_staff'] },
   { id: 'system', title: 'Hệ thống', icon: '⚙️', keys: ['system_settings', 'view_logs', 'view_evaluations'] },
 ];
-
-function getToken() {
-  for (const role of ['admin','staff','teacher']) {
-    const directToken = localStorage.getItem(`${role}_access_token`);
-    if (directToken) return directToken;
-    const s = localStorage.getItem(`${role}_user`);
-    if (s) { try { const u = JSON.parse(s); if (u?.token) return u.token; } catch {} }
-  }
-  return '';
-}
 
 function RoleBadge({ adminRole }) {
   if (adminRole === 'SUPER_ADMIN') {
@@ -87,11 +76,9 @@ function StaffModal({ staff, onClose, onSaved }) {
 
   useEffect(() => {
     setBranchLoading(true);
-    fetch(`${API}/api/branches/all`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    })
-      .then(r => r.json())
-      .then(res => { if (res.success) setBranches(res.data || []); })
+    apiFetch('/branches/all')
+      .then((r) => r.json())
+      .then((res) => { if (res.success) setBranches(res.data || []); })
       .catch(() => {})
       .finally(() => setBranchLoading(false));
   }, []);
@@ -118,16 +105,13 @@ function StaffModal({ staff, onClose, onSaved }) {
 
     setSaving(true);
     try {
-      const url    = isEdit ? `${API}/api/staff/${staff._id}` : `${API}/api/staff`;
-      const method = isEdit ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({
-          ...form,
-          branchId: form.adminRole === 'SUPER_ADMIN' ? null : (form.branchId || null),
-        }),
-      }).then(r => r.json());
+      const payload = {
+        ...form,
+        branchId: form.adminRole === 'SUPER_ADMIN' ? null : (form.branchId || null),
+      };
+      const res = isEdit
+        ? await staffAPI.update(staff._id, payload)
+        : await staffAPI.create(payload);
 
       if (res.success) {
         toast.success(isEdit ? '✅ Đã cập nhật phân quyền' : '✅ Đã tạo tài khoản mới');
@@ -136,8 +120,8 @@ function StaffModal({ staff, onClose, onSaved }) {
       } else {
         toast.error(res.message || 'Lỗi lưu dữ liệu');
       }
-    } catch {
-      toast.error('Lỗi kết nối server');
+    } catch (err) {
+      toast.error(err?.message || 'Lỗi kết nối server');
     } finally {
       setSaving(false);
     }
@@ -442,7 +426,7 @@ function StaffModal({ staff, onClose, onSaved }) {
             type="button"
             onClick={handleSubmit}
             disabled={saving}
-            className="cms-btn cms-btn-secondary flex-[1.4]"
+            className="cms-btn cms-btn-primary flex-[1.4]"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? 'Đang lưu...' : (isEdit ? 'Lưu' : 'Tạo tài khoản')}
@@ -635,11 +619,8 @@ export default function StaffManagementTab() {
 
   const fetchStaff = useCallback(() => {
     setLoading(true);
-    fetch(`${API}/api/staff`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    })
-      .then(r => r.json())
-      .then(res => { if (res.success) setStaffList(res.data); })
+    staffAPI.getAll()
+      .then((res) => { if (res.success) setStaffList(res.data); })
       .catch(() => toast.error('Không tải được danh sách nhân viên'))
       .finally(() => setLoading(false));
   }, []);
@@ -656,17 +637,16 @@ export default function StaffManagementTab() {
       onConfirm: async () => {
         setDeleting(s._id);
         try {
-          const res = await fetch(`${API}/api/staff/${s._id}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${getToken()}` },
-          }).then(r => r.json());
+          const res = await staffAPI.remove(s._id);
           if (res.success) {
             setStaffList(prev => prev.filter(x => x._id !== s._id));
             toast.success(`🗑️ Đã xóa "${s.name}"`);
           } else {
             toast.error(res.message);
           }
-        } catch { toast.error('Lỗi kết nối'); }
+        } catch (err) {
+          toast.error(err?.message || 'Lỗi kết nối');
+        }
         finally { setDeleting(null); }
       }
     });
