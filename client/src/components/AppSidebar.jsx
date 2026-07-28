@@ -547,15 +547,15 @@ const AppSidebar = ({
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="lg:hidden fixed z-[70] w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] bg-white rounded-xl shadow-lg border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform"
+          className="lg:hidden fixed z-[70] w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] bg-white rounded-xl shadow-md border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform duration-200"
           style={{
-            top: 'max(0.75rem, env(safe-area-inset-top, 0px))',
+            top: 'calc(env(safe-area-inset-top, 0px) + 0.625rem)',
             left: 'max(0.75rem, env(safe-area-inset-left, 0px))',
           }}
           aria-label="Mở menu điều hướng"
           aria-expanded={false}
         >
-          <Menu size={20} />
+          <Menu size={18} />
         </button>
       )}
 

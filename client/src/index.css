@@ -221,7 +221,18 @@
   }
 
   .cms-stat-grid {
-    @apply grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6;
+    @apply grid grid-cols-2 lg:grid-cols-4 gap-3;
+  }
+
+  /* Student dashboard mobile density */
+  .cms-sd {
+    --cms-sd-gap: 1rem;
+    --cms-sd-radius: 1rem;
+  }
+  @media (max-width: 639.98px) {
+    .cms-sd {
+      --cms-sd-gap: 0.875rem;
+    }
   }
 
   .cms-toolbar {

@@ -54,31 +54,31 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
   const isToday = (d) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
       {/* Lịch tháng */}
-      <div className="lg:col-span-7 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col gap-3 xs:flex-row xs:items-center xs:justify-between min-w-0">
-          <h3 className="font-extrabold text-slate-800 uppercase tracking-tight">Lịch theo tháng</h3>
-          <div className="flex items-center gap-2">
-            <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 transition">
-              <ChevronRight size={18} className="text-slate-500 rotate-180" />
+      <div className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-w-0">
+        <div className="px-3.5 sm:px-5 py-3 border-b border-slate-100 flex flex-col gap-2 xs:flex-row xs:items-center xs:justify-between min-w-0">
+          <h3 className="text-base font-extrabold text-slate-800 uppercase tracking-tight">Lịch theo tháng</h3>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={prevMonth} className="w-9 h-9 rounded-lg hover:bg-slate-100 transition-colors duration-200 flex items-center justify-center" aria-label="Tháng trước">
+              <ChevronRight size={16} className="text-slate-500 rotate-180" aria-hidden="true" />
             </button>
-            <span className="text-sm font-bold text-slate-700 min-w-[120px] text-center">
+            <span className="text-sm font-bold text-slate-700 min-w-[7.5rem] text-center tabular-nums">
               {monthNames[month]} {year}
             </span>
-            <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-slate-100 transition">
-              <ChevronRight size={18} className="text-slate-500" />
+            <button type="button" onClick={nextMonth} className="w-9 h-9 rounded-lg hover:bg-slate-100 transition-colors duration-200 flex items-center justify-center" aria-label="Tháng sau">
+              <ChevronRight size={16} className="text-slate-500" aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-7 text-center px-2 sm:px-4 pt-4">
+        <div className="grid grid-cols-7 text-center px-1.5 sm:px-3 pt-2.5">
           {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((d, i) => (
-            <div key={d} className={`text-xs font-black py-2 cms-min-text-xs ${i === 0 ? 'text-red-500' : 'text-slate-400'}`}>{d}</div>
+            <div key={d} className={`text-[10px] sm:text-xs font-black py-1.5 ${i === 0 ? 'text-red-500' : 'text-slate-400'}`}>{d}</div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 px-2 sm:px-4 pb-4 sm:pb-6 gap-0.5 sm:gap-1 md:gap-2">
+        <div className="grid grid-cols-7 px-1.5 sm:px-3 pb-3 sm:pb-4 gap-0.5 sm:gap-1">
           {days.map((day, idx) => {
             if (!day) return <div key={`empty-${idx}`} />;
             const hasSchedule = scheduleMap[day]?.length > 0;
@@ -88,27 +88,26 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
             const isSelected = activeDate === day;
 
             return (
-              <button key={day} onClick={() => setSelectedDate(day === selectedDate ? null : day)}
-                className={`relative aspect-square min-h-[2.25rem] rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-xs sm:text-sm font-bold transition-all ${
-                  isSelected ? 'bg-red-600 text-white shadow-xl ring-4 ring-blue-100 scale-105 z-10' :
-                  isToday(day) ? 'bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200' :
+              <button key={day} type="button" onClick={() => setSelectedDate(day === selectedDate ? null : day)}
+                className={`relative aspect-square min-h-[2rem] sm:min-h-[2.25rem] rounded-xl flex flex-col items-center justify-center text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 ${
+                  isSelected ? 'bg-red-600 text-white shadow-md ring-2 ring-red-100 z-10' :
+                  isToday(day) ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' :
                   hasSchedule ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'text-slate-600 hover:bg-slate-50'
                 }`}>
                 {day}
                 {hasSchedule && (
-                  <div className="flex gap-1 mt-1 flex-wrap justify-center px-1">
-                    {daySchedules.filter(s => s.status === 'scheduled').slice(0,2).map((s, idx) => (
-                      <div key={'s-'+s.id+idx} className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-amber-500'} shadow-sm`} />
+                  <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center px-0.5">
+                    {daySchedules.filter(s => s.status === 'scheduled').slice(0,2).map((s, sidx) => (
+                      <div key={'s-'+s.id+sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-amber-500'}`} />
                     ))}
-                    {daySchedules.filter(s => s.status === 'completed').slice(0,2).map((s, idx) => (
-                      <div key={'c-'+s.id+idx} className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'} shadow-sm`} />
+                    {daySchedules.filter(s => s.status === 'completed').slice(0,2).map((s, sidx) => (
+                      <div key={'c-'+s.id+sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} />
                     ))}
-                    {daySchedules.filter(s => s.status === 'cancelled').slice(0,2).map((s, idx) => (
-                      <div key={'x-'+s.id+idx} className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-red-500'} shadow-sm`} />
+                    {daySchedules.filter(s => s.status === 'cancelled').slice(0,2).map((s, sidx) => (
+                      <div key={'x-'+s.id+sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-red-500'}`} />
                     ))}
                   </div>
                 )}
-                {/* Diagonal line for full-cancelled days */}
                 {!isSelected && daySchedules.length > 0 && daySchedules.every(s => s.status === 'cancelled') && (
                   <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
                     <div className="absolute top-0 left-0 w-full h-full" style={{ background: 'repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(239,68,68,0.15) 4px, rgba(239,68,68,0.15) 5px)' }} />
@@ -120,32 +119,34 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
         </div>
 
         {/* Legend */}
-        <div className="px-4 sm:px-6 pb-4 flex flex-wrap gap-3 sm:gap-5 text-xs text-gray-500 border-t border-gray-50 pt-4 mt-2">
-          <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-500" /> Đã học xong</span>
-          <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-500" /> Sắp diễn ra</span>
-          <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-500" /> Đã hủy</span>
+        <div className="px-3.5 sm:px-5 pb-3 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] sm:text-xs text-gray-500 border-t border-gray-50 pt-3 mt-1">
+          <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-emerald-500" /> Đã học xong</span>
+          <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-amber-500" /> Sắp diễn ra</span>
+          <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-red-500" /> Đã hủy</span>
         </div>
       </div>
 
       {/* Chi tiết lịch */}
-      <div className="lg:col-span-5 space-y-4">
-        <div className="bg-gradient-to-br from-[#203DB5] to-[#1E3A8A] rounded-3xl p-6 text-white shadow-xl">
-          <p className="text-blue-200 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Calendar size={14} className="text-yellow-400" />
-            {activeDate
-              ? (isShowingToday
-                ? `Hôm nay — ${today.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}`
-                : `Ngày ${activeDate}/${month + 1}/${year}`)
-              : 'Chọn ngày để xem lịch'
-            }
+      <div className="lg:col-span-5 space-y-3 sm:space-y-4 min-w-0">
+        <div className="bg-gradient-to-br from-[#203DB5] to-[#1E3A8A] rounded-2xl p-4 sm:p-6 text-white shadow-md">
+          <p className="text-blue-200 text-xs font-bold uppercase tracking-wide mb-3 flex items-center gap-2 leading-snug">
+            <Calendar size={14} className="text-yellow-400 shrink-0" aria-hidden="true" />
+            <span className="min-w-0">
+              {activeDate
+                ? (isShowingToday
+                  ? `Hôm nay — ${today.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}`
+                  : `Ngày ${activeDate}/${month + 1}/${year}`)
+                : 'Chọn ngày để xem lịch'
+              }
+            </span>
           </p>
           
           {selectedSchedules.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {selectedSchedules.map(s => (
-                <div key={s.id} className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/20 transition-all">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-extrabold text-base leading-tight">{s.topic || s.course}</h4>
+                <div key={s.id} className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10 hover:bg-white/20 transition-all duration-200">
+                  <div className="flex justify-between items-start gap-2 mb-1.5">
+                    <h4 className="font-extrabold text-sm sm:text-base leading-snug line-clamp-2 min-w-0">{s.topic || s.course}</h4>
                     {(() => {
                       let text = 'SẮP HỌC';
                       let style = 'bg-blue-400/20 text-blue-200';
@@ -153,26 +154,26 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
                       else if (s.status === 'cancelled') { text = 'ĐÃ HỦY'; style = 'bg-red-400/20 text-red-300'; }
                       else if (s.status === 'no_show') { text = 'VẮNG MẶT'; style = 'bg-orange-400/20 text-orange-300'; }
                       else if (isScheduleOngoingNow(s)) { text = 'ĐANG DIỄN RA'; style = 'bg-green-400/30 text-green-200 ring-1 ring-green-300/40'; }
-                      return <span className={`text-xs cms-min-text-xs font-black px-2 py-1 rounded-lg uppercase whitespace-nowrap ${style}`}>{text}</span>;
+                      return <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase whitespace-nowrap shrink-0 ${style}`}>{text}</span>;
                     })()}
                   </div>
                   <p className="text-blue-100 text-xs font-semibold">🕐 {s.startTime} - {s.endTime}</p>
-                  <p className="text-blue-100 text-xs font-semibold mt-0.5">👤 GV: {s.teacherName}</p>
+                  <p className="text-blue-100 text-xs font-semibold mt-0.5 truncate">👤 GV: {s.teacherName}</p>
                   {s.note && (
-                    <p className="text-blue-200/80 text-xs mt-2 bg-white/5 p-2.5 rounded-xl border border-white/5 italic">
+                    <p className="text-blue-200/80 text-xs mt-2 bg-white/5 p-2 rounded-xl border border-white/5 italic leading-snug">
                       <span className="font-bold block text-blue-200/90 mb-0.5">Ghi chú từ GV:</span> {s.note}
                     </p>
                   )}
                   {s.studentNote && (
-                    <p className="text-red-200 text-xs mt-2 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20 italic">
+                    <p className="text-red-200 text-xs mt-2 bg-red-500/10 p-2 rounded-xl border border-red-500/20 italic leading-snug">
                       <span className="font-bold block text-red-300 mb-0.5">Ghi chú của bạn:</span> {s.studentNote}
                     </p>
                   )}
                   
                   {s.status === 'scheduled' && (
-                    <div className="flex gap-2 mt-4">
+                    <div className="flex gap-2 mt-3">
                        {s.linkHoc && (
-                         <a href={s.linkHoc} target="_blank" rel="noreferrer" className="flex-1 bg-white text-blue-900 py-2.5 rounded-xl text-xs font-black text-center shadow-[0_4px_15px_rgba(0,0,0,0.1)] active:scale-95 transition-all">
+                         <a href={s.linkHoc} target="_blank" rel="noreferrer" className="flex-1 min-h-10 bg-white text-blue-900 py-2 rounded-xl text-xs font-black text-center shadow-sm active:scale-[0.98] transition-all duration-200 flex items-center justify-center">
                            VÀO LỚP
                          </a>
                        )}
@@ -183,7 +184,7 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
                            e.stopPropagation();
                            setNoteModalSched(s);
                          }}
-                         className="flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white py-2.5 rounded-xl text-xs font-black text-center transition-all relative z-10 cursor-pointer">
+                         className="flex-1 min-h-10 bg-white/10 hover:bg-white/20 border border-white/20 text-white py-2 rounded-xl text-xs font-black text-center transition-all duration-200 relative z-10 cursor-pointer active:scale-[0.98]">
                            GHI CHÚ / ĐỔI LỊCH
                        </button>
                     </div>
@@ -192,7 +193,7 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-6 text-blue-200/60 font-bold border-2 border-dashed border-white/10 rounded-2xl">
+            <div className="text-center py-5 text-blue-200/70 text-sm font-semibold border-2 border-dashed border-white/10 rounded-2xl">
               Không có lịch học ngày này.
             </div>
           )}

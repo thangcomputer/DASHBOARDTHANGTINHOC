@@ -1,13 +1,16 @@
 import React from 'react';
 
 export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
-  <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 min-w-0">
-    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-3 shadow-md`}>
-      <Icon size={18} className="text-white" />
+  <div className="cms-sd-stat bg-white rounded-2xl p-4 shadow-sm border border-gray-100 min-w-0 h-full flex flex-col transition-all duration-200 active:scale-[0.98] hover:shadow-md">
+    <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-2 shadow-sm shrink-0`}>
+      <Icon size={16} className="text-white" aria-hidden="true" />
     </div>
-    <p className="text-xs text-gray-500 font-medium">{label}</p>
-    <p className="text-xl sm:text-2xl font-black text-gray-800 leading-tight">
-      {value} <span className="text-xs font-normal text-gray-400">{sub}</span>
+    <p className="text-xs text-gray-500 font-medium leading-none">{label}</p>
+    <p className="mt-1.5 text-xl font-black text-gray-800 leading-none tabular-nums">
+      {value}
+      {sub != null && sub !== '' && (
+        <span className="text-xs font-normal text-gray-400 ml-1">{sub}</span>
+      )}
     </p>
   </div>
 );
@@ -15,9 +18,11 @@ export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
 export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
   if (!courses || courses.length <= 1) return null;
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 mb-6">
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Khóa học của bạn</p>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="cms-sd-courses mb-4 sm:mb-5">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 px-0.5">
+        Khóa học của bạn
+      </p>
+      <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain pb-1 -mx-0.5 px-0.5 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {courses.map((c) => {
           const name = c.courseName || c.name;
           const active = name === activeCourseName;
@@ -26,15 +31,24 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
               key={c.enrollmentId || c.id || name}
               type="button"
               onClick={() => onChange(name)}
-              className={`shrink-0 min-w-[140px] text-left px-4 py-3 rounded-xl border-2 transition-all ${
+              title={name}
+              className={`snap-start shrink-0 w-[min(88vw,20rem)] sm:w-[16rem] text-left px-4 py-3.5 rounded-2xl border-2 transition-all duration-200 active:scale-[0.98] ${
                 active
                   ? 'border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100'
-                  : 'border-slate-100 bg-slate-50 hover:border-slate-200'
+                  : 'border-slate-100 bg-white hover:border-slate-200 shadow-sm'
               }`}
             >
-              <p className={`text-sm font-black truncate ${active ? 'text-blue-800' : 'text-slate-800'}`}>{name}</p>
-              <p className="text-[10px] text-slate-500 mt-0.5 truncate">GV: {c.teacherName || 'Chưa phân công'}</p>
-              <p className="text-[10px] font-bold mt-1 text-slate-400">
+              <p
+                className={`text-sm font-bold leading-snug line-clamp-2 ${
+                  active ? 'text-blue-800' : 'text-slate-800'
+                }`}
+              >
+                {name}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5 truncate">
+                GV: {c.teacherName || 'Chưa phân công'}
+              </p>
+              <p className="text-xs font-semibold mt-1 text-slate-400 tabular-nums">
                 {c.completedSessions ?? 0}/{c.totalSessions ?? 12} buổi
               </p>
             </button>

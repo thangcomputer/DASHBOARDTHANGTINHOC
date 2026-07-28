@@ -266,17 +266,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <header className={`flex flex-col bg-white border-b border-slate-100 flex-shrink-0 z-40 safe-pad-top ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="h-14 sm:h-16 flex items-center gap-2 sm:gap-3 pl-[4.5rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-4 min-w-0">
+          <div className="h-[3.75rem] sm:h-16 flex items-center gap-1.5 sm:gap-3 pl-[4.25rem] sm:pl-20 lg:pl-6 pr-2 sm:pr-4 min-w-0">
             <div className="min-w-0 flex-1">
-              <h1 className="text-[16px] sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
-              <p className="text-[12px] text-slate-500 truncate leading-none mt-0.5">
+              <h1 className="text-base sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
+              <p className="text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5">
                 <span className="font-medium text-slate-600">{displayName}</span>
                 <span className="text-slate-300 mx-1">·</span>
                 <span>{roleLabel}</span>
               </p>
             </div>
 
-            <div className="flex items-center flex-nowrap justify-end gap-1 sm:gap-2 min-w-0 flex-shrink-0">
+            <div className="flex items-center flex-nowrap justify-end gap-0.5 sm:gap-2 min-w-0 flex-shrink-0">
               {showAdminBranch && (
                 <div className={isStudentsTab ? 'hidden lg:block' : 'hidden md:block'}>
                   <BranchFilterDropdown />
@@ -302,7 +302,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
                   aria-expanded={showNotif}
                   aria-haspopup="dialog"
-                  className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-colors duration-200 ${showNotif ? 'bg-red-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+                  className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-colors duration-200 ${showNotif ? 'bg-red-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
                 >
                   <Bell size={18} aria-hidden="true" />
                   {unreadCount > 0 && (
@@ -439,7 +439,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               {/* Mobile overflow: logout */}
               <details className="relative md:hidden">
                 <summary
-                  className="w-11 h-11 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center list-none cursor-pointer [&::-webkit-details-marker]:hidden"
+                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center list-none cursor-pointer [&::-webkit-details-marker]:hidden"
                   aria-label="Thêm tùy chọn"
                 >
                   <MoreVertical size={18} aria-hidden="true" />
@@ -469,7 +469,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           className={
             isImmersivePage
               ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-              : 'flex-1 min-h-0 px-2 py-2 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
+              : 'flex-1 min-h-0 px-2.5 py-1.5 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
           }
         >
           <div
