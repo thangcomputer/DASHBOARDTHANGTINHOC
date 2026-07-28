@@ -811,19 +811,178 @@
   border-radius: var(--cms-r-card);
   box-shadow: var(--cms-shadow);
 }
+.cms-feed-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+.cms-feed-composer__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.cms-feed-composer__avatar,
+.cms-feed-card__avatar {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 44px;
+  max-height: 44px;
+  border-radius: 999px;
+  object-fit: cover;
+  object-position: center;
+  flex-shrink: 0;
+  background: var(--cms-neutral-100);
+  border: 1px solid var(--cms-border);
+}
+.cms-feed-composer__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 72px;
+  resize: vertical;
+  padding: 12px 14px;
+  border-radius: var(--cms-r-input, 14px);
+  border: 1px solid var(--cms-border);
+  background: var(--cms-neutral-50);
+  color: var(--cms-neutral-900);
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  line-height: 1.45;
+}
+.cms-feed-composer__input:focus {
+  background: var(--cms-surface);
+  border-color: var(--cms-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cms-primary) 18%, transparent);
+}
+.cms-feed-composer__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cms-btn--media {
+  background: var(--cms-neutral-50);
+  color: var(--cms-neutral-800);
+  border-color: var(--cms-border);
+  min-height: 44px;
+}
+.cms-btn--media:hover:not(:disabled) {
+  background: var(--cms-neutral-100);
+}
+.cms-feed-card {
+  padding: 14px 0 8px;
+  overflow: hidden;
+}
+.cms-feed-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 14px 10px;
+}
+.cms-feed-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-bottom: 4px;
+}
+.cms-feed-card__author {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cms-neutral-900);
+  max-width: 100%;
+}
+.cms-feed-card__role {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1.2;
+}
+.cms-feed-card__time {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cms-neutral-500);
+}
+.cms-feed-card__body {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cms-neutral-800);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cms-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .cms-feed-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 8px;
+  border-top: 1px solid var(--cms-border);
+  margin-top: 4px;
+}
+.cms-feed-action__btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 40px;
-  padding: 0 8px;
+  padding: 0 10px;
   border-radius: var(--cms-r-btn);
   font-size: 13px;
   font-weight: 600;
   color: var(--cms-neutral-500);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
   transition: background var(--cms-duration) ease, color var(--cms-duration) ease;
 }
-.cms-feed-action:hover { background: var(--cms-neutral-100); }
+.cms-feed-action__btn:hover { background: var(--cms-neutral-100); }
+.cms-feed-action__btn--idle { color: var(--cms-neutral-500); }
+.cms-feed-action__btn--active { color: var(--cms-primary); background: color-mix(in srgb, var(--cms-primary) 8%, transparent); }
+.cms-feed-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cms-feed-skeleton-card { padding: 14px; }
+.cms-feed-skeleton-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.cms-skeleton--avatar {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.cms-feed-skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cms-feed-skeleton-lines::before,
+.cms-feed-skeleton-lines::after {
+  content: '';
+  display: block;
+  height: 12px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--cms-neutral-100) 25%, var(--cms-neutral-200) 37%, var(--cms-neutral-100) 63%);
+  background-size: 400% 100%;
+  animation: cms-shimmer 1.2s ease infinite;
+}
+.cms-feed-skeleton-lines::before { width: 55%; }
+.cms-feed-skeleton-lines::after { width: 90%; height: 48px; }
 .cms-skeleton {
   border-radius: var(--cms-r-card);
   background: linear-gradient(90deg, var(--cms-neutral-100) 25%, var(--cms-neutral-200) 37%, var(--cms-neutral-100) 63%);

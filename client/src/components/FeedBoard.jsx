@@ -375,21 +375,27 @@ export default function FeedBoard({ session, role }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
-            <Newspaper size={22} className="text-indigo-600" />
+            <Newspaper size={22} className="text-red-600" />
             Bảng tin hỏi bài
           </h2>
           <p className="text-xs text-slate-500 mt-1 font-medium">
             Đăng câu hỏi, chia sẻ ảnh bài tập — mọi người cùng xem và trả lời.
           </p>
         </div>
-        <button type="button" onClick={() => load(1, false)} className="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 flex items-center justify-center" title="Tải lại">
+        <button type="button" onClick={() => load(1, false)} className="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 flex items-center justify-center" title="Tải lại">
           <RefreshCw size={16} />
         </button>
       </div>
 
       <div className="cms-feed-composer">
         <div className="cms-feed-composer__row">
-          <img src={resolveAvatarUrl({ avatar: session?.avatar, role: meRole, adminRole: session?.adminRole })} alt="" className="cms-feed-composer__avatar" />
+          <img
+            src={resolveAvatarUrl({ avatar: session?.avatar, role: meRole, adminRole: session?.adminRole })}
+            alt=""
+            width={44}
+            height={44}
+            className="cms-feed-composer__avatar"
+          />
           <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2} maxLength={5000} placeholder="Bạn muốn hỏi gì về bài học? Viết câu hỏi tại đây..." className="cms-feed-composer__input" />
         </div>
         {previews.length > 0 && (
@@ -442,7 +448,13 @@ export default function FeedBoard({ session, role }) {
           {posts.map((post) => (
             <article key={post.id} className="cms-feed-card">
               <div className="cms-feed-card__head">
-                <img src={resolveAvatarUrl({ avatar: post.authorAvatar, role: post.authorRole })} alt="" className="cms-feed-card__avatar" />
+                <img
+                  src={resolveAvatarUrl({ avatar: post.authorAvatar, role: post.authorRole })}
+                  alt=""
+                  width={44}
+                  height={44}
+                  className="cms-feed-card__avatar"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="cms-feed-card__meta">
                     <span className="cms-feed-card__author truncate">{post.authorName}</span>
