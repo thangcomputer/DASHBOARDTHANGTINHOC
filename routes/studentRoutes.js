@@ -12,8 +12,6 @@ const {
   legacyEnrollmentFromStudent,
   studentMatchesTeacher,
   resolveEnrollmentExamSubjects,
-  recordAttendanceGrade,
-  normCourseName,
 } = require('../services/enrollmentService');
 
 // ─── GET /api/students ─────────────────────────────────────────────────────────
@@ -444,24 +442,17 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
       if (enrollmentCourse) {
         const doc = await Student.findById(req.params.id);
         if (doc?.enrollments?.length) {
-          const courseKey = normCourseName(enrollmentCourse);
-          const idx = doc.enrollments.findIndex((e) => normCourseName(e.courseName) === courseKey);
+          const idx = doc.enrollments.findIndex((e) => e.courseName === enrollmentCourse);
           if (idx >= 0) {
             const patchKeys = ['completedSessions', 'remainingSessions', 'lastGrade', 'avgGrade', 'grades', 'status', 'notes', 'linkHoc', 'nextClass', 'nextClassTime'];
             patchKeys.forEach((k) => {
               if (safeBody[k] !== undefined) doc.enrollments[idx][k] = safeBody[k];
             });
-            // Luôn đồng bộ grades/avg xuống root để HV chắc chắn thấy nhật ký
-            if (safeBody.grades !== undefined) doc.grades = safeBody.grades;
-            if (safeBody.avgGrade !== undefined) doc.avgGrade = safeBody.avgGrade;
-            if (safeBody.lastGrade !== undefined) doc.lastGrade = safeBody.lastGrade;
-            if (safeBody.completedSessions !== undefined && (doc.enrollments[idx].isPrimary || doc.enrollments.length === 1)) {
-              doc.completedSessions = safeBody.completedSessions;
-              if (safeBody.remainingSessions !== undefined) doc.remainingSessions = safeBody.remainingSessions;
-              if (safeBody.status !== undefined) doc.status = safeBody.status;
+            if (doc.enrollments[idx].isPrimary) {
+              patchKeys.forEach((k) => {
+                if (safeBody[k] !== undefined) doc[k] = safeBody[k];
+              });
             }
-            doc.markModified('enrollments');
-            doc.markModified('grades');
             await doc.save();
             const populated = await Student.findById(doc._id).populate('teacherId', 'name phone specialty');
             const io = req.app.get('io');
@@ -1166,12 +1157,20 @@ router.put('/:id/assign-teacher', authMiddleware, isAdmin, async (req, res) => {
         const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
         const teacherSubs = resolveTeacherSubjectIds(teacherDoc).map(String);
         const office = ['coban', 'word', 'excel', 'powerpoint'];
-        const nonCoban = teacherSubs.filter((id) => office.includes(id) && id !== 'coban');
-        if (nonCoban.length >= 3 && !teacherSubs.includes('canva') && !focuses.size) return ['thvp'];
         teacherSubs.forEach((id) => {
           if (id === 'coban') return;
           if (office.includes(id) || id === 'canva') focuses.add(id);
         });
+        // Đủ Word+Excel+PowerPoint → focus THVP (khớp khóa Tin học văn phòng)
+        const hasCanva = focuses.has('canva') || teacherSubs.includes('canva');
+        const hasFullOffice = ['word', 'excel', 'powerpoint'].every((id) => focuses.has(id));
+        if (hasFullOffice && !hasCanva) {
+          focuses.delete('word');
+          focuses.delete('excel');
+          focuses.delete('powerpoint');
+          focuses.delete('coban');
+          focuses.add('thvp');
+        }
         return [...focuses];
       })();
 
