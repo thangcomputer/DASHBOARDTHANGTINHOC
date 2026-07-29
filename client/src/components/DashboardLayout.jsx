@@ -470,18 +470,23 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
         <div
           className={
-            isImmersivePage
-              ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-              : role === 'student'
-                ? 'flex-1 min-h-0 px-0 py-0 sm:px-4 sm:py-3 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
-                : 'flex-1 min-h-0 px-2.5 py-1.5 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
+            isInboxPage
+              // Hộp thư: giữ full-height nhưng padding ngang giống Tài chính (không sát sidebar)
+              ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col px-2.5 py-1.5 sm:px-4 sm:py-3 md:px-6 md:py-4 lg:px-8 lg:py-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]'
+              : isImmersivePage
+                ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
+                : role === 'student'
+                  ? 'flex-1 min-h-0 px-0 py-0 sm:px-4 sm:py-3 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
+                  : 'flex-1 min-h-0 px-2.5 py-1.5 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
           }
         >
           <div
             className={
-              isImmersivePage
-                ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
-                : 'cms-page min-w-0 mx-auto max-w-7xl xl:max-w-[90rem] 2xl:max-w-[100rem]'
+              isInboxPage
+                ? 'cms-page min-w-0 mx-auto max-w-7xl xl:max-w-[90rem] 2xl:max-w-[100rem] flex-1 min-h-0 h-full flex flex-col overflow-hidden'
+                : isImmersivePage
+                  ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
+                  : 'cms-page min-w-0 mx-auto max-w-7xl xl:max-w-[90rem] 2xl:max-w-[100rem]'
             }
           >
             <Outlet />
