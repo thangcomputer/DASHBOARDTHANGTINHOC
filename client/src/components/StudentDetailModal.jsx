@@ -1013,6 +1013,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                               <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày</th>
                               <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Nội dung</th>
                               <th className="px-3 sm:px-4 py-3 text-right text-[11px] font-black text-slate-400 tracking-widest uppercase">Số tiền</th>
+                              <th className="px-3 sm:px-4 py-3 text-center text-[11px] font-black text-slate-400 tracking-widest uppercase">Hoàn thành</th>
                               <th className="px-4 sm:px-6 py-3 text-center text-[11px] font-black text-slate-400 tracking-widest uppercase">In</th>
                             </tr>
                           </thead>
@@ -1029,6 +1030,45 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                   {inv.khoaHoc}{inv.ghiChu ? ` — ${inv.ghiChu}` : ''}
                                 </td>
                                 <td className="px-3 sm:px-4 py-3.5 text-right font-black text-slate-800 text-sm whitespace-nowrap">{fmt(inv.hocPhi)}</td>
+                                <td className="px-3 sm:px-4 py-3.5 text-center">
+                                  {(() => {
+                                    const ma = String(inv.maHoaDon || '');
+                                    const ghi = String(inv.ghiChu || '');
+                                    const isRefund = ma.startsWith('R-') || /hoàn/i.test(ghi) || /refund/i.test(ghi);
+                                    const khoa = String(inv.khoaHoc || '').trim().toLowerCase();
+                                    const enr = (scopedEnrollments || []).find((e) => {
+                                      const name = String(e.courseName || e.name || '').trim().toLowerCase();
+                                      return name && name === khoa;
+                                    });
+                                    const st = String(enr?.status || '');
+                                    if (isRefund) {
+                                      return (
+                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                          Hoàn học phí
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'cancelled') {
+                                      return (
+                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200">
+                                          Hủy
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'completed' || st === 'Hoàn thành') {
+                                      return (
+                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-green-100 text-green-700 border border-green-200">
+                                          Hoàn thành
+                                        </span>
+                                      );
+                                    }
+                                    return (
+                                      <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-700 border border-amber-200">
+                                        Chưa thanh toán
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
                                 <td className="px-4 sm:px-6 py-3.5 text-center">
                                   <button type="button" onClick={() => window.print()} className="w-9 h-9 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 inline-flex items-center justify-center transition-all" aria-label="In">
                                     <Printer size={14} />

@@ -1738,13 +1738,10 @@ router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(
         });
 
         await postRefund({
-          studentId: student._id,
-          branchId: student.branchId,
-          enrollmentId: String(enr._id),
-          courseName,
           amount: refundAmt,
+          student,
+          courseName,
           note: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${cancelReason}`,
-          source: 'enrollment_cancel',
           sourceRef: `cancel:${student._id}:${enr._id}`,
           idempotencyKey: `refund:cancel:${student._id}:${enr._id}:${Date.now()}`,
           actor: financeActor(req),
