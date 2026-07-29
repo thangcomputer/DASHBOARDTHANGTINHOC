@@ -3,6 +3,7 @@ import { Users, GraduationCap, DollarSign, TrendingUp, ChevronRight } from 'luci
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../shared/StatCard';
 import Avatar from '../shared/Avatar';
+import { getClientEnrollments } from '../../../utils/enrollments';
 
 export default function AdminOverviewTab({
   statTotalStudents,
@@ -81,21 +82,37 @@ export default function AdminOverviewTab({
             <ul className="cms-dash-list">
               {filteredStudents.slice(0, 5).map((s) => (
                 <li key={s.id || s._id} className="cms-dash-row">
+                  {/*
+                    Backend set `paid=false` khi khóa bị cancel/refund.
+                    Vì vậy dùng `refundedAmount` để phân biệt "Đã hoàn" với "Chờ thu".
+                  */}
+                  {(() => {
+                    const enr = getClientEnrollments(s);
+                    const refunded = enr.some((e) => Number(e?.refundedAmount) > 0);
+                    const isPaid = !!s?.paid;
+                    const showPaid = isPaid || refunded;
+                    const badgeText = isPaid ? 'Đã thu' : refunded ? 'Đã hoàn' : 'Chờ thu';
+                    const color = showPaid ? 'bg-red-600' : 'bg-slate-400';
+                    return (
+                      <>
                   <Avatar
                     size="card"
                     initials={(s.name || '?').charAt(0).toUpperCase()}
                     name={s.name}
                     role="student"
                     src={s.avatar}
-                    color={s.paid ? 'bg-red-600' : 'bg-slate-400'}
+                    color={color}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-base font-semibold text-slate-900 truncate leading-snug">{s.name}</p>
                     <p className="text-[13px] text-slate-500 truncate mt-0.5">{s.course || 'Chưa chọn khóa'}</p>
                   </div>
-                  <span className={`cms-dash-badge flex-shrink-0 ${s.paid ? 'cms-dash-badge-success' : 'cms-dash-badge-primary'}`}>
-                    {s.paid ? 'Đã thu' : 'Chờ thu'}
+                  <span className={`cms-dash-badge flex-shrink-0 ${showPaid ? 'cms-dash-badge-success' : 'cms-dash-badge-primary'}`}>
+                    {badgeText}
                   </span>
+                      </>
+                    );
+                  })()}
                 </li>
               ))}
             </ul>
