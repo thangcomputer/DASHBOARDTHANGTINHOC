@@ -52,7 +52,14 @@ const TeacherSchema = new mongoose.Schema(
     },
     testDate: { type: Date },
     testNotes: { type: String, default: '' },
-    /** Append-only lịch sử điểm onboarding (80→90→95 …). */
+    testStatus: { type: String, default: null }, // 'passed' | 'failed' | null
+    testMcCorrect: { type: Number, default: null },
+    testMcWrong: { type: Number, default: null },
+    testMcTotal: { type: Number, default: null },
+    /** Số lần không thấy mặt/mắt trong oval (cộng dồn, không reset khi thấy lại) */
+    faceViolationCount: { type: Number, default: 0 },
+
+    /** Lịch sử nhập/sửa điểm bài test onboarding (GRADE-HIST). */
     scoreHistory: [{
       at: { type: Date, default: Date.now },
       oldScore: { type: Number, default: null },
@@ -62,12 +69,6 @@ const TeacherSchema = new mongoose.Schema(
       actorName: { type: String, default: '' },
       note: { type: String, default: '' },
     }],
-    testStatus: { type: String, default: null }, // 'passed' | 'failed' | null
-    testMcCorrect: { type: Number, default: null },
-    testMcWrong: { type: Number, default: null },
-    testMcTotal: { type: Number, default: null },
-    /** Số lần không thấy mặt/mắt trong oval (cộng dồn, không reset khi thấy lại) */
-    faceViolationCount: { type: Number, default: 0 },
 
     // ── Thực hành ─────────────────────────────────────────────────
     practicalFile: { type: String, default: null },
@@ -145,14 +146,6 @@ const TeacherSchema = new mongoose.Schema(
       default: null,
     },
     branchCode: { type: String, default: '' }, // Cached: CS1, CS2...
-    // Mã hiển thị GV001-CSx / AD001-CSx / ST001-CSx (ADR 0002). PK = _id.
-    displayCode: { type: String, default: '', trim: true, uppercase: true },
-    tenantId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
-      default: null,
-      index: true,
-    },
 
     // ── Bảo mật ───────────────────────────────────────────────────
     lastLogin: { type: Date },
@@ -218,11 +211,6 @@ TeacherSchema.index({ role: 1 });
 TeacherSchema.index({ email: 1 }, { sparse: true });
 TeacherSchema.index({ branchId: 1, status: 1 });
 TeacherSchema.index({ role: 1, status: 1 });
-TeacherSchema.index(
-  { branchId: 1, displayCode: 1 },
-  { unique: true, partialFilterExpression: { displayCode: { $type: 'string', $gt: '' } } }
-);
-TeacherSchema.index({ displayCode: 1 }, { sparse: true });
 
 const Teacher = mongoose.model('Teacher', TeacherSchema);
 module.exports = Teacher;

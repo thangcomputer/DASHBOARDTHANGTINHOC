@@ -8,10 +8,9 @@ const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
-const { authMiddleware, branchFilter } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 const logger = require('../config/logger');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
-const { assertStudentBranch } = require('../utils/branchScope');
 
 const router = express.Router();
 
@@ -138,16 +137,11 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
 });
 
 // ─── Lấy Bài tập cho Học viên (Kèm Submission cá nhân) ─────────────────────
-router.get('/student/:studentId/course/:courseId', authMiddleware, branchFilter, async (req, res) => {
+router.get('/student/:studentId/course/:courseId', authMiddleware, async (req, res) => {
   try {
     // Authorization: Học viên chỉ xem bài của mình
     if (req.user.role === 'student' && String(req.user.id || req.user._id) !== String(req.params.studentId)) {
       return res.status(403).json({ success: false, message: 'Không có quyền xem bài tập của học viên khác' });
-    }
-
-    if (req.user.role === 'admin' || req.user.role === 'staff') {
-      const ok = await assertStudentBranch(req, res, req.params.studentId);
-      if (!ok) return undefined;
     }
 
     // Khớp đúng tên khóa (không phân biệt hoa thường / khoảng trắng thừa).
@@ -234,9 +228,7 @@ router.post('/', authMiddleware, async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       if (newAssignment.studentId) {
-        const sid = String(newAssignment.studentId);
-        io.to(sid).emit('assignment:new', newAssignment);
-        io.to(`student_${sid}`).emit('assignment:new', newAssignment);
+        io.to(`student_${String(newAssignment.studentId)}`).emit('assignment:new', newAssignment);
       } else {
         io.to(`course_${req.body.courseId}`).emit('assignment:new', newAssignment);
       }
@@ -475,48 +467,52 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
       return res.status(404).json({ success: false, message: 'Không tìm thấy bài nộp' });
     }
 
-    const isRegrade = existingSubmission.status === 'graded';
-    const prevGrade = isRegrade ? existingSubmission.grade : null;
-    const gradeNum = Number(grade);
+    const newGrade = Number(grade);
+    if (!Number.isFinite(newGrade) || newGrade < 0 || newGrade > 10) {
+      return res.status(400).json({ success: false, message: 'Điểm không hợp lệ (0-10)' });
+    }
+
+    const isRegrade = existingSubmission.status === 'graded'
+      || (existingSubmission.grade != null && Number(existingSubmission.grade) !== newGrade);
+    const prevGrade = existingSubmission.grade != null ? Number(existingSubmission.grade) : null;
+    const auditAction = isRegrade ? 'assignment.regrade' : 'assignment.grade';
 
     const historyEntry = {
       at: new Date(),
-      oldGrade: prevGrade != null ? Number(prevGrade) : null,
-      newGrade: gradeNum,
-      actorUserId: String(req.user.id || ''),
-      actorRole: String(req.user.role || ''),
-      actorName: String(req.user.name || ''),
-      note: String(teacherFeedback || '').slice(0, 500),
+      oldGrade: isRegrade ? prevGrade : null,
+      newGrade,
+      actorUserId: String(req.user?.id || ''),
+      actorRole: String(req.user?.role || ''),
+      actorName: String(req.user?.name || ''),
+      note: String(teacherFeedback || '').slice(0, 300),
     };
 
     const submission = await Submission.findByIdAndUpdate(
       req.params.submissionId,
       {
-        grade: gradeNum,
-        teacherFeedback,
-        status: 'graded',
+        $set: { grade: newGrade, teacherFeedback, status: 'graded' },
         $push: { gradeHistory: historyEntry },
       },
-      { returnDocument: 'after' }
+      { returnDocument: 'after' },
     );
 
     try {
       const { writeAudit } = require('../services/auditLogService');
       await writeAudit({
-        action: isRegrade ? 'assignment.regrade' : 'assignment.grade',
-        actorUserId: req.user.id,
-        actorRole: req.user.role,
-        branchId: req.userBranchId || null,
+        action: auditAction,
+        actorUserId: String(req.user?.id || ''),
+        actorRole: String(req.user?.role || ''),
+        studentId: submission.studentId,
         entityType: 'submission',
         entityId: String(submission._id),
-        studentId: submission.studentId,
-        teacherId: submission.teacherId || (req.user.role === 'teacher' ? req.user.id : null),
-        oldValue: { grade: prevGrade, status: existingSubmission.status },
-        newValue: { grade: gradeNum, status: 'graded' },
-        ip: req.ip || '',
+        oldValue: { grade: prevGrade },
+        newValue: { grade: newGrade },
+        ip: req.ip,
         userAgent: req.headers['user-agent'] || '',
       });
-    } catch { /* ignore audit failures */ }
+    } catch (auditErr) {
+      logger.warn('[ASSIGNMENTS] grade audit: %s', auditErr.message);
+    }
 
     // Lấy thông tin Assignment để làm "note" (VD: Chấm bài: Thực hành Excel Buổi 3)
     const assignment = await Assignment.findById(submission.assignmentId);
@@ -557,7 +553,6 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
     const io = req.app.get('io');
     if (io) {
       // Emit to student
-      io.to(String(submission.studentId)).emit('submission:graded', submission);
       io.to(`student_${submission.studentId}`).emit('submission:graded', submission);
       
       try {

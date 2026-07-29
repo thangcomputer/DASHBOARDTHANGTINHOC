@@ -27,21 +27,20 @@ const ExamResultSchema = new mongoose.Schema({
   essayScore: { type: Number, default: null },
   essayNote:  { type: String, default: '' },
 
-  // Kết quả
-  passed: { type: Boolean, default: false },
-  date:   { type: String, default: '' },
-
-  /** Append-only lịch sử sửa điểm (essay / tổng) — old/new/user/time. */
+  /** Append-only lịch sử sửa điểm thi (GRADE-HIST). */
   scoreHistory: [{
     at: { type: Date, default: Date.now },
-    field: { type: String, default: 'essayScore' },
     oldScore: { type: Number, default: null },
-    newScore: { type: Number, required: true },
+    newScore: { type: Number, default: null },
     actorUserId: { type: String, default: '' },
     actorRole: { type: String, default: '' },
     actorName: { type: String, default: '' },
     note: { type: String, default: '' },
   }],
+
+  // Kết quả
+  passed: { type: Boolean, default: false },
+  date:   { type: String, default: '' },
 }, {
   timestamps: true,
 });

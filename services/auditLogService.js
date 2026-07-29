@@ -1,65 +1,67 @@
 /**
- * auditLogService — ghi AuditLog append-only + redact (ADR 0005).
- * Phase 1: service sẵn; routes migrate dần ở phase sau.
+ * Structured audit writer used by ledger and other domain services.
  */
 const AuditLog = require('../models/AuditLog');
+const SystemLog = require('../models/SystemLog');
+const logger = require('../config/logger');
 
-const REDACT_KEYS = new Set([
-  'password',
-  'newPassword',
-  'oldPassword',
-  'token',
-  'refreshToken',
-  'accessToken',
-  'otp',
-  'secret',
-  'mfaSecret',
-  'mfaPendingSecret',
-]);
+async function writeAudit({
+  action,
+  actorUserId = '',
+  actorRole = '',
+  branchId = null,
+  entityType = '',
+  entityId = '',
+  studentId = null,
+  teacherId = null,
+  courseId = null,
+  oldValue = {},
+  newValue = {},
+  ip = '',
+  userAgent = '',
+  device = '',
+} = {}) {
+  if (!action) return null;
 
-function redact(value, depth = 0) {
-  if (value == null || depth > 6) return value;
-  if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1));
-  if (typeof value !== 'object') return value;
-  const out = {};
-  for (const [k, v] of Object.entries(value)) {
-    if (REDACT_KEYS.has(k)) out[k] = '[REDACTED]';
-    else out[k] = redact(v, depth + 1);
+  try {
+    const doc = await AuditLog.create({
+      action,
+      actorUserId: String(actorUserId || ''),
+      actorRole: String(actorRole || ''),
+      branchId: branchId || null,
+      entityType: String(entityType || ''),
+      entityId: String(entityId || ''),
+      studentId: studentId || null,
+      teacherId: teacherId || null,
+      courseId: courseId || null,
+      oldValue: oldValue || {},
+      newValue: newValue || {},
+      ip: String(ip || '').slice(0, 80),
+      userAgent: String(userAgent || '').slice(0, 500),
+      device: String(device || '').slice(0, 120),
+    });
+
+    // Mirror finance actions vào SystemLog để Admin xem trên UI log hiện có
+    if (String(action).startsWith('payment.') || String(action).startsWith('course.')) {
+      SystemLog.create({
+        user_id: String(actorUserId || 'system'),
+        name: String(actorRole || 'system'),
+        role: String(actorRole || 'system'),
+        action: String(action),
+        category: 'finance',
+        target: `${entityType}/${entityId}`,
+        message: `${action} ${entityType} ${entityId}`.trim(),
+        method: 'SERVICE',
+        ip: String(ip || 'unknown'),
+        userAgent: String(userAgent || '').slice(0, 500),
+      }).catch(() => {});
+    }
+
+    return doc;
+  } catch (err) {
+    logger.warn('[audit] writeAudit failed: %s', err.message);
+    return null;
   }
-  return out;
 }
 
-/**
- * @param {object} entry
- */
-async function writeAudit(entry = {}) {
-  const doc = {
-    at: entry.at || new Date(),
-    actorUserId: entry.actorUserId != null ? String(entry.actorUserId) : '',
-    actorRole: entry.actorRole || '',
-    branchId: entry.branchId || null,
-    tenantId: entry.tenantId || null,
-    action: entry.action,
-    entityType: entry.entityType || '',
-    entityId: entry.entityId != null ? String(entry.entityId) : '',
-    oldValue: entry.oldValue != null ? redact(entry.oldValue) : null,
-    newValue: entry.newValue != null ? redact(entry.newValue) : null,
-    ip: entry.ip || '',
-    userAgent: entry.userAgent || '',
-    requestId: entry.requestId || '',
-    correlationId: entry.correlationId || '',
-    courseId: entry.courseId || null,
-    studentId: entry.studentId || null,
-    teacherId: entry.teacherId || null,
-    enrollmentId: entry.enrollmentId != null ? String(entry.enrollmentId) : '',
-    sessionId: entry.sessionId || null,
-  };
-  if (!doc.action) throw new Error('writeAudit: action là bắt buộc');
-  return AuditLog.create(doc);
-}
-
-module.exports = {
-  writeAudit,
-  redact,
-  REDACT_KEYS,
-};
+module.exports = { writeAudit };

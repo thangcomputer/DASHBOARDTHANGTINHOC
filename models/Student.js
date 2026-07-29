@@ -68,18 +68,18 @@ const StudentSchema = new mongoose.Schema(
       linkHoc: { type: String, default: '' },
       nextClass: { type: String, default: '' },
       nextClassTime: { type: String, default: '' },
-      status: { type: String, enum: ['pending_payment', 'active', 'completed', 'paused', 'cancelled', 'refunded'], default: 'active' },
+      status: {
+        type: String,
+        enum: ['active', 'completed', 'paused', 'pending_payment', 'refunded'],
+        default: 'active',
+      },
       isPrimary: { type: Boolean, default: false },
       registeredAt: { type: Date, default: Date.now },
-      activatedAt: { type: Date, default: null },
-      completedAt: { type: Date, default: null },
-      // AccessGrant nhẹ (Phase 6): quyền học theo enrollment
+      /** Quyền học theo enrollment — thu hồi khi hoàn 100% (undefined/true = được học) */
       learningAccess: { type: Boolean, default: true },
       // Quyền theo từng khóa (môn cần camera / mở khóa thi riêng)
       requireWebcam: { type: Boolean, default: true },
       examUnlocked: { type: Boolean, default: false },
-      // Mã enrollment hiển thị: HV001-CN1-EXCELMOS (ADR 0002) — không thay identity
-      enrollmentCode: { type: String, default: '', trim: true },
     }],
     price: {
       type: Number,
@@ -103,9 +103,7 @@ const StudentSchema = new mongoose.Schema(
     paidAt: { type: Date },
     paidAmount: { type: Number, default: 0 },  // Số tiền thực nhận qua SePay
     paidNote: { type: String, default: '' },    // Nội dung CK ghi nhận
-    studentCode: { type: String, default: '' }, // Mã HV dùng trong nội dung QR (tương thích)
-    // Mã định danh hiển thị chuẩn HV001-CSx (ADR 0002). PK vẫn là _id.
-    displayCode: { type: String, default: '', trim: true, uppercase: true },
+    studentCode: { type: String, default: '' }, // Mã HV dùng trong nội dung QR
     // Chi nhánh học viên đăng ký
     branchId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -113,12 +111,6 @@ const StudentSchema = new mongoose.Schema(
       default: null,
     },
     branchCode: { type: String, default: '' }, // Cached: CS1, CS2... dùng trong QR
-    tenantId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
-      default: null,
-      index: true,
-    },
     // Lịch sử điều chỉnh học phí bởi Admin
     priceHistory: [{
       oldPrice:  { type: Number },
@@ -195,6 +187,11 @@ const StudentSchema = new mongoose.Schema(
       default: false,
       // Chỉ được set = true khi đã hoàn thành đủ totalSessions buổi học
     },
+    /** Alias nghiệp vụ / workflow — đồng bộ với studentExamUnlocked khi mở khóa */
+    examApproved: {
+      type: Boolean,
+      default: false,
+    },
     requireWebcam: {
       type: Boolean,
       default: true,
@@ -204,8 +201,7 @@ const StudentSchema = new mongoose.Schema(
     // ── Tiến độ thi tốt nghiệp (per-subject) ────────────────────
     examProgress: [{
       id:         { type: String },                        // 'coban', 'word', 'excel', 'powerpoint'
-      status:     { type: String, default: 'chua_thi' },   // legacy + Phase 9: submitted|void|violation
-      attemptStatus: { type: String, default: null },      // ADR canonical: locked|unlocked|in_progress|...
+      status:     { type: String, default: 'chua_thi' },   // 'chua_thi' | 'dang_thi' | 'dat' | 'khong_dat'
       tracNghiem: {
         score: { type: Number, default: 0 },
         total: { type: Number, default: 15 }
@@ -214,9 +210,6 @@ const StudentSchema = new mongoose.Schema(
       essayFile:  { type: String, default: '' },            // URL file bài tự luận đã upload
       essayScore: { type: Number, default: null },          // Điểm chấm bởi admin (0-10)
       lockUntil:  { type: Number, default: null },          // Timestamp: khóa thi lại trong 7 ngày
-      violationReason: { type: String, default: '' },
-      voidReason: { type: String, default: '' },
-      voidedAt:   { type: String, default: null },
     }],
 
     // ── Tài khoản học viên (login) ────────────────────────────────
@@ -295,12 +288,6 @@ StudentSchema.index({ 'enrollments.teacherId': 1 });    // GV xem HV qua enrollm
 StudentSchema.index({ paid: 1, updatedAt: -1 });     // SePay webhook — HV chưa TT gần đây
 StudentSchema.index({ studentCode: 1 }, { sparse: true }); // Match mã HV trong nội dung CK
 StudentSchema.index({ branchId: 1, status: 1 });
-StudentSchema.index(
-  { branchId: 1, displayCode: 1 },
-  { unique: true, partialFilterExpression: { displayCode: { $type: 'string', $gt: '' } } }
-);
-StudentSchema.index({ displayCode: 1 }, { sparse: true });
-StudentSchema.index({ 'enrollments.enrollmentCode': 1 }, { sparse: true });
 
 const Student = mongoose.model('Student', StudentSchema);
 module.exports = Student;

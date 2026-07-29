@@ -57,6 +57,8 @@ function describeAction(method, path, body, responseBody) {
                     || (body?.branchCode && body.branchCode !== '' ? body.branchCode : null);
     return { action: 'THÊM HỌC VIÊN', category: 'student', desc: `Thêm học viên: ${sName}${amount ? ` - Học phí: ${amount}` : ''}${branchName ? ` [Chi nhánh: ${branchName}]` : ''}` };
   }
+  if (p.includes('/students') && p.includes('/refund')) return { action: 'HOÀN HỌC PHÍ', category: 'finance', desc: `Hoàn học phí học viên` };
+  if (p.includes('/students') && p.includes('/pay')) return { action: 'THU HỌC PHÍ', category: 'finance', desc: `Xác nhận thu học phí` };
   if (p.includes('/students') && p.includes('/price')) return { action: 'SỬA HỌC PHÍ', category: 'student', desc: `Điều chỉnh học phí học viên` };
   if (p.includes('/students') && method === 'PUT') {
     const sName = responseBody?.data?.name || body?.name || '';
@@ -108,6 +110,8 @@ function describeAction(method, path, body, responseBody) {
   // ── Settings ──
   if (p.includes('/settings'))  return { action: 'CÀI ĐẶT', category: 'settings', desc: `Cập nhật cài đặt hệ thống` };
   if (p.includes('/branches'))  return { action: method === 'POST' ? 'THÊM CHI NHÁNH' : 'CẬP NHẬT CHI NHÁNH', category: 'settings', desc: `Quản lý chi nhánh` };
+  if (p.includes('/courses') && method === 'DELETE') return { action: 'XÓA MỀM KHÓA HỌC', category: 'settings', desc: `Soft-delete khóa học` };
+  if (p.includes('/courses') && p.includes('/restore')) return { action: 'KHÔI PHỤC KHÓA HỌC', category: 'settings', desc: `Khôi phục khóa học đã ẩn` };
   if (p.includes('/courses'))   return { action: method === 'POST' ? 'THÊM KHÓA HỌC' : 'CẬP NHẬT KHÓA HỌC', category: 'settings', desc: `Quản lý khóa học` };
 
   // ── Webhook ──

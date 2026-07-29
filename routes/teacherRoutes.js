@@ -247,8 +247,7 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
     }
 
     const Evaluation = require('../models/Evaluation');
-    const { publicRatingFilter } = require('../services/ratingLifecycleService');
-    const evals = await Evaluation.find(publicRatingFilter()).lean();
+    const evals = await Evaluation.find({ type: 'teacher_rating' }).lean();
 
     let teachers = await Teacher.find(filter)
       .select('-password -refreshToken')
@@ -491,55 +490,58 @@ router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHE
       return res.status(400).json({ success: false, message: 'Điểm phải trong khoảng 0-100' });
     }
 
-    const existing = await Teacher.findById(req.params.id).select('testScore name status').lean();
-    if (!existing) {
+    const prev = await Teacher.findById(req.params.id).select('testScore name').lean();
+    if (!prev) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
-
+    const oldScore = prev.testScore != null ? Number(prev.testScore) : null;
     const newStatus = scoreNum >= 80 ? 'tested_passed' : 'tested_failed';
-    const oldScore = existing.testScore != null ? Number(existing.testScore) : null;
-    const historyEntry = {
-      at: new Date(),
-      oldScore,
-      newScore: scoreNum,
-      actorUserId: String(req.user.id || ''),
-      actorRole: String(req.user.role || ''),
-      actorName: String(req.user.name || ''),
-      note: String(testNotes || '').slice(0, 500),
-    };
 
     const teacher = await Teacher.findByIdAndUpdate(
       req.params.id,
       {
-        testScore: scoreNum,
-        testNotes: testNotes || '',
-        testDate:  new Date(),
-        status:    newStatus,
-        $push: { scoreHistory: historyEntry },
+        $set: {
+          testScore: scoreNum,
+          testNotes: testNotes || '',
+          testDate: new Date(),
+          status: newStatus,
+        },
+        $push: {
+          scoreHistory: {
+            at: new Date(),
+            oldScore,
+            newScore: scoreNum,
+            actorUserId: String(req.user?.id || ''),
+            actorRole: String(req.user?.role || ''),
+            actorName: String(req.user?.name || ''),
+            note: String(testNotes || '').slice(0, 300),
+          },
+        },
       },
-      { returnDocument: 'after' }
+      { returnDocument: 'after' },
     ).select('-password -refreshToken');
-
-    if (!teacher) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
-    }
 
     try {
       const { writeAudit } = require('../services/auditLogService');
       await writeAudit({
         action: 'teacher.score_change',
-        actorUserId: req.user.id,
-        actorRole: req.user.role,
-        branchId: req.userBranchId || teacher.branchId || null,
+        actorUserId: String(req.user?.id || ''),
+        actorRole: String(req.user?.role || ''),
         entityType: 'teacher',
         entityId: String(teacher._id),
         teacherId: teacher._id,
-        oldValue: { testScore: oldScore },
-        newValue: { testScore: scoreNum, status: newStatus },
-        ip: req.ip || '',
+        oldValue: { oldScore },
+        newValue: { newScore: scoreNum },
+        ip: req.ip,
         userAgent: req.headers['user-agent'] || '',
       });
-    } catch { /* ignore */ }
+    } catch (auditErr) {
+      logger.warn('[TEACHERS] score audit: %s', auditErr.message);
+    }
+
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
 
     // Thông báo real-time cho giảng viên
     const io = req.app.get('io');
@@ -834,7 +836,7 @@ router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.M
 });
 
 // ─── PUT /api/teachers/:id/finance/pay-flexible ──────────────────────────────────
-// Thanh toán linh hoạt — Phase 13 session payroll (ownership + chống double-pay)
+// Thanh toán linh hoạt: Admin tự chọn số buổi và số tiền, FIFO (cũ nhất trước)
 router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
   try {
     const { sessionsCount, amount, note } = req.body;
@@ -842,44 +844,132 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
       req.headers['idempotency-key'] || req.body.idempotencyKey || ''
     ).trim() || null;
 
-    const { payTeacherSessions } = require('../services/sessionPayrollService');
-    const result = await payTeacherSessions({
+    if (!sessionsCount || Number(sessionsCount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Số buổi thanh toán phải lớn hơn 0' });
+    }
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Số tiền thanh toán phải lớn hơn 0' });
+    }
+    if (Number(amount) > 500000000) {
+      return res.status(400).json({ success: false, message: `Số tiền vượt giới hạn 500 triệu/lần` });
+    }
+
+    if (idempotencyKey) {
+      const existing = await Transaction.findOne({ idempotencyKey }).lean();
+      if (existing) {
+        return res.json({
+          success: true,
+          message: 'Giao dịch đã tồn tại (idempotent)',
+          data: {
+            paidSessions: Number(sessionsCount),
+            markedSessions: 0,
+            totalAmount: existing.amount,
+            transaction: existing,
+            idempotent: true,
+          },
+        });
+      }
+    }
+
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
+
+    // Tìm buổi chưa thanh toán theo FIFO (chỉ tính các buổi đã hoàn thành - completed)
+    const pendingSessions = await Schedule.find({
       teacherId: req.params.id,
-      sessionsCount,
-      amount,
-      note,
-      idempotencyKey,
-      actor: { id: req.user.id, role: req.user.role, name: req.user.name },
-      reqMeta: {
-        ip: req.ip || '',
-        userAgent: req.headers['user-agent'] || '',
-        branchId: req.userBranchId || null,
-      },
-      io: req.app.get('io'),
-    });
+      status: 'completed',
+      is_paid_to_teacher: { $ne: true }
+    }).sort({ date: 1, createdAt: 1 }).limit(Number(sessionsCount));
+
+    const sessionIds = pendingSessions.map(s => s._id);
+
+    // Atomic claim: chỉ đánh dấu buổi còn unpaid
+    let actualCount = 0;
+    if (sessionIds.length > 0) {
+      const claim = await Schedule.updateMany(
+        {
+          _id: { $in: sessionIds },
+          status: 'completed',
+          is_paid_to_teacher: { $ne: true },
+        },
+        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+      );
+      actualCount = claim.modifiedCount || 0;
+    }
+
+    const now = new Date();
+    const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
+    const paidCount = Number(sessionsCount);
+    let transaction;
+    try {
+      transaction = await Transaction.create({
+        teacherId: req.params.id,
+        teacherName: teacher.name,
+        teacherPhone: teacher.phone || '',
+        amount: Number(amount),
+        description: note || `Thù lao ${paidCount} buổi dạy`,
+        month: monthLabel,
+        status: 'confirmed',
+        confirmedBy: req.user?.name || 'Admin',
+        confirmedAt: now,
+        bankName: teacher.bankAccount?.bankName || '',
+        bankAccount: teacher.bankAccount?.accountNumber || '',
+        note: note || '',
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      });
+    } catch (createErr) {
+      // Rollback claim nếu tạo phiếu chi thất bại (tránh buổi bị đánh dấu paid mà không có ledger)
+      if (actualCount > 0 && sessionIds.length > 0 && !(createErr?.code === 11000 && idempotencyKey)) {
+        try {
+          await Schedule.updateMany(
+            { _id: { $in: sessionIds }, is_paid_to_teacher: true },
+            { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
+          );
+        } catch (rollbackErr) {
+          logger.error('[TEACHERS] Pay rollback failed:', rollbackErr);
+        }
+      }
+      if (createErr?.code === 11000 && idempotencyKey) {
+        const existing = await Transaction.findOne({ idempotencyKey }).lean();
+        if (existing) {
+          return res.json({
+            success: true,
+            message: 'Giao dịch đã tồn tại (idempotent)',
+            data: {
+              paidSessions: paidCount,
+              markedSessions: actualCount,
+              totalAmount: existing.amount,
+              transaction: existing,
+              idempotent: true,
+            },
+          });
+        }
+      }
+      throw createErr;
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('teacher:financeUpdated', {
+        teacherId: req.params.id,
+        message: `Admin đã thanh toán ${Number(amount).toLocaleString('vi-VN')}đ cho ${paidCount} buổi.`
+      });
+      io.emit('transactions:new', transaction);
+    }
 
     return res.json({
       success: true,
-      message: result.idempotent
-        ? 'Giao dịch đã tồn tại (idempotent)'
-        : `Thanh toán thành công ${result.paidSessions} buổi`,
+      message: `Thanh toán thành công ${paidCount} buổi`,
       data: {
-        paidSessions: result.paidSessions,
-        markedSessions: result.markedSessions,
-        totalAmount: result.totalAmount,
-        transaction: result.transaction,
-        ledgerEntryId: result.ledgerEntryId || null,
-        idempotent: result.idempotent,
-      },
+        paidSessions: paidCount,
+        markedSessions: actualCount,
+        totalAmount: Number(amount),
+        transaction,
+      }
     });
   } catch (error) {
     logger.error('[FINANCE] Flexible pay error:', error);
-    const status = error.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'Lỗi server',
-      code: error.code,
-    });
+    return res.status(500).json({ success: false, message: 'Lỗi server: ' + error.message });
   }
 });
 

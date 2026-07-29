@@ -85,16 +85,15 @@ const courseSchema = new mongoose.Schema({
     enum: ['draft', 'published', 'archived'],
     default: 'published',
   },
-  // Soft delete (ADR 0001) — không hard-delete; không đụng Invoice/Payment
-  deletedAt: { type: Date, default: null, index: true },
-  deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
-  deleteReason: { type: String, default: '', maxlength: 500 },
-  // Chuẩn bị multi-tenant (nullable)
-  tenantId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Tenant',
+  /** Soft-delete — không xóa cứng; ledger/enrollment không đụng */
+  deletedAt: {
+    type: Date,
     default: null,
     index: true,
+  },
+  deletedBy: {
+    type: String,
+    default: '',
   },
   featured: {
     type: Boolean,
@@ -136,8 +135,6 @@ courseSchema.pre('save', async function () {
 });
 
 courseSchema.index({ category: 1, status: 1 });
-courseSchema.index({ status: 1, deletedAt: 1 });
-courseSchema.index({ tenantId: 1, deletedAt: 1 });
 
 // Tính discountPrice khi UPDATE (findByIdAndUpdate bypass pre-save)
 courseSchema.pre('findOneAndUpdate', async function () {

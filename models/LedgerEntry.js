@@ -1,16 +1,14 @@
 /**
- * LedgerEntry — sổ cái bất biến (ADR 0001 / Phase 10).
- * Chỉ INSERT; không UPDATE/DELETE số tiền đã posted.
+ * LedgerEntry — sổ cái tài chính append-only.
+ * Soft-delete course / hủy TT không được xóa dòng đã posted.
  */
 const mongoose = require('mongoose');
 
-const LedgerEntrySchema = new mongoose.Schema(
+const ledgerEntrySchema = new mongoose.Schema(
   {
-    /** Unique business key — chống double webhook / double settle */
     idempotencyKey: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       maxlength: 200,
     },
@@ -20,17 +18,17 @@ const LedgerEntrySchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    /** Luôn dương; dấu lấy từ type (payment +, refund −) */
     amount: {
       type: Number,
       required: true,
       min: 0,
     },
-    currency: { type: String, default: 'VND' },
+    currency: { type: String, default: 'VND', maxlength: 8 },
     status: {
       type: String,
-      enum: ['posted'],
+      enum: ['posted', 'void'],
       default: 'posted',
+      index: true,
     },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -49,26 +47,20 @@ const LedgerEntrySchema = new mongoose.Schema(
       ref: 'Tenant',
       default: null,
     },
-    enrollmentId: { type: String, default: '' },
+    enrollmentId: { type: String, default: '', maxlength: 64 },
     invoiceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Invoice',
       default: null,
     },
-    courseName: { type: String, default: '' },
-    source: {
-      type: String,
-      enum: ['admin_pay', 'enrollment_pay', 'sepay', 'session', 'refund', 'adjustment', 'system', 'reward', 'payroll'],
-      default: 'system',
-      index: true,
-    },
-    sourceRef: { type: String, default: '', index: true },
+    courseName: { type: String, default: '', trim: true, maxlength: 200 },
+    source: { type: String, default: 'system', maxlength: 64 },
+    sourceRef: { type: String, default: '', maxlength: 120 },
     note: { type: String, default: '', maxlength: 500 },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     postedAt: { type: Date, default: Date.now, index: true },
     postedBy: { type: String, default: '' },
     postedByRole: { type: String, default: '' },
-    /** Liên kết reversal → entry gốc (refund) */
     reversesEntryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'LedgerEntry',
@@ -78,22 +70,8 @@ const LedgerEntrySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-LedgerEntrySchema.index({ branchId: 1, postedAt: -1 });
-LedgerEntrySchema.index({ type: 1, postedAt: -1 });
-LedgerEntrySchema.index({ studentId: 1, postedAt: -1 });
+ledgerEntrySchema.index({ idempotencyKey: 1 }, { unique: true });
+ledgerEntrySchema.index({ studentId: 1, type: 1, postedAt: -1 });
+ledgerEntrySchema.index({ branchId: 1, postedAt: -1 });
 
-/** Signed amount cho báo cáo: payment +, refund − */
-LedgerEntrySchema.virtual('signedAmount').get(function signedAmount() {
-  const amt = Number(this.amount) || 0;
-  if (this.type === 'refund') return -Math.abs(amt);
-  if (this.type === 'adjustment') {
-    const dir = this.metadata?.direction;
-    if (dir === 'debit') return -Math.abs(amt);
-  }
-  return Math.abs(amt);
-});
-
-LedgerEntrySchema.set('toJSON', { virtuals: true });
-LedgerEntrySchema.set('toObject', { virtuals: true });
-
-module.exports = mongoose.model('LedgerEntry', LedgerEntrySchema);
+module.exports = mongoose.model('LedgerEntry', ledgerEntrySchema);
