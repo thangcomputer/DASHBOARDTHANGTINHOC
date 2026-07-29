@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
+import { createContext, useContext, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import api from '../services/api';
 import { mapStudent } from '../lib/entityMaps';
@@ -59,10 +59,18 @@ export function StudentsProvider({ user, children }) {
   const [adminQuery, setAdminQuery] = useState(null);
   const key = studentsKey(user, adminQuery);
   const { socket } = useSocket();
+  const prevIdentityRef = useRef({ id: null, role: null });
 
+  // Chỉ clear query khi đổi tài khoản (id/role), không clear khi /auth/me refresh cùng user
   useEffect(() => {
-    setAdminQuery(null);
-  }, [user?.id, user?.role]);
+    const id = String(user?.id || user?._id || '');
+    const role = String(user?.role || '');
+    const prev = prevIdentityRef.current;
+    if (prev.id && (prev.id !== id || prev.role !== role)) {
+      setAdminQuery(null);
+    }
+    prevIdentityRef.current = { id, role };
+  }, [user?.id, user?._id, user?.role]);
 
   const { data, mutate, isValidating } = useSWR(
     key,

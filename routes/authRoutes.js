@@ -1362,6 +1362,8 @@ router.get('/me', authMiddleware, async (req, res) => {
           name:   dbAdminName,
           phone:  'admin',
           role:   'admin',
+          adminRole: 'SUPER_ADMIN',
+          permissions: [],
           status: 'active',
           avatar: '',
         },

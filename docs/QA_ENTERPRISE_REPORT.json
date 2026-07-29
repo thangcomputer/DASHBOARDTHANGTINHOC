@@ -1,0 +1,1169 @@
+{
+  "summary": {
+    "pass": 15,
+    "fail": 11,
+    "warn": 0,
+    "readiness": 52,
+    "critical": 2,
+    "high": 4,
+    "medium": 5,
+    "low": 0,
+    "seedSummary": {
+      "branches": 3,
+      "superAdmin": 1,
+      "admins": 3,
+      "staff": 3,
+      "teachers": 6,
+      "students": 30,
+      "courses": 6,
+      "password": "Test@123456",
+      "note": "QA_ENTERPRISE_2026"
+    }
+  },
+  "byModule": {
+    "System": {
+      "pass": 1,
+      "fail": 1,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "SYS-01",
+          "module": "System",
+          "name": "Healthz",
+          "expected": "200 healthy",
+          "actual": "200 redis=disabled queue=inline",
+          "result": "PASS",
+          "severity": "Critical",
+          "api": "GET /healthz",
+          "impact": "Môi trường test không chạy",
+          "rootCause": ""
+        },
+        {
+          "id": "SYS-02",
+          "module": "System",
+          "name": "Redis for multi-instance",
+          "expected": "redis up",
+          "actual": "disabled",
+          "result": "FAIL",
+          "severity": "High",
+          "api": "GET /healthz",
+          "impact": "Cache/session/socket scale hạn chế khi multi-instance",
+          "rootCause": "REDIS_URL chưa cấu hình trên môi trường local",
+          "fixHint": "Bật Redis trên staging/prod trước go-live"
+        }
+      ]
+    },
+    "Authentication": {
+      "pass": 1,
+      "fail": 1,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "AUTH-CONC-01",
+          "module": "Authentication",
+          "name": "Concurrent JWT /auth/me (42 actors)",
+          "expected": "all 200",
+          "actual": "ok=42 fail=0 avgMs=40 wall=54ms",
+          "result": "PASS",
+          "severity": "Critical",
+          "api": "GET /api/auth/me",
+          "reproduce": "Mint 42 JWT → Promise.all /auth/me",
+          "impact": "JWT/session không chịu tải đồng thời",
+          "database": "Teacher/Student by JWT id"
+        },
+        {
+          "id": "AUTH-CONC-02",
+          "module": "Authentication",
+          "name": "Concurrent password+CAPTCHA login (42 users)",
+          "expected": "Automate được login thật 30HV+6GV+3Admin+3Staff",
+          "actual": "CAPTCHA SVG one-shot — suite không đọc được đáp án → chưa chạy password login đồng thời",
+          "result": "FAIL",
+          "severity": "Medium",
+          "api": "POST /api/auth/login/public|internal",
+          "rootCause": "CAPTCHA không có bypass test hook",
+          "reproduce": "Cần 42 captcha answers song song",
+          "impact": "Chưa verify race device-lock / refresh token trên login thật",
+          "fixHint": "CAPTCHA_BYPASS chỉ khi NODE_ENV=test",
+          "ui": "Login form"
+        }
+      ]
+    },
+    "Multi Branch": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "BRANCH-01",
+          "module": "Multi Branch",
+          "name": "Staff CN1 không thấy HV CN2",
+          "expected": "0 HV CN2",
+          "actual": "status=200 total=10 leaked=0",
+          "result": "PASS",
+          "severity": "Critical",
+          "api": "GET /api/students",
+          "reproduce": "Staff CN1 list students",
+          "impact": "Lộ PII chi nhánh khác",
+          "database": "Student.branchId",
+          "fixHint": "branchFilter + assertStudentBranchAccess",
+          "ui": "Admin/Staff students table"
+        }
+      ]
+    },
+    "RBAC": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "RBAC-01",
+          "module": "RBAC",
+          "name": "Admin CN1 (có finance) bị chặn pay HV CN2 theo branch",
+          "expected": "403/404 do branch scope (không phải thiếu permission)",
+          "actual": "status=403 msg=Không có quyền thao tác học viên chi nhánh khác",
+          "result": "PASS",
+          "severity": "Critical",
+          "api": "PUT /api/students/:id/pay",
+          "reproduce": "Admin CN1 (DB có manage_finance) PUT pay student CN2",
+          "impact": "Leo thang tài chính cross-branch / IDOR",
+          "rootCause": "",
+          "database": "Student.paid / LedgerEntry",
+          "fixHint": "assertStudentBranchAccess trên mọi mutation finance"
+        }
+      ]
+    },
+    "Course": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "COURSE-01",
+          "module": "Course",
+          "name": "DELETE course = soft-delete",
+          "expected": "API ok + deletedAt set",
+          "actual": "api=200 deletedAt=Wed Jul 29 2026 12:38:44 GMT+0700 (Giờ Đông Dương)",
+          "result": "PASS",
+          "severity": "High",
+          "api": "DELETE /api/courses/:id",
+          "database": "Course.deletedAt",
+          "fixHint": "softDeleteCourse service",
+          "impact": "Hard delete mất lịch sử/revenue",
+          "rootCause": ""
+        }
+      ]
+    },
+    "Payment": {
+      "pass": 1,
+      "fail": 1,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "PAY-01",
+          "module": "Payment",
+          "name": "Admin xác nhận thanh toán",
+          "expected": "200 + paid=true",
+          "actual": "status=200 paid=true msg=Đã xác nhận thanh toán 2.500.000đ",
+          "result": "PASS",
+          "severity": "Critical",
+          "api": "PUT /api/students/:id/pay",
+          "database": "Student.paid, Invoice, LedgerEntry",
+          "ui": "Admin mark paid",
+          "impact": "Không cấp quyền học / lệch doanh thu",
+          "rootCause": ""
+        },
+        {
+          "id": "PAY-REF-01",
+          "module": "Payment",
+          "name": "Refund partial + full + revenue/invoice",
+          "expected": "Đã kiểm tra E2E đầy đủ",
+          "actual": "NOT RUN trong suite lần này",
+          "result": "FAIL",
+          "severity": "Critical",
+          "rootCause": "Phạm vi API/seed chưa cover luồng này",
+          "impact": "Không đủ bằng chứng Pass cho go-live",
+          "fixHint": "Bổ sung automation + chạy lại regression"
+        }
+      ]
+    },
+    "Attendance": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "ATT-01",
+          "module": "Attendance",
+          "name": "GV điểm danh present",
+          "expected": "200 + completed/present",
+          "actual": "api=200 status=completed att=present",
+          "result": "PASS",
+          "severity": "High",
+          "api": "POST /api/schedules/:id/attendance",
+          "database": "Schedule + AuditLog",
+          "ui": "Teacher calendar",
+          "rootCause": ""
+        }
+      ]
+    },
+    "Schedule": {
+      "pass": 1,
+      "fail": 1,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "REASSIGN-01",
+          "module": "Schedule",
+          "name": "Ownership completed GV A ≥ 8",
+          "expected": "split[6a6991e23dc72df1ba35b4e2]>=8",
+          "actual": "{\"6a6991e23dc72df1ba35b4e2\":9}",
+          "result": "PASS",
+          "severity": "High",
+          "api": "teacherReassignmentService.computeCompletedSplitByTeacher",
+          "database": "Schedule.teacherId/status",
+          "impact": "Sai lương khi đổi GV"
+        },
+        {
+          "id": "REASSIGN-E2E-01",
+          "module": "Schedule",
+          "name": "Đổi GV A→B full E2E (8/12 + HV giữ lịch/điểm/BT)",
+          "expected": "Đã kiểm tra E2E đầy đủ",
+          "actual": "NOT RUN trong suite lần này",
+          "result": "FAIL",
+          "severity": "Critical",
+          "rootCause": "Phạm vi API/seed chưa cover luồng này",
+          "impact": "Không đủ bằng chứng Pass cho go-live",
+          "fixHint": "Bổ sung automation + chạy lại regression"
+        }
+      ]
+    },
+    "Exam": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "EXAM-01",
+          "module": "Exam",
+          "name": "Unlock exam",
+          "expected": "200 + studentExamUnlocked",
+          "actual": "status=200 unlocked=true",
+          "result": "PASS",
+          "severity": "High",
+          "api": "PUT /api/students/:id/unlock-exam",
+          "database": "Student.studentExamUnlocked",
+          "rootCause": ""
+        }
+      ]
+    },
+    "Rating": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "RATING-01",
+          "module": "Rating",
+          "name": "pending rating không public",
+          "expected": "false",
+          "actual": "false",
+          "result": "PASS",
+          "severity": "High",
+          "api": "ratingLifecycleService.isPublicRating"
+        }
+      ]
+    },
+    "Dashboard": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "DASH-01",
+          "module": "Dashboard",
+          "name": "KPI operational ≠ financial",
+          "expected": "meta.kpisSeparated true",
+          "actual": "status=200 separated=true",
+          "result": "PASS",
+          "severity": "High",
+          "api": "GET /api/analytics/kpi"
+        }
+      ]
+    },
+    "Notification": {
+      "pass": 1,
+      "fail": 3,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "NOTIF-01",
+          "module": "Notification",
+          "name": "HV list notifications",
+          "expected": "200",
+          "actual": "status=200",
+          "result": "PASS",
+          "severity": "Medium",
+          "api": "GET /api/notifications"
+        },
+        {
+          "id": "NOTIF-02",
+          "module": "Notification",
+          "name": "Zalo OA env",
+          "expected": "token present",
+          "actual": "missing",
+          "result": "FAIL",
+          "severity": "Medium",
+          "impact": "Không gửi Zalo ngoài in-app",
+          "fixHint": "Cấu hình ZALO_OA_ACCESS_TOKEN",
+          "rootCause": "Env missing trên local"
+        },
+        {
+          "id": "NOTIF-03",
+          "module": "Notification",
+          "name": "SMTP env",
+          "expected": "SMTP_HOST",
+          "actual": "missing",
+          "result": "FAIL",
+          "severity": "Medium",
+          "fixHint": "Cấu hình SMTP_*",
+          "rootCause": "Env missing trên local"
+        },
+        {
+          "id": "FIREBASE-01",
+          "module": "Notification",
+          "name": "Firebase push device thật",
+          "expected": "Đã kiểm tra E2E đầy đủ",
+          "actual": "NOT RUN trong suite lần này",
+          "result": "FAIL",
+          "severity": "Medium",
+          "rootCause": "Phạm vi API/seed chưa cover luồng này",
+          "impact": "Không đủ bằng chứng Pass cho go-live",
+          "fixHint": "Bổ sung automation + chạy lại regression"
+        }
+      ]
+    },
+    "Assignment": {
+      "pass": 1,
+      "fail": 1,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "ASG-01",
+          "module": "Assignment",
+          "name": "GV tạo bài tập",
+          "expected": "200/201",
+          "actual": "status=200 msg=",
+          "result": "PASS",
+          "severity": "High",
+          "api": "POST /api/assignments",
+          "ui": "Teacher assignments",
+          "rootCause": ""
+        },
+        {
+          "id": "GRADE-HIST-01",
+          "module": "Assignment",
+          "name": "Grade history 80→90→95 old/new/user/time",
+          "expected": "Đã kiểm tra E2E đầy đủ",
+          "actual": "NOT RUN trong suite lần này",
+          "result": "FAIL",
+          "severity": "High",
+          "rootCause": "Phạm vi API/seed chưa cover luồng này",
+          "impact": "Không đủ bằng chứng Pass cho go-live",
+          "fixHint": "Bổ sung automation + chạy lại regression"
+        }
+      ]
+    },
+    "Audit Log": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "AUDIT-01",
+          "module": "Audit Log",
+          "name": "Có audit critical actions",
+          "expected": "count>0",
+          "actual": "count=12",
+          "result": "PASS",
+          "severity": "High",
+          "database": "AuditLog"
+        }
+      ]
+    },
+    "UI E2E": {
+      "pass": 0,
+      "fail": 1,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "UI-01",
+          "module": "UI E2E",
+          "name": "Playwright toàn bộ màn Admin/Staff/GV/HV",
+          "expected": "Đã kiểm tra E2E đầy đủ",
+          "actual": "NOT RUN trong suite lần này",
+          "result": "FAIL",
+          "severity": "High",
+          "rootCause": "Phạm vi API/seed chưa cover luồng này",
+          "impact": "Không đủ bằng chứng Pass cho go-live",
+          "fixHint": "Bổ sung automation + chạy lại regression"
+        }
+      ]
+    },
+    "Socket": {
+      "pass": 0,
+      "fail": 1,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "SOCK-01",
+          "module": "Socket",
+          "name": "Realtime reconnect/offline/duplicate event",
+          "expected": "Đã kiểm tra E2E đầy đủ",
+          "actual": "NOT RUN trong suite lần này",
+          "result": "FAIL",
+          "severity": "High",
+          "rootCause": "Phạm vi API/seed chưa cover luồng này",
+          "impact": "Không đủ bằng chứng Pass cho go-live",
+          "fixHint": "Bổ sung automation + chạy lại regression"
+        }
+      ]
+    },
+    "Performance": {
+      "pass": 0,
+      "fail": 1,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "PERF-01",
+          "module": "Performance",
+          "name": "Đo CPU/RAM/DB query dưới 42 user concurrent write",
+          "expected": "Đã kiểm tra E2E đầy đủ",
+          "actual": "NOT RUN trong suite lần này",
+          "result": "FAIL",
+          "severity": "Medium",
+          "rootCause": "Phạm vi API/seed chưa cover luồng này",
+          "impact": "Không đủ bằng chứng Pass cho go-live",
+          "fixHint": "Bổ sung automation + chạy lại regression"
+        }
+      ]
+    },
+    "Regression": {
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "cases": [
+        {
+          "id": "UNIT-01",
+          "module": "Regression",
+          "name": "Phase integration gates",
+          "expected": "fail=0",
+          "actual": "pass=120 fail=0 exit=0",
+          "result": "PASS",
+          "severity": "High",
+          "api": "node --test *Phase*.test.js",
+          "fixHint": "Xem fail trong tests/integration",
+          "rootCause": ""
+        }
+      ]
+    }
+  },
+  "bugs": [
+    {
+      "id": "SYS-02",
+      "module": "System",
+      "title": "Redis for multi-instance",
+      "severity": "High",
+      "priority": "P1",
+      "expected": "redis up",
+      "actual": "disabled",
+      "reproduce": "GET /healthz",
+      "fixHint": "Bật Redis trên staging/prod trước go-live",
+      "api": "GET /healthz",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Cache/session/socket scale hạn chế khi multi-instance",
+      "rootCause": "REDIS_URL chưa cấu hình trên môi trường local"
+    },
+    {
+      "id": "AUTH-CONC-02",
+      "module": "Authentication",
+      "title": "Concurrent password+CAPTCHA login (42 users)",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "Automate được login thật 30HV+6GV+3Admin+3Staff",
+      "actual": "CAPTCHA SVG one-shot — suite không đọc được đáp án → chưa chạy password login đồng thời",
+      "reproduce": "Cần 42 captcha answers song song",
+      "fixHint": "CAPTCHA_BYPASS chỉ khi NODE_ENV=test",
+      "api": "POST /api/auth/login/public|internal",
+      "ui": "Login form",
+      "database": "",
+      "impact": "Chưa verify race device-lock / refresh token trên login thật",
+      "rootCause": "CAPTCHA không có bypass test hook"
+    },
+    {
+      "id": "NOTIF-02",
+      "module": "Notification",
+      "title": "Zalo OA env",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "token present",
+      "actual": "missing",
+      "reproduce": "",
+      "fixHint": "Cấu hình ZALO_OA_ACCESS_TOKEN",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không gửi Zalo ngoài in-app",
+      "rootCause": "Env missing trên local"
+    },
+    {
+      "id": "NOTIF-03",
+      "module": "Notification",
+      "title": "SMTP env",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "SMTP_HOST",
+      "actual": "missing",
+      "reproduce": "",
+      "fixHint": "Cấu hình SMTP_*",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "",
+      "rootCause": "Env missing trên local"
+    },
+    {
+      "id": "UI-01",
+      "module": "UI E2E",
+      "title": "Playwright toàn bộ màn Admin/Staff/GV/HV",
+      "severity": "High",
+      "priority": "P1",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "SOCK-01",
+      "module": "Socket",
+      "title": "Realtime reconnect/offline/duplicate event",
+      "severity": "High",
+      "priority": "P1",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "PAY-REF-01",
+      "module": "Payment",
+      "title": "Refund partial + full + revenue/invoice",
+      "severity": "Critical",
+      "priority": "P0",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "GRADE-HIST-01",
+      "module": "Assignment",
+      "title": "Grade history 80→90→95 old/new/user/time",
+      "severity": "High",
+      "priority": "P1",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "REASSIGN-E2E-01",
+      "module": "Schedule",
+      "title": "Đổi GV A→B full E2E (8/12 + HV giữ lịch/điểm/BT)",
+      "severity": "Critical",
+      "priority": "P0",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "FIREBASE-01",
+      "module": "Notification",
+      "title": "Firebase push device thật",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "PERF-01",
+      "module": "Performance",
+      "title": "Đo CPU/RAM/DB query dưới 42 user concurrent write",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    }
+  ],
+  "missing": [
+    "UI E2E Playwright đầy đủ mọi role/màn",
+    "Concurrent password+CAPTCHA login 42 users",
+    "Firebase Push thật",
+    "Zalo/Email send end-to-end (nếu env thiếu)",
+    "Socket reconnect/offline/duplicate matrix",
+    "Refund partial/full chứng từ đầy đủ",
+    "Grade edit history collection/UI",
+    "Đổi GV A→B full business E2E (giữ lịch/điểm/BT + payroll 8/12)",
+    "PostgreSQL/Prisma — brief lệch; runtime hiện tại MongoDB+Mongoose",
+    "Perf profiling CPU/RAM/query plan dưới tải write"
+  ],
+  "risks": [
+    "Redis disabled → rủi ro multi-instance / cache inconsistency",
+    "CAPTCHA + device lock chưa load-test bằng automation",
+    "Coverage API-only → bug UI/UX và Socket có thể lọt",
+    "Refund/grade-history/reassign E2E chưa chạy → rủi ro tài chính & lương GV",
+    "Cross-branch IDOR phụ thuộc middleware nhất quán trên mọi route",
+    "Phase 8–15 soft-delete/ledger mới — cần verify trên staging gần prod"
+  ],
+  "fixOrder": [
+    {
+      "id": "PAY-REF-01",
+      "module": "Payment",
+      "title": "Refund partial + full + revenue/invoice",
+      "severity": "Critical",
+      "priority": "P0",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "REASSIGN-E2E-01",
+      "module": "Schedule",
+      "title": "Đổi GV A→B full E2E (8/12 + HV giữ lịch/điểm/BT)",
+      "severity": "Critical",
+      "priority": "P0",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "SYS-02",
+      "module": "System",
+      "title": "Redis for multi-instance",
+      "severity": "High",
+      "priority": "P1",
+      "expected": "redis up",
+      "actual": "disabled",
+      "reproduce": "GET /healthz",
+      "fixHint": "Bật Redis trên staging/prod trước go-live",
+      "api": "GET /healthz",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Cache/session/socket scale hạn chế khi multi-instance",
+      "rootCause": "REDIS_URL chưa cấu hình trên môi trường local"
+    },
+    {
+      "id": "UI-01",
+      "module": "UI E2E",
+      "title": "Playwright toàn bộ màn Admin/Staff/GV/HV",
+      "severity": "High",
+      "priority": "P1",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "SOCK-01",
+      "module": "Socket",
+      "title": "Realtime reconnect/offline/duplicate event",
+      "severity": "High",
+      "priority": "P1",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "GRADE-HIST-01",
+      "module": "Assignment",
+      "title": "Grade history 80→90→95 old/new/user/time",
+      "severity": "High",
+      "priority": "P1",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "AUTH-CONC-02",
+      "module": "Authentication",
+      "title": "Concurrent password+CAPTCHA login (42 users)",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "Automate được login thật 30HV+6GV+3Admin+3Staff",
+      "actual": "CAPTCHA SVG one-shot — suite không đọc được đáp án → chưa chạy password login đồng thời",
+      "reproduce": "Cần 42 captcha answers song song",
+      "fixHint": "CAPTCHA_BYPASS chỉ khi NODE_ENV=test",
+      "api": "POST /api/auth/login/public|internal",
+      "ui": "Login form",
+      "database": "",
+      "impact": "Chưa verify race device-lock / refresh token trên login thật",
+      "rootCause": "CAPTCHA không có bypass test hook"
+    },
+    {
+      "id": "NOTIF-02",
+      "module": "Notification",
+      "title": "Zalo OA env",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "token present",
+      "actual": "missing",
+      "reproduce": "",
+      "fixHint": "Cấu hình ZALO_OA_ACCESS_TOKEN",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không gửi Zalo ngoài in-app",
+      "rootCause": "Env missing trên local"
+    },
+    {
+      "id": "NOTIF-03",
+      "module": "Notification",
+      "title": "SMTP env",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "SMTP_HOST",
+      "actual": "missing",
+      "reproduce": "",
+      "fixHint": "Cấu hình SMTP_*",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "",
+      "rootCause": "Env missing trên local"
+    },
+    {
+      "id": "FIREBASE-01",
+      "module": "Notification",
+      "title": "Firebase push device thật",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    },
+    {
+      "id": "PERF-01",
+      "module": "Performance",
+      "title": "Đo CPU/RAM/DB query dưới 42 user concurrent write",
+      "severity": "Medium",
+      "priority": "P2",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "reproduce": "",
+      "fixHint": "Bổ sung automation + chạy lại regression",
+      "api": "",
+      "ui": "Chưa kiểm UI (API-only)",
+      "database": "",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này"
+    }
+  ],
+  "md": "# QA Enterprise E2E Report — QUANLYCMS\n\n**Ngày:** 2026-07-29T05:38:44.811Z\n**Môi trường:** Local API `http://127.0.0.1:5000`\n**Stack thực tế:** MongoDB + Mongoose + Express + React/Vite (+ Redis optional, Socket.IO).\n**Lưu ý brief:** PostgreSQL/Prisma/Firebase trong yêu cầu là hướng đích / kênh — **không** phải runtime đã kiểm tra đầy đủ.\n**Phạm vi:** Seed 3CN + roles + 30HV (≥2 khóa) + API smoke + concurrent JWT. **Không Pass toàn hệ thống** khi còn NOT RUN.\n**Quy tắc:** Không sửa product code trong vòng QA này.\n\n## Seed summary\n```json\n{\n  \"branches\": 3,\n  \"superAdmin\": 1,\n  \"admins\": 3,\n  \"staff\": 3,\n  \"teachers\": 6,\n  \"students\": 30,\n  \"courses\": 6,\n  \"password\": \"Test@123456\",\n  \"note\": \"QA_ENTERPRISE_2026\"\n}\n```\n\n## Kết quả case: PASS 15 · FAIL 11 · WARN 0\n**Production readiness (ước lượng, conservative): 52%**\n\n> Module chỉ được gắn **PASS** khi mọi case của module Pass **và** không còn gap nghiệp vụ bắt buộc. Các module còn FAIL/NOT RUN → **FAIL / PARTIAL**.\n\n## Theo module\n\n# System\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 1 · Fail: 1 · Warn: 0\n- **[PASS]** `SYS-01` — Healthz — `200 redis=disabled queue=inline`\n- **[FAIL]** `SYS-02` — Redis for multi-instance — `disabled`\n  - Severity: High\n  - API: GET /healthz\n  - Root cause: REDIS_URL chưa cấu hình trên môi trường local\n  - Fix: Bật Redis trên staging/prod trước go-live\n\n------------------------------------------------\n\n# Authentication\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 1 · Fail: 1 · Warn: 0\n- **[PASS]** `AUTH-CONC-01` — Concurrent JWT /auth/me (42 actors) — `ok=42 fail=0 avgMs=40 wall=54ms`\n- **[FAIL]** `AUTH-CONC-02` — Concurrent password+CAPTCHA login (42 users) — `CAPTCHA SVG one-shot — suite không đọc được đáp án → chưa chạy password login đồng thời`\n  - Severity: Medium\n  - API: POST /api/auth/login/public|internal\n  - Root cause: CAPTCHA không có bypass test hook\n  - Fix: CAPTCHA_BYPASS chỉ khi NODE_ENV=test\n\n------------------------------------------------\n\n# Multi Branch\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `BRANCH-01` — Staff CN1 không thấy HV CN2 — `status=200 total=10 leaked=0`\n\n------------------------------------------------\n\n# RBAC\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `RBAC-01` — Admin CN1 (có finance) bị chặn pay HV CN2 theo branch — `status=403 msg=Không có quyền thao tác học viên chi nhánh khác`\n\n------------------------------------------------\n\n# Course\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `COURSE-01` — DELETE course = soft-delete — `api=200 deletedAt=Wed Jul 29 2026 12:38:44 GMT+0700 (Giờ Đông Dương)`\n\n------------------------------------------------\n\n# Payment\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 1 · Fail: 1 · Warn: 0\n- **[PASS]** `PAY-01` — Admin xác nhận thanh toán — `status=200 paid=true msg=Đã xác nhận thanh toán 2.500.000đ`\n- **[FAIL]** `PAY-REF-01` — Refund partial + full + revenue/invoice — `NOT RUN trong suite lần này`\n  - Severity: Critical\n  - API: -\n  - Root cause: Phạm vi API/seed chưa cover luồng này\n  - Fix: Bổ sung automation + chạy lại regression\n\n------------------------------------------------\n\n# Attendance\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `ATT-01` — GV điểm danh present — `api=200 status=completed att=present`\n\n------------------------------------------------\n\n# Schedule\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 1 · Fail: 1 · Warn: 0\n- **[PASS]** `REASSIGN-01` — Ownership completed GV A ≥ 8 — `{\"6a6991e23dc72df1ba35b4e2\":9}`\n- **[FAIL]** `REASSIGN-E2E-01` — Đổi GV A→B full E2E (8/12 + HV giữ lịch/điểm/BT) — `NOT RUN trong suite lần này`\n  - Severity: Critical\n  - API: -\n  - Root cause: Phạm vi API/seed chưa cover luồng này\n  - Fix: Bổ sung automation + chạy lại regression\n\n------------------------------------------------\n\n# Exam\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `EXAM-01` — Unlock exam — `status=200 unlocked=true`\n\n------------------------------------------------\n\n# Rating\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `RATING-01` — pending rating không public — `false`\n\n------------------------------------------------\n\n# Dashboard\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `DASH-01` — KPI operational ≠ financial — `status=200 separated=true`\n\n------------------------------------------------\n\n# Notification\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 1 · Fail: 3 · Warn: 0\n- **[PASS]** `NOTIF-01` — HV list notifications — `status=200`\n- **[FAIL]** `NOTIF-02` — Zalo OA env — `missing`\n  - Severity: Medium\n  - API: -\n  - Root cause: Env missing trên local\n  - Fix: Cấu hình ZALO_OA_ACCESS_TOKEN\n- **[FAIL]** `NOTIF-03` — SMTP env — `missing`\n  - Severity: Medium\n  - API: -\n  - Root cause: Env missing trên local\n  - Fix: Cấu hình SMTP_*\n- **[FAIL]** `FIREBASE-01` — Firebase push device thật — `NOT RUN trong suite lần này`\n  - Severity: Medium\n  - API: -\n  - Root cause: Phạm vi API/seed chưa cover luồng này\n  - Fix: Bổ sung automation + chạy lại regression\n\n------------------------------------------------\n\n# Assignment\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 1 · Fail: 1 · Warn: 0\n- **[PASS]** `ASG-01` — GV tạo bài tập — `status=200 msg=`\n- **[FAIL]** `GRADE-HIST-01` — Grade history 80→90→95 old/new/user/time — `NOT RUN trong suite lần này`\n  - Severity: High\n  - API: -\n  - Root cause: Phạm vi API/seed chưa cover luồng này\n  - Fix: Bổ sung automation + chạy lại regression\n\n------------------------------------------------\n\n# Audit Log\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `AUDIT-01` — Có audit critical actions — `count=12`\n\n------------------------------------------------\n\n# UI E2E\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 0 · Fail: 1 · Warn: 0\n- **[FAIL]** `UI-01` — Playwright toàn bộ màn Admin/Staff/GV/HV — `NOT RUN trong suite lần này`\n  - Severity: High\n  - API: -\n  - Root cause: Phạm vi API/seed chưa cover luồng này\n  - Fix: Bổ sung automation + chạy lại regression\n\n------------------------------------------------\n\n# Socket\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 0 · Fail: 1 · Warn: 0\n- **[FAIL]** `SOCK-01` — Realtime reconnect/offline/duplicate event — `NOT RUN trong suite lần này`\n  - Severity: High\n  - API: -\n  - Root cause: Phạm vi API/seed chưa cover luồng này\n  - Fix: Bổ sung automation + chạy lại regression\n\n------------------------------------------------\n\n# Performance\n\n**Verdict: ❌ Fail / Partial**\n- Pass: 0 · Fail: 1 · Warn: 0\n- **[FAIL]** `PERF-01` — Đo CPU/RAM/DB query dưới 42 user concurrent write — `NOT RUN trong suite lần này`\n  - Severity: Medium\n  - API: -\n  - Root cause: Phạm vi API/seed chưa cover luồng này\n  - Fix: Bổ sung automation + chạy lại regression\n\n------------------------------------------------\n\n# Regression\n\n**Verdict: ⚠️ Partial (smoke only — chưa đủ luồng nghiệp vụ)**\n- Pass: 1 · Fail: 0 · Warn: 0\n- **[PASS]** `UNIT-01` — Phase integration gates — `pass=120 fail=0 exit=0`\n\n------------------------------------------------\n\n## 1. Danh sách toàn bộ Bug\n\n### SYS-02 — Redis for multi-instance\n- **Severity:** High · **Priority:** P1\n- **Module:** System\n- **Expected / Actual:** redis up / disabled\n- **Root cause:** REDIS_URL chưa cấu hình trên môi trường local\n- **Reproduce:** GET /healthz\n- **API / UI / DB:** GET /healthz / Chưa kiểm UI (API-only) / \n- **Impact:** Cache/session/socket scale hạn chế khi multi-instance\n- **Cách sửa:** Bật Redis trên staging/prod trước go-live\n\n### AUTH-CONC-02 — Concurrent password+CAPTCHA login (42 users)\n- **Severity:** Medium · **Priority:** P2\n- **Module:** Authentication\n- **Expected / Actual:** Automate được login thật 30HV+6GV+3Admin+3Staff / CAPTCHA SVG one-shot — suite không đọc được đáp án → chưa chạy password login đồng thời\n- **Root cause:** CAPTCHA không có bypass test hook\n- **Reproduce:** Cần 42 captcha answers song song\n- **API / UI / DB:** POST /api/auth/login/public|internal / Login form / \n- **Impact:** Chưa verify race device-lock / refresh token trên login thật\n- **Cách sửa:** CAPTCHA_BYPASS chỉ khi NODE_ENV=test\n\n### NOTIF-02 — Zalo OA env\n- **Severity:** Medium · **Priority:** P2\n- **Module:** Notification\n- **Expected / Actual:** token present / missing\n- **Root cause:** Env missing trên local\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** Không gửi Zalo ngoài in-app\n- **Cách sửa:** Cấu hình ZALO_OA_ACCESS_TOKEN\n\n### NOTIF-03 — SMTP env\n- **Severity:** Medium · **Priority:** P2\n- **Module:** Notification\n- **Expected / Actual:** SMTP_HOST / missing\n- **Root cause:** Env missing trên local\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** \n- **Cách sửa:** Cấu hình SMTP_*\n\n### UI-01 — Playwright toàn bộ màn Admin/Staff/GV/HV\n- **Severity:** High · **Priority:** P1\n- **Module:** UI E2E\n- **Expected / Actual:** Đã kiểm tra E2E đầy đủ / NOT RUN trong suite lần này\n- **Root cause:** Phạm vi API/seed chưa cover luồng này\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** Không đủ bằng chứng Pass cho go-live\n- **Cách sửa:** Bổ sung automation + chạy lại regression\n\n### SOCK-01 — Realtime reconnect/offline/duplicate event\n- **Severity:** High · **Priority:** P1\n- **Module:** Socket\n- **Expected / Actual:** Đã kiểm tra E2E đầy đủ / NOT RUN trong suite lần này\n- **Root cause:** Phạm vi API/seed chưa cover luồng này\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** Không đủ bằng chứng Pass cho go-live\n- **Cách sửa:** Bổ sung automation + chạy lại regression\n\n### PAY-REF-01 — Refund partial + full + revenue/invoice\n- **Severity:** Critical · **Priority:** P0\n- **Module:** Payment\n- **Expected / Actual:** Đã kiểm tra E2E đầy đủ / NOT RUN trong suite lần này\n- **Root cause:** Phạm vi API/seed chưa cover luồng này\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** Không đủ bằng chứng Pass cho go-live\n- **Cách sửa:** Bổ sung automation + chạy lại regression\n\n### GRADE-HIST-01 — Grade history 80→90→95 old/new/user/time\n- **Severity:** High · **Priority:** P1\n- **Module:** Assignment\n- **Expected / Actual:** Đã kiểm tra E2E đầy đủ / NOT RUN trong suite lần này\n- **Root cause:** Phạm vi API/seed chưa cover luồng này\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** Không đủ bằng chứng Pass cho go-live\n- **Cách sửa:** Bổ sung automation + chạy lại regression\n\n### REASSIGN-E2E-01 — Đổi GV A→B full E2E (8/12 + HV giữ lịch/điểm/BT)\n- **Severity:** Critical · **Priority:** P0\n- **Module:** Schedule\n- **Expected / Actual:** Đã kiểm tra E2E đầy đủ / NOT RUN trong suite lần này\n- **Root cause:** Phạm vi API/seed chưa cover luồng này\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** Không đủ bằng chứng Pass cho go-live\n- **Cách sửa:** Bổ sung automation + chạy lại regression\n\n### FIREBASE-01 — Firebase push device thật\n- **Severity:** Medium · **Priority:** P2\n- **Module:** Notification\n- **Expected / Actual:** Đã kiểm tra E2E đầy đủ / NOT RUN trong suite lần này\n- **Root cause:** Phạm vi API/seed chưa cover luồng này\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** Không đủ bằng chứng Pass cho go-live\n- **Cách sửa:** Bổ sung automation + chạy lại regression\n\n### PERF-01 — Đo CPU/RAM/DB query dưới 42 user concurrent write\n- **Severity:** Medium · **Priority:** P2\n- **Module:** Performance\n- **Expected / Actual:** Đã kiểm tra E2E đầy đủ / NOT RUN trong suite lần này\n- **Root cause:** Phạm vi API/seed chưa cover luồng này\n- **Reproduce:** \n- **API / UI / DB:**  / Chưa kiểm UI (API-only) / \n- **Impact:** Không đủ bằng chứng Pass cho go-live\n- **Cách sửa:** Bổ sung automation + chạy lại regression\n\n## 2. Phân loại severity\n- Critical: 2\n- High: 4\n- Medium: 5\n- Low: 0\n\n## 3. Production readiness: **52%**\nKhông khuyến nghị Production cho đến khi Critical/High nghiệp vụ (refund, reassign E2E, Redis, UI/Socket) được đóng.\n\n## 4. Chức năng còn thiếu / chưa cover\n- UI E2E Playwright đầy đủ mọi role/màn\n- Concurrent password+CAPTCHA login 42 users\n- Firebase Push thật\n- Zalo/Email send end-to-end (nếu env thiếu)\n- Socket reconnect/offline/duplicate matrix\n- Refund partial/full chứng từ đầy đủ\n- Grade edit history collection/UI\n- Đổi GV A→B full business E2E (giữ lịch/điểm/BT + payroll 8/12)\n- PostgreSQL/Prisma — brief lệch; runtime hiện tại MongoDB+Mongoose\n- Perf profiling CPU/RAM/query plan dưới tải write\n\n## 5. Rủi ro nếu Production ngay\n- Redis disabled → rủi ro multi-instance / cache inconsistency\n- CAPTCHA + device lock chưa load-test bằng automation\n- Coverage API-only → bug UI/UX và Socket có thể lọt\n- Refund/grade-history/reassign E2E chưa chạy → rủi ro tài chính & lương GV\n- Cross-branch IDOR phụ thuộc middleware nhất quán trên mọi route\n- Phase 8–15 soft-delete/ledger mới — cần verify trên staging gần prod\n\n## 6. Thứ tự sửa ưu tiên\n1. [Critical] PAY-REF-01 — Refund partial + full + revenue/invoice\n2. [Critical] REASSIGN-E2E-01 — Đổi GV A→B full E2E (8/12 + HV giữ lịch/điểm/BT)\n3. [High] SYS-02 — Redis for multi-instance\n4. [High] UI-01 — Playwright toàn bộ màn Admin/Staff/GV/HV\n5. [High] SOCK-01 — Realtime reconnect/offline/duplicate event\n6. [High] GRADE-HIST-01 — Grade history 80→90→95 old/new/user/time\n7. [Medium] AUTH-CONC-02 — Concurrent password+CAPTCHA login (42 users)\n8. [Medium] NOTIF-02 — Zalo OA env\n9. [Medium] NOTIF-03 — SMTP env\n10. [Medium] FIREBASE-01 — Firebase push device thật\n11. [Medium] PERF-01 — Đo CPU/RAM/DB query dưới 42 user concurrent write\n\n## 7. Regression rule\nSau mỗi bugfix: chạy lại module liên quan + `node --test tests/integration/*Phase*.test.js` + `node scripts/qa_enterprise_seed_e2e.cjs`.\n\n## Credentials test (local only — đổi ngay nếu lộ)\n- Password chung: `Test@123456`\n- Super Admin phone: `0999000001`\n- Admin CN1: `0981100001` · Staff CN1: `0982100001` · GV CN1-1: `097100001`\n- HV CN1-01: `096110001` · email `qa.hv.cn1.01@test.local`",
+  "results": [
+    {
+      "id": "SYS-01",
+      "module": "System",
+      "name": "Healthz",
+      "expected": "200 healthy",
+      "actual": "200 redis=disabled queue=inline",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "GET /healthz",
+      "impact": "Môi trường test không chạy",
+      "rootCause": ""
+    },
+    {
+      "id": "SYS-02",
+      "module": "System",
+      "name": "Redis for multi-instance",
+      "expected": "redis up",
+      "actual": "disabled",
+      "result": "FAIL",
+      "severity": "High",
+      "api": "GET /healthz",
+      "impact": "Cache/session/socket scale hạn chế khi multi-instance",
+      "rootCause": "REDIS_URL chưa cấu hình trên môi trường local",
+      "fixHint": "Bật Redis trên staging/prod trước go-live"
+    },
+    {
+      "id": "AUTH-CONC-01",
+      "module": "Authentication",
+      "name": "Concurrent JWT /auth/me (42 actors)",
+      "expected": "all 200",
+      "actual": "ok=42 fail=0 avgMs=40 wall=54ms",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "GET /api/auth/me",
+      "reproduce": "Mint 42 JWT → Promise.all /auth/me",
+      "impact": "JWT/session không chịu tải đồng thời",
+      "database": "Teacher/Student by JWT id"
+    },
+    {
+      "id": "AUTH-CONC-02",
+      "module": "Authentication",
+      "name": "Concurrent password+CAPTCHA login (42 users)",
+      "expected": "Automate được login thật 30HV+6GV+3Admin+3Staff",
+      "actual": "CAPTCHA SVG one-shot — suite không đọc được đáp án → chưa chạy password login đồng thời",
+      "result": "FAIL",
+      "severity": "Medium",
+      "api": "POST /api/auth/login/public|internal",
+      "rootCause": "CAPTCHA không có bypass test hook",
+      "reproduce": "Cần 42 captcha answers song song",
+      "impact": "Chưa verify race device-lock / refresh token trên login thật",
+      "fixHint": "CAPTCHA_BYPASS chỉ khi NODE_ENV=test",
+      "ui": "Login form"
+    },
+    {
+      "id": "BRANCH-01",
+      "module": "Multi Branch",
+      "name": "Staff CN1 không thấy HV CN2",
+      "expected": "0 HV CN2",
+      "actual": "status=200 total=10 leaked=0",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "GET /api/students",
+      "reproduce": "Staff CN1 list students",
+      "impact": "Lộ PII chi nhánh khác",
+      "database": "Student.branchId",
+      "fixHint": "branchFilter + assertStudentBranchAccess",
+      "ui": "Admin/Staff students table"
+    },
+    {
+      "id": "RBAC-01",
+      "module": "RBAC",
+      "name": "Admin CN1 (có finance) bị chặn pay HV CN2 theo branch",
+      "expected": "403/404 do branch scope (không phải thiếu permission)",
+      "actual": "status=403 msg=Không có quyền thao tác học viên chi nhánh khác",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "PUT /api/students/:id/pay",
+      "reproduce": "Admin CN1 (DB có manage_finance) PUT pay student CN2",
+      "impact": "Leo thang tài chính cross-branch / IDOR",
+      "rootCause": "",
+      "database": "Student.paid / LedgerEntry",
+      "fixHint": "assertStudentBranchAccess trên mọi mutation finance"
+    },
+    {
+      "id": "COURSE-01",
+      "module": "Course",
+      "name": "DELETE course = soft-delete",
+      "expected": "API ok + deletedAt set",
+      "actual": "api=200 deletedAt=Wed Jul 29 2026 12:38:44 GMT+0700 (Giờ Đông Dương)",
+      "result": "PASS",
+      "severity": "High",
+      "api": "DELETE /api/courses/:id",
+      "database": "Course.deletedAt",
+      "fixHint": "softDeleteCourse service",
+      "impact": "Hard delete mất lịch sử/revenue",
+      "rootCause": ""
+    },
+    {
+      "id": "PAY-01",
+      "module": "Payment",
+      "name": "Admin xác nhận thanh toán",
+      "expected": "200 + paid=true",
+      "actual": "status=200 paid=true msg=Đã xác nhận thanh toán 2.500.000đ",
+      "result": "PASS",
+      "severity": "Critical",
+      "api": "PUT /api/students/:id/pay",
+      "database": "Student.paid, Invoice, LedgerEntry",
+      "ui": "Admin mark paid",
+      "impact": "Không cấp quyền học / lệch doanh thu",
+      "rootCause": ""
+    },
+    {
+      "id": "ATT-01",
+      "module": "Attendance",
+      "name": "GV điểm danh present",
+      "expected": "200 + completed/present",
+      "actual": "api=200 status=completed att=present",
+      "result": "PASS",
+      "severity": "High",
+      "api": "POST /api/schedules/:id/attendance",
+      "database": "Schedule + AuditLog",
+      "ui": "Teacher calendar",
+      "rootCause": ""
+    },
+    {
+      "id": "REASSIGN-01",
+      "module": "Schedule",
+      "name": "Ownership completed GV A ≥ 8",
+      "expected": "split[6a6991e23dc72df1ba35b4e2]>=8",
+      "actual": "{\"6a6991e23dc72df1ba35b4e2\":9}",
+      "result": "PASS",
+      "severity": "High",
+      "api": "teacherReassignmentService.computeCompletedSplitByTeacher",
+      "database": "Schedule.teacherId/status",
+      "impact": "Sai lương khi đổi GV"
+    },
+    {
+      "id": "EXAM-01",
+      "module": "Exam",
+      "name": "Unlock exam",
+      "expected": "200 + studentExamUnlocked",
+      "actual": "status=200 unlocked=true",
+      "result": "PASS",
+      "severity": "High",
+      "api": "PUT /api/students/:id/unlock-exam",
+      "database": "Student.studentExamUnlocked",
+      "rootCause": ""
+    },
+    {
+      "id": "RATING-01",
+      "module": "Rating",
+      "name": "pending rating không public",
+      "expected": "false",
+      "actual": "false",
+      "result": "PASS",
+      "severity": "High",
+      "api": "ratingLifecycleService.isPublicRating"
+    },
+    {
+      "id": "DASH-01",
+      "module": "Dashboard",
+      "name": "KPI operational ≠ financial",
+      "expected": "meta.kpisSeparated true",
+      "actual": "status=200 separated=true",
+      "result": "PASS",
+      "severity": "High",
+      "api": "GET /api/analytics/kpi"
+    },
+    {
+      "id": "NOTIF-01",
+      "module": "Notification",
+      "name": "HV list notifications",
+      "expected": "200",
+      "actual": "status=200",
+      "result": "PASS",
+      "severity": "Medium",
+      "api": "GET /api/notifications"
+    },
+    {
+      "id": "NOTIF-02",
+      "module": "Notification",
+      "name": "Zalo OA env",
+      "expected": "token present",
+      "actual": "missing",
+      "result": "FAIL",
+      "severity": "Medium",
+      "impact": "Không gửi Zalo ngoài in-app",
+      "fixHint": "Cấu hình ZALO_OA_ACCESS_TOKEN",
+      "rootCause": "Env missing trên local"
+    },
+    {
+      "id": "NOTIF-03",
+      "module": "Notification",
+      "name": "SMTP env",
+      "expected": "SMTP_HOST",
+      "actual": "missing",
+      "result": "FAIL",
+      "severity": "Medium",
+      "fixHint": "Cấu hình SMTP_*",
+      "rootCause": "Env missing trên local"
+    },
+    {
+      "id": "ASG-01",
+      "module": "Assignment",
+      "name": "GV tạo bài tập",
+      "expected": "200/201",
+      "actual": "status=200 msg=",
+      "result": "PASS",
+      "severity": "High",
+      "api": "POST /api/assignments",
+      "ui": "Teacher assignments",
+      "rootCause": ""
+    },
+    {
+      "id": "AUDIT-01",
+      "module": "Audit Log",
+      "name": "Có audit critical actions",
+      "expected": "count>0",
+      "actual": "count=12",
+      "result": "PASS",
+      "severity": "High",
+      "database": "AuditLog"
+    },
+    {
+      "id": "UI-01",
+      "module": "UI E2E",
+      "name": "Playwright toàn bộ màn Admin/Staff/GV/HV",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "result": "FAIL",
+      "severity": "High",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "fixHint": "Bổ sung automation + chạy lại regression"
+    },
+    {
+      "id": "SOCK-01",
+      "module": "Socket",
+      "name": "Realtime reconnect/offline/duplicate event",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "result": "FAIL",
+      "severity": "High",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "fixHint": "Bổ sung automation + chạy lại regression"
+    },
+    {
+      "id": "PAY-REF-01",
+      "module": "Payment",
+      "name": "Refund partial + full + revenue/invoice",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "result": "FAIL",
+      "severity": "Critical",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "fixHint": "Bổ sung automation + chạy lại regression"
+    },
+    {
+      "id": "GRADE-HIST-01",
+      "module": "Assignment",
+      "name": "Grade history 80→90→95 old/new/user/time",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "result": "FAIL",
+      "severity": "High",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "fixHint": "Bổ sung automation + chạy lại regression"
+    },
+    {
+      "id": "REASSIGN-E2E-01",
+      "module": "Schedule",
+      "name": "Đổi GV A→B full E2E (8/12 + HV giữ lịch/điểm/BT)",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "result": "FAIL",
+      "severity": "Critical",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "fixHint": "Bổ sung automation + chạy lại regression"
+    },
+    {
+      "id": "FIREBASE-01",
+      "module": "Notification",
+      "name": "Firebase push device thật",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "result": "FAIL",
+      "severity": "Medium",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "fixHint": "Bổ sung automation + chạy lại regression"
+    },
+    {
+      "id": "PERF-01",
+      "module": "Performance",
+      "name": "Đo CPU/RAM/DB query dưới 42 user concurrent write",
+      "expected": "Đã kiểm tra E2E đầy đủ",
+      "actual": "NOT RUN trong suite lần này",
+      "result": "FAIL",
+      "severity": "Medium",
+      "rootCause": "Phạm vi API/seed chưa cover luồng này",
+      "impact": "Không đủ bằng chứng Pass cho go-live",
+      "fixHint": "Bổ sung automation + chạy lại regression"
+    },
+    {
+      "id": "UNIT-01",
+      "module": "Regression",
+      "name": "Phase integration gates",
+      "expected": "fail=0",
+      "actual": "pass=120 fail=0 exit=0",
+      "result": "PASS",
+      "severity": "High",
+      "api": "node --test *Phase*.test.js",
+      "fixHint": "Xem fail trong tests/integration",
+      "rootCause": ""
+    }
+  ],
+  "generatedAt": "2026-07-29T05:38:44.811Z"
+}
