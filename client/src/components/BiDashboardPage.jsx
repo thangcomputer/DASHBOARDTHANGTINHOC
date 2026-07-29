@@ -111,7 +111,7 @@ export default function BiDashboardPage() {
   const k = data?.kpis || {};
 
   return (
-    <div className="cms-viewport-fill w-full">
+    <div className="w-full h-full min-h-0 flex flex-col gap-3 sm:gap-4 overflow-hidden">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between shrink-0">
         <div className="min-w-0">
           <h1 className="cms-m-title flex items-center gap-2">
@@ -155,7 +155,7 @@ export default function BiDashboardPage() {
       </div>
 
       {loading && !data ? (
-        <div className="cms-viewport-scroll grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3" aria-busy="true" aria-label="Đang tải">
+        <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3" aria-busy="true" aria-label="Đang tải">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="cms-m-kpi animate-pulse">
               <div className="w-10 h-10 rounded-xl bg-slate-100 mb-3" />
@@ -165,7 +165,7 @@ export default function BiDashboardPage() {
           ))}
         </div>
       ) : (
-        <div className="cms-viewport-scroll space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 hide-scrollbar">
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi icon={Users} label="Học viên mới" value={k.studentsNew ?? 0} delta={k.studentsNewChange} sub={`Tổng ${k.studentsTotal ?? 0}`} />
             <Kpi icon={DollarSign} label="Doanh thu thuần (kỳ)" value={fmtMoney(k.revenuePeriod)} delta={k.revenueChange} color="text-emerald-600" bg="bg-emerald-50" sub={`Tỷ lệ TT ${k.paidRate ?? 0}%`} />
@@ -201,33 +201,26 @@ export default function BiDashboardPage() {
                 <MiniBars data={data?.trend || []} field="students" color="#6366f1" />
               </div>
             </div>
-            <div className="cms-m-card p-4">
-              <h2 className="cms-m-heading text-base mb-3">Doanh thu đăng ký (theo ngày)</h2>
-              <div className="cms-m-chart">
-                <MiniBars data={data?.trend || []} field="revenue" color="#10b981" />
+            <div className="cms-m-card overflow-hidden flex flex-col min-h-[220px]">
+              <div className="px-4 py-3 border-b border-slate-50 shrink-0">
+                <h2 className="cms-m-heading text-base">Top khóa học (kỳ này)</h2>
               </div>
+              <ul className="divide-y divide-slate-50 flex-1 min-h-0 overflow-y-auto">
+                {(data?.byCourse || []).length === 0 ? (
+                  <li className="cms-m-empty min-h-[140px]">Chưa có dữ liệu</li>
+                ) : (
+                  data.byCourse.map((c) => (
+                    <li key={c.course} className="cms-m-list-row">
+                      <span className="cms-m-list-title flex-1">{c.course}</span>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="cms-m-caption font-bold">{c.count} HV</span>
+                        <span className="text-[13px] font-extrabold text-emerald-700">{fmtMoney(c.revenue)}</span>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ul>
             </div>
-          </div>
-
-          <div className="cms-m-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-50">
-              <h2 className="cms-m-heading text-base">Top khóa học (kỳ này)</h2>
-            </div>
-            <ul className="divide-y divide-slate-50">
-              {(data?.byCourse || []).length === 0 ? (
-                <li className="cms-m-empty min-h-[140px]">Chưa có dữ liệu</li>
-              ) : (
-                data.byCourse.map((c) => (
-                  <li key={c.course} className="cms-m-list-row">
-                    <span className="cms-m-list-title flex-1">{c.course}</span>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="cms-m-caption font-bold">{c.count} HV</span>
-                      <span className="text-[13px] font-extrabold text-emerald-700">{fmtMoney(c.revenue)}</span>
-                    </div>
-                  </li>
-                ))
-              )}
-            </ul>
           </div>
         </div>
       )}

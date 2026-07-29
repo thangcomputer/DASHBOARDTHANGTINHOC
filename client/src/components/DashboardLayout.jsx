@@ -257,8 +257,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const adminHash = (location.hash || '').replace('#', '') || (location.pathname === '/admin' ? 'dashboard' : '');
   const isStudentsTab = adminHash === 'students';
   const isInboxPage = location.pathname.includes('/inbox');
+  const isBiPage = location.pathname.includes('/bi');
   const isImmersivePage =
-    isInboxPage || (role === 'teacher' && location.pathname === '/teacher/test');
+    isInboxPage || isBiPage || (role === 'teacher' && location.pathname === '/teacher/test');
   const showAdminBranch = role === 'admin';
   const roleLabel = role === 'admin'
     ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')
@@ -496,8 +497,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
         <div
           className={
-            isInboxPage
-              // Hộp thư: giữ full-height nhưng padding ngang giống Tài chính (không sát sidebar)
+            isInboxPage || isBiPage
+              // Hộp thư / BI: full-height + padding ngang giống Tài chính
               ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col px-2.5 py-1.5 sm:px-4 sm:py-3 md:px-6 md:py-4 lg:px-8 lg:py-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]'
               : isImmersivePage
                 ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
@@ -508,7 +509,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         >
           <div
             className={
-              isInboxPage
+              isInboxPage || isBiPage
                 ? 'cms-page min-w-0 mx-auto max-w-7xl xl:max-w-[90rem] 2xl:max-w-[100rem] flex-1 min-h-0 h-full flex flex-col overflow-hidden'
                 : isImmersivePage
                   ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
