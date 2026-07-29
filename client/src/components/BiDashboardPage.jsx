@@ -111,7 +111,7 @@ export default function BiDashboardPage() {
   const k = data?.kpis || {};
 
   return (
-    <div className="max-w-6xl mx-auto cms-viewport-fill">
+    <div className="cms-viewport-fill w-full">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between shrink-0">
         <div className="min-w-0">
           <h1 className="cms-m-title flex items-center gap-2">
