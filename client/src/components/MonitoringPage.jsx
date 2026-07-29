@@ -87,8 +87,8 @@ export default function MonitoringPage({ session }) {
   const alerts = data?.alerts || [];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="cms-viewport-fill w-full">
+      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <Activity className="text-cyan-600" size={22} /> Monitoring
@@ -110,9 +110,9 @@ export default function MonitoringPage({ session }) {
       </div>
 
       {loading && !data ? (
-        <div className="p-16 flex justify-center text-gray-400"><Loader2 className="animate-spin" size={28} /></div>
+        <div className="cms-viewport-scroll p-16 flex justify-center text-gray-400"><Loader2 className="animate-spin" size={28} /></div>
       ) : (
-        <>
+        <div className="cms-viewport-scroll space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={health?.status || 'unknown'} />
             <span className="text-xs text-gray-500 font-medium">
@@ -182,12 +182,12 @@ export default function MonitoringPage({ session }) {
             <StatCard icon={CheckCircle2} label="Latency max" value={`${metrics?.latency?.maxMs ?? 0} ms`} sub={`P50 ${metrics?.latency?.p50Ms ?? 0} ms`} color="text-emerald-600" bg="bg-emerald-50" />
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-4">
-            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-gray-50">
+          <div className="grid lg:grid-cols-2 gap-4 min-h-[220px]">
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-0 max-h-[min(40vh,22rem)]">
+              <div className="px-4 py-3 border-b border-gray-50 shrink-0">
                 <h2 className="text-sm font-black text-gray-800">Top endpoints</h2>
               </div>
-              <ul className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+              <ul className="divide-y divide-gray-50 flex-1 min-h-0 overflow-y-auto">
                 {(metrics?.topPaths || []).length === 0 ? (
                   <li className="p-6 text-center text-xs text-gray-400 font-bold">Chưa có traffic</li>
                 ) : (
@@ -203,11 +203,11 @@ export default function MonitoringPage({ session }) {
               </ul>
             </div>
 
-            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-gray-50">
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-0 max-h-[min(40vh,22rem)]">
+              <div className="px-4 py-3 border-b border-gray-50 shrink-0">
                 <h2 className="text-sm font-black text-gray-800">Lỗi gần đây</h2>
               </div>
-              <ul className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+              <ul className="divide-y divide-gray-50 flex-1 min-h-0 overflow-y-auto">
                 {(metrics?.recentErrors || []).length === 0 ? (
                   <li className="p-6 text-center text-xs text-gray-400 font-bold">Không có lỗi gần đây</li>
                 ) : (
@@ -225,7 +225,7 @@ export default function MonitoringPage({ session }) {
               </ul>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -80,8 +80,8 @@ export default function TenantManagementPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="cms-viewport-fill w-full">
+      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <Building2 className="text-red-600" size={22} /> Multi-tenant
@@ -99,7 +99,7 @@ export default function TenantManagementPage() {
       </div>
 
       {showCreate && (
-        <div className="bg-white border border-violet-100 rounded-2xl p-4 space-y-2 shadow-sm">
+        <div className="bg-white border border-violet-100 rounded-2xl p-4 space-y-2 shadow-sm shrink-0">
           <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Tên tổ chức" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold" />
           <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Mã (vd: ACME)" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono font-bold" maxLength={16} />
           <div className="grid grid-cols-2 gap-2">
@@ -113,8 +113,8 @@ export default function TenantManagementPage() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <ul className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-50 overflow-hidden">
+      <div className="grid lg:grid-cols-2 gap-4 flex-1 min-h-0">
+        <ul className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-50 overflow-y-auto min-h-0 max-lg:max-h-[40vh] h-full">
           {tenants.map((t) => (
             <li key={t._id} className={`p-3 flex items-center gap-2 cursor-pointer hover:bg-gray-50 ${selected?._id === t._id ? 'bg-red-50' : ''}`} onClick={() => openTenant(t)}>
               <div className="flex-1 min-w-0">
@@ -133,7 +133,7 @@ export default function TenantManagementPage() {
           ))}
         </ul>
 
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3 shadow-sm min-h-[200px]">
+        <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3 shadow-sm overflow-y-auto min-h-0 max-lg:min-h-[200px] h-full">
           {!selected ? (
             <p className="text-sm text-gray-400 font-bold text-center py-10">Chọn tenant để xem chi tiết</p>
           ) : (

@@ -102,9 +102,8 @@ export default function AdminLogsTab() {
   const rows = Array.isArray(dbLogs) ? dbLogs : [];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
+    <div className="cms-viewport-module bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-500">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white shrink-0">
           <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
             <Lock size={20} className="text-slate-600" />
             Nhật Ký Hệ Thống
@@ -118,7 +117,7 @@ export default function AdminLogsTab() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="cms-viewport-scroll overflow-x-auto">
           {isLoadingLogs ? (
             <div className="p-12 text-center text-gray-400">
               <RefreshCw size={40} className="mx-auto mb-3 text-gray-300 animate-spin" />
@@ -173,7 +172,6 @@ export default function AdminLogsTab() {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -83,8 +83,8 @@ export default function AiCenterPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="cms-viewport-fill w-full">
+      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <Sparkles className="text-fuchsia-600" size={22} /> AI Center
@@ -98,7 +98,7 @@ export default function AiCenterPage() {
         </button>
       </div>
 
-      <div className={`rounded-xl border px-3 py-2 text-xs font-bold flex items-start gap-2 ${
+      <div className={`rounded-xl border px-3 py-2 text-xs font-bold flex items-start gap-2 shrink-0 ${
         status?.healthy
           ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
           : status?.configured
@@ -115,7 +115,7 @@ export default function AiCenterPage() {
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 shrink-0">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -130,6 +130,7 @@ export default function AiCenterPage() {
         ))}
       </div>
 
+      <div className="cms-viewport-scroll space-y-4">
       <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3 shadow-sm">
         {tab === 'quiz' && (
           <>
@@ -207,6 +208,7 @@ export default function AiCenterPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

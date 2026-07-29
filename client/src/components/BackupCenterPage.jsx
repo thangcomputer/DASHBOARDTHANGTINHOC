@@ -95,8 +95,8 @@ export default function BackupCenterPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="cms-viewport-fill w-full">
+      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <Archive className="text-red-600" size={22} /> Sao lưu dữ liệu
@@ -121,7 +121,7 @@ export default function BackupCenterPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
         {[
           { label: 'Tổng job', value: stats?.total ?? '—' },
           { label: 'Thành công', value: stats?.completed ?? '—' },
@@ -135,13 +135,13 @@ export default function BackupCenterPage() {
         ))}
       </div>
 
-      <div className="bg-red-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-800 font-medium">
+      <div className="bg-red-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-800 font-medium shrink-0">
         Backup xuất toàn bộ collection MongoDB ra file <code className="font-mono">.json.gz</code>.
         Lịch tự động 03:00 hàng ngày (tắt bằng <code className="font-mono">BACKUP_SCHEDULE=0</code>).
         Restore thủ công từ file tải về — không ghi đè DB qua UI.
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden cms-viewport-scroll">
         {loading && items.length === 0 ? (
           <div className="p-12 flex justify-center text-gray-400"><Loader2 className="animate-spin" size={28} /></div>
         ) : items.length === 0 ? (

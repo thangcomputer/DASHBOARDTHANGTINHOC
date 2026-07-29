@@ -131,8 +131,8 @@ export default function FileCenterPage() {
   };
 
   return (
-    <div className="w-full max-w-full space-y-3 sm:space-y-4">
-      <div className="cms-toolbar">
+    <div className="cms-viewport-fill w-full">
+      <div className="cms-toolbar shrink-0">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-black text-gray-900 flex items-center gap-2">
             <HardDrive className="text-indigo-600 flex-shrink-0" size={22} /> Quản lý file
@@ -152,7 +152,7 @@ export default function FileCenterPage() {
       </div>
 
       {stats?.byCategory?.length > 0 && (
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 shrink-0">
           {stats.byCategory.map((c) => (
             <button
               key={c.category}
@@ -169,7 +169,7 @@ export default function FileCenterPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 cms-mobile-stack sm:flex sm:flex-row sm:flex-wrap sm:items-end gap-3">
+      <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 cms-mobile-stack sm:flex sm:flex-row sm:flex-wrap sm:items-end gap-3 shrink-0">
         <div className="w-full sm:w-auto sm:min-w-[12rem] flex-1">
           <label className="text-[10px] font-black text-gray-400 uppercase">Category upload</label>
           <CmsSelect
@@ -194,7 +194,7 @@ export default function FileCenterPage() {
         <input ref={inputRef} type="file" className="hidden" onChange={onUpload} />
       </div>
 
-      <form onSubmit={onSearch} className="cms-mobile-stack sm:flex sm:flex-row sm:flex-wrap gap-2 sm:items-center">
+      <form onSubmit={onSearch} className="cms-mobile-stack sm:flex sm:flex-row sm:flex-wrap gap-2 sm:items-center shrink-0">
         <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
           <Filter size={14} className="text-gray-400 flex-shrink-0" />
           <CmsSelect
@@ -220,7 +220,7 @@ export default function FileCenterPage() {
         <button type="submit" className="w-full sm:w-auto px-3 py-2 rounded-xl bg-gray-900 text-white text-xs font-bold">Tìm</button>
       </form>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden cms-viewport-scroll flex flex-col min-h-0">
         {loading ? (
           <div className="p-12 flex justify-center text-gray-400"><Loader2 className="animate-spin" size={28} /></div>
         ) : items.length === 0 ? (
@@ -265,7 +265,7 @@ export default function FileCenterPage() {
       </div>
 
       {pages > 1 && (
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 shrink-0">
           <button type="button" disabled={page <= 1} onClick={() => load(page - 1)} className="p-2 rounded-xl border border-gray-200 disabled:opacity-40">
             <ChevronLeft size={18} />
           </button>

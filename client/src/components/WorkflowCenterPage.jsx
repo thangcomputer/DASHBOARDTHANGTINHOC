@@ -70,8 +70,8 @@ export default function WorkflowCenterPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="cms-viewport-fill w-full">
+      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <GitBranch className="text-teal-600" size={22} /> Workflow
@@ -85,7 +85,7 @@ export default function WorkflowCenterPage() {
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
         <Filter size={14} className="text-gray-400" />
         <CmsSelect value={status} onChange={(e) => setStatus(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-white">
           <option value="open">Đang mở</option>
@@ -102,7 +102,7 @@ export default function WorkflowCenterPage() {
       </div>
 
       {status === 'open' && (
-        <div className="bg-white border border-gray-100 rounded-xl p-3">
+        <div className="bg-white border border-gray-100 rounded-xl p-3 shrink-0">
           <label className="text-[10px] font-black text-gray-400 uppercase">Ghi chú khi duyệt / từ chối</label>
           <input
             value={note}
@@ -113,7 +113,7 @@ export default function WorkflowCenterPage() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm cms-viewport-scroll">
         {loading ? (
           <div className="p-12 flex justify-center text-gray-400"><Loader2 className="animate-spin" size={28} /></div>
         ) : items.length === 0 ? (

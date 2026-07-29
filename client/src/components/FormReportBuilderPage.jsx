@@ -169,8 +169,8 @@ export default function FormReportBuilderPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="cms-viewport-fill w-full">
+      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <FormInput className="text-sky-600" size={22} /> Form & Report Builder
@@ -180,11 +180,12 @@ export default function FormReportBuilderPage() {
         <button type="button" onClick={load} className="p-2.5 rounded-xl bg-gray-50 text-gray-500"><RefreshCw size={16} /></button>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 shrink-0">
         <button type="button" onClick={() => setTab('forms')} className={`px-3 py-2 rounded-xl text-xs font-bold border ${tab === 'forms' ? 'bg-red-600 text-white border-sky-600' : 'bg-white border-gray-200'}`}>Forms</button>
         <button type="button" onClick={() => setTab('reports')} className={`px-3 py-2 rounded-xl text-xs font-bold border ${tab === 'reports' ? 'bg-red-600 text-white border-sky-600' : 'bg-white border-gray-200'}`}>Reports</button>
       </div>
 
+      <div className="cms-viewport-scroll space-y-4">
       {tab === 'forms' && (
         <div className="grid lg:grid-cols-2 gap-4">
           <div className="space-y-3">
@@ -361,6 +362,7 @@ export default function FormReportBuilderPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
