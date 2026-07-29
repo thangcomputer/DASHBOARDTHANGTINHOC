@@ -111,13 +111,23 @@ router.get('/:id', authMiddleware, branchFilter, async (req, res) => {
 
 // ─── POST /api/invoices ────────────────────────────────────────────────────────
 // Tạo hóa đơn thủ công (Admin) — dùng field names từ Student schema mới
-router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter], async (req, res) => {
   try {
     const { hocVienId, ghiChu } = req.body;
 
     const student = await Student.findById(hocVienId);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+
+    if (req.userBranchId) {
+      const studentBranch = student.branchId ? String(student.branchId) : null;
+      if (studentBranch && studentBranch !== String(req.userBranchId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Không có quyền thao tác học viên chi nhánh khác',
+        });
+      }
     }
 
     // Tạo mã hóa đơn

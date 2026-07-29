@@ -234,7 +234,9 @@ router.post('/', authMiddleware, async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       if (newAssignment.studentId) {
-        io.to(`student_${String(newAssignment.studentId)}`).emit('assignment:new', newAssignment);
+        const sid = String(newAssignment.studentId);
+        io.to(sid).emit('assignment:new', newAssignment);
+        io.to(`student_${sid}`).emit('assignment:new', newAssignment);
       } else {
         io.to(`course_${req.body.courseId}`).emit('assignment:new', newAssignment);
       }
@@ -555,6 +557,7 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
     const io = req.app.get('io');
     if (io) {
       // Emit to student
+      io.to(String(submission.studentId)).emit('submission:graded', submission);
       io.to(`student_${submission.studentId}`).emit('submission:graded', submission);
       
       try {

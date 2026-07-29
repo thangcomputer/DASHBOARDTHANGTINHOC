@@ -1171,7 +1171,7 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
 
 // ─── POST /api/students/:id/enrollments ───────────────────────────────────────
 // Admin thêm khóa học mới cho học viên (cùng tài khoản, khác môn / thầy)
-router.post('/:id/enrollments', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.post('/:id/enrollments', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const { courseName, courseId, teacherId, price, totalSessions, paid } = req.body;
     if (!courseName?.trim() && !courseId) {
@@ -1291,7 +1291,7 @@ function syncStudentFromPrimaryEnrollment(student) {
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/settings ─────────────────
 // Cập nhật quyền theo khóa: requireWebcam, examUnlocked
-router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.put('/:id/enrollments/:enrollmentId/settings', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) {
@@ -1341,7 +1341,7 @@ router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermi
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/pay ──────────────────────
 // Xác nhận thanh toán học phí cho 1 khóa (enrollment)
-router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const { paymentMethod = 'cash', note = '' } = req.body || {};
     const student = await Student.findById(req.params.id);
@@ -1406,7 +1406,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, checkPermission
 
 // ─── DELETE /api/students/:id/enrollments/:enrollmentId ───────────────────────
 // Xóa 1 khóa học khỏi tài khoản học viên
-router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) {
@@ -1456,7 +1456,7 @@ router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(
 
 // ─── PUT /api/students/:id/assign-teacher ─────────────────────────────────────
 // Admin/Staff gán (hoặc bỏ gán) giảng viên — theo khóa (enrollmentId) hoặc khóa chính
-router.put('/:id/assign-teacher', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.put('/:id/assign-teacher', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const { teacherId, enrollmentId } = req.body;
     const isUnassign = teacherId === null || teacherId === '' || teacherId === undefined;
@@ -1654,7 +1654,7 @@ router.delete('/:id', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDEN
 
 // ─── POST /api/students/:id/reset-today-attendance ─────────────────────────────
 // Xóa điểm danh HÔM NAY của học viên — CHỈ CHO PHÉP TRONG VÒNG 1 TIẾNG
-router.post('/:id/reset-today-attendance', authMiddleware, async (req, res) => {
+router.post('/:id/reset-today-attendance', [authMiddleware, branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
@@ -1742,7 +1742,7 @@ router.post('/:id/reset-today-attendance', authMiddleware, async (req, res) => {
 
 // ─── POST /api/students/:id/reset-history ──────────────────────────────────────
 // Reset lịch sử học (xóa buổi học, điểm danh, điểm số) — giữ thông tin cá nhân & học phí
-router.post('/:id/reset-history', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.post('/:id/reset-history', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });

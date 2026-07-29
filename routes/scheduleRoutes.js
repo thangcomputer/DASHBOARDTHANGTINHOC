@@ -849,6 +849,16 @@ router.post('/:scheduleId/attendance', authMiddleware, branchFilter, async (req,
         { path: 'studentId', select: 'name course' },
       ]);
 
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('attendance:updated', {
+        scheduleId: String(result.schedule._id),
+        studentId: String(result.schedule.studentId),
+        attendanceStatus: result.schedule.attendanceStatus || req.body?.attendanceStatus,
+      });
+      io.emit('data:refresh', { type: 'schedule', action: 'attendance', id: result.schedule._id });
+    }
+
     return res.json({
       success: true,
       message: result.isCorrection ? 'Đã sửa điểm danh' : 'Đã điểm danh',
