@@ -1014,7 +1014,6 @@ export default function StudentDetailModal({ studentId, onClose }) {
                               <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Nội dung</th>
                               <th className="px-3 sm:px-4 py-3 text-right text-[11px] font-black text-slate-400 tracking-widest uppercase">Số tiền</th>
                               <th className="px-3 sm:px-4 py-3 text-center text-[11px] font-black text-slate-400 tracking-widest uppercase">Hoàn thành</th>
-                              <th className="px-4 sm:px-6 py-3 text-center text-[11px] font-black text-slate-400 tracking-widest uppercase">In</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
@@ -1068,11 +1067,6 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                       </span>
                                     );
                                   })()}
-                                </td>
-                                <td className="px-4 sm:px-6 py-3.5 text-center">
-                                  <button type="button" onClick={() => window.print()} className="w-9 h-9 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 inline-flex items-center justify-center transition-all" aria-label="In">
-                                    <Printer size={14} />
-                                  </button>
                                 </td>
                               </tr>
                             ))}
