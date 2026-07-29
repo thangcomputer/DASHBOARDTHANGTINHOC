@@ -40,12 +40,21 @@ const summarizeEnrollments = (list) => {
   const items = Array.isArray(list) ? list : [];
   const isPaid = (e) =>
     e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
+  const netPaidForEnr = (e) => {
+    if (!isPaid(e)) return 0;
+    const price = Number(e?.price) || 0;
+    if (e?.status === 'cancelled') {
+      const refunded = Number(e?.refundedAmount) || 0;
+      return Math.max(0, price - refunded);
+    }
+    return price;
+  };
   const totalSessions = items.reduce((s, e) => s + (Number(e.totalSessions) || 12), 0);
   const completedSessions = items.reduce((s, e) => s + (Number(e.completedSessions) || 0), 0);
   const remainingSessions = items.reduce((s, e) => s + enrollmentRemaining(e), 0);
   const price = items.reduce((s, e) => s + (Number(e.price) || 0), 0);
-  const paidPrice = items.filter(isPaid).reduce((s, e) => s + (Number(e.price) || 0), 0);
-  const paidCount = items.filter(isPaid).length;
+  const paidPrice = items.reduce((s, e) => s + netPaidForEnr(e), 0);
+  const paidCount = items.filter((e) => netPaidForEnr(e) > 0).length;
   const progressPercent = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
   const grades = items.map((e) => Number(e.avgGrade)).filter((g) => Number.isFinite(g) && g > 0);
   const avgGrade = grades.length
