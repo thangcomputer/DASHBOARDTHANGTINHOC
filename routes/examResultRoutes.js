@@ -62,6 +62,32 @@ router.post('/', authMiddleware, async (req, res) => {
       io.emit('data:refresh', { type: 'examResult', id: result._id });
     }
 
+    if (io && result.type === 'teacher' && result.teacherId) {
+      const subject = result.subject || 'bài thi GV';
+      const outcome = result.passed ? 'ĐẠT' : 'CHƯA ĐẠT';
+      const name = result.teacherName || 'Giảng viên';
+      await NotificationService.notifyAdmins(
+        io,
+        result.passed ? '🎉 Giảng viên thi đạt' : '❌ Giảng viên thi chưa đạt',
+        `GV ${name} — ${subject}: ${outcome}.`,
+        {
+          examResultId: String(result._id),
+          teacherId: String(result.teacherId),
+          passed: Boolean(result.passed),
+        },
+        '/admin#training',
+      );
+      await NotificationService.send(io, {
+        type: 'EXAM',
+        title: result.passed ? '🎉 Bạn đã thi đạt' : '📊 Kết quả thi đã ghi nhận',
+        content: `${subject}: ${outcome}.`,
+        receivers: String(result.teacherId),
+        payload: { examResultId: String(result._id), teacherId: String(result.teacherId), passed: Boolean(result.passed) },
+        link: '/teacher/test',
+      });
+      io.emit('data:refresh', { type: 'examResult', id: result._id });
+    }
+
     res.status(201).json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -154,6 +180,32 @@ router.put('/:id', authMiddleware, async (req, res) => {
         receivers: String(notifyDoc.studentId),
         payload: { examResultId: String(notifyDoc._id), studentId: String(notifyDoc.studentId), subject, passed: Boolean(notifyDoc.passed) },
         link: '/student/exam'
+      });
+      io.emit('data:refresh', { type: 'examResult', id: notifyDoc._id });
+    }
+
+    if (io && notifyDoc.type === 'teacher' && notifyDoc.teacherId) {
+      const subject = notifyDoc.subject || 'bài thi GV';
+      const outcome = notifyDoc.passed ? 'ĐẠT' : 'CHƯA ĐẠT';
+      const name = notifyDoc.teacherName || 'Giảng viên';
+      await NotificationService.notifyAdmins(
+        io,
+        notifyDoc.passed ? '🎉 Giảng viên thi đạt' : '❌ Giảng viên thi chưa đạt',
+        `GV ${name} — ${subject}: ${outcome}.`,
+        {
+          examResultId: String(notifyDoc._id),
+          teacherId: String(notifyDoc.teacherId),
+          passed: Boolean(notifyDoc.passed),
+        },
+        '/admin#training',
+      );
+      await NotificationService.send(io, {
+        type: 'EXAM',
+        title: `📊 Kết quả thi: ${notifyDoc.passed ? '✅ ĐẠT' : '❌ CHƯA ĐẠT'}`,
+        content: `${subject} — ${outcome}.`,
+        receivers: String(notifyDoc.teacherId),
+        payload: { examResultId: String(notifyDoc._id), teacherId: String(notifyDoc.teacherId), passed: Boolean(notifyDoc.passed) },
+        link: '/teacher/test',
       });
       io.emit('data:refresh', { type: 'examResult', id: notifyDoc._id });
     }

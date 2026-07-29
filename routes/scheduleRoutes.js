@@ -102,6 +102,91 @@ function assertEndAfterStart(startTime, endTime) {
   return null;
 }
 
+/** Thông báo điểm danh: HV + Admin (GV nào · HV nào · buổi thứ mấy). */
+async function notifyAttendanceTaken(io, {
+  studentId, studentName, teacherName, course, date,
+}) {
+  if (!io || !studentId) return;
+  const NotificationService = require('../services/NotificationService');
+  const courseName = String(course || '').trim();
+  const match = {
+    studentId,
+    status: 'completed',
+    ...(courseName ? { course: courseName } : {}),
+  };
+  const completedSessions = await Schedule.countDocuments(match);
+  const student = await Student.findById(studentId)
+    .select('name course totalSessions enrollments')
+    .lean();
+  const name = studentName || student?.name || 'Học viên';
+  let totalRequired = student?.totalSessions || 12;
+  if (courseName && Array.isArray(student?.enrollments)) {
+    const enr = student.enrollments.find(
+      (e) => String(e.courseName || e.course || '').trim().toLowerCase() === courseName.toLowerCase(),
+    );
+    if (enr?.totalSessions) totalRequired = enr.totalSessions;
+  }
+  const notifDate = date
+    ? new Date(date).toLocaleDateString('vi-VN')
+    : new Date().toLocaleDateString('vi-VN');
+  const gv = teacherName || 'Giảng viên';
+  const courseLabel = courseName || student?.course || 'khóa học';
+  const progress = `${completedSessions}/${totalRequired}`;
+
+  await NotificationService.send(io, {
+    type: 'SCHEDULE',
+    title: '✅ Đã điểm danh buổi học',
+    content: `${gv} đã điểm danh bạn ngày ${notifDate} (${courseLabel} · buổi ${progress}).`,
+    receivers: String(studentId),
+    payload: { studentId: String(studentId), course: courseLabel, completedSessions, totalRequired },
+    link: '/student#schedule',
+  });
+
+  await NotificationService.notifyAdmins(
+    io,
+    '📋 Điểm danh buổi học',
+    `GV ${gv} điểm danh HV ${name} — ${courseLabel}: buổi ${progress}.`,
+    {
+      studentId: String(studentId),
+      teacherName: gv,
+      course: courseLabel,
+      completedSessions,
+      totalRequired,
+    },
+    '/admin/students',
+  );
+
+  return { completedSessions, totalRequired, courseLabel, name };
+}
+
+/** Thông báo HV hoàn thành khóa (HV + Admin). */
+async function notifyCourseCompleted(io, {
+  studentId, studentName, courseName, completedSessions, totalRequired,
+}) {
+  if (!io || !studentId) return;
+  const NotificationService = require('../services/NotificationService');
+  const name = studentName || 'Học viên';
+  const course = courseName || 'khóa học';
+  const progress = `${completedSessions}/${totalRequired}`;
+
+  await NotificationService.send(io, {
+    type: 'COURSE',
+    title: '🎓 Hoàn thành khóa học',
+    content: `Chúc mừng! Bạn đã hoàn thành khóa ${course} (${progress} buổi).`,
+    receivers: String(studentId),
+    payload: { studentId: String(studentId), course, completedSessions, totalRequired },
+    link: '/student',
+  });
+
+  await NotificationService.notifyAdmins(
+    io,
+    '🎓 Học viên hoàn thành khóa',
+    `HV ${name} đã hoàn thành khóa ${course} (${progress} buổi).`,
+    { studentId: String(studentId), course, completedSessions, totalRequired },
+    '/admin/students',
+  );
+}
+
 // ─── Helper: Kiểm tra và tự động Unlock Thi cho Học Viên ─────────────────────
 // Workflow 2: Đếm buổi hoàn thành theo từng khóa → set enrollment.examUnlocked
 async function checkAndUnlockExam(studentId, io, courseNameHint) {
@@ -117,40 +202,61 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
 
     const enrollments = student.enrollments || [];
     if (!enrollments.length) {
-      if (student.studentExamUnlocked) return;
       const completedSessions = await Schedule.countDocuments({
         studentId,
         course: student.course,
         status: 'completed',
       });
       const totalRequired = student.totalSessions || 12;
-      if (completedSessions >= totalRequired) {
-        await Student.findByIdAndUpdate(studentId, { studentExamUnlocked: true });
-        if (io) {
-          const NotificationService = require('../services/NotificationService');
+      if (completedSessions < totalRequired) return;
+
+      const justUnlocked = !student.studentExamUnlocked;
+      const justCompleted = String(student.status || '') !== 'Hoàn thành';
+      if (!justUnlocked && !justCompleted) return;
+
+      const statusPatch = {};
+      if (justUnlocked) statusPatch.studentExamUnlocked = true;
+      if (justCompleted) statusPatch.status = 'Hoàn thành';
+      if (Object.keys(statusPatch).length) {
+        await Student.findByIdAndUpdate(studentId, statusPatch);
+      }
+
+      if (io) {
+        const NotificationService = require('../services/NotificationService');
+        if (justUnlocked) {
           NotificationService.send(io, {
             type: 'EXAM',
             title: '🎉 Phòng thi đã được mở khóa!',
             content: `Chúc mừng! Bạn đã hoàn thành ${completedSessions} buổi học. Phòng thi đã được mở khóa!`,
             receivers: student._id.toString(),
-            link: '/student/exam'
+            link: '/student/exam',
           });
           io.emit('exam:unlocked', {
             studentId: student._id.toString(),
             studentName: student.name,
           });
-          io.emit('data:refresh', { type: 'student', id: student._id });
         }
-        logger.info(`✅ [SCHEDULE] Unlock thi cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
+        if (justCompleted) {
+          await notifyCourseCompleted(io, {
+            studentId: student._id,
+            studentName: student.name,
+            courseName: student.course,
+            completedSessions,
+            totalRequired,
+          });
+        }
+        io.emit('data:refresh', { type: 'student', id: student._id });
       }
+      logger.info(`✅ [SCHEDULE] Unlock thi cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
       return;
     }
 
     let changed = false;
+    let justUnlockedAny = false;
+    const completedCourses = [];
     const hint = String(courseNameHint || '').trim().toLowerCase();
     for (let i = 0; i < enrollments.length; i++) {
       const enr = enrollments[i];
-      if (enr.examUnlocked === true) continue;
       const courseName = enr.courseName || enr.course || '';
       if (hint && String(courseName).trim().toLowerCase() !== hint) continue;
 
@@ -160,32 +266,60 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
         status: 'completed',
       });
       const totalRequired = enr.totalSessions || student.totalSessions || 12;
-      if (completedSessions >= totalRequired) {
+      if (completedSessions < totalRequired) continue;
+
+      const wasUnlocked = enr.examUnlocked === true;
+      const wasCompleted = String(enr.status || '').toLowerCase() === 'completed'
+        || String(enr.status || '') === 'Hoàn thành';
+      if (!wasUnlocked) {
         student.enrollments[i].examUnlocked = true;
         changed = true;
-        logger.info(`✅ [SCHEDULE] Unlock thi khóa "${courseName}" cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
+        justUnlockedAny = true;
       }
+      if (!wasCompleted) {
+        student.enrollments[i].status = 'completed';
+        changed = true;
+        completedCourses.push({ courseName, completedSessions, totalRequired });
+      }
+      logger.info(`✅ [SCHEDULE] Unlock thi khóa "${courseName}" cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
     }
 
     if (!changed) return;
 
     student.studentExamUnlocked = (student.enrollments || []).some((e) => e.examUnlocked === true);
+    if ((student.enrollments || []).every((e) => {
+      const st = String(e.status || '').toLowerCase();
+      return st === 'completed' || e.status === 'Hoàn thành';
+    })) {
+      student.status = 'Hoàn thành';
+    }
     student.markModified('enrollments');
     await student.save({ validateModifiedOnly: true });
 
     if (io) {
       const NotificationService = require('../services/NotificationService');
-      NotificationService.send(io, {
-        type: 'EXAM',
-        title: '🎉 Phòng thi đã được mở khóa!',
-        content: 'Bạn đã hoàn thành đủ buổi học của khóa. Phòng thi khóa học đó đã được mở khóa!',
-        receivers: student._id.toString(),
-        link: '/student/exam'
-      });
-      io.emit('exam:unlocked', {
-        studentId: student._id.toString(),
-        studentName: student.name,
-      });
+      if (justUnlockedAny) {
+        NotificationService.send(io, {
+          type: 'EXAM',
+          title: '🎉 Phòng thi đã được mở khóa!',
+          content: 'Bạn đã hoàn thành đủ buổi học của khóa. Phòng thi khóa học đó đã được mở khóa!',
+          receivers: student._id.toString(),
+          link: '/student/exam',
+        });
+        io.emit('exam:unlocked', {
+          studentId: student._id.toString(),
+          studentName: student.name,
+        });
+      }
+      for (const c of completedCourses) {
+        await notifyCourseCompleted(io, {
+          studentId: student._id,
+          studentName: student.name,
+          courseName: c.courseName || student.course,
+          completedSessions: c.completedSessions,
+          totalRequired: c.totalRequired,
+        });
+      }
       io.emit('data:refresh', { type: 'student', id: student._id });
     }
   } catch (err) {
@@ -488,21 +622,33 @@ router.post('/', authMiddleware, async (req, res) => {
       { path: 'studentId', select: 'name course' },
     ]);
 
-    // Thông báo real-time cho học viên
+    // Thông báo real-time
     const io = req.app.get('io');
     if (io) {
       const NotificationService = require('../services/NotificationService');
       if (studentId) {
-         const notifDate = new Date(date).toLocaleDateString('vi-VN');
-         NotificationService.send(io, {
-           type: 'SCHEDULE',
-           title: '📅 Lịch học mới',
-           content: `Lịch học mới vào ngày ${notifDate} lúc ${startTime} đã được thêm.`,
-           receivers: studentId.toString(),
-           link: '/student#schedule'
-         });
+        const notifDate = new Date(date).toLocaleDateString('vi-VN');
+        if (schedule.status === 'completed') {
+          notifyAttendanceTaken(io, {
+            studentId,
+            studentName,
+            teacherName: teacherName || schedule.teacherName || req.user?.name,
+            course: courseFinal,
+            date,
+          }).catch((e) => logger.warn('[SCHEDULE] attendance notify:', e.message));
+          checkAndUnlockExam(studentId.toString(), io, courseFinal)
+            .catch((e) => logger.warn('[SCHEDULE] unlock after create:', e.message));
+        } else {
+          NotificationService.send(io, {
+            type: 'SCHEDULE',
+            title: '📅 Lịch học mới',
+            content: `Lịch học mới vào ngày ${notifDate} lúc ${startTime} đã được thêm.`,
+            receivers: studentId.toString(),
+            link: '/student#schedule',
+          });
+        }
       }
-      
+
       io.emit('schedule:new', {
         studentId: studentId.toString(),
         schedule,
@@ -664,15 +810,6 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
          // Emit cancelled event so clients refetch / update UI immediately
          io.emit('schedule:cancelled', { scheduleId: schedule._id.toString(), reason: cancelReason });
       }
-      else if (status === 'completed' && schedule.status !== 'completed') {
-         NotificationService.send(io, {
-           type: 'SCHEDULE',
-           title: '✅ Hệ thống đã điểm danh',
-           content: `Giảng viên đã điểm danh buổi học ngày ${notifDate}.`,
-           receivers: schedule.studentId.toString(),
-           link: '/student#schedule'
-         });
-      }
       else if ((startTime && startTime !== schedule.startTime) || (date && new Date(date).getTime() !== schedule.date.getTime())) {
          NotificationService.send(io, {
            type: 'SCHEDULE',
@@ -694,7 +831,16 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
     ]);
 
     // BUSINESS LOGIC: Nếu đánh dấu hoàn thành → kiểm tra unlock thi
-    if (status === 'completed' && schedule.studentId) {
+    if (status === 'completed' && schedule.status !== 'completed' && schedule.studentId) {
+      if (io) {
+        notifyAttendanceTaken(io, {
+          studentId: schedule.studentId,
+          studentName: schedule.studentName || updated?.studentId?.name,
+          teacherName: schedule.teacherName || req.user?.name,
+          course: schedule.course,
+          date: schedule.date,
+        }).catch((e) => logger.warn('[SCHEDULE] attendance notify:', e.message));
+      }
       await checkAndUnlockExam(schedule.studentId.toString(), io, schedule.course);
 
       // Cập nhật remainingSessions của học viên (Tách biệt logic trừ buổi và cộng buổi)

@@ -378,7 +378,7 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
     }
 
     const isAdminRole = (req.user.role === 'admin' || req.user.role === 'staff');
-    // Self-edit: chỉ profile cá nhân — không được tự ghi điểm thi / status / practical
+    // Self-edit: profile + kết quả thi onboarding (client-side grade rồi sync)
     const allowedFields = isAdminRole 
       ? [
           'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'bio', 'startDate', 'address',
@@ -389,7 +389,14 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
           'lockReason', 'practicalFile', 'practicalStatus',
           'branchId', 'branchCode',
         ]
-      : [
+      : isSelfEdit
+        ? [
+            'zalo', 'email', 'bio', 'bankAccount', 'avatar', 'address',
+            'testScore', 'testStatus', 'testDate', 'testNotes', 'faceViolationCount',
+            'testMcCorrect', 'testMcWrong', 'testMcTotal',
+            'lockReason', 'practicalFile', 'practicalStatus', 'status',
+          ]
+        : [
           'zalo', 'email', 'bio', 'bankAccount', 'avatar', 'address',
         ];
 
@@ -436,7 +443,7 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
       }
     }
 
-    const prev = await Teacher.findById(req.params.id).select('status tokenVersion phone zalo email').lean();
+    const prev = await Teacher.findById(req.params.id).select('status tokenVersion phone zalo email testStatus testScore name').lean();
     if (!prev) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
@@ -488,6 +495,39 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
           role: 'teacher',
           reason: 'account_disabled',
         });
+      }
+
+      // Thông báo khi GV thi đạt / trượt (lần đầu ghi nhận hoặc đổi trạng thái)
+      const nextTest = String(updates.testStatus || '').toLowerCase();
+      const prevTest = String(prev.testStatus || '').toLowerCase();
+      if ((nextTest === 'passed' || nextTest === 'failed') && nextTest !== prevTest) {
+        const score = teacher.testScore != null ? Number(teacher.testScore) : null;
+        const scoreText = Number.isFinite(score) ? ` (${score}/100)` : '';
+        if (nextTest === 'passed') {
+          NotificationService.notifyAdmins(
+            io,
+            '🎉 Giảng viên thi đạt',
+            `GV ${teacher.name} đã thi đạt${scoreText}.`,
+            { teacherId: teacher._id, testStatus: 'passed', testScore: score },
+            '/admin#training',
+          ).catch((err) => logger.warn('[TEACHERS] notify exam pass:', err.message));
+          NotificationService.send(io, {
+            type: 'EXAM',
+            title: '🎉 Bạn đã thi đạt',
+            content: `Chúc mừng! Kết quả thi của bạn: ĐẠT${scoreText}.`,
+            receivers: String(teacher._id),
+            payload: { teacherId: String(teacher._id), testStatus: 'passed' },
+            link: '/teacher/test',
+          }).catch((err) => logger.warn('[TEACHERS] notify self exam:', err.message));
+        } else {
+          NotificationService.notifyAdmins(
+            io,
+            '❌ Giảng viên thi chưa đạt',
+            `GV ${teacher.name} thi chưa đạt${scoreText}.`,
+            { teacherId: teacher._id, testStatus: 'failed', testScore: score },
+            '/admin#training',
+          ).catch((err) => logger.warn('[TEACHERS] notify exam fail:', err.message));
+        }
       }
     }
 
@@ -682,6 +722,13 @@ router.post('/:id/submit-practical', authMiddleware, isTeacher, async (req, res)
         fileUrl,
         message: `📁 Giảng viên ${teacher.name} đã nộp bài thực hành`,
       });
+      NotificationService.notifyAdmins(
+        io,
+        '📁 GV nộp bài thực hành',
+        `Giảng viên ${teacher.name} đã nộp bài thực hành.`,
+        { teacherId: teacher._id, fileUrl },
+        '/admin#training',
+      ).catch((err) => logger.warn('[TEACHERS] notify practical:', err.message));
     }
 
     try {
