@@ -90,9 +90,13 @@ export default function AdminOverviewTab({
                     const enr = getClientEnrollments(s);
                     const refunded = enr.some((e) => Number(e?.refundedAmount) > 0);
                     const isPaid = !!s?.paid;
-                    const showPaid = isPaid || refunded;
                     const badgeText = isPaid ? 'Đã thu' : refunded ? 'Đã hoàn' : 'Chờ thu';
-                    const color = showPaid ? 'bg-red-600' : 'bg-slate-400';
+                    const badgeClass = isPaid
+                      ? 'cms-dash-badge-success'
+                      : refunded
+                        ? 'cms-dash-badge-primary'
+                        : 'cms-dash-badge-warning';
+                    const color = isPaid ? 'bg-red-600' : refunded ? 'bg-red-500' : 'bg-slate-400';
                     return (
                       <>
                   <Avatar
@@ -107,7 +111,7 @@ export default function AdminOverviewTab({
                     <p className="text-base font-semibold text-slate-900 truncate leading-snug">{s.name}</p>
                     <p className="text-[13px] text-slate-500 truncate mt-0.5">{s.course || 'Chưa chọn khóa'}</p>
                   </div>
-                  <span className={`cms-dash-badge flex-shrink-0 ${showPaid ? 'cms-dash-badge-success' : 'cms-dash-badge-primary'}`}>
+                  <span className={`cms-dash-badge flex-shrink-0 ${badgeClass}`}>
                     {badgeText}
                   </span>
                       </>
