@@ -83,17 +83,42 @@ function NewsCard({ post, basePath, onOpen }) {
   );
 }
 
+function htmlToPlain(html) {
+  return String(html || '')
+    .replace(/<\/p>\s*<p>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?p[^>]*>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .trim();
+}
+
 function EditorForm({ initial, onSaved, onCancel }) {
   const toast = useToast();
   const fileRef = useRef(null);
-  const [title, setTitle] = useState(initial?.title || '');
-  const [excerpt, setExcerpt] = useState(initial?.excerpt || '');
-  const [content, setContent] = useState(
-    (initial?.contentHtml || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p><p>/gi, '\n\n').replace(/<[^>]+>/g, '') || '',
-  );
-  const [thumbnailUrl, setThumbnailUrl] = useState(initial?.thumbnailUrl || '');
-  const [attachments, setAttachments] = useState(initial?.attachments || []);
+  const seededIdRef = useRef(null);
+  const [title, setTitle] = useState('');
+  const [excerpt, setExcerpt] = useState('');
+  const [content, setContent] = useState('');
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const [busy, setBusy] = useState(false);
+
+  // Nạp dữ liệu khi mở sửa (async) — tránh form trống dù title header đã có id
+  useEffect(() => {
+    const id = initial?.id || null;
+    if (id && seededIdRef.current === id) return;
+    seededIdRef.current = id;
+    setTitle(initial?.title || '');
+    setExcerpt(initial?.excerpt || '');
+    setContent(htmlToPlain(initial?.contentHtml || ''));
+    setThumbnailUrl(initial?.thumbnailUrl || '');
+    setAttachments(Array.isArray(initial?.attachments) ? initial.attachments : []);
+  }, [initial]);
 
   const toHtml = (text) => {
     const escaped = String(text || '')
@@ -318,16 +343,25 @@ export default function NewsPage({ session, role = 'admin' }) {
     else if (mode === 'edit') {
       setDetail(null);
       if (editId) {
-        blogAPI.get(editId, { manage: true }).then((res) => {
-          if (res.success) setEditing(res.data);
-        }).catch(() => {});
-      } else setEditing({});
+        setEditing(null);
+        setLoading(true);
+        blogAPI.get(editId, { manage: true })
+          .then((res) => {
+            if (res.success) setEditing(res.data);
+            else toast.error(res.message || 'Không tải được bài để sửa');
+          })
+          .catch(() => toast.error('Lỗi tải bài để sửa'))
+          .finally(() => setLoading(false));
+      } else {
+        setEditing({});
+        setLoading(false);
+      }
     } else {
       setDetail(null);
       setEditing(null);
       loadList(1);
     }
-  }, [slug, mode, editId, loadDetail, loadList]);
+  }, [slug, mode, editId, loadDetail, loadList, toast]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -341,9 +375,17 @@ export default function NewsPage({ session, role = 'admin' }) {
   const openPost = (post) => navigate(`${base}/${post.slug}`);
 
   if (mode === 'edit' && canManage) {
+    if (editId && (loading || !editing?.id)) {
+      return (
+        <div className="cms-viewport-fill flex items-center justify-center text-slate-400">
+          <Loader2 className="animate-spin" size={28} />
+        </div>
+      );
+    }
     return (
       <div className="cms-viewport-fill w-full space-y-4">
         <EditorForm
+          key={editing?.id || 'new'}
           initial={editing}
           onCancel={() => {
             setSearchParams({});
