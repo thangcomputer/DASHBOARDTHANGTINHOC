@@ -1885,14 +1885,26 @@ router.post('/:id/enrollments', [authMiddleware, checkPermission(PERMISSIONS.MAN
 
 function syncStudentFromPrimaryEnrollment(student) {
   if (!student?.enrollments?.length) return;
-  const primary = student.enrollments.find((e) => e.isPrimary) || student.enrollments[0];
+  const list = student.enrollments;
+  const active = list.filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
+  const primary = active.find((e) => e.isPrimary)
+    || active[0]
+    || list.find((e) => e.isPrimary)
+    || list[0];
   if (!primary) return;
   student.course = primary.courseName;
   student.price = Number(primary.price) || 0;
-  student.paid = !!primary.paid;
+  // Không còn khóa active → paid=false (kể cả khi primary là khóa đã hủy)
+  if (!active.length) {
+    student.paid = false;
+    student.teacherId = null;
+    student.teacherName = '';
+  } else {
+    student.paid = !!primary.paid;
+    student.teacherId = primary.teacherId || null;
+    student.teacherName = primary.teacherName || '';
+  }
   if (primary.paidAt) student.paidAt = primary.paidAt;
-  student.teacherId = primary.teacherId || null;
-  student.teacherName = primary.teacherName || '';
   student.totalSessions = primary.totalSessions || 12;
   student.remainingSessions = primary.remainingSessions ?? primary.totalSessions ?? 12;
   student.completedSessions = primary.completedSessions || 0;
@@ -2087,13 +2099,6 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission
       student.enrollments[0].isPrimary = true;
     }
     const list = student.enrollments || [];
-    const activeList = list.filter((e) => e.status !== 'cancelled');
-    if (activeList.length <= 1) {
-      return res.status(400).json({
-        success: false,
-        message: 'Không thể hủy khóa duy nhất còn hoạt động. Học viên cần giữ ít nhất 1 khóa học.',
-      });
-    }
     const idx = list.findIndex((e) => String(e._id) === String(req.params.enrollmentId));
     if (idx < 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
@@ -2102,6 +2107,8 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission
     if (enr.status === 'cancelled') {
       return res.status(400).json({ success: false, message: 'Khóa học này đã bị hủy trước đó.' });
     }
+
+    // Cho phép hủy cả khóa active cuối cùng — HV vẫn giữ hồ sơ (dòng danh sách mờ)
 
     const cancelReason = String(req.body?.cancelReason || '').trim() || 'Admin hủy khóa';
     const courseName = enr.courseName;

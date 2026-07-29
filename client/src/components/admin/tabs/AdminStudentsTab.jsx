@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import BranchFilterDropdown from '../../BranchFilterDropdown';
@@ -54,7 +55,8 @@ function RefundHint({ amount }) {
   );
 }
 
-function StudentActionMenu({
+/** Nút ⋯ + menu portal (fixed) — tránh bị che bởi overflow bảng/card. */
+function StudentRowActions({
   s,
   actionMenuId,
   setActionMenuId,
@@ -68,113 +70,180 @@ function StudentActionMenu({
   removeStudent,
   onOpenRefund,
   align = 'right',
+  buttonClassName = 'w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all',
 }) {
-  if (actionMenuId !== s.id) return null;
+  const open = actionMenuId === s.id;
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+  const [coords, setCoords] = useState(null);
 
   const refundable = getRefundableEnrollment(s);
   const locked = isStudentRowLocked(s);
 
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) {
+      setCoords(null);
+      return undefined;
+    }
+    const place = () => {
+      const r = btnRef.current.getBoundingClientRect();
+      const menuW = Math.min(260, window.innerWidth - 16);
+      const approxH = menuRef.current?.offsetHeight || 360;
+      const gap = 6;
+      const spaceBelow = window.innerHeight - r.bottom - 12;
+      const spaceAbove = r.top - 12;
+      const openUp = spaceBelow < Math.min(approxH, 280) && spaceAbove > spaceBelow;
+      let left = align === 'left' ? r.left : r.right - menuW;
+      left = Math.max(8, Math.min(left, window.innerWidth - menuW - 8));
+      const maxH = Math.max(160, openUp ? spaceAbove : spaceBelow);
+      const top = openUp
+        ? Math.max(8, r.top - gap - Math.min(approxH, maxH))
+        : r.bottom + gap;
+      setCoords({ left, top, width: menuW, maxH, openUp });
+    };
+    place();
+    // Đo lại sau khi menu mount (chiều cao thật)
+    const t = window.setTimeout(place, 0);
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, align, refundable, locked]);
+
   const itemCls =
-    'w-full flex items-center gap-3 px-3.5 py-2.5 min-h-11 text-[13px] font-semibold text-left whitespace-nowrap transition-colors';
+    'w-full flex items-center gap-2.5 px-3 py-2 min-h-10 text-[13px] font-semibold text-left whitespace-nowrap transition-colors';
+
+  const menu = open && coords
+    ? createPortal(
+      <div
+        ref={menuRef}
+        role="menu"
+        className="fixed z-[10060] bg-white border border-slate-200 rounded-2xl shadow-[0_16px_48px_rgba(15,23,42,0.18)] py-1 w-[min(92vw,260px)] animate-in fade-in zoom-in-95 duration-150 overflow-y-auto overscroll-contain"
+        style={{
+          left: coords.left,
+          top: coords.top,
+          width: coords.width,
+          maxHeight: coords.maxH,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" role="menuitem" onClick={() => { setShowStudentDetailId(s.id); setActionMenuId(null); }}
+          className={`${itemCls} text-slate-800 hover:bg-slate-50 border-b border-slate-100 mb-0.5`}>
+          <ClipboardList size={15} className="shrink-0 text-slate-500" />
+          <span className="min-w-0">Xem hồ sơ chi tiết</span>
+        </button>
+        {!locked && (
+          <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); setEnrollmentModalStudent(s); }}
+            className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
+            <Plus size={15} className="shrink-0" />
+            <span className="min-w-0">Thêm khóa học</span>
+          </button>
+        )}
+        {!locked && (
+          <button type="button" role="menuitem" onClick={() => { s.studentExamUnlocked ? revokeStudentExam(s.id) : approveStudentExam(s.id); setActionMenuId(null); }}
+            className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
+            {s.studentExamUnlocked
+              ? <><Lock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Khóa phòng thi</span></>
+              : <><Unlock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Cho phép thi</span></>}
+          </button>
+        )}
+        {!locked && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={async () => {
+              const webcamEnforced = s.requireWebcam !== false;
+              try {
+                await ctxUpdateStudent(s.id || s._id, { requireWebcam: !webcamEnforced });
+                toast.success(webcamEnforced ? 'Đã tắt giám sát webcam khi thi' : 'Đã bật giám sát webcam khi thi');
+              } catch (e) {
+                toast.error(e?.message || 'Không cập nhật được giám sát webcam');
+              }
+              setActionMenuId(null);
+            }}
+            className={`${itemCls} text-slate-700 hover:bg-slate-50`}
+          >
+            <Camera size={15} className="shrink-0 text-slate-500" />
+            <span className="min-w-0">
+              {s.requireWebcam !== false ? 'Tắt webcam khi thi' : 'Bật webcam khi thi'}
+            </span>
+          </button>
+        )}
+        {!locked && (
+          <button type="button" role="menuitem" onClick={() => { handlePrintInvoice(s); setActionMenuId(null); }}
+            disabled={!studentHasActivePaid(s)}
+            className={`${itemCls} ${
+              studentHasActivePaid(s) ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
+            }`}>
+            <Printer size={15} className="shrink-0" />
+            <span className="min-w-0">Xuất hóa đơn PDF</span>
+          </button>
+        )}
+        {!locked && refundable && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setActionMenuId(null);
+              onOpenRefund?.(s, refundable);
+            }}
+            className={`${itemCls} text-rose-700 hover:bg-rose-50`}
+          >
+            <CircleDollarSign size={15} className="shrink-0 text-rose-600" />
+            <span className="min-w-0">Hoàn học phí</span>
+          </button>
+        )}
+        {!locked && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setActionMenuId(null);
+              window.dispatchEvent(new CustomEvent('open-reset-pw', {
+                detail: {
+                  userId: s.id || s._id,
+                  userName: s.name || 'Học viên',
+                  role: 'student',
+                },
+              }));
+            }}
+            className={`${itemCls} text-amber-800 hover:bg-amber-50`}
+          >
+            <KeyRound size={15} className="shrink-0 text-amber-600" />
+            <span className="min-w-0">Cấp mật khẩu</span>
+          </button>
+        )}
+        <div className="border-t border-slate-100 my-0.5" />
+        <button type="button" role="menuitem" onClick={() => { removeStudent(s.id); setActionMenuId(null); }}
+          className={`${itemCls} text-red-600 hover:bg-red-50`}>
+          <Trash2 size={15} className="shrink-0" />
+          <span className="min-w-0">Xóa học viên</span>
+        </button>
+      </div>,
+      document.body,
+    )
+    : null;
 
   return (
-    <div
-      className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] py-1.5 w-[min(92vw,260px)] animate-in fade-in zoom-in-95 duration-150`}
-      onClick={(e) => e.stopPropagation()}
-      role="menu"
-    >
-      <button type="button" role="menuitem" onClick={() => { setShowStudentDetailId(s.id); setActionMenuId(null); }}
-        className={`${itemCls} text-slate-800 hover:bg-slate-50 border-b border-slate-100 mb-0.5`}>
-        <ClipboardList size={15} className="shrink-0 text-slate-500" />
-        <span className="min-w-0">Xem hồ sơ chi tiết</span>
+    <div className="relative inline-flex shrink-0">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setActionMenuId(open ? null : s.id);
+        }}
+        className={buttonClassName}
+        aria-label="Thao tác"
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        <MoreHorizontal size={16} />
       </button>
-      {!locked && (
-        <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); setEnrollmentModalStudent(s); }}
-          className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
-          <Plus size={15} className="shrink-0" />
-          <span className="min-w-0">Thêm khóa học</span>
-        </button>
-      )}
-      {!locked && (
-        <button type="button" role="menuitem" onClick={() => { s.studentExamUnlocked ? revokeStudentExam(s.id) : approveStudentExam(s.id); setActionMenuId(null); }}
-          className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
-          {s.studentExamUnlocked
-            ? <><Lock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Khóa phòng thi</span></>
-            : <><Unlock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Cho phép thi</span></>}
-        </button>
-      )}
-      {!locked && (
-        <button
-          type="button"
-          role="menuitem"
-          onClick={async () => {
-            const webcamEnforced = s.requireWebcam !== false;
-            try {
-              await ctxUpdateStudent(s.id || s._id, { requireWebcam: !webcamEnforced });
-              toast.success(webcamEnforced ? 'Đã tắt giám sát webcam khi thi' : 'Đã bật giám sát webcam khi thi');
-            } catch (e) {
-              toast.error(e?.message || 'Không cập nhật được giám sát webcam');
-            }
-            setActionMenuId(null);
-          }}
-          className={`${itemCls} text-slate-700 hover:bg-slate-50`}
-        >
-          <Camera size={15} className="shrink-0 text-slate-500" />
-          <span className="min-w-0">
-            {s.requireWebcam !== false ? 'Tắt webcam khi thi' : 'Bật webcam khi thi'}
-          </span>
-        </button>
-      )}
-      {!locked && (
-        <button type="button" role="menuitem" onClick={() => { handlePrintInvoice(s); setActionMenuId(null); }}
-          disabled={!studentHasActivePaid(s)}
-          className={`${itemCls} ${
-            studentHasActivePaid(s) ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
-          }`}>
-          <Printer size={15} className="shrink-0" />
-          <span className="min-w-0">Xuất hóa đơn PDF</span>
-        </button>
-      )}
-      {!locked && refundable && (
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            setActionMenuId(null);
-            onOpenRefund?.(s, refundable);
-          }}
-          className={`${itemCls} text-rose-700 hover:bg-rose-50`}
-        >
-          <CircleDollarSign size={15} className="shrink-0 text-rose-600" />
-          <span className="min-w-0">Hoàn học phí</span>
-        </button>
-      )}
-      {!locked && (
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            setActionMenuId(null);
-            window.dispatchEvent(new CustomEvent('open-reset-pw', {
-              detail: {
-                userId: s.id || s._id,
-                userName: s.name || 'Học viên',
-                role: 'student',
-              },
-            }));
-          }}
-          className={`${itemCls} text-amber-800 hover:bg-amber-50`}
-        >
-          <KeyRound size={15} className="shrink-0 text-amber-600" />
-          <span className="min-w-0">Cấp mật khẩu</span>
-        </button>
-      )}
-      <div className="border-t border-slate-100 my-1" />
-      <button type="button" role="menuitem" onClick={() => { removeStudent(s.id); setActionMenuId(null); }}
-        className={`${itemCls} text-red-600 hover:bg-red-50`}>
-        <Trash2 size={15} className="shrink-0" />
-        <span className="min-w-0">Xóa học viên</span>
-      </button>
+      {menu}
     </div>
   );
 }
@@ -608,17 +677,12 @@ export default function AdminStudentsTab() {
                       </p>
                     </div>
                     {!locked && (
-                      <div className="relative flex-shrink-0 pointer-events-auto">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === s.id ? null : s.id); }}
-                          className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
-                          aria-label="Thao tác"
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
-                        <StudentActionMenu s={s} {...menuProps} align="right" />
-                      </div>
+                      <StudentRowActions
+                        s={s}
+                        {...menuProps}
+                        align="right"
+                        buttonClassName="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                      />
                     )}
                   </div>
 
@@ -832,16 +896,7 @@ export default function AdminStudentsTab() {
                   </td>
                   <td className="px-3 py-3 text-center">
                     {!locked && (
-                      <div className="relative inline-block pointer-events-auto">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === s.id ? null : s.id); }}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
-                        <StudentActionMenu s={s} {...menuProps} />
-                      </div>
+                      <StudentRowActions s={s} {...menuProps} align="right" />
                     )}
                   </td>
                 </tr>
