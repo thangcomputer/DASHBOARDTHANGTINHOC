@@ -7,7 +7,17 @@ const SubmissionSchema = new mongoose.Schema({
   submittedFileUrl: { type: String, required: true },
   status: { type: String, enum: ['submitted', 'late', 'graded'], default: 'submitted' },
   grade: { type: Number, min: 0, max: 10, default: null },
-  teacherFeedback: { type: String, default: '' }
+  teacherFeedback: { type: String, default: '' },
+  /** Append-only lịch sử chấm/sửa điểm (GRADE-HIST). */
+  gradeHistory: [{
+    at: { type: Date, default: Date.now },
+    oldGrade: { type: Number, default: null },
+    newGrade: { type: Number, required: true },
+    actorUserId: { type: String, default: '' },
+    actorRole: { type: String, default: '' },
+    actorName: { type: String, default: '' },
+    note: { type: String, default: '' },
+  }],
 }, {
   timestamps: true
 });

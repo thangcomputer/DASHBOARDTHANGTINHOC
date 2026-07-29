@@ -491,7 +491,22 @@ router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHE
       return res.status(400).json({ success: false, message: 'Điểm phải trong khoảng 0-100' });
     }
 
+    const existing = await Teacher.findById(req.params.id).select('testScore name status').lean();
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
     const newStatus = scoreNum >= 80 ? 'tested_passed' : 'tested_failed';
+    const oldScore = existing.testScore != null ? Number(existing.testScore) : null;
+    const historyEntry = {
+      at: new Date(),
+      oldScore,
+      newScore: scoreNum,
+      actorUserId: String(req.user.id || ''),
+      actorRole: String(req.user.role || ''),
+      actorName: String(req.user.name || ''),
+      note: String(testNotes || '').slice(0, 500),
+    };
 
     const teacher = await Teacher.findByIdAndUpdate(
       req.params.id,
@@ -500,6 +515,7 @@ router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHE
         testNotes: testNotes || '',
         testDate:  new Date(),
         status:    newStatus,
+        $push: { scoreHistory: historyEntry },
       },
       { returnDocument: 'after' }
     ).select('-password -refreshToken');
@@ -507,6 +523,23 @@ router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHE
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
+
+    try {
+      const { writeAudit } = require('../services/auditLogService');
+      await writeAudit({
+        action: 'teacher.score_change',
+        actorUserId: req.user.id,
+        actorRole: req.user.role,
+        branchId: req.userBranchId || teacher.branchId || null,
+        entityType: 'teacher',
+        entityId: String(teacher._id),
+        teacherId: teacher._id,
+        oldValue: { testScore: oldScore },
+        newValue: { testScore: scoreNum, status: newStatus },
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch { /* ignore */ }
 
     // Thông báo real-time cho giảng viên
     const io = req.app.get('io');

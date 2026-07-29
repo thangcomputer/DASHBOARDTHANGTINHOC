@@ -52,6 +52,16 @@ const TeacherSchema = new mongoose.Schema(
     },
     testDate: { type: Date },
     testNotes: { type: String, default: '' },
+    /** Append-only lịch sử điểm onboarding (80→90→95 …). */
+    scoreHistory: [{
+      at: { type: Date, default: Date.now },
+      oldScore: { type: Number, default: null },
+      newScore: { type: Number, required: true },
+      actorUserId: { type: String, default: '' },
+      actorRole: { type: String, default: '' },
+      actorName: { type: String, default: '' },
+      note: { type: String, default: '' },
+    }],
     testStatus: { type: String, default: null }, // 'passed' | 'failed' | null
     testMcCorrect: { type: Number, default: null },
     testMcWrong: { type: Number, default: null },

@@ -30,6 +30,18 @@ const ExamResultSchema = new mongoose.Schema({
   // Kết quả
   passed: { type: Boolean, default: false },
   date:   { type: String, default: '' },
+
+  /** Append-only lịch sử sửa điểm (essay / tổng) — old/new/user/time. */
+  scoreHistory: [{
+    at: { type: Date, default: Date.now },
+    field: { type: String, default: 'essayScore' },
+    oldScore: { type: Number, default: null },
+    newScore: { type: Number, required: true },
+    actorUserId: { type: String, default: '' },
+    actorRole: { type: String, default: '' },
+    actorName: { type: String, default: '' },
+    note: { type: String, default: '' },
+  }],
 }, {
   timestamps: true,
 });

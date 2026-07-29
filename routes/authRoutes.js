@@ -288,6 +288,11 @@ router.get('/csrf-token', (req, res) => {
 });
 
 // ─── GET /api/auth/captcha  — Sinh CAPTCHA mới ────────────────────────────────
+/** Chỉ bật khi NODE_ENV=test và CAPTCHA_BYPASS=1 — không bao giờ trên production. */
+function isCaptchaBypassEnabled() {
+  return process.env.NODE_ENV === 'test' && String(process.env.CAPTCHA_BYPASS || '') === '1';
+}
+
 router.get('/captcha', captchaLimiter, (req, res) => {
   const captcha = svgCaptcha.create({
     size:        5,
@@ -301,11 +306,18 @@ router.get('/captcha', captchaLimiter, (req, res) => {
   });
   const cid = `c_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   captchaStore.set(cid, { text: captcha.text.toLowerCase(), expiresAt: Date.now() + CAPTCHA_TTL });
-  res.json({ success: true, cid, svg: captcha.data });
+  const payload = { success: true, cid, svg: captcha.data };
+  // Cho phép automation đọc đáp án — chỉ khi bypass test hook bật
+  if (isCaptchaBypassEnabled()) payload.answer = captcha.text;
+  res.json(payload);
 });
 
 // ─── POST /api/auth/captcha/verify  — Xác thực CAPTCHA (nội bộ) ───────────────
 function verifyCaptcha(cid, input) {
+  if (isCaptchaBypassEnabled()) {
+    // Vẫn chấp nhận cid giả / answer bất kỳ trong test — không đụng store production
+    return { ok: true, bypassed: true };
+  }
   const record = captchaStore.get(cid);
   if (!record) return { ok: false, reason: 'Mã bảo vệ hết hạn. Vui lòng làm mới.' };
   if (record.expiresAt < Date.now()) { captchaStore.delete(cid); return { ok: false, reason: 'Mã bảo vệ đã hết hạn. Vui lòng làm mới.' }; }

@@ -60,15 +60,28 @@ Report: `docs/QA_UI_GOLDEN_PATHS_REPORT.md` · Script: `node scripts/qa_ui_golde
 - `StudentsContext`: không reset `adminQuery` khi `/auth/me` refresh cùng user
 - `GET /api/auth/me` (hardcoded admin): trả `adminRole: SUPER_ADMIN`
 
-## 5. Next
+## 5. Next (updated 2026-07-29 after phase deploy)
 
-1. Commit/deploy khi bạn yêu cầu  
-2. (Optional) CAPTCHA login UI thật · Socket matrix · Local Redis
+### Done in this remediation pass
+- CAPTCHA_BYPASS hook: `NODE_ENV=test` + `CAPTCHA_BYPASS=1` only
+- Grade/score history: Teacher / ExamResult / Submission (+ AuditLog)
+- Scripts: `qa_grade_history_e2e.cjs`, `qa_socket_matrix.cjs`, `qa_captcha_concurrent_login.cjs`
+
+### Still optional / env-dependent
+1. Local Redis (`REDIS_URL`) for developer machines
+2. Zalo OA / SMTP / Firebase push credentials
+3. Full Playwright matrix mọi màn (golden paths đã PASS 7/7)
+4. Perf profiling CPU/RAM dưới tải write
 
 ## Regression command
 
 ```bash
+node --test tests/integration/*Phase*.test.js tests/integration/gradeHistory.test.js tests/integration/captchaBypass.test.js
 node scripts/qa_fix_redis_url_staging.cjs
 node scripts/qa_refund_e2e.cjs
 node scripts/qa_reassign_e2e.cjs
+node scripts/qa_grade_history_e2e.cjs
+node scripts/qa_socket_matrix.cjs
+# Server must run NODE_ENV=test CAPTCHA_BYPASS=1 for internal CAPTCHA path:
+node scripts/qa_captcha_concurrent_login.cjs
 ```

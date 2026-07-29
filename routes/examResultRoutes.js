@@ -118,12 +118,59 @@ router.put('/:id', authMiddleware, branchFilter, async (req, res) => {
       if (!ok) return undefined;
     }
 
+    const patch = { ...req.body };
+    delete patch.scoreHistory; // không cho client ghi đè history
+
+    const historyEntries = [];
+    if (Object.prototype.hasOwnProperty.call(req.body, 'essayScore')) {
+      const oldScore = existing.essayScore != null ? Number(existing.essayScore) : null;
+      const newScore = req.body.essayScore == null ? null : Number(req.body.essayScore);
+      if (oldScore !== newScore && newScore != null && !Number.isNaN(newScore)) {
+        historyEntries.push({
+          at: new Date(),
+          field: 'essayScore',
+          oldScore,
+          newScore,
+          actorUserId: String(req.user.id || ''),
+          actorRole: String(req.user.role || ''),
+          actorName: String(req.user.name || ''),
+          note: String(req.body.essayNote || req.body.note || '').slice(0, 500),
+        });
+      }
+    }
+
+    const update = historyEntries.length
+      ? { ...patch, $push: { scoreHistory: { $each: historyEntries } } }
+      : patch;
+
     const result = await ExamResult.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      update,
       { returnDocument: 'after', runValidators: true }
     );
     if (!result) return res.status(404).json({ success: false, message: 'Không tìm thấy kết quả thi' });
+
+    if (historyEntries.length) {
+      try {
+        const { writeAudit } = require('../services/auditLogService');
+        for (const h of historyEntries) {
+          await writeAudit({
+            action: 'exam.score_change',
+            actorUserId: req.user.id,
+            actorRole: req.user.role,
+            branchId: req.userBranchId || null,
+            entityType: 'examResult',
+            entityId: String(result._id),
+            studentId: result.studentId || null,
+            teacherId: result.teacherId || null,
+            oldValue: { field: h.field, score: h.oldScore },
+            newValue: { field: h.field, score: h.newScore, at: h.at },
+            ip: req.ip || '',
+            userAgent: req.headers['user-agent'] || '',
+          });
+        }
+      } catch { /* ignore */ }
+    }
 
     const io = req.app.get('io');
     if (io && result.type === 'student' && result.studentId) {

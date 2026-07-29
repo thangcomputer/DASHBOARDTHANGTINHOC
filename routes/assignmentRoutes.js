@@ -475,12 +475,46 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
 
     const isRegrade = existingSubmission.status === 'graded';
     const prevGrade = isRegrade ? existingSubmission.grade : null;
+    const gradeNum = Number(grade);
+
+    const historyEntry = {
+      at: new Date(),
+      oldGrade: prevGrade != null ? Number(prevGrade) : null,
+      newGrade: gradeNum,
+      actorUserId: String(req.user.id || ''),
+      actorRole: String(req.user.role || ''),
+      actorName: String(req.user.name || ''),
+      note: String(teacherFeedback || '').slice(0, 500),
+    };
 
     const submission = await Submission.findByIdAndUpdate(
       req.params.submissionId,
-      { grade, teacherFeedback, status: 'graded' },
+      {
+        grade: gradeNum,
+        teacherFeedback,
+        status: 'graded',
+        $push: { gradeHistory: historyEntry },
+      },
       { returnDocument: 'after' }
     );
+
+    try {
+      const { writeAudit } = require('../services/auditLogService');
+      await writeAudit({
+        action: isRegrade ? 'assignment.regrade' : 'assignment.grade',
+        actorUserId: req.user.id,
+        actorRole: req.user.role,
+        branchId: req.userBranchId || null,
+        entityType: 'submission',
+        entityId: String(submission._id),
+        studentId: submission.studentId,
+        teacherId: submission.teacherId || (req.user.role === 'teacher' ? req.user.id : null),
+        oldValue: { grade: prevGrade, status: existingSubmission.status },
+        newValue: { grade: gradeNum, status: 'graded' },
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch { /* ignore audit failures */ }
 
     // Lấy thông tin Assignment để làm "note" (VD: Chấm bài: Thực hành Excel Buổi 3)
     const assignment = await Assignment.findById(submission.assignmentId);
