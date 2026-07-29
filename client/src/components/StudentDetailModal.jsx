@@ -1049,6 +1049,11 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                       return name && name === khoa;
                                     });
                                     const st = String(enr?.status || '');
+                                    const isPaidEnr = (enr) =>
+                                      enr?.paid === true
+                                      || enr?.paid === 'Đã đóng phí'
+                                      || enr?.paid === 'true'
+                                      || enr?.paid === 1;
                                     if (isRefund) {
                                       return (
                                         <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
@@ -1067,6 +1072,20 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                       return (
                                         <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-green-100 text-green-700 border border-green-200">
                                           Hoàn thành
+                                        </span>
+                                      );
+                                    }
+                                    if (enr && isPaidEnr(enr)) {
+                                      return (
+                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                          Đã thanh toán
+                                        </span>
+                                      );
+                                    }
+                                    if (!enr && inv.synthetic === false) {
+                                      return (
+                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                          Đã thanh toán
                                         </span>
                                       );
                                     }
