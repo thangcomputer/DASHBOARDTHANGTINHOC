@@ -25,9 +25,17 @@ import SystemResetModal from './SystemResetModal';
 import { AlertOctagon } from 'lucide-react';
 
 // ── Tuition QR Preview ────────────────────────────────────────────────────────
-function TuitionQRPreview({ settings }) {
+function TuitionQRPreview({ settings, compact = false }) {
   const { centerBankCode, centerBankAccountNumber, centerBankAccountName } = settings;
-  if (!centerBankCode || !centerBankAccountNumber) return null;
+  if (!centerBankCode || !centerBankAccountNumber) {
+    return (
+      <div className={`rounded-xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-center px-3 ${compact ? 'min-h-[140px]' : 'min-h-[160px]'}`}>
+        <p className="text-[11px] text-slate-400 font-semibold leading-snug">
+          Chọn ngân hàng + số TK để xem QR mẫu
+        </p>
+      </div>
+    );
+  }
   const params = new URLSearchParams({
     amount: '500000',
     addInfo: 'HV001 Nop hoc phi THVP',
@@ -35,13 +43,15 @@ function TuitionQRPreview({ settings }) {
   });
   const url = `https://img.vietqr.io/image/${centerBankCode}-${centerBankAccountNumber}-compact2.png?${params}`;
   return (
-    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
-      <p className="text-xs font-bold text-blue-600 uppercase mb-2 flex items-center gap-1">
-        <Eye size={12} /> Xem thử mã QR thu học phí (500.000đ mẫu)
+    <div className={`rounded-xl border border-blue-100 bg-blue-50/70 flex flex-col items-center ${compact ? 'p-2.5 gap-1.5' : 'p-3 gap-2'}`}>
+      <p className="text-[10px] font-black text-blue-600 uppercase tracking-wide flex items-center gap-1">
+        <Eye size={11} /> QR mẫu · 500.000đ
       </p>
-      <div className="flex justify-center">
-        <img src={url} alt="QR mẫu" className="w-40 h-40 object-contain rounded-xl border bg-white p-1" />
-      </div>
+      <img
+        src={url}
+        alt="QR mẫu"
+        className={`object-contain rounded-lg border bg-white p-0.5 ${compact ? 'w-[112px] h-[112px]' : 'w-36 h-36'}`}
+      />
     </div>
   );
 }
@@ -411,73 +421,80 @@ export default function SystemSettingsTab() {
         <div className="flex-1 min-w-0">
       {/* ── TAB 1: NGÂN HÀNG ───────────────────────────────────────────── */}
       {activeSubTab === 'bank' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 w-full max-w-full lg:max-w-2xl">
-          <div className="flex items-center gap-2 mb-1">
-            <Landmark size={16} className="text-emerald-600" />
-            <h3 className="font-bold text-gray-800">Tài khoản ngân hàng thu học phí</h3>
-          </div>
-          <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 rounded-xl p-3">
-            💡 Đây là tài khoản ngân hàng của <strong>Trung tâm</strong> dùng để Học viên chuyển học phí. Mã QR sẽ tự động tạo từ thông tin này khi Admin bấm "Thu tiền".
-          </p>
-
-          {/* Bank Select */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Ngân hàng</label>
-            <BankSelect
-              value={settings.centerBankCode}
-              onChange={bank => setSettings(prev => ({
-                ...prev,
-                centerBankCode: bank.bin,
-                centerBankName: bank.shortName,
-              }))}
-            />
-            {settings.centerBankCode && (
-              <p className="text-[11px] text-emerald-600 mt-1">✓ {settings.centerBankName} (BIN: {settings.centerBankCode})</p>
-            )}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-4 w-full max-w-full lg:max-w-3xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Landmark size={15} className="text-emerald-600 shrink-0" />
+              <h3 className="font-bold text-sm text-gray-800 truncate">Tài khoản thu học phí</h3>
+            </div>
+            <p className="text-[10px] text-amber-700/90 font-semibold bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 max-w-full sm:max-w-[min(100%,28rem)] leading-snug">
+              TK trung tâm · QR tự tạo khi Admin thu tiền
+            </p>
           </div>
 
-          {/* Account Number */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Số tài khoản</label>
-            <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-emerald-400 transition">
-              <CreditCard size={15} className="text-emerald-500 flex-shrink-0" />
-              <input
-                type="text"
-                value={settings.centerBankAccountNumber}
-                onChange={e => setSettings(prev => ({ ...prev, centerBankAccountNumber: e.target.value.replace(/\D/g,'') }))}
-                className="flex-1 text-sm font-mono outline-none bg-transparent tracking-wider"
-                placeholder="Nhập số tài khoản"
-                maxLength={20}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 md:gap-4 items-start">
+            <div className="space-y-2.5 min-w-0">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Ngân hàng</label>
+                <BankSelect
+                  value={settings.centerBankCode}
+                  onChange={(bank) => setSettings((prev) => ({
+                    ...prev,
+                    centerBankCode: bank.bin,
+                    centerBankName: bank.shortName,
+                  }))}
+                />
+                {settings.centerBankCode ? (
+                  <p className="text-[10px] text-emerald-600 mt-1 font-semibold">
+                    ✓ {settings.centerBankName} · BIN {settings.centerBankCode}
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Số tài khoản</label>
+                <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 focus-within:border-emerald-400 transition">
+                  <CreditCard size={14} className="text-emerald-500 shrink-0" />
+                  <input
+                    type="text"
+                    value={settings.centerBankAccountNumber}
+                    onChange={(e) => setSettings((prev) => ({ ...prev, centerBankAccountNumber: e.target.value.replace(/\D/g, '') }))}
+                    className="flex-1 text-sm font-mono outline-none bg-transparent tracking-wider min-w-0"
+                    placeholder="Số TK"
+                    maxLength={20}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Chủ tài khoản</label>
+                <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 focus-within:border-emerald-400 transition">
+                  <Users size={14} className="text-emerald-500 shrink-0" />
+                  <input
+                    type="text"
+                    value={settings.centerBankAccountName}
+                    onChange={(e) => setSettings((prev) => ({ ...prev, centerBankAccountName: e.target.value.toUpperCase() }))}
+                    className="flex-1 text-xs font-bold outline-none bg-transparent uppercase min-w-0"
+                    placeholder="TÊN CHỦ TK"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSave(['centerBankCode', 'centerBankName', 'centerBankAccountNumber', 'centerBankAccountName'])}
+                disabled={saving || !settings.centerBankCode || !settings.centerBankAccountNumber}
+                className="w-full sm:w-auto sm:min-w-[200px] py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wide rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
+              </button>
+            </div>
+
+            <div className="w-full md:w-[148px] shrink-0">
+              <TuitionQRPreview settings={settings} compact />
             </div>
           </div>
-
-          {/* Account Name */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Tên chủ tài khoản</label>
-            <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-emerald-400 transition">
-              <Users size={15} className="text-emerald-500 flex-shrink-0" />
-              <input
-                type="text"
-                value={settings.centerBankAccountName}
-                onChange={e => setSettings(prev => ({ ...prev, centerBankAccountName: e.target.value.toUpperCase() }))}
-                className="flex-1 text-sm font-bold outline-none bg-transparent uppercase"
-                placeholder="VD: THANG TIN HOC CENTER"
-              />
-            </div>
-          </div>
-
-          {/* QR Preview */}
-          <TuitionQRPreview settings={settings} />
-
-          <button
-            onClick={() => handleSave(['centerBankCode','centerBankName','centerBankAccountNumber','centerBankAccountName'])}
-            disabled={saving || !settings.centerBankCode || !settings.centerBankAccountNumber}
-            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl hover:from-red-700 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-red-100"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? 'Đang lưu...' : 'Lưu cấu hình ngân hàng'}
-          </button>
         </div>
       )}
 
