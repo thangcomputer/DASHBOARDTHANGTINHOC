@@ -257,8 +257,17 @@ export default function StudentDetailModal({ studentId, onClose }) {
     }
     const isPaid = enr.paid === true || enr.paid === 'Đã đóng phí';
     const maxRefund = isPaid ? (Number(enr.price) || 0) : 0;
-    // Mặc định hoàn 0 — hủy khóa ≠ tự động hoàn toàn bộ (tránh lệch sổ)
-    setCancelEnrModal({ enr, sid, enrId, reason: '', refundAmount: 0, maxRefund, isPaid });
+    // Mặc định hoàn đủ học phí đã đóng — Admin chỉnh tiền hoặc % nếu cần
+    setCancelEnrModal({
+      enr,
+      sid,
+      enrId,
+      reason: '',
+      refundAmount: maxRefund,
+      refundPercent: maxRefund > 0 ? 100 : 0,
+      maxRefund,
+      isPaid,
+    });
   };
 
   const handleConfirmCancelEnrollment = async () => {
@@ -1797,18 +1806,59 @@ export default function StudentDetailModal({ studentId, onClose }) {
               </div>
               {cancelEnrModal.isPaid && (
                 <div>
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">
-                    Số tiền hoàn trả (tối đa {Number(cancelEnrModal.maxRefund).toLocaleString('vi-VN')}đ)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={cancelEnrModal.maxRefund}
-                    value={cancelEnrModal.refundAmount}
-                    onChange={(e) => setCancelEnrModal((p) => ({ ...p, refundAmount: Math.min(Number(e.target.value) || 0, p.maxRefund) }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-red-300 outline-none"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">Nhập 0 nếu không hoàn tiền</p>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1 min-w-0">
+                      <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">
+                        Số tiền hoàn (tối đa {Number(cancelEnrModal.maxRefund).toLocaleString('vi-VN')}đ)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={cancelEnrModal.maxRefund}
+                        step={1000}
+                        value={cancelEnrModal.refundAmount}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setCancelEnrModal((p) => {
+                            const max = Number(p.maxRefund) || 0;
+                            const amt = Math.min(Math.max(0, Number(raw) || 0), max);
+                            const pct = max > 0 ? Math.round((amt / max) * 1000) / 10 : 0;
+                            return { ...p, refundAmount: amt, refundPercent: pct };
+                          });
+                        }}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none"
+                      />
+                    </div>
+                    <div className="w-[96px] shrink-0">
+                      <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">
+                        % hoàn
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={cancelEnrModal.refundPercent ?? 0}
+                          onChange={(e) => {
+                            setCancelEnrModal((p) => {
+                              const max = Number(p.maxRefund) || 0;
+                              const pct = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                              const amt = Math.min(max, Math.round((max * pct) / 100));
+                              return { ...p, refundPercent: pct, refundAmount: amt };
+                            });
+                          }}
+                          className="w-full border border-slate-200 rounded-xl pl-3 pr-7 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Mặc định 100%. Đổi tiền hoặc % — hai ô đồng bộ. Nhập 0 nếu không hoàn.
+                  </p>
                 </div>
               )}
             </div>

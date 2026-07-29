@@ -419,7 +419,7 @@ export default function AdminFinanceTab() {
                   </p>
                 </div>
                 <p className={`text-[15px] font-extrabold shrink-0 ${neg ? 'text-red-600' : 'text-emerald-700'}`}>
-                  {neg && signed > 0 ? '−' : ''}{Math.abs(signed).toLocaleString('vi-VN')}đ
+                  {neg ? '−' : ''}{Math.abs(signed).toLocaleString('vi-VN')}đ
                 </p>
               </div>
             );

@@ -8,10 +8,31 @@ import {
   ChevronLeft, ChevronRight, Loader2, MapPin, Globe, Building2, KeyRound,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
-import { getActiveClientEnrollments } from '../../../utils/enrollments';
+import { getActiveClientEnrollments, getClientEnrollments } from '../../../utils/enrollments';
 import { isTeacherActive } from '../../../constants/teacherStatus';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { apiFetch } from '../../../services/api';
+
+/** Tổng tiền đã hoàn từ khóa cancelled (chỉ hiển thị, không sửa). */
+function getStudentRefundedTotal(student) {
+  return getClientEnrollments(student)
+    .filter((e) => e?.status === 'cancelled' || e?.status === 'refunded')
+    .reduce((sum, e) => sum + Math.abs(Number(e.refundedAmount) || 0), 0);
+}
+
+function RefundHint({ amount }) {
+  const amt = Math.abs(Number(amount) || 0);
+  if (!(amt > 0)) return null;
+  return (
+    <p
+      className="text-xs text-slate-400/90 mt-0.5 tabular-nums pointer-events-none select-none"
+      title="Hoàn học phí — chỉ xem, không chỉnh sửa"
+      aria-readonly="true"
+    >
+      −{amt.toLocaleString('vi-VN')}đ · hoàn
+    </p>
+  );
+}
 
 function StudentActionMenu({
   s,
@@ -310,6 +331,7 @@ export default function AdminStudentsTab() {
   };
 
   const renderTuition = (s, enrollments, hasMultiCourse) => {
+    const refundedTotal = getStudentRefundedTotal(s);
     if (hasMultiCourse) {
       return (
         <div className="space-y-1.5">
@@ -326,12 +348,14 @@ export default function AdminStudentsTab() {
               </div>
             );
           })}
+          <RefundHint amount={refundedTotal} />
         </div>
       );
     }
     return (
       <>
         <p className="text-sm font-semibold text-slate-800">{(s.price || 0).toLocaleString('vi-VN')}đ</p>
+        <RefundHint amount={refundedTotal} />
         <p className="text-xs text-slate-500 mt-0.5">Tiến độ: {(s.completedSessions || 0)}/{(s.totalSessions || 12)} buổi</p>
       </>
     );
@@ -518,52 +542,63 @@ export default function AdminStudentsTab() {
                   <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right">Trạng thái</p>
 
                   {hasMultiCourse ? (
-                    enrollments.map((enr) => {
-                      const enrId = enr.enrollmentId || enr.id;
-                      const enrTeacherVal = enr.teacherId || '';
-                      const courseLabel = enr.courseName || enr.name || '';
-                      const { matched, other } = teachersForCourse(enr, enrTeacherVal);
-                      return (
-                        <div key={enrId} className="contents">
-                          <div className="min-w-0 space-y-1">
-                            <p className="text-[11px] font-semibold text-sky-700 truncate" title={courseLabel}>
-                              {courseLabel}
-                            </p>
-                            <CmsSelect
-                              value={enrTeacherVal}
-                              onChange={(e) => {
-                                e?.stopPropagation?.();
-                                handleAssignTeacher(s.id || s._id, e.target.value || null, enrId !== 'main' ? enrId : undefined);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className={teacherSelectClass}
-                              wrapperClassName={teacherSelectWrapClass}
-                            >
-                              <option value="">Chưa phân công</option>
-                              {matched.map((t) => (
-                                <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-                              ))}
-                              {other.map((t) => (
-                                <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
-                                  {t.name} (khác môn)
-                                </option>
-                              ))}
-                            </CmsSelect>
+                    <>
+                      {enrollments.map((enr) => {
+                        const enrId = enr.enrollmentId || enr.id;
+                        const enrTeacherVal = enr.teacherId || '';
+                        const courseLabel = enr.courseName || enr.name || '';
+                        const { matched, other } = teachersForCourse(enr, enrTeacherVal);
+                        return (
+                          <div key={enrId} className="contents">
+                            <div className="min-w-0 space-y-1">
+                              <p className="text-[11px] font-semibold text-sky-700 truncate" title={courseLabel}>
+                                {courseLabel}
+                              </p>
+                              <CmsSelect
+                                value={enrTeacherVal}
+                                onChange={(e) => {
+                                  e?.stopPropagation?.();
+                                  handleAssignTeacher(s.id || s._id, e.target.value || null, enrId !== 'main' ? enrId : undefined);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className={teacherSelectClass}
+                                wrapperClassName={teacherSelectWrapClass}
+                              >
+                                <option value="">Chưa phân công</option>
+                                {matched.map((t) => (
+                                  <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                                ))}
+                                {other.map((t) => (
+                                  <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
+                                    {t.name} (khác môn)
+                                  </option>
+                                ))}
+                              </CmsSelect>
+                            </div>
+                            <div className="min-w-0 pt-0.5">
+                              <p className="text-sm font-semibold text-slate-800 leading-tight tabular-nums">
+                                {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
+                              </p>
+                            </div>
+                            <div className="flex justify-end pt-0.5">
+                              <PaidBadge paid={isEnrollmentPaidFlag(enr)} />
+                            </div>
                           </div>
-                          <div className="min-w-0 pt-0.5">
-                            <p className="text-sm font-semibold text-slate-800 leading-tight tabular-nums">
-                              {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
-                            </p>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
-                            </p>
+                        );
+                      })}
+                      {getStudentRefundedTotal(s) > 0 ? (
+                        <div className="contents">
+                          <div aria-hidden="true" />
+                          <div className="min-w-0">
+                            <RefundHint amount={getStudentRefundedTotal(s)} />
                           </div>
-                          <div className="flex justify-end pt-0.5">
-                            <PaidBadge paid={isEnrollmentPaidFlag(enr)} />
-                          </div>
+                          <div aria-hidden="true" />
                         </div>
-                      );
-                    })
+                      ) : null}
+                    </>
                   ) : (
                     <>
                       <div className="min-w-0">
