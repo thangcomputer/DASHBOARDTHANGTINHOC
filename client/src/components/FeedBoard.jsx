@@ -3,7 +3,6 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
 import {
   Heart, ThumbsUp, Laugh, Frown, Sparkles, MessageCircle, ImagePlus, Send, Trash2,
   Loader2, X, Newspaper, RefreshCw, Reply, Circle, Headphones,
@@ -12,6 +11,8 @@ import api, { resolveMediaUrl } from '../services/api';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { useToast } from '../utils/toast';
 import { useSocket } from '../context/SocketContext';
+import { useFloatingMessenger } from '../context/FloatingMessengerContext';
+import { openSiteChat } from './FloatingMessenger';
 
 const ROLE_LABEL = {
   admin: 'Admin',
@@ -71,12 +72,11 @@ function isSupportPresence(u) {
 
 export default function FeedBoard({ session, role }) {
   const toast = useToast();
-  const navigate = useNavigate();
   const { socket, onlineUsers } = useSocket() || {};
+  const { openChat, setSupportOpen } = useFloatingMessenger();
   const fileRef = useRef(null);
   const meId = String(session?.id || session?._id || '');
   const meRole = role || session?.role || 'student';
-  const inboxPath = `/${meRole === 'staff' ? 'admin' : meRole}/inbox`;
 
   const supportOnline = useMemo(() => {
     const seen = new Set();
@@ -107,17 +107,10 @@ export default function FeedBoard({ session, role }) {
 
   const openSupportChat = useCallback((person) => {
     if (!person?.id) return;
-    navigate(inboxPath, {
-      state: {
-        selectUserId: person.id,
-        selectUser: {
-          id: person.id,
-          name: person.name,
-          role: person.role,
-        },
-      },
-    });
-  }, [navigate, inboxPath]);
+    setSupportOpen(true);
+    if (typeof openChat === 'function') openChat(person);
+    else openSiteChat(person);
+  }, [openChat, setSupportOpen]);
 
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(1);

@@ -3,11 +3,13 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import BranchFilterDropdown from './BranchFilterDropdown';
 import { LmsGuideHost } from './LmsGuideTour';
+import FloatingMessenger from './FloatingMessenger';
+import { FloatingMessengerProvider } from '../context/FloatingMessengerContext';
 import { useData } from '../context/DataContext';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
   Bell, LogOut, CheckCircle2, Clock, X, Lock, MoreVertical,
-  Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, MessageSquare,
+  Calendar, DollarSign, UserPlus, Zap, BookOpen, Award,
 } from 'lucide-react';
 
 const PAGE_TITLES = {
@@ -246,6 +248,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     : role;
 
   return (
+    <FloatingMessengerProvider
+      currentUserId={myId}
+      currentUserRole={role === 'staff' ? 'admin' : role}
+    >
     <div className="flex h-[100dvh] max-h-[100dvh] bg-[#f8fafc] relative font-sans overflow-hidden">
       {isRefetching ? (
         <div className="sr-only" role="status" aria-live="polite">
@@ -496,19 +502,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
       <ChangePasswordModal session={session} role={role} />
 
-      {/* FAB tin nhắn nhanh: chỉ desktop, ẩn trên điện thoại và khi đang ở Hộp thư */}
-      {role !== 'student' && !isInboxPage && (
-        <button
-          type="button"
-          onClick={() => navigate(`/${role}/inbox`)}
-          className="cms-fab hidden md:inline-flex bg-red-600 hover:bg-red-700 text-white p-3.5 sm:p-4 focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2"
-          title="Nhắn tin"
-          aria-label="Mở hộp thư"
-        >
-          <MessageSquare size={24} aria-hidden="true" />
-        </button>
-      )}
+      {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
+      <FloatingMessenger session={session} role={role} />
     </div>
+    </FloatingMessengerProvider>
   );
 };
 

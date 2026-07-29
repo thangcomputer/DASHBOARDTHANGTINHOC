@@ -531,6 +531,139 @@
     }
   }
 
+  /* Floating Messenger (Facebook-style) */
+  .cms-fm-root {
+    position: fixed;
+    z-index: 85;
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: none;
+    max-width: calc(100vw - 1rem);
+  }
+  .cms-fm-root > * { pointer-events: auto; }
+
+  .cms-fm-dock {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  .cms-fm-fab {
+    @apply relative w-14 h-14 rounded-full bg-red-600 text-white shadow-2xl flex items-center justify-center hover:bg-red-700 transition active:scale-95;
+  }
+  .cms-fm-fab__badge {
+    @apply absolute -top-0.5 -right-0.5 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-emerald-500 text-[10px] font-black text-white flex items-center justify-center ring-2 ring-white;
+  }
+
+  .cms-fm-support {
+    width: min(300px, calc(100vw - 1.5rem));
+    max-height: min(420px, calc(100dvh - 6rem));
+    @apply bg-white rounded-2xl border border-slate-200 shadow-[0_12px_40px_rgba(15,23,42,0.18)] flex flex-col overflow-hidden;
+  }
+  .cms-fm-support__head {
+    @apply flex items-start gap-2 px-3.5 py-3 border-b border-slate-100 shrink-0;
+  }
+  .cms-fm-support__body {
+    @apply flex-1 min-h-0 overflow-y-auto overscroll-contain p-1.5;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .cms-fm-support__body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .cms-fm-support__tabs {
+    @apply px-3 py-2 border-t border-slate-100 shrink-0 bg-slate-50/80;
+  }
+
+  .cms-fm-tab-chip {
+    @apply text-[11px] font-bold px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:border-red-200 hover:text-red-600 transition;
+  }
+  .cms-fm-tab-chip.is-active {
+    @apply bg-red-600 text-white border-red-600;
+  }
+
+  .cms-fm-chats {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 10px;
+    max-width: calc(100vw - 5.5rem);
+    overflow-x: auto;
+    overscroll-contain: contain;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .cms-fm-chats::-webkit-scrollbar { display: none; }
+
+  .cms-fm-window {
+    width: min(320px, calc(100vw - 1.5rem));
+    height: min(420px, calc(100dvh - 6rem));
+    @apply bg-white rounded-2xl border border-slate-200 shadow-[0_12px_40px_rgba(15,23,42,0.18)] flex flex-col overflow-hidden shrink-0;
+  }
+  .cms-fm-window.is-active {
+    box-shadow: 0 16px 48px rgba(220, 38, 38, 0.18);
+    border-color: color-mix(in srgb, #dc2626 35%, #e2e8f0);
+  }
+  .cms-fm-window__head {
+    @apply flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 bg-white cursor-pointer shrink-0;
+  }
+  .cms-fm-window__body {
+    @apply flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2.5 space-y-1.5 bg-slate-50/60;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .cms-fm-window__body::-webkit-scrollbar { display: none; }
+  .cms-fm-window__foot {
+    @apply flex items-center gap-1.5 px-2.5 py-2 border-t border-slate-100 bg-white shrink-0;
+  }
+
+  .cms-fm-input {
+    @apply flex-1 min-w-0 h-10 px-3 rounded-xl bg-slate-100 border-0 text-[13px] font-medium text-slate-800 outline-none focus:ring-2 focus:ring-red-500/20;
+  }
+  .cms-fm-send {
+    @apply w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center disabled:opacity-40 hover:bg-red-700 transition shrink-0;
+  }
+  .cms-fm-icon-btn {
+    @apply w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 flex items-center justify-center transition;
+  }
+
+  .cms-fm-bubble {
+    @apply max-w-[85%] text-[13px] font-medium leading-snug px-3 py-2 rounded-2xl;
+  }
+  .cms-fm-bubble.is-mine {
+    @apply ml-auto bg-red-600 text-white rounded-br-md;
+  }
+  .cms-fm-bubble.is-theirs {
+    @apply mr-auto bg-white text-slate-800 border border-slate-100 rounded-bl-md;
+  }
+
+  .cms-fm-pill {
+    @apply flex items-center gap-2 h-12 pl-1.5 pr-3 rounded-full bg-white border border-slate-200 shadow-lg hover:border-red-200 transition shrink-0;
+  }
+
+  @media (max-width: 639.98px) {
+    .cms-fm-root {
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .cms-fm-chats {
+      flex-direction: column;
+      align-items: flex-end;
+      max-width: calc(100vw - 1rem);
+    }
+    .cms-fm-window {
+      width: min(100vw - 1rem, 360px);
+      height: min(55dvh, 420px);
+    }
+    .cms-fm-support {
+      width: min(100vw - 1rem, 320px);
+      max-height: min(50dvh, 360px);
+    }
+  }
 
   /* ?? Students module (mobile CRM cards) ????????????????????????? */
   .cms-students-module {
