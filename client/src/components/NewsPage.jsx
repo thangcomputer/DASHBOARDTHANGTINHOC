@@ -1,0 +1,640 @@
+/**
+ * Tin tức trung tâm — danh sách Card + chi tiết + soạn bài (manage_blog).
+ */
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  Newspaper, Search, Plus, Loader2, Eye, Calendar, User, ChevronLeft,
+  ImagePlus, Paperclip, Send, Save, EyeOff, Trash2, RefreshCw, X, FileText,
+} from 'lucide-react';
+import { resolveMediaUrl, blogAPI } from '../services/api';
+import { useToast } from '../utils/toast';
+import { useSocket } from '../context/SocketContext';
+import { hasPermission, PERMISSIONS } from '../constants/permissions';
+
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function statusLabel(s) {
+  if (s === 'published') return 'Đã đăng';
+  if (s === 'hidden') return 'Đã ẩn';
+  return 'Nháp';
+}
+
+function statusClass(s) {
+  if (s === 'published') return 'bg-emerald-50 text-emerald-700';
+  if (s === 'hidden') return 'bg-slate-100 text-slate-600';
+  return 'bg-amber-50 text-amber-700';
+}
+
+function NewsCard({ post, basePath, onOpen }) {
+  const thumb = post.thumbnailUrl ? resolveMediaUrl(post.thumbnailUrl) : null;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(post)}
+      className="group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-red-100 transition-all duration-200 flex flex-col h-full"
+    >
+      <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+        {thumb ? (
+          <img
+            src={thumb}
+            alt=""
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-300">
+            <Newspaper size={40} />
+          </div>
+        )}
+        {post.isNew && (
+          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black tracking-wide">
+            NEW
+          </span>
+        )}
+      </div>
+      <div className="p-4 flex flex-col flex-1 gap-2">
+        <h3 className="text-base font-bold text-slate-900 line-clamp-2 group-hover:text-red-700 transition-colors">
+          {post.title}
+        </h3>
+        {post.excerpt ? (
+          <p className="text-sm text-slate-500 line-clamp-2 flex-1">{post.excerpt}</p>
+        ) : (
+          <div className="flex-1" />
+        )}
+        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 font-semibold pt-1 border-t border-slate-50">
+          <span className="truncate flex items-center gap-1">
+            <User size={12} /> {post.authorName || 'Admin'}
+          </span>
+          <span className="shrink-0 flex items-center gap-2">
+            <span className="inline-flex items-center gap-0.5"><Eye size={12} />{post.viewCount || 0}</span>
+            <span>{formatDate(post.publishedAt || post.createdAt).slice(0, 8)}</span>
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function EditorForm({ initial, onSaved, onCancel }) {
+  const toast = useToast();
+  const fileRef = useRef(null);
+  const [title, setTitle] = useState(initial?.title || '');
+  const [excerpt, setExcerpt] = useState(initial?.excerpt || '');
+  const [content, setContent] = useState(
+    (initial?.contentHtml || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p><p>/gi, '\n\n').replace(/<[^>]+>/g, '') || '',
+  );
+  const [thumbnailUrl, setThumbnailUrl] = useState(initial?.thumbnailUrl || '');
+  const [attachments, setAttachments] = useState(initial?.attachments || []);
+  const [busy, setBusy] = useState(false);
+
+  const toHtml = (text) => {
+    const escaped = String(text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return escaped
+      .split(/\n{2,}/)
+      .map((p) => `<p>${p.replace(/\n/g, '<br/>')}</p>`)
+      .join('');
+  };
+
+  const uploadFiles = async (files) => {
+    if (!files?.length) return;
+    setBusy(true);
+    try {
+      const res = await blogAPI.upload([...files]);
+      if (!res.success) throw new Error(res.message || 'Upload lỗi');
+      const items = res.data || [];
+      const imgs = items.filter((i) => i.kind === 'image');
+      if (imgs[0] && !thumbnailUrl) setThumbnailUrl(imgs[0].url);
+      setAttachments((prev) => [...prev, ...items]);
+      toast.success(`Đã tải ${items.length} file`);
+    } catch (e) {
+      toast.error(e.message || 'Upload thất bại');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = async (status) => {
+    if (!title.trim()) {
+      toast.error('Nhập tiêu đề');
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = {
+        title: title.trim(),
+        excerpt: excerpt.trim(),
+        contentHtml: toHtml(content),
+        thumbnailUrl,
+        attachments,
+        status,
+      };
+      let res;
+      if (initial?.id) res = await blogAPI.update(initial.id, payload);
+      else res = await blogAPI.create(payload);
+      if (!res.success) throw new Error(res.message || 'Lưu thất bại');
+      toast.success(status === 'published' ? 'Đã đăng bài' : 'Đã lưu');
+      onSaved?.(res.data);
+    } catch (e) {
+      toast.error(e.message || 'Lỗi lưu bài');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-black text-slate-900">{initial?.id ? 'Sửa bài viết' : 'Soạn bài mới'}</h2>
+        <button type="button" onClick={onCancel} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400">
+          <X size={18} />
+        </button>
+      </div>
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Tiêu đề bài viết"
+        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-base font-bold outline-none focus:border-red-300"
+      />
+      <textarea
+        value={excerpt}
+        onChange={(e) => setExcerpt(e.target.value)}
+        placeholder="Mô tả ngắn (hiện trên card)"
+        rows={2}
+        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-300 resize-y"
+      />
+      <textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="Nội dung bài viết…"
+        rows={12}
+        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-300 resize-y leading-relaxed"
+      />
+
+      {thumbnailUrl && (
+        <div className="relative w-full max-w-sm aspect-video rounded-xl overflow-hidden bg-slate-100">
+          <img src={resolveMediaUrl(thumbnailUrl)} alt="" className="w-full h-full object-cover" />
+          <button
+            type="button"
+            onClick={() => setThumbnailUrl('')}
+            className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {attachments.length > 0 && (
+        <ul className="space-y-1.5">
+          {attachments.map((a, i) => (
+            <li key={`${a.url}-${i}`} className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
+              <FileText size={14} className="text-slate-400 shrink-0" />
+              <span className="truncate flex-1">{a.name || a.url}</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">{a.kind}</span>
+              <button
+                type="button"
+                className="text-red-500 hover:underline"
+                onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+              >
+                Xóa
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"
+          className="hidden"
+          onChange={(e) => {
+            uploadFiles(e.target.files);
+            e.target.value = '';
+          }}
+        />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+          className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
+        >
+          <ImagePlus size={14} /> Ảnh / file
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => save('draft')}
+          className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
+        >
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Lưu nháp
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => save('published')}
+          className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 flex items-center gap-1.5"
+        >
+          <Send size={14} /> Đăng bài
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function NewsPage({ session, role = 'admin' }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const { slug } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { socket } = useSocket() || {};
+  const base = `/${role}/news`;
+  const canManage = hasPermission(session, PERMISSIONS.MANAGE_BLOG);
+
+  const mode = searchParams.get('mode'); // edit | manage
+  const editId = searchParams.get('id');
+
+  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [q, setQ] = useState('');
+  const [qInput, setQInput] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState(null);
+  const [related, setRelated] = useState([]);
+  const [manageStatus, setManageStatus] = useState('');
+  const [editing, setEditing] = useState(null);
+
+  const loadList = useCallback(async (p = 1) => {
+    setLoading(true);
+    try {
+      const res = canManage && mode === 'manage'
+        ? await blogAPI.manageList({ page: p, limit: 20, status: manageStatus || undefined, q: q || undefined })
+        : await blogAPI.list({ page: p, limit: 12, q: q || undefined });
+      if (res.success) {
+        setItems(res.data || []);
+        setPages(res.pagination?.pages || 1);
+        setPage(res.pagination?.page || p);
+      }
+    } catch {
+      toast.error('Không tải được tin tức');
+    } finally {
+      setLoading(false);
+    }
+  }, [canManage, mode, manageStatus, q, toast]);
+
+  const loadDetail = useCallback(async (s) => {
+    setLoading(true);
+    try {
+      const res = await blogAPI.get(s, { manage: canManage });
+      if (res.success) {
+        setDetail(res.data);
+        setRelated(res.related || []);
+      } else {
+        toast.error(res.message || 'Không tìm thấy bài');
+        navigate(base);
+      }
+    } catch {
+      toast.error('Lỗi tải bài viết');
+    } finally {
+      setLoading(false);
+    }
+  }, [canManage, navigate, base, toast]);
+
+  useEffect(() => {
+    if (slug) loadDetail(slug);
+    else if (mode === 'edit') {
+      setDetail(null);
+      if (editId) {
+        blogAPI.get(editId, { manage: true }).then((res) => {
+          if (res.success) setEditing(res.data);
+        }).catch(() => {});
+      } else setEditing({});
+    } else {
+      setDetail(null);
+      setEditing(null);
+      loadList(1);
+    }
+  }, [slug, mode, editId, loadDetail, loadList]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onPub = () => {
+      if (!slug && mode !== 'edit') loadList(page);
+    };
+    socket.on('blog:published', onPub);
+    return () => socket.off('blog:published', onPub);
+  }, [socket, slug, mode, page, loadList]);
+
+  const openPost = (post) => navigate(`${base}/${post.slug}`);
+
+  if (mode === 'edit' && canManage) {
+    return (
+      <div className="cms-viewport-fill w-full space-y-4">
+        <EditorForm
+          initial={editing}
+          onCancel={() => {
+            setSearchParams({});
+            navigate(base);
+          }}
+          onSaved={(data) => {
+            setSearchParams({});
+            if (data?.slug) navigate(`${base}/${data.slug}`);
+            else navigate(base);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (slug) {
+    if (loading && !detail) {
+      return (
+        <div className="cms-viewport-fill flex items-center justify-center text-slate-400">
+          <Loader2 className="animate-spin" size={28} />
+        </div>
+      );
+    }
+    if (!detail) return null;
+    const thumb = detail.thumbnailUrl ? resolveMediaUrl(detail.thumbnailUrl) : null;
+    return (
+      <div className="cms-viewport-fill w-full">
+        <div className="max-w-4xl mx-auto space-y-5">
+          <button
+            type="button"
+            onClick={() => navigate(base)}
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-red-600"
+          >
+            <ChevronLeft size={16} /> Tin tức
+          </button>
+          {thumb && (
+            <div className="rounded-2xl overflow-hidden aspect-[21/9] bg-slate-100">
+              <img src={thumb} alt="" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div>
+            {detail.isNew && (
+              <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black">NEW</span>
+            )}
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">{detail.title}</h1>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold text-slate-500">
+              <span className="inline-flex items-center gap-1"><User size={13} />{detail.authorName}</span>
+              <span className="inline-flex items-center gap-1"><Calendar size={13} />{formatDate(detail.publishedAt || detail.createdAt)}</span>
+              <span className="inline-flex items-center gap-1"><Eye size={13} />{detail.viewCount || 0} lượt xem</span>
+              {canManage && (
+                <span className={`px-2 py-0.5 rounded-md ${statusClass(detail.status)}`}>{statusLabel(detail.status)}</span>
+              )}
+            </div>
+          </div>
+          {detail.excerpt && (
+            <p className="text-base text-slate-600 font-medium border-l-4 border-red-500 pl-4">{detail.excerpt}</p>
+          )}
+          <div
+            className="prose prose-slate max-w-none text-slate-800 leading-relaxed text-[15px]
+              [&_p]:mb-3 [&_img]:rounded-xl [&_img]:max-w-full"
+            dangerouslySetInnerHTML={{ __html: detail.contentHtml || '' }}
+          />
+          {Array.isArray(detail.attachments) && detail.attachments.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">Tệp đính kèm</p>
+              <ul className="space-y-1.5">
+                {detail.attachments.map((a, i) => (
+                  <li key={`${a.url}-${i}`}>
+                    {a.kind === 'image' ? (
+                      <img src={resolveMediaUrl(a.url)} alt={a.name || ''} className="rounded-xl max-h-80 object-contain" />
+                    ) : a.kind === 'video' ? (
+                      // eslint-disable-next-line jsx-a11y/media-has-caption
+                      <video src={resolveMediaUrl(a.url)} controls className="rounded-xl w-full max-h-96 bg-black" />
+                    ) : (
+                      <a
+                        href={resolveMediaUrl(a.url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm font-bold text-red-600 hover:underline"
+                      >
+                        <Paperclip size={14} /> {a.name || 'Tải file'}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {canManage && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                className="px-3 py-2 rounded-xl border text-xs font-bold"
+                onClick={() => navigate(`${base}?mode=edit&id=${detail.id}`)}
+              >
+                Sửa
+              </button>
+              {detail.status !== 'published' && (
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold"
+                  onClick={async () => {
+                    const res = await blogAPI.publish(detail.id);
+                    if (res.success) {
+                      toast.success('Đã đăng');
+                      setDetail(res.data);
+                    }
+                  }}
+                >
+                  Đăng bài
+                </button>
+              )}
+              {detail.status === 'published' && (
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1"
+                  onClick={async () => {
+                    const res = await blogAPI.hide(detail.id);
+                    if (res.success) {
+                      toast.success('Đã ẩn');
+                      setDetail(res.data);
+                    }
+                  }}
+                >
+                  <EyeOff size={14} /> Ẩn
+                </button>
+              )}
+              <button
+                type="button"
+                className="px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1"
+                onClick={async () => {
+                  if (!window.confirm('Xóa bài viết này?')) return;
+                  const res = await blogAPI.remove(detail.id);
+                  if (res.success) {
+                    toast.success('Đã xóa');
+                    navigate(base);
+                  }
+                }}
+              >
+                <Trash2 size={14} /> Xóa
+              </button>
+            </div>
+          )}
+          {related.length > 0 && (
+            <div className="pt-6 border-t border-slate-100">
+              <h2 className="text-sm font-black uppercase tracking-wide text-slate-400 mb-3">Bài liên quan</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {related.map((p) => (
+                  <NewsCard key={p.id} post={p} basePath={base} onOpen={openPost} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="cms-viewport-fill w-full space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">
+            <Newspaper className="text-red-600" size={22} /> Tin tức
+          </h1>
+          <p className="text-xs text-slate-500 font-medium mt-1">Tin tức &amp; thông báo từ trung tâm</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => loadList(page)}
+            className="p-2.5 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100"
+            title="Làm mới"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+          {canManage && (
+            <>
+              <button
+                type="button"
+                onClick={() => setSearchParams(mode === 'manage' ? {} : { mode: 'manage' })}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border ${mode === 'manage' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}
+              >
+                Quản lý
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(`${base}?mode=edit`)}
+                className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 flex items-center gap-1.5"
+              >
+                <Plus size={14} /> Viết bài
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[12rem]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setQ(qInput.trim());
+            }}
+            placeholder="Tìm bài viết…"
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-red-300"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setQ(qInput.trim())}
+          className="px-3 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
+        >
+          Tìm
+        </button>
+        {canManage && mode === 'manage' && (
+          <select
+            value={manageStatus}
+            onChange={(e) => setManageStatus(e.target.value)}
+            className="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold bg-white"
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="published">Đã đăng</option>
+            <option value="draft">Nháp</option>
+            <option value="hidden">Đã ẩn</option>
+          </select>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="py-16 flex justify-center text-slate-400">
+          <Loader2 className="animate-spin" size={28} />
+        </div>
+      ) : items.length === 0 ? (
+        <div className="py-16 text-center text-sm font-bold text-slate-400 bg-white rounded-2xl border border-slate-100">
+          Chưa có bài viết
+        </div>
+      ) : mode === 'manage' && canManage ? (
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <ul className="divide-y divide-slate-50">
+            {items.map((p) => (
+              <li key={p.id} className="p-3 sm:p-4 flex flex-wrap items-center gap-3 hover:bg-slate-50">
+                <button type="button" className="flex-1 min-w-0 text-left" onClick={() => openPost(p)}>
+                  <p className="font-bold text-slate-900 truncate">{p.title}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{formatDate(p.updatedAt)} · {p.viewCount || 0} xem</p>
+                </button>
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${statusClass(p.status)}`}>
+                  {statusLabel(p.status)}
+                </span>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-slate-600 hover:text-red-600"
+                  onClick={() => navigate(`${base}?mode=edit&id=${p.id}`)}
+                >
+                  Sửa
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {items.map((p) => (
+            <NewsCard key={p.id} post={p} basePath={base} onOpen={openPost} />
+          ))}
+        </div>
+      )}
+
+      {pages > 1 && (
+        <div className="flex justify-center gap-2 pt-2">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => loadList(page - 1)}
+            className="px-3 py-2 rounded-xl border text-xs font-bold disabled:opacity-40"
+          >
+            Trước
+          </button>
+          <span className="px-3 py-2 text-xs font-bold text-slate-500">{page}/{pages}</span>
+          <button
+            type="button"
+            disabled={page >= pages}
+            onClick={() => loadList(page + 1)}
+            className="px-3 py-2 rounded-xl border text-xs font-bold disabled:opacity-40"
+          >
+            Sau
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

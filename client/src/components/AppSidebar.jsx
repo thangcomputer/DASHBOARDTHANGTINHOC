@@ -30,6 +30,7 @@ const MENU_CONFIG = {
     items: [
       { key: 'dashboard',  icon: LayoutDashboard, label: 'Tổng quan',      path: '/student' },
       { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',       path: '/student/feed' },
+      { key: 'news',       icon: FileText,         label: 'Tin tức',        path: '/student/news' },
       { key: 'exam',       icon: Trophy,           label: 'Phòng Thi',      path: '/student/exam' },
       { key: 'schedule',   icon: Calendar,         label: 'Lịch học',       path: '/student', hash: 'schedule' },
       { key: 'materials',  icon: BookOpen,          label: 'Tài liệu',      path: '/student', hash: 'materials' },
@@ -49,6 +50,7 @@ const MENU_CONFIG = {
     items: [
       { key: 'dashboard',  icon: LayoutDashboard, label: 'Tổng quan',      path: '/teacher' },
       { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',       path: '/teacher/feed' },
+      { key: 'news',       icon: FileText,         label: 'Tin tức',        path: '/teacher/news' },
       { key: 'students',   icon: Users,            label: 'Quản lý học viên', path: '/teacher', hash: 'students' },
       { key: 'schedule',   icon: Calendar,         label: 'Lịch dạy',      path: '/teacher', hash: 'schedule' },
       { key: 'test',       icon: ClipboardList,    label: 'Bài Test',       path: '/teacher/test' },
@@ -69,6 +71,7 @@ const MENU_CONFIG = {
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/admin', hash: 'dashboard' },
       { key: 'feed',      icon: Newspaper,       label: 'Bảng tin',  path: '/admin/feed' },
+      { key: 'news',      icon: FileText,        label: 'Tin tức',   path: '/admin/news' },
       { key: 'inbox',     icon: MessageSquare,   label: 'Hộp thư',   path: '/admin/inbox' },
       {
         key: 'people-group',
@@ -350,19 +353,20 @@ const AppSidebar = ({
 
   const isActive = (item) => {
     if (activeKey) return item.key === activeKey;
-    const pathMatches = location.pathname === item.path;
+    const pathMatches = location.pathname === item.path
+      || (item.path && item.path !== '/' && location.pathname.startsWith(`${item.path}/`));
     const currentHash = location.hash?.replace('#', '') || '';
 
     // Item has a hash → only active when path AND hash both match
     if (item.hash) {
-      return pathMatches && currentHash === item.hash;
+      return location.pathname === item.path && currentHash === item.hash;
     }
     // Base dashboard items (no hash) → active only when path matches AND no hash in URL
     const basePaths = ['/student', '/teacher', '/admin'];
-    if (basePaths.includes(item.path) && pathMatches) {
+    if (basePaths.includes(item.path) && location.pathname === item.path) {
       return !currentHash;
     }
-    // Other items (e.g. /teacher/finance) → path match AND no hash in URL
+    // Other items (e.g. /teacher/finance, /admin/news/:slug) → path match AND no hash in URL
     return pathMatches && !currentHash;
   };
 

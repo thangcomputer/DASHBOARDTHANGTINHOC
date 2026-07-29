@@ -10,6 +10,7 @@ const PERMISSIONS = {
   MANAGE_STUDENT_TRAINING: 'manage_student_training',
   MANAGE_STAFF: 'manage_staff',
   MANAGE_HR: 'manage_hr',
+  MANAGE_BLOG: 'manage_blog',
   SYSTEM_SETTINGS: 'system_settings',
   VIEW_LOGS: 'view_logs',
   VIEW_EVALUATIONS: 'view_evaluations',

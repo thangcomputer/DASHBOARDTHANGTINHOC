@@ -1770,6 +1770,59 @@ export const feedAPI = {
   },
 };
 
+// ─── TIN TỨC / BLOG TRUNG TÂM ────────────────────────────────────────────────
+export const blogAPI = {
+  list: async ({ page = 1, limit = 12, q } = {}) => {
+    const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (q) qs.set('q', q);
+    const res = await apiFetch(`/blog/posts?${qs}`);
+    return res.json();
+  },
+  get: async (slugOrId, { manage = false } = {}) => {
+    const qs = manage ? '?manage=1' : '';
+    const res = await apiFetch(`/blog/posts/${encodeURIComponent(slugOrId)}${qs}`);
+    return res.json();
+  },
+  manageList: async ({ page = 1, limit = 20, status, q } = {}) => {
+    const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (status) qs.set('status', status);
+    if (q) qs.set('q', q);
+    const res = await apiFetch(`/blog/manage/posts?${qs}`);
+    return res.json();
+  },
+  create: async (payload) => {
+    const res = await apiFetch('/blog/manage/posts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+  update: async (id, payload) => {
+    const res = await apiFetch(`/blog/manage/posts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+  publish: async (id) => {
+    const res = await apiFetch(`/blog/manage/posts/${id}/publish`, { method: 'POST' });
+    return res.json();
+  },
+  hide: async (id) => {
+    const res = await apiFetch(`/blog/manage/posts/${id}/hide`, { method: 'POST' });
+    return res.json();
+  },
+  remove: async (id) => {
+    const res = await apiFetch(`/blog/manage/posts/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+  upload: async (files) => {
+    const fd = new FormData();
+    (files || []).forEach((f) => fd.append('files', f));
+    return uploadWithAuth('/blog/manage/upload', fd);
+  },
+};
+
 export default {
   auth:         authAPI,
   students:     studentsAPI,
@@ -1796,4 +1849,5 @@ export default {
   tenants:       tenantsAPI,
   trainingLms:   trainingLmsAPI,
   feed:          feedAPI,
+  blog:          blogAPI,
 };

@@ -30,6 +30,7 @@ const FormReportBuilderPage = lazy(() => import('./components/FormReportBuilderP
 const TenantManagementPage = lazy(() => import('./components/TenantManagementPage'));
 const PublicPaymentPage = lazy(() => import('./components/PublicPaymentPage'));
 const FeedBoard = lazy(() => import('./components/FeedBoard'));
+const NewsPage = lazy(() => import('./components/NewsPage'));
 import DashboardLayout                       from './components/DashboardLayout';
 import api, { clearTokens, getRolePrefix, NetworkOfflineError } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
@@ -290,6 +291,12 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         <Route path="/admin/feed" element={
           <ErrorBoundary inline><FeedBoard session={session} role="admin" /></ErrorBoundary>
         } />
+        <Route path="/admin/news" element={
+          <ErrorBoundary inline><NewsPage session={session} role="admin" /></ErrorBoundary>
+        } />
+        <Route path="/admin/news/:slug" element={
+          <ErrorBoundary inline><NewsPage session={session} role="admin" /></ErrorBoundary>
+        } />
       </Route>
 
       {/* ═══ Teacher ═══ */}
@@ -310,6 +317,12 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         } />
         <Route path="/teacher/feed" element={
           <ErrorBoundary inline><FeedBoard session={session} role="teacher" /></ErrorBoundary>
+        } />
+        <Route path="/teacher/news" element={
+          <ErrorBoundary inline><NewsPage session={session} role="teacher" /></ErrorBoundary>
+        } />
+        <Route path="/teacher/news/:slug" element={
+          <ErrorBoundary inline><NewsPage session={session} role="teacher" /></ErrorBoundary>
         } />
         <Route path="/teacher/test"    element={
           <ErrorBoundary>
@@ -336,6 +349,12 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         } />
         <Route path="/student/feed" element={
           <ErrorBoundary inline><FeedBoard session={session} role="student" /></ErrorBoundary>
+        } />
+        <Route path="/student/news" element={
+          <ErrorBoundary inline><NewsPage session={session} role="student" /></ErrorBoundary>
+        } />
+        <Route path="/student/news/:slug" element={
+          <ErrorBoundary inline><NewsPage session={session} role="student" /></ErrorBoundary>
         } />
       </Route>
 

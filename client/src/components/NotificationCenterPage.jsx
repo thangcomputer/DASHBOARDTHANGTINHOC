@@ -131,6 +131,10 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
       return;
     }
+    if (n.payload?.action === 'blog_published' && n.payload?.slug) {
+      navigate(`/${role}/news/${n.payload.slug}`);
+      return;
+    }
     const path = resolveNavPath(n.path);
     if (path) navigate(path);
   };

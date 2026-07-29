@@ -6,6 +6,8 @@ import { LmsGuideHost } from './LmsGuideTour';
 import FloatingMessenger from './FloatingMessenger';
 import { FloatingMessengerProvider } from '../context/FloatingMessengerContext';
 import { useData } from '../context/DataContext';
+import { useSocket } from '../context/SocketContext';
+import { useToast } from '../utils/toast';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
   Bell, LogOut, CheckCircle2, Clock, X, Lock, MoreVertical,
@@ -36,6 +38,7 @@ function resolvePageTitle(role, pathname, hash) {
   if (key && PAGE_TITLES[key]) return PAGE_TITLES[key];
   if (pathname.includes('/inbox')) return 'Hộp thư';
   if (pathname.includes('/feed')) return 'Bảng tin';
+  if (pathname.includes('/news')) return 'Tin tức';
   if (pathname.includes('/notifications')) return 'Thông báo';
   if (pathname.includes('/bi')) return 'BI Dashboard';
   if (pathname.includes('/files')) return 'Quản lý file';
@@ -93,9 +96,21 @@ const getGreetingTime = () => {
 const DashboardLayout = ({ role, session, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
+  const { socket } = useSocket() || {};
   const { teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const myId = String(session?.id || session?._id || '');
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onBlog = (payload) => {
+      const title = payload?.title ? `Có bài viết mới: '${payload.title}'` : 'Có bài viết mới';
+      toast.info(title);
+    };
+    socket.on('blog:published', onBlog);
+    return () => socket.off('blog:published', onBlog);
+  }, [socket, toast]);
 
   useEffect(() => {
     const key = `${role}_user`;
@@ -371,6 +386,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                                     markNotificationRead(n.id || n._id); 
                                     if (n.payload?.action === 'RESET_PASSWORD') {
                                       window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
+                                    } else if (n.payload?.action === 'blog_published' && n.payload?.slug) {
+                                      const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
+                                      navigate(`${base}/news/${n.payload.slug}`);
                                     } else if (n.path) {
                                       let targetPath = n.path;
                                       
@@ -381,11 +399,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                                         } catch (e) {}
                                       }
 
-                                      if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && !targetPath.includes('#')) {
+                                      if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && targetPath !== '/admin/news' && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                                         targetPath = '/admin#' + targetPath.replace('/admin/', '');
-                                      } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox'].includes(targetPath) && !targetPath.includes('#')) {
+                                      } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                                         targetPath = '/student#' + targetPath.replace('/student/', '');
-                                      } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile'].includes(targetPath) && !targetPath.includes('#')) {
+                                      } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                                         targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
                                       }
                                       

@@ -11,6 +11,7 @@ export const PERMISSIONS = {
   MANAGE_STUDENT_TRAINING: 'manage_student_training', // Đào tạo HV: module đào tạo học viên
   MANAGE_STAFF:       'manage_staff',         // Phân quyền NV: chỉ Super Admin
   MANAGE_HR:          'manage_hr',            // ⭐ Nhân sự & Lương: quản lý hồ sơ + trả lương
+  MANAGE_BLOG:        'manage_blog',          // Tin tức / Blog trung tâm: đăng bài
   SYSTEM_SETTINGS:    'system_settings',      // Cài đặt hệ thống
   VIEW_LOGS:          'view_logs',            // Nhật ký hệ thống
   VIEW_EVALUATIONS:   'view_evaluations',     // Đánh giá nội bộ
@@ -28,6 +29,7 @@ export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.MANAGE_TRAINING,     label: 'Đào tạo GV',             desc: 'Module đào tạo giảng viên' },
   { key: PERMISSIONS.MANAGE_STUDENT_TRAINING, label: 'Đào tạo HV',         desc: 'Module đào tạo học viên' },
   { key: PERMISSIONS.MANAGE_HR,            label: '👤 Nhân sự & Lương',         desc: 'Quản lý hồ sơ nhân viên, trả lương hàng tháng' },
+  { key: PERMISSIONS.MANAGE_BLOG,          label: '📰 Tin tức / Blog',           desc: 'Đăng, sửa, ẩn, xóa bài viết tin tức trung tâm' },
   { key: PERMISSIONS.SYSTEM_SETTINGS,     label: 'Cài đặt hệ thống',          desc: 'Cấu hình ngân hàng, chi nhánh, thông báo' },
   { key: PERMISSIONS.VIEW_LOGS,           label: 'Nhật ký hệ thống',          desc: 'Xem log hoạt động hệ thống' },
   { key: PERMISSIONS.VIEW_EVALUATIONS,    label: 'Đánh giá nội bộ',           desc: 'Xem đánh giá và kiểm tra nội bộ' },
