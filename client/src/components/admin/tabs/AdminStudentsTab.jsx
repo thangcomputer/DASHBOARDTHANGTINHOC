@@ -4,7 +4,7 @@ import { useAdminTab } from '../AdminTabContext';
 import BranchFilterDropdown from '../../BranchFilterDropdown';
 import {
   BookOpen, Search, Download, FileSpreadsheet, Plus, Users, AlertTriangle,
-  MoreHorizontal, ClipboardList, Edit3, Bell, Unlock, Lock, Camera, Printer, Trash2,
+  MoreHorizontal, ClipboardList, Unlock, Lock, Camera, Printer, Trash2,
   ChevronLeft, ChevronRight, Loader2, MapPin, Globe, Building2,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
@@ -18,9 +18,7 @@ function StudentActionMenu({
   actionMenuId,
   setActionMenuId,
   setShowStudentDetailId,
-  setEditStudent,
   setEnrollmentModalStudent,
-  sendDebtReminder,
   approveStudentExam,
   revokeStudentExam,
   ctxUpdateStudent,
@@ -45,23 +43,11 @@ function StudentActionMenu({
         <ClipboardList size={15} className="shrink-0 text-slate-500" />
         <span className="min-w-0">Xem hồ sơ chi tiết</span>
       </button>
-      <button type="button" role="menuitem" onClick={() => { setEditStudent({ ...s }); setActionMenuId(null); }}
-        className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
-        <Edit3 size={15} className="shrink-0 text-slate-500" />
-        <span className="min-w-0">Sửa thông tin</span>
-      </button>
       <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); setEnrollmentModalStudent(s); }}
         className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
         <Plus size={15} className="shrink-0" />
         <span className="min-w-0">Thêm khóa học</span>
       </button>
-      {!s.paid && (
-        <button type="button" role="menuitem" onClick={() => { sendDebtReminder(s); setActionMenuId(null); }}
-          className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
-          <Bell size={15} className="shrink-0 text-slate-500" />
-          <span className="min-w-0">Nhắc nợ</span>
-        </button>
-      )}
       <button type="button" role="menuitem" onClick={() => { s.studentExamUnlocked ? revokeStudentExam(s.id) : approveStudentExam(s.id); setActionMenuId(null); }}
         className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
         {s.studentExamUnlocked
@@ -136,9 +122,9 @@ export default function AdminStudentsTab() {
     search, setSearch, filterCourse, setFilterCourse, filterPaid, setFilterPaid,
     handleExportExcel, isExportingExcel, setShowImportModal, setShowModal,
     studentsPagination, filteredStudents, safeTeachers, safeBranches,
-    assignTeacher, actionMenuId, setActionMenuId, setShowStudentDetailId, setEditStudent,
+    assignTeacher, actionMenuId, setActionMenuId, setShowStudentDetailId,
     setEnrollmentModalStudent,
-    sendDebtReminder, approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
+    approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
     handlePrintInvoice, removeStudent, currentPage, setCurrentPage,
     examSubjectsCatalog,
   } = useAdminTab();
@@ -219,8 +205,8 @@ export default function AdminStudentsTab() {
   };
 
   const menuProps = {
-    actionMenuId, setActionMenuId, setShowStudentDetailId, setEditStudent,
-    setEnrollmentModalStudent, sendDebtReminder, approveStudentExam, revokeStudentExam,
+    actionMenuId, setActionMenuId, setShowStudentDetailId,
+    setEnrollmentModalStudent, approveStudentExam, revokeStudentExam,
     ctxUpdateStudent, toast, handlePrintInvoice, removeStudent,
   };
 

@@ -6,7 +6,7 @@ import {
   MapPin, Phone, MessageSquare, Calendar, ChevronRight,
   TrendingUp, CreditCard, ClipboardList, ShieldCheck, 
   Printer, Loader2, AlertCircle, CheckCircle2, Star,
-  Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2
+  Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2, Edit3
 } from 'lucide-react';
 import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
@@ -92,8 +92,12 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const [data, setData]           = useState(null);
   const { showModal }             = useModal();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'attendance' | 'finance' | 'academic'
+  const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'attendance' | 'finance' | 'academic' | 'edit'
   const [courseFilter, setCourseFilter] = useState('all'); // 'all' | enrollmentId
+  const [editForm, setEditForm] = useState({
+    name: '', email: '', phone: '', age: '', zalo: '', password: '',
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const { updateStudent, assignTeacher, teachers } = useData() || {};
   const [showAddEnrollment, setShowAddEnrollment] = useState(false);
@@ -103,12 +107,62 @@ export default function StudentDetailModal({ studentId, onClose }) {
     setActiveTab('summary');
   }, [studentId]);
 
+  useEffect(() => {
+    const s = data?.student;
+    if (!s) return;
+    setEditForm({
+      name: s.name || '',
+      email: s.email || '',
+      phone: s.phone || '',
+      age: s.age != null && s.age !== '' ? String(s.age) : '',
+      zalo: s.zalo || '',
+      password: '',
+    });
+  }, [data?.student?._id, data?.student?.name, data?.student?.email, data?.student?.phone, data?.student?.age, data?.student?.zalo]);
+
   const reloadProfile = () => {
     if (!studentId) return;
     setLoading(true);
     api.students.getFullDetail(studentId)
       .then((res) => { if (res.success) setData(res.data); })
       .finally(() => setLoading(false));
+  };
+
+  const handleSaveEditProfile = async () => {
+    const sid = data?.student?._id || data?.student?.id || studentId;
+    if (!sid) return;
+    if (!String(editForm.name || '').trim() || !String(editForm.phone || '').trim()) {
+      toast.error('Vui lòng nhập họ tên và số điện thoại');
+      return;
+    }
+    const payload = {
+      name: String(editForm.name || '').trim().toUpperCase(),
+      email: String(editForm.email || '').trim().toLowerCase(),
+      phone: String(editForm.phone || '').trim(),
+      zalo: String(editForm.zalo || '').trim(),
+      age: editForm.age === '' ? '' : Number(String(editForm.age).replace(/\D/g, '') || 0),
+    };
+    if (String(editForm.password || '').trim()) {
+      payload.password = String(editForm.password).trim();
+    }
+    setSavingEdit(true);
+    try {
+      const res = await api.students.update(sid, payload);
+      if (res?.success === false) {
+        toast.error(res?.message || 'Không cập nhật được');
+        return;
+      }
+      toast.success('Đã cập nhật thông tin học viên');
+      setEditForm((f) => ({ ...f, password: '' }));
+      reloadProfile();
+      if (updateStudent) {
+        try { await updateStudent(sid, payload); } catch { /* ignore sync */ }
+      }
+    } catch {
+      toast.error('Lỗi kết nối khi cập nhật');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleAssignEnrollmentTeacher = async (enrollmentId, teacherId) => {
@@ -598,6 +652,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                     { id: 'assignments', label: 'Bài tập', icon: BookOpen },
                     { id: 'finance', label: 'Tài chính', icon: CreditCard },
                     { id: 'academic', label: 'Điểm số', icon: Trophy },
+                    { id: 'edit', label: 'Sửa thông tin', icon: Edit3 },
                   ].map((tab) => (
                     <button
                       type="button"
@@ -617,7 +672,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                     </button>
                   ))}
                 </div>
-                {enrollments.length > 1 && (
+                {enrollments.length > 1 && activeTab !== 'edit' && (
                   <div className="w-full sm:w-64 shrink-0 pb-2 sm:pb-0">
                     <CmsSelect
                       value={effectiveCourseFilter}
@@ -1424,6 +1479,93 @@ export default function StudentDetailModal({ studentId, onClose }) {
                           )}
                        </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- TAB: SỬA THÔNG TIN --- */}
+              {activeTab === 'edit' && (
+                <div className="max-w-xl mx-auto space-y-5 animate-in slide-in-from-right-10 duration-500">
+                  <div>
+                    <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2">
+                      <Edit3 size={16} className="text-indigo-500" /> Sửa thông tin học viên
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">Chỉ cập nhật thông tin cá nhân. Để trống mật khẩu nếu không đổi.</p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 sm:p-6 space-y-4">
+                    <div>
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Họ tên <span className="text-red-500">*</span></label>
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value.toUpperCase() }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:ring-2 focus:ring-indigo-200"
+                        placeholder="VD: NGUYỄN VĂN A"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Số điện thoại <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          value={editForm.phone}
+                          onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-200"
+                          placeholder="0911222333"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Tuổi</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={editForm.age}
+                          onChange={(e) => setEditForm((f) => ({ ...f, age: e.target.value.replace(/\D/g, '') }))}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-center outline-none focus:ring-2 focus:ring-indigo-200"
+                          placeholder="VD: 20"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Zalo</label>
+                      <input
+                        type="text"
+                        value={editForm.zalo}
+                        onChange={(e) => setEditForm((f) => ({ ...f, zalo: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-200"
+                        placeholder="Số Zalo (nếu khác SĐT)"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Mật khẩu mới</label>
+                      <input
+                        type="password"
+                        value={editForm.password}
+                        onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                        placeholder="Để trống nếu không đổi"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={handleSaveEditProfile}
+                      className="w-full min-h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-black uppercase tracking-wide inline-flex items-center justify-center gap-2"
+                    >
+                      {savingEdit ? <Loader2 size={16} className="animate-spin" /> : <Edit3 size={16} />}
+                      Lưu thông tin
+                    </button>
                   </div>
                 </div>
               )}

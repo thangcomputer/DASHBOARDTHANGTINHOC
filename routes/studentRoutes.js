@@ -680,6 +680,17 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
       }
     }
 
+    // Hash mật khẩu nếu admin/staff đổi (findByIdAndUpdate không chạy pre('save'))
+    if (Object.prototype.hasOwnProperty.call(safeBody, 'password')) {
+      const plain = String(safeBody.password || '').trim();
+      if (plain) {
+        const bcrypt = require('bcryptjs');
+        safeBody.password = await bcrypt.hash(plain, 10);
+      } else {
+        delete safeBody.password;
+      }
+    }
+
     const prevStatusDoc = await Student.findById(req.params.id).select('status').lean();
     const nextStatus = safeBody.status != null ? String(safeBody.status).toLowerCase() : null;
     const prevStatus = String(prevStatusDoc?.status || '').toLowerCase();
