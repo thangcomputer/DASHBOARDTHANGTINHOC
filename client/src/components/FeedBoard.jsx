@@ -1,11 +1,12 @@
 /**
  * Bang tin chung — HV / GV / Admin hoi bai, binh luan, thich, anh.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Heart, ThumbsUp, Laugh, Frown, Sparkles, MessageCircle, ImagePlus, Send, Trash2,
-  Loader2, X, Newspaper, RefreshCw, Reply,
+  Loader2, X, Newspaper, RefreshCw, Reply, Circle, Headphones,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
@@ -57,12 +58,66 @@ function isAdminLike(role, userId) {
   return r === 'admin' || r === 'staff' || userId === 'admin';
 }
 
+function normalizePresenceRole(role) {
+  const r = String(role || '').toLowerCase();
+  if (r === 'staff') return 'admin';
+  return r;
+}
+
+function isSupportPresence(u) {
+  const role = normalizePresenceRole(u?.role);
+  return role === 'admin' || role === 'teacher' || String(u?.userId) === 'admin';
+}
+
 export default function FeedBoard({ session, role }) {
   const toast = useToast();
-  const { socket } = useSocket() || {};
+  const navigate = useNavigate();
+  const { socket, onlineUsers } = useSocket() || {};
   const fileRef = useRef(null);
   const meId = String(session?.id || session?._id || '');
   const meRole = role || session?.role || 'student';
+  const inboxPath = `/${meRole === 'staff' ? 'admin' : meRole}/inbox`;
+
+  const supportOnline = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    for (const u of onlineUsers || []) {
+      if (!isSupportPresence(u)) continue;
+      const uid = String(u.userId || '');
+      if (!uid || uid === meId) continue;
+      const roleKey = normalizePresenceRole(u.role);
+      const key = `${roleKey}_${uid}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push({
+        id: uid,
+        name: u.name || (roleKey === 'admin' ? 'Admin' : 'Giảng viên'),
+        role: roleKey,
+        connectedAt: u.connectedAt,
+      });
+    }
+    list.sort((a, b) => {
+      const rank = (r) => (r === 'admin' ? 0 : 1);
+      const d = rank(a.role) - rank(b.role);
+      if (d !== 0) return d;
+      return String(a.name).localeCompare(String(b.name), 'vi');
+    });
+    return list;
+  }, [onlineUsers, meId]);
+
+  const openSupportChat = useCallback((person) => {
+    if (!person?.id) return;
+    navigate(inboxPath, {
+      state: {
+        selectUserId: person.id,
+        selectUser: {
+          id: person.id,
+          name: person.name,
+          role: person.role,
+        },
+      },
+    });
+  }, [navigate, inboxPath]);
 
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(1);
@@ -371,14 +426,14 @@ export default function FeedBoard({ session, role }) {
     isAdminLike(meRole, meId) || String(c.authorId) === meId || String(post.authorId) === meId;
 
   return (
-    <div className="cms-feed max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto w-full px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 space-y-3 md:space-y-4">
-      <div className="flex items-start justify-between gap-3 md:gap-4">
+    <div className="cms-viewport-fill w-full">
+      <div className="flex items-start justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
             <Newspaper size={22} className="text-red-600 md:w-6 md:h-6 shrink-0" />
             Bảng tin hỏi bài
           </h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium md:max-w-2xl">
+          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium">
             Đăng câu hỏi, chia sẻ ảnh bài tập — mọi người cùng xem và trả lời.
           </p>
         </div>
@@ -387,6 +442,45 @@ export default function FeedBoard({ session, role }) {
         </button>
       </div>
 
+      {/* Mobile: hỗ trợ online ngang */}
+      <div className="xl:hidden shrink-0 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <Headphones size={14} className="text-emerald-600" />
+          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
+            Hỗ trợ đang online ({supportOnline.length})
+          </p>
+        </div>
+        {supportOnline.length === 0 ? (
+          <p className="text-xs text-slate-400 font-medium">Chưa có admin/giảng viên online</p>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto pb-0.5">
+            {supportOnline.map((p) => (
+              <button
+                key={`${p.role}_${p.id}`}
+                type="button"
+                onClick={() => openSupportChat(p)}
+                className="shrink-0 flex flex-col items-center gap-1 w-[4.5rem] group"
+                title={`Chat với ${p.name}`}
+              >
+                <span className="relative">
+                  <img
+                    src={resolveAvatarUrl({ role: p.role, name: p.name })}
+                    alt=""
+                    className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow"
+                  />
+                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                </span>
+                <span className="text-[10px] font-bold text-slate-700 truncate w-full text-center group-hover:text-red-600">
+                  {p.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(240px,280px)] gap-4 flex-1 min-h-0">
+        <div className="cms-viewport-scroll space-y-3 md:space-y-4 min-w-0">
       <div className="cms-feed-composer">
         <div className="cms-feed-composer__row">
           <img
@@ -789,6 +883,59 @@ export default function FeedBoard({ session, role }) {
           ) : null}
         </div>
       )}
+        </div>
+
+        {/* Desktop: cột hỗ trợ online kiểu Facebook */}
+        <aside className="hidden xl:flex flex-col min-h-0 rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 shrink-0">
+            <p className="text-sm font-black text-slate-800 flex items-center gap-2">
+              <Headphones size={16} className="text-emerald-600" />
+              Hỗ trợ đang online
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+              Bấm để chat ngay — không cần kết bạn
+            </p>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2">
+            {supportOnline.length === 0 ? (
+              <div className="px-3 py-10 text-center text-xs text-slate-400 font-medium">
+                <Circle size={28} className="mx-auto mb-2 text-slate-200" />
+                Chưa có admin / giảng viên online
+              </div>
+            ) : (
+              <ul className="space-y-0.5">
+                {supportOnline.map((p) => (
+                  <li key={`${p.role}_${p.id}`}>
+                    <button
+                      type="button"
+                      onClick={() => openSupportChat(p)}
+                      className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-slate-50 text-left transition-colors group"
+                    >
+                      <span className="relative shrink-0">
+                        <img
+                          src={resolveAvatarUrl({ role: p.role, name: p.name })}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-slate-800 truncate group-hover:text-red-600">
+                          {p.name}
+                        </span>
+                        <span className="block text-[11px] text-slate-500 font-medium">
+                          {ROLE_LABEL[p.role] || p.role} · Đang hoạt động
+                        </span>
+                      </span>
+                      <MessageCircle size={15} className="text-slate-300 group-hover:text-red-500 shrink-0" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
+      </div>
 
       {lightbox ? createPortal(
         <div

@@ -164,6 +164,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const dataContextConvs = getConversations(currentUserId);
   const [contacts, setContacts] = useState([]);
+  const [seedContact, setSeedContact] = useState(null);
   const [hiddenList, setHiddenList] = useState([]);
   const [contactTab, setContactTab] = useState('all'); // 'all', 'student', 'teacher', 'admin', 'group'
 
@@ -258,6 +259,33 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         unread: existingConv?.unread || 0,
       });
     });
+
+    // Contact seed từ bảng tin / hỗ trợ online — chat không cần có sẵn trong danh bạ
+    if (seedContact?.id && String(seedContact.id) !== String(currentUserId)) {
+      const role = normalizeRole(seedContact.role);
+      const convId = buildConversationId(currentUserRole, currentUserId, role, seedContact.id);
+      if (!seenConvIds.has(convId)) {
+        seenConvIds.add(convId);
+        const existingConv = dataContextConvs.find((dc) => String(dc.id) === String(convId));
+        list.unshift({
+          id: convId,
+          isGroup: false,
+          isHidden: false,
+          user: {
+            id: seedContact.id,
+            name: seedContact.name,
+            role,
+            avatar: seedContact.avatar,
+            phone: seedContact.phone || '',
+            online: onlineUsers ? onlineUsers.some((u) => String(u.userId) === String(seedContact.id)) : true,
+          },
+          lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
+          lastTime: existingConv?.lastTime || new Date(),
+          unread: existingConv?.unread || 0,
+        });
+      }
+    }
+
     const groupConvs = dataContextConvs.filter(dc => dc.isGroup).map(dc => ({
       ...dc,
       isHidden: hiddenList.includes(dc.id)
@@ -283,7 +311,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       const timeB = new Date(b.lastTime || 0).getTime();
       return timeB - timeA;
     });
-  }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers]);
+  }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact]);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -656,18 +684,51 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
 
-  // Auto-select conversation từ navigation state
+  // Auto-select conversation từ navigation state (kể cả chưa có trong danh bạ)
   const hasAutoSelected = useRef(false);
   useEffect(() => {
     const selectId = location.state?.selectUserId;
-    if (selectId && conversations.length > 0 && !hasAutoSelected.current) {
-      const found = conversations.find(c => String(c.user.id) === String(selectId));
-      if (found) {
-        hasAutoSelected.current = true;
-        selectConversation(found);
-      }
+    const selectUser = location.state?.selectUser;
+    if (selectUser?.id) {
+      setSeedContact({
+        id: String(selectUser.id),
+        name: selectUser.name || 'Người dùng',
+        role: normalizeRole(selectUser.role || 'admin'),
+        avatar: selectUser.avatar,
+        phone: selectUser.phone || '',
+      });
     }
-  }, [location.state?.selectUserId, conversations.length]);
+    if (!selectId || hasAutoSelected.current) return;
+
+    const found = conversations.find((c) => String(c.user?.id) === String(selectId));
+    if (found) {
+      hasAutoSelected.current = true;
+      selectConversation(found);
+      return;
+    }
+
+    if (selectUser && String(selectUser.id) === String(selectId) && currentUserId) {
+      hasAutoSelected.current = true;
+      const role = normalizeRole(selectUser.role || 'admin');
+      const convId = buildConversationId(currentUserRole, currentUserId, role, selectUser.id);
+      selectConversation({
+        id: convId,
+        isGroup: false,
+        isHidden: false,
+        user: {
+          id: String(selectUser.id),
+          name: selectUser.name || 'Người dùng',
+          role,
+          avatar: selectUser.avatar,
+          phone: selectUser.phone || '',
+          online: true,
+        },
+        lastMessage: 'Bắt đầu cuộc trò chuyện',
+        lastTime: new Date(),
+        unread: 0,
+      });
+    }
+  }, [location.state?.selectUserId, location.state?.selectUser, conversations, currentUserId, currentUserRole]);
 
   return (
     <div className="cms-chat-shell">
