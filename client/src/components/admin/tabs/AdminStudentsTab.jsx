@@ -88,6 +88,12 @@ function StudentRowActions({
     const place = () => {
       if (!btnRef.current) return;
       const r = btnRef.current.getBoundingClientRect();
+      // Card mobile + bảng desktop cùng mount; bản ẩn (display:none) có rect 0 → bỏ qua
+      // để tránh portal menu thứ 2 góc trái màn hình.
+      if (r.width < 1 || r.height < 1) {
+        setCoords((prev) => (prev == null ? prev : null));
+        return;
+      }
       const menuW = Math.min(260, window.innerWidth - 16);
       const approxH = menuRef.current?.offsetHeight || 360;
       const gap = 6;
