@@ -1254,12 +1254,14 @@ router.post('/register-teacher', sensitiveFlowLimiter, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Mật khẩu xác nhận không khớp' });
     }
 
-    const exists = await Teacher.findOne({ phone });
-    if (exists) {
-      return res.status(409).json({
-        success: false,
-        message: 'Số điện thoại này đã được đăng ký',
-      });
+    try {
+      const { assertUniqueContact } = require('../utils/uniqueContact');
+      await assertUniqueContact({ phone, zalo: phone });
+    } catch (dupErr) {
+      if (dupErr.status === 409) {
+        return res.status(409).json({ success: false, message: dupErr.message });
+      }
+      throw dupErr;
     }
 
     const teacher = await Teacher.create({

@@ -6,18 +6,38 @@ import {
   BookOpen, Search, Download, FileSpreadsheet, Plus, Users, AlertTriangle,
   MoreHorizontal, ClipboardList, Unlock, Lock, Camera, Printer, Trash2,
   ChevronLeft, ChevronRight, Loader2, MapPin, Globe, Building2, KeyRound,
+  CircleDollarSign,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
 import { getActiveClientEnrollments, getClientEnrollments } from '../../../utils/enrollments';
 import { isTeacherActive } from '../../../constants/teacherStatus';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
-import { apiFetch } from '../../../services/api';
+import api, { apiFetch } from '../../../services/api';
 
 /** Tổng tiền đã hoàn từ khóa cancelled (chỉ hiển thị, không sửa). */
 function getStudentRefundedTotal(student) {
   return getClientEnrollments(student)
     .filter((e) => e?.status === 'cancelled' || e?.status === 'refunded')
     .reduce((sum, e) => sum + Math.abs(Number(e.refundedAmount) || 0), 0);
+}
+
+/** Không còn khóa active — chỉ còn khóa đã hủy/hoàn → dòng mờ + khóa thao tác. */
+function isStudentRowLocked(student) {
+  const active = getActiveClientEnrollments(student);
+  if (active.length > 0) return false;
+  const all = getClientEnrollments(student);
+  return all.some((e) => e?.status === 'cancelled' || e?.status === 'refunded');
+}
+
+function isEnrollmentPaidFlag(e) {
+  return e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
+}
+
+/** Khóa active đã đóng phí — ưu tiên primary. */
+function getRefundableEnrollment(student) {
+  const paid = getActiveClientEnrollments(student).filter(isEnrollmentPaidFlag);
+  if (!paid.length) return null;
+  return paid.find((e) => e.isPrimary) || paid[0];
 }
 
 function RefundHint({ amount }) {
@@ -46,9 +66,13 @@ function StudentActionMenu({
   toast,
   handlePrintInvoice,
   removeStudent,
+  onOpenRefund,
   align = 'right',
 }) {
   if (actionMenuId !== s.id) return null;
+
+  const refundable = getRefundableEnrollment(s);
+  const locked = isStudentRowLocked(s);
 
   const itemCls =
     'w-full flex items-center gap-3 px-3.5 py-2.5 min-h-11 text-[13px] font-semibold text-left whitespace-nowrap transition-colors';
@@ -64,63 +88,87 @@ function StudentActionMenu({
         <ClipboardList size={15} className="shrink-0 text-slate-500" />
         <span className="min-w-0">Xem hồ sơ chi tiết</span>
       </button>
-      <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); setEnrollmentModalStudent(s); }}
-        className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
-        <Plus size={15} className="shrink-0" />
-        <span className="min-w-0">Thêm khóa học</span>
-      </button>
-      <button type="button" role="menuitem" onClick={() => { s.studentExamUnlocked ? revokeStudentExam(s.id) : approveStudentExam(s.id); setActionMenuId(null); }}
-        className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
-        {s.studentExamUnlocked
-          ? <><Lock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Khóa phòng thi</span></>
-          : <><Unlock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Cho phép thi</span></>}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={async () => {
-          const webcamEnforced = s.requireWebcam !== false;
-          try {
-            await ctxUpdateStudent(s.id || s._id, { requireWebcam: !webcamEnforced });
-            toast.success(webcamEnforced ? 'Đã tắt giám sát webcam khi thi' : 'Đã bật giám sát webcam khi thi');
-          } catch (e) {
-            toast.error(e?.message || 'Không cập nhật được giám sát webcam');
-          }
-          setActionMenuId(null);
-        }}
-        className={`${itemCls} text-slate-700 hover:bg-slate-50`}
-      >
-        <Camera size={15} className="shrink-0 text-slate-500" />
-        <span className="min-w-0">
-          {s.requireWebcam !== false ? 'Tắt webcam khi thi' : 'Bật webcam khi thi'}
-        </span>
-      </button>
-      <button type="button" role="menuitem" onClick={() => { handlePrintInvoice(s); setActionMenuId(null); }}
-        disabled={!studentHasActivePaid(s)}
-        className={`${itemCls} ${
-          studentHasActivePaid(s) ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
-        }`}>
-        <Printer size={15} className="shrink-0" />
-        <span className="min-w-0">Xuất hóa đơn PDF</span>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          setActionMenuId(null);
-          window.dispatchEvent(new CustomEvent('open-reset-pw', {
-            detail: {
-              userId: s.id || s._id,
-              userName: s.name || 'Học viên',
-              role: 'student',
-            },
-          }));
-        }}
-        className={`${itemCls} text-amber-800 hover:bg-amber-50`}
-      >
-        <KeyRound size={15} className="shrink-0 text-amber-600" />
-        <span className="min-w-0">Cấp mật khẩu</span>
-      </button>
+      {!locked && (
+        <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); setEnrollmentModalStudent(s); }}
+          className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
+          <Plus size={15} className="shrink-0" />
+          <span className="min-w-0">Thêm khóa học</span>
+        </button>
+      )}
+      {!locked && (
+        <button type="button" role="menuitem" onClick={() => { s.studentExamUnlocked ? revokeStudentExam(s.id) : approveStudentExam(s.id); setActionMenuId(null); }}
+          className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
+          {s.studentExamUnlocked
+            ? <><Lock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Khóa phòng thi</span></>
+            : <><Unlock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Cho phép thi</span></>}
+        </button>
+      )}
+      {!locked && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={async () => {
+            const webcamEnforced = s.requireWebcam !== false;
+            try {
+              await ctxUpdateStudent(s.id || s._id, { requireWebcam: !webcamEnforced });
+              toast.success(webcamEnforced ? 'Đã tắt giám sát webcam khi thi' : 'Đã bật giám sát webcam khi thi');
+            } catch (e) {
+              toast.error(e?.message || 'Không cập nhật được giám sát webcam');
+            }
+            setActionMenuId(null);
+          }}
+          className={`${itemCls} text-slate-700 hover:bg-slate-50`}
+        >
+          <Camera size={15} className="shrink-0 text-slate-500" />
+          <span className="min-w-0">
+            {s.requireWebcam !== false ? 'Tắt webcam khi thi' : 'Bật webcam khi thi'}
+          </span>
+        </button>
+      )}
+      {!locked && (
+        <button type="button" role="menuitem" onClick={() => { handlePrintInvoice(s); setActionMenuId(null); }}
+          disabled={!studentHasActivePaid(s)}
+          className={`${itemCls} ${
+            studentHasActivePaid(s) ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
+          }`}>
+          <Printer size={15} className="shrink-0" />
+          <span className="min-w-0">Xuất hóa đơn PDF</span>
+        </button>
+      )}
+      {!locked && refundable && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            setActionMenuId(null);
+            onOpenRefund?.(s, refundable);
+          }}
+          className={`${itemCls} text-rose-700 hover:bg-rose-50`}
+        >
+          <CircleDollarSign size={15} className="shrink-0 text-rose-600" />
+          <span className="min-w-0">Hoàn học phí</span>
+        </button>
+      )}
+      {!locked && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            setActionMenuId(null);
+            window.dispatchEvent(new CustomEvent('open-reset-pw', {
+              detail: {
+                userId: s.id || s._id,
+                userName: s.name || 'Học viên',
+                role: 'student',
+              },
+            }));
+          }}
+          className={`${itemCls} text-amber-800 hover:bg-amber-50`}
+        >
+          <KeyRound size={15} className="shrink-0 text-amber-600" />
+          <span className="min-w-0">Cấp mật khẩu</span>
+        </button>
+      )}
       <div className="border-t border-slate-100 my-1" />
       <button type="button" role="menuitem" onClick={() => { removeStudent(s.id); setActionMenuId(null); }}
         className={`${itemCls} text-red-600 hover:bg-red-50`}>
@@ -129,10 +177,6 @@ function StudentActionMenu({
       </button>
     </div>
   );
-}
-
-function isEnrollmentPaidFlag(e) {
-  return e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
 }
 
 function studentHasActivePaid(s, enrollments) {
@@ -175,10 +219,57 @@ export default function AdminStudentsTab() {
     setEnrollmentModalStudent,
     approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
     handlePrintInvoice, removeStudent, currentPage, setCurrentPage,
-    examSubjectsCatalog,
+    examSubjectsCatalog, refreshStudentList,
   } = useAdminTab();
 
   const [dbCourses, setDbCourses] = useState([]);
+  const [refundModal, setRefundModal] = useState(null); // { student, enr, reason, refundAmount, refundPercent, maxRefund }
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
+
+  const openRefundModal = (student, enr) => {
+    const enrId = enr?.enrollmentId || enr?.id || enr?._id;
+    if (!enrId || enrId === 'main') {
+      toast.error('Không xác định được khóa để hoàn. Mở hồ sơ chi tiết để hủy khóa.');
+      return;
+    }
+    const maxRefund = Number(enr.price) || 0;
+    setRefundModal({
+      student,
+      enr,
+      enrId,
+      reason: '',
+      refundAmount: maxRefund,
+      refundPercent: maxRefund > 0 ? 100 : 0,
+      maxRefund,
+    });
+  };
+
+  const handleConfirmRefund = async () => {
+    if (!refundModal || refundSubmitting) return;
+    const sid = refundModal.student?.id || refundModal.student?._id;
+    const { enrId, reason, refundAmount } = refundModal;
+    setRefundSubmitting(true);
+    const tid = toast.loading('Đang hoàn học phí...');
+    try {
+      const res = await api.students.deleteEnrollment(sid, enrId, {
+        cancelReason: reason || 'Admin hoàn học phí',
+        refundAmount: Number(refundAmount) || 0,
+      });
+      toast.dismiss(tid);
+      if (res?.success) {
+        toast.success(res.message || 'Đã hủy khóa và hoàn học phí');
+        setRefundModal(null);
+        refreshStudentList?.();
+      } else {
+        toast.error(res?.message || 'Không hoàn được học phí');
+      }
+    } catch {
+      toast.dismiss(tid);
+      toast.error('Lỗi kết nối API');
+    } finally {
+      setRefundSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -257,6 +348,7 @@ export default function AdminStudentsTab() {
     actionMenuId, setActionMenuId, setShowStudentDetailId,
     setEnrollmentModalStudent, approveStudentExam, revokeStudentExam,
     ctxUpdateStudent, toast, handlePrintInvoice, removeStudent,
+    onOpenRefund: openRefundModal,
   };
 
   const selectFilterClass =
@@ -476,9 +568,13 @@ export default function AdminStudentsTab() {
             <p className="text-xs text-slate-400 mt-1">Thử đổi bộ lọc hoặc từ khóa</p>
           </div>
         ) : filteredStudents.map((s) => {
+          const locked = isStudentRowLocked(s);
+          const allEnrollments = getClientEnrollments(s);
           const enrollments = getActiveClientEnrollments(s);
           const hasMultiCourse = enrollments.length > 1;
-          const primaryEnr = enrollments.find((e) => e.isPrimary) || enrollments[0];
+          const primaryEnr = enrollments.find((e) => e.isPrimary) || enrollments[0]
+            || allEnrollments.find((e) => e.status === 'cancelled' || e.status === 'refunded')
+            || allEnrollments[0];
           const teacherVal = (() => {
             const fromEnr = primaryEnr?.teacherId || '';
             if (fromEnr) return String(fromEnr);
@@ -489,7 +585,11 @@ export default function AdminStudentsTab() {
           })();
           const regDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString('vi-VN') : '';
           return (
-            <article key={s.id} className="cms-students-card">
+            <article
+              key={s.id}
+              className={`cms-students-card transition-opacity ${locked ? 'opacity-45 pointer-events-none select-none grayscale-[0.35]' : ''}`}
+              aria-disabled={locked || undefined}
+            >
               <div className="flex items-start gap-3">
                 <Avatar
                   size="card"
@@ -507,27 +607,32 @@ export default function AdminStudentsTab() {
                         {regDate}{s.phone ? ` · ${s.phone}` : ''}
                       </p>
                     </div>
-                    <div className="relative flex-shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === s.id ? null : s.id); }}
-                        className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
-                        aria-label="Thao tác"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-                      <StudentActionMenu s={s} {...menuProps} align="right" />
-                    </div>
+                    {!locked && (
+                      <div className="relative flex-shrink-0 pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === s.id ? null : s.id); }}
+                          className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                          aria-label="Thao tác"
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+                        <StudentActionMenu s={s} {...menuProps} align="right" />
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-2 space-y-1.5">
-                    <p className="text-sm font-semibold text-sky-700 leading-snug break-words">
+                    <p className={`text-sm font-semibold leading-snug break-words ${locked ? 'text-slate-500 line-through' : 'text-sky-700'}`}>
                       {primaryEnr?.courseName || primaryEnr?.name || s.course}
                     </p>
                     {enrollments.length > 1 && (
                       <p className="text-xs font-semibold text-sky-600">
                         +{enrollments.length - 1} khóa khác
                       </p>
+                    )}
+                    {locked && (
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Đã hoàn · khóa thao tác</p>
                     )}
                     <ModeBranchBadges s={s} safeBranches={safeBranches} />
                   </div>
@@ -602,13 +707,21 @@ export default function AdminStudentsTab() {
                   ) : (
                     <>
                       <div className="min-w-0">
-                        {renderTeacherSelects(s, enrollments, false, primaryEnr, teacherVal)}
+                        {locked ? (
+                          <span className="text-xs text-slate-400 font-semibold">—</span>
+                        ) : (
+                          renderTeacherSelects(s, enrollments, false, primaryEnr, teacherVal)
+                        )}
                       </div>
                       <div className="min-w-0 pt-0.5">
-                        {renderTuition(s, enrollments, false)}
+                        {renderTuition(s, enrollments.length ? enrollments : (primaryEnr ? [primaryEnr] : []), false)}
                       </div>
                       <div className="flex justify-end pt-0.5">
-                        {renderPaid(s, enrollments)}
+                        {locked ? (
+                          <span className="cms-students-badge-neutral text-slate-400">Đã hoàn</span>
+                        ) : (
+                          renderPaid(s, enrollments)
+                        )}
                       </div>
                     </>
                   )}
@@ -644,9 +757,13 @@ export default function AdminStudentsTab() {
                 </td>
               </tr>
             ) : filteredStudents.map((s) => {
+              const locked = isStudentRowLocked(s);
+              const allEnrollments = getClientEnrollments(s);
               const enrollments = getActiveClientEnrollments(s);
               const hasMultiCourse = enrollments.length > 1;
-              const primaryEnr = enrollments.find((e) => e.isPrimary) || enrollments[0];
+              const primaryEnr = enrollments.find((e) => e.isPrimary) || enrollments[0]
+                || allEnrollments.find((e) => e.status === 'cancelled' || e.status === 'refunded')
+                || allEnrollments[0];
               const teacherVal = (() => {
                 const fromEnr = primaryEnr?.teacherId || '';
                 if (fromEnr) return String(fromEnr);
@@ -657,7 +774,11 @@ export default function AdminStudentsTab() {
               })();
               const regDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString('vi-VN') : '';
               return (
-                <tr key={s.id} className="group hover:bg-slate-50/80 transition-colors">
+                <tr
+                  key={s.id}
+                  className={`group transition-opacity ${locked ? 'opacity-45 pointer-events-none select-none grayscale-[0.35]' : 'hover:bg-slate-50/80'}`}
+                  aria-disabled={locked || undefined}
+                >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar
@@ -675,7 +796,7 @@ export default function AdminStudentsTab() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm font-medium text-slate-700 leading-tight block truncate max-w-[180px]">
+                    <span className={`text-sm font-medium leading-tight block truncate max-w-[180px] ${locked ? 'text-slate-500 line-through' : 'text-slate-700'}`}>
                       {primaryEnr?.courseName || primaryEnr?.name || s.course}
                     </span>
                     {enrollments.length > 1 && (
@@ -683,32 +804,45 @@ export default function AdminStudentsTab() {
                         +{enrollments.length - 1} khóa khác
                       </span>
                     )}
+                    {locked && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-0.5 block">Đã hoàn</span>
+                    )}
                     <div className="mt-1.5">
                       <ModeBranchBadges s={s} safeBranches={safeBranches} />
                     </div>
                   </td>
                   <td className="px-4 py-3 min-w-[180px] max-w-[260px]">
-                    {renderTeacherSelects(s, enrollments, hasMultiCourse, primaryEnr, teacherVal)}
+                    {locked ? (
+                      <span className="text-xs text-slate-400 font-semibold">—</span>
+                    ) : (
+                      renderTeacherSelects(s, enrollments, hasMultiCourse, primaryEnr, teacherVal)
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    {renderTuition(s, enrollments, hasMultiCourse)}
+                    {renderTuition(s, enrollments.length ? enrollments : (primaryEnr ? [primaryEnr] : []), hasMultiCourse)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="inline-flex flex-col items-center gap-1.5">
-                      {renderPaid(s, enrollments)}
+                      {locked ? (
+                        <span className="cms-students-badge-neutral text-slate-400">Đã hoàn</span>
+                      ) : (
+                        renderPaid(s, enrollments)
+                      )}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-center">
-                    <div className="relative inline-block">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === s.id ? null : s.id); }}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-                      <StudentActionMenu s={s} {...menuProps} />
-                    </div>
+                    {!locked && (
+                      <div className="relative inline-block pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === s.id ? null : s.id); }}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+                        <StudentActionMenu s={s} {...menuProps} />
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -771,6 +905,120 @@ export default function AdminStudentsTab() {
           </button>
         </div>
       </div>
+
+      {refundModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !refundSubmitting && setRefundModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 border border-red-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                <CircleDollarSign size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-800">Hoàn học phí</h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Hủy khóa + hoàn tiền · HV vẫn hiện trong danh sách (mờ)
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+              <p className="text-xs font-black text-red-700 uppercase tracking-wide mb-0.5">Khóa học bị hủy</p>
+              <p className="text-sm font-bold text-slate-800">{refundModal.enr.courseName || refundModal.enr.name}</p>
+              <p className="text-xs text-red-600 mt-1">
+                Đã thanh toán:{' '}
+                <strong>{Number(refundModal.enr.price || 0).toLocaleString('vi-VN')}đ</strong>
+              </p>
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">Lý do hủy</label>
+                <input
+                  type="text"
+                  value={refundModal.reason}
+                  onChange={(e) => setRefundModal((p) => ({ ...p, reason: e.target.value }))}
+                  placeholder="Nhập lý do hủy khóa..."
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-red-300 outline-none"
+                />
+              </div>
+              <div>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">
+                      Số tiền hoàn (tối đa {Number(refundModal.maxRefund).toLocaleString('vi-VN')}đ)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={refundModal.maxRefund}
+                      step={1000}
+                      value={refundModal.refundAmount}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setRefundModal((p) => {
+                          const max = Number(p.maxRefund) || 0;
+                          const amt = Math.min(Math.max(0, Number(raw) || 0), max);
+                          const pct = max > 0 ? Math.round((amt / max) * 1000) / 10 : 0;
+                          return { ...p, refundAmount: amt, refundPercent: pct };
+                        });
+                      }}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none"
+                    />
+                  </div>
+                  <div className="w-[96px] shrink-0">
+                    <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">% hoàn</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={refundModal.refundPercent ?? 0}
+                        onChange={(e) => {
+                          setRefundModal((p) => {
+                            const max = Number(p.maxRefund) || 0;
+                            const pct = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                            const amt = Math.min(max, Math.round((max * pct) / 100));
+                            return { ...p, refundPercent: pct, refundAmount: amt };
+                          });
+                        }}
+                        className="w-full border border-slate-200 rounded-xl pl-3 pr-7 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">%</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Mặc định 100%. Đổi tiền hoặc % — hai ô đồng bộ. Nhập 0 nếu không hoàn.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setRefundModal(null)}
+                disabled={refundSubmitting}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Giữ lại
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRefund}
+                disabled={refundSubmitting}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-black hover:bg-red-700 disabled:opacity-50 inline-flex items-center justify-center gap-2"
+              >
+                {refundSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+                {Number(refundModal.refundAmount) > 0
+                  ? `Hủy & hoàn ${Number(refundModal.refundAmount).toLocaleString('vi-VN')}đ`
+                  : 'Xác nhận hủy'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -563,6 +563,21 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
       req.body.status = 'Đang học';
     }
 
+    // 1 SĐT / 1 email duy nhất — không trùng HV khác hoặc GV
+    try {
+      const { assertUniqueContact } = require('../utils/uniqueContact');
+      await assertUniqueContact({
+        phone: req.body.phone,
+        zalo: req.body.zalo || req.body.phone,
+        email: req.body.email,
+      });
+    } catch (dupErr) {
+      if (dupErr.status === 409) {
+        return res.status(409).json({ success: false, message: dupErr.message });
+      }
+      throw dupErr;
+    }
+
     const student = new Student(req.body);
     if (!student.studentCode || !String(student.studentCode).trim()) {
       const seq = String(Date.now()).slice(-8);
@@ -850,6 +865,33 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
         safeBody.password = await bcrypt.hash(plain, 10);
       } else {
         delete safeBody.password;
+      }
+    }
+
+    // Đổi SĐT / Zalo / email → kiểm tra trùng toàn hệ thống (HV + GV)
+    if (
+      safeBody.phone !== undefined
+      || safeBody.zalo !== undefined
+      || safeBody.email !== undefined
+    ) {
+      const current = await Student.findById(req.params.id).select('phone zalo email').lean();
+      if (!current) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+      }
+      try {
+        const { assertUniqueContact } = require('../utils/uniqueContact');
+        await assertUniqueContact({
+          phone: safeBody.phone !== undefined ? safeBody.phone : current.phone,
+          zalo: safeBody.zalo !== undefined ? safeBody.zalo : current.zalo,
+          email: safeBody.email !== undefined ? safeBody.email : current.email,
+          excludeRole: 'student',
+          excludeId: req.params.id,
+        });
+      } catch (dupErr) {
+        if (dupErr.status === 409) {
+          return res.status(409).json({ success: false, message: dupErr.message });
+        }
+        throw dupErr;
       }
     }
 

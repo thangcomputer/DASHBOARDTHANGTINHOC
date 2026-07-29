@@ -109,9 +109,14 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
     }
     const emailTrim = (rawEmail || '').trim();
     const email = emailTrim && emailTrim !== 'email@example.com' ? emailTrim : undefined;
-    const exists = await Teacher.findOne({ phone });
-    if (exists) {
-      return res.status(409).json({ success: false, message: 'Số điện thoại này đã được đăng ký' });
+    try {
+      const { assertUniqueContact } = require('../utils/uniqueContact');
+      await assertUniqueContact({ phone, zalo: phone, email });
+    } catch (dupErr) {
+      if (dupErr.status === 409) {
+        return res.status(409).json({ success: false, message: dupErr.message });
+      }
+      throw dupErr;
     }
     if (password && String(password).trim().length > 0 && String(password).trim().length < 6) {
       return res.status(400).json({ success: false, message: 'Mật khẩu phải ít nhất 6 ký tự' });
@@ -431,9 +436,27 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
       }
     }
 
-    const prev = await Teacher.findById(req.params.id).select('status tokenVersion').lean();
+    const prev = await Teacher.findById(req.params.id).select('status tokenVersion phone zalo email').lean();
     if (!prev) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    if (updates.phone !== undefined || updates.zalo !== undefined || updates.email !== undefined) {
+      try {
+        const { assertUniqueContact } = require('../utils/uniqueContact');
+        await assertUniqueContact({
+          phone: updates.phone !== undefined ? updates.phone : prev.phone,
+          zalo: updates.zalo !== undefined ? updates.zalo : (prev.zalo || prev.phone),
+          email: updates.email !== undefined ? updates.email : prev.email,
+          excludeRole: 'teacher',
+          excludeId: req.params.id,
+        });
+      } catch (dupErr) {
+        if (dupErr.status === 409) {
+          return res.status(409).json({ success: false, message: dupErr.message });
+        }
+        throw dupErr;
+      }
     }
 
     const nextStatus = updates.status !== undefined ? String(updates.status).toLowerCase() : null;
