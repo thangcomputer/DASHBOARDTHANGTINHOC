@@ -329,6 +329,25 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) 
       : req.params.id;
     const invoices = await Invoice.find({ hocVien: studentOid }).sort({ createdAt: -1 }).lean();
 
+    // 2b) Ledger refund (không tạo Invoice gốc) — append để UI "Tài chính" hiển thị.
+    const LedgerEntry = require('../models/LedgerEntry');
+    const refundEntries = await LedgerEntry.find({
+      studentId: studentOid,
+      type: 'refund',
+      status: 'posted',
+    }).sort({ postedAt: -1 }).lean();
+
+    const refundInvoices = (refundEntries || []).map((e, idx) => ({
+      _id: e._id,
+      maHoaDon: `R-${String(e._id || idx).slice(-6)}`,
+      createdAt: e.postedAt || e.updatedAt || new Date(),
+      ngayXuat: e.postedAt || e.updatedAt || new Date(),
+      khoaHoc: e.courseName || 'Khóa học',
+      ghiChu: e.note || 'Hoàn tiền (refund)',
+      hocPhi: Number(e.amount) || 0,
+      synthetic: true,
+    }));
+
     // 3. Kết quả thi (nếu có)
     const ExamResult = require('../models/ExamResult');
     const examResults = await ExamResult.find({
@@ -347,7 +366,7 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) 
       data: {
         student: studentDoc,
         schedules: schedules || [],
-        invoices: invoices || [],
+        invoices: [...(invoices || []), ...(refundInvoices || [])],
         examResults: examResults || []
       }
     });
