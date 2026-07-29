@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { CourseSwitcher, StatCard } from './StudentShared';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
+import { openSiteChat } from '../FloatingMessenger';
+import { useFloatingMessenger } from '../../context/FloatingMessengerContext';
 
 export default function StudentOverviewTab({
   studentData,
@@ -24,6 +26,7 @@ export default function StudentOverviewTab({
   materials,
 }) {
   const navigate = useNavigate();
+  const { setSupportOpen } = useFloatingMessenger();
   const pendingHw = myAssignments ? myAssignments.filter((a) => !a.mySubmission).length : 0;
   const joinLive = Boolean(viewStudent.joinClassUrl && viewStudent.isLikelyLiveClass);
   const docs = materials.filter((m) => m.category === 'document').slice(0, 3);
@@ -129,7 +132,7 @@ export default function StudentOverviewTab({
                     metaClass: 'text-blue-600',
                   },
                   {
-                    onClick: () => navigate('/student/inbox'),
+                    onClick: () => setSupportOpen(true),
                     tone: 'bg-purple-50/70 border-purple-100 text-purple-600',
                     icon: MessageSquare,
                     title: 'Tin nhắn & Phản hồi',
@@ -268,7 +271,17 @@ export default function StudentOverviewTab({
             <div className="hidden lg:flex flex-col gap-4">
               <button
                 type="button"
-                onClick={() => navigate('/student/inbox', { state: { selectUserId: studentData.teacherId } })}
+                onClick={() => {
+                  if (studentData.teacherId) {
+                    openSiteChat({
+                      id: String(studentData.teacherId),
+                      name: studentData.teacherName || 'Giảng viên',
+                      role: 'teacher',
+                    });
+                  } else {
+                    setSupportOpen(true);
+                  }
+                }}
                 className="cms-sd-btn w-full bg-white border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600"
               >
                 <MessageSquare size={18} aria-hidden="true" /> Nhắn tin Giảng viên

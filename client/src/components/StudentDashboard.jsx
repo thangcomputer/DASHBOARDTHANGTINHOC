@@ -27,6 +27,8 @@ import {
   StudentLazyProfileTab,
   StudentLazyOverviewTab,
 } from './student/StudentLazyTabShell';
+import { openSiteChat } from './FloatingMessenger';
+import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 
 
 const StudentDashboard = ({ onNavigate }) => {
@@ -38,6 +40,7 @@ const StudentDashboard = ({ onNavigate }) => {
   const { students, teachers, materials, schedules, getNotifications, getConversations, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, studentQuestions, examSubjectsCatalog } = useData();
   const student = students.find(s => String(s.id) === String(STUDENT_ID));
   const navigate = useNavigate();
+  const { setSupportOpen } = useFloatingMessenger();
   const location = useLocation();
   const { onDataRefresh, socket } = useSocket();
 
@@ -631,12 +634,22 @@ const StudentDashboard = ({ onNavigate }) => {
         )}
       </div>
 
-      {/* FAB tin nhắn nhanh: chỉ máy tính */}
+      {/* FAB tin nhắn nhanh: chỉ máy tính — mở chat nổi */}
       <button
         type="button"
-        onClick={() => navigate('/student/inbox', { state: { selectUserId: studentData.teacherId } })}
+        onClick={() => {
+          if (studentData?.teacherId) {
+            openSiteChat({
+              id: String(studentData.teacherId),
+              name: studentData.teacherName || 'Giảng viên',
+              role: 'teacher',
+            });
+          } else {
+            setSupportOpen(true);
+          }
+        }}
         className="hidden md:inline-flex fixed bottom-6 right-6 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-2xl z-50 active:scale-90 transition"
-        aria-label="Mở hộp thư"
+        aria-label="Nhắn tin"
         title="Nhắn tin"
       >
         <MessageSquare size={24} aria-hidden="true" />

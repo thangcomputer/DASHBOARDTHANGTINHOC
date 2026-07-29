@@ -16,6 +16,7 @@ import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
+import { openSiteChat } from '../FloatingMessenger';
 
 const getDisplayName = (person) => {
   if (!person) return 'Không rõ';
@@ -405,8 +406,11 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   </span>
                   <button
                     type="button"
-                    onClick={() => navigate('/teacher/inbox', {
-                      state: { selectUserId: String(student.id || student._id) },
+                    onClick={() => openSiteChat({
+                      id: String(student.id || student._id),
+                      name: student.name || 'Học viên',
+                      role: 'student',
+                      avatar: student.avatar,
                     })}
                     className="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition-all border border-blue-100"
                     title="Nhắn tin nội bộ"

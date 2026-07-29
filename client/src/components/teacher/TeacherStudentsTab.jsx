@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, MessageSquare, Users, GraduationCap } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import TeacherStudentCard from './TeacherStudentCard';
+import { openSiteChat } from '../FloatingMessenger';
 
 export default function TeacherStudentsTab({
   studentSearch, setStudentSearch, students, onlineUsers, lastSeenUsers, timeAgo,
@@ -81,7 +82,12 @@ export default function TeacherStudentsTab({
                               type="button"
                               onClick={(e) => { 
                                 e.stopPropagation(); 
-                                navigate('/teacher/inbox', { state: { selectUserId: String(sId) } }); 
+                                openSiteChat({
+                                  id: String(sId),
+                                  name: s.name || 'Học viên',
+                                  role: 'student',
+                                  avatar: s.avatar,
+                                });
                               }} 
                               className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 hover:text-blue-700 transition-all border-none outline-none shrink-0"
                               title="Nhắn tin nội bộ"
