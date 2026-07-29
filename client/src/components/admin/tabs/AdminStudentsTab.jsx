@@ -82,10 +82,11 @@ function StudentRowActions({
 
   useLayoutEffect(() => {
     if (!open || !btnRef.current) {
-      setCoords(null);
+      setCoords((prev) => (prev == null ? prev : null));
       return undefined;
     }
     const place = () => {
+      if (!btnRef.current) return;
       const r = btnRef.current.getBoundingClientRect();
       const menuW = Math.min(260, window.innerWidth - 16);
       const approxH = menuRef.current?.offsetHeight || 360;
@@ -99,10 +100,29 @@ function StudentRowActions({
       const top = openUp
         ? Math.max(8, r.top - gap - Math.min(approxH, maxH))
         : r.bottom + gap;
-      setCoords({ left, top, width: menuW, maxH, openUp });
+      const next = {
+        left: Math.round(left),
+        top: Math.round(top),
+        width: menuW,
+        maxH: Math.round(maxH),
+        openUp,
+      };
+      setCoords((prev) => {
+        if (
+          prev
+          && prev.left === next.left
+          && prev.top === next.top
+          && prev.width === next.width
+          && prev.maxH === next.maxH
+          && prev.openUp === next.openUp
+        ) {
+          return prev;
+        }
+        return next;
+      });
     };
     place();
-    // Đo lại sau khi menu mount (chiều cao thật)
+    // Đo lại 1 lần sau khi menu mount (chiều cao thật) — không put object vào deps
     const t = window.setTimeout(place, 0);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
@@ -111,7 +131,7 @@ function StudentRowActions({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [open, align, refundable, locked]);
+  }, [open, align]);
 
   const itemCls =
     'w-full flex items-center gap-2.5 px-3 py-2 min-h-10 text-[13px] font-semibold text-left whitespace-nowrap transition-colors';
