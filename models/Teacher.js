@@ -208,7 +208,6 @@ TeacherSchema.methods.incLoginAttempts = async function () {
 // ── Indexes ──────────────────────────────────────────────────────
 TeacherSchema.index({ status: 1 });
 TeacherSchema.index({ role: 1 });
-TeacherSchema.index({ email: 1 }, { sparse: true });
 TeacherSchema.index({ branchId: 1, status: 1 });
 TeacherSchema.index({ role: 1, status: 1 });
 
