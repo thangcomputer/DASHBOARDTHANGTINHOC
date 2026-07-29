@@ -179,13 +179,25 @@ export function sumClientPaidTuition(student) {
   return Number(student.price) || 0;
 }
 
-/** Flatten HV → từng dòng khóa học (dùng tab Tài chính). */
+/** Flatten HV → từng dòng khóa học (dùng tab Tài chính).
+ * Active: Đã nộp / Chưa nộp.
+ * Cancelled: 1 dòng Hoàn (số âm hoặc 0).
+ */
 export function expandFinanceEnrollmentRows(students) {
   const rows = [];
+  const isPaidEnr = (e) =>
+    e?.paid === true
+    || e?.paid === 'Đã đóng phí'
+    || e?.paid === 'true'
+    || e?.paid === 1;
+
   (students || []).forEach((student) => {
     const sid = student.id || student._id;
-    const list = getActiveClientEnrollments(student);
-    if (list.length === 0) {
+    const all = getClientEnrollments(student);
+    const active = all.filter((e) => e?.status !== 'cancelled');
+    const cancelled = all.filter((e) => e?.status === 'cancelled');
+
+    if (active.length === 0 && cancelled.length === 0) {
       rows.push({
         key: String(sid),
         studentId: sid,
@@ -193,12 +205,14 @@ export function expandFinanceEnrollmentRows(students) {
         courseName: student.course || '—',
         price: Number(student.price) || 0,
         paid: !!student.paid,
+        kind: 'tuition',
         enrollmentId: null,
         isLegacy: true,
       });
       return;
     }
-    list.forEach((enr, idx) => {
+
+    active.forEach((enr, idx) => {
       const enrId = enr.enrollmentId || enr.id;
       rows.push({
         key: `${sid}-${enrId || idx}`,
@@ -206,13 +220,59 @@ export function expandFinanceEnrollmentRows(students) {
         studentName: student.name || '—',
         courseName: enr.courseName || enr.name || student.course || '—',
         price: Number(enr.price) || 0,
-        paid: enr.paid === true || enr.paid === 'Đã đóng phí' || enr.paid === 'true' || enr.paid === 1,
+        paid: isPaidEnr(enr),
+        kind: 'tuition',
         enrollmentId: enrId && enrId !== 'main' ? enrId : null,
         isLegacy: !enrId || enrId === 'main',
       });
     });
+
+    cancelled.forEach((enr, idx) => {
+      const enrId = enr.enrollmentId || enr.id;
+      const courseName = enr.courseName || enr.name || 'Khóa học';
+      const refundAmt = Math.abs(Number(enr.refundedAmount) || 0);
+      rows.push({
+        key: `${sid}-refund-${enrId || idx}`,
+        studentId: sid,
+        studentName: student.name || '—',
+        courseName: `${courseName} — Hoàn học phí`,
+        price: -refundAmt,
+        paid: false,
+        kind: 'refund',
+        enrollmentId: enrId && enrId !== 'main' ? enrId : null,
+        isLegacy: false,
+        /** Giá khóa đã thu (để tính gross − hoàn) */
+        originalPrice: isPaidEnr(enr) || refundAmt > 0 ? (Number(enr.price) || 0) : 0,
+      });
+    });
   });
   return rows;
+}
+
+/** Tổng doanh thu thực tế = đã thu (kể cả khóa sau hủy) − hoàn */
+export function summarizeFinanceEnrollmentRows(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const tuitionPaid = list.filter((r) => r.kind !== 'refund' && r.paid);
+  const tuitionUnpaid = list.filter((r) => r.kind !== 'refund' && !r.paid);
+  const refunds = list.filter((r) => r.kind === 'refund');
+
+  const collectedActive = tuitionPaid.reduce((s, r) => s + (Number(r.price) || 0), 0);
+  const debt = tuitionUnpaid.reduce((s, r) => s + (Number(r.price) || 0), 0);
+  const refunded = refunds.reduce((s, r) => s + Math.abs(Number(r.price) || 0), 0);
+  const cancelledGross = refunds.reduce((s, r) => s + (Number(r.originalPrice) || 0), 0);
+  const gross = collectedActive + cancelledGross;
+  const net = gross - refunded;
+  const listed = collectedActive + debt;
+
+  return {
+    collectedActive,
+    cancelledGross,
+    gross,
+    refunded,
+    net,
+    debt,
+    listed,
+  };
 }
 
 export function sumClientListedTuition(student) {

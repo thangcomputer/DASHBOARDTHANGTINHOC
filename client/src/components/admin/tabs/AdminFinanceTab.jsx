@@ -6,6 +6,7 @@ import {
 import { exportToCSV } from '../../../utils/exportExcel';
 import {
   expandFinanceEnrollmentRows,
+  summarizeFinanceEnrollmentRows,
 } from '../../../utils/enrollments';
 import api from '../../../services/api';
 import { mutate } from 'swr';
@@ -20,11 +21,17 @@ export default function AdminFinanceTab() {
     () => expandFinanceEnrollmentRows(financeStudents),
     [financeStudents],
   );
-  const totalCollected = financeRows.filter((r) => r.paid).reduce((s, r) => s + r.price, 0);
-  const totalListed = financeRows.reduce((s, r) => s + r.price, 0);
-  const totalDebt = Math.max(0, totalListed - totalCollected);
+  const financeSummary = useMemo(
+    () => summarizeFinanceEnrollmentRows(financeRows),
+    [financeRows],
+  );
+  const totalNet = financeSummary.net;
+  const totalListed = financeSummary.listed;
+  const totalDebt = financeSummary.debt;
+  const totalRefunded = financeSummary.refunded;
 
   const handlePayRow = async (row) => {
+    if (row.kind === 'refund') return;
     const tid = toast.loading('Đang xác nhận thanh toán...');
     try {
       if (row.enrollmentId) {
@@ -64,7 +71,7 @@ export default function AdminFinanceTab() {
                                 "Học viên": r.studentName || "N/A",
                                 "Khóa học": r.courseName || "N/A",
                                 "Số tiền (VNĐ)": r.price || 0,
-                                "Trạng thái": r.paid ? "Đã nộp" : "Chưa nộp",
+                                "Trạng thái": r.kind === 'refund' ? 'Hoàn' : (r.paid ? 'Đã nộp' : 'Chưa nộp'),
                               }));
                               if (exportData.length === 0) throw new Error('Không có dữ liệu học phí');
                               exportToCSV(exportData, `BaoCaoDoanhThu_${new Date().toISOString().split('T')[0]}.csv`);
@@ -88,9 +95,9 @@ export default function AdminFinanceTab() {
                       </div>
                       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
                         <div className="min-w-0">
-                          <p className="text-red-100 text-[12px] font-semibold tracking-wide">Tổng doanh thu thực tế (Đã thu)</p>
+                          <p className="text-red-100 text-[12px] font-semibold tracking-wide">Tổng doanh thu thực tế (Đã thu − Hoàn)</p>
                           <p className="text-[1.5rem] sm:text-4xl font-extrabold mt-2 break-words">
-                            {totalCollected.toLocaleString('vi-VN')}đ
+                            {totalNet.toLocaleString('vi-VN')}đ
                           </p>
                         </div>
                         <div className="bg-white/20 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20 flex items-center gap-1.5 shrink-0 self-start min-h-11">
@@ -110,11 +117,17 @@ export default function AdminFinanceTab() {
                       </div>
 
                       <div className="flex flex-wrap gap-3 mt-5 text-[12px] font-semibold text-red-100 border-t border-white/10 pt-4">
-                        <div className="flex-1 min-w-[140px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
+                        <div className="flex-1 min-w-[120px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
                           <p className="opacity-70 mb-0.5">Dự kiến (Tất cả)</p>
                           <p className="text-[15px] font-bold text-white">{totalListed.toLocaleString('vi-VN')}đ</p>
                         </div>
-                        <div className="flex-1 min-w-[140px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
+                        <div className="flex-1 min-w-[120px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
+                          <p className="opacity-70 mb-0.5">Đã hoàn</p>
+                          <p className="text-[15px] font-bold text-red-200">
+                            {totalRefunded > 0 ? `−${totalRefunded.toLocaleString('vi-VN')}đ` : '0đ'}
+                          </p>
+                        </div>
+                        <div className="flex-1 min-w-[120px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
                           <p className="opacity-70 mb-0.5">Công nợ (Chưa thu)</p>
                           <p className="text-[15px] font-bold text-red-200">{totalDebt.toLocaleString('vi-VN')}đ</p>
                         </div>
@@ -126,10 +139,14 @@ export default function AdminFinanceTab() {
                     {!isLoadingFinance && financeRows.length === 0 && (
                       <div className="cms-m-empty min-h-[160px]">Chưa có giao dịch học phí.</div>
                     )}
-                    {financeRows.map((r) => (
+                    {financeRows.map((r) => {
+                      const isRefund = r.kind === 'refund';
+                      return (
                       <div key={r.key} className="cms-m-list-row hover:bg-slate-50">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${r.paid ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${
+                            isRefund ? 'bg-red-500' : (r.paid ? 'bg-emerald-500' : 'bg-amber-500')
+                          }`}>
                             {(r.studentName || '?')[0]}
                           </div>
                           <div className="min-w-0">
@@ -139,12 +156,18 @@ export default function AdminFinanceTab() {
                         </div>
                         <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                           <div className="text-left sm:text-right min-w-0">
-                            <p className="text-[15px] font-extrabold text-slate-900 break-words">{(r.price || 0).toLocaleString('vi-VN')}đ</p>
-                            <span className={`text-[13px] font-bold ${r.paid ? 'text-sky-700' : 'text-red-500'}`}>
-                              {r.paid ? 'Đã nộp' : 'Chưa nộp'}
+                            <p className={`text-[15px] font-extrabold break-words ${isRefund ? 'text-red-600' : 'text-slate-900'}`}>
+                              {isRefund
+                                ? `${(Number(r.price) || 0).toLocaleString('vi-VN')}đ`
+                                : `${(Number(r.price) || 0).toLocaleString('vi-VN')}đ`}
+                            </p>
+                            <span className={`text-[13px] font-bold ${
+                              isRefund ? 'text-red-600' : (r.paid ? 'text-sky-700' : 'text-red-500')
+                            }`}>
+                              {isRefund ? 'Hoàn' : (r.paid ? 'Đã nộp' : 'Chưa nộp')}
                             </span>
                           </div>
-                          {!r.paid && (
+                          {!isRefund && !r.paid && (
                             <button
                               type="button"
                               onClick={() => handlePayRow(r)}
@@ -155,7 +178,8 @@ export default function AdminFinanceTab() {
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 

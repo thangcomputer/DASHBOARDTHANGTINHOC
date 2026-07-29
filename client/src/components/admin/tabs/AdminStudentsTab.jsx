@@ -75,9 +75,9 @@ function StudentActionMenu({
         </span>
       </button>
       <button type="button" role="menuitem" onClick={() => { handlePrintInvoice(s); setActionMenuId(null); }}
-        disabled={!s.paid}
+        disabled={!studentHasActivePaid(s)}
         className={`${itemCls} ${
-          s.paid ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
+          studentHasActivePaid(s) ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
         }`}>
         <Printer size={15} className="shrink-0" />
         <span className="min-w-0">Xuất hóa đơn PDF</span>
@@ -90,6 +90,16 @@ function StudentActionMenu({
       </button>
     </div>
   );
+}
+
+function isEnrollmentPaidFlag(e) {
+  return e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
+}
+
+function studentHasActivePaid(s, enrollments) {
+  const list = Array.isArray(enrollments) ? enrollments : getActiveClientEnrollments(s);
+  if (list.length > 0) return list.some(isEnrollmentPaidFlag);
+  return !!s?.paid;
 }
 
 function PaidBadge({ paid }) {
@@ -309,15 +319,19 @@ export default function AdminStudentsTab() {
     );
   };
 
-  const renderPaid = (s, enrollments, hasMultiCourse) => {
-    if (hasMultiCourse) {
+  const renderPaid = (s, enrollments) => {
+    const list = Array.isArray(enrollments) ? enrollments : [];
+    if (list.length > 1) {
       return (
         <div className="flex flex-col gap-1.5 items-start">
-          {enrollments.map((enr) => (
-            <PaidBadge key={enr.enrollmentId || enr.id} paid={!!enr.paid} />
+          {list.map((enr) => (
+            <PaidBadge key={enr.enrollmentId || enr.id} paid={isEnrollmentPaidFlag(enr)} />
           ))}
         </div>
       );
+    }
+    if (list.length === 1) {
+      return <PaidBadge paid={isEnrollmentPaidFlag(list[0])} />;
     }
     return <PaidBadge paid={!!s.paid} />;
   };
@@ -441,7 +455,7 @@ export default function AdminStudentsTab() {
                   name={s.name}
                   role="student"
                   src={s.avatar}
-                  color={s.paid ? 'bg-sky-500' : 'bg-red-500'}
+                  color={studentHasActivePaid(s, enrollments) ? 'bg-sky-500' : 'bg-red-500'}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
@@ -527,7 +541,7 @@ export default function AdminStudentsTab() {
                             </p>
                           </div>
                           <div className="flex justify-end pt-0.5">
-                            <PaidBadge paid={!!enr.paid} />
+                            <PaidBadge paid={isEnrollmentPaidFlag(enr)} />
                           </div>
                         </div>
                       );
@@ -541,7 +555,7 @@ export default function AdminStudentsTab() {
                         {renderTuition(s, enrollments, false)}
                       </div>
                       <div className="flex justify-end pt-0.5">
-                        {renderPaid(s, enrollments, false)}
+                        {renderPaid(s, enrollments)}
                       </div>
                     </>
                   )}
@@ -599,7 +613,7 @@ export default function AdminStudentsTab() {
                         name={s.name}
                         role="student"
                         src={s.avatar}
-                        color={s.paid ? 'bg-sky-500' : 'bg-red-500'}
+                        color={studentHasActivePaid(s, enrollments) ? 'bg-sky-500' : 'bg-red-500'}
                       />
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900 text-base leading-snug truncate max-w-[200px]">{s.name}</p>
@@ -628,7 +642,7 @@ export default function AdminStudentsTab() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="inline-flex flex-col items-center gap-1.5">
-                      {renderPaid(s, enrollments, hasMultiCourse)}
+                      {renderPaid(s, enrollments)}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-center">

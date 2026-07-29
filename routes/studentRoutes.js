@@ -1801,7 +1801,8 @@ router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(
         const newPaid = Math.max(0, prevPaid - refundAmt);
         await Student.findByIdAndUpdate(student._id, {
           paidAmount: newPaid,
-          ...(newPaid === 0 ? { paid: false } : {}),
+          // Giữ paid=true nếu còn khóa active đã thu (không phụ thuộc paidAmount có về 0 do lệch cache)
+          paid: list.some((e) => e.status !== 'cancelled' && e.paid === true),
         });
 
         await postRefund({

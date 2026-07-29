@@ -26,11 +26,14 @@ export default function InvoicePreviewFrame({ data, className = '' }) {
     return () => ro.disconnect();
   }, []);
 
+  const viewW = Math.max(1, Math.round(A5_W * scale));
+  const viewH = Math.max(1, Math.round(A5_H * scale));
+
   return (
-    <div ref={wrapRef} className={`w-full max-w-[900px] mx-auto ${className}`}>
+    <div ref={wrapRef} className={`w-full max-w-[900px] mx-auto flex justify-center ${className}`}>
       <div
-        className="relative mx-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md"
-        style={{ width: '100%', height: Math.max(1, Math.round(A5_H * scale)) }}
+        className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md shrink-0"
+        style={{ width: viewW, height: viewH }}
       >
         <div
           className="origin-top-left"
