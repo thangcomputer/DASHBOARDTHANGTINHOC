@@ -120,10 +120,10 @@ export default function AdminFinanceTab() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="flex flex-col gap-3 sm:gap-4 max-lg:pb-2 lg:h-[calc(100dvh-7.25rem)] xl:h-[calc(100dvh-8.5rem)] lg:min-h-0 lg:overflow-hidden">
       {/* P2 P&L strip */}
       {ledger && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 shrink-0">
           {[
             { label: 'Doanh thu gộp', value: totalGross || 0, tone: 'text-slate-800' },
             { label: 'Hoàn tiền', value: totalRefunded, tone: 'text-red-600', neg: true },
@@ -131,9 +131,9 @@ export default function AdminFinanceTab() {
             { label: 'Chi phí (Ledger)', value: totalCosts, tone: 'text-blue-700', neg: true },
             { label: 'Lợi nhuận', value: totalProfit, tone: totalProfit >= 0 ? 'text-emerald-700' : 'text-red-600' },
           ].map((m) => (
-            <div key={m.label} className="cms-m-card !p-4">
+            <div key={m.label} className="cms-m-card !p-3 sm:!p-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{m.label}</p>
-              <p className={`text-lg font-extrabold break-words ${m.tone}`}>
+              <p className={`text-base sm:text-lg font-extrabold break-words ${m.tone}`}>
                 {m.neg && m.value > 0 ? '−' : ''}{(Number(m.value) || 0).toLocaleString('vi-VN')}đ
               </p>
             </div>
@@ -141,9 +141,9 @@ export default function AdminFinanceTab() {
         </div>
       )}
 
-      <div className={`grid grid-cols-1 ${isSuperAdmin ? 'lg:grid-cols-2' : ''} gap-4 sm:gap-6`}>
-        <div className="cms-m-card">
-          <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
+      <div className={`grid grid-cols-1 ${isSuperAdmin ? 'lg:grid-cols-2' : ''} gap-3 sm:gap-4 lg:flex-[1.15] lg:min-h-0`}>
+        <div className="cms-m-card flex flex-col min-h-0 overflow-hidden max-lg:max-h-[min(70vh,36rem)]">
+          <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0 shrink-0">
             <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
               <DollarSign size={18} className="text-sky-700 flex-shrink-0" /> Doanh Thu Học Phí
             </h3>
@@ -180,8 +180,8 @@ export default function AdminFinanceTab() {
               <Download size={14} className="flex-shrink-0" /> Xuất báo cáo doanh thu
             </button>
           </div>
-          <div className="p-4 sm:p-6">
-            <div className="bg-gradient-to-br from-red-700 to-red-900 rounded-2xl p-4 sm:p-6 text-white shadow-[0_6px_20px_rgba(220,38,38,0.25)] relative overflow-hidden">
+          <div className="p-3 sm:p-4 shrink-0">
+            <div className="bg-gradient-to-br from-red-700 to-red-900 rounded-2xl p-3 sm:p-5 text-white shadow-[0_6px_20px_rgba(220,38,38,0.25)] relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-10">
                 <DollarSign size={80} />
               </div>
@@ -190,7 +190,7 @@ export default function AdminFinanceTab() {
                   <p className="text-red-100 text-[12px] font-semibold tracking-wide">
                     Doanh thu thuần {ledger ? '(Ledger)' : '(Đã thu − Hoàn)'}
                   </p>
-                  <p className="text-[1.5rem] sm:text-4xl font-extrabold mt-2 break-words">
+                  <p className="text-[1.35rem] sm:text-3xl font-extrabold mt-1.5 break-words">
                     {totalNet.toLocaleString('vi-VN')}đ
                   </p>
                   {totalGross != null && (
@@ -209,25 +209,25 @@ export default function AdminFinanceTab() {
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-3 mt-5 text-[12px] font-semibold text-red-100 border-t border-white/10 pt-4">
-                <div className="flex-1 min-w-[120px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
+              <div className="flex flex-wrap gap-2 sm:gap-3 mt-3 sm:mt-4 text-[12px] font-semibold text-red-100 border-t border-white/10 pt-3">
+                <div className="flex-1 min-w-[100px] bg-white/5 px-3 py-2 rounded-xl border border-white/5">
                   <p className="opacity-70 mb-0.5">Dự kiến (Tất cả)</p>
-                  <p className="text-[15px] font-bold text-white">{totalListed.toLocaleString('vi-VN')}đ</p>
+                  <p className="text-[14px] sm:text-[15px] font-bold text-white">{totalListed.toLocaleString('vi-VN')}đ</p>
                 </div>
-                <div className="flex-1 min-w-[120px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
+                <div className="flex-1 min-w-[100px] bg-white/5 px-3 py-2 rounded-xl border border-white/5">
                   <p className="opacity-70 mb-0.5">Đã hoàn</p>
-                  <p className="text-[15px] font-bold text-red-200">
+                  <p className="text-[14px] sm:text-[15px] font-bold text-red-200">
                     {totalRefunded > 0 ? `−${totalRefunded.toLocaleString('vi-VN')}đ` : '0đ'}
                   </p>
                 </div>
-                <div className="flex-1 min-w-[120px] bg-white/5 px-3 py-2.5 rounded-xl border border-white/5">
+                <div className="flex-1 min-w-[100px] bg-white/5 px-3 py-2 rounded-xl border border-white/5">
                   <p className="opacity-70 mb-0.5">Công nợ (Chưa thu)</p>
-                  <p className="text-[15px] font-bold text-red-200">{totalDebt.toLocaleString('vi-VN')}đ</p>
+                  <p className="text-[14px] sm:text-[15px] font-bold text-red-200">{totalDebt.toLocaleString('vi-VN')}đ</p>
                 </div>
               </div>
             </div>
           </div>
-          <div className="divide-y divide-slate-50 border-t border-slate-50 max-h-80 overflow-y-auto relative">
+          <div className="divide-y divide-slate-50 border-t border-slate-50 flex-1 min-h-0 overflow-y-auto overscroll-contain relative">
             {isLoadingFinance && <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10"><RefreshCw className="animate-spin text-indigo-500" /></div>}
             {!isLoadingFinance && financeRows.length === 0 && (
               <div className="cms-m-empty min-h-[160px]">Chưa có giao dịch học phí.</div>
@@ -275,8 +275,8 @@ export default function AdminFinanceTab() {
         </div>
 
         {isSuperAdmin && (
-          <div className="cms-m-card">
-            <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+          <div className="cms-m-card flex flex-col min-h-0 overflow-hidden max-lg:max-h-[min(70vh,36rem)]">
+            <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0 shrink-0">
               <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
                 <CreditCard size={18} className="text-blue-600 flex-shrink-0" /> Thanh Toán Giảng Viên
               </h3>
@@ -314,13 +314,13 @@ export default function AdminFinanceTab() {
                 <Download size={16} /> Xuất Báo Cáo
               </button>
             </div>
-            <div className="p-4 sm:p-6">
-              <div className="bg-slate-800 rounded-2xl p-4 sm:p-6 text-white shadow-lg relative overflow-hidden">
+            <div className="p-3 sm:p-4 shrink-0">
+              <div className="bg-slate-800 rounded-2xl p-3 sm:p-5 text-white shadow-lg relative overflow-hidden">
                 {isLoadingFinance ? <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center"><RefreshCw className="animate-spin text-white" size={24} /></div> : null}
                 <p className="text-slate-400 text-[12px] font-semibold tracking-wide">
                   Chi phí {ledger && totalCosts > 0 ? '(Ledger salary+)' : '(phiếu chi)'}
                 </p>
-                <p className="text-[1.5rem] sm:text-4xl font-extrabold mt-2 break-words">
+                <p className="text-[1.35rem] sm:text-3xl font-extrabold mt-1.5 break-words">
                   {teacherPaid.toLocaleString('vi-VN')}đ
                 </p>
                 <p className="text-[12px] text-slate-500 mt-2 font-medium">
@@ -328,7 +328,7 @@ export default function AdminFinanceTab() {
                 </p>
               </div>
             </div>
-            <div className="divide-y divide-slate-50 border-t border-slate-50 max-h-80 overflow-y-auto">
+            <div className="divide-y divide-slate-50 border-t border-slate-50 flex-1 min-h-0 overflow-y-auto overscroll-contain">
               {financialData.map((t) => {
                 const bankInfo = t.teacherId?.bankAccount || t.bankAccount;
                 return (
@@ -370,8 +370,8 @@ export default function AdminFinanceTab() {
       </div>
 
       {/* P1: Sổ cái Ledger */}
-      <div className="cms-m-card">
-        <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="cms-m-card flex flex-col min-h-0 overflow-hidden lg:flex-1 max-lg:max-h-[min(55vh,28rem)]">
+        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
           <h3 className="cms-m-heading flex items-center gap-2">
             <BookOpen size={18} className="text-indigo-600" /> Sổ cái (Ledger)
           </h3>
@@ -394,7 +394,7 @@ export default function AdminFinanceTab() {
             </button>
           </div>
         </div>
-        <div className="divide-y divide-slate-50 max-h-96 overflow-y-auto relative">
+        <div className="divide-y divide-slate-50 flex-1 min-h-0 overflow-y-auto overscroll-contain relative">
           {loadingBook && (
             <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
               <RefreshCw className="animate-spin text-indigo-500" />
