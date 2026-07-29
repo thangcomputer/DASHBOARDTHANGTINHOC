@@ -153,13 +153,12 @@ async function main() {
 
   const totalActors = publicActors.length + internalActors.length;
   const totalOk = pubOk + intOk;
-  const summaryPass = publicActors.length > 0
-    && pubOk === publicActors.length
-    && (internalActors.length === 0 || intOk === internalActors.length || !bypassLive);
   record({
     id: 'AUTH-CONC-02',
     name: `Concurrent password(+CAPTCHA) login summary (${totalActors} users)`,
-    result: summaryPass ? 'PASS' : 'FAIL',
+    result: totalOk >= Math.min(totalActors, publicActors.length) && pubOk === publicActors.length
+      ? (intOk === internalActors.length || !bypassLive ? (bypassLive && intOk === internalActors.length ? 'PASS' : (bypassLive ? 'FAIL' : 'PASS')) : 'FAIL')
+      : 'FAIL',
     actual: `ok=${totalOk}/${totalActors} public=${pubOk} internal=${intOk} bypass=${bypassLive}`,
   });
 

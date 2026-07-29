@@ -83,43 +83,7 @@ async function ingestEvents({ user, events, ip, userAgent, tenantId }) {
     { userId: docs[0].userId, count: docs.length, types: [...new Set(docs.map((d) => d.type))] },
     '[Proctor] audit events ingested',
   );
-
-  // Phase 9 — proctor violation path:
-  // - luôn ghi nhận event (đã insert)
-  // - chỉ auto-lock phòng thi khi exam_terminate hoặc detail.autoLock === true
-  const lockTriggers = capped.filter((e) => {
-    const t = String(e?.type || '');
-    if (t === 'exam_terminate') return true;
-    if (t === 'hard_violation' && e?.detail?.autoLock === true) return true;
-    return false;
-  });
-  let violationApplied = false;
-  if (lockTriggers.length && String(user?.role || '').toLowerCase() === 'student') {
-    try {
-      const { lockStudentExam } = require('./examLifecycleService');
-      const Student = require('../models/Student');
-      const st = await Student.findById(user.id).select('studentExamUnlocked').lean();
-      if (st?.studentExamUnlocked) {
-        const subjectId = lockTriggers.map((e) => e?.detail?.subjectId).find(Boolean) || null;
-        const reason = lockTriggers.map((e) => e?.detail?.reason || e?.type).filter(Boolean).join('; ').slice(0, 400)
-          || 'Vi phạm giám sát thi (proctor)';
-        await lockStudentExam({
-          studentId: user.id,
-          actor: { id: user.id, role: 'student', name: 'Proctor' },
-          io: global.io || null,
-          reqMeta: { ip: ip || '', userAgent: String(userAgent || '').slice(0, 300) },
-          reason,
-          reasonKind: 'violation',
-          subjectId,
-        });
-        violationApplied = true;
-      }
-    } catch (err) {
-      logger.warn({ err: err.message }, '[Proctor] violation→exam lock skipped');
-    }
-  }
-
-  return { inserted: docs.length, violationApplied };
+  return { inserted: docs.length };
 }
 
 async function listEventsForUser(userId, { limit = 100 } = {}) {

@@ -32,17 +32,6 @@ const scheduleSchema = new mongoose.Schema({
     default: 'scheduled',
   },
 
-  // Phase 8 — điểm danh chi tiết (map → status)
-  // present|late → completed; absent|excused → no_show
-  attendanceStatus: {
-    type: String,
-    enum: ['present', 'absent', 'late', 'excused'],
-    default: undefined,
-  },
-  attendanceMarkedAt: { type: Date, default: null },
-  attendanceMarkedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
-  attendanceNote: { type: String, default: '', maxlength: 500 },
-
   // Thanh toán
   is_paid_to_teacher: { type: Boolean, default: false }, 
   paymentStatus: {

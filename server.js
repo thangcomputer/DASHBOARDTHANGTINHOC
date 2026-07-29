@@ -680,9 +680,6 @@ app.use('/api/training-lms', trainingRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/settings',     settingsRoutes);
 app.use('/api/webhooks',     webhookRoutes);
-app.use('/api/finance',      require('./routes/financeRoutes'));
-app.use('/api/rewards',      require('./routes/rewardRoutes'));
-app.use('/api/payroll',      require('./routes/payrollRoutes'));
 app.use('/api/staff',        staffRoutes);
 app.use('/api/branches',     branchRoutes);
 app.use('/api/analytics',    analyticsRoutes);    // ← Revenue Analytics
@@ -783,55 +780,6 @@ const runScheduledBackup = async () => {
 const backupCronExpr = process.env.BACKUP_CRON || '0 3 * * *';
 if (process.env.BACKUP_SCHEDULE !== '0') {
   cron.schedule(backupCronExpr, runScheduledBackup);
-}
-
-// Phase 5 — digest lịch học trong ngày (1 thông báo / HV / ngày). Tắt: CLASS_DIGEST_CRON=0
-const { runClassReminderDigest } = require('./services/notificationDigest');
-const classDigestCron = process.env.CLASS_DIGEST_CRON || '0 6 * * *';
-if (process.env.CLASS_DIGEST_CRON !== '0') {
-  cron.schedule(classDigestCron, async () => {
-    try {
-      await runClassReminderDigest(global.io || null);
-    } catch (err) {
-      logger.error({ err: err.message }, '[CRON] class reminder digest');
-    }
-  }, { timezone: 'Asia/Ho_Chi_Minh' });
-}
-
-// Phase 8 — nhắc thiếu điểm danh (mặc định mỗi giờ). Tắt: ATTENDANCE_MISS_CRON=0
-const { notifyMissedAttendance } = require('./services/attendanceService');
-const attendanceMissCron = process.env.ATTENDANCE_MISS_CRON || '15 * * * *';
-if (process.env.ATTENDANCE_MISS_CRON !== '0') {
-  cron.schedule(attendanceMissCron, async () => {
-    try {
-      await notifyMissedAttendance(global.io || null);
-    } catch (err) {
-      logger.error({ err: err.message }, '[CRON] missed attendance');
-    }
-  }, { timezone: 'Asia/Ho_Chi_Minh' });
-}
-
-// Phase 12 — job thưởng cuối tháng (ngày 1 lúc 02:00 VN). Tắt: REWARD_CRON=0
-const { runRewardPeriodJob, periodKeyFor } = require('./services/rewardService');
-const rewardCron = process.env.REWARD_CRON || '0 2 1 * *';
-if (process.env.REWARD_CRON !== '0') {
-  cron.schedule(rewardCron, async () => {
-    try {
-      // Chạy kỳ tháng trước
-      const prev = new Date();
-      prev.setMonth(prev.getMonth() - 1);
-      const periodKey = periodKeyFor('month', prev);
-      const result = await runRewardPeriodJob({
-        periodType: 'month',
-        periodKey,
-        actor: { id: 'cron', role: 'system' },
-        io: global.io || null,
-      });
-      logger.info({ periodKey, created: result.created }, '[CRON] reward period job');
-    } catch (err) {
-      logger.error({ err: err.message }, '[CRON] reward period');
-    }
-  }, { timezone: 'Asia/Ho_Chi_Minh' });
 }
 
 // ==========================================

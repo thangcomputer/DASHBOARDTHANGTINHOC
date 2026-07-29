@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T14:19:48.070Z",
+  "at": "2026-07-29T07:02:15.188Z",
   "base": "http://127.0.0.1:5000",
   "results": [
     {
@@ -14,7 +14,7 @@
     {
       "id": "G2-00b",
       "name": "Setup GV active để phân công",
-      "actual": "status=201 tid=6a68ba83f556decf221ced21",
+      "actual": "status=201 tid=6a69a576ed0aca06a551d2a1",
       "result": "PASS",
       "severity": "High",
       "api": "POST /api/teachers"
@@ -25,7 +25,7 @@
       "roleAct": "admin",
       "roleRecv": "student",
       "expected": "201 + id + có password hashed (không trả plain)",
-      "actual": "status=201 id=6a68ba83f556decf221ced26 pwdReturned=false msg=",
+      "actual": "status=201 id=6a69a576ed0aca06a551d2a6 pwdReturned=false msg=",
       "result": "PASS",
       "severity": "Critical",
       "api": "POST /api/students",
@@ -35,7 +35,7 @@
       "id": "G2-02",
       "name": "Sinh mã học viên (studentCode)",
       "expected": "studentCode không rỗng sau create",
-      "actual": "studentCode=\"HV48387857\"",
+      "actual": "studentCode=\"HV08534953\"",
       "result": "PASS",
       "severity": "High",
       "api": "POST /api/students",
@@ -74,7 +74,7 @@
       "id": "G2-06",
       "name": "HV đăng nhập",
       "expected": "200 + role student",
-      "actual": "status=200 role=student token=yes msg=Chào mừng QA HV 7806!",
+      "actual": "status=200 role=student token=yes msg=Chào mừng QA HV 4901!",
       "result": "PASS",
       "severity": "Critical",
       "api": "POST /api/auth/login/public"
@@ -121,7 +121,7 @@
       "id": "G2-11",
       "name": "Admin gán giảng viên",
       "expected": "200 + teacherId khớp",
-      "actual": "status=200 teacherId=6a68ba83f556decf221ced21 msg=Đã gán giảng viên thành công",
+      "actual": "status=200 teacherId=6a69a576ed0aca06a551d2a1 msg=Đã gán giảng viên thành công",
       "result": "PASS",
       "severity": "Critical",
       "api": "PUT /api/students/:id/assign-teacher"

@@ -69,12 +69,8 @@ export function useDataRatings({ students, teachers, setTeachers, triggerBackgro
         content: comment
       });
       if (res && res.success === false) throw new Error(res.message);
-      // ADR 0003: không notify GV lúc pending — chỉ khi approved
-      if (res?.meta?.status === 'approved' || res?.data?.status === 'approved') {
-        addNotification(teacherId, 'teacher', `${student?.name || 'Học viên'} đã đánh giá bạn ${stars}/5 sao`);
-      }
+      addNotification(teacherId, 'teacher', `${student?.name || 'Học viên'} đã đánh giá bạn ${stars}/5 sao`);
       triggerBackgroundSync();
-      return res;
     } catch (err) {
       setTeachers(previousTeachers);
       throw err;

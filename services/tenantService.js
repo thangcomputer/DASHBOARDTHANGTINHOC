@@ -140,87 +140,7 @@ async function assignBranch(tenantId, branchId) {
     err.status = 404;
     throw err;
   }
-
-  // Phase 15 — sync tenantId xuống entity thuộc chi nhánh
-  const sync = await syncTenantIdForBranch(branch._id, tenant._id);
-  return { branch, sync };
-}
-
-/**
- * Gán tenantId cho Student/Teacher/Course cùng branchId (best-effort).
- */
-async function syncTenantIdForBranch(branchId, tenantId) {
-  const [students, teachers] = await Promise.all([
-    Student.updateMany(
-      { branchId, $or: [{ tenantId: null }, { tenantId: { $exists: false } }, { tenantId: { $ne: tenantId } }] },
-      { $set: { tenantId } },
-    ),
-    Teacher.updateMany(
-      { branchId, $or: [{ tenantId: null }, { tenantId: { $exists: false } }, { tenantId: { $ne: tenantId } }] },
-      { $set: { tenantId } },
-    ),
-  ]);
-  // Course có tenantId nhưng không luôn có branchId — sync riêng khi schema hỗ trợ
-  let courses = 0;
-  try {
-    const Course = require('../models/Course');
-    if (Course.schema.paths.branchId) {
-      const r = await Course.updateMany(
-        { branchId, $or: [{ tenantId: null }, { tenantId: { $exists: false } }, { tenantId: { $ne: tenantId } }] },
-        { $set: { tenantId } },
-      );
-      courses = r.modifiedCount || 0;
-    }
-  } catch { /* ignore */ }
-  return {
-    students: students.modifiedCount || 0,
-    teachers: teachers.modifiedCount || 0,
-    courses,
-  };
-}
-
-/**
- * Backfill tenantId từ Branch.tenantId (dryRun mặc định true).
- */
-async function backfillTenantIdsFromBranches({ dryRun = true } = {}) {
-  const branches = await Branch.find({ tenantId: { $ne: null } }).select('_id tenantId').lean();
-  const summary = { branches: branches.length, students: 0, teachers: 0, courses: 0, dryRun: !!dryRun };
-  if (dryRun) {
-    for (const b of branches) {
-      summary.students += await Student.countDocuments({
-        branchId: b._id,
-        $or: [{ tenantId: null }, { tenantId: { $exists: false } }, { tenantId: { $ne: b.tenantId } }],
-      });
-      summary.teachers += await Teacher.countDocuments({
-        branchId: b._id,
-        $or: [{ tenantId: null }, { tenantId: { $exists: false } }, { tenantId: { $ne: b.tenantId } }],
-      });
-    }
-    return summary;
-  }
-  for (const b of branches) {
-    const sync = await syncTenantIdForBranch(b._id, b.tenantId);
-    summary.students += sync.students;
-    summary.teachers += sync.teachers;
-    summary.courses += sync.courses;
-  }
-  return summary;
-}
-
-async function assertBranchBelongsToTenant(branchId, tenantId) {
-  const branch = await Branch.findById(branchId).select('tenantId').lean();
-  if (!branch) {
-    const err = new Error('Khong tim thay chi nhanh');
-    err.status = 404;
-    throw err;
-  }
-  if (String(branch.tenantId || '') !== String(tenantId || '')) {
-    const err = new Error('Chi nhanh khong thuoc tenant');
-    err.status = 403;
-    err.code = 'TENANT_BRANCH_MISMATCH';
-    throw err;
-  }
-  return true;
+  return branch;
 }
 
 async function getTenantStats(tenantId) {
@@ -264,7 +184,4 @@ module.exports = {
   assignBranch,
   getTenantStats,
   resolveBranchIdsForTenant,
-  syncTenantIdForBranch,
-  backfillTenantIdsFromBranches,
-  assertBranchBelongsToTenant,
 };

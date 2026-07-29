@@ -277,9 +277,6 @@ const branchFilter = async (req, res, next) => {
         return next();
       }
 
-      // Phase 15: gắn adminRole vào req.user trước khi apply tenant (X-Tenant-Id)
-      req.user.adminRole = user.adminRole;
-
       // 🛡️ SECURITY FIX: Chỉ thực sự là SUPER_ADMIN mới được xem toàn bộ.
       // Nếu không có branchId mà cũng KHÔNG phải SUPER_ADMIN, ép về branchId=null (không thấy gì hoặc lỗi)
       const isActuallySuper = user.adminRole === 'SUPER_ADMIN';
@@ -315,22 +312,9 @@ const branchFilter = async (req, res, next) => {
 };
 
 async function applyTenantScopeIfAny(req) {
-  const {
-    mergeTenantIntoBranchFilter,
-    canApplyTenantHeader,
-  } = require('../utils/tenantScope');
-
-  const isPlatformAdmin = canApplyTenantHeader({
-    userId: req.user?.id,
-    adminRole: req.user?.adminRole,
-  });
-  if (!isPlatformAdmin) {
-    // Non-super: bỏ qua X-Tenant-Id (chống spoof escalate)
-    if (req.headers['x-tenant-id'] || req.query.tenant_id || req.query.tenantId) {
-      req.ignoredTenantHeader = true;
-    }
-    return;
-  }
+  const isPlatformAdmin =
+    req.user?.id === 'admin' || req.user?.adminRole === 'SUPER_ADMIN';
+  if (!isPlatformAdmin) return;
 
   const raw =
     req.headers['x-tenant-id'] ||
@@ -344,6 +328,8 @@ async function applyTenantScopeIfAny(req) {
   }
 
   const mongoose = require('mongoose');
+  // Soft-ignore: tenant cũ trong localStorage / ID sai không được làm sập toàn bộ API (400 spam).
+  // Client sẽ tự xóa selected_tenant_id khi nhận header gợi ý.
   if (!mongoose.Types.ObjectId.isValid(String(raw))) {
     logger.warn({ raw }, '[Tenant] ignore invalid X-Tenant-Id');
     req.tenant = null;
@@ -355,24 +341,30 @@ async function applyTenantScopeIfAny(req) {
   const Tenant = require('../models/Tenant');
   const tenantService = require('../services/tenantService');
   const tenant = await Tenant.findById(raw).lean();
-  if (!tenant) {
-    logger.warn({ raw }, '[Tenant] missing tenant');
+  if (!tenant || tenant.status === 'suspended') {
+    logger.warn({ raw, status: tenant?.status }, '[Tenant] ignore missing/suspended tenant');
     req.tenant = null;
     req.tenantScope = null;
     req.ignoredInvalidTenant = String(raw);
     return;
   }
-  if (tenant.status === 'suspended') {
-    const err = new Error('INVALID_TENANT');
-    err.code = 'INVALID_TENANT';
-    err.status = 400;
-    throw err;
-  }
 
   const branchIds = await tenantService.resolveBranchIdsForTenant(tenant._id);
   req.tenant = tenant;
   req.tenantScope = { tenantId: tenant._id, branchIds };
-  req.branchFilter = mergeTenantIntoBranchFilter(req.branchFilter || {}, branchIds);
+
+  const idStrs = branchIds.map((id) => String(id));
+  if (!req.branchFilter) req.branchFilter = {};
+
+  if (req.branchFilter.branchId && !req.branchFilter.branchId.$in) {
+    if (!idStrs.includes(String(req.branchFilter.branchId))) {
+      req.branchFilter = { branchId: null };
+    }
+  } else if (!req.branchFilter.branchId) {
+    req.branchFilter = {
+      branchId: { $in: branchIds.length ? branchIds : [null] },
+    };
+  }
 }
 
 /**

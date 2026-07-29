@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {

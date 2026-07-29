@@ -32,12 +32,6 @@ const ReportDefinition = require('../models/ReportDefinition');
 const Tenant = require('../models/Tenant');
 const FeedPost = require('../models/FeedPost');
 const SepayWebhookEvent = require('../models/SepayWebhookEvent');
-const AuditLog = require('../models/AuditLog');
-const DomainOutbox = require('../models/DomainOutbox');
-const BranchCodeCounter = require('../models/BranchCodeCounter');
-const PasswordProvisionLog = require('../models/PasswordProvisionLog');
-const NotificationDelivery = require('../models/NotificationDelivery');
-const TeacherAssignmentSegment = require('../models/TeacherAssignmentSegment');
 
 async function ensureIndexes() {
   try {
@@ -73,12 +67,6 @@ async function ensureIndexes() {
       Tenant.syncIndexes(),
       FeedPost.syncIndexes(),
       SepayWebhookEvent.syncIndexes(),
-      AuditLog.syncIndexes(),
-      DomainOutbox.syncIndexes(),
-      BranchCodeCounter.syncIndexes(),
-      PasswordProvisionLog.syncIndexes(),
-      NotificationDelivery.syncIndexes(),
-      TeacherAssignmentSegment.syncIndexes(),
     ]);
     console.log('✅ MongoDB indexes đã đồng bộ');
   } catch (err) {

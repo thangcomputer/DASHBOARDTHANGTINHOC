@@ -116,8 +116,6 @@ router.get('/revenue', guard, async (req, res) => {
       data: {
         period,
         dateRange: { from: start, to: end },
-        /** Phase 14: nguồn enrollment — không phải Ledger SoT */
-        source: 'operational_enrollment',
         totalRevenue,
         prevRevenue,
         growthPct,
@@ -127,7 +125,6 @@ router.get('/revenue', guard, async (req, res) => {
         paymentCount: current.paymentCount || 0,
         byBranch,
         timeSeries,
-        note: 'Dùng GET /api/analytics/kpi để xem financial.ledgerNet tách biệt',
       },
     });
   } catch (err) {
@@ -247,52 +244,6 @@ router.get('/branches', guard, async (req, res) => {
     return res.json({ success: true, data: result.sort((a, b) => b.revenue - a.revenue) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ─── Phase 14: KPI tách operational vs financial ─────────────────────────────
-router.get('/kpi', guard, async (req, res) => {
-  try {
-    const { buildDashboardKpis } = require('../services/dashboardKpiService');
-    const baseFilter = buildBaseFilter(req, req.query.branchId);
-    const data = await buildDashboardKpis({
-      branchFilter: baseFilter,
-      branchId: baseFilter.branchId || null,
-      from: req.query.from || null,
-      to: req.query.to || null,
-    });
-    return res.json({ success: true, data });
-  } catch (err) {
-    logger.error('[ANALYTICS] kpi error:', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-router.get('/queue-metrics', guard, async (req, res) => {
-  try {
-    const { getQueueMetrics } = require('../services/dashboardKpiService');
-    const data = await getQueueMetrics();
-    return res.json({ success: true, data });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-router.post('/audit/archive', guard, async (req, res) => {
-  try {
-    const role = String(req.user?.role || '').toLowerCase();
-    if (role !== 'admin' && role !== 'staff') {
-      return res.status(403).json({ success: false, message: 'Không có quyền archive audit' });
-    }
-    const { archiveOldAuditLogs } = require('../services/dashboardKpiService');
-    const result = await archiveOldAuditLogs({
-      olderThanDays: req.body?.olderThanDays || 90,
-      limit: req.body?.limit || 5000,
-    });
-    return res.json({ success: true, data: result });
-  } catch (err) {
-    logger.error('[ANALYTICS] audit archive:', err);
-    return res.status(500).json({ success: false, message: err.message });
   }
 });
 

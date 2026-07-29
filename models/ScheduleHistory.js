@@ -6,12 +6,11 @@ const mongoose = require('mongoose');
  * Dùng để Admin theo dõi hành vi hủy lịch của Giảng viên.
  */
 const scheduleHistorySchema = new mongoose.Schema({
-  // Lịch học liên quan (null khi log tổng hợp TEACHER_REASSIGNED)
+  // Lịch học liên quan
   scheduleId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Schedule',
-    default: null,
-    index: true,
+    required: true,
   },
 
   // Ai thực hiện
@@ -29,7 +28,7 @@ const scheduleHistorySchema = new mongoose.Schema({
   // Hành động
   action: {
     type: String,
-    enum: ['CREATED', 'CANCELLED', 'UPDATED', 'COMPLETED', 'TEACHER_REASSIGNED'],
+    enum: ['CREATED', 'CANCELLED', 'UPDATED', 'COMPLETED'],
     required: true,
   },
 

@@ -42,14 +42,11 @@ async function resolveEnrollmentExamSubjects({ courseName, courseId }) {
   const { getCachedSettings } = require('./settingsCache');
   let course = null;
   if (courseId && mongoose.Types.ObjectId.isValid(courseId)) {
-    course = await Course.findOne({ _id: courseId, deletedAt: null }).lean();
+    course = await Course.findById(courseId).lean();
   }
   if (!course && courseName) {
     const escaped = String(courseName).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    course = await Course.findOne({
-      name: new RegExp(`^${escaped}$`, 'i'),
-      deletedAt: null,
-    }).lean();
+    course = await Course.findOne({ name: new RegExp(`^${escaped}$`, 'i') }).lean();
   }
   const settings = await getCachedSettings();
   const custom = settings?.examSubjectsCustomRaw;
