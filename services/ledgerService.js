@@ -111,6 +111,25 @@ async function settlePayment({
     postedByRole: actor.role || '',
   });
 
+  // Trùng idempotencyKey chỉ OK khi cùng HV + số tiền + cùng enrollment (nếu đang gắn enrollment).
+  // Tránh: đăng ký lại khóa / key cũ không enrollmentId → không ghi PAYMENT mới nhưng enrollment vẫn paid.
+  if (!created && entry) {
+    const sameStudent = String(entry.studentId || '') === String(student?._id || '');
+    const sameAmt = Math.abs(Number(entry.amount) || 0) === amt;
+    const wantEnr = enrollmentId ? String(enrollmentId) : '';
+    const gotEnr = entry.enrollmentId ? String(entry.enrollmentId) : '';
+    const sameType = entry.type === 'payment' && entry.status === 'posted';
+    const sameEnr = wantEnr ? gotEnr === wantEnr : true;
+    if (!(sameStudent && sameAmt && sameType && sameEnr)) {
+      const err = new Error(
+        'Ledger idempotency trùng nhưng khác enrollment/số tiền — từ chối ghi im lặng',
+      );
+      err.status = 409;
+      err.code = 'LEDGER_IDEMPOTENCY_COLLISION';
+      throw err;
+    }
+  }
+
   if (created) {
     try {
       await writeAudit({
@@ -425,17 +444,90 @@ async function listLedgerEntries({
 }
 
 /**
+ * Ghi PAYMENT còn thiếu cho enrollment đã paid (active) — thường gặp sau đăng ký lại
+ * khi settlePayment trả created:false do trùng idempotency mà UI vẫn giữ paid + HĐ.
+ * Chỉ match theo enrollmentId (không soft-match courseName — tránh gắn nhầm payment khóa đã hủy).
+ */
+async function healOrphanEnrollmentPayments(student) {
+  if (!student?._id) return { healed: 0 };
+  const enrollments = Array.isArray(student.enrollments) ? student.enrollments : [];
+  const paidActive = enrollments.filter((e) => {
+    const st = String(e.status || 'active');
+    if (st === 'cancelled' || st === 'refunded') return false;
+    const paid = e.paid === true || e.paid === 'Đã đóng phí' || e.paid === 'true' || e.paid === 1;
+    return paid && (Number(e.price) || 0) > 0 && e._id;
+  });
+  if (!paidActive.length) return { healed: 0 };
+
+  const payments = await LedgerEntry.find({
+    studentId: student._id,
+    type: 'payment',
+    status: 'posted',
+  }).select('enrollmentId amount').lean();
+
+  const covered = new Set(
+    payments
+      .map((p) => String(p.enrollmentId || '').trim())
+      .filter(Boolean),
+  );
+
+  let healed = 0;
+  for (const enr of paidActive) {
+    const enrId = String(enr._id);
+    if (covered.has(enrId)) continue;
+    const amount = Number(enr.price) || 0;
+    try {
+      const { created } = await settlePayment({
+        student,
+        amount,
+        enrollmentId: enrId,
+        courseName: enr.courseName || '',
+        source: 'heal_orphan_enrollment',
+        sourceRef: `heal:${student._id}:${enrId}`,
+        idempotencyKey: `payment:heal:${student._id}:${enrId}`,
+        note: `Heal PAYMENT thiếu cho khóa ${enr.courseName || enrId}`,
+      });
+      if (created) {
+        healed += 1;
+        covered.add(enrId);
+        logger.warn(
+          '[ledger] healed orphan PAYMENT student=%s enrollment=%s amount=%s',
+          student._id,
+          enrId,
+          amount,
+        );
+      }
+    } catch (err) {
+      logger.error(
+        '[ledger] heal orphan PAYMENT failed student=%s enrollment=%s: %s',
+        student._id,
+        enrId,
+        err.message,
+      );
+    }
+  }
+  return { healed };
+}
+
+/**
  * Student Finance Card — 5 chỉ tiêu TO-BE (+ outstanding).
  */
 async function getStudentFinanceCard(studentId) {
   const Student = require('../models/Student');
   const student = await Student.findById(studentId)
-    .select('name enrollments branchId paid paidAmount course price')
+    .select('name enrollments branchId paid paidAmount course price tenantId')
     .lean();
   if (!student) {
     const err = new Error('Không tìm thấy học viên');
     err.status = 404;
     throw err;
+  }
+
+  // Tự heal trước khi cộng KPI — đóng lệch "HĐ có / enrollment paid / Ledger thiếu"
+  try {
+    await healOrphanEnrollmentPayments(student);
+  } catch (err) {
+    logger.warn('[ledger] heal on finance card: %s', err.message);
   }
 
   const enrollments = Array.isArray(student.enrollments) ? student.enrollments : [];
@@ -453,10 +545,10 @@ async function getStudentFinanceCard(studentId) {
     : (student.paid ? 0 : (Number(student.price) || 0));
 
   const ledger = await sumFinancialRevenue({ studentId });
-  const paidCashIn = ledger.payments || 0;
+  const ledgerPayments = ledger.payments || 0;
   const refundedCashOut = ledger.refunds || 0;
-  const netCollected = Math.max(0, paidCashIn - refundedCashOut);
-  // Tiền đã thu còn gắn khóa hiệu lực (hủy ≠ vẫn "đã thanh toán")
+  const netCollected = Math.max(0, ledgerPayments - refundedCashOut);
+  // Tiền đã thu còn gắn khóa hiệu lực (hủy ≠ vẫn "đã thanh toán" trên card)
   const activePaidCash = enrollments.length
     ? enrollments
       .filter((e) => {
@@ -483,7 +575,7 @@ async function getStudentFinanceCard(studentId) {
     /** UI "Đã thanh toán" = chỉ khóa còn hiệu lực đã thu (không tính khóa đã hủy) */
     paidCashIn: activePaidCash,
     /** Gross ledger (mọi PAYMENT từng ghi) — đối soát */
-    ledgerPayments: paidCashIn,
+    ledgerPayments,
     refundedCashOut,
     activeCourseValue,
     netCollected,
@@ -912,6 +1004,7 @@ module.exports = {
   voidLedgerEntry,
   listLedgerEntries,
   getStudentFinanceCard,
+  healOrphanEnrollmentPayments,
   sumFinancialRevenue,
   revenueByCourseFromLedger,
   listNetRevenueByDay,

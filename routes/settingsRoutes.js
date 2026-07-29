@@ -917,16 +917,16 @@ router.post('/reset-data', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SE
     }
 
     // 2. Thực hiện xóa theo tùy chọn
+    // Trung tâm kiểm soát đã xác thực Super Admin + chuỗi XOA_DU_LIEU + mật khẩu
+    // → cho phép wipe tài chính (không phụ thuộc FINANCE_ALLOW_HARD_DELETE;
+    //   flag đó chỉ chặn hard-delete từng HĐ/phiếu qua API thường).
     const isAll = options.all === true;
 
     if ((isAll || options.finance) && process.env.NODE_ENV === 'production') {
-      const { allowHardDeleteFinance } = require('../utils/financeFlags');
-      if (!allowHardDeleteFinance()) {
-        return res.status(405).json({
-          success: false,
-          message: 'Production: đặt FINANCE_ALLOW_HARD_DELETE=true để wipe tài chính (Ledger + Invoice + Transaction).',
-        });
-      }
+      logger.warn(
+        '[SETTINGS] Control Center finance wipe by %s — bypass FINANCE_ALLOW_HARD_DELETE gate',
+        userId,
+      );
     }
     
     // NHÓM: HỌC VIÊN

@@ -219,6 +219,42 @@ async function main() {
     card.paidCashIn === 0 && card.netCollected === PRICE_B,
     `paidCashIn=${card.paidCashIn} netLedger=${card.netCollected} active=${card.activeCourseValue}`);
 
+  // ─── 4b) Đăng ký lại khóa A (đã hủy) + thu → phải có PAYMENT mới, net = A+B ─
+  const reAddA = await mut('POST', `/api/students/${sid}/enrollments`, {
+    courseName: 'QA Excel Flow',
+    price: PRICE_A,
+    totalSessions: 12,
+    paid: true,
+    paymentMethod: 'cash',
+  });
+  st = await Student.findById(sid).lean();
+  const enrA2 = (st.enrollments || []).find(
+    (e) => e.status !== 'cancelled' && String(e.courseName).includes('Excel'),
+  );
+  pays = await LedgerEntry.find({ studentId: sid, type: 'payment', status: 'posted' }).lean();
+  const paySumRe = pays.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const payForA2 = pays.filter((p) => String(p.enrollmentId || '') === String(enrA2?._id || ''));
+  const netAfterRe = (await sumFinancialRevenue({ studentId: sid })).net;
+  card = await getStudentFinanceCard(sid);
+
+  ok('RE-01', 'Đăng ký lại Excel + thu → API OK + enrollment active',
+    (reAddA.status === 200 || reAddA.status === 201) && !!enrA2 && enrA2.paid === true,
+    `status=${reAddA.status} enrA2=${!!enrA2} paid=${enrA2?.paid}`);
+
+  ok('RE-02', 'Có PAYMENT gắn đúng enrollmentId khóa mới (không nuốt vào payment cũ)',
+    payForA2.length >= 1 && Number(payForA2[0].amount) === PRICE_A,
+    `payForA2=${payForA2.length} amount=${payForA2[0]?.amount} paySum=${paySumRe}`);
+
+  ok('RE-03', 'Net ledger = B (còn lại sau hoàn A) + A (đăng ký lại) = A+B',
+    netAfterRe === PRICE_A + PRICE_B,
+    `net=${netAfterRe} expect=${PRICE_A + PRICE_B}`);
+
+  ok('RE-04', 'Card: Đã TT = A (khóa đăng ký lại); net = A+B; còn đóng = giá C chưa thu',
+    card.paidCashIn === PRICE_A
+      && card.netCollected === PRICE_A + PRICE_B
+      && card.outstanding === 100000,
+    `paidCashIn=${card.paidCashIn} net=${card.netCollected} outstanding=${card.outstanding} active=${card.activeCourseValue}`);
+
   // ─── 5) Double-cancel A ──────────────────────────────────────────────────
   const cancelAgain = await mut('DELETE', `/api/students/${sid}/enrollments/${enrAId}`, {
     cancelReason: 'double',

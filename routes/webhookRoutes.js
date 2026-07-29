@@ -328,15 +328,21 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
         }
         try {
           const { settlePayment } = require('../services/ledgerService');
+          const list = updated.enrollments || [];
+          const primary = list.find((e) => e.isPrimary) || list[0];
+          const enrId = primary?._id ? String(primary._id) : '';
           await settlePayment({
             student: updated,
             amount,
             invoice: sepayInvoice,
+            enrollmentId: enrId,
             courseName: updated.course || '',
             source: 'sepay',
             sourceRef: sepayInvoice?.maHoaDon || gatewayTxnId || matchedRef,
-            // Cùng key primary với admin_pay → idempotent nếu claim race đã thắng trước
-            idempotencyKey: `payment:student:${updated._id}:primary`,
+            // Khớp admin_pay theo enrollment — tránh key :primary nuốt lần thu khóa đăng ký lại
+            idempotencyKey: enrId
+              ? `payment:student:${updated._id}:enr:${enrId}`
+              : `payment:student:${updated._id}:primary`,
             actor: { id: 'sepay', role: 'system' },
             note: String(body.content || '').slice(0, 300),
             reqMeta: { ip: req.ip, userAgent: 'sepay-webhook', branchId: updated.branchId },

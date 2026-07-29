@@ -638,14 +638,16 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
         note: `Thanh toán khi thêm học viên — ${courseName}`,
       });
       try {
+        const primaryEnr = student.enrollments?.[0];
         await settlePayment({
           student,
           amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
           invoice: createdInvoice,
+          enrollmentId: primaryEnr?._id ? String(primaryEnr._id) : '',
           courseName,
           source: 'student_create_paid',
           sourceRef: createdInvoice?.maHoaDon || `create:${student._id}`,
-          idempotencyKey: `payment:create:${student._id}:${createdInvoice?.maHoaDon || 'nohd'}`,
+          idempotencyKey: `payment:create:${student._id}:${primaryEnr?._id || createdInvoice?.maHoaDon || 'nohd'}`,
           actor: financeActor(req),
           note: 'Thanh toán khi thêm học viên',
           reqMeta: financeReqMeta(req, student),
@@ -1197,11 +1199,21 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
         student,
         amount: student.paidAmount || student.price,
         invoice,
+        enrollmentId: (() => {
+          const list = student.enrollments || [];
+          const primary = list.find((e) => e.isPrimary) || list[0];
+          return primary?._id ? String(primary._id) : '';
+        })(),
         courseName: student.course,
         source: 'admin_pay',
         sourceRef: maHD || `pay:${student._id}`,
-        // Key ổn định theo HV — idempotent nếu rematch cùng lần thu đầu
-        idempotencyKey: `payment:student:${student._id}:primary`,
+        // Key theo HV + enrollment primary — idempotent rematch cùng lần thu
+        idempotencyKey: (() => {
+          const list = student.enrollments || [];
+          const primary = list.find((e) => e.isPrimary) || list[0];
+          const enrId = primary?._id ? String(primary._id) : 'none';
+          return `payment:student:${student._id}:enr:${enrId}`;
+        })(),
         actor: financeActor(req),
         note,
         reqMeta: financeReqMeta(req, student),
@@ -1782,8 +1794,10 @@ router.post('/:id/enrollments', [authMiddleware, checkPermission(PERMISSIONS.MAN
           enrollmentId: String(lastEnr?._id || ''),
           courseName: resolvedName,
           source: 'enrollment_add_paid',
-          sourceRef: invoice?.maHoaDon || `add:${student._id}:${resolvedName}`,
-          idempotencyKey: `payment:enrollment_add:${student._id}:${lastEnr?._id || resolvedName}`,
+          sourceRef: invoice?.maHoaDon || `add:${student._id}:${lastEnr?._id || resolvedName}`,
+          idempotencyKey: lastEnr?._id
+            ? `payment:enrollment_add:${student._id}:${lastEnr._id}`
+            : `payment:enrollment_add:${student._id}:${invoice?.maHoaDon || 'nohd'}`,
           actor: financeActor(req),
           note: `Thêm khóa ${resolvedName}`,
           reqMeta: financeReqMeta(req, student),
