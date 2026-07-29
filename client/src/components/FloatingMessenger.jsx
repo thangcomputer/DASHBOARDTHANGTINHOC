@@ -2,11 +2,12 @@
  * Floating messenger — Facebook-style:
  * - Panel "Hỗ trợ đang online" mặc định
  * - Nhiều cửa sổ chat (tab) góc dưới phải, tối đa 3
- * - Đồng bộ toàn site qua FloatingMessengerContext + event cms:open-chat
+ * - Chat tại chỗ (không điều hướng Inbox) + gửi ảnh/file
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle, Maximize2,
+  ImagePlus, Paperclip, FileText, Loader2,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
@@ -14,20 +15,85 @@ import { useData } from '../context/DataContext';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { normalizeChatRole } from '../utils/chatConversationId';
+import { messagesAPI, resolveMediaUrl } from '../services/api';
+import { useToast } from '../utils/toast';
 
 const ROLE_LABEL = { admin: 'Admin', staff: 'NV', teacher: 'GV', student: 'HV' };
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i;
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 function isSupportPresence(u) {
   const role = normalizeChatRole(u?.role);
   return role === 'admin' || role === 'teacher' || String(u?.userId) === 'admin';
 }
 
+function isImageMessage(m) {
+  if (!m || m.isRecalled) return false;
+  if (m.messageType === 'image') return true;
+  if (m.messageType === 'file' && m.fileUrl && IMAGE_EXT_RE.test(`${m.fileName || ''} ${m.fileUrl || ''}`)) {
+    return true;
+  }
+  return false;
+}
+
+function MessageBubble({ m, mine }) {
+  if (m.isRecalled) {
+    return (
+      <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'} opacity-70 italic`}>
+        Tin nhắn đã thu hồi
+      </div>
+    );
+  }
+
+  if (isImageMessage(m) && m.fileUrl) {
+    return (
+      <div className={`cms-fm-bubble cms-fm-bubble--media ${mine ? 'is-mine' : 'is-theirs'}`}>
+        <a href={resolveMediaUrl(m.fileUrl)} target="_blank" rel="noreferrer" className="block">
+          <img
+            src={resolveMediaUrl(m.fileUrl)}
+            alt={m.fileName || 'Hình ảnh'}
+            className="cms-fm-img"
+          />
+        </a>
+        {m.content && m.content !== '[Hình ảnh]' && (
+          <p className="mt-1.5 whitespace-pre-wrap break-words px-0.5">{m.content}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (m.messageType === 'file' && m.fileUrl) {
+    return (
+      <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
+        <a
+          href={resolveMediaUrl(m.fileUrl)}
+          target="_blank"
+          rel="noreferrer"
+          className={`cms-fm-file ${mine ? 'is-mine' : ''}`}
+        >
+          <FileText size={16} className="shrink-0" />
+          <span className="truncate">{m.fileName || 'Tệp đính kèm'}</span>
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
+      <p className="whitespace-pre-wrap break-words">{m.content}</p>
+    </div>
+  );
+}
+
 function ChatWindow({
-  tab, active, meId, meName, meRole, messages, onClose, onMinimize, onFocus, onSend,
+  tab, active, meId, meName, meRole, messages, onClose, onMinimize, onFocus, onSend, onSendFile,
 }) {
   const [text, setText] = useState('');
+  const [uploading, setUploading] = useState(false);
   const endRef = useRef(null);
   const inputRef = useRef(null);
+  const imageRef = useRef(null);
+  const fileRef = useRef(null);
 
   useEffect(() => {
     if (!tab.minimized) endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -40,9 +106,21 @@ function ChatWindow({
   const submit = (e) => {
     e?.preventDefault?.();
     const body = text.trim();
-    if (!body) return;
+    if (!body || uploading) return;
     onSend(tab, body);
     setText('');
+  };
+
+  const pickFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || uploading) return;
+    setUploading(true);
+    try {
+      await onSendFile(tab, file);
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (tab.minimized) {
@@ -105,8 +183,8 @@ function ChatWindow({
           messages.map((m) => {
             const mine = String(m.senderId) === String(meId);
             return (
-              <div key={m.id} className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
-                <p className="whitespace-pre-wrap break-words">{m.content}</p>
+              <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                <MessageBubble m={m} mine={mine} />
               </div>
             );
           })
@@ -115,15 +193,44 @@ function ChatWindow({
       </div>
 
       <form className="cms-fm-window__foot" onSubmit={submit}>
+        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickFile} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt,image/*"
+          className="hidden"
+          onChange={pickFile}
+        />
+        <button
+          type="button"
+          className="cms-fm-attach"
+          disabled={uploading}
+          onClick={() => imageRef.current?.click()}
+          title="Gửi ảnh"
+          aria-label="Gửi ảnh"
+        >
+          <ImagePlus size={16} />
+        </button>
+        <button
+          type="button"
+          className="cms-fm-attach"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          title="Gửi file"
+          aria-label="Gửi file"
+        >
+          <Paperclip size={16} />
+        </button>
         <input
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Nhập tin nhắn..."
+          placeholder={uploading ? 'Đang tải file…' : 'Nhập tin nhắn...'}
+          disabled={uploading}
           className="cms-fm-input"
         />
-        <button type="submit" disabled={!text.trim()} className="cms-fm-send" aria-label="Gửi">
-          <Send size={15} />
+        <button type="submit" disabled={!text.trim() || uploading} className="cms-fm-send" aria-label="Gửi">
+          {uploading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
         </button>
       </form>
     </div>
@@ -133,6 +240,7 @@ function ChatWindow({
 export default function FloatingMessenger({ session, role }) {
   const location = useLocation();
   const isInbox = location.pathname.includes('/inbox');
+  const toast = useToast();
   const { onlineUsers } = useSocket() || {};
   const { sendMessage, getMessages } = useData();
   const {
@@ -152,7 +260,6 @@ export default function FloatingMessenger({ session, role }) {
       const uid = String(u.userId || '');
       if (!uid || uid === meId) continue;
       const roleKey = normalizeChatRole(u.role);
-      // Học viên/GV: ưu tiên admin + GV; admin vẫn thấy GV online
       const key = `${roleKey}_${uid}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -171,11 +278,6 @@ export default function FloatingMessenger({ session, role }) {
     return list;
   }, [onlineUsers, meId]);
 
-  // Auto-open chat khi nhận tin từ người chưa có tab
-  useEffect(() => {
-    // no-op here — onMessageReceive handled in DataContext; tabs stay user-driven
-  }, []);
-
   if (isInbox || !meId) return null;
 
   const handleSend = async (tab, content) => {
@@ -188,13 +290,42 @@ export default function FloatingMessenger({ session, role }) {
       receiverName: tab.user.name,
       receiverRole: tab.user.role,
       content,
+      messageType: 'text',
       isGroup: false,
     });
   };
 
+  const handleSendFile = async (tab, file) => {
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      toast.error('File quá lớn (tối đa 5MB)');
+      return;
+    }
+    try {
+      const uploadRes = await messagesAPI.uploadMessageFile(file);
+      if (!uploadRes?.success) throw new Error(uploadRes?.message || 'Upload thất bại');
+      const isImage = file.type.startsWith('image/');
+      await sendMessage({
+        conversationId: tab.id,
+        senderId: meId,
+        senderName: meName,
+        senderRole: meRole,
+        receiverId: tab.user.id,
+        receiverName: tab.user.name,
+        receiverRole: tab.user.role,
+        content: isImage ? '[Hình ảnh]' : `Đã gửi tệp: ${file.name}`,
+        messageType: isImage ? 'image' : 'file',
+        fileUrl: uploadRes.url,
+        fileName: file.name,
+        isGroup: false,
+      });
+    } catch (err) {
+      toast.error(err.message || 'Gửi file thất bại');
+    }
+  };
+
   return (
     <div className="cms-fm-root" aria-live="polite">
-      {/* Cửa sổ chat (tab) */}
       <div className="cms-fm-chats">
         {[...tabs].reverse().map((tab) => (
           <ChatWindow
@@ -209,11 +340,11 @@ export default function FloatingMessenger({ session, role }) {
             onMinimize={toggleMinimize}
             onFocus={focusChat}
             onSend={handleSend}
+            onSendFile={handleSendFile}
           />
         ))}
       </div>
 
-      {/* Panel hỗ trợ + FAB */}
       <div className="cms-fm-dock">
         {supportOpen ? (
           <div className="cms-fm-support">

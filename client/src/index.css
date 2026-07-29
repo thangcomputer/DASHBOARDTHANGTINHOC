@@ -617,11 +617,13 @@
   }
   .cms-fm-window__body::-webkit-scrollbar { display: none; }
   .cms-fm-window__foot {
-    @apply flex items-center gap-1.5 px-2.5 py-2 border-t border-slate-100 bg-white shrink-0;
+    @apply flex items-center gap-1 px-2 py-2 border-t border-slate-100 bg-white shrink-0;
   }
-
+  .cms-fm-attach {
+    @apply w-9 h-9 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-600 flex items-center justify-center transition shrink-0 disabled:opacity-40;
+  }
   .cms-fm-input {
-    @apply flex-1 min-w-0 h-10 px-3 rounded-xl bg-slate-100 border-0 text-[13px] font-medium text-slate-800 outline-none focus:ring-2 focus:ring-red-500/20;
+    @apply flex-1 min-w-0 h-10 px-3 rounded-xl bg-slate-100 border-0 text-[13px] font-medium text-slate-800 outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-60;
   }
   .cms-fm-send {
     @apply w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center disabled:opacity-40 hover:bg-red-700 transition shrink-0;
@@ -633,11 +635,23 @@
   .cms-fm-bubble {
     @apply max-w-[85%] text-[13px] font-medium leading-snug px-3 py-2 rounded-2xl;
   }
+  .cms-fm-bubble--media {
+    @apply p-1.5 overflow-hidden;
+  }
   .cms-fm-bubble.is-mine {
     @apply ml-auto bg-red-600 text-white rounded-br-md;
   }
   .cms-fm-bubble.is-theirs {
     @apply mr-auto bg-white text-slate-800 border border-slate-100 rounded-bl-md;
+  }
+  .cms-fm-img {
+    @apply block w-full max-h-48 object-cover rounded-xl;
+  }
+  .cms-fm-file {
+    @apply flex items-center gap-2 text-[12px] font-bold underline-offset-2 hover:underline;
+  }
+  .cms-fm-bubble.is-mine .cms-fm-file {
+    @apply text-white;
   }
 
   .cms-fm-pill {
