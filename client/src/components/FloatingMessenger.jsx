@@ -86,7 +86,8 @@ function MessageBubble({ m, mine }) {
 }
 
 function ChatWindow({
-  tab, active, meId, meName, meRole, messages, onClose, onMinimize, onFocus, onSend, onSendFile,
+  tab, active, meId, meName, meRole, messages, unread = 0,
+  onClose, onMinimize, onFocus, onSend, onSendFile,
 }) {
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -137,7 +138,13 @@ function ChatWindow({
             alt=""
             className="w-9 h-9 rounded-full object-cover"
           />
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+          {unread > 0 ? (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white">
+              {unread > 99 ? '99+' : unread}
+            </span>
+          ) : (
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+          )}
         </span>
         <span className="text-xs font-bold text-slate-800 truncate max-w-[7rem]">{tab.user.name}</span>
         <Maximize2 size={12} className="text-slate-400 shrink-0" />
@@ -241,8 +248,8 @@ export default function FloatingMessenger({ session, role }) {
   const location = useLocation();
   const isInbox = location.pathname.includes('/inbox');
   const toast = useToast();
-  const { onlineUsers } = useSocket() || {};
-  const { sendMessage, getMessages } = useData();
+  const { onlineUsers, onMessageReceive } = useSocket() || {};
+  const { sendMessage, getMessages, getConversations, markMessagesRead } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
     openChat, closeChat, toggleMinimize, focusChat,
@@ -251,6 +258,25 @@ export default function FloatingMessenger({ session, role }) {
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';
   const meRole = normalizeChatRole(role || session?.role || 'student');
+
+  const conversations = useMemo(
+    () => (meId ? (getConversations(meId) || []) : []),
+    [getConversations, meId],
+  );
+
+  const unreadTotal = useMemo(
+    () => conversations.reduce((sum, c) => sum + (Number(c.unread) || 0), 0),
+    [conversations],
+  );
+
+  const unreadByPeer = useMemo(() => {
+    const map = new Map();
+    for (const c of conversations) {
+      if (!c?.user?.id || !(c.unread > 0) || c.isGroup) continue;
+      map.set(`${normalizeChatRole(c.user.role)}_${c.user.id}`, Number(c.unread) || 0);
+    }
+    return map;
+  }, [conversations]);
 
   const supportOnline = useMemo(() => {
     const seen = new Set();
@@ -277,6 +303,44 @@ export default function FloatingMessenger({ session, role }) {
     });
     return list;
   }, [onlineUsers, meId]);
+
+  // Tin đến → toast + mở cửa sổ chat nổi (không vào Inbox)
+  useEffect(() => {
+    if (!onMessageReceive || !meId || isInbox) return undefined;
+    return onMessageReceive((data) => {
+      if (!data) return;
+      if (String(data.senderId) === meId) return;
+      // Admin mailbox: staff nhận tin gửi tới 'admin'
+      const forMe = String(data.receiverId) === meId
+        || (meRole === 'admin' && String(data.receiverId) === 'admin');
+      if (!forMe && !data.isGroup) return;
+
+      const peer = {
+        id: String(data.senderId),
+        name: data.senderName || 'Người dùng',
+        role: normalizeChatRole(data.senderRole || 'student'),
+      };
+      openChat(peer);
+
+      const preview = data.messageType === 'image'
+        ? 'Đã gửi một hình ảnh'
+        : data.messageType === 'file'
+          ? `File: ${data.fileName || 'đính kèm'}`
+          : String(data.content || '').slice(0, 80);
+      toast.info(`${peer.name}: ${preview || 'Tin nhắn mới'}`);
+    });
+  }, [onMessageReceive, meId, meRole, isInbox, openChat, toast]);
+
+  // Đánh dấu đã đọc khi đang xem cửa sổ chat (không thu nhỏ)
+  useEffect(() => {
+    if (!meId || !activeTabId) return;
+    const tab = tabs.find((t) => t.id === activeTabId);
+    if (!tab || tab.minimized) return;
+    const unread = conversations.find((c) => c.id === activeTabId)?.unread || 0;
+    if (unread > 0) {
+      markMessagesRead?.(activeTabId, meId);
+    }
+  }, [activeTabId, tabs, conversations, meId, markMessagesRead]);
 
   if (isInbox || !meId) return null;
 
@@ -324,25 +388,38 @@ export default function FloatingMessenger({ session, role }) {
     }
   };
 
+  const handleFocus = (convId) => {
+    focusChat(convId);
+    if (meId) markMessagesRead?.(convId, meId);
+  };
+
+  const badgeCount = unreadTotal > 0 ? unreadTotal : 0;
+  const badgeLabel = badgeCount > 99 ? '99+' : String(badgeCount);
+
   return (
     <div className="cms-fm-root" aria-live="polite">
       <div className="cms-fm-chats">
-        {[...tabs].reverse().map((tab) => (
-          <ChatWindow
-            key={tab.id}
-            tab={tab}
-            active={activeTabId === tab.id}
-            meId={meId}
-            meName={meName}
-            meRole={meRole}
-            messages={getMessages(tab.id) || []}
-            onClose={closeChat}
-            onMinimize={toggleMinimize}
-            onFocus={focusChat}
-            onSend={handleSend}
-            onSendFile={handleSendFile}
-          />
-        ))}
+        {[...tabs].reverse().map((tab) => {
+          const peerKey = `${normalizeChatRole(tab.user.role)}_${tab.user.id}`;
+          const tabUnread = unreadByPeer.get(peerKey) || 0;
+          return (
+            <ChatWindow
+              key={tab.id}
+              tab={tab}
+              active={activeTabId === tab.id}
+              meId={meId}
+              meName={meName}
+              meRole={meRole}
+              messages={getMessages(tab.id) || []}
+              unread={tabUnread}
+              onClose={closeChat}
+              onMinimize={toggleMinimize}
+              onFocus={handleFocus}
+              onSend={handleSend}
+              onSendFile={handleSendFile}
+            />
+          );
+        })}
       </div>
 
       <div className="cms-fm-dock">
@@ -353,6 +430,9 @@ export default function FloatingMessenger({ session, role }) {
                 <p className="text-sm font-black text-slate-800 flex items-center gap-2">
                   <Headphones size={15} className="text-emerald-600 shrink-0" />
                   Hỗ trợ đang online
+                  {unreadTotal > 0 && (
+                    <span className="cms-fm-unread-pill">{badgeLabel} mới</span>
+                  )}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
                   Bấm để chat ngay — không cần kết bạn
@@ -368,6 +448,47 @@ export default function FloatingMessenger({ session, role }) {
               </button>
             </div>
             <div className="cms-fm-support__body">
+              {/* Hội thoại chưa đọc (kể cả người offline) */}
+              {conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup).length > 0 && (
+                <div className="px-2 pb-2 mb-1 border-b border-slate-50">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-red-500 px-1 mb-1">
+                    Tin chưa đọc
+                  </p>
+                  <ul className="space-y-0.5">
+                    {conversations
+                      .filter((c) => (c.unread || 0) > 0 && !c.isGroup)
+                      .slice(0, 8)
+                      .map((c) => (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openChat(c.user);
+                              markMessagesRead?.(c.id, meId);
+                            }}
+                            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-red-50 text-left transition-colors"
+                          >
+                            <span className="relative shrink-0">
+                              <img
+                                src={resolveAvatarUrl({ role: c.user.role, name: c.user.name })}
+                                alt=""
+                                className="w-9 h-9 rounded-full object-cover"
+                              />
+                              <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white">
+                                {c.unread > 99 ? '99+' : c.unread}
+                              </span>
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-bold text-slate-800 truncate">{c.user.name}</span>
+                              <span className="block text-[11px] text-slate-500 truncate">{c.lastMessage}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+
               {supportOnline.length === 0 ? (
                 <div className="px-3 py-8 text-center text-xs text-slate-400 font-medium">
                   <Circle size={28} className="mx-auto mb-2 text-slate-200" />
@@ -375,33 +496,42 @@ export default function FloatingMessenger({ session, role }) {
                 </div>
               ) : (
                 <ul className="space-y-0.5">
-                  {supportOnline.map((p) => (
-                    <li key={`${p.role}_${p.id}`}>
-                      <button
-                        type="button"
-                        onClick={() => openChat(p)}
-                        className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-slate-50 text-left transition-colors group"
-                      >
-                        <span className="relative shrink-0">
-                          <img
-                            src={resolveAvatarUrl({ role: p.role, name: p.name })}
-                            alt=""
-                            className="w-9 h-9 rounded-full object-cover"
-                          />
-                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] font-bold text-slate-800 truncate group-hover:text-red-600">
-                            {p.name}
+                  {supportOnline.map((p) => {
+                    const peerUnread = unreadByPeer.get(`${p.role}_${p.id}`) || 0;
+                    return (
+                      <li key={`${p.role}_${p.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => openChat(p)}
+                          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-slate-50 text-left transition-colors group"
+                        >
+                          <span className="relative shrink-0">
+                            <img
+                              src={resolveAvatarUrl({ role: p.role, name: p.name })}
+                              alt=""
+                              className="w-9 h-9 rounded-full object-cover"
+                            />
+                            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
                           </span>
-                          <span className="block text-[11px] text-slate-500 font-medium">
-                            {ROLE_LABEL[p.role] || p.role} · Đang hoạt động
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13px] font-bold text-slate-800 truncate group-hover:text-red-600">
+                              {p.name}
+                            </span>
+                            <span className="block text-[11px] text-slate-500 font-medium">
+                              {ROLE_LABEL[p.role] || p.role} · Đang hoạt động
+                            </span>
                           </span>
-                        </span>
-                        <MessageCircle size={14} className="text-slate-300 group-hover:text-red-500 shrink-0" />
-                      </button>
-                    </li>
-                  ))}
+                          {peerUnread > 0 ? (
+                            <span className="min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-red-600 text-[10px] font-black text-white flex items-center justify-center">
+                              {peerUnread > 99 ? '99+' : peerUnread}
+                            </span>
+                          ) : (
+                            <MessageCircle size={14} className="text-slate-300 group-hover:text-red-500 shrink-0" />
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -415,7 +545,7 @@ export default function FloatingMessenger({ session, role }) {
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => focusChat(t.id)}
+                      onClick={() => handleFocus(t.id)}
                       className={`cms-fm-tab-chip ${activeTabId === t.id ? 'is-active' : ''}`}
                     >
                       {t.user.name.split(' ').slice(-1)[0] || t.user.name}
@@ -431,13 +561,13 @@ export default function FloatingMessenger({ session, role }) {
           type="button"
           onClick={() => setSupportOpen((v) => !v)}
           className="cms-fm-fab"
-          title={supportOpen ? 'Thu gọn hỗ trợ' : 'Mở hỗ trợ online'}
+          title={supportOpen ? 'Thu gọn hỗ trợ' : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : 'Mở hỗ trợ online')}
           aria-label={supportOpen ? 'Thu gọn hỗ trợ' : 'Mở hỗ trợ online'}
           aria-expanded={supportOpen}
         >
           {supportOpen ? <X size={22} /> : <MessageSquare size={22} />}
-          {!supportOpen && supportOnline.length > 0 && (
-            <span className="cms-fm-fab__badge">{supportOnline.length}</span>
+          {!supportOpen && unreadTotal > 0 && (
+            <span className="cms-fm-fab__badge is-unread">{badgeLabel}</span>
           )}
         </button>
       </div>
