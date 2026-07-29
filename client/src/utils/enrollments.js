@@ -105,6 +105,11 @@ export function getClientEnrollments(student) {
   }
   return [];
 }
+
+/** Chỉ khóa đang hoạt động (ẩn khóa đã hủy khỏi danh sách ngoài / gán GV / học phí list). */
+export function getActiveClientEnrollments(student) {
+  return getClientEnrollments(student).filter((e) => e?.status !== 'cancelled');
+}
 export function expandStudentsForTeacher(students, teacherId) {
   const tid = String(teacherId); const result = [];
   (students || []).filter(Boolean).forEach((student) => {
@@ -179,7 +184,7 @@ export function expandFinanceEnrollmentRows(students) {
   const rows = [];
   (students || []).forEach((student) => {
     const sid = student.id || student._id;
-    const list = getClientEnrollments(student);
+    const list = getActiveClientEnrollments(student);
     if (list.length === 0) {
       rows.push({
         key: String(sid),

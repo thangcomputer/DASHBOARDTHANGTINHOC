@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Loader2, MapPin, Globe, Building2,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
-import { getClientEnrollments } from '../../../utils/enrollments';
+import { getActiveClientEnrollments } from '../../../utils/enrollments';
 import { isTeacherActive } from '../../../constants/teacherStatus';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { apiFetch } from '../../../services/api';
@@ -434,7 +434,7 @@ export default function AdminStudentsTab() {
             <p className="text-xs text-slate-400 mt-1">Thử đổi bộ lọc hoặc từ khóa</p>
           </div>
         ) : filteredStudents.map((s) => {
-          const enrollments = getClientEnrollments(s);
+          const enrollments = getActiveClientEnrollments(s);
           const hasMultiCourse = enrollments.length > 1;
           const primaryEnr = enrollments.find((e) => e.isPrimary) || enrollments[0];
           const teacherVal = (() => {
@@ -480,11 +480,11 @@ export default function AdminStudentsTab() {
 
                   <div className="mt-2 space-y-1.5">
                     <p className="text-sm font-semibold text-sky-700 leading-snug break-words">
-                      {s.course}
+                      {primaryEnr?.courseName || primaryEnr?.name || s.course}
                     </p>
-                    {(s.courses?.length > 1 || s.enrollments?.length > 1) && (
+                    {enrollments.length > 1 && (
                       <p className="text-xs font-semibold text-sky-600">
-                        +{(s.courses || s.enrollments).length - 1} khóa khác
+                        +{enrollments.length - 1} khóa khác
                       </p>
                     )}
                     <ModeBranchBadges s={s} safeBranches={safeBranches} />
@@ -591,7 +591,7 @@ export default function AdminStudentsTab() {
                 </td>
               </tr>
             ) : filteredStudents.map((s) => {
-              const enrollments = getClientEnrollments(s);
+              const enrollments = getActiveClientEnrollments(s);
               const hasMultiCourse = enrollments.length > 1;
               const primaryEnr = enrollments.find((e) => e.isPrimary) || enrollments[0];
               const teacherVal = (() => {
@@ -622,10 +622,12 @@ export default function AdminStudentsTab() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm font-medium text-slate-700 leading-tight block truncate max-w-[180px]">{s.course}</span>
-                    {(s.courses?.length > 1 || s.enrollments?.length > 1) && (
+                    <span className="text-sm font-medium text-slate-700 leading-tight block truncate max-w-[180px]">
+                      {primaryEnr?.courseName || primaryEnr?.name || s.course}
+                    </span>
+                    {enrollments.length > 1 && (
                       <span className="text-xs font-semibold text-sky-600 mt-0.5 block">
-                        +{(s.courses || s.enrollments).length - 1} khóa khác
+                        +{enrollments.length - 1} khóa khác
                       </span>
                     )}
                     <div className="mt-1.5">

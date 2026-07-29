@@ -554,7 +554,10 @@ export default function StudentDetailModal({ studentId, onClose }) {
                     </span>
                     {(data.student.courses?.length > 1 || data.student.enrollments?.length > 1) && (
                       <span className="px-2.5 py-1 bg-sky-50 text-sky-700 rounded-lg text-[11px] font-semibold border border-sky-100 shrink-0">
-                        {(data.student.courses || data.student.enrollments).length} khóa học
+                        {enrollments.filter((e) => e.status !== 'cancelled').length || enrollments.length} khóa đang học
+                        {enrollments.some((e) => e.status === 'cancelled')
+                          ? ` · ${enrollments.filter((e) => e.status === 'cancelled').length} đã hủy`
+                          : ''}
                       </span>
                     )}
                   </div>
@@ -764,6 +767,23 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                             <p className="text-[10px] text-slate-500 font-bold mt-0.5">
                                               {enr.completedSessions || 0}/{enr.totalSessions || 12} buổi · {progress}% · {fmt(enr.price)}
                                             </p>
+                                            {(() => {
+                                              if (isCancelled || !isPaid) return null;
+                                              const courseName = String(enr.courseName || enr.name || '').trim().toLowerCase();
+                                              const amount = Number(enr.price) || 0;
+                                              const inv = (invoiceList || []).find((i) => {
+                                                const sameCourse = String(i.khoaHoc || '').trim().toLowerCase() === courseName;
+                                                const sameAmount = Math.abs(Number(i.hocPhi) - amount) < 1;
+                                                const isRefund = String(i.maHoaDon || '').startsWith('R-') || /hoàn/i.test(String(i.ghiChu || ''));
+                                                return sameCourse && sameAmount && !isRefund;
+                                              });
+                                              if (!inv?.maHoaDon) return null;
+                                              return (
+                                                <p className="text-[10px] font-black text-indigo-600 mt-1">
+                                                  Mã HĐ: {inv.maHoaDon}
+                                                </p>
+                                              );
+                                            })()}
                                             {isCancelled ? (
                                               <p className="text-[10px] text-red-500 font-bold mt-1">
                                                 Lý do: {String(enr.cancelReason || '').trim() ? enr.cancelReason : 'Admin hủy khóa'} · {enr.cancelledAt ? new Date(enr.cancelledAt).toLocaleDateString('vi-VN') : ''}

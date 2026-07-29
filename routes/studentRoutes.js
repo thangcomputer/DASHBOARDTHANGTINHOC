@@ -35,21 +35,48 @@ function financeReqMeta(req, student) {
   };
 }
 
+async function nextInvoiceCode() {
+  const now = new Date();
+  const yy = now.getFullYear().toString().slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const prefix = `HD${yy}${mm}-`;
+  // Lấy mã lớn nhất cùng tháng để tăng tuần tự (tránh trùng khi race nhẹ)
+  const latest = await Invoice.findOne({ maHoaDon: { $regex: `^${prefix}` } })
+    .sort({ maHoaDon: -1 })
+    .select('maHoaDon')
+    .lean();
+  let seq = 1;
+  if (latest?.maHoaDon) {
+    const m = String(latest.maHoaDon).match(/-(\d+)$/);
+    if (m) seq = Number(m[1]) + 1;
+  }
+  return `${prefix}${String(seq).padStart(4, '0')}`;
+}
+
 async function createTuitionInvoice({ student, courseName, amount, note = '' }) {
   const hocPhi = Number(amount) || 0;
   if (!student?._id || hocPhi <= 0) return null;
   try {
-    const count = await Invoice.countDocuments();
-    const now = new Date();
-    const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
-    return await Invoice.create({
-      maHoaDon: maHD,
-      hocVien: student._id,
-      hoTen: student.name,
-      khoaHoc: courseName || student.course || 'Học phí',
-      hocPhi,
-      ghiChu: note || `Thanh toán khóa ${courseName || student.course || ''}`.trim(),
-    });
+    let maHD = await nextInvoiceCode();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        return await Invoice.create({
+          maHoaDon: maHD,
+          hocVien: student._id,
+          hoTen: student.name,
+          khoaHoc: courseName || student.course || 'Học phí',
+          hocPhi,
+          ghiChu: note || `Thanh toán khóa ${courseName || student.course || ''}`.trim(),
+        });
+      } catch (err) {
+        if (err?.code === 11000) {
+          maHD = await nextInvoiceCode();
+          continue;
+        }
+        throw err;
+      }
+    }
+    return null;
   } catch (err) {
     logger.warn('[INVOICE] create skipped:', err.message);
     return null;
@@ -327,7 +354,34 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) 
     const studentOid = mongoose.Types.ObjectId.isValid(req.params.id)
       ? new mongoose.Types.ObjectId(req.params.id)
       : req.params.id;
-    const invoices = await Invoice.find({ hocVien: studentOid }).sort({ createdAt: -1 }).lean();
+    const invoicesRaw = await Invoice.find({ hocVien: studentOid }).sort({ createdAt: -1 }).lean();
+    let invoices = Array.isArray(invoicesRaw) ? [...invoicesRaw] : [];
+
+    // Backfill: khóa đang học đã thanh toán nhưng chưa có hóa đơn → tạo mã HĐ tuần tự
+    const enrList = Array.isArray(student.enrollments) ? student.enrollments : [];
+    for (const enr of enrList) {
+      if (!enr || enr.status === 'cancelled') continue;
+      const isPaid = enr.paid === true || enr.paid === 'Đã đóng phí';
+      const amount = Number(enr.price) || 0;
+      const courseName = String(enr.courseName || '').trim();
+      if (!isPaid || amount <= 0 || !courseName) continue;
+      const hasInvoice = invoices.some((inv) => {
+        const sameCourse = String(inv.khoaHoc || '').trim().toLowerCase() === courseName.toLowerCase();
+        const sameAmount = Math.abs(Number(inv.hocPhi) - amount) < 1;
+        const isRefundNote = /hoàn/i.test(String(inv.ghiChu || ''));
+        return sameCourse && sameAmount && !isRefundNote;
+      });
+      if (hasInvoice) continue;
+      const created = await createTuitionInvoice({
+        student,
+        courseName,
+        amount,
+        note: `Thanh toán khóa ${courseName}`,
+      });
+      if (created) {
+        invoices.unshift(typeof created.toObject === 'function' ? created.toObject() : created);
+      }
+    }
 
     // 2b) Ledger refund (không tạo Invoice gốc) — append để UI "Tài chính" hiển thị.
     const LedgerEntry = require('../models/LedgerEntry');
