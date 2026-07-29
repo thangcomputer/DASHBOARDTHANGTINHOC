@@ -763,7 +763,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                             </p>
                                             {isCancelled ? (
                                               <p className="text-[10px] text-red-500 font-bold mt-1">
-                                                Lý do: {enr.cancelReason || '—'} · {enr.cancelledAt ? new Date(enr.cancelledAt).toLocaleDateString('vi-VN') : ''}
+                                                Lý do: {String(enr.cancelReason || '').trim() ? enr.cancelReason : 'Admin hủy khóa'} · {enr.cancelledAt ? new Date(enr.cancelledAt).toLocaleDateString('vi-VN') : ''}
                                               </p>
                                             ) : (
                                               <span className={`inline-flex mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${
