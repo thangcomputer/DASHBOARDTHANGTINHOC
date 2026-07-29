@@ -188,13 +188,14 @@ const AppSidebar = ({
     return () => window.removeEventListener('lms-guide-open-nav', openForGuide);
   }, []);
 
-  // Tablet+: bấm nội dung bên phải → sidebar tự thu gọn
+  // Chỉ tablet (rail overlay): bấm nội dung bên phải → thu sidebar.
+  // Desktop/laptop (≥ xl): giữ mở cho đến khi user bấm nút ẩn.
   useEffect(() => {
     const main = document.getElementById('main-content');
     if (!main) return undefined;
     const collapseOnContentInteract = () => {
       if (typeof window === 'undefined') return;
-      if (!window.matchMedia('(min-width: 768px)').matches) return;
+      if (!window.matchMedia(TABLET_RAIL_MQ).matches) return;
       setCollapsedPersist(true);
     };
     main.addEventListener('pointerdown', collapseOnContentInteract);
