@@ -36,27 +36,24 @@ const enrollmentRemaining = (enr) => {
   const done = Number(enr?.completedSessions) || 0;
   return Math.max(0, total - done);
 };
+const isEnrollmentPaid = (e) =>
+  e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
+
 const summarizeEnrollments = (list) => {
   const items = Array.isArray(list) ? list : [];
-  const isPaid = (e) =>
-    e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
-  const netPaidForEnr = (e) => {
-    if (!isPaid(e)) return 0;
-    const price = Number(e?.price) || 0;
-    if (e?.status === 'cancelled') {
-      const refunded = Number(e?.refundedAmount) || 0;
-      return Math.max(0, price - refunded);
-    }
-    return price;
-  };
-  const totalSessions = items.reduce((s, e) => s + (Number(e.totalSessions) || 12), 0);
-  const completedSessions = items.reduce((s, e) => s + (Number(e.completedSessions) || 0), 0);
-  const remainingSessions = items.reduce((s, e) => s + enrollmentRemaining(e), 0);
-  const price = items.reduce((s, e) => s + (Number(e.price) || 0), 0);
-  const paidPrice = items.reduce((s, e) => s + netPaidForEnr(e), 0);
-  const paidCount = items.filter((e) => netPaidForEnr(e) > 0).length;
+  // Khóa đã hủy/hoàn không còn tính vào học phí đang theo & số đã thu
+  const activeItems = items.filter((e) => e?.status !== 'cancelled');
+  const cancelledItems = items.filter((e) => e?.status === 'cancelled');
+  const totalSessions = activeItems.reduce((s, e) => s + (Number(e.totalSessions) || 12), 0);
+  const completedSessions = activeItems.reduce((s, e) => s + (Number(e.completedSessions) || 0), 0);
+  const remainingSessions = activeItems.reduce((s, e) => s + enrollmentRemaining(e), 0);
+  const price = activeItems.reduce((s, e) => s + (Number(e.price) || 0), 0);
+  const paidItems = activeItems.filter(isEnrollmentPaid);
+  const paidPrice = paidItems.reduce((s, e) => s + (Number(e.price) || 0), 0);
+  const paidCount = paidItems.length;
+  const refundedTotal = cancelledItems.reduce((s, e) => s + (Number(e.refundedAmount) || 0), 0);
   const progressPercent = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
-  const grades = items.map((e) => Number(e.avgGrade)).filter((g) => Number.isFinite(g) && g > 0);
+  const grades = activeItems.map((e) => Number(e.avgGrade)).filter((g) => Number.isFinite(g) && g > 0);
   const avgGrade = grades.length
     ? Math.round((grades.reduce((a, b) => a + b, 0) / grades.length) * 10) / 10
     : null;
@@ -67,7 +64,9 @@ const summarizeEnrollments = (list) => {
     price,
     paidPrice,
     paidCount,
-    enrollmentCount: items.length,
+    enrollmentCount: activeItems.length,
+    cancelledCount: cancelledItems.length,
+    refundedTotal,
     progressPercent,
     avgGrade,
   };
@@ -417,20 +416,24 @@ export default function StudentDetailModal({ studentId, onClose }) {
       : (activeEnrollment.status === 'active' ? 'Đang học' : (activeEnrollment.status || data?.student?.status || '—')))
     : (data?.student?.status || '—');
   const avgGradeDisplay = summaryMetrics.avgGrade ?? data?.student?.avgGrade ?? '—';
-  const financePaidTotal = summaryMetrics.paidPrice > 0
-    ? summaryMetrics.paidPrice
-    : (Number(data?.student?.paidAmount) > 0 && effectiveCourseFilter === 'all'
-      ? Number(data.student.paidAmount)
-      : 0);
+  const financePaidTotal = summaryMetrics.paidPrice;
   const financeListedTotal = summaryMetrics.price;
+  const financeRefundedTotal = summaryMetrics.refundedTotal || 0;
+  const financeDebt = Math.max(0, financeListedTotal - financePaidTotal);
   const financeAllPaid = summaryMetrics.enrollmentCount > 0
     && summaryMetrics.paidCount >= summaryMetrics.enrollmentCount;
   const financePartialPaid = summaryMetrics.paidCount > 0 && !financeAllPaid;
-  const financeStatusLabel = financeAllPaid
-    ? 'ĐÃ HOÀN TẤT'
-    : financePartialPaid
-      ? 'THU MỘT PHẦN'
-      : (data?.student?.paid ? 'ĐÃ HOÀN TẤT' : 'CÒN NỢ');
+  const financeStatusLabel = summaryMetrics.enrollmentCount === 0
+    ? 'KHÔNG CÒN KHÓA'
+    : financeAllPaid
+      ? 'ĐÃ HOÀN TẤT'
+      : financePartialPaid
+        ? 'THU MỘT PHẦN'
+        : 'CÒN NỢ';
+  // Badge header theo khóa đang hoạt động (không phụ thuộc student.paid sau khi hoàn)
+  const headerPaid = summaryMetrics.enrollmentCount > 0
+    ? financeAllPaid
+    : !!data?.student?.paid;
 
   const invoiceList = Array.isArray(data?.invoices) ? data.invoices : [];
   const paidScopedEnrollments = scopedEnrollments.filter(
@@ -539,9 +542,9 @@ export default function StudentDetailModal({ studentId, onClose }) {
                       {data.student.name}
                     </h2>
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
-                      data.student.paid ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'
+                      headerPaid ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'
                     }`}>
-                      {data.student.paid ? 'Đã thanh toán' : 'Chưa đóng phí'}
+                      {headerPaid ? 'Đã thanh toán' : 'Chưa đóng phí'}
                     </span>
                   </div>
 
@@ -959,13 +962,14 @@ export default function StudentDetailModal({ studentId, onClose }) {
               {activeTab === 'finance' && (
                 <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                     <div className={`${financeAllPaid || (data.student.paid && !financePartialPaid) ? 'bg-emerald-600' : financePartialPaid ? 'bg-amber-600' : 'bg-red-600'} rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] sm:h-48`}>
+                     <div className={`${financeAllPaid ? 'bg-emerald-600' : financePartialPaid ? 'bg-amber-600' : 'bg-red-600'} rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] sm:h-48`}>
                         <DollarSign className="absolute -right-8 -bottom-8 w-40 h-40 opacity-10" />
                         <div>
                           <p className="text-[11px] font-black opacity-60 uppercase tracking-widest mb-1">Trạng thái đóng phí</p>
                           <h4 className="text-2xl sm:text-3xl font-black">{financeStatusLabel}</h4>
                           <p className="text-[12px] font-semibold opacity-80 mt-2">
-                            {summaryMetrics.paidCount}/{summaryMetrics.enrollmentCount || 1} khóa đã thu
+                            {summaryMetrics.paidCount}/{summaryMetrics.enrollmentCount || 0} khóa đang học đã thu
+                            {summaryMetrics.cancelledCount > 0 ? ` · ${summaryMetrics.cancelledCount} khóa đã hủy` : ''}
                             {activeEnrollment ? ` · ${activeEnrollment.courseName || activeEnrollment.name}` : ''}
                           </p>
                         </div>
@@ -974,7 +978,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                             <p className="text-[10px] font-bold opacity-60">Đăng ký ngày</p>
                             <p className="text-sm font-black">{fmtDate(data.student.createdAt)}</p>
                           </div>
-                          {financePaidTotal < financeListedTotal && (
+                          {financeDebt > 0 && (
                             <button type="button" onClick={() => showModal({ 
                                 title: 'Hướng dẫn nghiệp vụ', 
                                 content: 'Thu từng khóa tại danh sách "Các khóa học đang theo" (Tổng quan) hoặc tab Giao dịch để đồng bộ hóa đơn.', 
@@ -990,9 +994,14 @@ export default function StudentDetailModal({ studentId, onClose }) {
                           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Số tiền đã thanh toán</p>
                           <h4 className="text-2xl sm:text-3xl font-black text-slate-800 break-words">{fmt(financePaidTotal)}</h4>
                           <p className="text-[12px] font-semibold text-slate-400 mt-1.5">
-                            Học phí gốc: {fmt(financeListedTotal)}
-                            {financeListedTotal > financePaidTotal ? ` · Còn nợ ${fmt(financeListedTotal - financePaidTotal)}` : ''}
+                            Học phí đang theo: {fmt(financeListedTotal)}
+                            {financeDebt > 0 ? ` · Còn nợ ${fmt(financeDebt)}` : ''}
                           </p>
+                          {financeRefundedTotal > 0 && (
+                            <p className="text-[12px] font-bold text-red-600 mt-1">
+                              Đã hoàn: {fmt(financeRefundedTotal)}
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-4">
                            <div className="flex-1 p-3 bg-slate-50 rounded-2xl border border-slate-100">
@@ -1049,46 +1058,45 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                       return name && name === khoa;
                                     });
                                     const st = String(enr?.status || '');
-                                    const isPaidEnr = (enr) =>
-                                      enr?.paid === true
-                                      || enr?.paid === 'Đã đóng phí'
-                                      || enr?.paid === 'true'
-                                      || enr?.paid === 1;
+                                    // Hoàn học phí → đỏ
                                     if (isRefund) {
                                       return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200">
                                           Hoàn học phí
                                         </span>
                                       );
                                     }
+                                    // Hủy → xám (không còn “đã thanh toán”)
                                     if (st === 'cancelled') {
                                       return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200">
+                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">
                                           Hủy
                                         </span>
                                       );
                                     }
                                     if (st === 'completed' || st === 'Hoàn thành') {
                                       return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-green-100 text-green-700 border border-green-200">
+                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
                                           Hoàn thành
                                         </span>
                                       );
                                     }
-                                    if (enr && isPaidEnr(enr)) {
+                                    // Đã thanh toán → xanh
+                                    if (enr && isEnrollmentPaid(enr)) {
                                       return (
                                         <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
                                           Đã thanh toán
                                         </span>
                                       );
                                     }
-                                    if (!enr && inv.synthetic === false) {
+                                    if (!enr && inv.synthetic === false && !isRefund) {
                                       return (
                                         <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
                                           Đã thanh toán
                                         </span>
                                       );
                                     }
+                                    // Chưa thanh toán → vàng
                                     return (
                                       <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-700 border border-amber-200">
                                         Chưa thanh toán
@@ -1425,9 +1433,9 @@ export default function StudentDetailModal({ studentId, onClose }) {
                 </div>
 
                 <div className="flex items-center gap-2 sm:gap-3">
-                  {!data.student.paid && (
+                  {financeDebt > 0 && (
                     <p className="text-[12px] font-semibold text-red-500 flex items-center gap-1 shrink-0">
-                      <AlertCircle size={14} /> Còn nợ: {fmt(data.student.price)}
+                      <AlertCircle size={14} /> Còn nợ: {fmt(financeDebt)}
                     </p>
                   )}
                   <button
