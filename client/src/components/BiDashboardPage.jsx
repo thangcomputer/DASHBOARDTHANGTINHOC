@@ -168,7 +168,7 @@ export default function BiDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Kpi icon={Wallet} label="Chưa thanh toán" value={k.studentsUnpaid ?? 0} color="text-red-600" bg="bg-red-50" />
+            <Kpi icon={Wallet} label="Hoàn học phí" value={k.studentsUnpaid ?? 0} color="text-emerald-600" bg="bg-emerald-50" />
             <Kpi icon={ClipboardCheck} label="Tỷ lệ đỗ thi" value={k.examPassRate != null ? `${k.examPassRate}%` : '—'} sub={`${k.examPassed ?? 0}/${k.examTotal ?? 0} bài`} color="text-cyan-600" bg="bg-cyan-50" />
             <Kpi icon={DollarSign} label="GV chờ chi" value={k.transactionsPending ?? 0} color="text-orange-600" bg="bg-orange-50" />
             <Kpi icon={Users} label="Đã thanh toán" value={k.studentsPaid ?? 0} color="text-emerald-600" bg="bg-emerald-50" />

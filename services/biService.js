@@ -8,6 +8,7 @@ const Schedule = require('../models/Schedule');
 const Transaction = require('../models/Transaction');
 const ExamResult = require('../models/ExamResult');
 const Branch = require('../models/Branch');
+const LedgerEntry = require('../models/LedgerEntry');
 const cache = require('../utils/cache');
 const {
   sumPaidRevenue,
@@ -76,7 +77,13 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
     ] = await Promise.all([
       Student.countDocuments(bf),
       Student.countDocuments({ ...bf, paid: true }),
-      Student.countDocuments({ ...bf, paid: false }),
+      // Đổi luồng: card "Hoàn học phí" = số ledger refund posted theo khoảng thời gian
+      LedgerEntry.countDocuments({
+        ...bf,
+        type: 'refund',
+        status: 'posted',
+        postedAt: { $gte: start, $lte: end },
+      }),
       Student.countDocuments({ ...bf, createdAt: { $gte: start, $lte: end } }),
       Student.countDocuments({ ...bf, createdAt: { $gte: prevStart, $lte: prevEnd } }),
       sumPaidRevenue({ branchFilter: bf, start, end }),
