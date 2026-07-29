@@ -1646,7 +1646,8 @@ router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, checkPermission
 });
 
 // ─── DELETE /api/students/:id/enrollments/:enrollmentId ───────────────────────
-// Xóa 1 khóa học khỏi tài khoản học viên
+// Hủy (soft-cancel) 1 khóa học — không xóa cứng; tự động hoàn tiền nếu đã thanh toán.
+// Body (optional): { cancelReason: string, refundAmount: number }
 router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -1658,37 +1659,112 @@ router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(
       student.enrollments[0].isPrimary = true;
     }
     const list = student.enrollments || [];
-    if (list.length <= 1) {
+    const activeList = list.filter((e) => e.status !== 'cancelled');
+    if (activeList.length <= 1) {
       return res.status(400).json({
         success: false,
-        message: 'Không thể xóa khóa duy nhất. Học viên cần giữ ít nhất 1 khóa học.',
+        message: 'Không thể hủy khóa duy nhất còn hoạt động. Học viên cần giữ ít nhất 1 khóa học.',
       });
     }
     const idx = list.findIndex((e) => String(e._id) === String(req.params.enrollmentId));
     if (idx < 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
     }
-    const removed = list[idx];
-    const wasPrimary = !!removed.isPrimary;
-    const courseName = removed.courseName;
-    list.splice(idx, 1);
-    if (wasPrimary || !list.some((e) => e.isPrimary)) {
-      list.forEach((e, i) => { e.isPrimary = i === 0; });
+    const enr = list[idx];
+    if (enr.status === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Khóa học này đã bị hủy trước đó.' });
     }
+
+    const cancelReason = String(req.body?.cancelReason || '').trim() || 'Admin hủy khóa';
+    const courseName = enr.courseName;
+    const isPaid = enr.paid === true;
+    const paidAmt = Number(enr.price || 0);
+
+    // Xác định số tiền hoàn
+    let refundAmt = 0;
+    if (isPaid && paidAmt > 0) {
+      const bodyRefund = req.body?.refundAmount != null ? Number(req.body.refundAmount) : null;
+      refundAmt = (bodyRefund != null && bodyRefund >= 0 && bodyRefund <= paidAmt) ? bodyRefund : paidAmt;
+    }
+
+    // Soft-cancel enrollment (giữ nguyên trong DB, đánh dấu cancelled)
+    list[idx].status = 'cancelled';
+    list[idx].cancelledAt = new Date();
+    list[idx].cancelReason = cancelReason;
+    list[idx].refundedAmount = refundAmt;
+    list[idx].learningAccess = false;
+
+    // Nếu enrollment bị hủy là primary, chuyển primary sang enrollment active tiếp theo
+    if (enr.isPrimary) {
+      list[idx].isPrimary = false;
+      const nextActive = list.find((e, i) => i !== idx && e.status !== 'cancelled');
+      if (nextActive) nextActive.isPrimary = true;
+    }
+
     student.enrollments = list;
     syncStudentFromPrimaryEnrollment(student);
     student.markModified('enrollments');
     await student.save();
 
+    // Ghi ledger refund nếu có tiền hoàn
+    let refundMsg = '';
+    if (refundAmt > 0) {
+      try {
+        // Trừ paidAmount tổng của student
+        const prevPaid = Number(student.paidAmount || 0);
+        const newPaid = Math.max(0, prevPaid - refundAmt);
+        await Student.findByIdAndUpdate(student._id, {
+          paidAmount: newPaid,
+          ...(newPaid === 0 ? { paid: false } : {}),
+        });
+
+        await postRefund({
+          studentId: student._id,
+          branchId: student.branchId,
+          enrollmentId: String(enr._id),
+          courseName,
+          amount: refundAmt,
+          note: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${cancelReason}`,
+          source: 'enrollment_cancel',
+          sourceRef: `cancel:${student._id}:${enr._id}`,
+          idempotencyKey: `refund:cancel:${student._id}:${enr._id}:${Date.now()}`,
+          actor: financeActor(req),
+          reqMeta: financeReqMeta(req, student),
+        });
+
+        const { writeAudit } = require('../services/auditLogService');
+        await writeAudit({
+          action: 'enrollment.cancel_refund',
+          actorUserId: String(req.user?.id || ''),
+          actorRole: String(req.user?.role || ''),
+          studentId: student._id,
+          branchId: student.branchId,
+          entityType: 'enrollment',
+          entityId: String(enr._id),
+          oldValue: { status: 'active', paid: true, price: paidAmt },
+          newValue: { status: 'cancelled', refundedAmount: refundAmt, cancelReason },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'] || '',
+        });
+        refundMsg = ` Đã hoàn ${refundAmt.toLocaleString('vi-VN')}đ.`;
+      } catch (ledgerErr) {
+        logger.warn('[STUDENTS] cancel enrollment refund ledger: %s', ledgerErr.message);
+      }
+    }
+
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh', { type: 'student', id: student._id });
+    if (io) {
+      io.emit('data:refresh', { type: 'student', id: student._id });
+      if (refundAmt > 0) io.emit('revenue:updated', { amount: -refundAmt, studentName: student.name });
+    }
 
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
     return res.json({
       success: true,
-      message: `Đã xóa khóa "${courseName}"`,
+      message: `Đã hủy khóa "${courseName}".${refundMsg}`,
       data: doc,
+      meta: { refundedAmount: refundAmt, cancelReason },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

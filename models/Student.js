@@ -70,7 +70,7 @@ const StudentSchema = new mongoose.Schema(
       nextClassTime: { type: String, default: '' },
       status: {
         type: String,
-        enum: ['active', 'completed', 'paused', 'pending_payment', 'refunded'],
+        enum: ['active', 'completed', 'paused', 'pending_payment', 'refunded', 'cancelled'],
         default: 'active',
       },
       isPrimary: { type: Boolean, default: false },
@@ -80,6 +80,10 @@ const StudentSchema = new mongoose.Schema(
       // Quyền theo từng khóa (môn cần camera / mở khóa thi riêng)
       requireWebcam: { type: Boolean, default: true },
       examUnlocked: { type: Boolean, default: false },
+      // Soft-cancel enrollment
+      cancelledAt: { type: Date, default: null },
+      cancelReason: { type: String, default: '' },
+      refundedAmount: { type: Number, default: 0 },
     }],
     price: {
       type: Number,

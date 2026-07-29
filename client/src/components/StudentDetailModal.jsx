@@ -162,36 +162,41 @@ export default function StudentDetailModal({ studentId, onClose }) {
     });
   };
 
+  const [cancelEnrModal, setCancelEnrModal] = useState(null); // { enr, reason, refundAmount }
+
   const handleDeleteEnrollment = (enr) => {
     const sid = data?.student?._id || data?.student?.id || studentId;
-    const enrId = enr.enrollmentId || enr.id;
+    const enrId = enr.enrollmentId || enr._id || enr.id;
     if (!sid || !enrId || enrId === 'main') {
-      toast.error('Không xác định được khóa học để xóa');
+      toast.error('Không xác định được khóa học để hủy');
       return;
     }
-    showModal({
-      title: 'Xóa khóa học',
-      content: `Xóa khóa "${enr.courseName || enr.name}" khỏi học viên này? Không thể hoàn tác.`,
-      type: 'warning',
-      confirmText: 'Xóa khóa',
-      cancelText: 'Hủy',
-      onConfirm: async () => {
-        const tid = toast.loading('Đang xóa khóa...');
-        try {
-          const res = await api.students.deleteEnrollment(sid, enrId);
-          toast.dismiss(tid);
-          if (res?.success) {
-            toast.success(res.message || 'Đã xóa khóa');
-            reloadProfile();
-          } else {
-            toast.error(res?.message || 'Không xóa được khóa');
-          }
-        } catch {
-          toast.dismiss(tid);
-          toast.error('Lỗi kết nối API');
-        }
-      },
-    });
+    const isPaid = enr.paid === true || enr.paid === 'Đã đóng phí';
+    const maxRefund = isPaid ? (Number(enr.price) || 0) : 0;
+    setCancelEnrModal({ enr, sid, enrId, reason: '', refundAmount: maxRefund, maxRefund, isPaid });
+  };
+
+  const handleConfirmCancelEnrollment = async () => {
+    if (!cancelEnrModal) return;
+    const { sid, enrId, enr, reason, refundAmount } = cancelEnrModal;
+    const tid = toast.loading('Đang hủy khóa...');
+    try {
+      const res = await api.students.deleteEnrollment(sid, enrId, {
+        cancelReason: reason || 'Admin hủy khóa',
+        refundAmount: Number(refundAmount) || 0,
+      });
+      toast.dismiss(tid);
+      setCancelEnrModal(null);
+      if (res?.success) {
+        toast.success(res.message || 'Đã hủy khóa');
+        reloadProfile();
+      } else {
+        toast.error(res?.message || 'Không hủy được khóa');
+      }
+    } catch {
+      toast.dismiss(tid);
+      toast.error('Lỗi kết nối API');
+    }
   };
   const handleUnlockExams = async () => {
     if (!data.student || !data.student.examProgress || !updateStudent) return;
@@ -723,52 +728,66 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                 </div>
                                 <div className="space-y-3">
                                   {enrollments.map((enr) => {
-                                    const enrId = enr.enrollmentId || enr.id;
+                                    const enrId = enr.enrollmentId || enr._id || enr.id;
+                                    const isCancelled = enr.status === 'cancelled';
                                     const progress = enr.totalSessions
                                       ? Math.round(((enr.completedSessions || 0) / enr.totalSessions) * 100)
                                       : 0;
                                     const isPaid = enr.paid === true || enr.paid === 'Đã đóng phí';
                                     return (
-                                      <div key={enrId} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-3">
+                                      <div key={enrId} className={`p-4 rounded-2xl border space-y-3 ${isCancelled ? 'border-red-200 bg-red-50/60 opacity-80' : 'border-slate-100 bg-slate-50/50'}`}>
                                         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                                           <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-black text-slate-900 truncate">
-                                              {enr.courseName || enr.name}
-                                              {enr.isPrimary && <span className="ml-2 text-[9px] text-indigo-500 font-black">CHÍNH</span>}
-                                            </p>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <p className={`text-sm font-black truncate ${isCancelled ? 'text-red-600 line-through' : 'text-slate-900'}`}>
+                                                {enr.courseName || enr.name}
+                                              </p>
+                                              {enr.isPrimary && !isCancelled && <span className="text-[9px] text-indigo-500 font-black">CHÍNH</span>}
+                                              {isCancelled && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[9px] font-black uppercase tracking-wide border border-red-200">
+                                                  ĐÃ HỦY{enr.refundedAmount > 0 ? ` · HOÀN ${Number(enr.refundedAmount).toLocaleString('vi-VN')}Đ` : ''}
+                                                </span>
+                                              )}
+                                            </div>
                                             <p className="text-[10px] text-slate-500 font-bold mt-0.5">
                                               {enr.completedSessions || 0}/{enr.totalSessions || 12} buổi · {progress}% · {fmt(enr.price)}
                                             </p>
-                                            <span className={`inline-flex mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${
-                                              isPaid
-                                                ? 'bg-emerald-100 text-emerald-700'
-                                                : 'bg-amber-100 text-amber-700'
-                                            }`}
-                                            >
-                                              {isPaid ? 'Đã thanh toán' : 'Chưa thanh toán'}
-                                            </span>
+                                            {isCancelled ? (
+                                              <p className="text-[10px] text-red-500 font-bold mt-1">
+                                                Lý do: {enr.cancelReason || '—'} · {enr.cancelledAt ? new Date(enr.cancelledAt).toLocaleDateString('vi-VN') : ''}
+                                              </p>
+                                            ) : (
+                                              <span className={`inline-flex mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${
+                                                isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                              }`}>
+                                                {isPaid ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                                              </span>
+                                            )}
                                           </div>
-                                          <CmsSelect
-                                            value={enr.teacherId || ''}
-                                            onChange={(e) => handleAssignEnrollmentTeacher(enrId, e.target.value)}
-                                            className="sm:w-44 py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
-                                          >
-                                            <option value="">Chưa phân công GV</option>
-                                            {(() => {
-                                              const { matched, other } = splitTeachers(enr);
-                                              return (
-                                                <>
-                                                  {matched.map((t) => (
-                                                    <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-                                                  ))}
-                                                  {other.map((t) => (
-                                                    <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
-                                                  ))}
-                                                </>
-                                              );
-                                            })()}
-                                          </CmsSelect>
+                                          {!isCancelled && (
+                                            <CmsSelect
+                                              value={enr.teacherId || ''}
+                                              onChange={(e) => handleAssignEnrollmentTeacher(enrId, e.target.value)}
+                                              className="sm:w-44 py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
+                                            >
+                                              <option value="">Chưa phân công GV</option>
+                                              {(() => {
+                                                const { matched, other } = splitTeachers(enr);
+                                                return (
+                                                  <>
+                                                    {matched.map((t) => (
+                                                      <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
+                                                    ))}
+                                                    {other.map((t) => (
+                                                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
+                                                    ))}
+                                                  </>
+                                                );
+                                              })()}
+                                            </CmsSelect>
+                                          )}
                                         </div>
+                                        {!isCancelled && (
                                         <div className="flex flex-wrap gap-2">
                                           {!isPaid && enrId !== 'main' && (
                                             <button
@@ -785,11 +804,12 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                               onClick={() => handleDeleteEnrollment(enr)}
                                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-red-200 text-red-600 text-[10px] font-black uppercase tracking-wide hover:bg-red-50"
                                             >
-                                              <Trash2 size={12} /> Xóa khóa
+                                              <Trash2 size={12} /> Hủy khóa
                                             </button>
                                           )}
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                        )}
+                                        {!isCancelled && <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                                           {(() => {
                                             const webcamOn = enr.requireWebcam !== false;
                                             const unlocked = enr.examUnlocked === true;
@@ -828,7 +848,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                               </>
                                             );
                                           })()}
-                                        </div>
+                                        </div>}
                                       </div>
                                     );
                                   })}
@@ -1370,6 +1390,82 @@ export default function StudentDetailModal({ studentId, onClose }) {
           onSubmit={handleAddEnrollmentSubmit}
           onClose={() => setShowAddEnrollment(false)}
         />
+      )}
+
+      {/* ── Dialog HỦY KHÓA ─────────────────────────────────────────── */}
+      {cancelEnrModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setCancelEnrModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 border border-red-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-800">Hủy khóa học</h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Khóa bị hủy vẫn lưu trong hồ sơ (gạch đỏ)
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+              <p className="text-xs font-black text-red-700 uppercase tracking-wide mb-0.5">Khóa học bị hủy</p>
+              <p className="text-sm font-bold text-slate-800">{cancelEnrModal.enr.courseName || cancelEnrModal.enr.name}</p>
+              {cancelEnrModal.isPaid && (
+                <p className="text-xs text-red-600 mt-1">Đã thanh toán: <strong>{Number(cancelEnrModal.enr.price || 0).toLocaleString('vi-VN')}đ</strong></p>
+              )}
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">Lý do hủy</label>
+                <input
+                  type="text"
+                  value={cancelEnrModal.reason}
+                  onChange={(e) => setCancelEnrModal((p) => ({ ...p, reason: e.target.value }))}
+                  placeholder="Nhập lý do hủy khóa..."
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-red-300 outline-none"
+                />
+              </div>
+              {cancelEnrModal.isPaid && (
+                <div>
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">
+                    Số tiền hoàn trả (tối đa {Number(cancelEnrModal.maxRefund).toLocaleString('vi-VN')}đ)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={cancelEnrModal.maxRefund}
+                    value={cancelEnrModal.refundAmount}
+                    onChange={(e) => setCancelEnrModal((p) => ({ ...p, refundAmount: Math.min(Number(e.target.value) || 0, p.maxRefund) }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-red-300 outline-none"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Nhập 0 nếu không hoàn tiền</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelEnrModal(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Giữ lại
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancelEnrollment}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-black hover:bg-red-700"
+              >
+                {cancelEnrModal.isPaid && cancelEnrModal.refundAmount > 0
+                  ? `Hủy & hoàn ${Number(cancelEnrModal.refundAmount).toLocaleString('vi-VN')}đ`
+                  : 'Xác nhận hủy'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

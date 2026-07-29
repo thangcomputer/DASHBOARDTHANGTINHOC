@@ -764,9 +764,11 @@ export const studentsAPI = {
     });
     return res.json();
   },
-  deleteEnrollment: async (id, enrollmentId) => {
+  deleteEnrollment: async (id, enrollmentId, body) => {
     const res = await apiFetch(`/students/${id}/enrollments/${enrollmentId}`, {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
     });
     return res.json();
   },
