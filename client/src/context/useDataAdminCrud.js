@@ -68,6 +68,7 @@ export function useDataAdminCrud({
       status:    teacher.status || 'inactive',
       branchId:   teacher.branchId || undefined,
       branchCode: teacher.branchCode || undefined,
+      baseSalaryPerSession: Math.max(0, Number(teacher.baseSalaryPerSession) || 0),
     };
 
     try {

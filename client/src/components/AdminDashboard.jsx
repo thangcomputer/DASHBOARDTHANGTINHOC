@@ -38,11 +38,12 @@ const AdminDashboard = () => {
     adminTabValue,
     deleteConfirm, setDeleteConfirm, removeTrainingItem,
     showModal, setShowModal, teachers, addStudent,
-    payoutModal, setPayoutModal, handleGoToQR, handlePayout,
+    payoutModal, setPayoutModal, handleGoToQR, handlePayout, handleSaveHoaHongRate,
     printStudent,
     showTeacherModal, setShowTeacherModal, teacherForm, setTeacherForm,
     isSuperAdmin, safeBranches, ctxAddTeacher, toast, fetchTeachers,
     editTeacher, setEditTeacher, handleOpenResetPw, ctxUpdateTeacher, examSubjectsCatalog,
+    getTeacherRating,
     editStudent, setEditStudent, globalTeachers, ctxUpdateStudent,
     selectedBranchId, currentPage, PAGE_SIZE, search, filterPaid, filterCourse,
     fetchStudentsPaginated,
@@ -112,6 +113,7 @@ const AdminDashboard = () => {
           setPayoutModal={setPayoutModal}
           onGoToQR={handleGoToQR}
           onConfirm={handlePayout}
+          onSaveRate={handleSaveHoaHongRate}
         />
       )}
 
@@ -136,6 +138,10 @@ const AdminDashboard = () => {
           safeBranches={safeBranches}
           onClose={() => setShowTeacherModal(false)}
           onSubmit={async () => {
+            if (!teacherForm.name?.trim() || !teacherForm.phone?.trim()) {
+              toast.error('Vui lòng nhập họ tên và số điện thoại');
+              return;
+            }
             if (!teacherForm.subjectIds?.length) {
               toast.error('Vui lòng chọn ít nhất một môn chuyên môn');
               return;
@@ -152,8 +158,14 @@ const AdminDashboard = () => {
                 status: 'inactive',
                 branchId: teacherForm.branchId || undefined,
                 branchCode: teacherForm.branchCode || undefined,
+                baseSalaryPerSession: Number(teacherForm.baseSalaryPerSession) || 0,
               });
-              setTeacherForm({ name: '', phone: '', email: '', specialty: '', subjectIds: [], startDate: new Date().toISOString().split('T')[0], address: '', branchId: '', branchCode: '' });
+              setTeacherForm({
+                name: '', phone: '', email: '', specialty: '', subjectIds: [],
+                startDate: new Date().toISOString().split('T')[0],
+                address: '', branchId: '', branchCode: '',
+                baseSalaryPerSession: 150000,
+              });
               setShowTeacherModal(false);
               toast.success('Đã thêm giảng viên thành công!');
               fetchTeachers();
@@ -170,6 +182,7 @@ const AdminDashboard = () => {
           setEditTeacher={setEditTeacher}
           isSuperAdmin={isSuperAdmin}
           safeBranches={safeBranches}
+          getTeacherRating={getTeacherRating}
           onClose={() => setEditTeacher(null)}
           onResetPassword={(id, name) => handleOpenResetPw(id, name, 'teacher')}
           onSave={async () => {

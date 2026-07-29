@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import {
   GraduationCap, Search, Plus, Star, FileSpreadsheet, FileText, CheckCircle2,
   Download, Unlock, UserCheck, DollarSign, Edit3, Trash2, User,
-  Phone, CalendarCheck, MessageSquare, X,
+  Phone, CalendarCheck, MessageSquare, X, MoreHorizontal, AlertTriangle,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
-import { resolveTeacherExamDate, isTeacherExamDateApproximate, practicalFileDisplayName, practicalFileDownloadUrl, practicalFileViewUrl } from '../utils/teacherExam';
+import {
+  resolveTeacherExamDate,
+  isTeacherExamDateApproximate,
+  practicalFileDisplayName,
+  practicalFileDownloadUrl,
+  practicalFileViewUrl,
+} from '../utils/teacherExam';
 import { isTeacherPending } from '../../../constants/teacherStatus';
 
 const PROCESS_STEPS = [
@@ -16,6 +23,100 @@ const PROCESS_STEPS = [
   'Cấp quyền',
 ];
 
+function StatusBadge({ active, pending, locked }) {
+  if (active) return <span className="cms-students-badge-success">Đã cấp quyền</span>;
+  if (pending) return <span className="cms-students-badge-neutral" style={{ background: '#fffbeb', color: '#b45309' }}>Chờ duyệt</span>;
+  if (locked) return <span className="cms-students-badge-primary">Đã khóa</span>;
+  return <span className="cms-students-badge-neutral">Chưa cấp quyền</span>;
+}
+
+function TeacherActionMenu({
+  t,
+  openId,
+  setOpenId,
+  isSuperAdmin,
+  align = 'right',
+  setReviewModal,
+  setGrantModal,
+  setApproveModal,
+  setEditTeacher,
+  handlePayTeacher,
+  removeTeacher,
+}) {
+  if (openId !== t.id) return null;
+
+  const score = t.testScore;
+  const active = ['Active', 'active'].includes(t.status);
+  const pending = ['Pending', 'pending'].includes(t.status);
+  const locked = String(t.status).toLowerCase() === 'locked';
+  const inactive = String(t.status).toLowerCase() === 'inactive' || locked;
+  const canApprove = pending && (score || 0) >= 80 && t.practicalStatus === 'reviewed';
+
+  const itemCls =
+    'w-full flex items-center gap-3 px-3.5 py-2.5 min-h-10 text-[13px] font-semibold text-left whitespace-nowrap transition-colors';
+
+  const close = () => setOpenId(null);
+
+  return (
+    <div
+      className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] py-1.5 w-[min(92vw,260px)] animate-in fade-in zoom-in-95 duration-150`}
+      onClick={(e) => e.stopPropagation()}
+      role="menu"
+    >
+      {isSuperAdmin && active && (
+        <button type="button" role="menuitem" onClick={() => { handlePayTeacher(t); close(); }}
+          className={`${itemCls} text-emerald-700 hover:bg-emerald-50`}>
+          <DollarSign size={15} className="shrink-0" />
+          <span>Thanh toán lương</span>
+        </button>
+      )}
+      {isSuperAdmin && inactive && (
+        <button type="button" role="menuitem"
+          onClick={() => { setGrantModal({ id: t.id, name: t.name || t.email || t.phone, type: locked ? 'retry' : 'first' }); close(); }}
+          className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
+          <Unlock size={15} className="shrink-0" />
+          <span>{locked ? 'Cấp quyền thi lại' : 'Cấp truy cập thi'}</span>
+        </button>
+      )}
+      {isSuperAdmin && pending && (
+        <button type="button" role="menuitem" disabled={!canApprove}
+          onClick={() => { if (canApprove) { setApproveModal(t); close(); } }}
+          className={`${itemCls} ${canApprove ? 'text-emerald-700 hover:bg-emerald-50' : 'text-slate-300 cursor-not-allowed'}`}>
+          <UserCheck size={15} className="shrink-0" />
+          <span>Cấp quyền giảng dạy</span>
+        </button>
+      )}
+      {t.practicalFile && t.practicalStatus !== 'reviewed' && (
+        <button type="button" role="menuitem" onClick={() => { setReviewModal(t); close(); }}
+          className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
+          <FileSpreadsheet size={15} className="shrink-0" />
+          <span>Kiểm tra bài thực hành</span>
+        </button>
+      )}
+      {isSuperAdmin && (
+        <button type="button" role="menuitem" onClick={() => { setEditTeacher(t); close(); }}
+          className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
+          <Edit3 size={15} className="shrink-0 text-slate-500" />
+          <span>Chỉnh sửa / lương</span>
+        </button>
+      )}
+      {isSuperAdmin && (
+        <>
+          <div className="border-t border-slate-100 my-1" />
+          <button type="button" role="menuitem" onClick={() => { removeTeacher(t.id); close(); }}
+            className={`${itemCls} text-red-600 hover:bg-red-50`}>
+            <Trash2 size={15} className="shrink-0" />
+            <span>Xóa giảng viên</span>
+          </button>
+        </>
+      )}
+      {!isSuperAdmin && (
+        <p className="px-3.5 py-2 text-[12px] text-slate-400">Chỉ Super Admin thao tác được</p>
+      )}
+    </div>
+  );
+}
+
 export default function AdminTeachersTab() {
   const {
     teachers, safeTeachers, filteredTeachers, search, setSearch, isSuperAdmin, setShowTeacherModal,
@@ -23,265 +124,384 @@ export default function AdminTeachersTab() {
     removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed, toast,
   } = useAdminTab();
 
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [menuId, setMenuId] = useState(null);
+  const menuRootRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuId) return undefined;
+    const onDoc = (e) => {
+      if (menuRootRef.current && !menuRootRef.current.contains(e.target)) setMenuId(null);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [menuId]);
+
   const pendingCount = safeTeachers.filter((t) => isTeacherPending(t.status)).length;
   const filePending = safeTeachers.filter((t) => t.practicalFile && t.practicalStatus === 'submitted').length;
 
+  const rows = useMemo(() => {
+    const list = Array.isArray(filteredTeachers) ? filteredTeachers : [];
+    if (filterStatus === 'all') return list;
+    return list.filter((t) => {
+      const st = String(t.status || '').toLowerCase();
+      if (filterStatus === 'active') return st === 'active';
+      if (filterStatus === 'pending') return st === 'pending';
+      if (filterStatus === 'locked') return st === 'locked';
+      if (filterStatus === 'inactive') return st === 'inactive' || (!st);
+      if (filterStatus === 'file') return !!t.practicalFile && t.practicalStatus === 'submitted';
+      return true;
+    });
+  }, [filteredTeachers, filterStatus]);
+
+  const selectFilterClass =
+    'h-11 w-full bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none transition-all';
+
+  const menuProps = {
+    openId: menuId,
+    setOpenId: setMenuId,
+    isSuperAdmin,
+    setReviewModal,
+    setGrantModal,
+    setApproveModal,
+    setEditTeacher,
+    handlePayTeacher,
+    removeTeacher,
+  };
+
   return (
     <>
-      <div className="space-y-3 sm:space-y-4">
-        <div className="bg-white dark:bg-slate-900 rounded-[20px] border border-slate-100 dark:border-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_14px_rgba(15,23,42,0.04)] overflow-hidden">
-          <div className="cms-teacher-toolbar space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
-                  <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
-                    <GraduationCap size={18} aria-hidden="true" />
-                  </span>
-                  <span className="leading-snug truncate">Duyệt giảng viên</span>
-                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0">
-                    {teachers.length}
-                  </span>
-                </h2>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <span className={`cms-dash-badge ${pendingCount ? 'cms-dash-badge-warning' : 'cms-dash-badge-neutral'}`}>
-                    {pendingCount} chờ duyệt
-                  </span>
-                  {filePending > 0 && (
-                    <span className="cms-dash-badge-warning">{filePending} file chờ kiểm tra</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col min-[420px]:flex-row gap-2 w-full sm:w-auto sm:max-w-xl sm:flex-1 sm:justify-end">
-                <div className="relative flex-1 min-w-0 sm:max-w-xs">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Tìm giảng viên..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="cms-input pl-10"
-                    aria-label="Tìm giảng viên"
-                  />
-                </div>
-                {isSuperAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => setShowTeacherModal(true)}
-                    className="cms-btn cms-btn-primary shrink-0"
-                  >
-                    <Plus size={16} /> Thêm giảng viên
-                  </button>
-                )}
-              </div>
+      <div className="cms-students-module bg-white rounded-2xl lg:rounded-[28px] border border-slate-100 shadow-[0_4px_24px_rgba(15,23,42,0.04)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500" ref={menuRootRef}>
+        <div className="px-3 pt-3 pb-2 sm:px-4 lg:px-6 lg:pt-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 min-w-0">
+            <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+                <GraduationCap size={18} aria-hidden="true" />
+              </span>
+              <span className="truncate">Quản lý Giảng viên</span>
+              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0">
+                {teachers.length}
+              </span>
+            </h2>
+            <div className="flex flex-wrap gap-1.5 justify-end">
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${pendingCount ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                {pendingCount} chờ duyệt
+              </span>
+              {filePending > 0 && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700">
+                  {filePending} file chờ
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="px-3 sm:px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2.5">Quy trình duyệt</p>
-            <div className="cms-teacher-steps">
+          <div className="cms-students-search-sticky -mx-3 px-3 py-2 sm:-mx-4 sm:px-4 lg:mx-0 lg:px-0 lg:static lg:bg-transparent lg:backdrop-blur-none lg:border-0 lg:py-0">
+            <div className="relative w-full">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Tìm tên / SĐT..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none w-full transition-all"
+                aria-label="Tìm giảng viên"
+              />
+            </div>
+          </div>
+
+          <div className="cms-students-filters">
+            <CmsSelect
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className={selectFilterClass}
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="active">Đã cấp quyền</option>
+              <option value="pending">Chờ duyệt</option>
+              <option value="inactive">Chưa cấp quyền</option>
+              <option value="locked">Đã khóa</option>
+              <option value="file">File chờ kiểm tra</option>
+            </CmsSelect>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="cms-teacher-steps !gap-1.5 flex-1 min-w-0 overflow-x-auto">
               {PROCESS_STEPS.map((label, i) => (
-                <div key={label} className="cms-teacher-step">
-                  <span className="cms-teacher-step__n">{i + 1}</span>
-                  <span className="cms-teacher-step__label">{label}</span>
+                <div key={label} className="cms-teacher-step !py-1 !px-1.5">
+                  <span className="cms-teacher-step__n !w-5 !h-5 !text-[10px]">{i + 1}</span>
+                  <span className="cms-teacher-step__label !text-[10px]">{label}</span>
                 </div>
               ))}
             </div>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowTeacherModal(true)}
+                className="cms-students-btn-primary !px-2.5 shrink-0"
+              >
+                <Plus size={15} /> Thêm giảng viên
+              </button>
+            )}
           </div>
+        </div>
 
-          <div className="p-3 sm:p-4 space-y-2.5 bg-slate-50/50">
-            {filteredTeachers.length > 0 ? filteredTeachers.map((t) => {
-              const score = t.testScore;
-              const passed = (score || 0) >= 80;
-              const rating = getTeacherRating(t.id);
-              const active = ['Active', 'active'].includes(t.status);
-              const pending = ['Pending', 'pending'].includes(t.status);
-              const locked = String(t.status).toLowerCase() === 'locked';
-              const inactive = String(t.status).toLowerCase() === 'inactive' || locked;
-              const examDate = resolveTeacherExamDate(t);
+        {/* Mobile cards */}
+        <div className="lg:hidden px-3 pb-3 sm:px-4 space-y-2 min-h-[280px]">
+          {rows.length === 0 ? (
+            <div className="py-12 text-center text-slate-400">
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <User size={24} className="opacity-40" />
+              </div>
+              <p className="text-sm font-semibold text-slate-600">Không tìm thấy giảng viên nào</p>
+            </div>
+          ) : rows.map((t) => {
+            const score = t.testScore;
+            const passed = (score || 0) >= 80;
+            const rating = getTeacherRating(t.id);
+            const active = ['Active', 'active'].includes(t.status);
+            const pending = ['Pending', 'pending'].includes(t.status);
+            const locked = String(t.status).toLowerCase() === 'locked';
+            const examDate = resolveTeacherExamDate(t);
+            const joinDate = t.createdAt || t.startDate
+              ? new Date(t.createdAt || t.startDate).toLocaleDateString('vi-VN')
+              : '';
 
-              return (
-                <article key={t.id} className={`cms-teacher-card ${t.practicalStatus === 'submitted' ? 'ring-1 ring-amber-200' : ''}`}>
-                  <div className="flex items-start gap-3 min-w-0">
-                    <Avatar
-                      size="card"
-                      initials={t.name?.substring(0, 2).toUpperCase() || 'GV'}
-                      name={t.name}
-                      role="teacher"
-                      src={t.avatar}
-                      color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-slate-400'}
-                    />
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[15px] font-bold text-slate-900 truncate leading-tight">{t.name}</p>
-                          <p className="text-[13px] text-slate-500 mt-1 flex items-center gap-1.5 min-w-0">
-                            <Phone size={12} className="shrink-0 text-slate-400" />
-                            <span className="truncate font-mono">{t.phone || '—'}</span>
-                            {t.branchCode ? <span className="text-slate-300">·</span> : null}
-                            {t.branchCode ? <span className="truncate font-medium text-slate-500">{t.branchCode}</span> : null}
-                          </p>
-                        </div>
-                        <span className={`cms-dash-badge flex-shrink-0 ${
-                          active ? 'cms-dash-badge-success'
-                            : pending ? 'cms-dash-badge-warning'
-                              : locked ? 'cms-dash-badge-primary'
-                                : 'cms-dash-badge-neutral'
-                        }`}>
-                          {active ? 'Đã cấp quyền' : pending ? 'Chờ duyệt' : locked ? 'Đã khóa' : 'Chưa cấp quyền'}
-                        </span>
+            return (
+              <article key={t.id} className={`cms-students-card ${t.practicalStatus === 'submitted' ? 'ring-1 ring-amber-200' : ''}`}>
+                <div className="flex items-start gap-3">
+                  <Avatar
+                    size="card"
+                    initials={t.name?.substring(0, 2).toUpperCase() || 'GV'}
+                    name={t.name}
+                    role="teacher"
+                    src={t.avatar}
+                    color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-slate-400'}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="text-base font-semibold text-slate-900 leading-snug truncate">{t.name}</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {joinDate}{t.phone ? ` · ${t.phone}` : ''}
+                          {t.branchCode ? ` · ${t.branchCode}` : ''}
+                        </p>
                       </div>
-
-                      {t.specialty && (
-                        <p className="text-[12px] text-slate-600 leading-snug line-clamp-2">{t.specialty}</p>
-                      )}
+                      <div className="relative flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setMenuId(menuId === t.id ? null : t.id); }}
+                          className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                          aria-label="Thao tác"
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+                        <TeacherActionMenu t={t} {...menuProps} align="right" />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="cms-teacher-card__chips">
-                    <span className={`cms-teacher-chip ${score == null ? 'cms-teacher-chip--muted' : passed ? 'cms-teacher-chip--ok' : 'cms-teacher-chip--bad'}`}>
-                      <Star size={12} className={passed ? 'fill-current' : ''} />
-                      {score == null ? 'Chưa thi' : `${score}/100 · ${passed ? 'Đạt' : 'Trượt'}`}
-                    </span>
-                    <span className={`cms-teacher-chip ${rating.count > 0 ? 'cms-teacher-chip--warn' : 'cms-teacher-chip--muted'}`}>
-                      <Star size={12} className={rating.count > 0 ? 'fill-current' : ''} />
-                      {rating.count > 0 ? `${rating.avg}/5 · ${rating.count} đánh giá` : 'Chưa có đánh giá'}
-                    </span>
-                    {t.assignedStudents?.length > 0 && (
-                      <span className="cms-teacher-chip cms-teacher-chip--info">
-                        Đang dạy {t.assignedStudents.length} HV
-                      </span>
-                    )}
-                    {examDate && (
-                      <span className={`cms-teacher-chip ${isTeacherExamDateApproximate(t) ? 'cms-teacher-chip--warn' : 'cms-teacher-chip--muted'}`}>
-                        <CalendarCheck size={12} />
-                        Thi {examDate.toLocaleDateString('vi-VN')}
-                        {isTeacherExamDateApproximate(t) ? ' (ước lượng)' : ''}
-                      </span>
+                    {t.specialty && (
+                      <p className="mt-1.5 text-sm font-semibold text-sky-700 leading-snug line-clamp-2">{t.specialty}</p>
                     )}
                   </div>
+                </div>
 
-                  <div
-                    className={`cms-teacher-card__status ${
-                      t.practicalStatus === 'reviewed' ? 'is-ready'
-                        : t.practicalFile ? 'is-wait' : ''
-                    }`}
+                <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Điểm / Sao</p>
+                    <p className={`text-[13px] font-bold mt-0.5 ${passed ? 'text-emerald-700' : 'text-red-600'}`}>
+                      {score == null ? 'Chưa thi' : `${score}/100`}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {rating.count > 0 ? `${rating.avg}/5★` : 'Chưa đánh giá'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Lương/buổi</p>
+                    <p className="text-[13px] font-bold text-slate-800 mt-0.5 tabular-nums">
+                      {(Number(t.baseSalaryPerSession) || 0).toLocaleString('vi-VN')}đ
+                    </p>
+                    <p className="text-[11px] text-slate-500">/ buổi</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase self-end">Trạng thái</p>
+                    <StatusBadge active={active} pending={pending} locked={locked} />
+                  </div>
+                </div>
+
+                {t.practicalFile && (
+                  <button
+                    type="button"
+                    onClick={() => setReviewModal(t)}
+                    className="mt-2 w-full text-left text-[12px] font-semibold text-sky-700 bg-sky-50 border border-sky-100 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5"
                   >
-                    <FileSpreadsheet size={15} className="shrink-0 opacity-80" />
-                    {t.practicalFile ? (
-                      <div className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-semibold truncate text-[13px]">
-                          {practicalFileDisplayName(t.practicalFile)}
-                        </span>
-                        <span className="text-[11px] font-bold uppercase tracking-wide opacity-80">
-                          {t.practicalStatus === 'reviewed' ? 'Đã duyệt' : 'Chờ kiểm tra'}
-                        </span>
+                    <FileSpreadsheet size={13} />
+                    {t.practicalStatus === 'reviewed' ? 'Đã duyệt thực hành' : 'File chờ kiểm tra — bấm xem'}
+                  </button>
+                )}
+                {examDate && (
+                  <p className="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1">
+                    <CalendarCheck size={11} />
+                    Thi {examDate.toLocaleDateString('vi-VN')}
+                    {isTeacherExamDateApproximate(t) ? ' (ước lượng)' : ''}
+                  </p>
+                )}
+                {locked && t.lockReason && (
+                  <p className="mt-1.5 text-[11px] text-red-600 bg-red-50 rounded-lg px-2 py-1 flex items-start gap-1">
+                    <AlertTriangle size={12} className="mt-0.5 shrink-0" /> {t.lockReason}
+                  </p>
+                )}
+              </article>
+            );
+          })}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden lg:block cms-table-wrap overscroll-x-contain min-h-[360px] touch-pan-x">
+          <table className="w-full text-left border-collapse min-w-[960px]">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/70">
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Giảng viên</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Chuyên môn</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Điểm / Sao</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lương/buổi</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Thực hành</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Trạng thái</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center w-14" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-16 text-center text-slate-400">
+                    <User size={28} className="mx-auto mb-2 opacity-40" />
+                    <p className="text-sm font-semibold">Không tìm thấy giảng viên nào</p>
+                  </td>
+                </tr>
+              ) : rows.map((t) => {
+                const score = t.testScore;
+                const passed = (score || 0) >= 80;
+                const rating = getTeacherRating(t.id);
+                const active = ['Active', 'active'].includes(t.status);
+                const pending = ['Pending', 'pending'].includes(t.status);
+                const locked = String(t.status).toLowerCase() === 'locked';
+                const examDate = resolveTeacherExamDate(t);
+                const joinDate = t.createdAt || t.startDate
+                  ? new Date(t.createdAt || t.startDate).toLocaleDateString('vi-VN')
+                  : '';
+
+                return (
+                  <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar
+                          size="sm"
+                          initials={t.name?.substring(0, 2).toUpperCase() || 'GV'}
+                          name={t.name}
+                          role="teacher"
+                          src={t.avatar}
+                          color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-slate-400'}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 truncate uppercase tracking-wide">{t.name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                            {joinDate && <span>{joinDate}</span>}
+                            {t.phone && (
+                              <>
+                                {joinDate && <span className="text-slate-300">·</span>}
+                                <Phone size={10} className="text-slate-400" />
+                                <span className="font-mono">{t.phone}</span>
+                              </>
+                            )}
+                          </p>
+                          {t.branchCode && (
+                            <p className="text-[11px] text-slate-400 mt-0.5">{t.branchCode}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 max-w-[200px]">
+                      <p className="text-sm font-semibold text-slate-800 line-clamp-2">{t.specialty || '—'}</p>
+                      {t.assignedStudents?.length > 0 && (
+                        <p className="text-[11px] text-sky-600 font-semibold mt-0.5">
+                          Đang dạy {t.assignedStudents.length} HV
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <p className={`text-sm font-bold ${score == null ? 'text-slate-400' : passed ? 'text-emerald-700' : 'text-red-600'}`}>
+                        {score == null ? 'Chưa thi' : `${score}/100 · ${passed ? 'Đạt' : 'Trượt'}`}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                        <Star size={11} className={rating.count > 0 ? 'text-amber-500 fill-amber-500' : 'text-slate-300'} />
+                        {rating.count > 0 ? `${rating.avg}/5 · ${rating.count} ĐG` : 'Chưa có đánh giá'}
+                      </p>
+                      {examDate && (
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Thi {examDate.toLocaleDateString('vi-VN')}
+                          {isTeacherExamDateApproximate(t) ? ' ≈' : ''}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <p className="text-sm font-bold text-slate-800 tabular-nums">
+                        {(Number(t.baseSalaryPerSession) || 0).toLocaleString('vi-VN')}đ
+                      </p>
+                      <p className="text-xs text-slate-500">/ buổi</p>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {t.practicalFile ? (
                         <button
                           type="button"
                           onClick={() => setReviewModal(t)}
-                          className="ml-auto text-[13px] font-bold text-sky-700 hover:underline shrink-0 min-h-9 px-1"
+                          className={`text-left text-[12px] font-semibold rounded-lg px-2 py-1 border ${
+                            t.practicalStatus === 'reviewed'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              : 'bg-amber-50 text-amber-700 border-amber-100'
+                          }`}
                         >
-                          Kiểm tra
+                          {t.practicalStatus === 'reviewed' ? 'Đã duyệt' : 'Chờ kiểm tra'}
                         </button>
-                      </div>
-                    ) : (
-                      <span className="font-medium text-[13px]">Chưa nộp bài thực hành</span>
-                    )}
-                  </div>
-
-                  {t.approvedAt && (
-                    <p className="text-[12px] text-emerald-600 flex items-center gap-1.5 -mt-1">
-                      <CheckCircle2 size={12} /> Duyệt {new Date(t.approvedAt).toLocaleString('vi-VN')}
-                    </p>
-                  )}
-                  {locked && t.lockReason && (
-                    <p className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                      {t.lockReason}
-                    </p>
-                  )}
-
-                  {isSuperAdmin && (
-                    <div className="cms-teacher-card__footer">
-                      <div className="cms-teacher-card__footer-main">
-                        {inactive && (
-                          <button
-                            type="button"
-                            onClick={() => setGrantModal({ id: t.id, name: t.name || t.email || t.phone, type: locked ? 'retry' : 'first' })}
-                            className={`cms-btn cms-btn-sm ${locked ? 'cms-btn-primary' : 'cms-btn-secondary'}`}
-                          >
-                            <Unlock size={15} /> {locked ? 'Cấp quyền thi lại' : 'Cấp truy cập thi'}
-                          </button>
-                        )}
-
-                        {pending && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => setApproveModal(t)}
-                              disabled={(t.testScore || 0) < 80 || t.practicalStatus !== 'reviewed'}
-                              className="cms-btn cms-btn-success cms-btn-sm"
-                            >
-                              <UserCheck size={15} /> Cấp quyền giảng dạy
-                            </button>
-                            {(t.testScore || 0) < 80 && (
-                              <p className="text-[11px] text-red-500 font-semibold">Chưa đủ 80 điểm</p>
-                            )}
-                            {t.practicalStatus !== 'reviewed' && (
-                              <p className="text-[11px] text-amber-600 font-semibold">Chưa duyệt bài thực hành</p>
-                            )}
-                          </>
-                        )}
-
-                        {active && (
-                          <button
-                            type="button"
-                            onClick={() => handlePayTeacher(t)}
-                            className="cms-btn cms-btn-outline cms-btn-sm"
-                          >
-                            <DollarSign size={14} /> Thanh toán
-                          </button>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium">Chưa nộp</span>
+                      )}
+                      {t.approvedAt && (
+                        <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-0.5">
+                          <CheckCircle2 size={10} /> {new Date(t.approvedAt).toLocaleDateString('vi-VN')}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <div className="inline-flex flex-col items-center gap-1">
+                        <StatusBadge active={active} pending={pending} locked={locked} />
+                        {locked && t.lockReason && (
+                          <span className="text-[10px] text-red-500 max-w-[120px] line-clamp-2">{t.lockReason}</span>
                         )}
                       </div>
-
-                      <div className="cms-teacher-card__footer-tools">
+                    </td>
+                    <td className="px-3 py-3.5 text-center">
+                      <div className="relative inline-block">
                         <button
                           type="button"
-                          onClick={() => setEditTeacher(t)}
-                          className="cms-btn cms-btn-outline cms-btn-icon"
-                          title="Chỉnh sửa"
-                          aria-label="Chỉnh sửa"
+                          onClick={(e) => { e.stopPropagation(); setMenuId(menuId === t.id ? null : t.id); }}
+                          className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          aria-label="Thao tác"
                         >
-                          <Edit3 size={16} />
+                          <MoreHorizontal size={16} />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => removeTeacher(t.id)}
-                          className="cms-btn cms-btn-outline cms-btn-icon text-red-600"
-                          title="Xóa"
-                          aria-label="Xóa"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <TeacherActionMenu t={t} {...menuProps} align="right" />
                       </div>
-                    </div>
-                  )}
-                </article>
-              );
-            }) : (
-              <div className="py-14 text-center space-y-3">
-                <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
-                  <User size={28} />
-                </div>
-                <p className="text-sm font-semibold text-slate-400">Không tìm thấy giảng viên nào</p>
-              </div>
-            )}
-          </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-          <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100">
-            <p className="text-xs text-slate-500 font-medium">
-              Hiển thị {filteredTeachers.length} / {teachers.length} giảng viên
-            </p>
-          </div>
+        <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
+          <p className="text-xs text-slate-500 font-medium">
+            Hiển thị {rows.length} / {teachers.length} giảng viên
+          </p>
         </div>
       </div>
 

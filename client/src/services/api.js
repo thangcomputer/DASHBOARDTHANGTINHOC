@@ -803,10 +803,16 @@ export const teachersAPI = {
     const res = await apiFetch(`/teachers/${id}/finance/pending`);
     return res.json();
   },
-  payFlexible: async (teacherId, sessionsCount, amount, note) => {
+  payFlexible: async (teacherId, sessionsCount, amount, note, opts = {}) => {
     const res = await apiFetch(`/teachers/${teacherId}/finance/pay-flexible`, {
       method: 'PUT',
-      body: JSON.stringify({ sessionsCount, amount, note }),
+      body: JSON.stringify({
+        sessionsCount,
+        amount,
+        note,
+        includeStarBonus: !!opts.includeStarBonus,
+        ...(Array.isArray(opts.starBonusMonths) ? { starBonusMonths: opts.starBonusMonths } : {}),
+      }),
     });
     return res.json();
   },
@@ -1280,6 +1286,17 @@ export const systemLogsAPI = {
     const res = await apiFetch(`/system-logs?page=${page}&limit=${limit}`);
     return res.json();
   },
+  create: async (payload) => {
+    const res = await apiFetch('/system-logs', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    });
+    return res.json();
+  },
+  remove: async (id) => {
+    const res = await apiFetch(`/system-logs/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
 };
 
 // ─── NOTIFICATIONS API (Notification Center) ────────────────────────────────
@@ -1648,6 +1665,55 @@ export const trainingLmsAPI = {
   },
 };
 
+// ─── FINANCE (Ledger SoT) ────────────────────────────────────────────────────
+export const financeAPI = {
+  summary: async ({ branchId = 'all', from = '', to = '', studentId = '' } = {}) => {
+    const q = new URLSearchParams();
+    if (branchId) q.set('branchId', branchId);
+    if (from) q.set('from', from);
+    if (to) q.set('to', to);
+    if (studentId) q.set('studentId', studentId);
+    const res = await apiFetch(`/finance/summary?${q}`);
+    return res.json();
+  },
+  ledger: async ({
+    branchId = 'all', studentId = '', teacherId = '', type = '',
+    from = '', to = '', status = 'posted', page = 1, limit = 50,
+  } = {}) => {
+    const q = new URLSearchParams();
+    if (branchId) q.set('branchId', branchId);
+    if (studentId) q.set('studentId', studentId);
+    if (teacherId) q.set('teacherId', teacherId);
+    if (type) q.set('type', type);
+    if (from) q.set('from', from);
+    if (to) q.set('to', to);
+    if (status) q.set('status', status);
+    q.set('page', String(page));
+    q.set('limit', String(limit));
+    const res = await apiFetch(`/finance/ledger?${q}`);
+    return res.json();
+  },
+  studentCard: async (studentId) => {
+    const res = await apiFetch(`/finance/students/${studentId}`);
+    return res.json();
+  },
+  voidEntry: async (entryId, { reason = '', createReversal = true } = {}) => {
+    const res = await apiFetch(`/finance/ledger/${entryId}/void`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, createReversal }),
+    });
+    return res.json();
+  },
+  reconcile: async ({ branchId = 'all', from = '', to = '' } = {}) => {
+    const q = new URLSearchParams();
+    if (branchId) q.set('branchId', branchId);
+    if (from) q.set('from', from);
+    if (to) q.set('to', to);
+    const res = await apiFetch(`/finance/reconcile?${q}`);
+    return res.json();
+  },
+};
+
 // ─── BANG TIN (hoi bai / trao doi) ───────────────────────────────────────────
 export const feedAPI = {
   list: async (page = 1, limit = 20) => {
@@ -1724,6 +1790,7 @@ export default {
   monitoring:    monitoringAPI,
   ai:            aiAPI,
   bi:            biAPI,
+  finance:       financeAPI,
   workflows:     workflowsAPI,
   builder:       builderAPI,
   tenants:       tenantsAPI,

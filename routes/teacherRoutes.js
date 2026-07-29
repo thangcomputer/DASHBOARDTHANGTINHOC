@@ -15,6 +15,8 @@ const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const NotificationService = require('../services/NotificationService');
 const { generateTempPassword } = require('../utils/tempPassword');
+const { postSalary } = require('../services/ledgerService');
+const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
 
 const router = express.Router();
 
@@ -101,7 +103,7 @@ const superAdminOnlyTeacher = async (req, res, next) => {
 // Chỉ Super Admin được tạo giảng viên
 router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], async (req, res) => {
   try {
-    const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail } = req.body;
+    const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
     }
@@ -155,6 +157,7 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       isFirstLogin: true,
       branchId:   finalBranchId,
       branchCode: finalBranchCode,
+      baseSalaryPerSession: Math.max(0, Number(baseSalaryPerSession) || 0),
     });
 
     // Emit socket cho Admin thấy real-time
@@ -800,7 +803,7 @@ router.get('/:id/finance', authMiddleware, async (req, res) => {
 });
 
 // ─── GET /api/teachers/:id/finance/pending ──────────────────────────────────────
-// Lấy số buổi còn nợ thanh toán (cho modal Step 1)
+// Lấy số buổi còn nợ thanh toán + thưởng sao tích lũy (cho modal Step 1)
 router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const teacher = await Teacher.findById(req.params.id);
@@ -814,6 +817,7 @@ router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.M
 
     const salaryPerSession = teacher.baseSalaryPerSession || 0;
     const unpaidAmount = pendingSessionsCount * salaryPerSession;
+    const starBonus = await computeStarBonusSummary(teacher);
 
     return res.json({
       success: true,
@@ -821,6 +825,7 @@ router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.M
         pendingSessionsCount,
         salaryPerSession,
         unpaidAmount,
+        starBonus,
         bankInfo: {
           bankName: teacher.bankAccount?.bankName || '',
           accountNumber: teacher.bankAccount?.accountNumber || '',
@@ -837,15 +842,19 @@ router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.M
 
 // ─── PUT /api/teachers/:id/finance/pay-flexible ──────────────────────────────────
 // Thanh toán linh hoạt: Admin tự chọn số buổi và số tiền, FIFO (cũ nhất trước)
+// Có thể cộng thưởng sao tích lũy (includeStarBonus)
 router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
   try {
-    const { sessionsCount, amount, note } = req.body;
+    const { sessionsCount, amount, note, includeStarBonus, starBonusMonths } = req.body;
     const idempotencyKey = String(
       req.headers['idempotency-key'] || req.body.idempotencyKey || ''
     ).trim() || null;
 
-    if (!sessionsCount || Number(sessionsCount) <= 0) {
-      return res.status(400).json({ success: false, message: 'Số buổi thanh toán phải lớn hơn 0' });
+    const paidCount = Math.max(0, Number(sessionsCount) || 0);
+    const wantBonus = includeStarBonus === true || includeStarBonus === 'true' || includeStarBonus === 1;
+
+    if (paidCount <= 0 && !wantBonus) {
+      return res.status(400).json({ success: false, message: 'Số buổi thanh toán phải lớn hơn 0 (hoặc bật thưởng sao)' });
     }
     if (!amount || Number(amount) <= 0) {
       return res.status(400).json({ success: false, message: 'Số tiền thanh toán phải lớn hơn 0' });
@@ -861,9 +870,11 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
           success: true,
           message: 'Giao dịch đã tồn tại (idempotent)',
           data: {
-            paidSessions: Number(sessionsCount),
+            paidSessions: paidCount,
             markedSessions: 0,
             totalAmount: existing.amount,
+            starBonusAmount: existing.starBonusAmount || 0,
+            starBonusMonths: existing.starBonusMonths || [],
             transaction: existing,
             idempotent: true,
           },
@@ -874,32 +885,56 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
 
-    // Tìm buổi chưa thanh toán theo FIFO (chỉ tính các buổi đã hoàn thành - completed)
-    const pendingSessions = await Schedule.find({
-      teacherId: req.params.id,
-      status: 'completed',
-      is_paid_to_teacher: { $ne: true }
-    }).sort({ date: 1, createdAt: 1 }).limit(Number(sessionsCount));
-
-    const sessionIds = pendingSessions.map(s => s._id);
-
-    // Atomic claim: chỉ đánh dấu buổi còn unpaid
-    let actualCount = 0;
-    if (sessionIds.length > 0) {
-      const claim = await Schedule.updateMany(
-        {
-          _id: { $in: sessionIds },
-          status: 'completed',
-          is_paid_to_teacher: { $ne: true },
-        },
-        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+    let bonusPayout = { payoutMonths: [], payoutBonusAmount: 0 };
+    if (wantBonus) {
+      bonusPayout = await resolveBonusForPayout(
+        teacher,
+        Array.isArray(starBonusMonths) ? starBonusMonths : null
       );
-      actualCount = claim.modifiedCount || 0;
+      if (paidCount <= 0 && bonusPayout.payoutBonusAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Không có thưởng sao đủ điều kiện để thanh toán',
+        });
+      }
+    }
+    const starBonusAmount = Number(bonusPayout.payoutBonusAmount) || 0;
+    const starBonusMonthKeys = Array.isArray(bonusPayout.payoutMonths) ? bonusPayout.payoutMonths : [];
+
+    // Tìm buổi chưa thanh toán theo FIFO (chỉ tính các buổi đã hoàn thành - completed)
+    let sessionIds = [];
+    let actualCount = 0;
+    if (paidCount > 0) {
+      const pendingSessions = await Schedule.find({
+        teacherId: req.params.id,
+        status: 'completed',
+        is_paid_to_teacher: { $ne: true }
+      }).sort({ date: 1, createdAt: 1 }).limit(paidCount);
+
+      sessionIds = pendingSessions.map(s => s._id);
+
+      if (sessionIds.length > 0) {
+        const claim = await Schedule.updateMany(
+          {
+            _id: { $in: sessionIds },
+            status: 'completed',
+            is_paid_to_teacher: { $ne: true },
+          },
+          { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+        );
+        actualCount = claim.modifiedCount || 0;
+      }
     }
 
     const now = new Date();
     const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
-    const paidCount = Number(sessionsCount);
+    const bonusNote = starBonusAmount > 0
+      ? ` + thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ (${starBonusMonthKeys.join(', ')})`
+      : '';
+    const defaultDesc = paidCount > 0
+      ? `Thù lao ${paidCount} buổi dạy${bonusNote}`
+      : `Thưởng sao giảng viên${bonusNote}`;
+
     let transaction;
     try {
       transaction = await Transaction.create({
@@ -907,7 +942,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
         teacherName: teacher.name,
         teacherPhone: teacher.phone || '',
         amount: Number(amount),
-        description: note || `Thù lao ${paidCount} buổi dạy`,
+        description: note || defaultDesc,
         month: monthLabel,
         status: 'confirmed',
         confirmedBy: req.user?.name || 'Admin',
@@ -915,6 +950,8 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
         bankName: teacher.bankAccount?.bankName || '',
         bankAccount: teacher.bankAccount?.accountNumber || '',
         note: note || '',
+        starBonusAmount,
+        starBonusMonths: starBonusMonthKeys,
         ...(idempotencyKey ? { idempotencyKey } : {}),
       });
     } catch (createErr) {
@@ -939,6 +976,8 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
               paidSessions: paidCount,
               markedSessions: actualCount,
               totalAmount: existing.amount,
+              starBonusAmount: existing.starBonusAmount || 0,
+              starBonusMonths: existing.starBonusMonths || [],
               transaction: existing,
               idempotent: true,
             },
@@ -948,22 +987,79 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
       throw createErr;
     }
 
+    // P2: post Ledger salary — fail-closed (rollback Transaction + sessions nếu Ledger lỗi)
+    try {
+      await postSalary({
+        teacher,
+        amount: Number(amount),
+        transaction,
+        branchId: teacher.branchId || null,
+        idempotencyKey: `salary:tx:${transaction._id}`,
+        sourceRef: `tx:${transaction._id}`,
+        actor: { id: req.user?.id || req.user?._id || '', role: req.user?.role || 'admin', name: req.user?.name || '' },
+        note: note || defaultDesc,
+        metadata: {
+          sessionsCount: paidCount,
+          sessionIds: sessionIds.map(String),
+          starBonusAmount,
+          starBonusMonths: starBonusMonthKeys,
+        },
+      });
+    } catch (ledgerErr) {
+      logger.error('[FINANCE] salary ledger (pay-flexible) FAILED — rollback: %s', ledgerErr.message);
+      try {
+        await Transaction.findByIdAndUpdate(transaction._id, { status: 'cancelled' });
+        if (sessionIds.length > 0) {
+          await Schedule.updateMany(
+            { _id: { $in: sessionIds }, is_paid_to_teacher: true },
+            { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
+          );
+        }
+      } catch (rbErr) {
+        logger.error('[FINANCE] pay-flexible rollback failed: %s', rbErr.message);
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Ghi sổ lương thất bại — đã hủy phiếu chi. Thử lại.',
+      });
+    }
+
+    // Đánh dấu tháng thưởng đã chi sau khi Ledger OK
+    if (starBonusMonthKeys.length > 0) {
+      try {
+        await Teacher.findByIdAndUpdate(req.params.id, {
+          $addToSet: { starBonusPaidMonths: { $each: starBonusMonthKeys } },
+        });
+      } catch (bonusMarkErr) {
+        logger.error('[FINANCE] Mark starBonusPaidMonths failed: %s', bonusMarkErr.message);
+      }
+    }
+
     const io = req.app.get('io');
     if (io) {
       io.emit('teacher:financeUpdated', {
         teacherId: req.params.id,
-        message: `Admin đã thanh toán ${Number(amount).toLocaleString('vi-VN')}đ cho ${paidCount} buổi.`
+        message: `Admin đã thanh toán ${Number(amount).toLocaleString('vi-VN')}đ`
+          + (paidCount > 0 ? ` cho ${paidCount} buổi` : '')
+          + (starBonusAmount > 0 ? ` (gồm thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ)` : '')
+          + '.',
       });
       io.emit('transactions:new', transaction);
+      io.emit('revenue:updated', { amount: Number(amount), type: 'salary' });
     }
 
     return res.json({
       success: true,
-      message: `Thanh toán thành công ${paidCount} buổi`,
+      message: paidCount > 0
+        ? `Thanh toán thành công ${paidCount} buổi`
+          + (starBonusAmount > 0 ? ` + thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ` : '')
+        : `Thanh toán thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ`,
       data: {
         paidSessions: paidCount,
         markedSessions: actualCount,
         totalAmount: Number(amount),
+        starBonusAmount,
+        starBonusMonths: starBonusMonthKeys,
         transaction,
       }
     });
@@ -1058,6 +1154,35 @@ router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.
       throw createErr;
     }
 
+    try {
+      await postSalary({
+        teacher,
+        amount: totalAmount,
+        transaction,
+        branchId: teacher.branchId || null,
+        idempotencyKey: `salary:tx:${transaction._id}`,
+        sourceRef: `tx:${transaction._id}`,
+        actor: { id: req.user?.id || req.user?._id || '', role: req.user?.role || 'admin', name: req.user?.name || '' },
+        note: `Thanh toán thù lao ${paidCount} buổi dạy`,
+        metadata: { sessionsCount: paidCount, sessionIds: sessionIds.map(String) },
+      });
+    } catch (ledgerErr) {
+      logger.error('[FINANCE] salary ledger (pay-all) FAILED — rollback: %s', ledgerErr.message);
+      try {
+        await Transaction.findByIdAndUpdate(transaction._id, { status: 'cancelled' });
+        await Schedule.updateMany(
+          { _id: { $in: sessionIds }, is_paid_to_teacher: true },
+          { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
+        );
+      } catch (rbErr) {
+        logger.error('[FINANCE] pay-all rollback failed: %s', rbErr.message);
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Ghi sổ lương thất bại — đã hủy phiếu chi. Thử lại.',
+      });
+    }
+
     const io = req.app.get('io');
     if (io) {
       io.emit('teacher:financeUpdated', {
@@ -1065,6 +1190,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.
         message: `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${paidCount} buổi dạy.`
       });
       io.emit('transactions:new', transaction);
+      io.emit('revenue:updated', { amount: totalAmount, type: 'salary' });
     }
 
     return res.json({

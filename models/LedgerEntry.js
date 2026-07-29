@@ -14,7 +14,16 @@ const ledgerEntrySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['payment', 'refund', 'adjustment'],
+      enum: [
+        'payment',
+        'refund',
+        'adjustment',
+        'salary',
+        'bonus',
+        'expense',
+        'discount',
+        'coupon',
+      ],
       required: true,
       index: true,
     },
@@ -46,6 +55,12 @@ const ledgerEntrySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Tenant',
       default: null,
+    },
+    teacherId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Teacher',
+      default: null,
+      index: true,
     },
     enrollmentId: { type: String, default: '', maxlength: 64 },
     invoiceId: {

@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Settings, CreditCard, Bell, Save, Loader2, Eye,
   Upload, Users, GraduationCap, ToggleLeft,
-  ToggleRight, AlertCircle, Landmark, X,
+  ToggleRight, Landmark, X,
   DollarSign, Building2, Lock, User, KeyRound, EyeOff, CheckCircle2, FileText,
   ShieldCheck, Briefcase,
 } from 'lucide-react';
@@ -497,91 +497,96 @@ export default function SystemSettingsTab() {
       )}
 
       {activeSubTab === 'popup' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 w-full max-w-full lg:max-w-2xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell size={16} className="text-red-600" />
-              <h3 className="font-bold text-gray-800">Popup thông báo / quảng cáo</h3>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3.5 space-y-3 w-full max-w-4xl">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                <Bell size={14} className="text-red-600" /> Popup thông báo
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {settings.popupIsActive
+                  ? 'Đang bật — hiện khi đăng nhập theo đối tượng đã chọn'
+                  : 'Đang tắt — không hiện khi đăng nhập'}
+              </p>
             </div>
-            {/* Toggle bật/tắt */}
-            <button
-              onClick={() => setSettings(prev => ({ ...prev, popupIsActive: !prev.popupIsActive }))}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition ${
-                settings.popupIsActive
-                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
-            >
-              {settings.popupIsActive
-                ? <><ToggleRight size={20} className="text-emerald-600" /> Đang bật</>
-                : <><ToggleLeft size={20} /> Đang tắt</>
-              }
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({ ...prev, popupIsActive: !prev.popupIsActive }))}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition ${
+                  settings.popupIsActive
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                {settings.popupIsActive
+                  ? <><ToggleRight size={16} className="text-emerald-600" /> Bật</>
+                  : <><ToggleLeft size={16} /> Tắt</>
+                }
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSave(['popupIsActive','popupTitle','popupContent','popupImageUrl','popupTargetRole'])}
+                disabled={saving}
+                className="cms-btn cms-btn-primary !py-1.5 !px-3 !text-xs !rounded-lg disabled:opacity-40"
+              >
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                {saving ? 'Lưu…' : 'Lưu'}
+              </button>
+            </div>
           </div>
 
-          {!settings.popupIsActive && (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center gap-2 text-sm text-gray-500">
-              <AlertCircle size={14} />
-              Popup đang tắt — Học viên / Giảng viên / Nhân viên sẽ không thấy popup khi đăng nhập.
-            </div>
-          )}
-
-          {/* Target Role */}
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Đối tượng hiển thị</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <label className="text-[11px] font-semibold text-slate-500 block mb-1">Đối tượng</label>
+            <div className="grid grid-cols-4 gap-1.5">
               {[
                 { v: 'all',     label: 'Tất cả',    Icon: Users },
-                { v: 'student', label: 'Học viên',   Icon: Users },
-                { v: 'teacher', label: 'Giảng viên', Icon: GraduationCap },
-                { v: 'staff',   label: 'Nhân viên',  Icon: Briefcase },
+                { v: 'student', label: 'HV',         Icon: Users },
+                { v: 'teacher', label: 'GV',         Icon: GraduationCap },
+                { v: 'staff',   label: 'NV',         Icon: Briefcase },
               ].map(({ v, label, Icon }) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => setSettings(prev => ({ ...prev, popupTargetRole: v }))}
-                  className={`py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition border-2 ${
+                  className={`py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition border ${
                     settings.popupTargetRole === v
                       ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
+                  title={v === 'staff' ? 'Thông báo nội bộ Staff khi đăng nhập' : undefined}
                 >
-                  <Icon size={14} /> {label}
+                  <Icon size={12} /> {label}
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-gray-400 mt-2">
-              Chọn <strong>Nhân viên</strong> để gửi thông báo nội bộ cho Staff khi đăng nhập.
-            </p>
           </div>
 
-          {/* Title */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Tiêu đề popup</label>
-            <input
-              type="text"
-              value={settings.popupTitle}
-              onChange={e => setSettings(prev => ({ ...prev, popupTitle: e.target.value }))}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-red-400 outline-none transition"
-              placeholder="VD: 🎉 Thông báo lịch học tháng 4"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="sm:col-span-2">
+              <label className="text-[11px] font-semibold text-slate-500 block mb-1">Tiêu đề</label>
+              <input
+                type="text"
+                value={settings.popupTitle}
+                onChange={e => setSettings(prev => ({ ...prev, popupTitle: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] focus:border-red-400 outline-none transition"
+                placeholder="VD: Thông báo lịch học tháng 4"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-[11px] font-semibold text-slate-500 block mb-1">Nội dung</label>
+              <textarea
+                value={settings.popupContent}
+                onChange={e => setSettings(prev => ({ ...prev, popupContent: e.target.value }))}
+                rows={3}
+                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] focus:border-red-400 outline-none resize-none transition"
+                placeholder="Nội dung thông báo…"
+              />
+            </div>
           </div>
 
-          {/* Content */}
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Nội dung thông báo</label>
-            <textarea
-              value={settings.popupContent}
-              onChange={e => setSettings(prev => ({ ...prev, popupContent: e.target.value }))}
-              rows={4}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-red-400 outline-none resize-none transition"
-              placeholder="Nhập nội dung thông báo..."
-            />
-          </div>
-
-          {/* Image Upload */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Ảnh banner (tùy chọn)</label>
+            <label className="text-[11px] font-semibold text-slate-500 block mb-1">Ảnh banner (tuỳ chọn)</label>
             <input
               ref={imgInputRef}
               type="file"
@@ -589,80 +594,84 @@ export default function SystemSettingsTab() {
               className="hidden"
               onChange={e => handleImageUpload(e.target.files?.[0])}
             />
-            <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row gap-1.5">
               <button
+                type="button"
                 onClick={() => imgInputRef.current?.click()}
                 disabled={uploading}
-                className="w-full border-2 border-dashed border-red-300 rounded-xl py-4 text-red-600 hover:bg-red-50 flex items-center justify-center gap-2 font-medium text-sm transition disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-red-300 text-red-600 text-[11px] font-semibold hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
               >
-                {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                {uploading ? 'Đang upload...' : 'Chọn ảnh banner'}
+                {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                {uploading ? 'Upload…' : 'Chọn ảnh'}
               </button>
-
-              {settings.popupImageUrl && (
-                <div className="relative">
-                  <img
-                    src={settings.popupImageUrl.startsWith('http')
-                      ? settings.popupImageUrl
-                      : `${import.meta.env.VITE_API_URL || ""}${settings.popupImageUrl}`}
-                    alt="Banner preview"
-                    className="w-full rounded-xl border max-h-48 object-cover"
-                  />
-                  <button
-                    onClick={() => setSettings(prev => ({ ...prev, popupImageUrl: '' }))}
-                    className="absolute top-2 right-2 w-7 h-7 bg-black/50 rounded-full text-white flex items-center justify-center hover:bg-black/70"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              )}
-
-              {/* URL input thay thế */}
               <input
                 type="url"
                 value={settings.popupImageUrl}
                 onChange={e => setSettings(prev => ({ ...prev, popupImageUrl: e.target.value }))}
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-xs font-mono focus:border-red-400 outline-none transition"
-                placeholder="Hoặc nhập URL ảnh trực tiếp..."
+                className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:border-red-400 outline-none transition"
+                placeholder="Hoặc URL ảnh…"
               />
             </div>
+            {settings.popupImageUrl && (
+              <div className="relative mt-1.5 inline-block max-w-full">
+                <img
+                  src={settings.popupImageUrl.startsWith('http')
+                    ? settings.popupImageUrl
+                    : `${import.meta.env.VITE_API_URL || ""}${settings.popupImageUrl}`}
+                  alt="Banner preview"
+                  className="rounded-lg border max-h-28 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSettings(prev => ({ ...prev, popupImageUrl: '' }))}
+                  className="absolute top-1 right-1 w-6 h-6 bg-black/50 rounded-full text-white flex items-center justify-center hover:bg-black/70"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
           </div>
-
-          <button
-            onClick={() => handleSave(['popupIsActive','popupTitle','popupContent','popupImageUrl','popupTargetRole'])}
-            disabled={saving}
-            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl hover:from-red-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-red-100"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? 'Đang lưu...' : 'Lưu cấu hình Popup'}
-          </button>
         </div>
       )}
 
       {/* ── TAB: HÓA ĐƠN (INVOICE) ────────────────────────────────────────── */}
       {activeSubTab === 'invoice' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-6 w-full max-w-full lg:max-w-2xl">
-          <div className="flex items-center gap-2">
-            <FileText size={16} className="text-blue-600" />
-            <h3 className="font-bold text-gray-800">Cấu hình Hóa đơn (Phiếu thu)</h3>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3.5 space-y-3 w-full max-w-4xl">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                <FileText size={14} className="text-blue-600" /> Cấu hình Hóa đơn
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Logo · chữ ký · dấu mộc trên phiếu thu A5</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSave(['invoiceLogoUrl', 'invoiceSignatureUrl', 'invoiceStampText'])}
+              disabled={saving}
+              className="cms-btn cms-btn-primary !py-1.5 !px-3 !text-xs !rounded-lg disabled:opacity-40"
+            >
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              {saving ? 'Lưu…' : 'Lưu'}
+            </button>
           </div>
-          
-          <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-xl p-3">
-            💡 Tùy chỉnh Logo, Chữ ký và dấu mộc hiển thị trên hóa đơn (khổ A5) của Trung tâm.
-          </p>
 
-          {/* Logo Hóa đơn */}
-          <div className="space-y-3">
-             <label className="text-xs font-bold text-gray-500 uppercase block">Logo trên hóa đơn</label>
-             <div className="flex items-center gap-4">
-               {settings.invoiceLogoUrl && (
-                 <img 
-                    src={settings.invoiceLogoUrl.startsWith('http') ? settings.invoiceLogoUrl : `${import.meta.env.VITE_API_URL || ""}${settings.invoiceLogoUrl}`} 
-                    className="h-16 w-16 object-contain border rounded-lg bg-gray-50" 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Logo hóa đơn</label>
+              <div className="flex items-center gap-2">
+                {settings.invoiceLogoUrl ? (
+                  <img
+                    src={settings.invoiceLogoUrl.startsWith('http') ? settings.invoiceLogoUrl : `${import.meta.env.VITE_API_URL || ""}${settings.invoiceLogoUrl}`}
+                    className="h-11 w-11 object-contain border rounded-md bg-white flex-shrink-0"
                     alt="Logo Invoice"
-                 />
-               )}
-               <button 
+                  />
+                ) : (
+                  <div className="h-11 w-11 rounded-md border border-dashed border-slate-200 bg-white flex items-center justify-center text-slate-300 flex-shrink-0">
+                    <FileText size={14} />
+                  </div>
+                )}
+                <button
+                  type="button"
                   onClick={() => {
                     const input = document.createElement('input');
                     input.type = 'file';
@@ -670,25 +679,29 @@ export default function SystemSettingsTab() {
                     input.onchange = (e) => handleInvoiceLogoUpload(e.target.files[0]);
                     input.click();
                   }}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition flex items-center gap-2"
-               >
-                 <Upload size={14} /> {settings.invoiceLogoUrl ? 'Thay đổi Logo' : 'Tải lên Logo'}
-               </button>
-             </div>
-          </div>
+                  className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                >
+                  <Upload size={12} /> {settings.invoiceLogoUrl ? 'Đổi' : 'Tải lên'}
+                </button>
+              </div>
+            </div>
 
-          {/* Chữ ký */}
-          <div className="space-y-3">
-             <label className="text-xs font-bold text-gray-500 uppercase block">Chữ ký người nhận tiền</label>
-             <div className="flex items-center gap-4">
-               {settings.invoiceSignatureUrl && (
-                 <img 
-                    src={settings.invoiceSignatureUrl.startsWith('http') ? settings.invoiceSignatureUrl : `${import.meta.env.VITE_API_URL || ""}${settings.invoiceSignatureUrl}`} 
-                    className="h-16 w-32 object-contain border rounded-lg bg-gray-50" 
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Chữ ký người nhận</label>
+              <div className="flex items-center gap-2">
+                {settings.invoiceSignatureUrl ? (
+                  <img
+                    src={settings.invoiceSignatureUrl.startsWith('http') ? settings.invoiceSignatureUrl : `${import.meta.env.VITE_API_URL || ""}${settings.invoiceSignatureUrl}`}
+                    className="h-11 w-20 object-contain border rounded-md bg-white flex-shrink-0"
                     alt="Chữ ký"
-                 />
-               )}
-               <button 
+                  />
+                ) : (
+                  <div className="h-11 w-20 rounded-md border border-dashed border-slate-200 bg-white flex items-center justify-center text-slate-300 flex-shrink-0 text-[10px]">
+                    PNG
+                  </div>
+                )}
+                <button
+                  type="button"
                   onClick={() => {
                     const input = document.createElement('input');
                     input.type = 'file';
@@ -696,34 +709,25 @@ export default function SystemSettingsTab() {
                     input.onchange = (e) => handleSignatureUpload(e.target.files[0]);
                     input.click();
                   }}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition flex items-center gap-2"
-               >
-                 <Upload size={14} /> {settings.invoiceSignatureUrl ? 'Thay đổi Chữ ký' : 'Tải lên Chữ ký'}
-               </button>
-             </div>
-             <p className="text-[10px] text-gray-400 italic">Gợi ý: Sử dụng ảnh nền trong suốt (PNG) để hiển thị đẹp nhất.</p>
+                  className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                >
+                  <Upload size={12} /> {settings.invoiceSignatureUrl ? 'Đổi' : 'Tải lên'}
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-400">Nên dùng PNG nền trong suốt</p>
+            </div>
           </div>
 
-          {/* Dấu mộc (Stamp) */}
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Nội dung dấu mộc (Stamp)</label>
+            <label className="text-[11px] font-semibold text-slate-500 block mb-1">Nội dung dấu mộc</label>
             <input
               type="text"
               value={settings.invoiceStampText}
               onChange={e => setSettings(prev => ({ ...prev, invoiceStampText: e.target.value.toUpperCase() }))}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-red-600 focus:border-red-400 outline-none transition"
+              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] font-bold text-red-600 focus:border-red-400 outline-none transition"
               placeholder="VD: ĐÃ THANH TOÁN"
             />
           </div>
-
-          <button
-            onClick={() => handleSave(['invoiceLogoUrl', 'invoiceSignatureUrl', 'invoiceStampText'])}
-            disabled={saving}
-            className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl hover:from-red-700 flex items-center justify-center gap-2 disabled:opacity-40 transition shadow-lg shadow-red-100"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? 'Đang lưu...' : 'Lưu cấu hình Hóa đơn'}
-          </button>
         </div>
       )}
       {/* ── TAB 5: CÀI ĐẶT WEB ── WebSettingsTab component ──────────────────── */}
@@ -733,127 +737,122 @@ export default function SystemSettingsTab() {
 
       {/* ── TAB 6: TÀI KHOẢN ADMIN ──────────────────────────────────────────── */}
       {activeSubTab === 'account' && (
-        <div className={`grid grid-cols-1 gap-4 sm:gap-6 w-full max-w-full ${isSuperAdmin ? 'lg:grid-cols-2' : 'lg:max-w-2xl'}`}>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-5 min-w-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <Lock size={16} className="text-red-600 shrink-0" />
-              <h3 className="text-base font-semibold text-slate-900">Thay đổi thông tin Admin</h3>
-            </div>
-            <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-100 rounded-xl px-3.5 py-3">
-              Thay đổi tên hiển thị và mật khẩu đăng nhập của tài khoản Admin.
-            </p>
-          </div>
-
-          {adminSuccess && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-3 flex items-center gap-2 text-emerald-700 text-sm font-semibold">
-              <CheckCircle2 size={16} className="shrink-0" /> {adminSuccess}
-            </div>
-          )}
-
-          {/* Tên hiển thị */}
-          <div>
-            <label className="text-[13px] font-medium text-slate-600 block mb-1.5">Tên hiển thị mới (tùy chọn)</label>
-            <div className="flex items-center gap-2.5 bg-white border border-slate-200 rounded-xl px-3.5 min-h-12 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/10 transition">
-              <User size={16} className="text-slate-400 flex-shrink-0" />
-              <input
-                type="text"
-                value={adminName}
-                onChange={e => setAdminName(e.target.value)}
-                className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent py-3"
-                placeholder="Nhập tên hiển thị mới..."
-              />
-            </div>
-          </div>
-
-          <div className="border-t border-slate-100 pt-5 space-y-4">
-            <p className="text-[13px] font-semibold text-slate-700 flex items-center gap-1.5">
-              <KeyRound size={14} className="text-slate-500" /> Đổi mật khẩu (tùy chọn)
-            </p>
-
-            <div className="space-y-3.5">
+        <div className={`grid grid-cols-1 gap-3 w-full max-w-4xl ${isSuperAdmin ? 'lg:grid-cols-2' : 'lg:max-w-xl'}`}>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3.5 space-y-3 min-w-0">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <label className="text-[13px] font-medium text-slate-600 block mb-1.5">Mật khẩu hiện tại</label>
-                <div className="flex items-center gap-2.5 bg-white border border-slate-200 rounded-xl px-3.5 min-h-12 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/10 transition">
-                  <Lock size={16} className="text-slate-400 flex-shrink-0" />
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <Lock size={14} className="text-red-600 shrink-0" /> Thông tin Admin
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Đổi tên hiển thị / mật khẩu đăng nhập</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAdminProfileSave}
+                disabled={adminSaving || (adminNewPw && adminNewPw !== adminNewPw2)}
+                className="cms-btn cms-btn-primary !py-1.5 !px-3 !text-xs !rounded-lg disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                {adminSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                {adminSaving ? 'Lưu…' : 'Lưu'}
+              </button>
+            </div>
+
+            {adminSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 text-emerald-700 text-[12px] font-semibold">
+                <CheckCircle2 size={13} className="shrink-0" /> {adminSuccess}
+              </div>
+            )}
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-500 block mb-1">Tên hiển thị</label>
+              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-500/10 transition">
+                <User size={14} className="text-slate-400 flex-shrink-0" />
+                <input
+                  type="text"
+                  value={adminName}
+                  onChange={e => setAdminName(e.target.value)}
+                  className="flex-1 text-[13px] font-medium text-slate-800 outline-none bg-transparent py-1.5"
+                  placeholder="Tên hiển thị mới…"
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-2.5 space-y-2">
+              <p className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
+                <KeyRound size={12} className="text-slate-400" /> Đổi mật khẩu
+              </p>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-500 block mb-1">Mật khẩu hiện tại</label>
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-500/10 transition">
+                  <Lock size={14} className="text-slate-400 flex-shrink-0" />
                   <input
                     type={showAdminOldPw ? 'text' : 'password'}
                     value={adminOldPw}
                     onChange={e => setAdminOldPw(e.target.value)}
-                    className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent py-3"
-                    placeholder="Nhập mật khẩu hiện tại..."
+                    className="flex-1 text-[13px] font-medium text-slate-800 outline-none bg-transparent py-1.5"
+                    placeholder="Mật khẩu hiện tại…"
                   />
-                  <button type="button" onClick={() => setShowAdminOldPw(!showAdminOldPw)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Hiện/ẩn mật khẩu">
-                    {showAdminOldPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <button type="button" onClick={() => setShowAdminOldPw(!showAdminOldPw)} className="text-slate-400 hover:text-slate-600 p-0.5" aria-label="Hiện/ẩn mật khẩu">
+                    {showAdminOldPw ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="text-[13px] font-medium text-slate-600 block mb-1.5">Mật khẩu mới (ít nhất 6 ký tự)</label>
-                <div className="flex items-center gap-2.5 bg-white border border-slate-200 rounded-xl px-3.5 min-h-12 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/10 transition">
-                  <KeyRound size={16} className="text-slate-400 flex-shrink-0" />
-                  <input
-                    type={showAdminNewPw ? 'text' : 'password'}
-                    value={adminNewPw}
-                    onChange={e => setAdminNewPw(e.target.value)}
-                    className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent py-3"
-                    placeholder="Nhập mật khẩu mới..."
-                  />
-                  <button type="button" onClick={() => setShowAdminNewPw(!showAdminNewPw)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Hiện/ẩn mật khẩu">
-                    {showAdminNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">Mật khẩu mới (≥6)</label>
+                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 min-h-9 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-500/10 transition">
+                    <KeyRound size={14} className="text-slate-400 flex-shrink-0" />
+                    <input
+                      type={showAdminNewPw ? 'text' : 'password'}
+                      value={adminNewPw}
+                      onChange={e => setAdminNewPw(e.target.value)}
+                      className="flex-1 text-[13px] font-medium text-slate-800 outline-none bg-transparent py-1.5 min-w-0"
+                      placeholder="Mật khẩu mới…"
+                    />
+                    <button type="button" onClick={() => setShowAdminNewPw(!showAdminNewPw)} className="text-slate-400 hover:text-slate-600 p-0.5" aria-label="Hiện/ẩn mật khẩu">
+                      {showAdminNewPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-[13px] font-medium text-slate-600 block mb-1.5">Xác nhận mật khẩu mới</label>
-                <div className={`flex items-center gap-2.5 bg-white border rounded-xl px-3.5 min-h-12 transition ${
-                  adminNewPw2 && adminNewPw !== adminNewPw2
-                    ? 'border-red-300'
-                    : 'border-slate-200 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/10'
-                }`}>
-                  <KeyRound size={16} className="text-slate-400 flex-shrink-0" />
-                  <input
-                    type="password"
-                    value={adminNewPw2}
-                    onChange={e => setAdminNewPw2(e.target.value)}
-                    className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent py-3"
-                    placeholder="Nhập lại mật khẩu mới..."
-                  />
-                  {adminNewPw2 && adminNewPw === adminNewPw2 && (
-                    <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">Xác nhận</label>
+                  <div className={`flex items-center gap-2 bg-white border rounded-lg px-2.5 min-h-9 transition ${
+                    adminNewPw2 && adminNewPw !== adminNewPw2
+                      ? 'border-red-300'
+                      : 'border-slate-200 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-500/10'
+                  }`}>
+                    <KeyRound size={14} className="text-slate-400 flex-shrink-0" />
+                    <input
+                      type="password"
+                      value={adminNewPw2}
+                      onChange={e => setAdminNewPw2(e.target.value)}
+                      className="flex-1 text-[13px] font-medium text-slate-800 outline-none bg-transparent py-1.5 min-w-0"
+                      placeholder="Nhập lại…"
+                    />
+                    {adminNewPw2 && adminNewPw === adminNewPw2 && (
+                      <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                    )}
+                  </div>
+                  {adminNewPw2 && adminNewPw !== adminNewPw2 && (
+                    <p className="text-[10px] text-red-500 mt-0.5">Không khớp</p>
                   )}
                 </div>
-                {adminNewPw2 && adminNewPw !== adminNewPw2 && (
-                  <p className="text-xs text-red-500 mt-1.5">Mật khẩu xác nhận không khớp</p>
-                )}
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleAdminProfileSave}
-            disabled={adminSaving || (adminNewPw && adminNewPw !== adminNewPw2)}
-            className="w-full min-h-12 py-3 mt-1 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
-          >
-            {adminSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {adminSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
-          </button>
-          </div>
-
           {isSuperAdmin && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-4 min-w-0 h-fit">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-emerald-600" />
-                  <h3 className="font-bold text-gray-800">Xác thực 2 bước (MFA)</h3>
-                </div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3.5 space-y-2.5 min-w-0 h-fit">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-600" /> MFA (2 bước)
+                </h3>
                 {mfaLoading ? (
-                  <Loader2 size={14} className="animate-spin text-gray-400" />
+                  <Loader2 size={13} className="animate-spin text-gray-400" />
                 ) : (
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                     mfaEnabled
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : 'bg-gray-50 text-gray-500 border border-gray-200'
@@ -862,8 +861,8 @@ export default function SystemSettingsTab() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 rounded-xl p-3">
-                Dùng Google Authenticator / Authy. Sau khi bật, đăng nhập tài khoản này qua cổng nội bộ cần thêm mã OTP 6 số.
+              <p className="text-[11px] text-amber-800/80 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 leading-snug">
+                Google Authenticator / Authy · đăng nhập nội bộ cần OTP 6 số.
               </p>
 
               {!mfaEnabled && !mfaSetup && (
@@ -871,21 +870,21 @@ export default function SystemSettingsTab() {
                   type="button"
                   onClick={handleMfaStartSetup}
                   disabled={mfaBusy}
-                  className="w-full py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 flex items-center justify-center gap-2 disabled:opacity-40"
+                  className="w-full py-2 bg-emerald-600 text-white text-[13px] font-bold rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-1.5 disabled:opacity-40"
                 >
-                  {mfaBusy ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
-                  Bắt đầu bật MFA
+                  {mfaBusy ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                  Bật MFA
                 </button>
               )}
 
               {!mfaEnabled && mfaSetup && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {mfaSetup.qrDataUrl && (
                     <div className="flex justify-center">
-                      <img src={mfaSetup.qrDataUrl} alt="MFA QR" className="w-44 h-44 rounded-xl border bg-white p-1" />
+                      <img src={mfaSetup.qrDataUrl} alt="MFA QR" className="w-36 h-36 rounded-lg border bg-white p-1" />
                     </div>
                   )}
-                  <p className="text-xs text-center text-gray-500 break-all font-mono bg-gray-50 rounded-lg p-2">
+                  <p className="text-[10px] text-center text-gray-500 break-all font-mono bg-gray-50 rounded-md px-2 py-1.5">
                     {mfaSetup.secret}
                   </p>
                   <input
@@ -893,14 +892,14 @@ export default function SystemSettingsTab() {
                     inputMode="numeric"
                     value={mfaCode}
                     onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-center tracking-widest outline-none focus:border-emerald-400"
-                    placeholder="Mã OTP 6 số"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-center tracking-widest outline-none focus:border-emerald-400"
+                    placeholder="OTP 6 số"
                   />
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                     <button
                       type="button"
                       onClick={() => { setMfaSetup(null); setMfaCode(''); }}
-                      className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50"
+                      className="flex-1 py-2 border border-gray-200 rounded-lg text-[12px] font-bold text-gray-600 hover:bg-gray-50"
                     >
                       Hủy
                     </button>
@@ -908,22 +907,22 @@ export default function SystemSettingsTab() {
                       type="button"
                       onClick={handleMfaEnable}
                       disabled={mfaBusy || mfaCode.length !== 6}
-                      className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-40 flex items-center justify-center gap-2"
+                      className="flex-1 py-2 bg-emerald-600 text-white text-[12px] font-bold rounded-lg hover:bg-emerald-700 disabled:opacity-40 flex items-center justify-center gap-1.5"
                     >
-                      {mfaBusy ? <Loader2 size={15} className="animate-spin" /> : null}
-                      Xác nhận bật
+                      {mfaBusy ? <Loader2 size={13} className="animate-spin" /> : null}
+                      Xác nhận
                     </button>
                   </div>
                 </div>
               )}
 
               {mfaEnabled && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <input
                     type="password"
                     value={mfaDisablePw}
                     onChange={(e) => setMfaDisablePw(e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-red-300"
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-[13px] font-medium outline-none focus:border-red-300"
                     placeholder="Mật khẩu hiện tại"
                   />
                   <input
@@ -931,16 +930,16 @@ export default function SystemSettingsTab() {
                     inputMode="numeric"
                     value={mfaCode}
                     onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-center tracking-widest outline-none focus:border-red-300"
-                    placeholder="Mã OTP hiện tại"
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold text-center tracking-widest outline-none focus:border-red-300"
+                    placeholder="OTP hiện tại"
                   />
                   <button
                     type="button"
                     onClick={handleMfaDisable}
                     disabled={mfaBusy}
-                    className="w-full py-2.5 bg-red-50 text-red-700 border border-red-200 font-bold rounded-xl hover:bg-red-100 disabled:opacity-40 flex items-center justify-center gap-2"
+                    className="w-full py-2 bg-red-50 text-red-700 border border-red-200 text-[13px] font-bold rounded-lg hover:bg-red-100 disabled:opacity-40 flex items-center justify-center gap-1.5"
                   >
-                    {mfaBusy ? <Loader2 size={15} className="animate-spin" /> : null}
+                    {mfaBusy ? <Loader2 size={14} className="animate-spin" /> : null}
                     Tắt MFA
                   </button>
                 </div>

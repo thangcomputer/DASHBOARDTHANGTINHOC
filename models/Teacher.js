@@ -121,8 +121,11 @@ const TeacherSchema = new mongoose.Schema(
     totalSessionsTaught: { type: Number, default: 0 },
     averageRating: { type: Number, min: 0, max: 5, default: 0 },
 
-    // Lương cơ bản / buổi dạy (Workflow 4 tính thù lao)
+    // Lương cứng / buổi dạy (không phụ thuộc sao)
     baseSalaryPerSession: { type: Number, default: 0, min: 0 },
+
+    /** Các tháng YYYY-MM đã chi thưởng sao (≥10 HV + ≥5★ → 200k/tháng) */
+    starBonusPaidMonths: { type: [String], default: [] },
 
     // ── Thông tin thêm ────────────────────────────────────────────
     specialty: { type: String, default: '' }, // Chuyên môn: "THVP, Excel, ..."

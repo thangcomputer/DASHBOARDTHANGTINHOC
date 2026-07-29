@@ -91,13 +91,18 @@ function toClientCourse(enrollment, index) {
     linkHoc: enrollment.linkHoc || '',
     nextClass: enrollment.nextClass || '',
     nextClassTime: enrollment.nextClassTime || '',
-    paid: enrollment.paid,
+    paid: (enrollment.status === 'cancelled' || enrollment.status === 'refunded')
+      ? false
+      : enrollment.paid,
     price: enrollment.price,
     status: enrollment.status || (completed >= (enrollment.totalSessions || 12) ? 'completed' : 'active'),
     registeredAt: enrollment.registeredAt,
     isPrimary: enrollment.isPrimary,
     requireWebcam: enrollment.requireWebcam !== false,
     examUnlocked: enrollment.examUnlocked === true,
+    cancelledAt: enrollment.cancelledAt || null,
+    cancelReason: enrollment.cancelReason || '',
+    refundedAmount: Number(enrollment.refundedAmount) || 0,
   };
 }
 

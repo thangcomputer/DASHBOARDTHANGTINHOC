@@ -1,11 +1,20 @@
 import React from 'react';
 import { getExamSubjectGroupLabel, getExamSubjectOptions } from '../../../utils/examSubjects';
 
+/**
+ * @param {object} props
+ * @param {number} [props.columns=3] — số cột desktop (mobile tự về 2)
+ * @param {boolean} [props.dense] — chip thấp hơn, nhóm sát hơn
+ * @param {boolean} [props.hideLabel] — ẩn label "Môn học"
+ */
 export default function ExamSubjectCheckboxGrid({
   catalog,
   value = [],
   onChange,
   accent = 'red',
+  columns = 3,
+  dense = false,
+  hideLabel = false,
 }) {
   const options = getExamSubjectOptions(catalog);
   const selected = Array.isArray(value) ? value : [];
@@ -29,24 +38,36 @@ export default function ExamSubjectCheckboxGrid({
         : accent === 'green' ? 'is-accent-green'
           : '';
 
+  const colClass =
+    columns === 4 ? 'cms-chip-grid--4'
+      : columns === 2 ? 'cms-chip-grid--2'
+        : 'cms-chip-grid--3';
+
   return (
-    <div className="space-y-2">
-      <label className="cms-label">
-        Môn học <span className="text-red-500">*</span>
-      </label>
-      <div className="space-y-3">
+    <div className={dense ? 'space-y-1.5' : 'space-y-2'}>
+      {!hideLabel && (
+        <label className="cms-label">
+          Môn học <span className="text-red-500">*</span>
+          {selected.length > 0 && (
+            <span className="ml-1.5 normal-case tracking-normal font-semibold text-slate-400">
+              ({selected.length} đã chọn)
+            </span>
+          )}
+        </label>
+      )}
+      <div className={dense ? 'space-y-2.5' : 'space-y-3'}>
         {Object.entries(groups).map(([groupKey, items]) => (
-          <div key={groupKey} className="space-y-2">
-            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+          <div key={groupKey} className={dense ? 'space-y-1.5' : 'space-y-2'}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               {getExamSubjectGroupLabel(groupKey)}
             </p>
-            <div className={`cms-chip-grid ${accentClass}`}>
+            <div className={`cms-chip-grid ${colClass} ${accentClass}`}>
               {items.map(({ id, label }) => {
                 const on = selected.includes(id);
                 return (
                   <label
                     key={id}
-                    className={`cms-chip-option ${on ? 'is-on' : ''}`}
+                    className={`cms-chip-option ${dense ? 'cms-chip-option--dense' : ''} ${on ? 'is-on' : ''}`}
                   >
                     <input
                       type="checkbox"
@@ -69,7 +90,7 @@ export default function ExamSubjectCheckboxGrid({
         ))}
       </div>
       {!options.length && (
-        <p className="text-[12px] text-amber-600">Chưa có danh mục môn. Cấu hình tại Cài đặt hệ thống.</p>
+        <p className="text-xs text-amber-600">Chưa có danh mục môn. Cấu hình tại Cài đặt hệ thống.</p>
       )}
     </div>
   );

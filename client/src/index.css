@@ -266,7 +266,7 @@
   }
 
   .cms-label {
-    @apply text-xs font-black uppercase tracking-widest text-slate-500;
+    @apply text-xs font-semibold uppercase tracking-wide text-slate-600;
   }
 
   .cms-form-stack {
@@ -1166,19 +1166,38 @@
   box-shadow: none;
 }
 .cms-step__label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--cms-neutral-500);
+  color: var(--cms-neutral-600);
 }
 .cms-chip-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
+.cms-chip-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.cms-chip-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cms-chip-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 639.98px) {
+  .cms-chip-grid,
+  .cms-chip-grid--3,
+  .cms-chip-grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (max-width: 379.98px) {
-  .cms-chip-grid {
+  .cms-chip-grid,
+  .cms-chip-grid--2,
+  .cms-chip-grid--3,
+  .cms-chip-grid--4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1198,6 +1217,13 @@
   text-align: left;
   min-width: 0;
   transition: border-color var(--cms-duration) ease, background var(--cms-duration) ease;
+}
+.cms-chip-option--dense {
+  min-height: 34px;
+  padding: 5px 8px;
+  gap: 6px;
+  border-radius: 10px;
+  font-size: 12.5px;
 }
 .cms-chip-option > span:last-child {
   min-width: 0;
@@ -1359,63 +1385,68 @@
   padding-bottom: 16px;
 }
 
-/* Compact modal form - avoid scrollbar on common viewports */
+/* Compact modal form - giảm padding/gap, giữ cỡ chữ đồng bộ web */
 .cms-sheet--compact {
-  --cms-modal-pad: 14px;
-  --cms-field-gap: 10px;
+  --cms-modal-pad: 16px;
+  --cms-field-gap: 12px;
 }
 .cms-sheet--compact .cms-sheet-header {
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 .cms-sheet--compact .cms-sheet-body {
-  padding-bottom: 12px;
+  padding-bottom: 14px;
 }
 .cms-sheet--compact .cms-sheet-footer {
   gap: 8px;
-  padding-top: 10px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  padding-top: 12px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
 }
 .cms-sheet--compact .cms-sheet-footer > .cms-btn {
   min-height: 44px;
 }
 .cms-sheet--compact .cms-form {
-  gap: 10px;
+  gap: 12px;
 }
 .cms-sheet--compact .cms-label {
-  margin-bottom: 4px;
-  font-size: 11px;
+  margin-bottom: 6px;
+  /* giữ cỡ chữ web — không thu nhỏ hơn .cms-label chuẩn */
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }
 .cms-sheet--compact .cms-input {
-  min-height: 40px;
-  height: 40px;
-  font-size: 13px;
-  padding: 0 12px;
+  min-height: 44px;
+  height: 44px;
+  font-size: 14px;
+  padding: 0 14px;
   border-radius: 12px;
 }
 .cms-sheet--compact .cms-step {
-  gap: 8px;
+  gap: 10px;
   margin: 0;
-  padding: 0 0 2px;
+  padding: 0 0 4px;
 }
 .cms-sheet--compact .cms-step__num {
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
   box-shadow: none;
 }
 .cms-sheet--compact .cms-step__label {
-  font-size: 11px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
-.cms-sheet--compact .cms-chip-option {
-  min-height: 36px;
-  padding: 6px 10px;
-  font-size: 12px;
-  border-radius: 10px;
+.cms-sheet--compact .cms-form-row .cms-label {
+  min-height: 0;
 }
 .cms-sheet--compact .cms-chip-grid {
   gap: 6px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 639.98px) {
+  .cms-sheet--compact .cms-chip-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Chat */

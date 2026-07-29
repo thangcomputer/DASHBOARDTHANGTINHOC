@@ -11,6 +11,9 @@ const { authMiddleware, checkPermission, isTeacher, branchFilter } = require('..
 const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
+const { postSalary, voidLedgerEntry } = require('../services/ledgerService');
+const LedgerEntry = require('../models/LedgerEntry');
+const { allowHardDeleteFinance } = require('../utils/financeFlags');
 
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
@@ -238,6 +241,37 @@ router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
       return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
     }
 
+    try {
+      const teacherDoc = transaction.teacherId?._id
+        ? transaction.teacherId
+        : await Teacher.findById(transaction.teacherId).lean();
+      await postSalary({
+        teacher: teacherDoc,
+        amount: transaction.amount,
+        transaction,
+        branchId: teacherDoc?.branchId || transaction.branchId || null,
+        idempotencyKey: `salary:tx:${transaction._id}`,
+        sourceRef: `tx:${transaction._id}`,
+        actor: { id: req.user?.id || '', role: req.user?.role || 'admin', name: confirmedBy },
+        note: transaction.description || `Chi lương ${transaction.month || ''}`,
+      });
+    } catch (ledgerErr) {
+      logger.error('[TRANSACTIONS] salary ledger on confirm FAILED — rollback: %s', ledgerErr.message);
+      try {
+        await Transaction.findByIdAndUpdate(transaction._id, {
+          status: 'pending',
+          confirmedBy: '',
+          confirmedAt: null,
+        });
+      } catch (rbErr) {
+        logger.error('[TRANSACTIONS] confirm rollback failed: %s', rbErr.message);
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Ghi sổ lương thất bại — phiếu vẫn pending. Thử lại.',
+      });
+    }
+
     // Thông báo real-time cho giảng viên
     const io = req.app.get('io');
     if (io) {
@@ -263,14 +297,44 @@ router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
 // ─── PUT /api/transactions/:id/cancel ─────────────────────────────────────────
 router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
+    const prev = await Transaction.findById(req.params.id);
+    if (!prev) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
+    }
+    if (prev.status === 'cancelled') {
+      return res.json({ success: true, data: prev });
+    }
+
     const transaction = await Transaction.findByIdAndUpdate(
       req.params.id,
       { status: 'cancelled' },
       { returnDocument: 'after' }
     );
 
-    if (!transaction) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
+    // H8: hủy phiếu confirmed → void SALARY ledger
+    if (prev.status === 'confirmed') {
+      try {
+        const salaryEntry = await LedgerEntry.findOne({
+          type: 'salary',
+          status: 'posted',
+          $or: [
+            { sourceRef: `tx:${prev._id}` },
+            { idempotencyKey: `salary:tx:${prev._id}` },
+            { 'metadata.transactionId': String(prev._id) },
+          ],
+        });
+        if (salaryEntry) {
+          await voidLedgerEntry({
+            entryId: salaryEntry._id,
+            reason: `Hủy phiếu chi ${prev._id}`,
+            actor: { id: req.user?.id || '', role: req.user?.role || 'admin' },
+            createReversal: true,
+          });
+        }
+      } catch (voidErr) {
+        logger.error('[TRANSACTIONS] void salary on cancel: %s', voidErr.message);
+        // Không rollback cancel phiếu — admin có thể void tay; log để reconcile
+      }
     }
 
     res.json({ success: true, data: transaction });
@@ -280,12 +344,26 @@ router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FIN
 });
 
 // ─── DELETE /api/transactions/:id ────────────────────────────────────────────
+// P3: cấm hard-delete phiếu đã confirmed; chỉ cho phép khi FINANCE_ALLOW_HARD_DELETE=true
 router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
-    const transaction = await Transaction.findByIdAndDelete(req.params.id);
+    const transaction = await Transaction.findById(req.params.id);
     if (!transaction) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
     }
+    if (transaction.status === 'confirmed' && !allowHardDeleteFinance()) {
+      return res.status(405).json({
+        success: false,
+        message: 'Không được xóa phiếu lương đã xác nhận. Hãy hủy (cancel) hoặc void ledger.',
+      });
+    }
+    if (!allowHardDeleteFinance() && transaction.status !== 'pending' && transaction.status !== 'cancelled') {
+      return res.status(405).json({
+        success: false,
+        message: 'Hard-delete bị tắt. Dùng PUT /cancel.',
+      });
+    }
+    await Transaction.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Đã xóa giao dịch' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

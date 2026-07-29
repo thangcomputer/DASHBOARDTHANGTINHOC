@@ -16,7 +16,8 @@ const {
 } = require('../services/enrollmentService');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const { generateTempPassword } = require('../utils/tempPassword');
-const { settlePayment, postRefund } = require('../services/ledgerService');
+const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../services/ledgerService');
+const cache = require('../utils/cache');
 
 function financeActor(req) {
   return {
@@ -33,6 +34,12 @@ function financeReqMeta(req, student) {
     userAgent: req.headers['user-agent'] || '',
     branchId: student?.branchId || req.user?.branchId || null,
   };
+}
+
+function bustFinanceCaches() {
+  try {
+    cache.delByPrefix('bi:overview');
+  } catch { /* ignore */ }
 }
 
 async function nextInvoiceCode() {
@@ -193,6 +200,53 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
       studentsWithRealSessions.map((doc) => applyEnrollmentStats(doc, doc._id, Schedule))
     );
 
+    // Heal: khóa cancelled thiếu refundedAmount trên DTO → lấy từ ledger refund
+    try {
+      const needHealIds = [];
+      enrichedStudents.forEach((s) => {
+        const list = Array.isArray(s.courses) && s.courses.length
+          ? s.courses
+          : (Array.isArray(s.enrollments) ? s.enrollments : []);
+        const missing = list.some((e) => e?.status === 'cancelled' && !(Number(e.refundedAmount) > 0));
+        if (missing) needHealIds.push(s._id);
+      });
+      if (needHealIds.length) {
+        const LedgerEntry = require('../models/LedgerEntry');
+        const refundRows = await LedgerEntry.find({
+          studentId: { $in: needHealIds },
+          type: 'refund',
+          status: 'posted',
+        }).select('studentId courseName amount postedAt').lean();
+        const byStudent = new Map();
+        refundRows.forEach((r) => {
+          const sid = String(r.studentId);
+          if (!byStudent.has(sid)) byStudent.set(sid, []);
+          byStudent.get(sid).push(r);
+        });
+        const norm = (n) => String(n || '').trim().toLowerCase();
+        enrichedStudents.forEach((s) => {
+          const sid = String(s._id);
+          const ledgers = byStudent.get(sid);
+          if (!ledgers?.length) return;
+          const patchList = (list) => {
+            if (!Array.isArray(list)) return;
+            list.forEach((e) => {
+              if (e?.status !== 'cancelled' || Number(e.refundedAmount) > 0) return;
+              const courseKey = norm(e.courseName || e.name);
+              const match = ledgers.find((r) => norm(r.courseName) === courseKey)
+                || ledgers.find((r) => courseKey && norm(r.courseName).includes(courseKey))
+                || ledgers[0];
+              if (match) e.refundedAmount = Math.abs(Number(match.amount) || 0);
+            });
+          };
+          patchList(s.courses);
+          patchList(s.enrollments);
+        });
+      }
+    } catch (healErr) {
+      logger.warn('[STUDENTS] refund heal skipped: %s', healErr.message);
+    }
+
     res.json({
       success: true,
       count: enrichedStudents.length,
@@ -224,13 +278,12 @@ router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
     const unpaid = await Student.countDocuments({ ...bf, paid: false });
     const unlocked = await Student.countDocuments({ ...bf, studentExamUnlocked: true });
 
-    const {
-      sumPaidRevenue,
-    } = require('../services/revenueAggregate');
+    const { sumFinancialRevenue } = require('../services/ledgerService');
+    const branchId = bf.branchId || null;
 
-    // Doanh thu = SUM price của mọi enrollment đã thanh toán (không chỉ khóa chính)
+    // Doanh thu SoT = Ledger (PAYMENT − REFUND), không dùng enrollment.paid
     const [revenueAll, pendingResult, todayRevenueRow] = await Promise.all([
-      sumPaidRevenue({ branchFilter: bf }),
+      sumFinancialRevenue({ branchId }),
       Student.aggregate([
         { $match: { ...bf } },
         {
@@ -245,7 +298,12 @@ router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
                         $filter: {
                           input: '$enrollments',
                           as: 'e',
-                          cond: { $ne: ['$$e.paid', true] },
+                          cond: {
+                            $and: [
+                              { $ne: ['$$e.paid', true] },
+                              { $ne: ['$$e.status', 'cancelled'] },
+                            ],
+                          },
                         },
                       },
                       as: 'e',
@@ -265,12 +323,12 @@ router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
       (async () => {
         const nowVN = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
         const startOfTodayVN = new Date(Date.UTC(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate()) - 7 * 60 * 60 * 1000);
-        return sumPaidRevenue({ branchFilter: bf, start: startOfTodayVN, end: new Date() });
+        return sumFinancialRevenue({ branchId, from: startOfTodayVN, to: new Date() });
       })(),
     ]);
-    const totalRevenue = revenueAll.total || 0;
+    const totalRevenue = revenueAll.net || 0;
     const pendingRevenue = pendingResult[0]?.total || 0;
-    const todayRevenue = todayRevenueRow.total || 0;
+    const todayRevenue = todayRevenueRow.net || 0;
 
     // Số giảng viên active (branch-aware)
     const Teacher = require('../models/Teacher');
@@ -357,31 +415,8 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) 
     const invoicesRaw = await Invoice.find({ hocVien: studentOid }).sort({ createdAt: -1 }).lean();
     let invoices = Array.isArray(invoicesRaw) ? [...invoicesRaw] : [];
 
-    // Backfill: khóa đang học đã thanh toán nhưng chưa có hóa đơn → tạo mã HĐ tuần tự
-    const enrList = Array.isArray(student.enrollments) ? student.enrollments : [];
-    for (const enr of enrList) {
-      if (!enr || enr.status === 'cancelled') continue;
-      const isPaid = enr.paid === true || enr.paid === 'Đã đóng phí';
-      const amount = Number(enr.price) || 0;
-      const courseName = String(enr.courseName || '').trim();
-      if (!isPaid || amount <= 0 || !courseName) continue;
-      const hasInvoice = invoices.some((inv) => {
-        const sameCourse = String(inv.khoaHoc || '').trim().toLowerCase() === courseName.toLowerCase();
-        const sameAmount = Math.abs(Number(inv.hocPhi) - amount) < 1;
-        const isRefundNote = /hoàn/i.test(String(inv.ghiChu || ''));
-        return sameCourse && sameAmount && !isRefundNote;
-      });
-      if (hasInvoice) continue;
-      const created = await createTuitionInvoice({
-        student,
-        courseName,
-        amount,
-        note: `Thanh toán khóa ${courseName}`,
-      });
-      if (created) {
-        invoices.unshift(typeof created.toObject === 'function' ? created.toObject() : created);
-      }
-    }
+    // H11: GET read-only — không backfill Invoice (tránh chứng từ orphan không Ledger).
+    // Heal thiếu HĐ bằng job reconcile / finance reconcile API.
 
     // 2b) Ledger refund (không tạo Invoice gốc) — append để UI "Tài chính" hiển thị.
     const LedgerEntry = require('../models/LedgerEntry');
@@ -533,7 +568,116 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
       const seq = String(Date.now()).slice(-8);
       student.studentCode = `HV${seq}`;
     }
+
+    // Luôn có enrollment primary (đồng bộ danh sách khóa + thu phí)
+    const isPaidOnCreate = student.paid === true || student.paid === 'true' || student.paid === 1;
+    const courseName = String(student.course || '').trim() || 'Khóa học';
+    const courseId = req.body.courseId || null;
+    const price = Number(student.price) || 0;
+    const enrollSessions = Number(student.totalSessions) > 0 ? Number(student.totalSessions) : sessions;
+    let teacherName = student.teacherName || '';
+    if (student.teacherId && !teacherName) {
+      try {
+        const Teacher = require('../models/Teacher');
+        const t = await Teacher.findById(student.teacherId).select('name').lean();
+        teacherName = t?.name || '';
+        student.teacherName = teacherName;
+      } catch { /* ignore */ }
+    }
+    const examSubjects = await resolveEnrollmentExamSubjects({
+      courseName,
+      courseId,
+    });
+    if (!Array.isArray(student.enrollments) || student.enrollments.length === 0) {
+      student.enrollments = [{
+        courseName,
+        courseId: courseId || null,
+        examSubjects,
+        teacherId: student.teacherId || null,
+        teacherName,
+        price,
+        paid: !!isPaidOnCreate,
+        paidAt: isPaidOnCreate ? new Date() : undefined,
+        totalSessions: enrollSessions,
+        remainingSessions: enrollSessions,
+        completedSessions: 0,
+        grades: [],
+        status: isPaidOnCreate ? 'active' : 'pending_payment',
+        learningAccess: !!isPaidOnCreate,
+        isPrimary: true,
+        registeredAt: new Date(),
+        requireWebcam: true,
+        examUnlocked: false,
+      }];
+    } else if (isPaidOnCreate) {
+      student.enrollments.forEach((e, i) => {
+        if (i === 0 || e.isPrimary) {
+          e.paid = true;
+          e.paidAt = e.paidAt || new Date();
+          e.learningAccess = true;
+          if (!e.status || e.status === 'pending_payment') e.status = 'active';
+        }
+      });
+    }
+    if (isPaidOnCreate) {
+      student.paid = true;
+      if (!(Number(student.paidAmount) > 0)) student.paidAmount = price;
+      if (!student.paidAt) student.paidAt = new Date();
+      if (!student.paymentMethod) student.paymentMethod = 'cash';
+    }
+
     await student.save();
+
+    // Tạo hóa đơn + ledger ngay khi thêm HV đã thanh toán (fail-closed: Ledger bắt buộc)
+    let createdInvoice = null;
+    if (isPaidOnCreate && price > 0) {
+      createdInvoice = await createTuitionInvoice({
+        student,
+        courseName,
+        amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
+        note: `Thanh toán khi thêm học viên — ${courseName}`,
+      });
+      try {
+        await settlePayment({
+          student,
+          amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
+          invoice: createdInvoice,
+          courseName,
+          source: 'student_create_paid',
+          sourceRef: createdInvoice?.maHoaDon || `create:${student._id}`,
+          idempotencyKey: `payment:create:${student._id}:${createdInvoice?.maHoaDon || 'nohd'}`,
+          actor: financeActor(req),
+          note: 'Thanh toán khi thêm học viên',
+          reqMeta: financeReqMeta(req, student),
+        });
+        bustFinanceCaches();
+      } catch (ledgerErr) {
+        logger.error('[STUDENTS] ledger settle on create FAILED — rollback paid: %s', ledgerErr.message);
+        // Rollback cache + void invoice (không để paid không có Ledger)
+        if (Array.isArray(student.enrollments)) {
+          student.enrollments.forEach((e) => {
+            e.paid = false;
+            e.paidAt = undefined;
+            e.status = 'pending_payment';
+          });
+          student.markModified('enrollments');
+        }
+        student.paid = false;
+        student.paidAmount = 0;
+        student.paidAt = undefined;
+        await student.save();
+        if (createdInvoice?._id) {
+          try {
+            await Invoice.findByIdAndUpdate(createdInvoice._id, { status: 'void' });
+          } catch { /* ignore */ }
+        }
+        return res.status(500).json({
+          success: false,
+          message: 'Đã tạo HV nhưng ghi sổ cái thất bại — trạng thái thu đã rollback. Thử thu lại.',
+          data: { studentId: student._id },
+        });
+      }
+    }
 
     const io = req.app.get('io');
     if (io) {
@@ -546,6 +690,9 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
         course: student.course,
       });
       io.emit('data:refresh', { type: 'student', action: 'create' });
+      if (createdInvoice) {
+        io.emit('revenue:updated', { amount: price, studentName: student.name });
+      }
     }
 
     const welcome = await sendAccountWelcome(io, {
@@ -574,6 +721,13 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
     studentObj.welcomeQueued = welcome.queued;
     studentObj.welcomeNotified = welcome.notified;
     studentObj.tempPassword = plainPassword;
+    if (createdInvoice) {
+      studentObj.invoice = {
+        _id: createdInvoice._id,
+        maHoaDon: createdInvoice.maHoaDon,
+        hocPhi: createdInvoice.hocPhi,
+      };
+    }
 
     res.status(201).json({ success: true, data: studentObj });
 
@@ -602,6 +756,12 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
     }
 
     const safeBody = { ...req.body };
+    // H12: cấm set paid/paidAmount/paymentMethod qua PUT generic — phải qua /pay hoặc /refund
+    delete safeBody.paid;
+    delete safeBody.paidAmount;
+    delete safeBody.paidAt;
+    delete safeBody.paymentMethod;
+    delete safeBody.paidNote;
     const before = await Student.findById(req.params.id)
       .select('studentExamUnlocked examApproved name examProgress')
       .lean();
@@ -729,8 +889,7 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
         || safeBody.course != null
         || safeBody.courseId != null
         || safeBody.price != null
-        || safeBody.teacherId !== undefined
-        || safeBody.paid != null;
+        || safeBody.teacherId !== undefined;
 
       if (touchCourse) {
         const { legacyEnrollmentFromStudent } = require('../services/enrollmentService');
@@ -745,7 +904,6 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
           if (safeBody.course != null) enr.courseName = safeBody.course;
           if (safeBody.courseId != null) enr.courseId = safeBody.courseId;
           if (safeBody.price != null) enr.price = Number(safeBody.price) || 0;
-          if (safeBody.paid != null) enr.paid = !!safeBody.paid;
           if (safeBody.teacherId !== undefined) {
             enr.teacherId = safeBody.teacherId || null;
           }
@@ -976,42 +1134,62 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
   try {
     const { paymentMethod = 'transfer', note = '' } = req.body;
 
-    const student = await Student.findById(req.params.id);
-    if (!student) {
+    const existing = await Student.findById(req.params.id);
+    if (!existing) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
-    if (student.paid) {
+    if (existing.paid) {
       return res.status(409).json({ success: false, message: 'Học viên đã thanh toán trước đó' });
     }
 
-    // Cập nhật trạng thái thanh toán
-    student.paid = true;
-    student.paidAt = new Date();
-    student.paymentMethod = paymentMethod;
-    if (!(Number(student.paidAmount) > 0)) {
-      student.paidAmount = Number(student.price) || 0;
+    const paidAt = new Date();
+    const paidAmount = Number(existing.paidAmount) > 0
+      ? Number(existing.paidAmount)
+      : (Number(existing.price) || 0);
+
+    // Atomic claim — tránh race double-pay (admin×admin / admin×SePay)
+    const claimed = await Student.findOneAndUpdate(
+      { _id: req.params.id, paid: false },
+      {
+        $set: {
+          paid: true,
+          paidAt,
+          paymentMethod,
+          paidAmount,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+    if (!claimed) {
+      return res.status(409).json({ success: false, message: 'Học viên đã thanh toán trước đó' });
     }
+
     // Mở quyền học enrollment primary / đã gắn khóa chính
-    if (student.enrollments?.length) {
-      student.enrollments.forEach((e) => {
-        if (e.isPrimary || student.enrollments.length === 1) {
+    if (claimed.enrollments?.length) {
+      claimed.enrollments.forEach((e) => {
+        if (e.isPrimary || claimed.enrollments.length === 1) {
           e.paid = true;
-          e.paidAt = student.paidAt;
+          e.paidAt = paidAt;
           e.learningAccess = true;
           if (e.status === 'pending_payment' || e.status === 'refunded') e.status = 'active';
         }
       });
-      student.markModified('enrollments');
+      claimed.markModified('enrollments');
+      await claimed.save({ validateModifiedOnly: true });
     }
-    await student.save({ validateModifiedOnly: true });
 
-    // Tự động tạo hóa đơn
-    const invoice = await createTuitionInvoice({
-      student,
-      courseName: student.course,
-      amount: student.paidAmount || student.price,
-      note,
-    });
+    const student = claimed;
+    let invoice = null;
+    try {
+      invoice = await createTuitionInvoice({
+        student,
+        courseName: student.course,
+        amount: student.paidAmount || student.price,
+        note,
+      });
+    } catch (invErr) {
+      logger.warn('[STUDENTS] invoice on pay: %s', invErr.message);
+    }
     const maHD = invoice?.maHoaDon || '';
 
     try {
@@ -1021,14 +1199,43 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
         invoice,
         courseName: student.course,
         source: 'admin_pay',
-        sourceRef: maHD || `pay:${student._id}:${student.paidAt?.getTime?.() || Date.now()}`,
-        idempotencyKey: `payment:admin_pay:${student._id}:${maHD || student.paidAt?.toISOString?.() || Date.now()}`,
+        sourceRef: maHD || `pay:${student._id}`,
+        // Key ổn định theo HV — idempotent nếu rematch cùng lần thu đầu
+        idempotencyKey: `payment:student:${student._id}:primary`,
         actor: financeActor(req),
         note,
         reqMeta: financeReqMeta(req, student),
       });
+      bustFinanceCaches();
     } catch (ledgerErr) {
-      logger.warn('[STUDENTS] ledger settle pay: %s', ledgerErr.message);
+      logger.error('[STUDENTS] ledger settle pay FAILED — rollback: %s', ledgerErr.message);
+      try {
+        if (student.enrollments?.length) {
+          student.enrollments.forEach((e) => {
+            if (e.isPrimary || student.enrollments.length === 1) {
+              e.paid = false;
+              e.paidAt = undefined;
+              e.learningAccess = false;
+              if (e.status === 'active') e.status = 'pending_payment';
+            }
+          });
+          student.markModified('enrollments');
+        }
+        student.paid = false;
+        student.paidAmount = 0;
+        student.paidAt = undefined;
+        student.paymentMethod = '';
+        await student.save({ validateModifiedOnly: true });
+        if (invoice?._id) {
+          await Invoice.findByIdAndUpdate(invoice._id, { status: 'void' });
+        }
+      } catch (rbErr) {
+        logger.error('[STUDENTS] pay rollback failed: %s', rbErr.message);
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Ghi sổ cái thất bại — đã rollback trạng thái thu. Thử lại.',
+      });
     }
 
     // Thông báo real-time
@@ -1111,11 +1318,37 @@ router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
       paidAmount: available,
     };
 
+    const remainingAfter = partial
+      ? Math.round((available - refundAmt) * 100) / 100
+      : 0;
+
+    // Ledger trước — fail-closed: không clear cache nếu sổ cái lỗi
+    let ledgerEntry = null;
+    try {
+      const posted = await postRefund({
+        student,
+        amount: refundAmt,
+        courseName: student.course,
+        sourceRef: `refund:student:${student._id}:${partial ? 'partial' : 'full'}:${refundAmt}:${oldSnapshot.paidAmount}`,
+        idempotencyKey: `refund:student:${student._id}:${partial ? 'partial' : 'full'}:${refundAmt}:${oldSnapshot.paidAmount}`,
+        actor: financeActor(req),
+        note,
+        metadata: { partial, remaining: remainingAfter },
+        reqMeta: financeReqMeta(req, student),
+      });
+      ledgerEntry = posted?.entry || null;
+    } catch (ledgerErr) {
+      logger.error('[STUDENTS] ledger refund FAILED: %s', ledgerErr.message);
+      return res.status(ledgerErr.status || 500).json({
+        success: false,
+        message: ledgerErr.message || 'Ghi sổ hoàn thất bại — chưa đổi trạng thái học viên',
+      });
+    }
+
     if (partial) {
-      student.paidAmount = Math.round((available - refundAmt) * 100) / 100;
+      student.paidAmount = remainingAfter;
       student.paid = true;
       student.paidNote = note;
-      // Giữ enrollment/learningAccess khi hoàn một phần
     } else {
       student.paid = false;
       student.paidAmount = 0;
@@ -1136,24 +1369,7 @@ router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
     }
 
     await student.save({ validateModifiedOnly: true });
-
-    let ledgerEntry = null;
-    try {
-      const posted = await postRefund({
-        student,
-        amount: refundAmt,
-        courseName: student.course,
-        sourceRef: `refund:${student._id}:${Date.now()}`,
-        idempotencyKey: `refund:${student._id}:${partial ? 'partial' : 'full'}:${refundAmt}:${Date.now()}`,
-        actor: financeActor(req),
-        note,
-        metadata: { partial, remaining: Number(student.paidAmount) || 0 },
-        reqMeta: financeReqMeta(req, student),
-      });
-      ledgerEntry = posted?.entry || null;
-    } catch (ledgerErr) {
-      logger.warn('[STUDENTS] ledger refund: %s', ledgerErr.message);
-    }
+    bustFinanceCaches();
 
     const io = req.app.get('io');
     if (io) {
@@ -1458,11 +1674,22 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
 
 // ─── POST /api/students/:id/enrollments ───────────────────────────────────────
 // Admin thêm khóa học mới cho học viên (cùng tài khoản, khác môn / thầy)
-router.post('/:id/enrollments', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.post('/:id/enrollments', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const { courseName, courseId, teacherId, price, totalSessions, paid } = req.body;
     if (!courseName?.trim() && !courseId) {
       return res.status(400).json({ success: false, message: 'Tên khóa học hoặc courseId là bắt buộc' });
+    }
+
+    const isPaidFlag = paid === true || paid === 'true' || paid === 1 || paid === '1';
+    if (isPaidFlag) {
+      const canFinance = await userHasPermission(req.user, PERMISSIONS.MANAGE_FINANCE);
+      if (!canFinance) {
+        return res.status(403).json({
+          success: false,
+          message: '403 Forbidden: Đánh dấu đã thanh toán khi thêm khóa cần quyền tài chính.',
+        });
+      }
     }
 
     const Course = require('../models/Course');
@@ -1556,13 +1783,31 @@ router.post('/:id/enrollments', authMiddleware, checkPermission(PERMISSIONS.MANA
           courseName: resolvedName,
           source: 'enrollment_add_paid',
           sourceRef: invoice?.maHoaDon || `add:${student._id}:${resolvedName}`,
-          idempotencyKey: `payment:enrollment_add:${student._id}:${lastEnr?._id || resolvedName}:${Date.now()}`,
+          idempotencyKey: `payment:enrollment_add:${student._id}:${lastEnr?._id || resolvedName}`,
           actor: financeActor(req),
           note: `Thêm khóa ${resolvedName}`,
           reqMeta: financeReqMeta(req, student),
         });
+        bustFinanceCaches();
       } catch (ledgerErr) {
-        logger.warn('[STUDENTS] ledger add enrollment: %s', ledgerErr.message);
+        logger.error('[STUDENTS] ledger add enrollment FAILED — rollback: %s', ledgerErr.message);
+        lastEnr.paid = false;
+        lastEnr.paidAt = undefined;
+        lastEnr.learningAccess = false;
+        lastEnr.status = 'pending_payment';
+        student.paidAmount = Math.max(0, (Number(student.paidAmount) || 0) - resolvedPrice);
+        const stillPaid = (student.enrollments || []).some((e) => e.paid === true && e.status !== 'cancelled');
+        student.paid = stillPaid;
+        student.markModified('enrollments');
+        await student.save();
+        if (invoice?._id) {
+          try { await Invoice.findByIdAndUpdate(invoice._id, { status: 'void' }); } catch { /* ignore */ }
+        }
+        return res.status(500).json({
+          success: false,
+          message: 'Đã thêm khóa nhưng ghi sổ cái thất bại — trạng thái thu đã rollback.',
+          data: student.toObject(),
+        });
       }
     }
 
@@ -1649,7 +1894,7 @@ router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermi
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/pay ──────────────────────
 // Xác nhận thanh toán học phí cho 1 khóa (enrollment)
-router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const { paymentMethod = 'cash', note = '' } = req.body || {};
     const student = await Student.findById(req.params.id);
@@ -1669,61 +1914,101 @@ router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, checkPermission
       return res.status(409).json({ success: false, message: 'Khóa học này đã thanh toán' });
     }
     const amount = Number(enr.price) || 0;
-    enr.paid = true;
-    enr.paidAt = new Date();
-    enr.learningAccess = true;
-    if (enr.status === 'pending_payment' || enr.status === 'refunded') enr.status = 'active';
+    const paidAt = new Date();
+
+    // Atomic claim trên enrollment chưa paid
+    const claimed = await Student.findOneAndUpdate(
+      {
+        _id: student._id,
+        enrollments: {
+          $elemMatch: {
+            _id: enr._id,
+            paid: { $ne: true },
+          },
+        },
+      },
+      {
+        $set: {
+          'enrollments.$.paid': true,
+          'enrollments.$.paidAt': paidAt,
+          'enrollments.$.learningAccess': true,
+          'enrollments.$.status': 'active',
+        },
+      },
+      { returnDocument: 'after' }
+    );
+    if (!claimed) {
+      return res.status(409).json({ success: false, message: 'Khóa học này đã thanh toán' });
+    }
+
+    // Refresh + sync root paid cache
+    const fresh = await Student.findById(student._id);
+    const claimedEnr = fresh.enrollments.find((e) => String(e._id) === String(enr._id)) || fresh.enrollments[idx];
     if (amount > 0) {
-      student.paidAmount = (Number(student.paidAmount) || 0) + amount;
+      fresh.paidAmount = (Number(fresh.paidAmount) || 0) + amount;
     }
-    if (enr.isPrimary || student.enrollments.length === 1 || student.enrollments.every((e) => e.paid)) {
-      student.paid = true;
-      student.paidAt = enr.paidAt;
-      student.paymentMethod = paymentMethod;
-    } else if (student.enrollments.some((e) => e.paid)) {
-      // Có ít nhất 1 khóa đã thu — đánh dấu HV đã có thanh toán (KPI/list)
-      student.paid = true;
-      if (!student.paidAt) student.paidAt = enr.paidAt;
-      student.paymentMethod = paymentMethod;
+    if (claimedEnr.isPrimary || fresh.enrollments.length === 1 || fresh.enrollments.every((e) => e.paid || e.status === 'cancelled')) {
+      fresh.paid = true;
+      fresh.paidAt = paidAt;
+      fresh.paymentMethod = paymentMethod;
+    } else if (fresh.enrollments.some((e) => e.paid)) {
+      fresh.paid = true;
+      if (!fresh.paidAt) fresh.paidAt = paidAt;
+      fresh.paymentMethod = paymentMethod;
     }
-    student.markModified('enrollments');
-    await student.save();
+    await fresh.save({ validateModifiedOnly: true });
 
     let invoice = null;
     if (amount > 0) {
       invoice = await createTuitionInvoice({
-        student,
-        courseName: enr.courseName,
+        student: fresh,
+        courseName: claimedEnr.courseName,
         amount,
-        note: note || `Thanh toán khóa ${enr.courseName}`,
+        note: note || `Thanh toán khóa ${claimedEnr.courseName}`,
       });
       try {
         await settlePayment({
-          student,
+          student: fresh,
           amount,
           invoice,
-          enrollmentId: String(enr._id),
-          courseName: enr.courseName,
+          enrollmentId: String(claimedEnr._id),
+          courseName: claimedEnr.courseName,
           source: 'enrollment_pay',
-          sourceRef: invoice?.maHoaDon || `enr:${enr._id}`,
-          idempotencyKey: `payment:enrollment_pay:${student._id}:${enr._id}`,
+          sourceRef: invoice?.maHoaDon || `enr:${claimedEnr._id}`,
+          idempotencyKey: `payment:enrollment_pay:${fresh._id}:${claimedEnr._id}`,
           actor: financeActor(req),
           note: note || '',
-          reqMeta: financeReqMeta(req, student),
+          reqMeta: financeReqMeta(req, fresh),
         });
+        bustFinanceCaches();
       } catch (ledgerErr) {
-        logger.warn('[STUDENTS] ledger enrollment pay: %s', ledgerErr.message);
+        logger.error('[STUDENTS] ledger enrollment pay FAILED — rollback: %s', ledgerErr.message);
+        claimedEnr.paid = false;
+        claimedEnr.paidAt = undefined;
+        claimedEnr.learningAccess = false;
+        claimedEnr.status = 'pending_payment';
+        fresh.paidAmount = Math.max(0, (Number(fresh.paidAmount) || 0) - amount);
+        fresh.paid = fresh.enrollments.some((e) => e.paid === true && e.status !== 'cancelled');
+        fresh.markModified('enrollments');
+        await fresh.save({ validateModifiedOnly: true });
+        if (invoice?._id) {
+          try { await Invoice.findByIdAndUpdate(invoice._id, { status: 'void' }); } catch { /* ignore */ }
+        }
+        return res.status(500).json({
+          success: false,
+          message: 'Ghi sổ cái thất bại — đã rollback trạng thái thu khóa.',
+        });
       }
     }
 
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh', { type: 'student', id: student._id });
+    if (io) io.emit('data:refresh', { type: 'student', id: fresh._id });
 
-    const doc = student.toObject();
-    await applyEnrollmentStats(doc, student._id, Schedule);
+    const doc = fresh.toObject();
+    await applyEnrollmentStats(doc, fresh._id, Schedule);
     return res.json({
       success: true,
-      message: `Đã xác nhận thanh toán khóa "${enr.courseName}"${amount ? ` — ${amount.toLocaleString('vi-VN')}đ` : ''}`,
+      message: `Đã xác nhận thanh toán khóa "${claimedEnr.courseName}"${amount ? ` — ${amount.toLocaleString('vi-VN')}đ` : ''}`,
       data: { student: doc, invoice },
     });
   } catch (error) {
@@ -1732,15 +2017,16 @@ router.put('/:id/enrollments/:enrollmentId/pay', authMiddleware, checkPermission
 });
 
 // ─── DELETE /api/students/:id/enrollments/:enrollmentId ───────────────────────
-// Hủy (soft-cancel) 1 khóa học — không xóa cứng; tự động hoàn tiền nếu đã thanh toán.
+// Hủy (soft-cancel) 1 khóa học — không xóa cứng; hoàn tiền chỉ khi có quyền finance + refundAmount > 0
 // Body (optional): { cancelReason: string, refundAmount: number }
-router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
     if (!student.enrollments?.length && student.course) {
+      const { legacyEnrollmentFromStudent } = require('../services/enrollmentService');
       student.enrollments = [legacyEnrollmentFromStudent(student)];
       student.enrollments[0].isPrimary = true;
     }
@@ -1763,14 +2049,51 @@ router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(
 
     const cancelReason = String(req.body?.cancelReason || '').trim() || 'Admin hủy khóa';
     const courseName = enr.courseName;
-    const isPaid = enr.paid === true;
+    const wasPaid = enr.paid === true;
     const paidAmt = Number(enr.price || 0);
 
-    // Xác định số tiền hoàn
+    // Số tiền hoàn: chỉ hoàn khi client gửi rõ; mặc định 0 (hủy ≠ tự động hoàn toàn bộ)
     let refundAmt = 0;
-    if (isPaid && paidAmt > 0) {
-      const bodyRefund = req.body?.refundAmount != null ? Number(req.body.refundAmount) : null;
-      refundAmt = (bodyRefund != null && bodyRefund >= 0 && bodyRefund <= paidAmt) ? bodyRefund : paidAmt;
+    if (wasPaid && paidAmt > 0 && req.body?.refundAmount != null) {
+      const bodyRefund = Number(req.body.refundAmount);
+      if (Number.isFinite(bodyRefund) && bodyRefund >= 0 && bodyRefund <= paidAmt) {
+        refundAmt = bodyRefund;
+      }
+    }
+
+    // H3: hoàn tiền > 0 cần MANAGE_FINANCE
+    if (refundAmt > 0) {
+      const canFinance = await userHasPermission(req.user, PERMISSIONS.MANAGE_FINANCE);
+      if (!canFinance) {
+        return res.status(403).json({
+          success: false,
+          message: '403 Forbidden: Hoàn tiền khi hủy khóa cần quyền quản lý tài chính.',
+        });
+      }
+    }
+
+    // Ledger refund trước khi soft-cancel (nếu có tiền hoàn)
+    if (refundAmt > 0) {
+      try {
+        await postRefund({
+          amount: refundAmt,
+          student,
+          enrollmentId: String(enr._id),
+          courseName,
+          note: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${cancelReason}`,
+          sourceRef: `cancel:${student._id}:${enr._id}`,
+          idempotencyKey: `refund:cancel:${student._id}:${enr._id}`,
+          actor: financeActor(req),
+          reqMeta: financeReqMeta(req, student),
+          metadata: { enrollmentId: String(enr._id), cancelReason },
+        });
+      } catch (ledgerErr) {
+        logger.error('[STUDENTS] cancel enrollment refund FAILED: %s', ledgerErr.message);
+        return res.status(ledgerErr.status || 500).json({
+          success: false,
+          message: ledgerErr.message || 'Ghi sổ hoàn thất bại — khóa chưa hủy.',
+        });
+      }
     }
 
     // Soft-cancel enrollment (giữ nguyên trong DB, đánh dấu cancelled)
@@ -1779,8 +2102,8 @@ router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(
     list[idx].cancelReason = cancelReason;
     list[idx].refundedAmount = refundAmt;
     list[idx].learningAccess = false;
+    list[idx].paid = false;
 
-    // Nếu enrollment bị hủy là primary, chuyển primary sang enrollment active tiếp theo
     if (enr.isPrimary) {
       list[idx].isPrimary = false;
       const nextActive = list.find((e, i) => i !== idx && e.status !== 'cancelled');
@@ -1789,33 +2112,18 @@ router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(
 
     student.enrollments = list;
     syncStudentFromPrimaryEnrollment(student);
+    const activePaid = list.some((e) => e.status !== 'cancelled' && e.paid === true);
+    student.paid = activePaid;
+    if (refundAmt > 0) {
+      student.paidAmount = Math.max(0, (Number(student.paidAmount) || 0) - refundAmt);
+    }
     student.markModified('enrollments');
     await student.save();
+    if (refundAmt > 0) bustFinanceCaches();
 
-    // Ghi ledger refund nếu có tiền hoàn
     let refundMsg = '';
     if (refundAmt > 0) {
       try {
-        // Trừ paidAmount tổng của student
-        const prevPaid = Number(student.paidAmount || 0);
-        const newPaid = Math.max(0, prevPaid - refundAmt);
-        await Student.findByIdAndUpdate(student._id, {
-          paidAmount: newPaid,
-          // Giữ paid=true nếu còn khóa active đã thu (không phụ thuộc paidAmount có về 0 do lệch cache)
-          paid: list.some((e) => e.status !== 'cancelled' && e.paid === true),
-        });
-
-        await postRefund({
-          amount: refundAmt,
-          student,
-          courseName,
-          note: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${cancelReason}`,
-          sourceRef: `cancel:${student._id}:${enr._id}`,
-          idempotencyKey: `refund:cancel:${student._id}:${enr._id}:${Date.now()}`,
-          actor: financeActor(req),
-          reqMeta: financeReqMeta(req, student),
-        });
-
         const { writeAudit } = require('../services/auditLogService');
         await writeAudit({
           action: 'enrollment.cancel_refund',
@@ -1830,10 +2138,8 @@ router.delete('/:id/enrollments/:enrollmentId', authMiddleware, checkPermission(
           ip: req.ip,
           userAgent: req.headers['user-agent'] || '',
         });
-        refundMsg = ` Đã hoàn ${refundAmt.toLocaleString('vi-VN')}đ.`;
-      } catch (ledgerErr) {
-        logger.warn('[STUDENTS] cancel enrollment refund ledger: %s', ledgerErr.message);
-      }
+      } catch { /* ignore audit */ }
+      refundMsg = ` Đã hoàn ${refundAmt.toLocaleString('vi-VN')}đ.`;
     }
 
     const io = req.app.get('io');

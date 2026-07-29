@@ -226,17 +226,48 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
       );
 
       if (claimed) {
-        matched = true;
-        matchedRef = claimed.ref;
-        logger.info(`[SEPAY] Session ${claimed.sessionId} khớp ref="${claimed.ref}" — ${amount}đ`);
-
-        const io = req.app.get('io');
-        if (io) {
-          io.emit('tuition:paid', {
-            sessionId: claimed.sessionId,
+        try {
+          const { settlePayment } = require('../services/ledgerService');
+          await settlePayment({
+            student: claimed.studentId
+              ? { _id: claimed.studentId, branchId: claimed.branchId || null }
+              : { _id: null, branchId: claimed.branchId || null },
             amount,
-            message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
+            courseName: claimed.courseName || '',
+            source: 'sepay_session',
+            sourceRef: claimed.sessionId,
+            idempotencyKey: `payment:sepay:session:${claimed.sessionId}`,
+            actor: { id: 'sepay', role: 'system' },
+            note: String(body.content || '').slice(0, 300),
+            metadata: {
+              sessionId: claimed.sessionId,
+              ref: claimed.ref,
+              studentName: claimed.studentName || '',
+            },
+            reqMeta: { ip: req.ip, userAgent: 'sepay-webhook', branchId: claimed.branchId || null },
           });
+          matched = true;
+          matchedRef = claimed.ref;
+          logger.info(`[SEPAY] Session ${claimed.sessionId} khớp ref="${claimed.ref}" — ${amount}đ (+Ledger)`);
+
+          const io = req.app.get('io');
+          if (io) {
+            io.emit('tuition:paid', {
+              sessionId: claimed.sessionId,
+              amount,
+              message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
+            });
+          }
+        } catch (ledgerErr) {
+          logger.error('[SEPAY] session ledger FAILED — rollback session: %s', ledgerErr.message);
+          try {
+            await PaymentSession.findByIdAndUpdate(claimed._id, {
+              $set: { status: 'pending' },
+              $unset: { paidAmount: 1 },
+            });
+          } catch (rbErr) {
+            logger.error('[SEPAY] session rollback failed: %s', rbErr.message);
+          }
         }
       }
     }
@@ -304,13 +335,29 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
             courseName: updated.course || '',
             source: 'sepay',
             sourceRef: sepayInvoice?.maHoaDon || gatewayTxnId || matchedRef,
-            idempotencyKey: `payment:sepay:${updated._id}:${gatewayTxnId || matchedRef || Date.now()}`,
+            // Cùng key primary với admin_pay → idempotent nếu claim race đã thắng trước
+            idempotencyKey: `payment:student:${updated._id}:primary`,
             actor: { id: 'sepay', role: 'system' },
             note: String(body.content || '').slice(0, 300),
             reqMeta: { ip: req.ip, userAgent: 'sepay-webhook', branchId: updated.branchId },
           });
         } catch (ledgerErr) {
-          logger.warn('[SEPAY] ledger settle skipped: %s', ledgerErr.message);
+          logger.error('[SEPAY] ledger settle FAILED — rollback paid: %s', ledgerErr.message);
+          try {
+            await Student.findByIdAndUpdate(updated._id, {
+              $set: { paid: false, paidAmount: 0, paidNote: '' },
+              $unset: { paidAt: 1 },
+            });
+            if (sepayInvoice?._id) {
+              const Invoice = require('../models/Invoice');
+              await Invoice.findByIdAndUpdate(sepayInvoice._id, { status: 'void' });
+            }
+          } catch (rbErr) {
+            logger.error('[SEPAY] student paid rollback failed: %s', rbErr.message);
+          }
+          matched = false;
+          matchedRef = '';
+          continue;
         }
         const io = req.app.get('io');
         if (io) {

@@ -30,7 +30,37 @@ const invoiceSchema = new mongoose.Schema({
   ghiChu: {
     type: String,
     trim: true
-  }
+  },
+  // P3 ERP fields (optional / backward-compatible)
+  branchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    default: null,
+    index: true,
+  },
+  enrollmentId: { type: String, default: '', maxlength: 64 },
+  ledgerEntryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'LedgerEntry',
+    default: null,
+  },
+  docType: {
+    type: String,
+    enum: ['invoice', 'credit'],
+    default: 'invoice',
+    index: true,
+  },
+  status: {
+    type: String,
+    enum: ['issued', 'void'],
+    default: 'issued',
+    index: true,
+  },
+  originalInvoiceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Invoice',
+    default: null,
+  },
 }, {
   timestamps: true
 });

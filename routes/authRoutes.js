@@ -1451,7 +1451,7 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, async (req, res) =
       await Notification.create({
         type: 'SYSTEM',
         title: 'Yêu cầu cấp lại mật khẩu',
-        content: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${phone}) đang yêu cầu cấp lại mật khẩu. Vui lòng sinh mã OTP và gửi qua Zalo cho người này.`,
+        content: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${phone}) đang yêu cầu cấp lại mật khẩu qua Zalo. Vui lòng cấp mật khẩu thủ công và gửi lại cho họ.`,
         receivers: ['ALL_ADMIN'], // Chỉ admin nhận được
         payload: { userId: user._id, role: role, action: 'RESET_PASSWORD', userName: user.name }
       });
@@ -1468,8 +1468,8 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, async (req, res) =
 
     return res.json({
       success: true,
-      message: `Hệ thống đã gửi thông báo đến Admin. Vui lòng liên hệ Admin để nhận mã OTP.`,
-      data: { masked, name: user.name }
+      message: `Đã ghi nhận yêu cầu. Vui lòng nhắn Zalo Admin để được cấp mật khẩu.`,
+      data: { masked, name: user.name, phone: user.phone || phone.trim() }
     });
   } catch (error) {
     logger.error('[AUTH] forgot-password/request error:', error);
@@ -1656,12 +1656,15 @@ router.post('/admin/reset-password', authMiddleware, async (req, res) => {
 
     user.password = newPassword;
     user.isFirstLogin = true;
+    // Vô hiệu phiên đăng nhập cũ
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    user.refreshToken = undefined;
     await user.save({ validateModifiedOnly: true });
 
     return res.json({
       success: true,
       message: `Đã cấp lại mật khẩu cho ${user.name}`,
-      data: { name: user.name }
+      data: { name: user.name, phone: user.phone }
     });
 
   } catch (error) {

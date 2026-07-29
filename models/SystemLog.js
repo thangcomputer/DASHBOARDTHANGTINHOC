@@ -12,6 +12,7 @@ const systemLogSchema = new mongoose.Schema({
   target:     { type: String },                         // Endpoint URL
   message:    { type: String },                         // Human-readable mô tả chi tiết
   method:     { type: String },                         // HTTP Method
+  amount:     { type: Number, default: 0 },             // Số tiền liên quan (0 nếu không có)
 
   // ── Device fingerprint ──
   ip:         { type: String, default: 'unknown' },

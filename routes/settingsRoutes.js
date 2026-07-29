@@ -918,6 +918,16 @@ router.post('/reset-data', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SE
 
     // 2. Thực hiện xóa theo tùy chọn
     const isAll = options.all === true;
+
+    if ((isAll || options.finance) && process.env.NODE_ENV === 'production') {
+      const { allowHardDeleteFinance } = require('../utils/financeFlags');
+      if (!allowHardDeleteFinance()) {
+        return res.status(405).json({
+          success: false,
+          message: 'Production: đặt FINANCE_ALLOW_HARD_DELETE=true để wipe tài chính (Ledger + Invoice + Transaction).',
+        });
+      }
+    }
     
     // NHÓM: HỌC VIÊN
     if (isAll || options.students) {
@@ -928,11 +938,21 @@ router.post('/reset-data', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SE
       await Assignment.deleteMany({});
     }
 
-    // NHÓM: TÀI CHÍNH
+    // NHÓM: TÀI CHÍNH — factory reset xóa kèm Ledger/CreditNote/Snapshot
     if (isAll || options.finance) {
       await Transaction.deleteMany({});
       await Invoice.deleteMany({});
       await PayrollLog.deleteMany({});
+      try {
+        const LedgerEntry = require('../models/LedgerEntry');
+        const CreditNote = require('../models/CreditNote');
+        const FinanceDailySnapshot = require('../models/FinanceDailySnapshot');
+        await LedgerEntry.deleteMany({});
+        await CreditNote.deleteMany({});
+        await FinanceDailySnapshot.deleteMany({});
+      } catch (wipeErr) {
+        logger.warn('[SETTINGS] finance ledger wipe: %s', wipeErr.message);
+      }
     }
 
     // NHÓM: LỊCH DẠY

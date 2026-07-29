@@ -329,7 +329,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
             onClick={() => onResetPassword && onResetPassword(student.id || student._id, student.name)}
             className="cms-btn cms-btn-secondary"
           >
-            <KeyRound size={15} /> Cấp lại MK
+            <KeyRound size={15} /> Cấp MK
           </button>
           <button type="button" onClick={handleSubmitForm} className="cms-btn cms-btn-primary">
             <Save size={16} /> Lưu thay đổi

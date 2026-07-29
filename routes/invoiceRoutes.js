@@ -121,15 +121,10 @@ router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), as
       khoaHoc:  student.course,   // Student schema: course (không phải khoaHoc)
       hocPhi:   student.price,    // Student schema: price (không phải hocPhi)
       ghiChu:   ghiChu || '',
+      status:   'issued',
     });
 
-    // Đánh dấu học viên đã thanh toán nếu chưa
-    if (!student.paid) {
-      await Student.findByIdAndUpdate(hocVienId, {
-        paid:   true,
-        paidAt: new Date(),
-      });
-    }
+    // C4: Tạo HĐ thủ công ≠ thu tiền. Không set student.paid — dùng PUT /students/:id/pay.
 
     // Sinh PDF nền (uploads/invoices) — không chặn response
     enqueueInvoicePdf({ invoiceId: invoice._id.toString() }).catch((err) => {
@@ -230,12 +225,24 @@ router.post('/:id/email', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FIN
 });
 
 // ─── DELETE /api/invoices/:id ──────────────────────────────────────────────────
+// P3: cấm hard-delete HĐ — chỉ void (status=void) trừ khi FINANCE_ALLOW_HARD_DELETE=true
 router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
-    const invoice = await Invoice.findByIdAndDelete(req.params.id);
+    const { allowHardDeleteFinance } = require('../utils/financeFlags');
+    const invoice = await Invoice.findById(req.params.id);
     if (!invoice) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
     }
+    if (!allowHardDeleteFinance()) {
+      invoice.status = 'void';
+      await invoice.save();
+      return res.json({
+        success: true,
+        message: `Đã void hóa đơn ${invoice.maHoaDon} (không xóa chứng từ)`,
+        data: invoice,
+      });
+    }
+    await Invoice.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: `Đã xóa hóa đơn ${invoice.maHoaDon}` });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

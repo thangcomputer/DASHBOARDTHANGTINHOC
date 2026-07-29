@@ -1,6 +1,6 @@
 /**
  * BI service — executive KPIs, so sánh kỳ trước, breakdown.
- * Doanh thu: SUM enrollment.paid (services/revenueAggregate), cache 90s.
+ * P0: Doanh thu thuần / hoàn = Ledger sumFinancialRevenue (không phụ thuộc enrollment.paid).
  */
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
@@ -8,13 +8,8 @@ const Schedule = require('../models/Schedule');
 const Transaction = require('../models/Transaction');
 const ExamResult = require('../models/ExamResult');
 const Branch = require('../models/Branch');
-const LedgerEntry = require('../models/LedgerEntry');
 const cache = require('../utils/cache');
-const {
-  sumPaidRevenue,
-  listPaidItems,
-  revenueByCourse,
-} = require('./revenueAggregate');
+const { sumFinancialRevenue, revenueByCourseFromLedger, listNetRevenueByDay } = require('./ledgerService');
 
 function getPeriodRange(period) {
   const end = new Date();
@@ -48,7 +43,8 @@ function pctChange(current, previous) {
 
 async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'all' } = {}) {
   const bf = buildBranchFilter(branchFilter, queryBranch);
-  const cacheKey = 'bi:overview:v2:' + period + ':' + (bf.branchId || queryBranch || 'all');
+  const branchId = bf.branchId || null;
+  const cacheKey = 'bi:overview:v5-ledger:' + period + ':' + (branchId || queryBranch || 'all');
 
   return cache.wrap(cacheKey, 90, async () => {
     const { start, end, prevStart, prevEnd } = getPeriodRange(period);
@@ -57,11 +53,10 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
     const [
       studentsTotal,
       studentsPaid,
-      studentsUnpaid,
+      ledgerNow,
+      ledgerPrev,
       studentsNew,
       studentsNewPrev,
-      revenueNow,
-      revenuePrevRow,
       teachersActive,
       teachersPending,
       schedulesCompleted,
@@ -72,22 +67,15 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       examPassed,
       branches,
       byCourse,
-      paidItems,
+      dayRevenueRows,
       newStudents,
     ] = await Promise.all([
       Student.countDocuments(bf),
       Student.countDocuments({ ...bf, paid: true }),
-      // Đổi luồng: card "Hoàn học phí" = số ledger refund posted theo khoảng thời gian
-      LedgerEntry.countDocuments({
-        ...bf,
-        type: 'refund',
-        status: 'posted',
-        postedAt: { $gte: start, $lte: end },
-      }),
+      sumFinancialRevenue({ branchId, from: start, to: end }),
+      sumFinancialRevenue({ branchId, from: prevStart, to: prevEnd }),
       Student.countDocuments({ ...bf, createdAt: { $gte: start, $lte: end } }),
       Student.countDocuments({ ...bf, createdAt: { $gte: prevStart, $lte: prevEnd } }),
-      sumPaidRevenue({ branchFilter: bf, start, end }),
-      sumPaidRevenue({ branchFilter: bf, start: prevStart, end: prevEnd }),
       Teacher.countDocuments({ ...teacherBf, status: { $in: ['Active', 'active'] } }),
       Teacher.countDocuments({ ...teacherBf, status: { $in: ['Pending', 'pending'] } }),
       Schedule.countDocuments({ ...bf, status: 'completed', date: { $gte: start, $lte: end } }),
@@ -97,16 +85,22 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       ExamResult.countDocuments({ createdAt: { $gte: start, $lte: end } }),
       ExamResult.countDocuments({ createdAt: { $gte: start, $lte: end }, passed: true }),
       Branch.find({ isActive: { $ne: false } }).select('name code').lean(),
-      revenueByCourse({ branchFilter: bf, start, end, limit: 8 }),
-      listPaidItems({ branchFilter: bf, start, end }),
+      revenueByCourseFromLedger({ branchId, from: start, to: end, limit: 8 }),
+      listNetRevenueByDay({ branchId, from: start, to: end }),
       Student.find({
         ...bf,
         createdAt: { $gte: start, $lte: end },
       }).select('createdAt').lean(),
     ]);
 
-    const revenuePeriod = revenueNow.total || 0;
-    const revenuePrev = revenuePrevRow.total || 0;
+    const refundAmount = ledgerNow.refunds || 0;
+    const refundCount = ledgerNow.refundCount || 0;
+    // Alias cũ: số giao dịch hoàn trong kỳ
+    const studentsUnpaid = refundCount;
+
+    // P0 SoT: doanh thu kỳ = net Ledger (PAYMENT − REFUND)
+    const revenuePeriod = ledgerNow.net || 0;
+    const revenuePrev = ledgerPrev.net || 0;
 
     const dayMap = {};
     const cur = new Date(start);
@@ -126,11 +120,10 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       if (!dayMap[key]) return;
       dayMap[key].students += 1;
     });
-    paidItems.forEach((item) => {
-      if (!item?.paidAt) return;
-      const key = new Date(item.paidAt).toISOString().slice(0, 10);
+    (dayRevenueRows || []).forEach((row) => {
+      const key = row.dateKey;
       if (!dayMap[key]) return;
-      dayMap[key].revenue += Number(item.amount) || 0;
+      dayMap[key].revenue += Number(row.revenue) || 0;
     });
     const trend = Object.values(dayMap);
 
@@ -143,9 +136,12 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
         studentsTotal,
         studentsPaid,
         studentsUnpaid,
+        refundAmount,
+        refundCount,
         studentsNew,
         studentsNewChange: pctChange(studentsNew, studentsNewPrev),
         revenuePeriod,
+        revenueGross: ledgerNow.payments || 0,
         revenueChange: pctChange(revenuePeriod, revenuePrev),
         revenuePrev,
         teachersActive,
@@ -158,7 +154,10 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
         examPassed,
         examPassRate,
         paidRate: studentsTotal > 0 ? Math.round((studentsPaid / studentsTotal) * 1000) / 10 : 0,
-        paymentsPeriod: revenueNow.paymentCount || 0,
+        paymentsPeriod: ledgerNow.paymentCount || 0,
+        costsPeriod: ledgerNow.costs || 0,
+        profitPeriod: ledgerNow.profit || 0,
+        source: 'ledger',
       },
       byCourse: (byCourse || []).map((c) => ({
         course: c.course || 'Khác',
@@ -177,12 +176,16 @@ function overviewToCsv(data) {
   const lines = [
     'metric,value',
     'period,' + data.period,
+    'source,' + (k.source || 'ledger'),
     'students_total,' + k.studentsTotal,
     'students_paid,' + k.studentsPaid,
     'students_unpaid,' + k.studentsUnpaid,
+    'refund_amount,' + (k.refundAmount ?? 0),
+    'refund_count,' + (k.refundCount ?? 0),
     'students_new,' + k.studentsNew,
     'students_new_change_pct,' + k.studentsNewChange,
-    'revenue_period,' + k.revenuePeriod,
+    'revenue_period_net,' + k.revenuePeriod,
+    'revenue_gross,' + (k.revenueGross ?? ''),
     'revenue_change_pct,' + k.revenueChange,
     'teachers_active,' + k.teachersActive,
     'teachers_pending,' + k.teachersPending,
@@ -190,6 +193,8 @@ function overviewToCsv(data) {
     'schedules_cancelled,' + k.schedulesCancelled,
     'exam_pass_rate,' + (k.examPassRate ?? ''),
     'paid_rate,' + k.paidRate,
+    'costs_period,' + (k.costsPeriod ?? 0),
+    'profit_period,' + (k.profitPeriod ?? 0),
   ];
   lines.push('');
   lines.push('course,count,revenue');

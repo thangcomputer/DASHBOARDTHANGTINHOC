@@ -1,6 +1,6 @@
 /**
  * analyticsRoutes.js — Báo cáo Doanh thu & Thống kê đa chi nhánh
- * Doanh thu: SUM từng enrollment đã thanh toán (revenueAggregate).
+ * P0: KPI doanh thu chính = Ledger sumFinancialRevenue (net = payment − refund).
  */
 const express = require('express');
 const router = express.Router();
@@ -11,11 +11,11 @@ const { authMiddleware, checkAnyPermission, branchFilter } = require('../middlew
 const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
 const {
-  sumPaidRevenue,
   listPaidItems,
   revenueByBranch,
   sumStudentPaidTuition,
 } = require('../services/revenueAggregate');
+const { sumFinancialRevenue } = require('../services/ledgerService');
 
 const guard = [authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE), branchFilter];
 
@@ -81,16 +81,15 @@ router.get('/revenue', guard, async (req, res) => {
     const { period = '1m', branchId: queryBranch } = req.query;
     const { start, end } = getPeriodRange(period);
     const baseFilter = buildBaseFilter(req, queryBranch);
+    const branchId = baseFilter.branchId || null;
+    const periodMs = end - start;
+    const prevStart = new Date(start.getTime() - periodMs);
+    const prevEnd = new Date(start);
 
     const [current, previous, allTime, paidItems, newStudents] = await Promise.all([
-      sumPaidRevenue({ branchFilter: baseFilter, start, end }),
-      (() => {
-        const periodMs = end - start;
-        const prevStart = new Date(start.getTime() - periodMs);
-        const prevEnd = new Date(start);
-        return sumPaidRevenue({ branchFilter: baseFilter, start: prevStart, end: prevEnd });
-      })(),
-      sumPaidRevenue({ branchFilter: baseFilter }),
+      sumFinancialRevenue({ branchId, from: start, to: end }),
+      sumFinancialRevenue({ branchId, from: prevStart, to: prevEnd }),
+      sumFinancialRevenue({ branchId }),
       listPaidItems({ branchFilter: baseFilter, start, end }),
       Student.countDocuments({
         ...baseFilter,
@@ -98,8 +97,8 @@ router.get('/revenue', guard, async (req, res) => {
       }),
     ]);
 
-    const totalRevenue = current.total || 0;
-    const prevRevenue = previous.total || 0;
+    const totalRevenue = current.net || 0;
+    const prevRevenue = previous.net || 0;
     const growthPct = prevRevenue > 0
       ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100)
       : null;
@@ -116,13 +115,17 @@ router.get('/revenue', guard, async (req, res) => {
       data: {
         period,
         dateRange: { from: start, to: end },
+        source: 'ledger',
         totalRevenue,
+        grossRevenue: current.payments || 0,
+        refunds: current.refunds || 0,
         prevRevenue,
         growthPct,
-        allTimeRevenue: allTime.total || 0,
+        allTimeRevenue: allTime.net || 0,
         newStudentsCount: newStudents,
-        paidStudentsCount: current.paidStudentsCount || 0,
+        paidStudentsCount: current.paymentCount || 0,
         paymentCount: current.paymentCount || 0,
+        refundCount: current.refundCount || 0,
         byBranch,
         timeSeries,
       },
@@ -199,6 +202,9 @@ router.get('/enrollment', guard, async (req, res) => {
       data: {
         period,
         dateRange: { from: start, to: end },
+        // H6: ops enrollment cache — KPI tiền dùng /analytics/revenue (Ledger)
+        source: 'enrollment_ops',
+        note: 'totalFee/byCourse.revenue từ enrollment.paid (ops). Doanh thu SoT: GET /analytics/revenue',
         total,
         paid,
         totalFee,
@@ -221,7 +227,7 @@ router.get('/branches', guard, async (req, res) => {
       const [studentCount, paidCount, revenueRes, scheduleCount] = await Promise.all([
         Student.countDocuments({ branchId: br._id }),
         Student.countDocuments({ branchId: br._id, paid: true }),
-        sumPaidRevenue({ branchFilter: { branchId: br._id } }),
+        sumFinancialRevenue({ branchId: br._id }),
         Schedule.countDocuments({ branchId: br._id }),
       ]);
       return {
@@ -231,7 +237,7 @@ router.get('/branches', guard, async (req, res) => {
         address: br.address,
         studentCount,
         paidCount,
-        revenue: revenueRes.total || 0,
+        revenue: revenueRes.net || 0,
         scheduleCount,
       };
     }));

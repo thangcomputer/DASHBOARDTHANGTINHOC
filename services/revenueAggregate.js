@@ -1,9 +1,23 @@
 /**
- * Doanh thu = SUM các dòng thanh toán (enrollment.paid / legacy student.paid),
- * không lấy 1 cột price cấp học viên (chỉ phản ánh khóa chính).
+ * Enrollment revenue helpers — projection / legacy.
+ * P4: KPI doanh thu chính KHÔNG dùng file này khi FINANCE_LEDGER_SOT=true (mặc định).
+ * Dùng services/ledgerService.sumFinancialRevenue cho Dashboard/BI/Analytics.
+ * Các hàm dưới đây phục vụ breakdown theo khóa / danh sách thu còn hiệu lực.
  */
 const mongoose = require('mongoose');
 const Student = require('../models/Student');
+const { isLedgerSot } = require('../utils/financeFlags');
+const logger = require('../config/logger');
+
+let _warnedDeprecation = false;
+function warnIfLegacyKpi(caller) {
+  if (!isLedgerSot() || _warnedDeprecation) return;
+  _warnedDeprecation = true;
+  logger.warn(
+    '[revenueAggregate] DEPRECATED for KPI SoT (caller=%s). Use ledgerService.sumFinancialRevenue. Set FINANCE_LEDGER_SOT=false to silence.',
+    caller || 'unknown'
+  );
+}
 
 function toObjectIdMaybe(value) {
   if (!value) return value;
@@ -31,7 +45,9 @@ function moneyExpr(input) {
   };
 }
 
-/** Unwind → flat payment lines: amount, courseName, paidAt, studentId, ... */
+/** Unwind → flat payment lines: amount, courseName, paidAt, studentId, ...
+ * P0: loại cancelled/refunded khỏi KPI enrollment (Ledger mới là SoT doanh thu thuần).
+ */
 function expandPaidItemsStages() {
   return [
     {
@@ -45,7 +61,13 @@ function expandPaidItemsStages() {
                   $filter: {
                     input: { $ifNull: ['$enrollments', []] },
                     as: 'e',
-                    cond: { $eq: ['$$e.paid', true] },
+                    cond: {
+                      $and: [
+                        { $eq: ['$$e.paid', true] },
+                        { $ne: ['$$e.status', 'cancelled'] },
+                        { $ne: ['$$e.status', 'refunded'] },
+                      ],
+                    },
                   },
                 },
                 as: 'e',
@@ -110,6 +132,7 @@ function paidItemsPipeline({ branchFilter = {}, start, end } = {}) {
 }
 
 async function sumPaidRevenue({ branchFilter = {}, start, end } = {}) {
+  warnIfLegacyKpi('sumPaidRevenue');
   const rows = await Student.aggregate([
     ...paidItemsPipeline({ branchFilter, start, end }),
     {

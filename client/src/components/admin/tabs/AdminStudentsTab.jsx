@@ -5,7 +5,7 @@ import BranchFilterDropdown from '../../BranchFilterDropdown';
 import {
   BookOpen, Search, Download, FileSpreadsheet, Plus, Users, AlertTriangle,
   MoreHorizontal, ClipboardList, Unlock, Lock, Camera, Printer, Trash2,
-  ChevronLeft, ChevronRight, Loader2, MapPin, Globe, Building2,
+  ChevronLeft, ChevronRight, Loader2, MapPin, Globe, Building2, KeyRound,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
 import { getActiveClientEnrollments } from '../../../utils/enrollments';
@@ -81,6 +81,24 @@ function StudentActionMenu({
         }`}>
         <Printer size={15} className="shrink-0" />
         <span className="min-w-0">Xuất hóa đơn PDF</span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => {
+          setActionMenuId(null);
+          window.dispatchEvent(new CustomEvent('open-reset-pw', {
+            detail: {
+              userId: s.id || s._id,
+              userName: s.name || 'Học viên',
+              role: 'student',
+            },
+          }));
+        }}
+        className={`${itemCls} text-amber-800 hover:bg-amber-50`}
+      >
+        <KeyRound size={15} className="shrink-0 text-amber-600" />
+        <span className="min-w-0">Cấp mật khẩu</span>
       </button>
       <div className="border-t border-slate-100 my-1" />
       <button type="button" role="menuitem" onClick={() => { removeStudent(s.id); setActionMenuId(null); }}

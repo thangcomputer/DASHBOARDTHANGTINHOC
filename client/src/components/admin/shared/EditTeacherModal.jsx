@@ -1,18 +1,27 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
-import { Edit3, X, Save, KeyRound, CreditCard, MapPin } from 'lucide-react';
+import { Edit3, X, Save, KeyRound, CreditCard, MapPin, DollarSign, Star } from 'lucide-react';
 import { BankSelect } from '../../BankSelect';
 import TeacherScheduleHistoryPanel from '../../TeacherScheduleHistoryPanel';
 import { useData } from '../../../context/DataContext';
 import ExamSubjectCheckboxGrid from './ExamSubjectCheckboxGrid';
 import { formatSubjectIdsAsSpecialty, resolveTeacherSubjectIds } from '../../../utils/examSubjects';
+import {
+  formatHoaHong,
+  formatStarBonusRule,
+  STAR_BONUS_AMOUNT,
+  STAR_BONUS_MIN_STARS,
+  STAR_BONUS_MIN_STUDENTS,
+} from '../../../utils/teacherCommission';
+
+const SALARY_PRESETS = [100000, 130000, 150000, 180000];
 
 export default function EditTeacherModal({
   editTeacher, setEditTeacher, onClose, onSave, onResetPassword, isSuperAdmin, safeBranches,
+  getTeacherRating,
 }) {
   const { examSubjectsCatalog } = useData() || {};
 
-  // Khôi phục subjectIds từ specialty chỉ khi DB chưa có — khớp chính xác tên môn
   useEffect(() => {
     if (!editTeacher) return;
     const hasIds = Array.isArray(editTeacher.subjectIds) && editTeacher.subjectIds.length > 0;
@@ -34,9 +43,19 @@ export default function EditTeacherModal({
       };
     });
   }, [editTeacher?.id, editTeacher?._id, examSubjectsCatalog, setEditTeacher]);
+
+  const rating = useMemo(() => {
+    if (!editTeacher || typeof getTeacherRating !== 'function') return null;
+    return getTeacherRating(editTeacher.id || editTeacher._id);
+  }, [editTeacher, getTeacherRating]);
+
   if (!editTeacher) return null;
 
   const isHistory = editTeacher._tab === 'history';
+  const salary = Number(editTeacher.baseSalaryPerSession) || 0;
+  const avg = Number(rating?.avg) || 0;
+  const count = Number(rating?.count) || 0;
+  const branches = (safeBranches || []).filter((b) => b && b.isActive !== false);
 
   return (
     <>
@@ -45,7 +64,7 @@ export default function EditTeacherModal({
         role="dialog"
         aria-modal="true"
         aria-label="Hồ sơ giảng viên"
-        className="cms-sheet cms-sheet--wide w-full"
+        className="cms-sheet cms-sheet--wide cms-sheet--compact w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
@@ -53,7 +72,12 @@ export default function EditTeacherModal({
           <span className="cms-sheet-header__side bg-sky-50 text-sky-600" aria-hidden="true">
             <Edit3 size={18} />
           </span>
-          <h3 className="cms-sheet-header__title">Hồ sơ giảng viên</h3>
+          <div className="min-w-0 px-1 text-center">
+            <h3 className="cms-sheet-header__title">Hồ sơ giảng viên</h3>
+            {editTeacher.name && (
+              <p className="text-xs text-slate-500 mt-0.5 truncate">{editTeacher.name}</p>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -89,217 +113,294 @@ export default function EditTeacherModal({
           {isHistory ? (
             <TeacherScheduleHistoryPanel teacherId={editTeacher.id || editTeacher._id} />
           ) : (
-            <div className="cms-form">
-              <div className="cms-form-row">
-                <div>
-                  <label className="cms-label">Họ tên</label>
-                  <input
-                    type="text"
-                    value={editTeacher.name || ''}
-                    onChange={(e) => setEditTeacher((p) => ({ ...p, name: e.target.value }))}
-                    className="cms-input"
-                  />
+            <div className="space-y-4">
+              {/* 1. Cá nhân */}
+              <section>
+                <div className="cms-step">
+                  <span className="cms-step__num">1</span>
+                  <span className="cms-step__label">Thông tin cá nhân</span>
                 </div>
-                <div>
-                  <label className="cms-label">Số điện thoại / Zalo</label>
-                  <input
-                    type="text"
-                    value={editTeacher.phone || ''}
-                    onChange={(e) => setEditTeacher((p) => ({ ...p, phone: e.target.value }))}
-                    className="cms-input font-mono"
-                  />
-                </div>
-              </div>
-
-              <ExamSubjectCheckboxGrid
-                catalog={examSubjectsCatalog}
-                value={editTeacher.subjectIds || []}
-                accent="red"
-                onChange={(ids) => setEditTeacher((p) => ({
-                  ...p,
-                  subjectIds: ids,
-                  specialty: formatSubjectIdsAsSpecialty(ids, examSubjectsCatalog),
-                }))}
-              />
-              {editTeacher.specialty && (
-                <p className="text-[12px] text-sky-600 -mt-2">Hiển thị: {editTeacher.specialty}</p>
-              )}
-
-              <div>
-                <label className="cms-label">Email</label>
-                <input
-                  type="email"
-                  value={editTeacher.email || ''}
-                  onChange={(e) => setEditTeacher((p) => ({ ...p, email: e.target.value }))}
-                  className="cms-input"
-                  placeholder="email@example.com"
-                />
-              </div>
-
-              <div className="cms-form-row">
-                <div>
-                  <label className="cms-label">Trạng thái duyệt</label>
-                  <CmsSelect
-                    value={String(editTeacher.status || 'inactive').toLowerCase()}
-                    onChange={(e) => setEditTeacher((p) => ({ ...p, status: e.target.value }))}
-                    className="cms-input"
-                  >
-                    <option value="inactive">🔒 Chưa cấp quyền</option>
-                    <option value="pending">🕒 Cấp quyền thi (Chờ làm bài)</option>
-                    <option value="active">🟢 Đã cấp quyền (Active)</option>
-                    <option value="locked">🚫 Đã khóa</option>
-                  </CmsSelect>
-                </div>
-                <div>
-                  <label className="cms-label">Lương / buổi (VNĐ)</label>
-                  <input
-                    type="text"
-                    value={editTeacher.baseSalaryPerSession || ''}
-                    onChange={(e) => setEditTeacher((p) => ({ ...p, baseSalaryPerSession: Number(e.target.value.replace(/\D/g, '')) }))}
-                    className="cms-input font-mono"
-                    placeholder="150000"
-                  />
-                </div>
-              </div>
-
-              {(() => {
-                const sess = JSON.parse(localStorage.getItem('admin_user') || '{}');
-                const isSA = sess?.id === 'admin' || sess?.adminRole === 'SUPER_ADMIN';
-                if (!isSA) return null;
-                return (
-                  <div>
-                    <label className="cms-label">Điều chuyển chi nhánh</label>
-                    <CmsSelect
-                      value={editTeacher.branchId || ''}
-                      onChange={(e) => {
-                        const opt = e.target.selectedOptions[0];
-                        setEditTeacher((p) => ({ ...p, branchId: e.target.value, branchCode: opt?.dataset.code || '' }));
-                      }}
-                      className="cms-input"
-                    >
-                      <option value="">— Chưa phân chi nhánh —</option>
-                      {(JSON.parse(localStorage.getItem('thvp_branches') || '[]')).map((b) => (
-                        <option key={b._id} value={b._id} data-code={b.code}>{b.name} ({b.code})</option>
-                      ))}
-                    </CmsSelect>
-                    {editTeacher.branchCode && (
-                      <p className="text-[12px] text-amber-700 font-semibold mt-1.5 flex items-center gap-1">
-                        <MapPin size={12} /> Hiện tại: {editTeacher.branchCode}
-                      </p>
-                    )}
+                <div className="cms-form space-y-2.5">
+                  <div className="cms-form-row">
+                    <div>
+                      <label className="cms-label">Họ tên</label>
+                      <input
+                        type="text"
+                        value={editTeacher.name || ''}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, name: e.target.value }))}
+                        className="cms-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="cms-label">SĐT / Zalo</label>
+                      <input
+                        type="text"
+                        value={editTeacher.phone || ''}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, phone: e.target.value }))}
+                        className="cms-input font-mono"
+                      />
+                    </div>
                   </div>
-                );
-              })()}
-
-              <div className="cms-form-row">
-                <div>
-                  <label className="cms-label">Ngày vào làm</label>
-                  <input
-                    type="date"
-                    value={editTeacher.startDate ? new Date(editTeacher.startDate).toISOString().split('T')[0] : ''}
-                    onChange={(e) => setEditTeacher((p) => ({ ...p, startDate: e.target.value }))}
-                    className="cms-input"
-                  />
+                  <div className="cms-form-row">
+                    <div>
+                      <label className="cms-label">Email</label>
+                      <input
+                        type="email"
+                        value={editTeacher.email || ''}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, email: e.target.value }))}
+                        className="cms-input"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="cms-label">Ngày vào làm</label>
+                      <input
+                        type="date"
+                        value={editTeacher.startDate ? new Date(editTeacher.startDate).toISOString().split('T')[0] : ''}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, startDate: e.target.value }))}
+                        className="cms-input"
+                      />
+                    </div>
+                  </div>
+                  <div className="cms-form-row">
+                    <div>
+                      <label className="cms-label">Địa chỉ</label>
+                      <input
+                        type="text"
+                        value={editTeacher.address || ''}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, address: e.target.value }))}
+                        className="cms-input"
+                        placeholder="Nhập địa chỉ..."
+                      />
+                    </div>
+                    <div>
+                      <label className="cms-label">Giới thiệu (Bio)</label>
+                      <input
+                        type="text"
+                        value={editTeacher.bio || ''}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, bio: e.target.value }))}
+                        className="cms-input"
+                        placeholder="Kinh nghiệm, bằng cấp..."
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="cms-label">Địa chỉ</label>
-                  <input
-                    type="text"
-                    value={editTeacher.address || ''}
-                    onChange={(e) => setEditTeacher((p) => ({ ...p, address: e.target.value }))}
-                    className="cms-input"
-                    placeholder="Nhập địa chỉ..."
-                  />
+              </section>
+
+              {/* 2. Công việc */}
+              <section>
+                <div className="cms-step">
+                  <span className="cms-step__num cms-step__num--muted">2</span>
+                  <span className="cms-step__label">Chuyên môn &amp; trạng thái</span>
                 </div>
-              </div>
-
-              <div>
-                <label className="cms-label">Giới thiệu bản thân (Bio)</label>
-                <textarea
-                  value={editTeacher.bio || ''}
-                  onChange={(e) => setEditTeacher((p) => ({ ...p, bio: e.target.value }))}
-                  rows={3}
-                  className="cms-input"
-                  style={{ minHeight: 88, height: 'auto', paddingTop: 12, paddingBottom: 12 }}
-                  placeholder="Kinh nghiệm cá nhân, bằng cấp, sở trường..."
-                />
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
-                <p className="text-[12px] font-bold text-emerald-700 flex items-center gap-1.5">
-                  <CreditCard size={14} /> Thông tin ngân hàng (QR nhận lương)
-                </p>
-                <div>
-                  <label className="cms-label">Ngân hàng nhận</label>
-                  <BankSelect
-                    value={editTeacher.bankAccount?.bankCode || ''}
-                    onChange={(bank) => setEditTeacher((p) => ({
+                <div className="cms-form space-y-2.5">
+                  <ExamSubjectCheckboxGrid
+                    catalog={examSubjectsCatalog}
+                    value={editTeacher.subjectIds || []}
+                    accent="red"
+                    columns={3}
+                    dense
+                    onChange={(ids) => setEditTeacher((p) => ({
                       ...p,
-                      bankAccount: {
-                        ...(p.bankAccount || {}),
-                        bankCode: bank.bin,
-                        bankName: bank.shortName,
-                      },
+                      subjectIds: ids,
+                      specialty: formatSubjectIdsAsSpecialty(ids, examSubjectsCatalog),
                     }))}
                   />
-                  {editTeacher.bankAccount?.bankCode && (
-                    <p className="text-[12px] font-semibold text-emerald-600 mt-1.5">
-                      ✓ Đã chọn: {editTeacher.bankAccount.bankName}
-                    </p>
-                  )}
-                </div>
-                <div className="cms-form-row">
-                  <div>
-                    <label className="cms-label">Số tài khoản</label>
-                    <input
-                      type="text"
-                      value={editTeacher.bankAccount?.accountNumber || ''}
-                      onChange={(e) => setEditTeacher((p) => ({
-                        ...p,
-                        bankAccount: { ...(p.bankAccount || {}), accountNumber: e.target.value.replace(/\D/g, '') },
-                      }))}
-                      className="cms-input font-mono"
-                      placeholder="VD: 123456789"
-                    />
+
+                  <div className="cms-form-row">
+                    <div>
+                      <label className="cms-label">Trạng thái duyệt</label>
+                      <CmsSelect
+                        value={String(editTeacher.status || 'inactive').toLowerCase()}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, status: e.target.value }))}
+                        className="cms-input"
+                      >
+                        <option value="inactive">Chưa cấp quyền</option>
+                        <option value="pending">Cấp quyền thi (chờ làm bài)</option>
+                        <option value="active">Đã cấp quyền (Active)</option>
+                        <option value="locked">Đã khóa</option>
+                      </CmsSelect>
+                    </div>
+                    <div>
+                      <label className="cms-label flex items-center gap-1">
+                        <MapPin size={12} /> Chi nhánh
+                      </label>
+                      {isSuperAdmin ? (
+                        <CmsSelect
+                          value={editTeacher.branchId || ''}
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            const b = branches.find((x) => String(x._id) === String(id));
+                            setEditTeacher((p) => ({
+                              ...p,
+                              branchId: id,
+                              branchCode: b?.code || '',
+                            }));
+                          }}
+                          className="cms-input"
+                        >
+                          <option value="">— Chưa phân chi nhánh —</option>
+                          {branches.map((b) => (
+                            <option key={b._id} value={b._id}>
+                              {b.name}{b.code ? ` (${b.code})` : ''}
+                            </option>
+                          ))}
+                        </CmsSelect>
+                      ) : (
+                        <input
+                          type="text"
+                          readOnly
+                          value={editTeacher.branchCode || 'Chi nhánh hiện tại'}
+                          className="cms-input opacity-70 cursor-not-allowed"
+                        />
+                      )}
+                    </div>
                   </div>
+                </div>
+              </section>
+
+              {/* 3. Lương */}
+              <section>
+                <div className="cms-step">
+                  <span className="cms-step__num cms-step__num--muted">3</span>
+                  <span className="cms-step__label">Lương cứng &amp; thưởng sao</span>
+                </div>
+                <div className="cms-form space-y-2.5">
+                  <div className="cms-form-row">
+                    <div>
+                      <label className="cms-label flex items-center gap-1.5">
+                        <DollarSign size={12} /> Lương cứng / buổi
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={salary || ''}
+                        onChange={(e) => setEditTeacher((p) => ({
+                          ...p,
+                          baseSalaryPerSession: Number(e.target.value.replace(/\D/g, '')) || 0,
+                        }))}
+                        className="cms-input font-mono font-semibold tabular-nums"
+                        placeholder="150000"
+                      />
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {SALARY_PRESETS.map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setEditTeacher((p) => ({ ...p, baseSalaryPerSession: amt }))}
+                            className={`text-xs font-semibold px-2 py-1 rounded-md border transition ${
+                              salary === amt
+                                ? 'border-sky-400 bg-sky-50 text-sky-800'
+                                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {formatHoaHong(amt)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="cms-label flex items-center gap-1.5">
+                        <Star size={12} className="text-amber-500" /> Thưởng sao
+                      </label>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 h-full min-h-[44px]">
+                        <p className="text-xs text-slate-700 leading-snug">
+                          {formatStarBonusRule({
+                            minStudents: STAR_BONUS_MIN_STUDENTS,
+                            minStars: STAR_BONUS_MIN_STARS,
+                            bonusPerMonth: STAR_BONUS_AMOUNT,
+                          })}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {count > 0
+                            ? <>Sao HV: <strong className="text-amber-700">{avg}/5</strong> ({count} lượt)</>
+                            : 'Chưa có đánh giá từ HV'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* 4. Ngân hàng */}
+              <section>
+                <div className="cms-step">
+                  <span className="cms-step__num cms-step__num--muted">4</span>
+                  <span className="cms-step__label">Ngân hàng nhận lương</span>
+                </div>
+                <div className="cms-form space-y-2.5 rounded-xl border border-slate-200 bg-white p-3">
                   <div>
-                    <label className="cms-label">Tên chủ tài khoản</label>
-                    <input
-                      type="text"
-                      value={editTeacher.bankAccount?.accountHolder || editTeacher.bankAccount?.accountName || ''}
-                      onChange={(e) => setEditTeacher((p) => ({
+                    <label className="cms-label flex items-center gap-1.5">
+                      <CreditCard size={12} /> Ngân hàng
+                    </label>
+                    <BankSelect
+                      value={editTeacher.bankAccount?.bankCode || ''}
+                      onChange={(bank) => setEditTeacher((p) => ({
                         ...p,
                         bankAccount: {
                           ...(p.bankAccount || {}),
-                          accountHolder: e.target.value.toUpperCase(),
-                          accountName: e.target.value.toUpperCase(),
+                          bankCode: bank.bin,
+                          bankName: bank.shortName,
                         },
                       }))}
-                      className="cms-input uppercase"
-                      placeholder="VD: NGUYEN VAN A"
                     />
                   </div>
+                  <div className="cms-form-row">
+                    <div>
+                      <label className="cms-label">Số tài khoản</label>
+                      <input
+                        type="text"
+                        value={editTeacher.bankAccount?.accountNumber || ''}
+                        onChange={(e) => setEditTeacher((p) => ({
+                          ...p,
+                          bankAccount: {
+                            ...(p.bankAccount || {}),
+                            accountNumber: e.target.value.replace(/\D/g, ''),
+                          },
+                        }))}
+                        className="cms-input font-mono"
+                        placeholder="123456789"
+                      />
+                    </div>
+                    <div>
+                      <label className="cms-label">Chủ tài khoản</label>
+                      <input
+                        type="text"
+                        value={editTeacher.bankAccount?.accountHolder || editTeacher.bankAccount?.accountName || ''}
+                        onChange={(e) => setEditTeacher((p) => ({
+                          ...p,
+                          bankAccount: {
+                            ...(p.bankAccount || {}),
+                            accountHolder: e.target.value.toUpperCase(),
+                            accountName: e.target.value.toUpperCase(),
+                          },
+                        }))}
+                        className="cms-input uppercase"
+                        placeholder="NGUYEN VAN A"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
             </div>
           )}
         </div>
 
         <div className={`cms-sheet-footer ${!isHistory ? 'cms-sheet-footer--triple' : ''}`}>
           <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">
-            {isHistory ? 'Đóng' : 'Huỷ bỏ'}
+            {isHistory ? 'Đóng' : 'Huỷ'}
           </button>
           {!isHistory && (
             <>
               <button
                 type="button"
                 onClick={() => onResetPassword(editTeacher.id || editTeacher._id, editTeacher.name)}
-                className="cms-btn cms-btn-secondary"
+                className="cms-btn cms-btn-outline"
               >
-                <KeyRound size={15} /> Cấp lại MK
+                <KeyRound size={15} /> Cấp MK
               </button>
               <button type="button" onClick={onSave} className="cms-btn cms-btn-primary">
-                <Save size={16} /> Lưu thay đổi
+                <Save size={16} /> Lưu
               </button>
             </>
           )}

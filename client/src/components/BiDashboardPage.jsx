@@ -3,7 +3,7 @@ import {
   BarChart3, Download, Loader2, RefreshCw, TrendingDown, TrendingUp,
   Users, GraduationCap, Calendar, DollarSign, ClipboardCheck, Wallet,
 } from 'lucide-react';
-import { biAPI } from '../services/api';
+import { biAPI, systemLogsAPI } from '../services/api';
 import { useBranch } from '../context/BranchContext';
 import { useToast } from '../utils/toast';
 
@@ -96,6 +96,12 @@ export default function BiDashboardPage() {
   const onExport = async () => {
     try {
       await biAPI.exportCsv({ period, branchId });
+      systemLogsAPI.create({
+        action: 'TẢI BÁO CÁO DOANH THU',
+        category: 'finance',
+        message: `Tải file báo cáo doanh thu BI (${period})`,
+        target: 'bi-export-csv',
+      }).catch(() => {});
       toast.success('Da tai CSV');
     } catch (e) {
       toast.error(e.message || 'Export that bai');
@@ -162,14 +168,28 @@ export default function BiDashboardPage() {
         <>
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi icon={Users} label="Học viên mới" value={k.studentsNew ?? 0} delta={k.studentsNewChange} sub={`Tổng ${k.studentsTotal ?? 0}`} />
-            <Kpi icon={DollarSign} label="Doanh thu kỳ" value={fmtMoney(k.revenuePeriod)} delta={k.revenueChange} color="text-emerald-600" bg="bg-emerald-50" sub={`Tỷ lệ TT ${k.paidRate ?? 0}%`} />
+            <Kpi icon={DollarSign} label="Doanh thu thuần (kỳ)" value={fmtMoney(k.revenuePeriod)} delta={k.revenueChange} color="text-emerald-600" bg="bg-emerald-50" sub={`Tỷ lệ TT ${k.paidRate ?? 0}%`} />
             <Kpi icon={GraduationCap} label="Giảng viên" value={k.teachersActive ?? 0} sub={`Chờ duyệt ${k.teachersPending ?? 0}`} color="text-red-600" bg="bg-red-50" />
             <Kpi icon={Calendar} label="Buổi hoàn thành" value={k.schedulesCompleted ?? 0} sub={`Hủy ${k.schedulesCancelled ?? 0} · Sắp tới ${k.schedulesUpcoming ?? 0}`} color="text-amber-600" bg="bg-amber-50" />
           </div>
 
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Kpi icon={Wallet} label="Hoàn học phí" value={k.studentsUnpaid ?? 0} color="text-emerald-600" bg="bg-emerald-50" />
-            <Kpi icon={ClipboardCheck} label="Tỷ lệ đỗ thi" value={k.examPassRate != null ? `${k.examPassRate}%` : '—'} sub={`${k.examPassed ?? 0}/${k.examTotal ?? 0} bài`} color="text-cyan-600" bg="bg-cyan-50" />
+            <Kpi
+              icon={Wallet}
+              label="Hoàn học phí"
+              value={fmtMoney(k.refundAmount ?? 0)}
+              sub={k.refundCount ? `${k.refundCount} giao dịch trong kỳ` : 'Chưa có hoàn trong kỳ'}
+              color="text-red-600"
+              bg="bg-red-50"
+            />
+            <Kpi
+              icon={DollarSign}
+              label="Lợi nhuận (kỳ)"
+              value={fmtMoney(k.profitPeriod ?? ((k.revenuePeriod || 0) - (k.costsPeriod || 0)))}
+              sub={`Chi phí ${fmtMoney(k.costsPeriod ?? 0)}`}
+              color="text-indigo-600"
+              bg="bg-indigo-50"
+            />
             <Kpi icon={DollarSign} label="GV chờ chi" value={k.transactionsPending ?? 0} color="text-orange-600" bg="bg-orange-50" />
             <Kpi icon={Users} label="Đã thanh toán" value={k.studentsPaid ?? 0} color="text-emerald-600" bg="bg-emerald-50" />
           </div>

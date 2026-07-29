@@ -27,6 +27,7 @@ export function useAdminTeachers({
     name: '', phone: '', email: '', specialty: '', subjectIds: [],
     startDate: new Date().toISOString().split('T')[0],
     address: '', branchId: '', branchCode: '',
+    baseSalaryPerSession: 150000,
   });
   const [editTeacher, setEditTeacher] = useState(null);
   const [grantModal, setGrantModal] = useState(null);
@@ -72,6 +73,10 @@ export function useAdminTeachers({
   const handlePayTeacher = async (teacher) => {
     const teacherId = String(teacher.id || teacher._id);
     const now = new Date();
+    const rating = typeof getTeacherRating === 'function' ? getTeacherRating(teacherId) : null;
+    const ratingLabel = rating?.count > 0
+      ? `Đánh giá HV: ${rating.avg}/5 · ${rating.count} lượt`
+      : '';
     setPayoutModal({
       step: 1,
       isLoading: true,
@@ -82,22 +87,31 @@ export function useAdminTeachers({
       pendingSessionsCount: 0,
       sessionsCount: '',
       amount: '',
-      note: `Thù lao giảng dạy tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
+      note: `Lương giảng dạy tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
       bankInfo: teacher.bankAccount || {},
+      ratingLabel,
+      rateDirty: false,
+      starBonus: null,
+      includeStarBonus: true,
     });
     try {
       const res = await api.teachers.getPendingSessions(teacherId);
       if (res.success) {
-        const { pendingSessionsCount, salaryPerSession, bankInfo } = res.data;
-        const autoAmount = pendingSessionsCount * (salaryPerSession || teacher.baseSalaryPerSession || 0);
+        const { pendingSessionsCount, salaryPerSession, bankInfo, starBonus } = res.data;
+        const rate = salaryPerSession || teacher.baseSalaryPerSession || 0;
+        const bonusTotal = Number(starBonus?.unpaidBonusTotal) || 0;
+        const includeBonus = bonusTotal > 0;
+        const autoAmount = pendingSessionsCount * rate + (includeBonus ? bonusTotal : 0);
         setPayoutModal((prev) => (prev ? {
           ...prev,
           isLoading: false,
           pendingSessionsCount,
-          baseSalaryPerSession: salaryPerSession || prev.baseSalaryPerSession,
+          baseSalaryPerSession: rate || prev.baseSalaryPerSession,
           sessionsCount: String(pendingSessionsCount),
           amount: String(autoAmount),
           bankInfo: bankInfo || prev.bankInfo || {},
+          starBonus: starBonus || null,
+          includeStarBonus: includeBonus,
         } : null));
       } else {
         setPayoutModal((prev) => (prev ? { ...prev, isLoading: false } : null));
@@ -107,9 +121,35 @@ export function useAdminTeachers({
     }
   };
 
+  const handleSaveHoaHongRate = async (rate) => {
+    if (!payoutModal?.teacherId) return;
+    const amount = Math.max(0, Number(rate) || 0);
+    try {
+      const res = await api.teachers.update(payoutModal.teacherId, { baseSalaryPerSession: amount });
+      if (res && res.success === false) throw new Error(res.message || 'Lưu thất bại');
+      setPayoutModal((prev) => {
+        if (!prev) return null;
+        const sessions = Math.max(0, Number(prev.sessionsCount) || 0);
+        const bonus = prev.includeStarBonus ? (Number(prev.starBonus?.unpaidBonusTotal) || 0) : 0;
+        return {
+          ...prev,
+          rateDirty: false,
+          baseSalaryPerSession: amount,
+          amount: String(sessions * amount + bonus),
+        };
+      });
+      toast.success(`Đã lưu lương cứng mặc định: ${amount.toLocaleString('vi-VN')}đ/buổi`);
+      fetchTeachers();
+    } catch (err) {
+      toast.error(err.message || 'Không lưu được lương cứng');
+    }
+  };
+
   const handleGoToQR = () => {
-    if (!payoutModal?.sessionsCount || Number(payoutModal.sessionsCount) <= 0) {
-      toast.error('Số buổi phải lớn hơn 0');
+    const sessions = Number(payoutModal?.sessionsCount) || 0;
+    const bonusOn = !!payoutModal?.includeStarBonus && (Number(payoutModal?.starBonus?.unpaidBonusTotal) || 0) > 0;
+    if (sessions <= 0 && !bonusOn) {
+      toast.error('Số buổi phải lớn hơn 0 (hoặc bật thưởng sao)');
       return;
     }
     if (!payoutModal?.amount || Number(payoutModal.amount) <= 0) {
@@ -123,16 +163,30 @@ export function useAdminTeachers({
     if (!payoutModal?.teacherId) return;
     const loadingId = toast.loading('Đang lưu giao dịch...');
     try {
+      const includeStarBonus = !!payoutModal.includeStarBonus
+        && (Number(payoutModal.starBonus?.unpaidBonusTotal) || 0) > 0;
       const res = await api.teachers.payFlexible(
         payoutModal.teacherId,
-        Number(payoutModal.sessionsCount),
+        Number(payoutModal.sessionsCount) || 0,
         Number(payoutModal.amount),
         payoutModal.note,
+        {
+          includeStarBonus,
+          starBonusMonths: includeStarBonus
+            ? (payoutModal.starBonus?.unpaidMonths || []).map((m) => m.month)
+            : [],
+        },
       );
       toast.dismiss(loadingId);
       if (res.success) {
-        const { paidSessions, totalAmount } = res.data || {};
-        toast.success(`Thanh toán ${paidSessions} buổi — ${Number(totalAmount).toLocaleString('vi-VN')}đ cho ${payoutModal.teacherName}`);
+        const { paidSessions, totalAmount, starBonusAmount } = res.data || {};
+        const bonusPart = Number(starBonusAmount) > 0
+          ? ` (gồm thưởng sao ${Number(starBonusAmount).toLocaleString('vi-VN')}đ)`
+          : '';
+        toast.success(
+          `Thanh toán ${paidSessions || 0} buổi — ${Number(totalAmount).toLocaleString('vi-VN')}đ`
+          + ` cho ${payoutModal.teacherName}${bonusPart}`
+        );
         setPayoutModal(null);
         mutate(['admin_finance', selectedBranchId]);
         triggerBackgroundSync?.();
@@ -230,6 +284,7 @@ export function useAdminTeachers({
     handlePayTeacher,
     handleGoToQR,
     handlePayout,
+    handleSaveHoaHongRate,
     approveTeacher,
     markFileReviewed,
     removeTeacher,

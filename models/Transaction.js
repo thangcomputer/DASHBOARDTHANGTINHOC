@@ -56,6 +56,11 @@ const transactionSchema = new mongoose.Schema({
   // Ghi chú
   note: { type: String, default: '' },
 
+  /** Thưởng sao cộng kèm (VNĐ) — tách khỏi lương cứng × buổi */
+  starBonusAmount: { type: Number, default: 0, min: 0 },
+  /** Các tháng YYYY-MM đã chi thưởng trong phiếu này */
+  starBonusMonths: { type: [String], default: [] },
+
   // Idempotency (tránh double-pay khi retry)
   idempotencyKey: { type: String, default: null },
 
