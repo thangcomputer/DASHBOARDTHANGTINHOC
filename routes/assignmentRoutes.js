@@ -8,9 +8,10 @@ const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, branchFilter } = require('../middleware/auth');
 const logger = require('../config/logger');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
+const { assertStudentBranch } = require('../utils/branchScope');
 
 const router = express.Router();
 
@@ -137,11 +138,16 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
 });
 
 // ─── Lấy Bài tập cho Học viên (Kèm Submission cá nhân) ─────────────────────
-router.get('/student/:studentId/course/:courseId', authMiddleware, async (req, res) => {
+router.get('/student/:studentId/course/:courseId', authMiddleware, branchFilter, async (req, res) => {
   try {
     // Authorization: Học viên chỉ xem bài của mình
     if (req.user.role === 'student' && String(req.user.id || req.user._id) !== String(req.params.studentId)) {
       return res.status(403).json({ success: false, message: 'Không có quyền xem bài tập của học viên khác' });
+    }
+
+    if (req.user.role === 'admin' || req.user.role === 'staff') {
+      const ok = await assertStudentBranch(req, res, req.params.studentId);
+      if (!ok) return undefined;
     }
 
     // Khớp đúng tên khóa (không phân biệt hoa thường / khoảng trắng thừa).

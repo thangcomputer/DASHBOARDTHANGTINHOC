@@ -889,6 +889,20 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
     if (!(Number(student.paidAmount) > 0)) {
       student.paidAmount = Number(student.price) || 0;
     }
+    // Grant access trên enrollments đã trả
+    try {
+      const { grantLearningAccess } = require('../services/enrollmentLifecycle');
+      (student.enrollments || []).forEach((enr) => {
+        if (!enr.paid) {
+          enr.paid = true;
+          enr.paidAt = enr.paidAt || new Date();
+        }
+        try { grantLearningAccess(enr); } catch { enr.learningAccess = true; }
+      });
+      if (student.enrollments?.length) student.markModified('enrollments');
+    } catch (lifeErr) {
+      logger.warn('[STUDENTS] pay enrollment access: %s', lifeErr.message);
+    }
     await student.save({ validateModifiedOnly: true });
 
     // Tự động tạo hóa đơn
@@ -899,6 +913,31 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
       note,
     });
     const maHD = invoice?.maHoaDon || '';
+
+    // Phase 10 — ledger
+    let ledgerEntryId = null;
+    try {
+      const { settlePayment } = require('../services/ledgerService');
+      const lr = await settlePayment({
+        student,
+        amount: student.paidAmount || student.price,
+        invoice,
+        courseName: student.course,
+        source: 'admin_pay',
+        sourceRef: maHD || String(student._id),
+        idempotencyKey: `payment:admin_pay:${student._id}:${student.paidAt?.getTime?.() || Date.now()}`,
+        actor: { id: req.user.id, role: req.user.role },
+        note,
+        reqMeta: {
+          ip: req.ip || '',
+          userAgent: req.headers['user-agent'] || '',
+          branchId: req.userBranchId || student.branchId || null,
+        },
+      });
+      ledgerEntryId = lr.entry?._id || null;
+    } catch (ledErr) {
+      logger.warn('[STUDENTS] pay ledger: %s', ledErr.message);
+    }
 
     // Thông báo real-time
     const io = req.app.get('io');
@@ -932,6 +971,7 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
           return o;
         })(),
         invoice,
+        ledgerEntryId,
       },
     });
   } catch (error) {
@@ -989,42 +1029,21 @@ router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
 });
 
 // ─── PUT /api/students/:id/unlock-exam ────────────────────────────────────────
-// Workflow 2: Admin mở khóa phòng thi thủ công
+// Workflow 2: Admin mở khóa phòng thi thủ công (Phase 9 lifecycle)
 router.put('/:id/unlock-exam', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
-    }
-
-    student.studentExamUnlocked = true;
-    student.examApproved = true;
-    if (!student.enrollments?.length && student.course) {
-      student.enrollments = [legacyEnrollmentFromStudent(student)];
-      student.enrollments[0].isPrimary = true;
-    }
-    (student.enrollments || []).forEach((e) => { e.examUnlocked = true; });
-    if (student.enrollments?.length) student.markModified('enrollments');
-    await student.save({ validateModifiedOnly: true });
-
-    // Thông báo real-time cho học viên
-    const io = req.app.get('io');
-    if (io) {
-      const NotificationService = require('../services/NotificationService');
-      await NotificationService.send(io, {
-        type: 'EXAM',
-        title: '🔓 Phòng thi đã mở',
-        content: 'Giảng viên/Admin đã cấp quyền cho bạn vào thi.',
-        receivers: student._id.toString(),
-        link: '/student/exam'
-      });
-      
-      io.emit('exam:unlocked', {
-        studentId: student._id.toString(),
-        studentName: student.name,
-      });
-      io.emit('data:refresh', { type: 'student', id: student._id });
-    }
+    const { unlockStudentExam } = require('../services/examLifecycleService');
+    const student = await unlockStudentExam({
+      studentId: req.params.id,
+      actor: { id: req.user.id, role: req.user.role, name: req.user.name },
+      io: req.app.get('io'),
+      reqMeta: {
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+        branchId: req.userBranchId || null,
+      },
+      reason: req.body?.reason || 'manual',
+    });
 
     try {
       const workflowService = require('../services/workflowService');
@@ -1043,12 +1062,13 @@ router.put('/:id/unlock-exam', [authMiddleware, checkPermission(PERMISSIONS.MANA
       data: student,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message });
   }
 });
 
 // ─── PUT /api/students/:id/lock-exam ──────────────────────────────────────────
-// Admin/Staff hoặc GV phụ trách: đánh trượt / khóa phòng thi
+// Admin/Staff hoặc GV phụ trách: đánh trượt / khóa phòng thi (Phase 9 lifecycle)
 router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
     const role = String(req.user?.role || '').toLowerCase();
@@ -1069,13 +1089,6 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
 
-    if (!existing.studentExamUnlocked) {
-      return res.status(400).json({
-        success: false,
-        message: 'Học viên chưa được mở khóa phòng thi hoặc đã bị đánh trượt',
-      });
-    }
-
     if (!isAdminActor) {
       if (role !== 'teacher') {
         return res.status(403).json({ success: false, message: 'Không có quyền khóa phòng thi' });
@@ -1089,51 +1102,40 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
       }
     }
 
-    const { reason: rawReason = '' } = req.body || {};
+    const { reason: rawReason = '', subjectId = null, reasonKind: rawKind } = req.body || {};
     const actorLabel = isAdminActor
       ? (req.user.name || 'Admin')
       : (req.user.name || 'Giảng viên');
     const reason = String(rawReason || '').trim()
       || `Vi phạm quy chế giám sát thi (${actorLabel} đã đánh trượt)`;
+    const reasonKind = rawKind === 'fail' ? 'fail' : 'violation';
 
-    const student = await Student.findById(req.params.id);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
-    }
-    student.studentExamUnlocked = false;
-    student.examApproved = false;
-    (student.enrollments || []).forEach((e) => { e.examUnlocked = false; });
-    if (student.enrollments?.length) student.markModified('enrollments');
-    await student.save({ validateModifiedOnly: true });
+    const { lockStudentExam } = require('../services/examLifecycleService');
+    const result = await lockStudentExam({
+      studentId: req.params.id,
+      actor: { id: req.user.id, role: req.user.role, name: actorLabel },
+      io: req.app.get('io'),
+      reqMeta: {
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+        branchId: req.userBranchId || null,
+      },
+      reason,
+      reasonKind,
+      subjectId,
+    });
 
+    // Notify admins (giữ hành vi cũ)
     const io = req.app.get('io');
     if (io) {
       try {
         const NotificationService = require('../services/NotificationService');
-
-        await NotificationService.send(io, {
-          type: 'EXAM',
-          title: '🔒 Bài thi bị đánh trượt',
-          content: `Phòng thi của bạn đã bị khóa. Lý do: ${reason}`,
-          sender_id: req.user.id,
-          receivers: student._id.toString(),
-          payload: {
-            studentId: student._id.toString(),
-            action: 'exam_failed',
-            reason,
-            by: role,
-            actorName: actorLabel,
-          },
-          link: '/student/exam',
-        });
-
         const adminTitle = isAdminActor
           ? '🔒 Admin đã khóa phòng thi học viên'
           : '🚨 Giảng viên đánh trượt học viên';
         const adminContent = isAdminActor
-          ? `${actorLabel} đã khóa phòng thi của học viên ${student.name}. Lý do: ${reason}`
-          : `${actorLabel} đã đánh trượt học viên ${student.name}. Lý do: ${reason}`;
-
+          ? `${actorLabel} đã khóa phòng thi của học viên ${result.student.name}. Lý do: ${result.reason}`
+          : `${actorLabel} đã đánh trượt học viên ${result.student.name}. Lý do: ${result.reason}`;
         await NotificationService.send(io, {
           type: 'EXAM',
           title: adminTitle,
@@ -1141,37 +1143,29 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
           sender_id: req.user.id,
           receivers: 'ALL_ADMIN',
           payload: {
-            studentId: student._id.toString(),
-            studentName: student.name,
-            teacherId: student.teacherId?.toString?.() || student.teacherId,
+            studentId: String(result.student._id),
+            studentName: result.student.name,
             action: 'exam_failed',
-            reason,
+            reason: result.reason,
             by: role,
           },
           link: '/admin#students',
+          eventId: `exam.lock.admin:${result.student._id}:${Date.now()}`,
         });
       } catch (notifErr) {
-        logger?.error?.('[LOCK_EXAM] Notification error:', notifErr);
+        logger?.error?.('[LOCK_EXAM] Admin notification error:', notifErr);
       }
-
-      const lockPayload = {
-        studentId: student._id.toString(),
-        reason,
-        message: `🔒 Phòng thi đã bị khóa. Lý do: ${reason}`,
-      };
-      io.to(`student_${student._id}`).emit('exam:locked', lockPayload);
-      io.emit('exam:locked', lockPayload);
-      io.emit('student:updated', student._id);
-      io.emit('data:refresh', { type: 'student', id: student._id });
     }
 
     res.json({
       success: true,
-      message: `Đã đánh trượt / khóa phòng thi của ${student.name}`,
-      data: student,
+      message: `Đã đánh trượt / khóa phòng thi của ${result.student.name}`,
+      data: result.student,
+      meta: { reasonKind: result.reasonKind, subjectId: result.subjectId },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message });
   }
 });
 
@@ -1589,85 +1583,29 @@ router.put('/:id/assign-teacher', authMiddleware, checkPermission(PERMISSIONS.MA
       }
     }
 
-    const mongoose = require('mongoose');
-    const hasValidEnrollmentId = enrollmentId
-      && enrollmentId !== 'main'
-      && mongoose.Types.ObjectId.isValid(String(enrollmentId));
-
-    if (hasValidEnrollmentId && student.enrollments?.length) {
-      const idx = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
-      if (idx < 0) {
-        return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
-      }
-      const prevEnrTeacher = student.enrollments[idx].teacherId;
-      student.enrollments[idx].teacherId = isUnassign ? null : teacherId;
-      student.enrollments[idx].teacherName = teacherName;
-      targetCourse = student.enrollments[idx].courseName;
-      const isPrimary = !!student.enrollments[idx].isPrimary || student.enrollments.length === 1;
-      if (isUnassign) {
-        // Bỏ phân công: luôn xóa teacherId cấp HV nếu là khóa chính / khóa duy nhất
-        // hoặc teacherId cấp HV đang trùng GV của khóa này
-        const topTid = student.teacherId?._id || student.teacherId;
-        if (isPrimary || String(topTid || '') === String(prevEnrTeacher || '')) {
-          student.teacherId = null;
-          student.teacherName = '';
-        }
-      } else if (isPrimary) {
-        student.teacherId = teacherId;
-        student.teacherName = teacherName;
-      }
-    } else {
-      student.teacherId = isUnassign ? null : teacherId;
-      student.teacherName = isUnassign ? '' : teacherName;
-      const primaryIdx = student.enrollments?.findIndex((e) => e.isPrimary);
-      const idx = primaryIdx >= 0 ? primaryIdx : 0;
-      if (student.enrollments?.[idx]) {
-        student.enrollments[idx].teacherId = isUnassign ? null : teacherId;
-        student.enrollments[idx].teacherName = teacherName;
-        targetCourse = student.enrollments[idx].courseName;
-      }
-    }
-
-    // Mark enrollments modified for Mongoose subdocument arrays
-    if (student.enrollments?.length) {
-      student.markModified('enrollments');
-    }
-
-    if (student.status === 'Chờ xếp lớp' && !isUnassign) {
-      student.status = 'Đang học';
-    }
-
-    await student.save();
-    await student.populate('teacherId', 'name phone specialty');
-
-    const ScheduleModel = require('../models/Schedule');
-    const schedFilter = {
+    const { reassignTeacher } = require('../services/teacherReassignmentService');
+    const result = await reassignTeacher({
       studentId: student._id,
-      status: 'scheduled',
-      ...(targetCourse ? { course: targetCourse } : {}),
-    };
-    if (isUnassign) {
-      await ScheduleModel.updateMany(schedFilter, { $set: { teacherId: null, teacherName: '' } });
-    } else {
-      await ScheduleModel.updateMany(schedFilter, {
-        $set: { teacherId, teacherName },
-      });
-    }
+      enrollmentId,
+      newTeacherId: isUnassign ? null : teacherId,
+      actor: { id: req.user.id, role: req.user.role },
+      io: req.app.get('io') || global.io,
+      reassignFutureSchedules: req.body?.reassignFutureSchedules !== false,
+      reason: req.body?.reason || '',
+      reqMeta: {
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+        branchId: req.userBranchId || null,
+      },
+      teacherDoc,
+      teacherName,
+    });
+
+    await result.student.populate('teacherId', 'name phone specialty');
 
     const io = req.app.get('io');
-
     try {
       if (io && !isUnassign) {
-        const NotificationService = require('../services/NotificationService');
-        await NotificationService.send(io, {
-          type: 'COURSE',
-          title: '📚 Học viên mới được giao',
-          content: `Học viên ${student.name} (${targetCourse || student.course}) đã được giao cho bạn.`,
-          receivers: teacherId.toString(),
-          payload: { studentId: student._id, type: 'student' },
-          link: `/teacher#students?studentId=${student._id}`,
-        });
-
         io.to(teacherId.toString()).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId });
         io.emit('student:assigned', { teacherId: teacherId.toString(), studentId: student._id.toString() });
@@ -1677,19 +1615,26 @@ router.put('/:id/assign-teacher', authMiddleware, checkPermission(PERMISSIONS.MA
         io.emit('data:refresh', { type: 'student', id: student._id });
       }
     } catch (notifErr) {
-      logger.error('[ASSIGN_TEACHER] Notification error:', notifErr);
+      logger.error('[ASSIGN_TEACHER] socket error:', notifErr);
     }
 
-    const doc = student.toObject();
+    const doc = result.student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
 
     res.json({
       success: true,
       message: isUnassign ? 'Đã bỏ phân công giảng viên' : 'Đã gán giảng viên thành công',
       data: doc,
+      meta: {
+        completedSessionsAtSwitch: result.completedSessionsAtSwitch,
+        futureSchedulesUpdated: result.futureUpdated,
+        completedSplit: result.completedSplit,
+        progressPreserved: true,
+      },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message });
   }
 });
 
@@ -1757,11 +1702,32 @@ router.post('/:id/reset-today-attendance', authMiddleware, async (req, res) => {
     });
 
     // Xóa schedule hôm nay nếu có
-    await Schedule.deleteMany({
+    const deleted = await Schedule.deleteMany({
       studentId: req.params.id,
       date: { $gte: new Date(todayISO), $lt: new Date(new Date(todayISO).getTime() + 86400000) },
       status: 'completed'
     });
+
+    try {
+      const { writeAudit } = require('../services/auditLogService');
+      await writeAudit({
+        action: 'attendance.reset',
+        actorUserId: req.user?.id || '',
+        actorRole: req.user?.role || '',
+        branchId: req.userBranchId || student.branchId || null,
+        entityType: 'student',
+        entityId: String(student._id),
+        studentId: student._id,
+        oldValue: { gradesToday: true, completedSessions: student.completedSessions },
+        newValue: {
+          gradesToday: false,
+          completedSessions: newCompleted,
+          deletedSchedules: deleted.deletedCount || 0,
+        },
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch { /* ignore */ }
 
     const io = req.app.get('io');
     if (io) {

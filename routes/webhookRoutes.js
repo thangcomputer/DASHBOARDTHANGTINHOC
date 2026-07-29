@@ -230,6 +230,28 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
         matchedRef = claimed.ref;
         logger.info(`[SEPAY] Session ${claimed.sessionId} khớp ref="${claimed.ref}" — ${amount}đ`);
 
+        try {
+          const { settlePayment } = require('../services/ledgerService');
+          await settlePayment({
+            student: null,
+            amount,
+            courseName: claimed.courseName || '',
+            source: 'session',
+            sourceRef: claimed.sessionId,
+            idempotencyKey: gatewayTxnId
+              ? `payment:sepay:${gatewayTxnId}`
+              : `payment:session:${claimed.sessionId}`,
+            actor: { id: 'sepay', role: 'system' },
+            note: `PaymentSession ${claimed.ref}`,
+            metadata: {
+              sessionId: claimed.sessionId,
+              studentName: claimed.studentName || '',
+            },
+          });
+        } catch (ledErr) {
+          logger.warn('[SEPAY] session ledger: %s', ledErr.message);
+        }
+
         const io = req.app.get('io');
         if (io) {
           io.emit('tuition:paid', {
@@ -278,12 +300,13 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
 
         matched = true;
         matchedRef = code;
+        let invoiceDoc = null;
         try {
           const Invoice = require('../models/Invoice');
           const count = await Invoice.countDocuments();
           const now = new Date();
           const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
-          await Invoice.create({
+          invoiceDoc = await Invoice.create({
             maHoaDon: maHD,
             hocVien: updated._id,
             hoTen: updated.name || s.name,
@@ -294,6 +317,47 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
         } catch (invErr) {
           logger.warn('[SEPAY] Invoice create skipped:', invErr.message);
         }
+
+        // Phase 10 — ledger idempotent theo gatewayTxnId
+        try {
+          const { settlePayment } = require('../services/ledgerService');
+          const { grantLearningAccess, applyEnrollmentStatus } = require('../services/enrollmentLifecycle');
+          const full = await Student.findById(updated._id);
+          if (full) {
+            try {
+              (full.enrollments || []).forEach((enr) => {
+                if (!enr.paid) {
+                  enr.paid = true;
+                  enr.paidAt = new Date();
+                  if (enr.status === 'pending_payment') applyEnrollmentStatus(enr, 'active');
+                  else grantLearningAccess(enr);
+                }
+              });
+              if (full.enrollments?.length) {
+                full.markModified('enrollments');
+                await full.save({ validateModifiedOnly: true });
+              }
+            } catch (gErr) {
+              logger.warn('[SEPAY] grant access: %s', gErr.message);
+            }
+          }
+          await settlePayment({
+            student: full || updated,
+            amount,
+            invoice: invoiceDoc,
+            courseName: updated.course || s.course || '',
+            source: 'sepay',
+            sourceRef: gatewayTxnId || code,
+            idempotencyKey: gatewayTxnId
+              ? `payment:sepay:${gatewayTxnId}`
+              : `payment:sepay:student:${updated._id}:${amount}`,
+            actor: { id: 'sepay', role: 'system' },
+            note: String(body.content || '').slice(0, 300),
+          });
+        } catch (ledErr) {
+          logger.warn('[SEPAY] ledger settle: %s', ledErr.message);
+        }
+
         const io = req.app.get('io');
         if (io) {
           io.emit('tuition:paid', {
@@ -301,6 +365,15 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
             amount,
             message: `✅ ${s.name} đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
           });
+          try {
+            const NotificationService = require('../services/NotificationService');
+            await NotificationService.sendFromTemplate(io, {
+              templateCode: 'PAYMENT_SUCCESS',
+              receivers: [String(s._id)],
+              data: { course: updated.course || 'khóa học' },
+              eventId: `payment.settle:sepay:${gatewayTxnId || s._id}`,
+            });
+          } catch { /* ignore */ }
         }
         logger.info(`[SEPAY] Học viên ${s.name} đã thanh toán ${amount}đ`);
         break;

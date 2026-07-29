@@ -1,9 +1,32 @@
 /**
  * Server-side merge/validate cho examProgress (học viên tự cập nhật tiến độ thi).
+ * Phase 9: state machine qua examLifecycleService.
  * Admin/staff vẫn có thể ghi đè qua PUT /students/:id.
  */
 
-const ALLOWED_STATUS = new Set(['chua_thi', 'dang_thi', 'khong_dat', 'dat']);
+const {
+  normalizeAttemptStatusChange,
+  toCanonical,
+  assertExamTransition,
+  canTransitionExam,
+} = require('./examLifecycleService');
+
+const ALLOWED_STATUS = new Set([
+  'chua_thi',
+  'dang_thi',
+  'khong_dat',
+  'dat',
+  'submitted',
+  'void',
+  'violation',
+  // canonical aliases accepted from clients
+  'locked',
+  'unlocked',
+  'in_progress',
+  'graded',
+  'pass',
+  'fail',
+]);
 const ALLOWED_THUC_HANH = new Set(['chua_nop', 'da_nop']);
 
 function sanitizeTracNghiem(tn) {
@@ -50,9 +73,10 @@ function sanitizeChanges(raw = {}) {
  * @param {object} student lean or doc
  * @param {string} subjectId
  * @param {object} rawChanges
+ * @param {{ actorRole?: string, enforceSm?: boolean }} [opts]
  * @returns {{ progress: array, entry: object }}
  */
-function applyStudentExamProgress(student, subjectId, rawChanges) {
+function applyStudentExamProgress(student, subjectId, rawChanges, opts = {}) {
   const sid = String(subjectId || '').trim();
   if (!sid) {
     const err = new Error('Thiếu subjectId');
@@ -68,6 +92,7 @@ function applyStudentExamProgress(student, subjectId, rawChanges) {
   }
 
   const now = Date.now();
+  const roomUnlocked = Boolean(student.studentExamUnlocked || student.examApproved);
   const progress = Array.isArray(student.examProgress)
     ? student.examProgress.map((e) => ({ ...(e.toObject ? e.toObject() : e) }))
     : [];
@@ -82,7 +107,9 @@ function applyStudentExamProgress(student, subjectId, rawChanges) {
       err.status = 403;
       throw err;
     }
-    if (changes.status && changes.status !== 'khong_dat' && existing.status === 'khong_dat') {
+    if (changes.status && changes.status !== 'khong_dat' && changes.status !== 'fail'
+      && changes.status !== 'violation'
+      && (existing.status === 'khong_dat' || existing.attemptStatus === 'fail' || existing.attemptStatus === 'violation')) {
       const err = new Error('Môn đang bị khóa, không thể đổi trạng thái');
       err.status = 403;
       throw err;
@@ -102,10 +129,47 @@ function applyStudentExamProgress(student, subjectId, rawChanges) {
   }
 
   // lockUntil chỉ cho phép tăng / set khi rớt
-  if (changes.lockUntil !== undefined && changes.status !== 'khong_dat' && existing.status !== 'khong_dat') {
+  if (changes.lockUntil !== undefined && changes.status !== 'khong_dat' && changes.status !== 'fail'
+    && changes.status !== 'violation'
+    && existing.status !== 'khong_dat'
+    && existing.attemptStatus !== 'fail'
+    && existing.attemptStatus !== 'violation') {
     if (!existing.lockUntil || Number(existing.lockUntil) <= now) {
-      // cho phép set lock khi hủy bài kèm khong_dat — nếu không có status khong_dat thì bỏ lockUntil
-      if (changes.status !== 'khong_dat') delete changes.lockUntil;
+      if (!['khong_dat', 'fail', 'violation'].includes(changes.status)) delete changes.lockUntil;
+    }
+  }
+
+  // Phase 9 — enforce state machine trên status
+  const enforceSm = opts.enforceSm !== false;
+  if (enforceSm && changes.status !== undefined) {
+    const normalized = normalizeAttemptStatusChange(existing, changes.status, { roomUnlocked });
+    if (normalized) {
+      changes.status = normalized.status;
+      changes.attemptStatus = normalized.attemptStatus;
+    }
+  } else if (changes.status !== undefined) {
+    // staff override: vẫn ghi attemptStatus nếu map được
+    try {
+      const normalized = normalizeAttemptStatusChange(existing, changes.status, { roomUnlocked });
+      if (normalized) {
+        changes.status = normalized.status;
+        changes.attemptStatus = normalized.attemptStatus;
+      }
+    } catch {
+      // admin có thể set trực tiếp legacy
+      changes.attemptStatus = toCanonical(changes.status, { roomUnlocked });
+    }
+  }
+
+  // Nộp thực hành → submitted nếu đang in_progress và chưa pass/fail
+  if (
+    changes.thucHanh === 'da_nop'
+    && !changes.status
+    && (existing.status === 'dang_thi' || existing.attemptStatus === 'in_progress')
+  ) {
+    if (canTransitionExam(existing.attemptStatus || 'in_progress', 'submitted', { roomUnlocked })) {
+      changes.status = 'submitted';
+      changes.attemptStatus = 'submitted';
     }
   }
 
@@ -119,4 +183,6 @@ function applyStudentExamProgress(student, subjectId, rawChanges) {
 module.exports = {
   applyStudentExamProgress,
   sanitizeChanges,
+  ALLOWED_STATUS,
+  assertExamTransition,
 };

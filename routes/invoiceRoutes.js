@@ -8,6 +8,7 @@ const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const { enqueueInvoicePdf, enqueueInvoiceEmail } = require('../services/queue/jobQueue');
 const logger = require('../config/logger');
+const { getStudentBranchId, assertBranchMatch } = require('../utils/branchScope');
 
 // ─── GET /api/invoices ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy hóa đơn (STAFF bị giới hạn theo chi nhánh)
@@ -79,19 +80,29 @@ router.get('/stats', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE
 });
 
 // ─── GET /api/invoices/:id ─────────────────────────────────────────────────────
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware, branchFilter, async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id)
-      .populate('hocVien', 'name course phone zalo address');
+      .populate('hocVien', 'name course phone zalo address branchId');
     
     if (!invoice) {
         return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
     }
 
-    // Bảo vệ: Chỉ Admin hoặc chính Student sở hữu hóa đơn mới được xem
-    if (req.user.role !== 'admin' && req.user.id !== invoice.hocVien?._id?.toString()) {
+    const ownerId = invoice.hocVien?._id?.toString() || String(invoice.hocVien || '');
+    const isOwner = req.user.role === 'student' && String(req.user.id) === ownerId;
+    const isStaffSide = req.user.role === 'admin' || req.user.role === 'staff' || req.user.id === 'admin';
+
+    if (!isOwner && !isStaffSide) {
        return res.status(403).json({ success: false, message: 'Bạn không có quyền xem hóa đơn này' });
     }
+
+    if (isStaffSide) {
+      const studentBranch = invoice.hocVien?.branchId || await getStudentBranchId(ownerId);
+      const ok = await assertBranchMatch(req, res, studentBranch);
+      if (!ok) return undefined;
+    }
+
     res.json({ success: true, data: invoice });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

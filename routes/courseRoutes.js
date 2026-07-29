@@ -10,6 +10,11 @@ const {
   resolveExamSubjectsForCourse,
   inferExamSubjectsFromCourseName,
 } = require('../services/examSubjectCatalog');
+const {
+  activeCourseFilter,
+  softDeleteCourse,
+  restoreCourse,
+} = require('../services/courseLifecycleService');
 
 const router = express.Router();
 
@@ -21,17 +26,29 @@ async function invalidateCourseCache() {
   await cache.delByPrefix('courses:');
 }
 
+function wantsIncludeDeleted(req) {
+  const q = req.query?.includeDeleted;
+  return q === '1' || q === 'true';
+}
+
 // ─── GET /api/courses/stats/summary — đặt trước /:id ───────────────────────────
 router.get('/stats/summary', async (req, res) => {
   try {
-    const data = await cache.wrap(COURSE_STATS_KEY, COURSE_TTL, async () => {
-      const total      = await Course.countDocuments();
-      const published  = await Course.countDocuments({ status: 'published' });
-      const featured   = await Course.countDocuments({ featured: true });
+    const includeDeleted = wantsIncludeDeleted(req);
+    const cacheKey = includeDeleted ? `${COURSE_STATS_KEY}:all` : COURSE_STATS_KEY;
+    const data = await cache.wrap(cacheKey, COURSE_TTL, async () => {
+      const base = includeDeleted ? {} : activeCourseFilter();
+      const total      = await Course.countDocuments(base);
+      const published  = await Course.countDocuments({ ...base, status: 'published' });
+      const featured   = await Course.countDocuments({ ...base, featured: true });
+      const softDeleted = includeDeleted
+        ? await Course.countDocuments({ deletedAt: { $ne: null } })
+        : await Course.countDocuments({ deletedAt: { $ne: null } });
       const categories = await Course.aggregate([
+        { $match: base },
         { $group: { _id: '$category', count: { $sum: 1 } } },
       ]);
-      return { total, published, featured, categories };
+      return { total, published, featured, softDeleted, categories };
     });
 
     return res.json({ success: true, data });
@@ -44,7 +61,8 @@ router.get('/stats/summary', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { category, status, featured, search } = req.query;
-    const filter = {};
+    const includeDeleted = wantsIncludeDeleted(req);
+    const filter = includeDeleted ? {} : activeCourseFilter();
 
     if (category) filter.category = category;
     if (status)   filter.status = status;
@@ -62,7 +80,7 @@ router.get('/', async (req, res) => {
     const courses = search
       ? await loadCourses()
       : await cache.wrap(
-        `courses:list:${category || ''}:${status || ''}:${featured || ''}`,
+        `courses:list:${category || ''}:${status || ''}:${featured || ''}:${includeDeleted ? 'all' : 'live'}`,
         COURSE_TTL,
         loadCourses,
       );
@@ -78,15 +96,49 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ─── POST /api/courses/:id/restore — trước /:id GET vẫn ok vì method khác; đặt trước DELETE ──
+router.post('/:id/restore', courseWriteGuard, async (req, res) => {
+  try {
+    const result = await restoreCourse({
+      courseId: req.params.id,
+      actor: { id: req.user.id, role: req.user.role },
+      reqMeta: {
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+        branchId: req.userBranchId || null,
+      },
+    });
+    await invalidateCourseCache();
+    return res.json({
+      success: true,
+      message: `Đã khôi phục khóa học: ${result.course.name}`,
+      data: result.course,
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    if (status < 500) {
+      return res.status(status).json({ success: false, message: error.message });
+    }
+    logger.error('[COURSES] Restore error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
 // ─── GET /api/courses/:id ─────────────────────────────────────────────────────
 router.get('/:id', async (req, res) => {
   try {
-    const course = await Course.findOne({
+    const includeDeleted = wantsIncludeDeleted(req);
+    const idFilter = {
       $or: [
         { _id: req.params.id.match(/^[a-f\d]{24}$/i) ? req.params.id : null },
         { slug: req.params.id },
       ],
-    });
+    };
+    if (!includeDeleted) {
+      idFilter.deletedAt = null;
+    }
+
+    const course = await Course.findOne(idFilter);
 
     if (!course) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
@@ -208,20 +260,40 @@ router.patch('/:id/price', courseWriteGuard, async (req, res) => {
   }
 });
 
-// ─── DELETE /api/courses/:id ──────────────────────────────────────────────────
+// ─── DELETE /api/courses/:id — soft delete (ADR 0001) ─────────────────────────
 router.delete('/:id', courseWriteGuard, async (req, res) => {
   try {
-    const course = await Course.findByIdAndDelete(req.params.id);
-    if (!course) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
-    }
+    const reason = req.body?.reason || req.query?.reason || '';
+    const result = await softDeleteCourse({
+      courseId: req.params.id,
+      actor: { id: req.user.id, role: req.user.role },
+      reason,
+      io: req.app.get('io') || global.io,
+      reqMeta: {
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+        branchId: req.userBranchId || null,
+      },
+    });
     await invalidateCourseCache();
 
     return res.json({
       success: true,
-      message: `Đã xóa khóa học: ${course.name}`,
+      message: `Đã xóa mềm khóa học: ${result.course.name} (đã thông báo ${result.notified}/${result.studentCount} học viên). Hóa đơn giữ nguyên: ${result.invoiceCount}.`,
+      data: {
+        id: result.course._id,
+        name: result.course.name,
+        deletedAt: result.course.deletedAt,
+        notified: result.notified,
+        studentCount: result.studentCount,
+        invoiceCount: result.invoiceCount,
+      },
     });
   } catch (error) {
+    const status = error.status || 500;
+    if (status < 500) {
+      return res.status(status).json({ success: false, message: error.message });
+    }
     logger.error('[COURSES] Delete error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
   }

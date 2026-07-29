@@ -67,10 +67,27 @@ router.post('/:id/branches', guard, async (req, res) => {
     if (!branchId) {
       return res.status(400).json({ success: false, message: 'Thiếu branchId' });
     }
-    const branch = await tenantService.assignBranch(req.params.id, branchId);
-    res.json({ success: true, data: branch });
+    const result = await tenantService.assignBranch(req.params.id, branchId);
+    // backward compat: data = branch; meta.sync = counts
+    const branch = result.branch || result;
+    res.json({
+      success: true,
+      data: branch,
+      meta: { sync: result.sync || null },
+    });
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+});
+
+// Phase 15 — dry-run / apply backfill tenantId từ Branch
+router.post('/backfill-tenant-ids', guard, async (req, res) => {
+  try {
+    const dryRun = req.body?.dryRun !== false;
+    const data = await tenantService.backfillTenantIdsFromBranches({ dryRun });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

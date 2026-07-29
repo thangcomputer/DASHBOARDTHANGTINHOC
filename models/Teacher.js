@@ -135,6 +135,14 @@ const TeacherSchema = new mongoose.Schema(
       default: null,
     },
     branchCode: { type: String, default: '' }, // Cached: CS1, CS2...
+    // Mã hiển thị GV001-CSx / AD001-CSx / ST001-CSx (ADR 0002). PK = _id.
+    displayCode: { type: String, default: '', trim: true, uppercase: true },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      default: null,
+      index: true,
+    },
 
     // ── Bảo mật ───────────────────────────────────────────────────
     lastLogin: { type: Date },
@@ -200,6 +208,11 @@ TeacherSchema.index({ role: 1 });
 TeacherSchema.index({ email: 1 }, { sparse: true });
 TeacherSchema.index({ branchId: 1, status: 1 });
 TeacherSchema.index({ role: 1, status: 1 });
+TeacherSchema.index(
+  { branchId: 1, displayCode: 1 },
+  { unique: true, partialFilterExpression: { displayCode: { $type: 'string', $gt: '' } } }
+);
+TeacherSchema.index({ displayCode: 1 }, { sparse: true });
 
 const Teacher = mongoose.model('Teacher', TeacherSchema);
 module.exports = Teacher;

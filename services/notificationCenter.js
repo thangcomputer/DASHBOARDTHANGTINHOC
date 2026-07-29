@@ -1,5 +1,5 @@
 /**
- * Notification Center — list / count / mark-read / dismiss / broadcast.
+ * Notification Center — list / count / mark-read / dismiss / archive / broadcast.
  */
 const Notification = require('../models/Notification');
 const logger = require('../config/logger');
@@ -38,6 +38,7 @@ function mapForClient(doc, userId) {
   const n = doc.toObject ? doc.toObject() : { ...doc };
   const readBy = Array.isArray(n.read_by) ? n.read_by.map(String) : [];
   const dismissedBy = Array.isArray(n.dismissed_by) ? n.dismissed_by.map(String) : [];
+  const archivedBy = Array.isArray(n.archived_by) ? n.archived_by.map(String) : [];
   return {
     ...n,
     id: String(n._id),
@@ -45,15 +46,24 @@ function mapForClient(doc, userId) {
     time: n.createdAt,
     read: readBy.includes(String(userId)),
     dismissed: dismissedBy.includes(String(userId)),
+    archived: archivedBy.includes(String(userId)),
+    path: n.path || '',
+    templateCode: n.templateCode || '',
+    priority: n.priority || 'normal',
   };
 }
 
-async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = false } = {}) {
+async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = false, archivedOnly = false } = {}) {
   const { userId, match } = buildReceiverMatch(user);
   const filter = {
     $or: match,
     dismissed_by: { $ne: userId },
   };
+  if (archivedOnly) {
+    filter.archived_by = userId;
+  } else {
+    filter.archived_by = { $ne: userId };
+  }
   if (type && VALID_TYPES.includes(String(type).toUpperCase())) {
     filter.type = String(type).toUpperCase();
   }
@@ -71,6 +81,7 @@ async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = fals
     Notification.countDocuments({
       $or: match,
       dismissed_by: { $ne: userId },
+      archived_by: { $ne: userId },
       read_by: { $ne: userId },
     }),
   ]);
@@ -92,6 +103,7 @@ async function countUnread(user) {
   const count = await Notification.countDocuments({
     $or: match,
     dismissed_by: { $ne: userId },
+    archived_by: { $ne: userId },
     read_by: { $ne: userId },
   });
   return count;
@@ -135,6 +147,26 @@ async function dismiss(user, notificationId) {
   return mapForClient(doc, userId);
 }
 
+async function archive(user, notificationId) {
+  const { userId } = buildReceiverMatch(user);
+  if (!notificationId) {
+    const err = new Error('Thieu notificationId');
+    err.status = 400;
+    throw err;
+  }
+  const doc = await Notification.findByIdAndUpdate(
+    notificationId,
+    { $addToSet: { archived_by: userId, read_by: userId } },
+    { returnDocument: 'after' },
+  );
+  if (!doc) {
+    const err = new Error('Khong tim thay thong bao');
+    err.status = 404;
+    throw err;
+  }
+  return mapForClient(doc, userId);
+}
+
 /**
  * Broadcast / send — uy quyen goi tu route (admin) hoac service khac.
  */
@@ -151,5 +183,6 @@ module.exports = {
   countUnread,
   markRead,
   dismiss,
+  archive,
   createAndEmit,
 };

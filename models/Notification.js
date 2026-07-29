@@ -31,6 +31,10 @@ const notificationSchema = new mongoose.Schema({
   dismissed_by: [{
     type: String
   }],
+  // Per-user archive (Phase 5)
+  archived_by: [{
+    type: String
+  }],
   payload: {
     type: mongoose.Schema.Types.Mixed,
     default: {}
@@ -38,7 +42,17 @@ const notificationSchema = new mongoose.Schema({
   path: {
     type: String,
     default: ''
-  }
+  },
+  // Phase 5 platform fields
+  templateCode: { type: String, default: '', index: true },
+  eventId: { type: String, default: '', index: true },
+  idempotencyKey: { type: String, default: '' },
+  priority: {
+    type: String,
+    enum: ['low', 'normal', 'high'],
+    default: 'normal',
+  },
+  expiresAt: { type: Date, default: null },
 }, {
   timestamps: true
 });
@@ -46,6 +60,14 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ receivers: 1, createdAt: -1 });
 notificationSchema.index({ read_by: 1, createdAt: -1 });
 notificationSchema.index({ dismissed_by: 1, createdAt: -1 });
+notificationSchema.index({ archived_by: 1, createdAt: -1 });
 notificationSchema.index({ type: 1, createdAt: -1 });
+notificationSchema.index(
+  { idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { idempotencyKey: { $type: 'string', $gt: '' } },
+  }
+);
 
 module.exports = mongoose.model('Notification', notificationSchema);

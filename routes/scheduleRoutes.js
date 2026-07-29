@@ -7,6 +7,7 @@ const ScheduleHistory = require('../models/ScheduleHistory');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const logger = require('../config/logger');
 const { studentMatchesTeacher } = require('../services/enrollmentService');
+const { assertStudentBranch, assertTeacherBranch, assertBranchMatch, getStudentBranchId } = require('../utils/branchScope');
 
 function isAdminOrStaff(user) {
   const role = String(user?.role || '').toLowerCase();
@@ -279,14 +280,18 @@ router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
 
 // ─── GET /api/schedules/teacher/:teacherId ─────────────────────────────────────
 // Giảng viên xem lịch dạy của mình
-router.get('/teacher/:teacherId', authMiddleware, async (req, res) => {
+router.get('/teacher/:teacherId', authMiddleware, branchFilter, async (req, res) => {
   try {
     const { status, month } = req.query;
     const filter = { teacherId: req.params.teacherId };
     
-    // Authorization: Chỉ chính GV đó hoặc Admin mới được xem
+    // Authorization: Chỉ chính GV đó hoặc Admin/Staff mới được xem
     if (req.user.role !== 'admin' && req.user.role !== 'staff' && String(req.user.id) !== String(req.params.teacherId)) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền xem lịch của người khác' });
+    }
+    if (req.user.role === 'admin' || req.user.role === 'staff') {
+      const ok = await assertTeacherBranch(req, res, req.params.teacherId);
+      if (!ok) return undefined;
     }
 
     if (status) filter.status = status;
@@ -312,7 +317,7 @@ router.get('/teacher/:teacherId', authMiddleware, async (req, res) => {
 
 // ─── GET /api/schedules/student/:studentId ─────────────────────────────────────
 // Học viên xem lịch học của mình
-router.get('/student/:studentId', authMiddleware, async (req, res) => {
+router.get('/student/:studentId', authMiddleware, branchFilter, async (req, res) => {
   try {
     const role = String(req.user.role || '').toLowerCase();
     // Authorization: HV chỉ xem mình; Admin/Staff xem; Teacher chỉ HV được gán
@@ -326,6 +331,10 @@ router.get('/student/:studentId', authMiddleware, async (req, res) => {
       }
     } else if (role !== 'student' && !isAdminOrStaff(req.user)) {
       return res.status(403).json({ success: false, message: 'Không có quyền' });
+    }
+    if (isAdminOrStaff(req.user)) {
+      const ok = await assertStudentBranch(req, res, req.params.studentId);
+      if (!ok) return undefined;
     }
 
     const schedules = await Schedule.find({ studentId: req.params.studentId })
@@ -348,7 +357,7 @@ router.get('/student/:studentId', authMiddleware, async (req, res) => {
 
 // ─── POST /api/schedules ───────────────────────────────────────────────────────
 // Giảng viên / Admin tạo lịch học mới
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, branchFilter, async (req, res) => {
   try {
     // Authorization: Chỉ Admin, Staff, hoặc Teacher mới được tạo lịch
     if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
@@ -368,6 +377,11 @@ router.post('/', authMiddleware, async (req, res) => {
       if (!ok) {
         return res.status(403).json({ success: false, message: 'Bạn chỉ được tạo lịch cho học viên được phân công' });
       }
+    }
+
+    if (isAdminOrStaff(req.user) && studentId) {
+      const ok = await assertStudentBranch(req, res, studentId);
+      if (!ok) return undefined;
     }
 
     if (!teacherId || !studentId || !date || !startTime) {
@@ -480,6 +494,8 @@ router.post('/', authMiddleware, async (req, res) => {
       status: status || 'scheduled',
       is_paid_to_teacher: finalPaidToTeacher,
       paymentStatus: paymentStatus,
+      branchId: studentDoc?.branchId || null,
+      branchCode: studentDoc?.branchCode || '',
     });
 
     // Populate để trả về đầy đủ
@@ -547,7 +563,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // ─── PUT /api/schedules/:scheduleId ───────────────────────────────────────────
 // Cập nhật lịch học (hoàn thành, huỷ, điểm danh...)
-router.put('/:scheduleId', authMiddleware, async (req, res) => {
+router.put('/:scheduleId', authMiddleware, branchFilter, async (req, res) => {
   try {
     // Authorization:
     // - Admin/Staff/Teacher: sửa lịch đầy đủ
@@ -569,6 +585,12 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
     // Teacher chỉ sửa lịch của mình
     if (role === 'teacher' && String(schedule.teacherId) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: 'Bạn chỉ được chỉnh sửa lịch của chính mình' });
+    }
+
+    if (isAdminOrStaff(req.user)) {
+      const targetBranch = schedule.branchId || await getStudentBranchId(schedule.studentId);
+      const ok = await assertBranchMatch(req, res, targetBranch);
+      if (!ok) return undefined;
     }
 
     const effectiveStart = startTime || schedule.startTime;
@@ -617,6 +639,21 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
     // Cập nhật các field được phép
     const updates = {};
     if (status)    updates.status    = status;
+    // Đồng bộ attendanceStatus khi client vẫn gửi status cũ (completed/no_show)
+    if (status === 'completed' && schedule.attendanceStatus == null) {
+      updates.attendanceStatus = 'present';
+      updates.attendanceMarkedAt = new Date();
+      if (req.user?.id && String(req.user.id).match(/^[a-f\d]{24}$/i)) {
+        updates.attendanceMarkedBy = req.user.id;
+      }
+    }
+    if (status === 'no_show' && schedule.attendanceStatus == null) {
+      updates.attendanceStatus = 'absent';
+      updates.attendanceMarkedAt = new Date();
+      if (req.user?.id && String(req.user.id).match(/^[a-f\d]{24}$/i)) {
+        updates.attendanceMarkedBy = req.user.id;
+      }
+    }
     if (linkHoc)   updates.linkHoc   = linkHoc;
     if (startTime) {
       updates.startTime = startTime;
@@ -672,6 +709,24 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
            receivers: schedule.studentId.toString(),
            link: '/student#schedule'
          });
+         try {
+           const { writeAudit } = require('../services/auditLogService');
+           await writeAudit({
+             action: 'attendance.mark',
+             actorUserId: req.user.id,
+             actorRole: req.user.role,
+             branchId: req.userBranchId || schedule.branchId || null,
+             entityType: 'schedule',
+             entityId: String(schedule._id),
+             studentId: schedule.studentId,
+             teacherId: schedule.teacherId,
+             sessionId: schedule._id,
+             oldValue: { status: schedule.status, attendanceStatus: schedule.attendanceStatus || null },
+             newValue: { status: 'completed', attendanceStatus: 'present' },
+             ip: req.ip || '',
+             userAgent: req.headers['user-agent'] || '',
+           });
+         } catch { /* ignore */ }
       }
       else if ((startTime && startTime !== schedule.startTime) || (date && new Date(date).getTime() !== schedule.date.getTime())) {
          NotificationService.send(io, {
@@ -746,17 +801,90 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── POST /api/schedules/:scheduleId/attendance — Phase 8 điểm danh chuẩn ─────
+router.post('/:scheduleId/attendance', authMiddleware, branchFilter, async (req, res) => {
+  try {
+    const role = String(req.user.role || '').toLowerCase();
+    if (!['admin', 'staff', 'teacher'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền điểm danh' });
+    }
+
+    const schedule = await Schedule.findById(req.params.scheduleId).lean();
+    if (!schedule) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
+    }
+
+    if (role === 'teacher' && String(schedule.teacherId) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: 'Bạn chỉ được điểm danh lịch của mình' });
+    }
+    if (isAdminOrStaff(req.user)) {
+      const targetBranch = schedule.branchId || await getStudentBranchId(schedule.studentId);
+      const ok = await assertBranchMatch(req, res, targetBranch);
+      if (!ok) return undefined;
+    }
+
+    const { attendanceStatus, note } = req.body || {};
+    if (!attendanceStatus) {
+      return res.status(400).json({ success: false, message: 'Thiếu attendanceStatus (present|absent|late|excused)' });
+    }
+
+    const { markAttendance } = require('../services/attendanceService');
+    const result = await markAttendance({
+      scheduleId: req.params.scheduleId,
+      attendanceStatus,
+      note,
+      actor: { id: req.user.id, role: req.user.role },
+      io: req.app.get('io') || global.io,
+      reqMeta: {
+        ip: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+        branchId: req.userBranchId || null,
+      },
+      checkAndUnlockExam,
+    });
+
+    const populated = await Schedule.findById(result.schedule._id)
+      .populate([
+        { path: 'teacherId', select: 'name phone' },
+        { path: 'studentId', select: 'name course' },
+      ]);
+
+    return res.json({
+      success: true,
+      message: result.isCorrection ? 'Đã sửa điểm danh' : 'Đã điểm danh',
+      data: populated,
+      meta: {
+        previous: result.previous,
+        payable: result.payable,
+        isCorrection: result.isCorrection,
+      },
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status < 500) {
+      return res.status(status).json({ success: false, message: err.message });
+    }
+    logger.error('[SCHEDULE] Attendance error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ─── DELETE /api/schedules/:scheduleId ────────────────────────────────────────
-router.delete('/:scheduleId', authMiddleware, async (req, res) => {
+router.delete('/:scheduleId', authMiddleware, branchFilter, async (req, res) => {
   try {
     // Authorization: Chỉ Admin/Staff mới được xóa vĩnh viễn lịch
     if (!['admin', 'staff'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền xóa lịch học' });
     }
-    const schedule = await Schedule.findByIdAndDelete(req.params.scheduleId);
+    const schedule = await Schedule.findById(req.params.scheduleId);
     if (!schedule) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
     }
+    const targetBranch = schedule.branchId || await getStudentBranchId(schedule.studentId);
+    const ok = await assertBranchMatch(req, res, targetBranch);
+    if (!ok) return undefined;
+
+    await Schedule.findByIdAndDelete(req.params.scheduleId);
     res.json({ success: true, message: 'Đã xóa lịch học' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -764,7 +892,7 @@ router.delete('/:scheduleId', authMiddleware, async (req, res) => {
 });
 
 // ─── PATCH /api/schedules/:scheduleId/cancel ─────────────────────────────────
-router.patch('/:scheduleId/cancel', authMiddleware, async (req, res) => {
+router.patch('/:scheduleId/cancel', authMiddleware, branchFilter, async (req, res) => {
   try {
     const { reason = '' } = req.body;
     const schedule = await Schedule.findById(req.params.scheduleId);
@@ -777,6 +905,11 @@ router.patch('/:scheduleId/cancel', authMiddleware, async (req, res) => {
     if (String(req.user.role).toLowerCase() === 'teacher'
         && String(schedule.teacherId) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: 'Bạn chỉ được hủy lịch của chính mình' });
+    }
+    if (isAdminOrStaff(req.user)) {
+      const targetBranch = schedule.branchId || await getStudentBranchId(schedule.studentId);
+      const ok = await assertBranchMatch(req, res, targetBranch);
+      if (!ok) return undefined;
     }
 
     if (schedule.status === 'cancelled') {

@@ -7,12 +7,13 @@ const center = require('../services/notificationCenter');
 // GET /api/notifications — danh sach phan trang (Notification Center)
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { page, limit, type, unreadOnly } = req.query;
+    const { page, limit, type, unreadOnly, archivedOnly } = req.query;
     const result = await center.listForUser(req.user, {
       page,
       limit,
       type,
       unreadOnly: unreadOnly === '1' || unreadOnly === 'true',
+      archivedOnly: archivedOnly === '1' || archivedOnly === 'true',
     });
     res.json({ success: true, ...result });
   } catch (error) {
@@ -69,10 +70,24 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// PUT /api/notifications/:id/archive — archive (Phase 5)
+router.put('/:id/archive', authMiddleware, async (req, res) => {
+  try {
+    const data = await center.archive(req.user, req.params.id);
+    res.json({ success: true, message: 'Da luu tru thong bao', data });
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message || 'Loi server' });
+  }
+});
+
 // POST /api/notifications — admin broadcast
 router.post('/', authMiddleware, isAdmin, async (req, res) => {
   try {
-    const { title, content, type = 'SYSTEM', receivers = 'ALL_ADMIN', path = '', payload = {} } = req.body || {};
+    const {
+      title, content, type = 'SYSTEM', receivers = 'ALL_ADMIN', path = '', payload = {},
+      eventId = '', templateCode = '',
+    } = req.body || {};
     if (!title || !content) {
       return res.status(400).json({ success: false, message: 'Thieu title hoac content' });
     }
@@ -89,6 +104,8 @@ router.post('/', authMiddleware, isAdmin, async (req, res) => {
       receivers,
       payload,
       link: path || '',
+      eventId: eventId ? String(eventId) : '',
+      templateCode: templateCode ? String(templateCode) : '',
     });
     res.status(201).json({ success: true, data: doc });
   } catch (error) {

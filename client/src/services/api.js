@@ -639,10 +639,15 @@ export const authAPI = {
     return res.json();
   },
 
-  adminResetPassword: async (userId, userRole, newPassword) => {
+  adminResetPassword: async (userId, userRole, newPassword, mode = 'manual') => {
     const res = await apiFetch('/auth/admin/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ userId, userRole, newPassword }),
+      body: JSON.stringify({
+        userId,
+        userRole,
+        mode,
+        ...(mode === 'manual' ? { newPassword } : {}),
+      }),
     });
     return res.json();
   },
@@ -1027,6 +1032,11 @@ export const evaluationsAPI = {
     const res = await apiFetch('/evaluations/admin');
     return res.json();
   },
+  getAdminRatings: async (status) => {
+    const q = status ? `?status=${encodeURIComponent(status)}` : '';
+    const res = await apiFetch(`/evaluations/admin/ratings${q}`);
+    return res.json();
+  },
   getByTeacher: async (teacherId) => {
     const res = await apiFetch(`/evaluations/teacher/${encodeURIComponent(teacherId)}`);
     return res.json();
@@ -1035,6 +1045,13 @@ export const evaluationsAPI = {
     const res = await apiFetch('/evaluations', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+  moderate: async (id, { action, reason = '' }) => {
+    const res = await apiFetch(`/evaluations/${id}/moderate`, {
+      method: 'PUT',
+      body: JSON.stringify({ action, reason }),
     });
     return res.json();
   },

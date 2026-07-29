@@ -169,6 +169,32 @@ async function processBackupJob(data) {
   return backupService.runBackupJob(data.jobId);
 }
 
+async function processNotifyTextJob(data) {
+  const { phone, email, text, userName, subject } = data || {};
+  const name = userName || 'ban';
+  const body = String(text || '').trim();
+  if (!body) return { skipped: true, reason: 'empty_text' };
+
+  const results = {};
+  if (phone) {
+    results.zalo = await sendZaloText(phone, body);
+  }
+  if (email) {
+    results.email = await sendEmail({
+      to: email,
+      subject: subject || '[Thang Tin Hoc] Thong bao',
+      text: body,
+      html: '<p>Xin chao <b>' + name + '</b>,</p><p>' + body.replace(/\n/g, '<br/>') + '</p>',
+    });
+  }
+  logger.info({
+    phone: phone ? maskSecret(phone) : null,
+    email: email ? maskSecret(email) : null,
+    results,
+  }, '[Queue] Notify text job done');
+  return results;
+}
+
 async function processNotifyJob(jobName, data) {
   switch (jobName) {
     case 'otp':
@@ -177,6 +203,8 @@ async function processNotifyJob(jobName, data) {
       return processPasswordJob(data);
     case 'welcome':
       return processWelcomeJob(data);
+    case 'notify-text':
+      return processNotifyTextJob(data);
     case 'invoice-email':
       return processInvoicePdfJob(data);
     case 'backup':
@@ -201,6 +229,7 @@ module.exports = {
   processOtpJob,
   processPasswordJob,
   processWelcomeJob,
+  processNotifyTextJob,
   processInvoicePdfJob,
   processBackupJob,
 };

@@ -11,6 +11,7 @@ const { authMiddleware, checkPermission, isTeacher, branchFilter } = require('..
 const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
+const { assertTeacherBranch, assertBranchMatch } = require('../utils/branchScope');
 
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
@@ -170,7 +171,7 @@ router.post('/calculate', authMiddleware, isTeacher, async (req, res) => {
 
 // ─── POST /api/transactions ────────────────────────────────────────────────────
 // Admin tạo phiếu chi lương cho giảng viên
-router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, async (req, res) => {
   try {
     const { teacherId, amount, description, month, note } = req.body;
 
@@ -182,6 +183,9 @@ router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), as
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
+
+    const ok = await assertTeacherBranch(req, res, teacherId);
+    if (!ok) return undefined;
 
     const transaction = await Transaction.create({
       teacherId,
@@ -224,19 +228,22 @@ router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), as
 
 // ─── PUT /api/transactions/:id/confirm ────────────────────────────────────────
 // Admin xác nhận đã thanh toán lương
-router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, async (req, res) => {
   try {
     const { confirmedBy = 'Admin' } = req.body;
+
+    const existing = await Transaction.findById(req.params.id).select('branchId teacherId').lean();
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
+    }
+    const ok = await assertBranchMatch(req, res, existing.branchId);
+    if (!ok) return undefined;
 
     const transaction = await Transaction.findByIdAndUpdate(
       req.params.id,
       { status: 'confirmed', confirmedBy, confirmedAt: new Date() },
       { returnDocument: 'after' }
     ).populate('teacherId', 'name phone');
-
-    if (!transaction) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
-    }
 
     // Thông báo real-time cho giảng viên
     const io = req.app.get('io');
@@ -261,8 +268,15 @@ router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
 });
 
 // ─── PUT /api/transactions/:id/cancel ─────────────────────────────────────────
-router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, async (req, res) => {
   try {
+    const existing = await Transaction.findById(req.params.id).select('branchId').lean();
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
+    }
+    const ok = await assertBranchMatch(req, res, existing.branchId);
+    if (!ok) return undefined;
+
     const transaction = await Transaction.findByIdAndUpdate(
       req.params.id,
       { status: 'cancelled' },
@@ -280,8 +294,15 @@ router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FIN
 });
 
 // ─── DELETE /api/transactions/:id ────────────────────────────────────────────
-router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, async (req, res) => {
   try {
+    const existing = await Transaction.findById(req.params.id).select('branchId').lean();
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
+    }
+    const ok = await assertBranchMatch(req, res, existing.branchId);
+    if (!ok) return undefined;
+
     const transaction = await Transaction.findByIdAndDelete(req.params.id);
     if (!transaction) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
