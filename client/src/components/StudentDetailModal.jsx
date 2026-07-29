@@ -39,6 +39,14 @@ const enrollmentRemaining = (enr) => {
 const isEnrollmentPaid = (e) =>
   e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
 
+const isRefundInvoice = (inv) => {
+  const ma = String(inv?.maHoaDon || '');
+  const ghi = String(inv?.ghiChu || '');
+  return ma.startsWith('R-') || /hoàn/i.test(ghi) || /refund/i.test(ghi);
+};
+
+const courseKeyOf = (name) => String(name || '').trim().toLowerCase();
+
 const summarizeEnrollments = (list) => {
   const items = Array.isArray(list) ? list : [];
   // Khóa đã hủy/hoàn không còn tính vào học phí đang theo & số đã thu
@@ -470,10 +478,59 @@ export default function StudentDetailModal({ studentId, onClose }) {
       : (activeEnrollment.status === 'active' ? 'Đang học' : (activeEnrollment.status || data?.student?.status || '—')))
     : (data?.student?.status || '—');
   const avgGradeDisplay = summaryMetrics.avgGrade ?? data?.student?.avgGrade ?? '—';
-  const financePaidTotal = summaryMetrics.paidPrice;
+  const invoiceList = Array.isArray(data?.invoices) ? data.invoices : [];
+  // Mỗi khóa đã hủy → ẩn đúng 1 hóa đơn thu cũ nhất (giữ HĐ mới nếu đăng ký lại)
+  const hidePaymentQuotaByCourse = {};
+  scopedEnrollments
+    .filter((e) => e?.status === 'cancelled')
+    .forEach((e) => {
+      const k = courseKeyOf(e.courseName || e.name);
+      if (!k) return;
+      hidePaymentQuotaByCourse[k] = (hidePaymentQuotaByCourse[k] || 0) + 1;
+    });
+  const hiddenCancelledPaymentKeys = (() => {
+    const skipped = {};
+    const hidden = new Set();
+    const payments = invoiceList
+      .filter((inv) => !isRefundInvoice(inv))
+      .slice()
+      .sort((a, b) => new Date(a.createdAt || a.ngayXuat || 0) - new Date(b.createdAt || b.ngayXuat || 0));
+    payments.forEach((inv) => {
+      const k = courseKeyOf(inv.khoaHoc);
+      const quota = hidePaymentQuotaByCourse[k] || 0;
+      if (!quota) return;
+      if ((skipped[k] || 0) >= quota) return;
+      hidden.add(String(inv._id || inv.maHoaDon));
+      skipped[k] = (skipped[k] || 0) + 1;
+    });
+    return hidden;
+  })();
+  const scopeCourseKey = activeEnrollment
+    ? courseKeyOf(activeEnrollment.courseName || activeEnrollment.name)
+    : '';
+  const invoiceInScope = (inv) => {
+    if (effectiveCourseFilter === 'all' || !scopeCourseKey) return true;
+    return courseKeyOf(inv?.khoaHoc) === scopeCourseKey;
+  };
+
+  // Tổng đã thanh toán = cộng tất cả hóa đơn thu (kể cả khóa sau này hủy), không lấy 1 khóa đang theo
+  const paymentInvoices = invoiceList.filter((inv) => !isRefundInvoice(inv) && invoiceInScope(inv));
+  const refundInvoices = invoiceList.filter((inv) => isRefundInvoice(inv) && invoiceInScope(inv));
+  const financePaidFromInvoices = paymentInvoices.reduce((s, inv) => s + (Number(inv.hocPhi) || 0), 0);
+  const financeRefundFromInvoices = refundInvoices.reduce((s, inv) => s + Math.abs(Number(inv.hocPhi) || 0), 0);
+  const financePaidTotal = paymentInvoices.length > 0
+    ? financePaidFromInvoices
+    : (
+      scopedEnrollments
+        .filter((e) => isEnrollmentPaid(e) || e?.status === 'cancelled')
+        .reduce((s, e) => s + (Number(e.price) || 0), 0)
+    );
   const financeListedTotal = summaryMetrics.price;
-  const financeRefundedTotal = summaryMetrics.refundedTotal || 0;
-  const financeDebt = Math.max(0, financeListedTotal - financePaidTotal);
+  const financeRefundedTotal = Math.max(
+    financeRefundFromInvoices,
+    summaryMetrics.refundedTotal || 0,
+  );
+  const financeDebt = Math.max(0, financeListedTotal - summaryMetrics.paidPrice);
   const financeAllPaid = summaryMetrics.enrollmentCount > 0
     && summaryMetrics.paidCount >= summaryMetrics.enrollmentCount;
   const financePartialPaid = summaryMetrics.paidCount > 0 && !financeAllPaid;
@@ -489,25 +546,59 @@ export default function StudentDetailModal({ studentId, onClose }) {
     ? financeAllPaid
     : !!data?.student?.paid;
 
-  const invoiceList = Array.isArray(data?.invoices) ? data.invoices : [];
   const paidScopedEnrollments = scopedEnrollments.filter(
-    (e) => e.paid === true || e.paid === 'Đã đóng phí' || e.paid === 'true' || e.paid === 1,
+    (e) => e.status !== 'cancelled' && isEnrollmentPaid(e),
   );
   const financeHistory = (() => {
-    const rows = invoiceList.map((inv) => ({
-      key: String(inv._id || inv.maHoaDon),
-      maHoaDon: inv.maHoaDon || '—',
-      createdAt: inv.createdAt || inv.ngayXuat,
-      khoaHoc: inv.khoaHoc || '—',
-      ghiChu: inv.ghiChu || 'Thu học phí',
-      hocPhi: Number(inv.hocPhi) || 0,
-      synthetic: false,
-    }));
+    const rows = [];
+
+    invoiceList.forEach((inv) => {
+      if (!invoiceInScope(inv)) return;
+      const isRefund = isRefundInvoice(inv);
+      const invKey = String(inv._id || inv.maHoaDon);
+      // Khóa đã hủy: chỉ hiện dòng hoàn, ẩn hóa đơn thu gốc tương ứng (không còn badge "Hủy")
+      if (!isRefund && hiddenCancelledPaymentKeys.has(invKey)) return;
+      const raw = Number(inv.hocPhi) || 0;
+      rows.push({
+        key: invKey,
+        maHoaDon: inv.maHoaDon || '—',
+        createdAt: inv.createdAt || inv.ngayXuat,
+        khoaHoc: inv.khoaHoc || '—',
+        ghiChu: inv.ghiChu || (isRefund ? 'Hoàn học phí' : 'Thu học phí'),
+        hocPhi: isRefund ? -Math.abs(raw) : raw,
+        isRefund,
+        synthetic: !!inv.synthetic,
+      });
+    });
+
+    // Hủy với hoàn 0đ / chưa có ledger → vẫn 1 dòng hoàn (0đ)
+    scopedEnrollments
+      .filter((e) => e?.status === 'cancelled')
+      .forEach((enr, idx) => {
+        const courseName = enr.courseName || enr.name || 'Khóa học';
+        const key = courseKeyOf(courseName);
+        if (effectiveCourseFilter !== 'all' && scopeCourseKey && key !== scopeCourseKey) return;
+        const hasRefundRow = rows.some((r) => r.isRefund && courseKeyOf(r.khoaHoc) === key);
+        if (hasRefundRow) return;
+        const refundAmt = Number(enr.refundedAmount) || 0;
+        rows.push({
+          key: `cancel-refund-${enr.enrollmentId || enr.id || idx}`,
+          maHoaDon: refundAmt > 0 ? `R-${String(enr.enrollmentId || enr.id || idx).slice(-6)}` : '—',
+          createdAt: enr.cancelledAt || enr.registeredAt,
+          khoaHoc: courseName,
+          ghiChu: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${String(enr.cancelReason || '').trim() || 'Admin hủy khóa'}`,
+          hocPhi: -Math.abs(refundAmt),
+          isRefund: true,
+          synthetic: true,
+        });
+      });
+
     paidScopedEnrollments.forEach((enr, idx) => {
       const courseName = enr.courseName || enr.name || '';
       const amount = Number(enr.price) || 0;
       const matched = rows.some((r) => {
-        const sameCourse = String(r.khoaHoc || '').trim().toLowerCase() === String(courseName).trim().toLowerCase();
+        if (r.isRefund) return false;
+        const sameCourse = courseKeyOf(r.khoaHoc) === courseKeyOf(courseName);
         const sameAmount = Math.abs(Number(r.hocPhi) - amount) < 1;
         return sameCourse && sameAmount;
       });
@@ -519,9 +610,11 @@ export default function StudentDetailModal({ studentId, onClose }) {
         khoaHoc: courseName || 'Khóa học',
         ghiChu: 'Thanh toán khóa học',
         hocPhi: amount,
+        isRefund: false,
         synthetic: true,
       });
     });
+
     rows.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     return rows;
   })();
@@ -1121,34 +1214,24 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                 <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-500 max-w-[180px] break-words">
                                   {inv.khoaHoc}{inv.ghiChu ? ` — ${inv.ghiChu}` : ''}
                                 </td>
-                                <td className="px-3 sm:px-4 py-3.5 text-right font-black text-slate-800 text-sm whitespace-nowrap">{fmt(inv.hocPhi)}</td>
+                                <td className={`px-3 sm:px-4 py-3.5 text-right font-black text-sm whitespace-nowrap ${inv.isRefund || inv.hocPhi < 0 ? 'text-red-600' : 'text-slate-800'}`}>
+                                  {fmt(inv.hocPhi)}
+                                </td>
                                 <td className="px-3 sm:px-4 py-3.5 text-center">
                                   {(() => {
-                                    const ma = String(inv.maHoaDon || '');
-                                    const ghi = String(inv.ghiChu || '');
-                                    const isRefund = ma.startsWith('R-') || /hoàn/i.test(ghi) || /refund/i.test(ghi);
-                                    const khoa = String(inv.khoaHoc || '').trim().toLowerCase();
-                                    const enr = (scopedEnrollments || []).find((e) => {
-                                      const name = String(e.courseName || e.name || '').trim().toLowerCase();
-                                      return name && name === khoa;
-                                    });
-                                    const st = String(enr?.status || '');
-                                    // Hoàn học phí → đỏ
-                                    if (isRefund) {
+                                    if (inv.isRefund || inv.hocPhi < 0) {
                                       return (
                                         <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200">
                                           Hoàn học phí
                                         </span>
                                       );
                                     }
-                                    // Hủy → xám (không còn “đã thanh toán”)
-                                    if (st === 'cancelled') {
-                                      return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">
-                                          Hủy
-                                        </span>
-                                      );
-                                    }
+                                    const khoa = String(inv.khoaHoc || '').trim().toLowerCase();
+                                    const enr = (scopedEnrollments || []).find((e) => {
+                                      const name = String(e.courseName || e.name || '').trim().toLowerCase();
+                                      return name && name === khoa && e.status !== 'cancelled';
+                                    });
+                                    const st = String(enr?.status || '');
                                     if (st === 'completed' || st === 'Hoàn thành') {
                                       return (
                                         <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
@@ -1164,7 +1247,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                         </span>
                                       );
                                     }
-                                    if (!enr && inv.synthetic === false && !isRefund) {
+                                    if (!enr && inv.synthetic === false) {
                                       return (
                                         <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
                                           Đã thanh toán

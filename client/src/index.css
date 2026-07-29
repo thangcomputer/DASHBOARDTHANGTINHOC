@@ -1328,11 +1328,35 @@
     width: min(96vw, var(--cms-modal-max));
   }
   .cms-sheet.cms-sheet--wide {
-    width: min(96vw, 720px);
+    width: min(96vw, 880px);
+  }
+  .cms-sheet.cms-sheet--md {
+    width: min(96vw, 640px);
+  }
+  .cms-sheet.cms-sheet--xl,
+  .cms-sheet.cms-sheet--invoice {
+    width: min(96vw, 980px);
+    max-height: min(94vh, 900px);
   }
   .cms-sheet.cms-sheet--compact {
-    max-height: min(92vh, 720px);
+    max-height: min(92vh, 640px);
   }
+  .cms-sheet.cms-sheet--form-dense {
+    max-height: min(90vh, 560px);
+  }
+  .cms-sheet.cms-sheet--form-dense .cms-sheet-body {
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .cms-sheet.cms-sheet--form-dense .cms-sheet-body::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.cms-sheet-body--invoice {
+  overflow-x: hidden;
+  padding-top: 12px;
+  padding-bottom: 16px;
 }
 
 /* Compact modal form - avoid scrollbar on common viewports */

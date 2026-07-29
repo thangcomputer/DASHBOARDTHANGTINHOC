@@ -353,7 +353,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
         role="dialog"
         aria-modal="true"
         aria-label="Thêm học viên mới"
-        className="cms-sheet cms-sheet--wide cms-sheet--compact w-full"
+        className="cms-sheet cms-sheet--wide cms-sheet--compact cms-sheet--form-dense w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
@@ -372,138 +372,140 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
           </button>
         </div>
 
-        <div className="cms-sheet-body space-y-3">
-          <section className="cms-form">
-            <div className="cms-step">
-              <span className="cms-step__num">1</span>
-              <span className="cms-step__label">Thông tin cá nhân</span>
-            </div>
+        <div className="cms-sheet-body">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5 md:items-start">
+            <section className="cms-form">
+              <div className="cms-step">
+                <span className="cms-step__num">1</span>
+                <span className="cms-step__label">Thông tin cá nhân</span>
+              </div>
 
-            <div>
-              <label className="cms-label">Họ tên học viên <span className="text-red-500">*</span></label>
-              <input
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                className="cms-input uppercase"
-                placeholder="VD: Nguyễn Văn A"
-              />
-            </div>
-
-            <div className="cms-form-row">
               <div>
-                <label className="cms-label">Tuổi</label>
+                <label className="cms-label">Họ tên học viên <span className="text-red-500">*</span></label>
                 <input
-                  name="age"
-                  type="number"
-                  value={form.age}
+                  name="name"
+                  value={form.name}
                   onChange={handleChange}
-                  className="cms-input text-center"
-                  placeholder="20"
+                  className="cms-input uppercase"
+                  placeholder="VD: Nguyễn Văn A"
                 />
               </div>
-              <div>
-                <label className="cms-label">Số điện thoại / Zalo <span className="text-red-500">*</span></label>
-                <input
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                  className="cms-input font-mono"
-                  placeholder="0911222333"
-                />
+
+              <div className="cms-form-row">
+                <div>
+                  <label className="cms-label">Tuổi</label>
+                  <input
+                    name="age"
+                    type="number"
+                    value={form.age}
+                    onChange={handleChange}
+                    className="cms-input text-center"
+                    placeholder="20"
+                  />
+                </div>
+                <div>
+                  <label className="cms-label">Số điện thoại / Zalo <span className="text-red-500">*</span></label>
+                  <input
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    className="cms-input font-mono"
+                    placeholder="0911222333"
+                  />
+                </div>
               </div>
-            </div>
-          </section>
 
-          <section className="cms-form">
-            <div className="cms-step">
-              <span className="cms-step__num cms-step__num--muted">2</span>
-              <span className="cms-step__label">Đăng ký khóa học</span>
-            </div>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 md:mt-auto">
+                <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 shrink-0" />
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-semibold text-slate-800 leading-tight">Thanh toán tiền mặt</span>
+                  <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp</span>
+                </span>
+              </label>
+            </section>
 
-            {isSuperAdmin && (
-              <div>
-                <label className="cms-label">Cơ sở (chi nhánh)</label>
-                <CmsSelect
-                  name="branchId"
-                  value={form.branchId || ''}
-                  onChange={handleChange}
-                  className="cms-input"
-                >
-                  <option value="">-- Chọn cơ sở đào tạo --</option>
-                  {branches.map((b) => (
-                    <option key={b._id} value={b._id}>{b.name}</option>
-                  ))}
-                </CmsSelect>
+            <section className="cms-form">
+              <div className="cms-step">
+                <span className="cms-step__num cms-step__num--muted">2</span>
+                <span className="cms-step__label">Đăng ký khóa học</span>
               </div>
-            )}
 
-            <div>
-              <label className="cms-label">Hình thức học</label>
-              <div className="cms-chip-grid">
-                <label className={`cms-chip-option ${form.learningMode === 'OFFLINE' ? 'is-on' : ''}`}>
-                  <input type="radio" name="learningMode" value="OFFLINE" checked={form.learningMode === 'OFFLINE'} onChange={handleChange} className="sr-only" />
-                  Tại cơ sở
-                </label>
-                <label className={`cms-chip-option ${form.learningMode === 'ONLINE' ? 'is-on' : ''}`}>
-                  <input type="radio" name="learningMode" value="ONLINE" checked={form.learningMode === 'ONLINE'} onChange={handleChange} className="sr-only" />
-                  Online
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="cms-label">Khóa học &amp; học phí</label>
-              {dbCourses.length > 0 ? (
-                <CmsSelect name="courseId" value={form.courseId} onChange={handleChange} className="cms-input">
-                  {dbCourses.map((c) => {
-                    const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
-                    const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
-                    return (
-                      <option key={c._id} value={c._id}>
-                        {c.name} — {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
-                      </option>
-                    );
-                  })}
-                </CmsSelect>
-              ) : (
-                <div className="cms-input flex items-center text-slate-400">Đang tải dữ liệu khóa học...</div>
-              )}
-              {form.price > 0 && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-100 text-[11px] font-bold">
-                    <DollarSign size={11} /> {form.price.toLocaleString('vi-VN')}đ
-                  </span>
-                  <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-0.5 rounded-lg border border-sky-100 text-[11px] font-bold">
-                    {form.totalSessions} buổi
-                  </span>
+              {isSuperAdmin && (
+                <div>
+                  <label className="cms-label">Cơ sở (chi nhánh)</label>
+                  <CmsSelect
+                    name="branchId"
+                    value={form.branchId || ''}
+                    onChange={handleChange}
+                    className="cms-input"
+                  >
+                    <option value="">-- Chọn cơ sở đào tạo --</option>
+                    {branches.map((b) => (
+                      <option key={b._id} value={b._id}>{b.name}</option>
+                    ))}
+                  </CmsSelect>
                 </div>
               )}
-            </div>
 
-            <div>
-              <label className="cms-label">Giảng viên hướng dẫn</label>
-              <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="cms-input">
-                <option value="">-- Chọn sau (không bắt buộc) --</option>
-                {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').map((t) => (
-                  <option key={t.id || t._id} value={t.id || t._id}>
-                    {t.name}{t.phone ? ` — ${t.phone}` : ''}
-                  </option>
-                ))}
-              </CmsSelect>
-              {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').length === 0 && (
-                <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên Active để phân công.</p>
-              )}
-            </div>
+              <div>
+                <label className="cms-label">Hình thức học</label>
+                <div className="cms-chip-grid">
+                  <label className={`cms-chip-option ${form.learningMode === 'OFFLINE' ? 'is-on' : ''}`}>
+                    <input type="radio" name="learningMode" value="OFFLINE" checked={form.learningMode === 'OFFLINE'} onChange={handleChange} className="sr-only" />
+                    Tại cơ sở
+                  </label>
+                  <label className={`cms-chip-option ${form.learningMode === 'ONLINE' ? 'is-on' : ''}`}>
+                    <input type="radio" name="learningMode" value="ONLINE" checked={form.learningMode === 'ONLINE'} onChange={handleChange} className="sr-only" />
+                    Online
+                  </label>
+                </div>
+              </div>
 
-            <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 shrink-0" />
-              <span className="min-w-0">
-                <span className="block text-[13px] font-semibold text-slate-800 leading-tight">Thanh toán tiền mặt</span>
-                <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp</span>
-              </span>
-            </label>
-          </section>
+              <div>
+                <label className="cms-label">Khóa học &amp; học phí</label>
+                {dbCourses.length > 0 ? (
+                  <CmsSelect name="courseId" value={form.courseId} onChange={handleChange} className="cms-input">
+                    {dbCourses.map((c) => {
+                      const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
+                      const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
+                      return (
+                        <option key={c._id} value={c._id}>
+                          {c.name} — {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
+                        </option>
+                      );
+                    })}
+                  </CmsSelect>
+                ) : (
+                  <div className="cms-input flex items-center text-slate-400">Đang tải dữ liệu khóa học...</div>
+                )}
+                {form.price > 0 && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-100 text-[11px] font-bold">
+                      <DollarSign size={11} /> {form.price.toLocaleString('vi-VN')}đ
+                    </span>
+                    <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-0.5 rounded-lg border border-sky-100 text-[11px] font-bold">
+                      {form.totalSessions} buổi
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="cms-label">Giảng viên hướng dẫn</label>
+                <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="cms-input">
+                  <option value="">-- Chọn sau (không bắt buộc) --</option>
+                  {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').map((t) => (
+                    <option key={t.id || t._id} value={t.id || t._id}>
+                      {t.name}{t.phone ? ` — ${t.phone}` : ''}
+                    </option>
+                  ))}
+                </CmsSelect>
+                {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên Active để phân công.</p>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
 
         <div className="cms-sheet-footer">

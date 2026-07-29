@@ -6,7 +6,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useModal } from '../../../utils/Modal.jsx';
-import InvoiceTemplate from '../../InvoiceTemplate';
+import InvoicePreviewFrame from '../../InvoicePreviewFrame';
 import exportPDF, { printInvoice } from '../../../utils/exportPDF';
 import { exportToCSV } from '../../../utils/exportExcel';
 import { parseQuestionBankExcel } from '../../../utils/studentQuestionsExcel';
@@ -142,26 +142,17 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         showGlobalModal({
           title: 'HÓA ĐƠN THU HỌC PHÍ',
           content: (
-                <div className="flex flex-col items-center bg-gray-100 p-6 rounded-2xl w-full overflow-hidden">
-              <div className="w-full flex justify-center overflow-hidden py-2">
-                <div
-                      className="shadow-2xl overflow-hidden flex-shrink-0 mx-auto w-full max-w-[560px] aspect-[210/148] bg-white"
-                >
-                      <div
-                        className="origin-top-left scale-[0.8] md:scale-[0.7] transition-transform"
-                        style={{ width: '210mm', height: '148mm' }}
-                      >
-                    <InvoiceTemplate data={{
-                      studentName: student.name,
-                      courseName: student.course,
-                      tuitionFee: student.price,
-                      date: new Date(),
-                      isPaid: true,
-                    }} />
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-wrap justify-center gap-3 mt-6 w-full max-w-lg relative z-20">
+            <div className="flex flex-col items-center gap-4 w-full rounded-2xl bg-slate-100 p-3 sm:p-5">
+              <InvoicePreviewFrame
+                data={{
+                  studentName: student.name,
+                  courseName: student.course,
+                  tuitionFee: student.price,
+                  date: new Date(),
+                  isPaid: true,
+                }}
+              />
+              <div className="flex flex-wrap justify-center gap-3 w-full max-w-lg relative z-20">
                 <button
                   type="button"
                   onClick={() => printInvoice()}

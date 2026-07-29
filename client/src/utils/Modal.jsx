@@ -49,6 +49,15 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
 
   const config = typeConfigs[modal.type] || typeConfigs.info;
   const Icon = config.icon;
+  const sizeClass = ({
+    sm: '',
+    md: 'cms-sheet--md',
+    lg: 'cms-sheet--wide',
+    xl: 'cms-sheet--xl',
+    '2xl': 'cms-sheet--xl',
+    '3xl': 'cms-sheet--invoice',
+  })[modal.size] || '';
+  const showFooter = Boolean(modal.cancelText || modal.confirmText);
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement;
@@ -107,7 +116,7 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
         aria-modal="true"
         aria-label={modal.title || 'Thông báo'}
         tabIndex={-1}
-        className="cms-sheet w-full"
+        className={`cms-sheet w-full ${sizeClass}`.trim()}
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
         <div className="cms-sheet-header">
@@ -125,24 +134,26 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
           </button>
         </div>
 
-        <div className="cms-sheet-body">
+        <div className={`cms-sheet-body ${modal.size === '3xl' ? 'cms-sheet-body--invoice' : ''}`}>
           <div className="text-sm text-slate-600 leading-relaxed">
             {modal.content}
           </div>
         </div>
 
-        <div className="cms-sheet-footer">
-          {modal.cancelText ? (
-            <button type="button" onClick={onCancel} className="cms-btn cms-btn-outline">
-              {modal.cancelText}
-            </button>
-          ) : null}
-          {modal.confirmText ? (
-            <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary">
-              {modal.confirmText}
-            </button>
-          ) : null}
-        </div>
+        {showFooter ? (
+          <div className="cms-sheet-footer">
+            {modal.cancelText ? (
+              <button type="button" onClick={onCancel} className="cms-btn cms-btn-outline">
+                {modal.cancelText}
+              </button>
+            ) : null}
+            {modal.confirmText ? (
+              <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary">
+                {modal.confirmText}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </>
   );

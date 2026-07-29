@@ -1485,9 +1485,11 @@ router.post('/:id/enrollments', authMiddleware, checkPermission(PERMISSIONS.MANA
       student.enrollments[0].isPrimary = true;
     }
 
-    const duplicate = (student.enrollments || []).some(
-      (e) => (e.courseName || '').toLowerCase() === resolvedName.toLowerCase()
-    );
+    const duplicate = (student.enrollments || []).some((e) => {
+      if (String(e.status || '') === 'cancelled') return false;
+      if (catalogCourse?._id && e.courseId && String(e.courseId) === String(catalogCourse._id)) return true;
+      return (e.courseName || '').toLowerCase() === resolvedName.toLowerCase();
+    });
     if (duplicate) {
       return res.status(409).json({ success: false, message: 'Học viên đã đăng ký khóa học này' });
     }

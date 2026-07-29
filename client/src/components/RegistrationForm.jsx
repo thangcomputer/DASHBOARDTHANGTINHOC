@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import InvoiceTemplate from './InvoiceTemplate';
-import exportPDF from '../utils/exportPDF';
+import InvoicePreviewFrame from './InvoicePreviewFrame';
+import exportPDF, { printInvoice } from '../utils/exportPDF';
 import { generateVietQRUrl } from './BankSelect';
 import { useModal } from '../utils/Modal.jsx';
 import { useToast } from '../utils/toast.jsx';
@@ -241,51 +242,42 @@ const RegistrationForm = ({ onNavigate }) => {
                 showModal({
               title: 'HÓA ĐƠN ĐĂNG KÝ HỌC',
               content: (
-                <div className="flex flex-col items-center bg-gray-50 p-6 rounded-2xl w-full overflow-hidden">
-                   <div className="w-full flex justify-center overflow-hidden py-2">
-                      <div
-                        className="shadow-2xl overflow-hidden flex-shrink-0 mx-auto w-full max-w-[560px] aspect-[210/148] bg-white"
-                      >
-                        <div
-                          className="origin-top-left scale-[0.8] md:scale-[0.7] transition-transform"
-                          style={{ width: '210mm', height: '148mm' }}
-                        >
-                          <InvoiceTemplate data={{
-                            studentName: formData.name,
-                            courseName: formData.course,
-                            tuitionFee: formData.effectivePrice || formData.price,
-                            date: new Date(),
-                            isPaid: true,
-                          }} />
-                        </div>
-                      </div>
-                   </div>
-                   <div className="flex flex-wrap justify-center gap-3 mt-6 w-full max-w-lg relative z-20">
-                      <button 
-                        onClick={() => {
-                          const { printInvoice } = require('../utils/exportPDF');
-                          printInvoice();
-                        }}
-                        className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-                      >
-                        <Printer size={18} /> IN (PRINT)
-                      </button>
-                      <button 
-                        onClick={() => exportPDF({ studentName: formData.name })}
-                        className="flex-1 min-w-[120px] py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-                      >
-                        <Download size={18} /> TẢI PDF
-                      </button>
-                      <button 
-                        onClick={() => {
-                          closeModal();
-                          setStep(3);
-                        }}
-                        className="flex-1 min-w-[120px] py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center justify-center"
-                      >
-                        ĐÓNG
-                      </button>
-                   </div>
+                <div className="flex flex-col items-center gap-4 w-full rounded-2xl bg-slate-100 p-3 sm:p-5">
+                  <InvoicePreviewFrame
+                    data={{
+                      studentName: formData.name,
+                      courseName: formData.course,
+                      tuitionFee: formData.effectivePrice || formData.price,
+                      date: new Date(),
+                      isPaid: true,
+                    }}
+                  />
+                  <div className="flex flex-wrap justify-center gap-3 w-full max-w-lg relative z-20">
+                    <button
+                      type="button"
+                      onClick={() => printInvoice()}
+                      className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Printer size={18} /> IN (PRINT)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportPDF({ studentName: formData.name })}
+                      className="flex-1 min-w-[120px] py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Download size={18} /> TẢI PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeModal();
+                        setStep(3);
+                      }}
+                      className="flex-1 min-w-[120px] py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center justify-center"
+                    >
+                      ĐÓNG
+                    </button>
+                  </div>
                 </div>
               ),
               type: 'info',
