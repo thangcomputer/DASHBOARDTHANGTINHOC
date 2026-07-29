@@ -285,9 +285,9 @@ export default function EmployeeManagementTab() {
   };
 
   return (
-    <div className="cms-hr space-y-3 sm:space-y-4 md:space-y-6">
+    <div className="cms-hr cms-viewport-fill">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
+      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between shrink-0">
         <div className="min-w-0">
           <h2 className="cms-hr-title flex items-center gap-2">
             <span className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
@@ -323,7 +323,7 @@ export default function EmployeeManagementTab() {
 
       {/* ── Stats Cards ── */}
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
           <div className="cms-hr-stat">
             <div className="cms-hr-stat-icon bg-red-100 text-red-600"><Users size={16} /></div>
             <p className="cms-hr-stat-value">{stats.total}</p>
@@ -350,7 +350,7 @@ export default function EmployeeManagementTab() {
       )}
 
       {/* ── Tab switcher ── */}
-      <div className="cms-hr-tabs" role="tablist" aria-label="Nhân sự">
+      <div className="cms-hr-tabs shrink-0" role="tablist" aria-label="Nhân sự">
         {[
           { id: 'list', label: 'Danh sách nhân sự', icon: ClipboardList },
           { id: 'payroll', label: 'Trả lương', icon: DollarSign },
@@ -383,7 +383,7 @@ export default function EmployeeManagementTab() {
 
       {/* ═══════════════ TAB 1: DANH SÁCH NHÂN SỰ ═══════════════ */}
       {activeTab === 'list' && (
-        <div className="cms-hr-panel">
+        <div className="cms-hr-panel cms-viewport-scroll flex flex-col min-h-0">
           <div className="cms-hr-toolbar">
             <div className="relative w-full md:w-auto md:min-w-[220px]">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
@@ -565,7 +565,7 @@ export default function EmployeeManagementTab() {
 
       {/* ═══════════════ TAB 2: TRẢ LƯƠNG ═══════════════ */}
       {activeTab === 'payroll' && (
-        <div className="space-y-3 sm:space-y-4">
+        <div className="cms-viewport-scroll space-y-3 sm:space-y-4">
           <div className="cms-hr-panel overflow-hidden">
             <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
               <h3 className="cms-hr-heading flex items-center gap-2">

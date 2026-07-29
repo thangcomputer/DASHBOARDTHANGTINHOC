@@ -57,10 +57,10 @@ const AdminDashboard = () => {
   } = s;
 
   return (
-    <div className="bg-transparent h-full">
-      <div className="min-w-0">
+    <div className="bg-transparent h-full min-h-0">
+      <div className="min-w-0 h-full min-h-0">
         <AdminTabProvider value={adminTabValue}>
-        <div className="px-0 py-1 sm:px-0 sm:py-2 md:px-0 lg:px-0 space-y-4 sm:space-y-6 md:space-y-8">
+        <div className="px-0 py-1 sm:px-0 sm:py-2 md:px-0 lg:px-0 h-full min-h-0">
           {activeTab === 'dashboard' && (
             <AdminLazyOverviewTab
               statTotalStudents={statTotalStudents}

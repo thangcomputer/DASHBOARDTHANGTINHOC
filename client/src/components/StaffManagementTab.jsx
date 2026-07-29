@@ -661,12 +661,12 @@ export default function StaffManagementTab() {
   };
 
   return (
-    <div className="cms-rbac space-y-3 sm:space-y-4">
+    <div className="cms-rbac cms-viewport-fill">
       {modal !== undefined && (
         <StaffModal staff={modal} onClose={() => setModal(undefined)} onSaved={handleSaved} />
       )}
 
-      <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
+      <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between shrink-0">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
             <span className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
@@ -686,7 +686,7 @@ export default function StaffManagementTab() {
       </div>
 
       {/* RBAC policy accordion — native details, no React state */}
-      <details className="cms-rbac-policy">
+      <details className="cms-rbac-policy shrink-0">
         <summary className="cms-rbac-policy-summary">
           <span className="flex items-center gap-2 font-semibold text-sky-900">
             <Shield size={14} className="text-sky-600" aria-hidden="true" />
@@ -701,16 +701,16 @@ export default function StaffManagementTab() {
       </details>
 
       {loading ? (
-        <div className="flex items-center justify-center py-14 gap-3 text-slate-400">
+        <div className="cms-viewport-scroll flex items-center justify-center py-14 gap-3 text-slate-400">
           <Loader2 size={20} className="animate-spin" /> <span className="text-sm">Đang tải...</span>
         </div>
       ) : staffList.length === 0 ? (
-        <div className="text-center py-14 text-slate-400">
+        <div className="cms-viewport-scroll text-center py-14 text-slate-400">
           <Users size={36} className="mx-auto mb-3 opacity-25" />
           <p className="text-sm font-medium">Chưa có tài khoản nội bộ nào.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="cms-viewport-scroll space-y-3 pr-0.5">
           {staffList.map((s) => (
             <StaffCard
               key={s._id}

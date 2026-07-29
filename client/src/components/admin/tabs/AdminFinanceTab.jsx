@@ -120,7 +120,7 @@ export default function AdminFinanceTab() {
   };
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 max-lg:pb-2 lg:h-[calc(100dvh-7.25rem)] xl:h-[calc(100dvh-8.5rem)] lg:min-h-0 lg:overflow-hidden">
+    <div className="cms-viewport-fill">
       {/* P2 P&L strip */}
       {ledger && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 shrink-0">

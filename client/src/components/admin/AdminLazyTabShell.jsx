@@ -34,7 +34,7 @@ export function AdminLazyExternalTab({ tab }) {
   const Component = EXTERNAL_TABS[tab];
   if (!Component) return null;
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300 h-full min-h-0">
       <Suspense fallback={<TabFallback />}>
         <Component />
       </Suspense>
@@ -44,15 +44,17 @@ export function AdminLazyExternalTab({ tab }) {
 
 export function AdminLazyOverviewTab(props) {
   return (
-    <Suspense fallback={<TabFallback />}>
-      <LazyAdminOverviewTab {...props} />
-    </Suspense>
+    <div className="h-full min-h-0">
+      <Suspense fallback={<TabFallback />}>
+        <LazyAdminOverviewTab {...props} />
+      </Suspense>
+    </div>
   );
 }
 
 function LazyAdminTab({ Component }) {
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300 h-full min-h-0">
       <Suspense fallback={<TabFallback />}>
         <Component />
       </Suspense>

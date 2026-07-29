@@ -24,7 +24,8 @@ export default function AdminOverviewTab({
   ];
 
   return (
-    <div className="cms-dashboard space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+    <div className="cms-dashboard cms-viewport-fill animate-in fade-in duration-200">
+      <div className="cms-viewport-scroll space-y-4 sm:space-y-6">
       {/* KPI grid */}
       <div className="cms-kpi-grid">
         <StatCard
@@ -188,6 +189,7 @@ export default function AdminOverviewTab({
           })}
         </div>
       </section>
+      </div>
     </div>
   );
 }

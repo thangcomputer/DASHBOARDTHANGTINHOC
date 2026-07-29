@@ -172,9 +172,9 @@ export default function RevenueAnalyticsTab() {
   const selectedPeriodLabel = PERIODS.find(p => p.value === period)?.label || '';
 
   return (
-    <div className="space-y-6 p-1">
+    <div className="cms-viewport-fill p-1">
       {/* ── Header Controls ────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
             <BarChart3 size={22} className="text-sky-700" />
@@ -198,7 +198,7 @@ export default function RevenueAnalyticsTab() {
       </div>
 
       {/* ── Period Selector ─────────────────────────────────────────── */}
-      <div className="cms-m-filter-scroll flex gap-2 flex-nowrap overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="cms-m-filter-scroll flex gap-2 flex-nowrap overflow-x-auto pb-1 -mx-1 px-1 shrink-0">
         {PERIODS.map(p => (
           <button key={p.value}
             type="button"
@@ -219,7 +219,7 @@ export default function RevenueAnalyticsTab() {
       )}
 
       {/* ── Stat Cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
         <StatCard label={`Doanh thu ${selectedPeriodLabel}`} value={fmt(data?.totalRevenue)}
           icon={DollarSign} color="#6366f1" trend={data?.growthPct} loading={loading}
           sub={`So với kỳ trước: ${fmt(data?.prevRevenue)}`} />
@@ -235,7 +235,7 @@ export default function RevenueAnalyticsTab() {
       </div>
 
       {/* ── Sub-tabs ───────────────────────────────────────────────── */}
-      <div className="border-b border-gray-200 -mx-1">
+      <div className="border-b border-gray-200 -mx-1 shrink-0">
         <div className="flex gap-1 flex-nowrap overflow-x-auto">
           {[
             { id: 'revenue',  label: '📈 Doanh thu theo thời gian' },
@@ -252,21 +252,23 @@ export default function RevenueAnalyticsTab() {
         </div>
       </div>
 
+      {/* ── Tab panels (scroll) ─────────────────────────────────────── */}
+      <div className="cms-viewport-scroll space-y-4">
       {/* ── Tab: Revenue Timeline ──────────────────────────────────── */}
       {activeTab === 'revenue' && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="font-black text-gray-700 mb-4 flex items-center gap-2">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 flex flex-col min-h-[220px] lg:min-h-0 lg:h-full">
+          <h3 className="font-black text-gray-700 mb-4 flex items-center gap-2 shrink-0">
             <BarChart3 size={16} className="text-indigo-500" />
             Biểu đồ doanh thu — {selectedPeriodLabel}
           </h3>
-          <div className="cms-m-chart min-h-[300px] flex flex-col">
+          <div className="cms-m-chart min-h-[180px] flex-1 flex flex-col">
             {loading ? (
-              <div className="flex flex-1 items-center justify-center text-gray-400 min-h-[300px]">
+              <div className="flex flex-1 items-center justify-center text-gray-400 min-h-[160px]">
                 <Loader2 size={24} className="animate-spin" />
               </div>
             ) : data?.timeSeries?.length ? (
               <>
-                <div className="flex-1 flex flex-col justify-end min-h-[260px]">
+                <div className="flex-1 flex flex-col justify-end min-h-[140px]">
                   <BarChart data={data.timeSeries} color="#6366f1" height={120} />
                 </div>
                 <div className="flex justify-between text-[10px] text-gray-400 mt-2">
@@ -275,7 +277,7 @@ export default function RevenueAnalyticsTab() {
                 </div>
               </>
             ) : (
-              <div className="flex flex-1 items-center justify-center text-center text-gray-400 text-sm min-h-[300px]">
+              <div className="flex flex-1 items-center justify-center text-center text-gray-400 text-sm min-h-[160px]">
                 Chưa có dữ liệu trong khoảng này
               </div>
             )}
@@ -360,9 +362,9 @@ export default function RevenueAnalyticsTab() {
           {/* Enrollment chart */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="font-black text-gray-700 mb-4">Đăng ký theo thời gian — {selectedPeriodLabel}</h3>
-            <div className="cms-m-chart min-h-[300px] flex flex-col">
+            <div className="cms-m-chart min-h-[180px] flex flex-col">
               {loading
-                ? <div className="flex flex-1 items-center justify-center min-h-[300px]"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
+                ? <div className="flex flex-1 items-center justify-center min-h-[160px]"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
                 : enrollment?.timeSeries?.length
                   ? (
                     <div className="flex-1 flex flex-col justify-end min-h-[260px]">
@@ -374,7 +376,7 @@ export default function RevenueAnalyticsTab() {
                       />
                     </div>
                   )
-                  : <div className="flex flex-1 items-center justify-center text-center text-gray-400 text-sm min-h-[300px]">Chưa có dữ liệu</div>
+                  : <div className="flex flex-1 items-center justify-center text-center text-gray-400 text-sm min-h-[160px]">Chưa có dữ liệu</div>
               }
             </div>
           </div>
@@ -437,6 +439,7 @@ export default function RevenueAnalyticsTab() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

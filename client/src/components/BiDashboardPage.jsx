@@ -111,8 +111,8 @@ export default function BiDashboardPage() {
   const k = data?.kpis || {};
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="max-w-6xl mx-auto cms-viewport-fill">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between shrink-0">
         <div className="min-w-0">
           <h1 className="cms-m-title flex items-center gap-2">
             <BarChart3 className="text-sky-700 flex-shrink-0" size={22} aria-hidden="true" /> BI Dashboard
@@ -155,7 +155,7 @@ export default function BiDashboardPage() {
       </div>
 
       {loading && !data ? (
-        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3" aria-busy="true" aria-label="Đang tải">
+        <div className="cms-viewport-scroll grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3" aria-busy="true" aria-label="Đang tải">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="cms-m-kpi animate-pulse">
               <div className="w-10 h-10 rounded-xl bg-slate-100 mb-3" />
@@ -165,7 +165,7 @@ export default function BiDashboardPage() {
           ))}
         </div>
       ) : (
-        <>
+        <div className="cms-viewport-scroll space-y-4">
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi icon={Users} label="Học viên mới" value={k.studentsNew ?? 0} delta={k.studentsNewChange} sub={`Tổng ${k.studentsTotal ?? 0}`} />
             <Kpi icon={DollarSign} label="Doanh thu thuần (kỳ)" value={fmtMoney(k.revenuePeriod)} delta={k.revenueChange} color="text-emerald-600" bg="bg-emerald-50" sub={`Tỷ lệ TT ${k.paidRate ?? 0}%`} />
@@ -229,7 +229,7 @@ export default function BiDashboardPage() {
               )}
             </ul>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

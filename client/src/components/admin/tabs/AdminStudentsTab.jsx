@@ -566,9 +566,9 @@ export default function AdminStudentsTab() {
   };
 
   return (
-    <div className="cms-students-module bg-white rounded-2xl lg:rounded-[28px] border border-slate-100 shadow-[0_4px_24px_rgba(15,23,42,0.04)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="cms-students-module cms-viewport-module bg-white rounded-2xl lg:rounded-[28px] border border-slate-100 shadow-[0_4px_24px_rgba(15,23,42,0.04)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Title + actions */}
-      <div className="px-3 pt-3 pb-2 sm:px-4 lg:px-6 lg:pt-4 space-y-3">
+      <div className="px-3 pt-3 pb-2 sm:px-4 lg:px-6 lg:pt-4 space-y-3 shrink-0">
         <div className="flex items-center justify-between gap-3 min-w-0">
           <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
             <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
@@ -653,7 +653,7 @@ export default function AdminStudentsTab() {
       </div>
 
       {/* ── MOBILE / TABLET CARDS (< lg) ─────────────────────────── */}
-      <div className="lg:hidden px-3 pb-3 sm:px-4 space-y-2 min-h-[280px]">
+      <div className="lg:hidden px-3 pb-3 sm:px-4 space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain">
         {filteredStudents.length === 0 ? (
           <div className="py-12 text-center text-slate-400">
             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -823,7 +823,7 @@ export default function AdminStudentsTab() {
       </div>
 
       {/* ── DESKTOP TABLE (≥ lg) ─────────────────────────────────── */}
-      <div className="hidden lg:block cms-table-wrap overscroll-x-contain min-h-[480px] touch-pan-x">
+      <div className="hidden lg:block cms-table-wrap overscroll-x-contain flex-1 min-h-0 overflow-auto touch-pan-x">
         <table className="w-full text-left border-collapse min-w-[900px]">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/70">
@@ -933,7 +933,7 @@ export default function AdminStudentsTab() {
       </div>
 
       {/* Pagination */}
-      <div className="px-3 py-3 sm:px-4 lg:px-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div className="px-3 py-3 sm:px-4 lg:px-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0">
         <p className="text-xs text-slate-500 font-medium">
           Hiển thị {filteredStudents.length} / {studentsPagination.totalRecords} học viên · Trang {studentsPagination.currentPage}/{studentsPagination.totalPages}
         </p>
