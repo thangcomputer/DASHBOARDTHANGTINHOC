@@ -61,36 +61,149 @@ async function main() {
   );
   const mut = (method, p, body) => req(method, p, { token, body, cookie, csrfToken });
 
-  const student = await Student.findOne({
+  const candidates = await Student.find({
     name: /^QA HV CN1/,
     'enrollments.completedSessions': { $gte: 8 },
     'enrollments.courseName': /Excel/i,
-  }).lean();
-  if (!student) {
-    console.error('Missing seed student');
+  }).limit(12).lean();
+  if (!candidates?.length) {
+    console.error('Missing seed students');
     process.exit(1);
   }
-  const enr = (student.enrollments || []).find((e) => /Excel/i.test(e.courseName || '')) || student.enrollments[0];
-  const gvA = enr.teacherId ? String(enr.teacherId) : null;
-  const gvB = await Teacher.findOne({
-    role: 'teacher',
-    branchCode: 'CN1',
-    status: 'active',
-    _id: { $ne: enr.teacherId },
-    specialty: /excel/i,
-  }).select('_id name specialty status').lean();
-  if (!gvB) {
-    const gvBFallback = await Teacher.findOne({
+
+  let student = null;
+  let enr = null;
+  let gvA = null;
+  let gvB = null;
+
+  for (const s of candidates) {
+    const e = (s.enrollments || []).find((x) => /Excel/i.test(x.courseName || '')) || (s.enrollments || [])[0];
+    if (!e?.teacherId) continue;
+
+    // endpoint requires teacherB.status === 'active' (approved to teach)
+    const teacherB = await Teacher.findOne({
       role: 'teacher',
       branchCode: 'CN1',
       status: 'active',
-      _id: { $ne: enr.teacherId },
+      _id: { $ne: e.teacherId },
+      specialty: /excel/i,
+    }).select('_id name specialty status').lean();
+
+    if (teacherB?._id) {
+      student = s;
+      enr = e;
+      gvA = String(e.teacherId);
+      gvB = teacherB;
+      break;
+    }
+  }
+
+  if (!student || !gvB) {
+    // If seed data doesn't allow selecting (teacherA != the only active Excel teacher),
+    // build a small scenario on-the-fly so the test stays deterministic.
+    const teacherBActive = await Teacher.findOne({
+      role: 'teacher',
+      branchCode: 'CN1',
+      status: 'active',
+      specialty: /excel/i,
     }).lean();
-    if (!gvBFallback) {
-      console.error('No GV B');
+    const teacherANonActive = await Teacher.findOne({
+      role: 'teacher',
+      branchCode: 'CN1',
+      status: { $ne: 'active' },
+      specialty: /excel/i,
+      ...(teacherBActive?._id ? { _id: { $ne: teacherBActive._id } } : {}),
+    }).lean();
+
+    if (!teacherBActive || !teacherANonActive) {
+      console.error('No suitable student+GV B found and cannot build scenario (need Excel active + non-active teachers)');
       process.exit(1);
     }
-    Object.assign(gvB || {}, gvBFallback);
+
+    const phone = `096${String(Date.now()).slice(-7)}`;
+    const sCreate = await mut('POST', '/api/students', {
+      name: `QA HV CN1 REA-${Date.now().toString().slice(-6)}`,
+      phone,
+      zalo: phone,
+      course: 'Excel MOS',
+      price: 2500000,
+      totalSessions: 20,
+      password: 'Test@123456',
+      // Provide enrollment upfront so the test can seed teacherId=non-active teacherA
+      // without calling assign-teacher (which blocks non-active teachers).
+      enrollments: [
+        {
+          courseName: 'Excel MOS',
+          teacherId: String(teacherANonActive._id),
+          teacherName: String(teacherANonActive.name || ''),
+          price: 2500000,
+          totalSessions: 20,
+          remainingSessions: 12,
+          completedSessions: 8,
+          isPrimary: true,
+          linkHoc: '',
+          status: 'active',
+        },
+      ],
+    });
+    const sid = sCreate.json?.data?._id || sCreate.json?._id;
+    if (!sid) {
+      console.error('Scenario: failed to create student', `status=${sCreate.status}`, `resp=${JSON.stringify(sCreate.json || {}, null, 2).slice(0, 600)}`);
+      process.exit(1);
+    }
+
+    // 2) Create schedules: first create as "scheduled" then mark to "completed"
+    //    (so we avoid the 12h cooldown which applies only when creating with status=completed)
+    const completedScheduleIds = [];
+    const stDoc2 = await Student.findById(sid).lean();
+    const eExcel = (stDoc2?.enrollments || []).find((x) => /Excel/i.test(x.courseName || x.course || '')) || stDoc2?.enrollments?.[0];
+    if (!eExcel?._id) {
+      console.error('Scenario: missing Excel enrollment after student create');
+      process.exit(1);
+    }
+    const courseName = String(eExcel.courseName || eExcel.course || 'Excel MOS');
+
+    for (let i = 0; i < 8; i++) {
+      const d = new Date(Date.now() - (20 + i) * 86400000);
+      const created = await mut('POST', '/api/schedules', {
+        teacherId: String(teacherANonActive._id),
+        studentId: String(sid),
+        date: d.toISOString(),
+        startTime: '09:00',
+        course: courseName,
+        note: `QA seed completed-${i}`,
+        status: 'scheduled',
+      });
+      const schId = created.json?.data?._id || created.json?._id;
+      if (schId) completedScheduleIds.push(schId);
+    }
+
+    for (const schId of completedScheduleIds) {
+      await mut('PUT', `/api/schedules/${schId}`, {
+        status: 'completed',
+        note: 'QA seed attendance (mark completed)',
+      });
+    }
+
+    // Future scheduled
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(Date.now() + (i + 1) * 86400000);
+      await mut('POST', '/api/schedules', {
+        teacherId: String(teacherANonActive._id),
+        studentId: String(sid),
+        date: d.toISOString(),
+        startTime: '10:00',
+        course: courseName,
+        linkHoc: 'https://meet.example.com/qa-reassign',
+        note: `QA seed future-${i}`,
+        status: 'scheduled',
+      });
+    }
+
+    student = await Student.findById(sid).lean();
+    enr = (student?.enrollments || []).find((x) => /Excel/i.test(x.courseName || x.course || '')) || student?.enrollments?.[0];
+    gvA = String(teacherANonActive._id);
+    gvB = teacherBActive;
   }
 
   const completedBefore = await Schedule.countDocuments({
@@ -147,8 +260,32 @@ async function main() {
     !!auditRe,
     `action=${auditRe?.action || 'none'}`);
 
-  // Grade history chain on submission if exists
-  const sub = await Submission.findOne({ studentId: student._id }).sort({ updatedAt: -1 });
+  // Grade history chain: ensure we have a submission, then regrade 3 times
+  let sub = await Submission.findOne({ studentId: student._id }).sort({ updatedAt: -1 });
+  if (!sub) {
+    const courseId = String(enr.courseName || enr.course || 'Excel MOS');
+    const asgCreate = await mut('POST', '/api/assignments', {
+      courseId,
+      studentId: String(student._id),
+      teacherId: gvB?._id ? String(gvB._id) : undefined,
+      title: `QA BT reassign-${Date.now().toString().slice(-6)}`,
+      description: 'QA reassign grade history chain',
+      deadline: new Date(Date.now() + 7 * 86400000).toISOString(),
+    });
+
+    const createdAsgId = asgCreate.json?.data?._id || asgCreate.json?._id;
+    if (createdAsgId) {
+      const submitRes = await mut('POST', `/api/assignments/${createdAsgId}/submit`, {
+        studentId: String(student._id),
+        teacherId: gvB?._id ? String(gvB._id) : undefined,
+        submittedFileUrl: '/uploads/assignments/qa-placeholder.txt',
+      });
+
+      const subId = submitRes.json?.data?._id || submitRes.json?._id;
+      if (subId) sub = await Submission.findById(subId).lean();
+    }
+  }
+
   if (sub) {
     const g1 = await mut('PUT', `/api/assignments/submissions/${sub._id}/grade`, { grade: 8, teacherFeedback: 'qa 80' });
     const g2 = await mut('PUT', `/api/assignments/submissions/${sub._id}/grade`, { grade: 9, teacherFeedback: 'qa 90' });
@@ -166,7 +303,7 @@ async function main() {
       g1.status === 200 && g2.status === 200 && g3.status === 200 && chainOk && !!gradeAudit,
       `histLen=${hist.length} last=${hist.slice(-2).map((h) => `${h.oldGrade}→${h.newGrade}`).join(',')}`);
   } else {
-    record('GRADE-HIST', 'Grade chain (skip — no submission)', true, 'no submission in DB');
+    record('GRADE-HIST', 'Grade chain 8→9→10 + audit', false, 'cannot create submission for grade history');
   }
 
   // Restore teacher for seed stability (optional)

@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-29T07:02:03.775Z",
+  "at": "2026-07-29T08:20:45.302Z",
   "base": "http://127.0.0.1:5000",
   "results": [
     {
@@ -19,7 +19,7 @@
       "roleAct": "admin",
       "roleRecv": "teacher",
       "expected": "201 + teacher id, không trả password",
-      "actual": "status=201 id=6a69a56bed0aca06a551d294 hasPwd=false msg=Đã tạo giảng viên QA GV 3606",
+      "actual": "status=201 id=6a69b7dd9675e30e653839b2 hasPwd=false msg=Đã tạo giảng viên QA GV 5108",
       "result": "PASS",
       "severity": "Critical",
       "api": "POST /api/teachers",
@@ -73,7 +73,7 @@
       "actual": "status=200 teacherStatus=active",
       "result": "PASS",
       "severity": "Critical",
-      "api": "PUT /api/teachers/6a69a56bed0aca06a551d294"
+      "api": "PUT /api/teachers/6a69b7dd9675e30e653839b2"
     },
     {
       "id": "G1-06",
@@ -92,7 +92,7 @@
       "roleAct": "teacher",
       "roleRecv": "-",
       "expected": "200 profile đúng id",
-      "actual": "status=200 id=6a69a56bed0aca06a551d294",
+      "actual": "status=200 id=6a69b7dd9675e30e653839b2",
       "result": "PASS",
       "severity": "Critical",
       "api": "GET /api/teachers/:id"
@@ -272,7 +272,7 @@
       "roleAct": "admin",
       "roleRecv": "-",
       "expected": "200 hoặc 204",
-      "actual": "status=200 msg=Đã xóa giảng viên QA GV 3606",
+      "actual": "status=200 msg=Đã xóa giảng viên QA GV 5108",
       "result": "PASS",
       "severity": "Low",
       "api": "DELETE /api/teachers/:id"
