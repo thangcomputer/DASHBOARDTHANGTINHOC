@@ -13,6 +13,7 @@ import { useToast } from '../utils/toast';
 import { useSocket } from '../context/SocketContext';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { openSiteChat } from './FloatingMessenger';
+import { buildSupportDirectory, flattenSupportPeople, isSuperAdminViewer } from '../utils/supportPresence';
 
 const ROLE_LABEL = {
   admin: 'Admin',
@@ -59,17 +60,6 @@ function isAdminLike(role, userId) {
   return r === 'admin' || r === 'staff' || userId === 'admin';
 }
 
-function normalizePresenceRole(role) {
-  const r = String(role || '').toLowerCase();
-  if (r === 'staff') return 'admin';
-  return r;
-}
-
-function isSupportPresence(u) {
-  const role = normalizePresenceRole(u?.role);
-  return role === 'admin' || role === 'teacher' || String(u?.userId) === 'admin';
-}
-
 export default function FeedBoard({ session, role }) {
   const toast = useToast();
   const { socket, onlineUsers } = useSocket() || {};
@@ -77,33 +67,12 @@ export default function FeedBoard({ session, role }) {
   const fileRef = useRef(null);
   const meId = String(session?.id || session?._id || '');
   const meRole = role || session?.role || 'student';
+  const isSuper = isSuperAdminViewer(session);
 
-  const supportOnline = useMemo(() => {
-    const seen = new Set();
-    const list = [];
-    for (const u of onlineUsers || []) {
-      if (!isSupportPresence(u)) continue;
-      const uid = String(u.userId || '');
-      if (!uid || uid === meId) continue;
-      const roleKey = normalizePresenceRole(u.role);
-      const key = `${roleKey}_${uid}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      list.push({
-        id: uid,
-        name: u.name || (roleKey === 'admin' ? 'Admin' : 'Giảng viên'),
-        role: roleKey,
-        connectedAt: u.connectedAt,
-      });
-    }
-    list.sort((a, b) => {
-      const rank = (r) => (r === 'admin' ? 0 : 1);
-      const d = rank(a.role) - rank(b.role);
-      if (d !== 0) return d;
-      return String(a.name).localeCompare(String(b.name), 'vi');
-    });
-    return list;
-  }, [onlineUsers, meId]);
+  const supportOnline = useMemo(
+    () => flattenSupportPeople(buildSupportDirectory({ session, onlineUsers, meId })),
+    [session, onlineUsers, meId],
+  );
 
   const openSupportChat = useCallback((person) => {
     if (!person?.id) return;
@@ -440,11 +409,11 @@ export default function FeedBoard({ session, role }) {
         <div className="flex items-center gap-2 mb-2">
           <Headphones size={14} className="text-emerald-600" />
           <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
-            Hỗ trợ đang online ({supportOnline.length})
+            {isSuper ? `Đang hoạt động (${supportOnline.length})` : 'Admin Super hỗ trợ'}
           </p>
         </div>
         {supportOnline.length === 0 ? (
-          <p className="text-xs text-slate-400 font-medium">Chưa có admin/giảng viên online</p>
+          <p className="text-xs text-slate-400 font-medium">Chưa có ai online</p>
         ) : (
           <div className="flex gap-2 overflow-x-auto pb-0.5">
             {supportOnline.map((p) => (
@@ -457,11 +426,11 @@ export default function FeedBoard({ session, role }) {
               >
                 <span className="relative">
                   <img
-                    src={resolveAvatarUrl({ role: p.role, name: p.name })}
+                    src={resolveAvatarUrl({ role: p.displayRole || p.role, name: p.name })}
                     alt=""
                     className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow"
                   />
-                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                  <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 ring-white ${p.online !== false ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                 </span>
                 <span className="text-[10px] font-bold text-slate-700 truncate w-full text-center group-hover:text-red-600">
                   {p.name}
@@ -883,17 +852,19 @@ export default function FeedBoard({ session, role }) {
           <div className="px-4 py-3 border-b border-slate-100 shrink-0">
             <p className="text-sm font-black text-slate-800 flex items-center gap-2">
               <Headphones size={16} className="text-emerald-600" />
-              Hỗ trợ đang online
+              {isSuper ? 'Đang hoạt động' : 'Admin Super hỗ trợ'}
             </p>
             <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-              Bấm để chat ngay — không cần kết bạn
+              {isSuper
+                ? 'HV / GV / Admin chi nhánh đang online'
+                : 'Chỉ chat với Admin Super hỗ trợ'}
             </p>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2">
             {supportOnline.length === 0 ? (
               <div className="px-3 py-10 text-center text-xs text-slate-400 font-medium">
                 <Circle size={28} className="mx-auto mb-2 text-slate-200" />
-                Chưa có admin / giảng viên online
+                Chưa có ai đang online
               </div>
             ) : (
               <ul className="space-y-0.5">
@@ -906,18 +877,20 @@ export default function FeedBoard({ session, role }) {
                     >
                       <span className="relative shrink-0">
                         <img
-                          src={resolveAvatarUrl({ role: p.role, name: p.name })}
+                          src={resolveAvatarUrl({ role: p.displayRole || p.role, name: p.name })}
                           alt=""
                           className="w-10 h-10 rounded-full object-cover"
                         />
-                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${p.online !== false ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-bold text-slate-800 truncate group-hover:text-red-600">
                           {p.name}
                         </span>
                         <span className="block text-[11px] text-slate-500 font-medium">
-                          {ROLE_LABEL[p.role] || p.role} · Đang hoạt động
+                          {ROLE_LABEL[p.displayRole] || ROLE_LABEL[p.role] || p.role}
+                          {' · '}
+                          {p.online !== false ? 'Đang hoạt động' : 'Ngoại tuyến'}
                         </span>
                       </span>
                       <MessageCircle size={15} className="text-slate-300 group-hover:text-red-500 shrink-0" />

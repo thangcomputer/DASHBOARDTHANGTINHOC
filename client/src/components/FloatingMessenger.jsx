@@ -17,16 +17,20 @@ import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { normalizeChatRole } from '../utils/chatConversationId';
 import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { useToast } from '../utils/toast';
+import {
+  isSuperAdminViewer,
+  buildSupportDirectory,
+} from '../utils/supportPresence';
 
-const ROLE_LABEL = { admin: 'Admin', staff: 'NV', teacher: 'GV', student: 'HV' };
+const ROLE_LABEL = {
+  admin: 'Admin',
+  staff: 'Admin CN',
+  teacher: 'GV',
+  student: 'HV',
+};
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i;
 const URL_RE = /(https?:\/\/[^\s<]+[^.,;:!?\s<])/gi;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-
-function isSupportPresence(u) {
-  const role = normalizeChatRole(u?.role);
-  return role === 'admin' || role === 'teacher' || String(u?.userId) === 'admin';
-}
 
 function isImageMessage(m) {
   if (!m || m.isRecalled) return false;
@@ -295,6 +299,7 @@ export default function FloatingMessenger({ session, role }) {
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';
   const meRole = normalizeChatRole(role || session?.role || 'student');
+  const isSuper = isSuperAdminViewer(session);
 
   const conversations = useMemo(
     () => (meId ? (getConversations(meId) || []) : []),
@@ -315,31 +320,17 @@ export default function FloatingMessenger({ session, role }) {
     return map;
   }, [conversations]);
 
-  const supportOnline = useMemo(() => {
-    const seen = new Set();
-    const list = [];
-    for (const u of onlineUsers || []) {
-      if (!isSupportPresence(u)) continue;
-      const uid = String(u.userId || '');
-      if (!uid || uid === meId) continue;
-      const roleKey = normalizeChatRole(u.role);
-      const key = `${roleKey}_${uid}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      list.push({
-        id: uid,
-        name: u.name || (roleKey === 'admin' ? 'Admin' : 'Giảng viên'),
-        role: roleKey,
-      });
-    }
-    list.sort((a, b) => {
-      const rank = (r) => (r === 'admin' ? 0 : 1);
-      const d = rank(a.role) - rank(b.role);
-      if (d !== 0) return d;
-      return String(a.name).localeCompare(String(b.name), 'vi');
-    });
-    return list;
-  }, [onlineUsers, meId]);
+  const directory = useMemo(
+    () => buildSupportDirectory({ session, onlineUsers, meId }),
+    [session, onlineUsers, meId],
+  );
+
+  const unreadConversations = useMemo(() => {
+    const list = conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup);
+    if (isSuper) return list.slice(0, 8);
+    // Non-super: chỉ tin từ Admin Super
+    return list.filter((c) => String(c.user?.id) === 'admin').slice(0, 8);
+  }, [conversations, isSuper]);
 
   const openWindow = tabs.find((t) => !t.minimized) || null;
   const heads = tabs.filter((t) => t.minimized);
@@ -477,13 +468,15 @@ export default function FloatingMessenger({ session, role }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-slate-800 flex items-center gap-2">
                   <Headphones size={15} className="text-emerald-600 shrink-0" />
-                  Hỗ trợ đang online
+                  {isSuper ? 'Đang hoạt động' : 'Hỗ trợ trung tâm'}
                   {unreadTotal > 0 && (
                     <span className="cms-fm-unread-pill">{badgeLabel} mới</span>
                   )}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                  Chọn người để chat — Inbox vẫn dùng riêng cho tin nhắn đầy đủ
+                  {isSuper
+                    ? 'Học viên, giảng viên, admin chi nhánh đang online'
+                    : 'Chỉ chat với Admin Super — Inbox dùng riêng cho tin đầy đủ'}
                 </p>
               </div>
               <button
@@ -496,90 +489,99 @@ export default function FloatingMessenger({ session, role }) {
               </button>
             </div>
             <div className="cms-fm-support__body">
-              {conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup).length > 0 && (
+              {unreadConversations.length > 0 && (
                 <div className="px-2 pb-2 mb-1 border-b border-slate-50">
                   <p className="text-[10px] font-black uppercase tracking-wide text-red-500 px-1 mb-1">
                     Tin chưa đọc
                   </p>
                   <ul className="space-y-0.5">
-                    {conversations
-                      .filter((c) => (c.unread || 0) > 0 && !c.isGroup)
-                      .slice(0, 8)
-                      .map((c) => (
-                        <li key={c.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              openChat(c.user, { expand: true });
-                              markMessagesRead?.(c.id, meId);
-                            }}
-                            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-red-50 text-left transition-colors"
-                          >
-                            <span className="relative shrink-0">
-                              <img
-                                src={resolveAvatarUrl({ role: c.user.role, name: c.user.name })}
-                                alt=""
-                                className="w-9 h-9 rounded-full object-cover"
-                              />
-                              <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white">
-                                {c.unread > 99 ? '99+' : c.unread}
-                              </span>
+                    {unreadConversations.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openChat(c.user, { expand: true });
+                            markMessagesRead?.(c.id, meId);
+                          }}
+                          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-red-50 text-left transition-colors"
+                        >
+                          <span className="relative shrink-0">
+                            <img
+                              src={resolveAvatarUrl({ role: c.user.role, name: c.user.name })}
+                              alt=""
+                              className="w-9 h-9 rounded-full object-cover"
+                            />
+                            <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white">
+                              {c.unread > 99 ? '99+' : c.unread}
                             </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-[13px] font-bold text-slate-800 truncate">{c.user.name}</span>
-                              <span className="block text-[11px] text-slate-500 truncate">{c.lastMessage}</span>
-                            </span>
-                          </button>
-                        </li>
-                      ))}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13px] font-bold text-slate-800 truncate">{c.user.name}</span>
+                            <span className="block text-[11px] text-slate-500 truncate">{c.lastMessage}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )}
 
-              {supportOnline.length === 0 ? (
+              {directory.groups.length === 0 ? (
                 <div className="px-3 py-8 text-center text-xs text-slate-400 font-medium">
                   <Circle size={28} className="mx-auto mb-2 text-slate-200" />
-                  Chưa có admin / giảng viên online
+                  Chưa có ai đang online
                 </div>
               ) : (
-                <ul className="space-y-0.5">
-                  {supportOnline.map((p) => {
-                    const peerUnread = unreadByPeer.get(`${p.role}_${p.id}`) || 0;
-                    return (
-                      <li key={`${p.role}_${p.id}`}>
-                        <button
-                          type="button"
-                          onClick={() => openChat(p, { expand: true })}
-                          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-slate-50 text-left transition-colors group"
-                        >
-                          <span className="relative shrink-0">
-                            <img
-                              src={resolveAvatarUrl({ role: p.role, name: p.name })}
-                              alt=""
-                              className="w-9 h-9 rounded-full object-cover"
-                            />
-                            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[13px] font-bold text-slate-800 truncate group-hover:text-red-600">
-                              {p.name}
-                            </span>
-                            <span className="block text-[11px] text-slate-500 font-medium">
-                              {ROLE_LABEL[p.role] || p.role} · Đang hoạt động
-                            </span>
-                          </span>
-                          {peerUnread > 0 ? (
-                            <span className="min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-red-600 text-[10px] font-black text-white flex items-center justify-center">
-                              {peerUnread > 99 ? '99+' : peerUnread}
-                            </span>
-                          ) : (
-                            <MessageCircle size={14} className="text-slate-300 group-hover:text-red-500 shrink-0" />
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                directory.groups.map((group) => (
+                  <div key={group.key} className="px-1 pb-2 mb-1">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 px-1.5 mb-1">
+                      {group.label}
+                    </p>
+                    <ul className="space-y-0.5">
+                      {group.people.map((p) => {
+                        const peerUnread = unreadByPeer.get(`${normalizeChatRole(p.role)}_${p.id}`) || 0;
+                        const online = p.online !== false;
+                        return (
+                          <li key={`${p.role}_${p.id}`}>
+                            <button
+                              type="button"
+                              onClick={() => openChat(p, { expand: true })}
+                              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-slate-50 text-left transition-colors group"
+                            >
+                              <span className="relative shrink-0">
+                                <img
+                                  src={resolveAvatarUrl({ role: p.displayRole || p.role, name: p.name })}
+                                  alt=""
+                                  className="w-9 h-9 rounded-full object-cover"
+                                />
+                                <span
+                                  className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-[13px] font-bold text-slate-800 truncate group-hover:text-red-600">
+                                  {p.name}
+                                </span>
+                                <span className="block text-[11px] text-slate-500 font-medium">
+                                  {ROLE_LABEL[p.displayRole] || ROLE_LABEL[p.role] || p.role}
+                                  {' · '}
+                                  {online ? 'Đang hoạt động' : 'Ngoại tuyến'}
+                                </span>
+                              </span>
+                              {peerUnread > 0 ? (
+                                <span className="min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-red-600 text-[10px] font-black text-white flex items-center justify-center">
+                                  {peerUnread > 99 ? '99+' : peerUnread}
+                                </span>
+                              ) : (
+                                <MessageCircle size={14} className="text-slate-300 group-hover:text-red-500 shrink-0" />
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))
               )}
             </div>
           </div>
