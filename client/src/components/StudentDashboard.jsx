@@ -33,8 +33,13 @@ const StudentDashboard = ({ onNavigate }) => {
   const [activeCourseName, setActiveCourseName] = useState('');
   const [evaluatingCourseId, setEvaluatingCourseId] = useState(null);
   const [noteModalSched, setNoteModalSched] = useState(null);
-  const session = JSON.parse(localStorage.getItem('student_user') || '{}');
-  const STUDENT_ID = session.id || 101;
+  let session = {};
+  try {
+    session = JSON.parse(localStorage.getItem('student_user') || '{}') || {};
+  } catch {
+    session = {};
+  }
+  const STUDENT_ID = session.id || session._id || null;
   const { students, teachers, materials, schedules, getNotifications, getConversations, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, studentQuestions, examSubjectsCatalog } = useData();
   const student = students.find(s => String(s.id) === String(STUDENT_ID));
   const navigate = useNavigate();
@@ -287,7 +292,7 @@ const StudentDashboard = ({ onNavigate }) => {
   }, [socket, STUDENT_ID, onDataRefresh, fetchMyAssignments]);
 
   // Hash-based section
-  const currentHash = location.hash?.replace('#', '') || '';
+  const currentHash = (location.hash?.replace('#', '') || '').split(/[?#]/)[0];
 
   // Rating state
   const [ratingCriteria, setRatingCriteria] = useState({ teaching: '', voice: '', guidance: '', support: '' });
@@ -541,8 +546,13 @@ const StudentDashboard = ({ onNavigate }) => {
                           setMyAssignments(prev => prev.map(a => a._id === activeAssignment._id ? { ...a, mySubmission: res.data } : a));
                           setActiveAssignment(null);
                           setSubmissionLink('');
+                        } else {
+                          window.alert?.(res.message || 'Nộp bài thất bại');
                         }
-                      }).catch(err => setIsSubmitting(false));
+                      }).catch(() => {
+                        setIsSubmitting(false);
+                        window.alert?.('Lỗi kết nối khi nộp bài. Vui lòng thử lại.');
+                      });
                   }}
                   className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg shadow-red-200 transition-all active:scale-[0.98] mt-4"
                 >

@@ -58,8 +58,14 @@ const ConfirmModal = ({ title, message, boldText, onConfirm, onCancel, confirmLa
 // ─── Main StudentTest ─────────────────────────────────────────────────────────
 const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = 'THIÊN TRANG', onBack }) => {
   // Socket & Data
-  const session = JSON.parse(localStorage.getItem('student_user') || '{}');
-  const STUDENT_ID = session.id || 101;
+  let session = {};
+  try {
+    session = JSON.parse(localStorage.getItem('student_user') || '{}') || {};
+  } catch {
+    session = {};
+  }
+  const STUDENT_ID = session.id || session._id || null;
+  const punishKey = STUDENT_ID ? `punish_student_exam:${STUDENT_ID}` : 'punish_student_exam';
   const { students, studentQuestions, setStudentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, updateStudent, addNotification, examSubjectsCatalog } = useData() || {
     students: [],
     studentQuestions: [],
@@ -377,7 +383,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
 
     // Bắt sự kiện khi thực sự rời khỏi trang (Reload hoặc Đóng tab)
     const handleActualUnload = () => {
-      localStorage.setItem('punish_student_exam', 'true');
+      if (STUDENT_ID) localStorage.setItem(punishKey, 'true');
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -393,7 +399,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       window.removeEventListener('pagehide', handleActualUnload);
       window.removeEventListener('unload', handleActualUnload);
     };
-  }, [phase]); // ĐÃ XÓA onBack, updateExamProgress VÀ showModal ĐỂ TRÁNH LẶP VÒNG LẶP PUSH HISTORY
+  }, [phase, STUDENT_ID, punishKey]); // ĐÃ XÓA onBack, updateExamProgress VÀ showModal ĐỂ TRÁNH LẶP VÒNG LẶP PUSH HISTORY
 
   const handleViolation = useCallback((reason) => {
     clearInterval(timerRef.current);
@@ -421,14 +427,15 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     addNotification(null, 'admin', `⚠️ Vi phạm thi cử: ${session.name || studentName} - môn ${meta.label}. Lý do: ${reason}`);
   }, [socket, STUDENT_ID, session.name, studentName, teacherId, meta.label, addNotification, updateExamProgress, TOTAL]);
 
-  // Kiểm tra dấu vết tải lại trang từ lần trước
+  // Kiểm tra dấu vết tải lại trang từ lần trước (theo từng học viên)
   useEffect(() => {
-    const violation = localStorage.getItem('punish_student_exam');
+    if (!STUDENT_ID) return;
+    const violation = localStorage.getItem(punishKey);
     if (violation === 'true') {
-      localStorage.removeItem('punish_student_exam');
+      localStorage.removeItem(punishKey);
       handleViolation('HỦY BÀI: Hành vi cố tình tải lại trang hoặc đóng tab khi đang thi!');
     }
-  }, [handleViolation]);
+  }, [STUDENT_ID, punishKey, handleViolation]);
 
   // Lắng nghe lệnh khóa từ Admin/Giảng viên qua Socket (server broadcast)
   useEffect(() => {
@@ -528,13 +535,15 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       setTuLuanSubmitting(false);
     }
     updateExamProgress({
-      thucHanh: 'da_nop',
-      status: 'dat',
+      thucHanh: essayFileStored ? 'da_nop' : 'chua_nop',
+      status: essayFileStored ? 'dat' : 'dang_thi',
       ...(essayFileStored ? { essayFile: essayFileStored } : {}),
     });
     setUploadDone(true);
     setPhase('result');
-    addNotification(null, 'admin', `📝 Học viên ${session.name || studentName} đã nộp bài thực hành môn ${meta.label}. Vui lòng chấm điểm.`);
+    if (essayFileStored) {
+      addNotification(null, 'admin', `📝 Học viên ${session.name || studentName} đã nộp bài thực hành môn ${meta.label}. Vui lòng chấm điểm.`);
+    }
   }, [uploadFile, updateExamProgress, showModal, addNotification, session.name, studentName, meta.label]);
 
   handleFinalTuLuanRef.current = handleFinalTuLuan;
@@ -567,6 +576,20 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   // HARDWARE CHECK
   // ══════════════════════════════════════════════════════
   const canStartExam = cameraReady && TOTAL > 0 && !questionsLoading;
+
+  if (!STUDENT_ID) {
+    return (
+      <div className="h-full flex items-center justify-center p-6 bg-slate-50">
+        <div className="max-w-md text-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <p className="text-lg font-bold text-slate-900">Phiên đăng nhập không hợp lệ</p>
+          <p className="text-sm text-slate-500 mt-2">Vui lòng đăng xuất và đăng nhập lại trước khi làm bài thi.</p>
+          <button type="button" onClick={onBack} className="mt-4 px-4 py-2 rounded-xl bg-red-600 text-white font-bold text-sm">
+            Quay lại Phòng thi
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (phase === 'hardware_check') return (
     <div className="min-h-screen w-full bg-slate-900 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
@@ -1249,7 +1272,12 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           message="bài làm đính kèm.\nVẫn nộp bài trắng?"
           confirmLabel="Nộp bài"
           cancelLabel="Quay lại chọn"
-          onConfirm={() => { setShowNoFileConfirm(false); setUploadDone(true); updateExamProgress({ thucHanh: 'chua_nop', status: 'dat' }); setPhase('result'); }}
+          onConfirm={() => {
+            setShowNoFileConfirm(false);
+            setUploadDone(true);
+            updateExamProgress({ thucHanh: 'chua_nop', status: 'dang_thi' });
+            setPhase('result');
+          }}
           onCancel={() => setShowNoFileConfirm(false)}
         />
       )}

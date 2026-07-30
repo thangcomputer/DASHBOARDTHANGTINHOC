@@ -336,10 +336,10 @@ router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
     if (branch_id && branch_id !== 'all' && !req.userBranchId) teacherBranchFilter.branchId = branch_id;
     const activeTeachers = await Teacher.countDocuments({ ...teacherBranchFilter, status: { $in: ['Active', 'active'] }, role: 'teacher' });
     const pendingTeachers = await Teacher.countDocuments({ role: 'teacher', status: 'Pending' });
-
+    const totalTeachers = await Teacher.countDocuments({ ...teacherBranchFilter, role: 'teacher' });
     res.json({
       success: true,
-      data: { total, paid, unpaid, unlocked, totalRevenue, pendingRevenue, todayRevenue, activeTeachers, pendingTeachers },
+      data: { total, paid, unpaid, unlocked, totalRevenue, pendingRevenue, todayRevenue, activeTeachers, pendingTeachers, totalTeachers },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1609,7 +1609,7 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
       }
     }
 
-    const existing = await Student.findById(req.params.id).select('teacherId name studentExamUnlocked').lean();
+    const existing = await Student.findById(req.params.id).select('teacherId name studentExamUnlocked enrollments.teacherId').lean();
     if (!existing) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
@@ -1625,8 +1625,12 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
       if (role !== 'teacher') {
         return res.status(403).json({ success: false, message: 'Không có quyền khóa phòng thi' });
       }
-      const assignedTeacherId = existing.teacherId?.toString?.() || String(existing.teacherId || '');
-      if (assignedTeacherId !== String(req.user.id)) {
+      const uid = String(req.user.id);
+      const rootOk = String(existing.teacherId || '') === uid;
+      const enrOk = (existing.enrollments || []).some(
+        (e) => String(e?.teacherId || '') === uid,
+      );
+      if (!rootOk && !enrOk) {
         return res.status(403).json({
           success: false,
           message: 'Chỉ được đánh trượt học viên do bạn phụ trách',

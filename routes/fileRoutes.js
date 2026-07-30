@@ -1,10 +1,27 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const { authMiddleware, isAdmin } = require('../middleware/auth');
+const { authMiddleware, checkPermission, checkAnyPermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
 const fileService = require('../services/fileService');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
+
+/** Category mọi role đã đăng nhập được upload (chat / bài tập). */
+const OPEN_UPLOAD_CATEGORIES = new Set(['messages', 'assignments']);
+
+function requireUploadCategoryPermission(req, res, next) {
+  const category = String(req.query.category || req.body?.category || 'general').toLowerCase();
+  if (OPEN_UPLOAD_CATEGORIES.has(category)) return next();
+  if (category === 'training') {
+    return checkAnyPermission(
+      PERMISSIONS.MANAGE_TRAINING,
+      PERMISSIONS.MANAGE_STUDENT_TRAINING,
+      PERMISSIONS.SYSTEM_SETTINGS,
+    )(req, res, next);
+  }
+  return checkPermission(PERMISSIONS.SYSTEM_SETTINGS)(req, res, next);
+}
 
 function uploadMiddleware(req, res, next) {
   const category = String(req.query.category || req.body?.category || 'general').toLowerCase();
@@ -29,7 +46,7 @@ function uploadMiddleware(req, res, next) {
 }
 
 // POST /api/files/upload?category=general
-router.post('/upload', authMiddleware, uploadMiddleware, async (req, res) => {
+router.post('/upload', authMiddleware, requireUploadCategoryPermission, uploadMiddleware, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Chua chon file' });
@@ -62,7 +79,7 @@ router.post('/upload', authMiddleware, uploadMiddleware, async (req, res) => {
 });
 
 // GET /api/files/stats
-router.get('/stats', authMiddleware, isAdmin, async (req, res) => {
+router.get('/stats', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   try {
     const stats = await fileService.getStats();
     res.json({
@@ -99,7 +116,7 @@ router.get('/categories', authMiddleware, (req, res) => {
 });
 
 // GET /api/files
-router.get('/', authMiddleware, isAdmin, async (req, res) => {
+router.get('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   try {
     const { page, limit, category, status, q, uploadedBy } = req.query;
     const result = await fileService.listAssets({ page, limit, category, status, q, uploadedBy });
@@ -118,7 +135,7 @@ router.get('/', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // POST /api/files/purge-expired
-router.post('/purge-expired', authMiddleware, isAdmin, async (req, res) => {
+router.post('/purge-expired', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
   try {
     const result = await fileService.purgeExpired();
     res.json({ success: true, message: 'Da don ' + result.purged + ' file het han', data: result });

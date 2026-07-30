@@ -34,6 +34,7 @@ export function useAdminTeachers({
   const [approveModal, setApproveModal] = useState(null);
   const [reviewModal, setReviewModal] = useState(null);
   const [payoutModal, setPayoutModal] = useState(null);
+  const [teacherSearch, setTeacherSearch] = useState('');
   const [erGvSearch, setErGvSearch] = useState('');
   const [erGvForm, setErGvForm] = useState(null);
   const teacherQuestionsExcelInputRef = useRef(null);
@@ -66,8 +67,8 @@ export function useAdminTeachers({
   const safeTeachersList = useMemo(() => (teachers || []).filter(Boolean), [teachers]);
   const safeTeachers = safeTeachersList;
   const filteredTeachers = safeTeachers.filter((t) =>
-    (t.name || '').toLowerCase().includes((search || '').toLowerCase())
-    || (t.phone || '').toLowerCase().includes((search || '').toLowerCase()),
+    (t.name || '').toLowerCase().includes((teacherSearch || '').toLowerCase())
+    || (t.phone || '').toLowerCase().includes((teacherSearch || '').toLowerCase()),
   );
 
   const handlePayTeacher = async (teacher) => {
@@ -209,8 +210,9 @@ export function useAdminTeachers({
 
   const markFileReviewed = async (id) => {
     try {
-      await ctxUpdateTeacher(id, { practicalStatus: 'passed', status: 'active' });
-      toast.success('Đã cập nhật: Giảng viên đủ điều kiện giảng dạy!');
+      // Chỉ đánh dấu đã xem — kích hoạt giảng dạy qua bước "Cấp quyền giảng dạy"
+      await ctxUpdateTeacher(id, { practicalStatus: 'reviewed' });
+      toast.success('Đã kiểm tra bài thực hành. Tiếp theo: Cấp quyền giảng dạy.');
       fetchTeachers();
     } catch {
       toast.error('Lỗi khi lưu trạng thái.');
@@ -267,6 +269,8 @@ export function useAdminTeachers({
     safeTeachersList,
     safeTeachers,
     filteredTeachers,
+    teacherSearch,
+    setTeacherSearch,
     showTeacherModal,
     setShowTeacherModal,
     teacherForm,

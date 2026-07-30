@@ -71,6 +71,13 @@ const AdminDashboard = () => {
               statPendingTeachers={statPendingTeachers}
               filteredStudents={filteredStudents}
               safeTeachers={safeTeachers}
+              session={(() => {
+                try {
+                  return JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}') || {};
+                } catch {
+                  return {};
+                }
+              })()}
             />
           )}
 

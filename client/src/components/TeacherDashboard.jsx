@@ -24,8 +24,13 @@ import { getDisplayName } from './teacher/TeacherShared';
 
 const TeacherDashboard = ({ onNavigate }) => {
   const { showModal } = useModal();
-  const session = JSON.parse(localStorage.getItem('teacher_user') || '{}');
-  const TEACHER_ID = session.id || session._id || 1;
+  let session = {};
+  try {
+    session = JSON.parse(localStorage.getItem('teacher_user') || '{}') || {};
+  } catch {
+    session = {};
+  }
+  const TEACHER_ID = session.id || session._id || null;
   const {
     students: allStudents, teachers, schedules,
     getStudentsByTeacher, getTeacherStats,
@@ -127,7 +132,7 @@ const TeacherDashboard = ({ onNavigate }) => {
     try {
       const s = pendingAttendanceSchedule;
       // Mark local students attendance + minus lesson
-      await markAttendance(s.studentId, 'Hệ thống: Điểm danh tự động', 0);
+      await markAttendance(s.studentId, 'Hệ thống: Điểm danh tự động', 0, s.course || s.courseName);
       // Update schedule to completed
       updateSchedule(s.id || s._id, { status: 'completed' });
     } catch (e) {
@@ -140,18 +145,24 @@ const TeacherDashboard = ({ onNavigate }) => {
     if (!pendingAttendanceSchedule || !noShowReason.trim()) return;
     try {
       const s = pendingAttendanceSchedule;
-      const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
+      const API = import.meta.env.VITE_API_URL || '';
       const token = localStorage.getItem('teacher_access_token') || localStorage.getItem('admin_access_token');
-      await csrfFetch(`${API}/api/schedules/${s._id || s.id}/cancel`, {
+      const res = await csrfFetch(`${API}/api/schedules/${s._id || s.id}/cancel`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ reason: noShowReason }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không hủy được buổi học');
+      }
       cancelSchedule(s._id || s.id, noShowReason);
+      toast.success('Đã ghi nhận nghỉ buổi học');
+      setPendingAttendanceSchedule(null);
+      setNoShowReason('');
     } catch (e) {
+      toast.error(e?.message || 'Lỗi khi ghi nhận nghỉ. Vui lòng thử lại.');
     }
-    setPendingAttendanceSchedule(null);
-    setNoShowReason('');
   };
 
   const handleScheduleSubmit = async (form) => {
@@ -204,30 +215,30 @@ const TeacherDashboard = ({ onNavigate }) => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const currentHash = location.hash?.replace('#', '') || '';
+  // Hash có thể kèm query (#students?studentId=…) — chỉ lấy tên tab
+  const hashRaw = location.hash?.replace('#', '') || '';
+  const currentHash = hashRaw.split(/[?#]/)[0];
+  const hashQuery = hashRaw.includes('?') ? hashRaw.slice(hashRaw.indexOf('?') + 1) : '';
   const toast = useToast();
   const [selectedEnrollmentKey, setSelectedEnrollmentKey] = useState(null);
 
   // Auto-select first student if none selected OR from URL params (Notifications)
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes('studentId=')) {
-      const params = new URLSearchParams(hash.split('?')[1]);
-      const studentId = params.get('studentId');
-      if (studentId) {
-        const match = students.find((s) => String(s._id || s.id) === String(studentId));
-        const key = match?._enrollmentKey || studentId;
-        if (key && String(selectedEnrollmentKey) !== String(key)) {
-          setSelectedEnrollmentKey(key);
-          return;
-        }
+    const params = new URLSearchParams(hashQuery);
+    const studentId = params.get('studentId');
+    if (studentId) {
+      const match = students.find((s) => String(s._id || s.id) === String(studentId));
+      const key = match?._enrollmentKey || studentId;
+      if (key && String(selectedEnrollmentKey) !== String(key)) {
+        setSelectedEnrollmentKey(key);
+        return;
       }
     }
 
     if (!selectedEnrollmentKey && students.length > 0) {
       setSelectedEnrollmentKey(students[0]._enrollmentKey || students[0]._id || students[0].id);
     }
-  }, [students, selectedEnrollmentKey, location.hash]);
+  }, [students, selectedEnrollmentKey, hashQuery]);
 
   const markAttendance = async (id, noteParam, gradeParam, courseName) => {
     const note = noteParam || noteInputs[id] || 'Đã điểm danh';
@@ -294,6 +305,17 @@ const TeacherDashboard = ({ onNavigate }) => {
 
   const totalMonthlyIncome = monthlyTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
   const myNotifs = getNotifications(TEACHER_ID, 'teacher').filter(n => !n.read).length;
+
+  if (!TEACHER_ID) {
+    return (
+      <div className="flex items-center justify-center p-8 h-full">
+        <div className="max-w-md text-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <p className="text-lg font-bold text-slate-900">Phiên đăng nhập không hợp lệ</p>
+          <p className="text-sm text-slate-500 mt-2">Vui lòng đăng xuất và đăng nhập lại.</p>
+        </div>
+      </div>
+    );
+  }
 
   // ── MÀN HÌNH CHỜ DUYỆT ── chỉ hiện nút Bài Test
   // ⭐ Fix: Chuyển sang logic "Pessimistic" (Coi là pending nếu KHÔNG PHẢI là active)

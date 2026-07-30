@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import StatCard from '../shared/StatCard';
 import Avatar from '../shared/Avatar';
 import { getClientEnrollments } from '../../../utils/enrollments';
+import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
 
 export default function AdminOverviewTab({
   statTotalStudents,
@@ -14,15 +15,27 @@ export default function AdminOverviewTab({
   statPendingTeachers,
   filteredStudents,
   safeTeachers,
+  session,
 }) {
   const navigate = useNavigate();
 
   const quickLinks = [
-    { label: 'Học viên', hash: 'students', icon: Users, tone: 'primary', desc: 'Quản lý danh sách' },
-    { label: 'Giảng viên', hash: 'teachers', icon: GraduationCap, tone: 'neutral', desc: 'Duyệt hồ sơ mới' },
-    { label: 'Tài chính', hash: 'finance', icon: DollarSign, tone: 'primary', desc: 'Thu chi & báo cáo' },
-    { label: 'Doanh thu', hash: 'analytics', icon: TrendingUp, tone: 'info', desc: 'Phân tích tăng trưởng' },
-  ];
+    { label: 'Học viên', hash: 'students', icon: Users, tone: 'primary', desc: 'Quản lý danh sách', permission: PERMISSIONS.MANAGE_STUDENTS },
+    { label: 'Giảng viên', hash: 'teachers', icon: GraduationCap, tone: 'neutral', desc: 'Duyệt hồ sơ mới', permission: PERMISSIONS.VIEW_TEACHERS },
+    { label: 'Tài chính', hash: 'finance', icon: DollarSign, tone: 'primary', desc: 'Thu chi & báo cáo', permission: PERMISSIONS.MANAGE_FINANCE },
+    {
+      label: 'Doanh thu',
+      hash: 'analytics',
+      icon: TrendingUp,
+      tone: 'info',
+      desc: 'Phân tích tăng trưởng',
+      anyOf: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE],
+    },
+  ].filter((q) => {
+    if (q.anyOf) return q.anyOf.some((p) => hasPermission(session, p));
+    if (q.permission) return hasPermission(session, q.permission);
+    return true;
+  });
 
   return (
     <div className="cms-dashboard cms-viewport-fill animate-in fade-in duration-200">

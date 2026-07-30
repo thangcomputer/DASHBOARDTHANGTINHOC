@@ -471,6 +471,11 @@ export default function NewsPage({ session, role = 'admin' }) {
   useEffect(() => {
     if (slug) loadDetail(slug);
     else if (mode === 'edit') {
+      if (!canManage) {
+        toast.error('Bạn không có quyền sửa tin tức');
+        navigate(base, { replace: true });
+        return;
+      }
       setDetail(null);
       if (editId) {
         // Chỉ prefill khi đã có contentHtml (từ trang chi tiết). Card manage list thiếu field này.
@@ -507,7 +512,7 @@ export default function NewsPage({ session, role = 'admin' }) {
       setEditing(null);
       loadList(1);
     }
-  }, [slug, mode, editId, loadDetail, loadList, toast, location.state]);
+  }, [slug, mode, editId, loadDetail, loadList, toast, location.state, canManage, navigate, base]);
 
   useEffect(() => {
     if (!socket) return undefined;

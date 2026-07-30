@@ -294,6 +294,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
 
   const monitorRef = useRef(null);
   const timerRef = useRef(null);
+  const handleSubmitRef = useRef(null);
   const lastViolationTime = useRef(0);
   const lastTabViolationAtRef = useRef(0);
   const tabGuardSuspendedUntilRef = useRef(0);
@@ -512,7 +513,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
 
   useEffect(() => {
     if (configuredMcMinutes == null) return;
-    if (phase === 'intro' || phase === 'hardware') {
+    if (phase === 'intro' || phase === 'hardware_check') {
       setTimeLeft(configuredMcMinutes * 60);
     }
   }, [configuredMcMinutes, phase]);
@@ -858,10 +859,20 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     };
   }, [phase]);
 
-  // Timer trắc nghiệm
+  // Timer trắc nghiệm — hết giờ tự nộp
   useEffect(() => {
-    if (phase !== 'test') return;
-    timerRef.current = setInterval(() => setTimeLeft(p => p > 0 ? p - 1 : 0), 1000);
+    if (phase !== 'test') return undefined;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((p) => {
+        if (p <= 1) {
+          clearInterval(timerRef.current);
+          // defer submit to avoid setState during render of interval
+          queueMicrotask(() => handleSubmitRef.current?.());
+          return 0;
+        }
+        return p - 1;
+      });
+    }, 1000);
     return () => clearInterval(timerRef.current);
   }, [phase]);
 
@@ -913,6 +924,8 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     }
   }, [questions, answers, teacherId, updateTeacher, persistTeacherSession, sessionTeacher, showModal]);
 
+  handleSubmitRef.current = handleSubmit;
+
   const handlePracticalSubmit = useCallback(async (fileObj) => {
     if (!teacherId || !fileObj) return;
     if (!practicalStarted || practicalExpired) {
@@ -936,7 +949,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       showModal({ title: 'Đang tải file...', content: 'Vui lòng chờ trong giây lát.', type: 'info' });
       const res = await api.teachers.uploadPractical(fileObj);
       if (res.success && res.fileUrl) {
-         updateTeacher(teacherId, {
+         await updateTeacher(teacherId, {
            practicalFile: (res.fileUrl || '').replace(/^https?:\/\/[^/]+/i, '') || res.fileUrl,
            practicalStatus: 'submitted'
          });

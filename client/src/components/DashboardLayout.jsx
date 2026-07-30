@@ -180,16 +180,20 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
     const status = String(currentTeacher?.status || session?.status || '').toLowerCase();
     if (!status) return;
-    
-    // Nếu đang Pending mà cố truy cập các trang khác (finance, students...)
-    if (status === 'pending' && !window.location.pathname.includes('/teacher/test')) {
+
+    const path = location.pathname || '';
+    const onTest = path.includes('/teacher/test');
+
+    // Pending / locked: chỉ được trang bài test
+    if ((status === 'pending' || status === 'locked') && !onTest) {
       navigate('/teacher/test', { replace: true });
+      return;
     }
-    // Nếu đang Active mà lại vào trang Test
-    if (status === 'active' && window.location.pathname.includes('/teacher/test')) {
+    // Active: không ở trang Test
+    if (status === 'active' && onTest) {
       navigate('/teacher', { replace: true });
     }
-  }, [currentTeacher?.status, session?.status, role, sessionTeacherId, navigate, isRefetching]);
+  }, [currentTeacher?.status, session?.status, role, sessionTeacherId, navigate, isRefetching, location.pathname]);
 
   // Admin/staff lần đầu: mở đổi MK ngay.
   // HV/GV: chờ hoàn thành hướng dẫn (LmsGuideHost) rồi mới mở.
@@ -292,11 +296,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <header className={`cms-topbar-glass flex flex-col border-b border-slate-100/80 flex-shrink-0 z-40 safe-pad-top ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="h-14 sm:h-16 flex items-center gap-1.5 sm:gap-3 pl-[max(5.5rem,calc(env(safe-area-inset-left,0px)+3.75rem))] sm:pl-[max(6rem,calc(env(safe-area-inset-left,0px)+4.25rem))] md:pl-6 lg:pl-6 pr-2 sm:pr-4 min-w-0">
-            <div className="min-w-0 flex-1">
+          <div className="h-14 sm:h-16 flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-3 pl-[max(5.5rem,calc(env(safe-area-inset-left,0px)+3.75rem))] sm:pl-[max(6rem,calc(env(safe-area-inset-left,0px)+4.25rem))] md:pl-6 lg:pl-6 pr-2 sm:pr-4 min-w-0">
+            <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center sm:gap-3">
               <h1 className="text-base sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
               {/* Tên user đẩy khỏi nav khi có hamburger (mobile/tablet hẹp); hiện từ md+ */}
-              <p className="hidden md:block text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5">
+              <p className="hidden md:block text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5 sm:mt-0">
                 <span className="font-medium text-slate-600">{displayName}</span>
                 <span className="text-slate-300 mx-1">·</span>
                 <span>{roleLabel}</span>

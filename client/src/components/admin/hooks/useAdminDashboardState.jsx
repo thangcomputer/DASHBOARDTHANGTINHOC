@@ -11,8 +11,23 @@ import { useAdminStudents } from './useAdminStudents';
 import { useAdminTeachers } from './useAdminTeachers';
 import { EXAM_RESULTS_STUDENTS_FETCH_CAP } from './adminConstants';
 import { sumClientPaidTuition } from '../../../utils/enrollments';
+import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
 
 export { EXAM_RESULTS_STUDENTS_FETCH_CAP };
+
+const TAB_PERMISSION = {
+  students: PERMISSIONS.MANAGE_STUDENTS,
+  teachers: PERMISSIONS.VIEW_TEACHERS,
+  staff: PERMISSIONS.MANAGE_STAFF,
+  hr: PERMISSIONS.MANAGE_HR,
+  training: PERMISSIONS.MANAGE_TRAINING,
+  'student-training': PERMISSIONS.MANAGE_STUDENT_TRAINING,
+  evaluations: PERMISSIONS.VIEW_EVALUATIONS,
+  finance: PERMISSIONS.MANAGE_FINANCE,
+  analytics: PERMISSIONS.VIEW_BRANCH_REVENUE,
+  settings: PERMISSIONS.SYSTEM_SETTINGS,
+  logs: PERMISSIONS.VIEW_LOGS,
+};
 
 /**
  * State + handlers for AdminDashboard.
@@ -77,7 +92,28 @@ export function useAdminDashboardState() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const activeTab = location.hash?.replace('#', '') || 'dashboard';
+  const activeTab = (location.hash?.replace('#', '') || 'dashboard').split(/[?#]/)[0] || 'dashboard';
+
+  // Chặn mở tab bằng URL hash khi không có quyền (menu đã ẩn nhưng URL vẫn vào được)
+  useEffect(() => {
+    if (activeTab === 'dashboard') return undefined;
+    if (activeTab === 'staff' && !isSuperAdmin) {
+      navigate('/admin#dashboard', { replace: true });
+      return undefined;
+    }
+    if (activeTab === 'analytics') {
+      const ok = hasPermission(_sess, PERMISSIONS.MANAGE_FINANCE)
+        || hasPermission(_sess, PERMISSIONS.VIEW_BRANCH_REVENUE);
+      if (!ok) navigate('/admin#dashboard', { replace: true });
+      return undefined;
+    }
+    const need = TAB_PERMISSION[activeTab];
+    if (need && !hasPermission(_sess, need)) {
+      navigate('/admin#dashboard', { replace: true });
+    }
+    return undefined;
+    // session snapshot from localStorage; isSuperAdmin covers role change
+  }, [activeTab, isSuperAdmin, navigate]);
 
   const [deleteModal, setDeleteModal] = useState(null);
   const [resetPwModal, setResetPwModal] = useState(null);
@@ -143,6 +179,7 @@ export function useAdminDashboardState() {
     safeTeachersList,
     safeTeachers,
     filteredTeachers,
+    teacherSearch, setTeacherSearch,
     showTeacherModal, setShowTeacherModal,
     teacherForm, setTeacherForm,
     editTeacher, setEditTeacher,
@@ -442,9 +479,8 @@ export function useAdminDashboardState() {
   const statPaidStudents = branchStats?.paid ?? filteredStudents.filter((s) => s.paid).length;
   const statActiveTeachers = branchStats?.activeTeachers
     ?? safeTeachers.filter((t) => t.status === 'Active' || t.status === 'active').length;
-  const statTotalTeachers = branchStats?.activeTeachers != null
-    ? branchStats.activeTeachers
-    : safeTeachers.length;
+  const statTotalTeachers = branchStats?.totalTeachers
+    ?? safeTeachers.length;
   const statTotalRevenue = branchStats?.totalRevenue
     ?? filteredStudents.reduce((sum, s) => sum + sumClientPaidTuition(s), 0);
   const statPendingTeachers = branchStats?.pendingTeachers
@@ -459,7 +495,7 @@ export function useAdminDashboardState() {
     sendDebtReminder, approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
     handlePrintInvoice, removeStudent, currentPage, setCurrentPage,
     refreshStudentList,
-    teachers, filteredTeachers, isSuperAdmin, setShowTeacherModal, getTeacherRating,
+    teachers, filteredTeachers, teacherSearch, setTeacherSearch, isSuperAdmin, setShowTeacherModal, getTeacherRating,
     setReviewModal, setGrantModal, setApproveModal, setEditTeacher, handlePayTeacher,
     removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed,
     courseBuilderMode, setCourseBuilderMode, trainingData, updateTrainingItem, trainingTab, setTrainingTab,

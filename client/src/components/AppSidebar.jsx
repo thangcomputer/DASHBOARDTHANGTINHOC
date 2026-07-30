@@ -55,7 +55,7 @@ const MENU_CONFIG = {
       { key: 'schedule',   icon: Calendar,         label: 'Lịch dạy',      path: '/teacher', hash: 'schedule' },
       { key: 'test',       icon: ClipboardList,    label: 'Bài Test',       path: '/teacher/test' },
       { key: 'finance',    icon: DollarSign,       label: 'Tài chính',      path: '/teacher/finance' },
-      {key: 'training',   icon: BookOpen,          label: 'Đào tạo',        path: '/teacher', hash: 'training' },
+      { key: 'training',   icon: BookOpen,          label: 'Đào tạo',        path: '/teacher', hash: 'training' },
       { key: 'inbox',      icon: MessageSquare,    label: 'Hộp thư',        path: '/teacher/inbox' },
     ],
     bottomItems: [
@@ -119,7 +119,7 @@ const MENU_CONFIG = {
           { key: 'backups',    icon: Archive,   label: 'Sao lưu dữ liệu',  path: '/admin/backups',           superAdminOnly: true },
           { key: 'monitoring', icon: Activity,  label: 'Monitoring',       path: '/admin/monitoring',        permission: PERMISSIONS.VIEW_LOGS },
           { key: 'ai',         icon: Sparkles,  label: 'AI Center',        path: '/admin/ai',                permission: PERMISSIONS.SYSTEM_SETTINGS },
-          { key: 'workflows',  icon: GitBranch, label: 'Workflow',         path: '/admin/workflows',         permission: PERMISSIONS.MANAGE_STUDENTS },
+          { key: 'workflows',  icon: GitBranch, label: 'Workflow',         path: '/admin/workflows',         permission: PERMISSIONS.SYSTEM_SETTINGS },
           { key: 'builder',    icon: FormInput, label: 'Form & Report',    path: '/admin/builder',           permission: PERMISSIONS.SYSTEM_SETTINGS },
           { key: 'tenants',    icon: Building2, label: 'Multi-tenant',     path: '/admin/tenants',           superAdminOnly: true },
         ],
@@ -320,7 +320,7 @@ const AppSidebar = ({
           if (!t) return false;
           const s = String(t.status || '').toLowerCase();
           const p = String(t.practicalStatus || '').toLowerCase();
-          return s === 'pending' || p === 'pending';
+          return s === 'pending' || p === 'pending' || p === 'submitted';
         }).length;
       }
       if (itemKey === 'evaluations') {
@@ -353,21 +353,36 @@ const AppSidebar = ({
 
   const isActive = (item) => {
     if (activeKey) return item.key === activeKey;
-    const pathMatches = location.pathname === item.path
-      || (item.path && item.path !== '/' && location.pathname.startsWith(`${item.path}/`));
-    const currentHash = location.hash?.replace('#', '') || '';
+    // Hash có thể kèm query: #students?studentId=… → chỉ lấy phần tab
+    const currentHash = (location.hash?.replace('#', '') || '').split(/[?#]/)[0];
 
-    // Item has a hash → only active when path AND hash both match
+    // Item has a hash → active when path matches AND (hash khớp, hoặc hash rỗng với tab mặc định dashboard)
     if (item.hash) {
-      return location.pathname === item.path && currentHash === item.hash;
+      if (location.pathname !== item.path) return false;
+      if (currentHash === item.hash) return true;
+      // /admin không hash = Tổng quan (dashboard)
+      if (!currentHash && item.hash === 'dashboard' && item.path === '/admin') return true;
+      return false;
     }
-    // Base dashboard items (no hash) → active only when path matches AND no hash in URL
+    // Base dashboard (Tổng quan) — chỉ active đúng path gốc, không active trên /student/feed, /teacher/finance…
     const basePaths = ['/student', '/teacher', '/admin'];
-    if (basePaths.includes(item.path) && location.pathname === item.path) {
-      return !currentHash;
+    if (basePaths.includes(item.path)) {
+      return location.pathname === item.path && !currentHash;
     }
-    // Other items (e.g. /teacher/finance, /admin/news/:slug) → path match AND no hash in URL
-    return pathMatches && !currentHash;
+    // Tin tức + slug chi tiết
+    if (item.path?.endsWith('/news')) {
+      const onNews = location.pathname === item.path
+        || location.pathname.startsWith(`${item.path}/`);
+      return onNews && !currentHash;
+    }
+    // Phòng thi + môn thi fullscreen
+    if (item.path?.endsWith('/exam')) {
+      const onExam = location.pathname === item.path
+        || location.pathname.startsWith(`${item.path}/`);
+      return onExam && !currentHash;
+    }
+    // Các trang lá khác: khớp path tuyệt đối
+    return location.pathname === item.path && !currentHash;
   };
 
   const initials = userName ? userName.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase() : 'HV';
@@ -460,7 +475,7 @@ const AppSidebar = ({
           const renderNavButton = (navItem, { nested = false } = {}) => {
             const Icon = navItem.icon;
             const active = isActive(navItem);
-            const isLocked = teacherPending && navItem.key !== 'test' && navItem.key !== 'feed';
+            const isLocked = teacherPending && navItem.key !== 'test';
             return (
               <div key={navItem.key} className="relative group/nav" data-guide-key={navItem.key}>
                 <button

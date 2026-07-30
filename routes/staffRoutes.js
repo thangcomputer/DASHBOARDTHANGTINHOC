@@ -22,6 +22,14 @@ async function actorIsSuperAdmin(req) {
   }
 }
 
+/** Staff không được gán quyền vượt quá quyền của chính mình (Super Admin được tất cả). */
+async function sanitizeAssignedPermissions(req, permissions) {
+  const list = Array.isArray(permissions) ? permissions.map(String) : [];
+  if (await actorIsSuperAdmin(req)) return list;
+  const mine = new Set(req.user?.permissions || []);
+  return list.filter((p) => mine.has(p));
+}
+
 // ── GET /api/staff ─────────────────────────────────────────────────────────────
 router.get('/', guard, async (req, res) => {
   try {
@@ -63,11 +71,15 @@ router.post('/', guard, async (req, res) => {
     if (exists)
       return res.status(409).json({ success: false, message: 'Số điện thoại đã được sử dụng' });
 
+    const safePermissions = adminRole === 'SUPER_ADMIN'
+      ? []
+      : await sanitizeAssignedPermissions(req, permissions);
+
     const newStaff = await Teacher.create({
       name, phone, password,
       role:        adminRole === 'SUPER_ADMIN' ? 'admin' : 'staff',
       adminRole,
-      permissions: adminRole === 'SUPER_ADMIN' ? [] : permissions,
+      permissions: safePermissions,
       branchId:    adminRole === 'SUPER_ADMIN' ? null : (branchId  || null),
       branchCode:  adminRole === 'SUPER_ADMIN' ? ''   : branchCode,
       status:    'active',
@@ -116,7 +128,7 @@ router.put('/:id', guard, async (req, res) => {
         updates.branchCode  = '';
       } else {
         updates.role        = 'staff';
-        updates.permissions = permissions;
+        updates.permissions = await sanitizeAssignedPermissions(req, permissions);
         if (branchId) {
           const branch = await Branch.findById(branchId);
           if (!branch)

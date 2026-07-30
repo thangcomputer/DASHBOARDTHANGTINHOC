@@ -659,8 +659,17 @@ export default function AdminStudentsTab() {
             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <Users size={24} className="opacity-40" />
             </div>
-            <p className="text-sm font-semibold text-slate-600">Không tìm thấy học viên nào</p>
-            <p className="text-xs text-slate-400 mt-1">Thử đổi bộ lọc hoặc từ khóa</p>
+            {(studentsPagination?.totalRecords || 0) === 0 && !search && filterPaid === 'all' && !filterCourse ? (
+              <>
+                <p className="text-sm font-semibold text-slate-600">Chưa có học viên</p>
+                <p className="text-xs text-slate-400 mt-1">Thêm học viên mới để bắt đầu quản lý</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-slate-600">Không tìm thấy học viên nào</p>
+                <p className="text-xs text-slate-400 mt-1">Thử đổi bộ lọc hoặc từ khóa</p>
+              </>
+            )}
           </div>
         ) : filteredStudents.map((s) => {
           const locked = isStudentRowLocked(s);
@@ -682,7 +691,7 @@ export default function AdminStudentsTab() {
           return (
             <article
               key={s.id}
-              className={`cms-students-card transition-opacity ${locked ? 'opacity-45 pointer-events-none select-none grayscale-[0.35]' : ''}`}
+              className={`cms-students-card transition-opacity ${locked ? 'opacity-55 select-none grayscale-[0.35]' : ''}`}
               aria-disabled={locked || undefined}
             >
               <div className="flex items-start gap-3">
@@ -702,14 +711,12 @@ export default function AdminStudentsTab() {
                         {regDate}{s.phone ? ` · ${s.phone}` : ''}
                       </p>
                     </div>
-                    {!locked && (
-                      <StudentRowActions
-                        s={s}
-                        {...menuProps}
-                        align="right"
-                        buttonClassName="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
-                      />
-                    )}
+                    <StudentRowActions
+                      s={s}
+                      {...menuProps}
+                      align="right"
+                      buttonClassName="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                    />
                   </div>
 
                   <div className="mt-2 space-y-1.5">
@@ -866,7 +873,7 @@ export default function AdminStudentsTab() {
               return (
                 <tr
                   key={s.id}
-                  className={`group transition-opacity ${locked ? 'opacity-45 pointer-events-none select-none grayscale-[0.35]' : 'hover:bg-slate-50/80'}`}
+                  className={`group transition-opacity ${locked ? 'opacity-55 select-none grayscale-[0.35]' : 'hover:bg-slate-50/80'}`}
                   aria-disabled={locked || undefined}
                 >
                   <td className="px-5 py-3">
@@ -921,9 +928,7 @@ export default function AdminStudentsTab() {
                     </div>
                   </td>
                   <td className="px-3 py-3 text-center">
-                    {!locked && (
-                      <StudentRowActions s={s} {...menuProps} align="right" />
-                    )}
+                    <StudentRowActions s={s} {...menuProps} align="right" />
                   </td>
                 </tr>
               );

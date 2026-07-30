@@ -45,6 +45,7 @@ import FaviconSwitcher                       from './components/FaviconSwitcher'
 import { useInactivityTimer }                from './utils/useInactivityTimer';
 import { unlockAudio }                       from './utils/sound';
 import { getMessagingRole }                  from './lib/messagingRoles';
+import { hasPermission, PERMISSIONS }        from './constants/permissions';
 import './App.css';
 
 // ── Session helpers ──────────────────────────────────────────────────────────
@@ -142,6 +143,27 @@ const Guard = ({ allowedRoles, session, children }) => {
   }
   localStorage.removeItem('alerted_ban');
 
+  // GV pending/locked: chỉ được /teacher/test (và feed nếu mở từ menu)
+  if (isTeacherExamOnly) {
+    const p = location.pathname || '';
+    const allowed = p === '/teacher/test' || p.startsWith('/teacher/test/');
+    if (!allowed) {
+      return <Navigate to="/teacher/test" replace />;
+    }
+  }
+
+  return children;
+};
+
+/** Chặn deep-link trang admin khi STAFF thiếu quyền (menu đã ẩn nhưng URL vẫn mở được). */
+const PermissionGuard = ({ session, permission, anyOf, superAdminOnly, children, fallback = '/admin' }) => {
+  const isSuper = session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN';
+  if (superAdminOnly && !isSuper) return <Navigate to={fallback} replace />;
+  if (anyOf?.length) {
+    if (!anyOf.some((p) => hasPermission(session, p))) return <Navigate to={fallback} replace />;
+  } else if (permission && !hasPermission(session, permission)) {
+    return <Navigate to={fallback} replace />;
+  }
   return children;
 };
 
@@ -255,28 +277,47 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
           <ErrorBoundary inline><NotificationCenterPage role="admin" session={session} /></ErrorBoundary>
         } />
         <Route path="/admin/files" element={
-          <ErrorBoundary inline><FileCenterPage /></ErrorBoundary>
+          <PermissionGuard session={session} permission={PERMISSIONS.SYSTEM_SETTINGS}>
+            <ErrorBoundary inline><FileCenterPage /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/backups" element={
-          <ErrorBoundary inline><BackupCenterPage /></ErrorBoundary>
+          <PermissionGuard session={session} superAdminOnly>
+            <ErrorBoundary inline><BackupCenterPage /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/monitoring" element={
-          <ErrorBoundary inline><MonitoringPage session={session} /></ErrorBoundary>
+          <PermissionGuard session={session} permission={PERMISSIONS.VIEW_LOGS}>
+            <ErrorBoundary inline><MonitoringPage session={session} /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/ai" element={
-          <ErrorBoundary inline><AiCenterPage /></ErrorBoundary>
+          <PermissionGuard session={session} permission={PERMISSIONS.SYSTEM_SETTINGS}>
+            <ErrorBoundary inline><AiCenterPage /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/bi" element={
-          <ErrorBoundary inline><BiDashboardPage /></ErrorBoundary>
+          <PermissionGuard
+            session={session}
+            anyOf={[PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE]}
+          >
+            <ErrorBoundary inline><BiDashboardPage /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/workflows" element={
-          <ErrorBoundary inline><WorkflowCenterPage /></ErrorBoundary>
+          <PermissionGuard session={session} permission={PERMISSIONS.SYSTEM_SETTINGS}>
+            <ErrorBoundary inline><WorkflowCenterPage /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/builder" element={
-          <ErrorBoundary inline><FormReportBuilderPage /></ErrorBoundary>
+          <PermissionGuard session={session} permission={PERMISSIONS.SYSTEM_SETTINGS}>
+            <ErrorBoundary inline><FormReportBuilderPage /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/tenants" element={
-          <ErrorBoundary inline><TenantManagementPage /></ErrorBoundary>
+          <PermissionGuard session={session} superAdminOnly>
+            <ErrorBoundary inline><TenantManagementPage /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/inbox" element={
           <ErrorBoundary inline>

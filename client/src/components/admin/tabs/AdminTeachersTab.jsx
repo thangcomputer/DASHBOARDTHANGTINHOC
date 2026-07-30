@@ -86,7 +86,7 @@ function TeacherActionMenu({
           <span>Cấp quyền giảng dạy</span>
         </button>
       )}
-      {t.practicalFile && t.practicalStatus !== 'reviewed' && (
+      {isSuperAdmin && t.practicalFile && t.practicalStatus !== 'reviewed' && (
         <button type="button" role="menuitem" onClick={() => { setReviewModal(t); close(); }}
           className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
           <FileSpreadsheet size={15} className="shrink-0" />
@@ -119,7 +119,7 @@ function TeacherActionMenu({
 
 export default function AdminTeachersTab() {
   const {
-    teachers, safeTeachers, filteredTeachers, search, setSearch, isSuperAdmin, setShowTeacherModal,
+    teachers, safeTeachers, filteredTeachers, teacherSearch, setTeacherSearch, isSuperAdmin, setShowTeacherModal,
     getTeacherRating, setReviewModal, setGrantModal, setApproveModal, setEditTeacher, handlePayTeacher,
     removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed, toast,
   } = useAdminTab();
@@ -173,7 +173,7 @@ export default function AdminTeachersTab() {
     <>
       <div className="cms-students-module cms-viewport-module bg-white rounded-2xl lg:rounded-[28px] border border-slate-100 shadow-[0_4px_24px_rgba(15,23,42,0.04)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500" ref={menuRootRef}>
         <div className="px-3 pt-3 pb-2 sm:px-4 lg:px-6 lg:pt-4 space-y-3 shrink-0">
-          <div className="flex items-center justify-between gap-3 min-w-0">
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
               <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
                 <GraduationCap size={18} aria-hidden="true" />
@@ -183,7 +183,7 @@ export default function AdminTeachersTab() {
                 {teachers.length}
               </span>
             </h2>
-            <div className="flex flex-wrap gap-1.5 justify-end">
+            <div className="flex flex-wrap gap-1.5 xl:justify-end">
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${pendingCount ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                 {pendingCount} chờ duyệt
               </span>
@@ -192,6 +192,7 @@ export default function AdminTeachersTab() {
                   {filePending} file chờ
                 </span>
               )}
+              <span className="sr-only">Duyệt Giảng Viên</span>
             </div>
           </div>
 
@@ -201,8 +202,8 @@ export default function AdminTeachersTab() {
               <input
                 type="text"
                 placeholder="Tìm tên / SĐT..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={teacherSearch}
+                onChange={(e) => setTeacherSearch(e.target.value)}
                 className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none w-full transition-all"
                 aria-label="Tìm giảng viên"
               />

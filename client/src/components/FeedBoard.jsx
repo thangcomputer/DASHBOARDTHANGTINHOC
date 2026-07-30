@@ -411,43 +411,47 @@ export default function FeedBoard({ session, role }) {
         </button>
       </div>
 
-      {/* Mobile: Hỗ trợ nhanh */}
-      <div className="xl:hidden shrink-0 cms-feed-support-card p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <SupportMascot size={28} />
-          <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-wide text-red-600">
-              Hỗ trợ nhanh
-            </p>
-            <p className="text-[10px] text-slate-500 font-medium truncate">
-              Liên hệ Admin Super khi cần trợ giúp
-            </p>
-          </div>
-        </div>
+      {/* Hỗ trợ nhanh — luôn hiện trên Bảng tin (mọi breakpoint) */}
+      <div className="shrink-0 cms-feed-support-card p-3 sm:p-4">
         {isSuper ? (
-          <p className="text-xs text-slate-500 font-medium px-1 py-2">
-            Bạn đang là bộ phận hỗ trợ — học viên / GV sẽ gửi yêu cầu tới bạn.
-          </p>
+          <div className="flex items-center gap-3 sm:gap-4 min-h-[56px]">
+            <SupportMascot size={56} className="cms-support-mascot--feed" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-slate-800">Hỗ trợ nhanh</p>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Bạn đang là bộ phận hỗ trợ — học viên / GV gửi yêu cầu tới Admin Super.
+              </p>
+            </div>
+          </div>
         ) : (
           <button
             type="button"
             onClick={openQuickSupport}
             className="cms-feed-support-cta"
-            title="Hỗ trợ nhanh"
+            title="Hỗ trợ nhanh — Admin Super"
           >
-            <SupportMascot size={44} />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-bold text-slate-800 truncate">{quickSupport.name}</span>
-              <span className="block text-[11px] text-slate-500 font-medium">
-                {quickSupport.online ? 'Đang sẵn sàng hỗ trợ' : 'Gửi yêu cầu hỗ trợ'}
+            <SupportMascot size={56} className="cms-support-mascot--feed" />
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block text-[11px] font-black uppercase tracking-wide text-red-600">
+                Hỗ trợ nhanh
+              </span>
+              <span className="block text-sm font-bold text-slate-800 mt-0.5 truncate">
+                {quickSupport.name}
+              </span>
+              <span className="block text-[11px] text-slate-500 font-medium mt-0.5">
+                {quickSupport.online
+                  ? 'Đang sẵn sàng — bấm để được hỗ trợ'
+                  : 'Bấm để gửi yêu cầu hỗ trợ'}
               </span>
             </span>
-            <Headphones size={16} className="text-red-500 shrink-0" />
+            <span className="shrink-0 w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center">
+              <Headphones size={18} />
+            </span>
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(240px,280px)] gap-4 flex-1 min-h-0">
+      <div className="grid grid-cols-1 gap-4 flex-1 min-h-0">
         <div className="cms-viewport-scroll space-y-3 md:space-y-4 min-w-0">
       <div className="cms-feed-composer">
         <div className="cms-feed-composer__row">
@@ -519,16 +523,16 @@ export default function FeedBoard({ session, role }) {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="cms-feed-card__meta">
-                    <span className="cms-feed-card__author truncate">{post.authorName}</span>
+                    <span className="cms-feed-card__author truncate">{post.authorName || 'Người dùng'}</span>
                     <span className={'cms-feed-card__role ' + (ROLE_BADGE[post.authorRole] || ROLE_BADGE.student)}>{ROLE_LABEL[post.authorRole] || post.authorRole}</span>
                     <span className="cms-feed-card__time">{formatTime(post.createdAt)}</span>
                   </div>
-                  {post.content ? <p className="cms-feed-card__body">{post.content}</p> : null}
                 </div>
                 {canDeletePost(post) ? (
-                  <button type="button" onClick={() => handleDelete(post.id)} disabled={busyId === post.id} className="text-slate-300 hover:text-red-500 p-1" title="Xóa bài"><Trash2 size={16} /></button>
+                  <button type="button" onClick={() => handleDelete(post.id)} disabled={busyId === post.id} className="text-slate-300 hover:text-red-500 p-1 shrink-0" title="Xóa bài"><Trash2 size={16} /></button>
                 ) : null}
               </div>
+              {post.content ? <p className="cms-feed-card__body px-3.5 pb-2">{post.content}</p> : null}
 
               {post.images?.length > 0 ? (
                 <div className={'grid gap-1 px-4 pb-2 ' + (post.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
@@ -852,55 +856,6 @@ export default function FeedBoard({ session, role }) {
         </div>
       )}
         </div>
-
-        {/* Desktop: Hỗ trợ nhanh (không phải nhắn tin) */}
-        <aside className="hidden xl:flex flex-col min-h-0 cms-feed-support-card">
-          <div className="px-4 py-3 border-b border-red-50 shrink-0 flex items-start gap-3">
-            <SupportMascot size={40} />
-            <div className="min-w-0">
-              <p className="text-sm font-black text-slate-800">
-                Hỗ trợ nhanh
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                Gặp khó khăn? Bấm để được Admin Super hỗ trợ
-              </p>
-            </div>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3">
-            {isSuper ? (
-              <div className="px-2 py-8 text-center">
-                <SupportMascot size={64} />
-                <p className="text-sm font-bold text-slate-700 mt-3">Bạn là bộ phận hỗ trợ</p>
-                <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
-                  Học viên, giảng viên và admin chi nhánh gửi hỗ trợ nhanh tới đây.
-                  Dùng biểu tượng tin nhắn ở các trang khác để nhắn tin đầy đủ.
-                </p>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={openQuickSupport}
-                className="cms-feed-support-cta"
-              >
-                <span className="relative shrink-0">
-                  <SupportMascot size={48} />
-                  <span
-                    className={`absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full ring-2 ring-white ${quickSupport.online ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                  />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold text-slate-800 truncate">
-                    {quickSupport.name}
-                  </span>
-                  <span className="block text-[11px] text-slate-500 font-medium">
-                    Admin Super · {quickSupport.online ? 'Đang sẵn sàng' : 'Gửi yêu cầu'}
-                  </span>
-                </span>
-                <Headphones size={16} className="text-red-500 shrink-0" />
-              </button>
-            )}
-          </div>
-        </aside>
       </div>
 
       {lightbox ? createPortal(

@@ -228,8 +228,11 @@ async function deleteById(id, user) {
     throw err;
   }
   const uid = String(user?.id || user?._id || '');
-  const isAdmin = user?.role === 'admin' || user?.role === 'staff';
-  if (!isAdmin && asset.uploadedBy && asset.uploadedBy !== uid) {
+  const perms = user?.permissions || [];
+  const canManageFiles = user?.id === 'admin'
+    || user?.adminRole === 'SUPER_ADMIN'
+    || perms.includes('system_settings');
+  if (!canManageFiles && asset.uploadedBy && asset.uploadedBy !== uid) {
     const err = new Error('Khong co quyen xoa file nay');
     err.status = 403;
     throw err;

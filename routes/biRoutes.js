@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, branchFilter } = require('../middleware/auth');
+const { authMiddleware, branchFilter, checkAnyPermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const biService = require('../services/biService');
 const logger = require('../config/logger');
 
-// Admin / staff (branchFilter da gioi han chi nhanh)
-const guard = [authMiddleware, branchFilter, (req, res, next) => {
-  if (req.user?.role === 'admin' || req.user?.role === 'staff' || req.user?.id === 'admin') {
-    return next();
-  }
-  return res.status(403).json({ success: false, message: 'Khong co quyen BI' });
-}];
+// Cùng quyền với Báo cáo doanh thu / analytics
+const guard = [
+  authMiddleware,
+  checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE),
+  branchFilter,
+];
 
 router.get('/overview', guard, async (req, res) => {
   try {
