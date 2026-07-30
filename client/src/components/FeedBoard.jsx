@@ -4,8 +4,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Heart, ThumbsUp, Laugh, Frown, Sparkles, MessageCircle, ImagePlus, Send, Trash2,
-  Loader2, X, Newspaper, RefreshCw, Reply, Circle, Headphones,
+  Headphones, ImagePlus, Send, Trash2, MessageCircle,
+  Loader2, X, Newspaper, RefreshCw, Reply, Sparkles, Heart, ThumbsUp, Laugh, Frown,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
@@ -13,7 +13,8 @@ import { useToast } from '../utils/toast';
 import { useSocket } from '../context/SocketContext';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { openSiteChat } from './FloatingMessenger';
-import { buildSupportDirectory, flattenSupportPeople, isSuperAdminViewer } from '../utils/supportPresence';
+import SupportMascot from './SupportMascot';
+import { isSuperAdminViewer, isSuperAdminPresence } from '../utils/supportPresence';
 
 const ROLE_LABEL = {
   admin: 'Admin',
@@ -69,17 +70,23 @@ export default function FeedBoard({ session, role }) {
   const meRole = role || session?.role || 'student';
   const isSuper = isSuperAdminViewer(session);
 
-  const supportOnline = useMemo(
-    () => flattenSupportPeople(buildSupportDirectory({ session, onlineUsers, meId })),
-    [session, onlineUsers, meId],
-  );
+  // Bảng tin: chỉ Hỗ trợ nhanh → Admin Super (không phải danh bạ nhắn tin)
+  const quickSupport = useMemo(() => {
+    const online = (onlineUsers || []).find(isSuperAdminPresence);
+    return {
+      id: 'admin',
+      name: online?.name || 'Hỗ trợ trung tâm',
+      role: 'admin',
+      online: !!online,
+    };
+  }, [onlineUsers]);
 
-  const openSupportChat = useCallback((person) => {
-    if (!person?.id) return;
-    setSupportOpen(true);
-    if (typeof openChat === 'function') openChat(person);
-    else openSiteChat(person);
-  }, [openChat, setSupportOpen]);
+  const openQuickSupport = useCallback(() => {
+    if (isSuper) return;
+    setSupportOpen(false);
+    if (typeof openChat === 'function') openChat(quickSupport, { expand: true });
+    else openSiteChat(quickSupport);
+  }, [isSuper, openChat, setSupportOpen, quickSupport]);
 
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(1);
@@ -404,40 +411,39 @@ export default function FeedBoard({ session, role }) {
         </button>
       </div>
 
-      {/* Mobile: hỗ trợ online ngang */}
-      <div className="xl:hidden shrink-0 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+      {/* Mobile: Hỗ trợ nhanh */}
+      <div className="xl:hidden shrink-0 cms-feed-support-card p-3">
         <div className="flex items-center gap-2 mb-2">
-          <Headphones size={14} className="text-emerald-600" />
-          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
-            {isSuper ? `Đang hoạt động (${supportOnline.length})` : 'Admin Super hỗ trợ'}
-          </p>
-        </div>
-        {supportOnline.length === 0 ? (
-          <p className="text-xs text-slate-400 font-medium">Chưa có ai online</p>
-        ) : (
-          <div className="flex gap-2 overflow-x-auto pb-0.5">
-            {supportOnline.map((p) => (
-              <button
-                key={`${p.role}_${p.id}`}
-                type="button"
-                onClick={() => openSupportChat(p)}
-                className="shrink-0 flex flex-col items-center gap-1 w-[4.5rem] group"
-                title={`Chat với ${p.name}`}
-              >
-                <span className="relative">
-                  <img
-                    src={resolveAvatarUrl({ role: p.displayRole || p.role, name: p.name })}
-                    alt=""
-                    className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow"
-                  />
-                  <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 ring-white ${p.online !== false ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                </span>
-                <span className="text-[10px] font-bold text-slate-700 truncate w-full text-center group-hover:text-red-600">
-                  {p.name}
-                </span>
-              </button>
-            ))}
+          <SupportMascot size={28} />
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-wide text-red-600">
+              Hỗ trợ nhanh
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium truncate">
+              Liên hệ Admin Super khi cần trợ giúp
+            </p>
           </div>
+        </div>
+        {isSuper ? (
+          <p className="text-xs text-slate-500 font-medium px-1 py-2">
+            Bạn đang là bộ phận hỗ trợ — học viên / GV sẽ gửi yêu cầu tới bạn.
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={openQuickSupport}
+            className="cms-feed-support-cta"
+            title="Hỗ trợ nhanh"
+          >
+            <SupportMascot size={44} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-slate-800 truncate">{quickSupport.name}</span>
+              <span className="block text-[11px] text-slate-500 font-medium">
+                {quickSupport.online ? 'Đang sẵn sàng hỗ trợ' : 'Gửi yêu cầu hỗ trợ'}
+              </span>
+            </span>
+            <Headphones size={16} className="text-red-500 shrink-0" />
+          </button>
         )}
       </div>
 
@@ -847,57 +853,51 @@ export default function FeedBoard({ session, role }) {
       )}
         </div>
 
-        {/* Desktop: cột hỗ trợ online kiểu Facebook */}
-        <aside className="hidden xl:flex flex-col min-h-0 rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 shrink-0">
-            <p className="text-sm font-black text-slate-800 flex items-center gap-2">
-              <Headphones size={16} className="text-emerald-600" />
-              {isSuper ? 'Đang hoạt động' : 'Admin Super hỗ trợ'}
-            </p>
-            <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-              {isSuper
-                ? 'HV / GV / Admin chi nhánh đang online'
-                : 'Chỉ chat với Admin Super hỗ trợ'}
-            </p>
+        {/* Desktop: Hỗ trợ nhanh (không phải nhắn tin) */}
+        <aside className="hidden xl:flex flex-col min-h-0 cms-feed-support-card">
+          <div className="px-4 py-3 border-b border-red-50 shrink-0 flex items-start gap-3">
+            <SupportMascot size={40} />
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-800">
+                Hỗ trợ nhanh
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                Gặp khó khăn? Bấm để được Admin Super hỗ trợ
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2">
-            {supportOnline.length === 0 ? (
-              <div className="px-3 py-10 text-center text-xs text-slate-400 font-medium">
-                <Circle size={28} className="mx-auto mb-2 text-slate-200" />
-                Chưa có ai đang online
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3">
+            {isSuper ? (
+              <div className="px-2 py-8 text-center">
+                <SupportMascot size={64} />
+                <p className="text-sm font-bold text-slate-700 mt-3">Bạn là bộ phận hỗ trợ</p>
+                <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
+                  Học viên, giảng viên và admin chi nhánh gửi hỗ trợ nhanh tới đây.
+                  Dùng biểu tượng tin nhắn ở các trang khác để nhắn tin đầy đủ.
+                </p>
               </div>
             ) : (
-              <ul className="space-y-0.5">
-                {supportOnline.map((p) => (
-                  <li key={`${p.role}_${p.id}`}>
-                    <button
-                      type="button"
-                      onClick={() => openSupportChat(p)}
-                      className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-slate-50 text-left transition-colors group"
-                    >
-                      <span className="relative shrink-0">
-                        <img
-                          src={resolveAvatarUrl({ role: p.displayRole || p.role, name: p.name })}
-                          alt=""
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${p.online !== false ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-bold text-slate-800 truncate group-hover:text-red-600">
-                          {p.name}
-                        </span>
-                        <span className="block text-[11px] text-slate-500 font-medium">
-                          {ROLE_LABEL[p.displayRole] || ROLE_LABEL[p.role] || p.role}
-                          {' · '}
-                          {p.online !== false ? 'Đang hoạt động' : 'Ngoại tuyến'}
-                        </span>
-                      </span>
-                      <MessageCircle size={15} className="text-slate-300 group-hover:text-red-500 shrink-0" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <button
+                type="button"
+                onClick={openQuickSupport}
+                className="cms-feed-support-cta"
+              >
+                <span className="relative shrink-0">
+                  <SupportMascot size={48} />
+                  <span
+                    className={`absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full ring-2 ring-white ${quickSupport.online ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-slate-800 truncate">
+                    {quickSupport.name}
+                  </span>
+                  <span className="block text-[11px] text-slate-500 font-medium">
+                    Admin Super · {quickSupport.online ? 'Đang sẵn sàng' : 'Gửi yêu cầu'}
+                  </span>
+                </span>
+                <Headphones size={16} className="text-red-500 shrink-0" />
+              </button>
             )}
           </div>
         </aside>

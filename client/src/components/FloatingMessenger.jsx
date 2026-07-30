@@ -438,6 +438,7 @@ export default function FloatingMessenger({ session, role }) {
     if (meId) markMessagesRead?.(convId, meId);
   };
 
+  const isFeedPage = location.pathname.includes('/feed');
   const badgeCount = unreadTotal > 0 ? unreadTotal : 0;
   const badgeLabel = badgeCount > 99 ? '99+' : String(badgeCount);
 
@@ -461,8 +462,8 @@ export default function FloatingMessenger({ session, role }) {
       )}
 
       <div className="cms-fm-dock">
-        {/* Panel danh bạ hỗ trợ — tách riêng khỏi cửa sổ chat */}
-        {supportOpen ? (
+        {/* Panel danh bạ nhắn tin — ẩn trên Bảng tin */}
+        {supportOpen && !isFeedPage ? (
           <div className="cms-fm-support">
             <div className="cms-fm-support__head">
               <div className="min-w-0 flex-1">
@@ -605,19 +606,22 @@ export default function FloatingMessenger({ session, role }) {
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => setSupportOpen((v) => !v)}
-          className="cms-fm-fab"
-          title={supportOpen ? 'Đóng danh bạ hỗ trợ' : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : 'Hỗ trợ online')}
-          aria-label={supportOpen ? 'Đóng danh bạ hỗ trợ' : 'Mở danh bạ hỗ trợ'}
-          aria-expanded={supportOpen}
-        >
-          {supportOpen ? <X size={22} /> : <MessageSquare size={22} />}
-          {!supportOpen && unreadTotal > 0 && (
-            <span className="cms-fm-fab__badge is-unread">{badgeLabel}</span>
-          )}
-        </button>
+        {/* FAB tin nhắn — các trang khác; Bảng tin dùng Hỗ trợ nhanh riêng */}
+        {!isFeedPage && (
+          <button
+            type="button"
+            onClick={() => setSupportOpen((v) => !v)}
+            className="cms-fm-fab"
+            title={supportOpen ? 'Đóng danh bạ nhắn tin' : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : 'Nhắn tin')}
+            aria-label={supportOpen ? 'Đóng danh bạ nhắn tin' : 'Mở nhắn tin'}
+            aria-expanded={supportOpen}
+          >
+            {supportOpen ? <X size={22} /> : <MessageSquare size={22} />}
+            {!supportOpen && unreadTotal > 0 && (
+              <span className="cms-fm-fab__badge is-unread">{badgeLabel}</span>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

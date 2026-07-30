@@ -625,6 +625,44 @@
     @apply inline-flex items-center px-1.5 py-0.5 rounded-md bg-red-50 text-red-600 text-[10px] font-black;
   }
 
+  /* Mascot hỗ trợ nhanh (Bảng tin) */
+  .cms-support-mascot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    flex-shrink: 0;
+  }
+  .cms-support-mascot.is-waving {
+    animation: cms-support-bob 2.4s ease-in-out infinite;
+  }
+  .cms-support-mascot.is-waving .cms-support-mascot__arm {
+    transform-origin: 44px 42px;
+    animation: cms-support-wave 1.2s ease-in-out infinite;
+  }
+  .cms-support-mascot.is-waving .cms-support-mascot__eye {
+    animation: cms-support-blink 3.2s ease-in-out infinite;
+  }
+  @keyframes cms-support-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+  @keyframes cms-support-wave {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(18deg); }
+  }
+  @keyframes cms-support-blink {
+    0%, 42%, 48%, 100% { transform: scaleY(1); }
+    45% { transform: scaleY(0.15); }
+  }
+
+  .cms-feed-support-card {
+    @apply rounded-2xl border border-red-100 bg-gradient-to-br from-white via-white to-red-50 shadow-sm overflow-hidden;
+  }
+  .cms-feed-support-cta {
+    @apply w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-white/80 border border-red-100 hover:border-red-300 hover:bg-red-50/60 text-left transition;
+  }
+
   .cms-fm-support {
     width: min(300px, calc(100vw - 1.5rem));
     max-height: min(420px, calc(100dvh - 6rem));
