@@ -150,11 +150,6 @@ export const getRolePrefix = (overrideRole = null) => {
   const path = window.location.pathname;
   const roles = ['admin', 'staff', 'teacher', 'student'];
 
-  const pathRole = path.startsWith('/admin') ? 'admin'
-    : path.startsWith('/teacher') ? 'teacher'
-    : path.startsWith('/student') ? 'student'
-    : null;
-
   const hasToken = (r) => {
     if (localStorage.getItem(`${r}_access_token`)) return true;
     try {
@@ -165,15 +160,24 @@ export const getRolePrefix = (overrideRole = null) => {
     }
   };
 
-  // 1. Ưu tiên vai trò khớp URL (tránh dùng token admin cũ khi đang ở /student)
-  if (pathRole && hasToken(pathRole)) return pathRole;
+  // /admin dùng chung Super Admin + Staff — khớp loadSession (ưu tiên staff trước)
+  if (path.startsWith('/admin')) {
+    if (hasToken('staff')) return 'staff';
+    if (hasToken('admin')) return 'admin';
+  } else if (path.startsWith('/teacher')) {
+    if (hasToken('teacher')) return 'teacher';
+  } else if (path.startsWith('/student')) {
+    if (hasToken('student')) return 'student';
+  }
 
-  // 2. Fallback: bất kỳ vai trò nào còn token
+  // Fallback: bất kỳ vai trò nào còn token
   for (const r of roles) {
     if (hasToken(r)) return r;
   }
 
-  if (pathRole) return pathRole;
+  if (path.startsWith('/admin')) return 'admin';
+  if (path.startsWith('/teacher')) return 'teacher';
+  if (path.startsWith('/student')) return 'student';
   return 'thvp';
 };
 

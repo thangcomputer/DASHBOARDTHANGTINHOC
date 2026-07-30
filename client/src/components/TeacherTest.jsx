@@ -442,7 +442,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     if (d.hasTeacherExamMinutes && d.teacherExamMinutes && typeof d.teacherExamMinutes === 'object') {
       setHasServerExamMinutes(true);
       setRemoteExamMinutes(d.teacherExamMinutes);
-      updateTeacherExamMinutes(d.teacherExamMinutes);
+      // Không ghi vào DataContext tại đây — tránh cascade re-render / max update depth
     } else {
       setHasServerExamMinutes(false);
       setRemoteExamMinutes(null);
@@ -450,14 +450,13 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     if (d.hasTeacherEssayExamMinutes && d.teacherEssayExamMinutes && typeof d.teacherEssayExamMinutes === 'object') {
       setHasServerEssayMinutes(true);
       setRemoteEssayMinutes(d.teacherEssayExamMinutes);
-      updateTeacherEssayExamMinutes(d.teacherEssayExamMinutes);
     } else {
       setHasServerEssayMinutes(false);
       setRemoteEssayMinutes(null);
     }
     setExamConfigReady(true);
     return d;
-  }, [contextQuestionBank?.length, updateTeacherExamMinutes, updateTeacherEssayExamMinutes]);
+  }, [contextQuestionBank?.length]);
 
   const handleStartMcExam = useCallback(async () => {
     if (!cameraReady || questions.length === 0 || startingExam) return;
@@ -473,6 +472,12 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
         });
         return;
       }
+      try {
+        updateTeacherExamMinutes?.(mcMap);
+        if (d?.hasTeacherEssayExamMinutes && d.teacherEssayExamMinutes) {
+          updateTeacherEssayExamMinutes?.(d.teacherEssayExamMinutes);
+        }
+      } catch { /* ignore */ }
       const seconds = resolveTeacherExamTimeSeconds(questions.length, mcMap);
       setTimeLeft(seconds);
       setPhase('test');
@@ -490,10 +495,12 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     startingExam,
     loadTeacherExamConfigFromServer,
     resolveTeacherExamTimeSeconds,
-    activeExamMinutes,
     showModal,
+    updateTeacherExamMinutes,
+    updateTeacherEssayExamMinutes,
   ]);
 
+  // Load cấu hình đề một lần khi mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -504,12 +511,8 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       }
     })();
     return () => { cancelled = true; };
-  }, [loadTeacherExamConfigFromServer]);
-
-  useEffect(() => {
-    if (phase !== 'intro') return;
-    loadTeacherExamConfigFromServer().catch(() => {});
-  }, [phase, loadTeacherExamConfigFromServer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ mount
+  }, []);
 
   useEffect(() => {
     if (configuredMcMinutes == null) return;
@@ -559,7 +562,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
 
   useEffect(() => {
     if (phase === 'test' || phase === 'result' || phase === 'banned') return;
-    if (teacherId && !profileForSubjects) return;
     if (teacherId && !teacherExamSubjectIds.length) return;
     const key = examPool?.length
       ? `${teacherExamSubjectIds.join(',')}:${examPool.length}:${examPool.map((q) => q?.id ?? q?._id ?? '').join(',')}`
@@ -569,11 +571,11 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
         lastTeacherBankKeyRef.current = key;
         setQuestions(buildGroupedTeacherExamQuestions(examPool, teacherExamSubjectIds));
       }
-    } else {
+    } else if (lastTeacherBankKeyRef.current !== '') {
       lastTeacherBankKeyRef.current = '';
       setQuestions([]);
     }
-  }, [examPool, phase, teacherId, profileForSubjects, teacherExamSubjectIds]);
+  }, [examPool, phase, teacherId, teacherExamSubjectIds]);
 
   const examSections = useMemo(
     () => buildTeacherExamSections(questions, teacherExamSubjectIds, examSubjectsCatalog),
@@ -646,7 +648,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       } else if (String(currentTeacher.practicalStatus || '').toLowerCase() === 'expired') {
         setPracticalExpired(true);
       }
-      setPhase('result');
+      setPhase((p) => (p === 'result' ? p : 'result'));
     } else if (teacherStatus === 'locked') {
       // Đang xem màn kết quả điểm — không ghi đè sang "BÀI THI BỊ HỦY"
       if (phase === 'result') return;
@@ -656,7 +658,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
         try { saved = JSON.parse(sessionStorage.getItem('teacher_quiz_result') || 'null'); } catch { /* ignore */ }
         setGrade(saved || buildGradeFromTeacher(currentTeacher, null));
         setShowQuizSummary(true);
-        setPhase('result');
+        setPhase((p) => (p === 'result' ? p : 'result'));
         return;
       }
 
@@ -664,9 +666,18 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
         currentTeacher.lockReason
         || 'Tài khoản đã bị KHÓA do kết quả thi KHÔNG ĐẠT. Vui lòng liên hệ Admin để được thi lại.',
       );
-      setPhase('banned');
+      setPhase((p) => (p === 'banned' ? p : 'banned'));
     }
-  }, [currentTeacher, phase]);
+  }, [
+    phase,
+    currentTeacher?.id,
+    currentTeacher?._id,
+    currentTeacher?.testStatus,
+    currentTeacher?.status,
+    currentTeacher?.practicalFile,
+    currentTeacher?.practicalStatus,
+    currentTeacher?.lockReason,
+  ]);
 
   // Kiểm tra trừng phạt khi load lại trang
   useEffect(() => {
