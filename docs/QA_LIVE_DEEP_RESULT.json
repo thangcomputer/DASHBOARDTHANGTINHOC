@@ -1,0 +1,1819 @@
+{
+  "startedAt": "2026-07-30T05:13:52.607Z",
+  "finishedAt": "2026-07-30T05:13:54.139Z",
+  "baseUrl": "http://127.0.0.1:5000",
+  "loginMetrics": {
+    "total": 29,
+    "ok": 29,
+    "failed": 0,
+    "failureRate": 0,
+    "p50Ms": 1164,
+    "p95Ms": 1253,
+    "captchaBypassLive": true
+  },
+  "failedLogins": [],
+  "apiChecks": [
+    {
+      "name": "admin GET /students/stats",
+      "pass": true,
+      "status": 200,
+      "ms": 5
+    },
+    {
+      "name": "admin GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "admin GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "staff GET /students",
+      "pass": true,
+      "status": 200,
+      "ms": 6
+    },
+    {
+      "name": "staff GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "staff GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "staff GET /students",
+      "pass": true,
+      "status": 200,
+      "ms": 6
+    },
+    {
+      "name": "staff GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "staff GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "staff GET /students",
+      "pass": true,
+      "status": 200,
+      "ms": 5
+    },
+    {
+      "name": "staff GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "staff GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "teacher GET /students",
+      "pass": true,
+      "status": 200,
+      "ms": 4
+    },
+    {
+      "name": "teacher GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "teacher GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "teacher GET /assignments/course/Word",
+      "pass": true,
+      "status": 200,
+      "ms": 4
+    },
+    {
+      "name": "teacher GET /students",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "teacher GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "teacher GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "teacher GET /assignments/course/Word",
+      "pass": true,
+      "status": 200,
+      "ms": 4
+    },
+    {
+      "name": "teacher GET /students",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "teacher GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "teacher GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "teacher GET /assignments/course/Word",
+      "pass": true,
+      "status": 200,
+      "ms": 4
+    },
+    {
+      "name": "teacher GET /students",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "teacher GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "teacher GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "teacher GET /assignments/course/Word",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "teacher GET /students",
+      "pass": true,
+      "status": 200,
+      "ms": 4
+    },
+    {
+      "name": "teacher GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "teacher GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "teacher GET /assignments/course/Word",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 4
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 3
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /feed",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /messages/contacts",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    },
+    {
+      "name": "student GET /training-lms/progress/me",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET /students/:id (examProgress)",
+      "pass": true,
+      "status": 200,
+      "ms": 2
+    },
+    {
+      "name": "student GET assignments by course",
+      "pass": true,
+      "status": 200,
+      "ms": 1
+    }
+  ],
+  "flowChecks": [
+    {
+      "name": "assignment create",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "name": "assignment submit",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "name": "assignment grade",
+      "pass": true,
+      "status": 200
+    }
+  ],
+  "chatChecks": [
+    {
+      "name": "chat student→admin",
+      "pass": true,
+      "status": 201
+    },
+    {
+      "name": "chat teacher→admin",
+      "pass": true,
+      "status": 201
+    }
+  ],
+  "summary": {
+    "loginOk": 29,
+    "loginTotal": 29,
+    "checksPass": 137,
+    "checksFail": 0,
+    "uiPass": 2,
+    "uiFail": 2
+  },
+  "api": {
+    "startedAt": "2026-07-30T05:13:52.607Z",
+    "finishedAt": "2026-07-30T05:13:54.139Z",
+    "baseUrl": "http://127.0.0.1:5000",
+    "loginMetrics": {
+      "total": 29,
+      "ok": 29,
+      "failed": 0,
+      "failureRate": 0,
+      "p50Ms": 1164,
+      "p95Ms": 1253,
+      "captchaBypassLive": true
+    },
+    "failedLogins": [],
+    "apiChecks": [
+      {
+        "name": "admin GET /students/stats",
+        "pass": true,
+        "status": 200,
+        "ms": 5
+      },
+      {
+        "name": "admin GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "admin GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "staff GET /students",
+        "pass": true,
+        "status": 200,
+        "ms": 6
+      },
+      {
+        "name": "staff GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "staff GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "staff GET /students",
+        "pass": true,
+        "status": 200,
+        "ms": 6
+      },
+      {
+        "name": "staff GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "staff GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "staff GET /students",
+        "pass": true,
+        "status": 200,
+        "ms": 5
+      },
+      {
+        "name": "staff GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "staff GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "teacher GET /students",
+        "pass": true,
+        "status": 200,
+        "ms": 4
+      },
+      {
+        "name": "teacher GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "teacher GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "teacher GET /assignments/course/Word",
+        "pass": true,
+        "status": 200,
+        "ms": 4
+      },
+      {
+        "name": "teacher GET /students",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "teacher GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "teacher GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "teacher GET /assignments/course/Word",
+        "pass": true,
+        "status": 200,
+        "ms": 4
+      },
+      {
+        "name": "teacher GET /students",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "teacher GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "teacher GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "teacher GET /assignments/course/Word",
+        "pass": true,
+        "status": 200,
+        "ms": 4
+      },
+      {
+        "name": "teacher GET /students",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "teacher GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "teacher GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "teacher GET /assignments/course/Word",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "teacher GET /students",
+        "pass": true,
+        "status": 200,
+        "ms": 4
+      },
+      {
+        "name": "teacher GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "teacher GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "teacher GET /assignments/course/Word",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 4
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 3
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /feed",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /messages/contacts",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      },
+      {
+        "name": "student GET /training-lms/progress/me",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET /students/:id (examProgress)",
+        "pass": true,
+        "status": 200,
+        "ms": 2
+      },
+      {
+        "name": "student GET assignments by course",
+        "pass": true,
+        "status": 200,
+        "ms": 1
+      }
+    ],
+    "flowChecks": [
+      {
+        "name": "assignment create",
+        "pass": true,
+        "status": 200
+      },
+      {
+        "name": "assignment submit",
+        "pass": true,
+        "status": 200
+      },
+      {
+        "name": "assignment grade",
+        "pass": true,
+        "status": 200
+      }
+    ],
+    "chatChecks": [
+      {
+        "name": "chat student→admin",
+        "pass": true,
+        "status": 201
+      },
+      {
+        "name": "chat teacher→admin",
+        "pass": true,
+        "status": 201
+      }
+    ],
+    "summary": {
+      "loginOk": 29,
+      "loginTotal": 29,
+      "checksPass": 137,
+      "checksFail": 0
+    }
+  },
+  "uiFinishedAt": "2026-07-30T05:17:22.557Z",
+  "feBase": "http://127.0.0.1:5173",
+  "ui": {
+    "roles": [
+      {
+        "role": "student",
+        "loggedIn": true,
+        "finalUrl": "http://127.0.0.1:5173/student",
+        "menuClicks": [
+          {
+            "label": "Tổng quan",
+            "ok": true
+          },
+          {
+            "label": "Bảng tin",
+            "ok": true
+          },
+          {
+            "label": "Tin tức",
+            "ok": true
+          },
+          {
+            "label": "Phòng Thi",
+            "ok": true
+          },
+          {
+            "label": "Lịch học",
+            "ok": true
+          },
+          {
+            "label": "Tài liệu",
+            "ok": true
+          },
+          {
+            "label": "Hộp thư",
+            "ok": true
+          },
+          {
+            "label": "Đánh giá",
+            "ok": true
+          }
+        ],
+        "consoleErrors": [],
+        "screenshots": [
+          "student-B_ng_tin.png",
+          "student-feed.png",
+          "student-home.png",
+          "student-H_p_th_.png",
+          "student-L_ch_h_c.png",
+          "student-Ph_ng_Thi.png",
+          "student-Tin_t_c.png",
+          "student-T_i_li_u.png",
+          "student-T_ng_quan.png",
+          "student-_nh_gi_.png"
+        ]
+      },
+      {
+        "role": "teacher",
+        "loggedIn": true,
+        "finalUrl": "http://127.0.0.1:5173/teacher",
+        "menuClicks": [
+          {
+            "label": "Tổng quan",
+            "ok": true
+          },
+          {
+            "label": "Bảng tin",
+            "ok": true
+          },
+          {
+            "label": "Tin tức",
+            "ok": true
+          },
+          {
+            "label": "Quản lý học viên",
+            "ok": true
+          },
+          {
+            "label": "Lịch dạy",
+            "ok": true
+          },
+          {
+            "label": "Hộp thư",
+            "ok": true
+          }
+        ],
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+        ],
+        "screenshots": [
+          "teacher-B_ng_tin.png",
+          "teacher-home.png",
+          "teacher-H_p_th_.png",
+          "teacher-L_ch_d_y.png",
+          "teacher-Qu_n_l_h_c_vi_n.png",
+          "teacher-test.png",
+          "teacher-Tin_t_c.png",
+          "teacher-T_ng_quan.png"
+        ]
+      },
+      {
+        "role": "staff",
+        "loggedIn": true,
+        "finalUrl": "http://127.0.0.1:5173/admin/login",
+        "menuClicks": [],
+        "consoleErrors": [],
+        "screenshots": [
+          "staff-home.png"
+        ]
+      },
+      {
+        "role": "super_admin",
+        "loggedIn": true,
+        "finalUrl": "http://127.0.0.1:5173/admin/login",
+        "menuClicks": [],
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+        ],
+        "screenshots": [
+          "super_admin-home.png"
+        ]
+      }
+    ],
+    "summary": {
+      "pass": 2,
+      "fail": 2,
+      "total": 4
+    }
+  }
+}

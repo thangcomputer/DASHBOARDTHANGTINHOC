@@ -86,13 +86,13 @@ async function seed() {
   const verifyAdmins   = await Teacher.find({ name: { $regex: /^ADMIN CHI NHÁNH TEST/ } }).select('name phone role adminRole').lean();
 
   console.log('\n═══ VERIFICATION ═══');
-  console.log(`Students:  ${verifyStudents.length}/10`);
+  console.log(`Students:  ${verifyStudents.length}/20`);
   verifyStudents.forEach(s => console.log(`  📗 ${s.name} | phone: ${s.phone} | _id: ${s._id}`));
 
   console.log(`Teachers:  ${verifyTeachers.length}/5`);
   verifyTeachers.forEach(t => console.log(`  📘 ${t.name} | phone: ${t.phone} | _id: ${t._id}`));
 
-  console.log(`Admins:    ${verifyAdmins.length}/5`);
+  console.log(`Admins:    ${verifyAdmins.length}/3`);
   verifyAdmins.forEach(a => console.log(`  📕 ${a.name} | phone: ${a.phone} | role: ${a.adminRole} | _id: ${a._id}`));
 
   // ── Xuất danh sách ID để dùng trong test ─────────────────────

@@ -22,13 +22,9 @@ function parseDirectConversationTokens(conversationId) {
 function isDirectConversationParticipant(conversationId, user) {
   const tokens = parseDirectConversationTokens(conversationId);
   if (!tokens?.length) return false;
-  // staff được normalize thành admin trong conversationId — so khớp theo role đã chuẩn hoá
-  const { normalizeChatRole } = require('./chatConversationId');
-  const myRole = normalizeChatRole(getMessagingRole(user));
+  const messagingRole = getMessagingRole(user);
   const myId = String(user.id);
-  return tokens.some(
-    (t) => String(t.id) === myId && normalizeChatRole(t.role) === myRole,
-  );
+  return tokens.some((t) => String(t.id) === myId && String(t.role) === messagingRole);
 }
 
 module.exports = { getMessagingRole, parseDirectConversationTokens, isDirectConversationParticipant };

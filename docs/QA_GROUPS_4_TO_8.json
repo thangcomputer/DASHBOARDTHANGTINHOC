@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-29T08:21:17.906Z",
+  "at": "2026-07-30T04:51:26.132Z",
   "results": [
     {
       "id": "GX-00",
@@ -19,7 +19,7 @@
       "id": "G4-02",
       "name": "Thanh toán → tạo hóa đơn",
       "expected": "200 + invoice.maHoaDon",
-      "actual": "status=200 maHD=HD2607-0026 paidAmt=2000000",
+      "actual": "status=200 maHD=HD2607-0012 paidAmt=2000000",
       "result": "PASS",
       "severity": "Critical",
       "api": "PUT /api/students/:id/pay"
@@ -27,7 +27,7 @@
     {
       "id": "G4-03",
       "name": "Admin list hóa đơn",
-      "actual": "status=200 n=26",
+      "actual": "status=200 n=12",
       "result": "PASS",
       "severity": "High"
     },
@@ -99,7 +99,7 @@
       "id": "G6-05",
       "name": "Chat upload file + emoji text (API)",
       "expected": "upload 200 + emoji message 201",
-      "actual": "upload=200 emoji=201 url=/uploads/messages/1785313277881-823680076-qa.png",
+      "actual": "upload=200 emoji=201 url=/uploads/messages/1785387086111-730877804-qa.png",
       "result": "PASS",
       "severity": "Medium",
       "api": "POST /api/messages/upload + POST /api/messages"
@@ -122,7 +122,7 @@
     {
       "id": "G8-01",
       "name": "DB sync sau thanh toán (paid=true)",
-      "actual": "paid=true code=HV13277547",
+      "actual": "paid=true code=HV87085839",
       "result": "PASS",
       "severity": "Critical"
     },

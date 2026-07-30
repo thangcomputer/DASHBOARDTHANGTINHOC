@@ -51,7 +51,7 @@ const StudentDashboard = ({ onNavigate }) => {
 
     const courses = enrichEnrollmentsWithTeachers(getClientEnrollments(student), teachers);
     const namesFromCourses = uniqueTeacherNames(courses);
-
+    
     // Properly handle populated vs unpopulated `teacherId`
     // Backend có thể trả `teacherId` dạng mảng (nhiều môn / nhiều GV)
     const rawTeacherId = student.teacherId;
@@ -639,7 +639,7 @@ const StudentDashboard = ({ onNavigate }) => {
             materials={materials}
           />
         )}
-      </div>
+                  </div>
 
       {activeMilestone && (
         <MilestoneEvaluationModal

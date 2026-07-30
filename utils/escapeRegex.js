@@ -23,7 +23,9 @@ function fixMojibakeText(text) {
   try {
     const fixed = Buffer.from(text, 'latin1').toString('utf8');
     if (fixed && !/\uFFFD/.test(fixed)) return fixed;
-  } catch (_) {}
+  } catch {
+    // ignore invalid mojibake conversion
+  }
   return text;
 }
 

@@ -155,11 +155,11 @@ const TeacherDashboard = ({ onNavigate }) => {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Không hủy được buổi học');
-      }
+    }
       cancelSchedule(s._id || s.id, noShowReason);
       toast.success('Đã ghi nhận nghỉ buổi học');
-      setPendingAttendanceSchedule(null);
-      setNoShowReason('');
+    setPendingAttendanceSchedule(null);
+    setNoShowReason('');
     } catch (e) {
       toast.error(e?.message || 'Lỗi khi ghi nhận nghỉ. Vui lòng thử lại.');
     }
@@ -225,13 +225,13 @@ const TeacherDashboard = ({ onNavigate }) => {
   // Auto-select first student if none selected OR from URL params (Notifications)
   useEffect(() => {
     const params = new URLSearchParams(hashQuery);
-    const studentId = params.get('studentId');
-    if (studentId) {
-      const match = students.find((s) => String(s._id || s.id) === String(studentId));
-      const key = match?._enrollmentKey || studentId;
-      if (key && String(selectedEnrollmentKey) !== String(key)) {
-        setSelectedEnrollmentKey(key);
-        return;
+      const studentId = params.get('studentId');
+      if (studentId) {
+        const match = students.find((s) => String(s._id || s.id) === String(studentId));
+        const key = match?._enrollmentKey || studentId;
+        if (key && String(selectedEnrollmentKey) !== String(key)) {
+          setSelectedEnrollmentKey(key);
+          return;
       }
     }
 

@@ -64,8 +64,8 @@ test('A->B message not readable by C', async (t) => {
   }
 
   const studentA = ids.students[0]._id;
-  const staffB = ids.admins[2]._id;
-  const staffC = ids.admins[3]._id;
+  const staffB = ids.admins[1]._id;
+  const staffC = ids.admins[2]._id;
 
   const tokA = generateTestToken({ id: studentA, role: 'student', name: 'HV-A' });
   const tokB = generateTestToken({ id: staffB, role: 'staff', adminRole: 'STAFF', name: 'Staff-B' });

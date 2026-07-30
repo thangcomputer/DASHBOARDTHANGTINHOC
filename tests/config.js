@@ -23,8 +23,8 @@ function generateTestToken(payload, audience = 'public') {
 // ── Định nghĩa các tài khoản test ─────────────────────────────────────────
 // Sẽ được seed vào DB bởi seed_test_accounts.js
 const TEST_ACCOUNTS = {
-  // 10 Học viên
-  students: Array.from({ length: 10 }, (_, i) => ({
+  // 20 Học viên
+  students: Array.from({ length: 20 }, (_, i) => ({
     name:     `HỌC VIÊN TEST ${String(i + 1).padStart(2, '0')}`,
     phone:    `09000000${String(i + 10).padStart(2, '0')}`,
     zalo:     `09000000${String(i + 10).padStart(2, '0')}`,
@@ -48,8 +48,8 @@ const TEST_ACCOUNTS = {
     role:      'teacher',
   })),
 
-  // 5 Admin chi nhánh
-  admins: Array.from({ length: 5 }, (_, i) => ({
+  // 3 Admin chi nhánh (staff)
+  admins: Array.from({ length: 3 }, (_, i) => ({
     name:        `ADMIN CHI NHÁNH TEST ${String(i + 1).padStart(2, '0')}`,
     phone:       `09200000${String(i + 10).padStart(2, '0')}`,
     password:    'Test@123',

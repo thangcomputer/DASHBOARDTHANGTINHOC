@@ -178,11 +178,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     const isLocalStatusValid = String(session?.status).toLowerCase();
     if (isRefetching || (!currentTeacher && isLocalStatusValid)) return;
 
-    const sessionStatus = String(session?.status || '').toLowerCase();
-    // Phiên pending/locked: ưu tiên session (tránh DataContext trả GV khác/active → redirect loop)
-    const status = (sessionStatus === 'pending' || sessionStatus === 'locked')
-      ? sessionStatus
-      : String(currentTeacher?.status || session?.status || '').toLowerCase();
+    const status = String(currentTeacher?.status || session?.status || '').toLowerCase();
     if (!status) return;
 
     const path = location.pathname || '';

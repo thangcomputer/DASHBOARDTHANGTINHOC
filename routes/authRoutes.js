@@ -301,7 +301,12 @@ router.get('/captcha', captchaLimiter, (req, res) => {
   });
   const cid = `c_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   captchaStore.set(cid, { text: captcha.text.toLowerCase(), expiresAt: Date.now() + CAPTCHA_TTL });
-  res.json({ success: true, cid, svg: captcha.data });
+  const payload = { success: true, cid, svg: captcha.data };
+  const allowCaptchaHint = process.env.NODE_ENV !== 'production';
+  if (allowCaptchaHint) {
+    payload.answer = captcha.text;
+  }
+  res.json(payload);
 });
 
 // ─── POST /api/auth/captcha/verify  — Xác thực CAPTCHA (nội bộ) ───────────────
