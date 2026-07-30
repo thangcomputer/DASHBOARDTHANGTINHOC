@@ -1,13 +1,13 @@
 /**
- * Floating messenger — Facebook-style:
- * - Panel "Hỗ trợ đang online" mặc định
- * - Nhiều cửa sổ chat (tab) góc dưới phải, tối đa 3
- * - Chat tại chỗ (không điều hướng Inbox) + gửi ảnh/file
+ * Chat nổi kiểu Messenger:
+ * - Panel "Hỗ trợ online" (danh bạ) tách khỏi cửa sổ chat
+ * - Mỗi người = 1 chat-head tròn; bấm head → mở cửa sổ, người trước thu thành head
+ * - Gửi text / link / ảnh (không thay Inbox)
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle, Maximize2,
-  ImagePlus, Paperclip, FileText, Loader2,
+  Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
+  ImagePlus, Link2, Loader2,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
@@ -20,6 +20,7 @@ import { useToast } from '../utils/toast';
 
 const ROLE_LABEL = { admin: 'Admin', staff: 'NV', teacher: 'GV', student: 'HV' };
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i;
+const URL_RE = /(https?:\/\/[^\s<]+[^.,;:!?\s<])/gi;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 function isSupportPresence(u) {
@@ -34,6 +35,34 @@ function isImageMessage(m) {
     return true;
   }
   return false;
+}
+
+function TextWithLinks({ text, mine }) {
+  const raw = String(text || '');
+  const nodes = [];
+  let last = 0;
+  let match;
+  const re = new RegExp(URL_RE.source, 'gi');
+  // eslint-disable-next-line no-cond-assign
+  while ((match = re.exec(raw)) !== null) {
+    if (match.index > last) nodes.push(raw.slice(last, match.index));
+    const url = match[0];
+    nodes.push(
+      <a
+        key={`${match.index}-${url}`}
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className={mine ? 'cms-fm-link is-mine' : 'cms-fm-link'}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>,
+    );
+    last = match.index + url.length;
+  }
+  if (last < raw.length) nodes.push(raw.slice(last));
+  return <>{nodes.length ? nodes : raw}</>;
 }
 
 function MessageBubble({ m, mine }) {
@@ -56,7 +85,9 @@ function MessageBubble({ m, mine }) {
           />
         </a>
         {m.content && m.content !== '[Hình ảnh]' && (
-          <p className="mt-1.5 whitespace-pre-wrap break-words px-0.5">{m.content}</p>
+          <p className="mt-1.5 whitespace-pre-wrap break-words px-0.5">
+            <TextWithLinks text={m.content} mine={mine} />
+          </p>
         )}
       </div>
     );
@@ -71,7 +102,6 @@ function MessageBubble({ m, mine }) {
           rel="noreferrer"
           className={`cms-fm-file ${mine ? 'is-mine' : ''}`}
         >
-          <FileText size={16} className="shrink-0" />
           <span className="truncate">{m.fileName || 'Tệp đính kèm'}</span>
         </a>
       </div>
@@ -80,29 +110,63 @@ function MessageBubble({ m, mine }) {
 
   return (
     <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
-      <p className="whitespace-pre-wrap break-words">{m.content}</p>
+      <p className="whitespace-pre-wrap break-words">
+        <TextWithLinks text={m.content} mine={mine} />
+      </p>
+    </div>
+  );
+}
+
+function ChatHead({ tab, unread = 0, onOpen, onClose }) {
+  return (
+    <div className="cms-fm-head-wrap">
+      <button
+        type="button"
+        onClick={() => onOpen(tab.id)}
+        className="cms-fm-head"
+        title={tab.user.name}
+        aria-label={`Mở chat với ${tab.user.name}`}
+      >
+        <img
+          src={resolveAvatarUrl({ avatar: tab.user.avatar, role: tab.user.role, name: tab.user.name })}
+          alt=""
+          className="cms-fm-head__avatar"
+        />
+        {unread > 0 ? (
+          <span className="cms-fm-head__badge">{unread > 99 ? '99+' : unread}</span>
+        ) : (
+          <span className="cms-fm-head__online" />
+        )}
+      </button>
+      <button
+        type="button"
+        className="cms-fm-head__close"
+        onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
+        aria-label={`Đóng chat ${tab.user.name}`}
+        title="Đóng"
+      >
+        <X size={10} />
+      </button>
     </div>
   );
 }
 
 function ChatWindow({
-  tab, active, meId, meName, meRole, messages, unread = 0,
-  onClose, onMinimize, onFocus, onSend, onSendFile,
+  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendLink,
 }) {
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const imageRef = useRef(null);
-  const fileRef = useRef(null);
 
   useEffect(() => {
-    if (!tab.minimized) endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, tab.minimized, active]);
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length, tab.id]);
 
   useEffect(() => {
-    if (!tab.minimized && active) inputRef.current?.focus();
-  }, [tab.minimized, active, tab.id]);
+    inputRef.current?.focus();
+  }, [tab.id]);
 
   const submit = (e) => {
     e?.preventDefault?.();
@@ -112,7 +176,7 @@ function ChatWindow({
     setText('');
   };
 
-  const pickFile = async (e) => {
+  const pickImage = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || uploading) return;
@@ -124,37 +188,17 @@ function ChatWindow({
     }
   };
 
-  if (tab.minimized) {
-    return (
-      <button
-        type="button"
-        onClick={() => onFocus(tab.id)}
-        className="cms-fm-pill"
-        title={tab.user.name}
-      >
-        <span className="relative shrink-0">
-          <img
-            src={resolveAvatarUrl({ avatar: tab.user.avatar, role: tab.user.role, name: tab.user.name })}
-            alt=""
-            className="w-9 h-9 rounded-full object-cover"
-          />
-          {unread > 0 ? (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white">
-              {unread > 99 ? '99+' : unread}
-            </span>
-          ) : (
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-          )}
-        </span>
-        <span className="text-xs font-bold text-slate-800 truncate max-w-[7rem]">{tab.user.name}</span>
-        <Maximize2 size={12} className="text-slate-400 shrink-0" />
-      </button>
-    );
-  }
+  const insertLink = () => {
+    const url = window.prompt('Dán link (https://…)');
+    if (!url?.trim()) return;
+    let link = url.trim();
+    if (!/^https?:\/\//i.test(link)) link = `https://${link}`;
+    onSendLink(tab, link);
+  };
 
   return (
-    <div className={`cms-fm-window ${active ? 'is-active' : ''}`}>
-      <div className="cms-fm-window__head" onClick={() => onFocus(tab.id)} role="presentation">
+    <div className="cms-fm-window is-active">
+      <div className="cms-fm-window__head">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="relative shrink-0">
             <img
@@ -172,10 +216,10 @@ function ChatWindow({
           </div>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
-          <button type="button" className="cms-fm-icon-btn" onClick={(e) => { e.stopPropagation(); onMinimize(tab.id); }} aria-label="Thu nhỏ">
+          <button type="button" className="cms-fm-icon-btn" onClick={() => onMinimize(tab.id)} aria-label="Thu nhỏ thành biểu tượng">
             <Minus size={14} />
           </button>
-          <button type="button" className="cms-fm-icon-btn" onClick={(e) => { e.stopPropagation(); onClose(tab.id); }} aria-label="Đóng">
+          <button type="button" className="cms-fm-icon-btn" onClick={() => onClose(tab.id)} aria-label="Đóng chat">
             <X size={14} />
           </button>
         </div>
@@ -184,7 +228,7 @@ function ChatWindow({
       <div className="cms-fm-window__body">
         {messages.length === 0 ? (
           <p className="text-center text-[12px] text-slate-400 py-8 px-3 font-medium">
-            Bắt đầu trò chuyện với {tab.user.name}. Không cần kết bạn.
+            Chat với {tab.user.name}. Có thể gửi ảnh hoặc dán link.
           </p>
         ) : (
           messages.map((m) => {
@@ -200,14 +244,7 @@ function ChatWindow({
       </div>
 
       <form className="cms-fm-window__foot" onSubmit={submit}>
-        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickFile} />
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt,image/*"
-          className="hidden"
-          onChange={pickFile}
-        />
+        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
         <button
           type="button"
           className="cms-fm-attach"
@@ -222,17 +259,17 @@ function ChatWindow({
           type="button"
           className="cms-fm-attach"
           disabled={uploading}
-          onClick={() => fileRef.current?.click()}
-          title="Gửi file"
-          aria-label="Gửi file"
+          onClick={insertLink}
+          title="Gửi link"
+          aria-label="Gửi link"
         >
-          <Paperclip size={16} />
+          <Link2 size={16} />
         </button>
         <input
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={uploading ? 'Đang tải file…' : 'Nhập tin nhắn...'}
+          placeholder={uploading ? 'Đang tải ảnh…' : 'Aa'}
           disabled={uploading}
           className="cms-fm-input"
         />
@@ -252,7 +289,7 @@ export default function FloatingMessenger({ session, role }) {
   const { sendMessage, getMessages, getConversations, markMessagesRead } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
-    openChat, closeChat, toggleMinimize, focusChat,
+    openChat, closeChat, minimizeChat, focusChat,
   } = useFloatingMessenger();
 
   const meId = String(session?.id || session?._id || '');
@@ -304,13 +341,17 @@ export default function FloatingMessenger({ session, role }) {
     return list;
   }, [onlineUsers, meId]);
 
-  // Tin đến → toast + mở cửa sổ chat nổi (không vào Inbox)
+  const openWindow = tabs.find((t) => !t.minimized) || null;
+  const heads = tabs.filter((t) => t.minimized);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
+  // Tin đến → chat-head + badge (không cướp cửa sổ đang mở); tách khỏi Inbox
   useEffect(() => {
     if (!onMessageReceive || !meId || isInbox) return undefined;
     return onMessageReceive((data) => {
       if (!data) return;
       if (String(data.senderId) === meId) return;
-      // Admin mailbox: staff nhận tin gửi tới 'admin'
       const forMe = String(data.receiverId) === meId
         || (meRole === 'admin' && String(data.receiverId) === 'admin');
       if (!forMe && !data.isGroup) return;
@@ -319,8 +360,17 @@ export default function FloatingMessenger({ session, role }) {
         id: String(data.senderId),
         name: data.senderName || 'Người dùng',
         role: normalizeChatRole(data.senderRole || 'student'),
+        avatar: data.senderAvatar || '',
       };
-      openChat(peer);
+
+      const current = tabsRef.current;
+      const alreadyThis = current.some((t) => (
+        !t.minimized
+        && t.user.id === peer.id
+        && normalizeChatRole(t.user.role) === peer.role
+      ));
+      // Đang xem đúng người → giữ cửa sổ; ngược lại chỉ hiện head tròn
+      openChat(peer, { expand: alreadyThis });
 
       const preview = data.messageType === 'image'
         ? 'Đã gửi một hình ảnh'
@@ -331,15 +381,12 @@ export default function FloatingMessenger({ session, role }) {
     });
   }, [onMessageReceive, meId, meRole, isInbox, openChat, toast]);
 
-  // Đánh dấu đã đọc khi đang xem cửa sổ chat (không thu nhỏ)
   useEffect(() => {
     if (!meId || !activeTabId) return;
     const tab = tabs.find((t) => t.id === activeTabId);
     if (!tab || tab.minimized) return;
     const unread = conversations.find((c) => c.id === activeTabId)?.unread || 0;
-    if (unread > 0) {
-      markMessagesRead?.(activeTabId, meId);
-    }
+    if (unread > 0) markMessagesRead?.(activeTabId, meId);
   }, [activeTabId, tabs, conversations, meId, markMessagesRead]);
 
   if (isInbox || !meId) return null;
@@ -359,16 +406,23 @@ export default function FloatingMessenger({ session, role }) {
     });
   };
 
+  const handleSendLink = async (tab, link) => {
+    await handleSend(tab, link);
+  };
+
   const handleSendFile = async (tab, file) => {
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Chỉ gửi ảnh tại chat nổi. File khác dùng Inbox.');
+      return;
+    }
     if (file.size > MAX_FILE_BYTES) {
-      toast.error('File quá lớn (tối đa 5MB)');
+      toast.error('Ảnh quá lớn (tối đa 5MB)');
       return;
     }
     try {
       const uploadRes = await messagesAPI.uploadMessageFile(file);
       if (!uploadRes?.success) throw new Error(uploadRes?.message || 'Upload thất bại');
-      const isImage = file.type.startsWith('image/');
       await sendMessage({
         conversationId: tab.id,
         senderId: meId,
@@ -377,14 +431,14 @@ export default function FloatingMessenger({ session, role }) {
         receiverId: tab.user.id,
         receiverName: tab.user.name,
         receiverRole: tab.user.role,
-        content: isImage ? '[Hình ảnh]' : `Đã gửi tệp: ${file.name}`,
-        messageType: isImage ? 'image' : 'file',
+        content: '[Hình ảnh]',
+        messageType: 'image',
         fileUrl: uploadRes.url,
         fileName: file.name,
         isGroup: false,
       });
     } catch (err) {
-      toast.error(err.message || 'Gửi file thất bại');
+      toast.error(err.message || 'Gửi ảnh thất bại');
     }
   };
 
@@ -398,31 +452,25 @@ export default function FloatingMessenger({ session, role }) {
 
   return (
     <div className="cms-fm-root" aria-live="polite">
-      <div className="cms-fm-chats">
-        {[...tabs].reverse().map((tab) => {
-          const peerKey = `${normalizeChatRole(tab.user.role)}_${tab.user.id}`;
-          const tabUnread = unreadByPeer.get(peerKey) || 0;
-          return (
-            <ChatWindow
-              key={tab.id}
-              tab={tab}
-              active={activeTabId === tab.id}
-              meId={meId}
-              meName={meName}
-              meRole={meRole}
-              messages={getMessages(tab.id) || []}
-              unread={tabUnread}
-              onClose={closeChat}
-              onMinimize={toggleMinimize}
-              onFocus={handleFocus}
-              onSend={handleSend}
-              onSendFile={handleSendFile}
-            />
-          );
-        })}
-      </div>
+      {/* Cửa sổ chat đang mở (tối đa 1) */}
+      {openWindow && (
+        <div className="cms-fm-stage">
+          <ChatWindow
+            key={openWindow.id}
+            tab={openWindow}
+            meId={meId}
+            messages={getMessages(openWindow.id) || []}
+            onClose={closeChat}
+            onMinimize={minimizeChat}
+            onSend={handleSend}
+            onSendFile={handleSendFile}
+            onSendLink={handleSendLink}
+          />
+        </div>
+      )}
 
       <div className="cms-fm-dock">
+        {/* Panel danh bạ hỗ trợ — tách riêng khỏi cửa sổ chat */}
         {supportOpen ? (
           <div className="cms-fm-support">
             <div className="cms-fm-support__head">
@@ -435,20 +483,19 @@ export default function FloatingMessenger({ session, role }) {
                   )}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                  Bấm để chat ngay — không cần kết bạn
+                  Chọn người để chat — Inbox vẫn dùng riêng cho tin nhắn đầy đủ
                 </p>
               </div>
               <button
                 type="button"
                 className="cms-fm-icon-btn"
                 onClick={() => setSupportOpen(false)}
-                aria-label="Thu gọn hỗ trợ"
+                aria-label="Đóng danh bạ hỗ trợ"
               >
                 <X size={14} />
               </button>
             </div>
             <div className="cms-fm-support__body">
-              {/* Hội thoại chưa đọc (kể cả người offline) */}
               {conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup).length > 0 && (
                 <div className="px-2 pb-2 mb-1 border-b border-slate-50">
                   <p className="text-[10px] font-black uppercase tracking-wide text-red-500 px-1 mb-1">
@@ -463,7 +510,7 @@ export default function FloatingMessenger({ session, role }) {
                           <button
                             type="button"
                             onClick={() => {
-                              openChat(c.user);
+                              openChat(c.user, { expand: true });
                               markMessagesRead?.(c.id, meId);
                             }}
                             className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-red-50 text-left transition-colors"
@@ -502,7 +549,7 @@ export default function FloatingMessenger({ session, role }) {
                       <li key={`${p.role}_${p.id}`}>
                         <button
                           type="button"
-                          onClick={() => openChat(p)}
+                          onClick={() => openChat(p, { expand: true })}
                           className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-slate-50 text-left transition-colors group"
                         >
                           <span className="relative shrink-0">
@@ -535,34 +582,33 @@ export default function FloatingMessenger({ session, role }) {
                 </ul>
               )}
             </div>
-            {tabs.length > 0 && (
-              <div className="cms-fm-support__tabs">
-                <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 px-1 mb-1">
-                  Đang chat ({tabs.length})
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {tabs.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => handleFocus(t.id)}
-                      className={`cms-fm-tab-chip ${activeTabId === t.id ? 'is-active' : ''}`}
-                    >
-                      {t.user.name.split(' ').slice(-1)[0] || t.user.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         ) : null}
+
+        {/* Chat-heads: mỗi người 1 vòng tròn */}
+        {heads.length > 0 && (
+          <div className="cms-fm-heads">
+            {heads.map((tab) => {
+              const peerKey = `${normalizeChatRole(tab.user.role)}_${tab.user.id}`;
+              return (
+                <ChatHead
+                  key={tab.id}
+                  tab={tab}
+                  unread={unreadByPeer.get(peerKey) || 0}
+                  onOpen={handleFocus}
+                  onClose={closeChat}
+                />
+              );
+            })}
+          </div>
+        )}
 
         <button
           type="button"
           onClick={() => setSupportOpen((v) => !v)}
           className="cms-fm-fab"
-          title={supportOpen ? 'Thu gọn hỗ trợ' : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : 'Mở hỗ trợ online')}
-          aria-label={supportOpen ? 'Thu gọn hỗ trợ' : 'Mở hỗ trợ online'}
+          title={supportOpen ? 'Đóng danh bạ hỗ trợ' : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : 'Hỗ trợ online')}
+          aria-label={supportOpen ? 'Đóng danh bạ hỗ trợ' : 'Mở danh bạ hỗ trợ'}
           aria-expanded={supportOpen}
         >
           {supportOpen ? <X size={22} /> : <MessageSquare size={22} />}

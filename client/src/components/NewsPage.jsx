@@ -1,8 +1,9 @@
 /**
  * Tin tức trung tâm — danh sách Card + chi tiết + soạn bài (manage_blog).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import {
   Newspaper, Search, Plus, Loader2, Eye, Calendar, User, ChevronLeft,
   ImagePlus, Paperclip, Send, Save, EyeOff, Trash2, RefreshCw, X, FileText,
@@ -11,6 +12,7 @@ import { resolveMediaUrl, blogAPI } from '../services/api';
 import { useToast } from '../utils/toast';
 import { useSocket } from '../context/SocketContext';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
+import NewsRichEditor from './NewsRichEditor';
 
 function formatDate(iso) {
   if (!iso) return '';
@@ -83,67 +85,114 @@ function NewsCard({ post, basePath, onOpen }) {
   );
 }
 
-function htmlToPlain(html) {
-  return String(html || '')
-    .replace(/<\/p>\s*<p>/gi, '\n\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/?p[^>]*>/gi, '')
+/** Sanitize + gắn token media trong HTML nội dung bài (nội bộ, không SEO) */
+function resolveContentHtml(html) {
+  const resolved = String(html || '').replace(
+    /(<img\b[^>]*\bsrc=["'])([^"']+)(["'])/gi,
+    (_, pre, src, post) => `${pre}${resolveMediaUrl(src)}${post}`,
+  );
+  return DOMPurify.sanitize(resolved, {
+    ADD_ATTR: ['target', 'style'],
+    ADD_TAGS: ['h2', 'h3', 'blockquote'],
+  });
+}
+
+function isHtmlEmpty(html) {
+  const text = String(html || '')
+    .replace(/<img\b[^>]*>/gi, 'img')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
     .trim();
+  return !text;
+}
+
+function wordCountFromHtml(html) {
+  const text = String(html || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return 0;
+  return text.split(/\s+/).length;
 }
 
 function EditorForm({ initial, onSaved, onCancel }) {
   const toast = useToast();
+  const editorRef = useRef(null);
+  const coverRef = useRef(null);
+  const inlineImgRef = useRef(null);
   const fileRef = useRef(null);
-  const seededIdRef = useRef(null);
-  const [title, setTitle] = useState('');
-  const [excerpt, setExcerpt] = useState('');
-  const [content, setContent] = useState('');
-  const [thumbnailUrl, setThumbnailUrl] = useState('');
-  const [attachments, setAttachments] = useState([]);
+
+  const [title, setTitle] = useState(() => initial?.title || '');
+  const [excerpt, setExcerpt] = useState(() => initial?.excerpt || '');
+  const [contentHtml, setContentHtml] = useState(() => initial?.contentHtml || '');
+  const [thumbnailUrl, setThumbnailUrl] = useState(() => initial?.thumbnailUrl || '');
+  const [attachments, setAttachments] = useState(() => (
+    Array.isArray(initial?.attachments) ? initial.attachments : []
+  ));
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(false);
 
-  // Nạp dữ liệu khi mở sửa (async) — tránh form trống dù title header đã có id
-  useEffect(() => {
-    const id = initial?.id || null;
-    if (id && seededIdRef.current === id) return;
-    seededIdRef.current = id;
-    setTitle(initial?.title || '');
-    setExcerpt(initial?.excerpt || '');
-    setContent(htmlToPlain(initial?.contentHtml || ''));
-    setThumbnailUrl(initial?.thumbnailUrl || '');
-    setAttachments(Array.isArray(initial?.attachments) ? initial.attachments : []);
-  }, [initial]);
+  const words = useMemo(() => wordCountFromHtml(contentHtml), [contentHtml]);
+  const readMins = Math.max(1, Math.ceil(words / 200));
 
-  const toHtml = (text) => {
-    const escaped = String(text || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    return escaped
-      .split(/\n{2,}/)
-      .map((p) => `<p>${p.replace(/\n/g, '<br/>')}</p>`)
-      .join('');
+  const uploadRaw = async (files) => {
+    const list = Array.isArray(files) ? files : Array.from(files || []);
+    if (!list.length) throw new Error('Không có file để tải lên');
+    const res = await blogAPI.upload(list);
+    if (!res?.success) throw new Error(res?.message || 'Upload lỗi');
+    const items = res.data || [];
+    if (!items.length) throw new Error('Server không nhận được file');
+    return items;
   };
 
-  const uploadFiles = async (files) => {
-    if (!files?.length) return;
+  const onCoverPick = async (e) => {
+    const list = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!list.length) return;
     setBusy(true);
     try {
-      const res = await blogAPI.upload([...files]);
-      if (!res.success) throw new Error(res.message || 'Upload lỗi');
-      const items = res.data || [];
+      const items = await uploadRaw(list.slice(0, 1));
+      const img = items.find((i) => i.kind === 'image') || items[0];
+      if (!img?.url) throw new Error('File không hợp lệ cho ảnh bìa');
+      setThumbnailUrl(img.url);
+      toast.success('Đã đặt ảnh bìa');
+    } catch (err) {
+      toast.error(err.message || 'Upload ảnh bìa thất bại');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onInlineImagePick = async (e) => {
+    const list = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!list.length) return;
+    setBusy(true);
+    try {
+      const items = await uploadRaw(list);
       const imgs = items.filter((i) => i.kind === 'image');
-      if (imgs[0] && !thumbnailUrl) setThumbnailUrl(imgs[0].url);
+      if (!imgs.length) throw new Error('Chỉ hỗ trợ ảnh để chèn vào bài');
+      imgs.forEach((img) => editorRef.current?.insertImage(img.url, img.name || ''));
+      toast.success(`Đã chèn ${imgs.length} ảnh vào bài`);
+    } catch (err) {
+      toast.error(err.message || 'Chèn ảnh thất bại');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onAttachPick = async (e) => {
+    const list = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!list.length) return;
+    setBusy(true);
+    try {
+      const items = await uploadRaw(list);
       setAttachments((prev) => [...prev, ...items]);
-      toast.success(`Đã tải ${items.length} file`);
-    } catch (e) {
-      toast.error(e.message || 'Upload thất bại');
+      toast.success(`Đã đính kèm ${items.length} tệp`);
+    } catch (err) {
+      toast.error(err.message || 'Đính kèm thất bại');
     } finally {
       setBusy(false);
     }
@@ -154,12 +203,17 @@ function EditorForm({ initial, onSaved, onCancel }) {
       toast.error('Nhập tiêu đề');
       return;
     }
+    const html = editorRef.current?.getHtml?.() || contentHtml;
+    if (isHtmlEmpty(html) && status === 'published') {
+      toast.error('Bài đăng cần có nội dung');
+      return;
+    }
     setBusy(true);
     try {
       const payload = {
         title: title.trim(),
         excerpt: excerpt.trim(),
-        contentHtml: toHtml(content),
+        contentHtml: html,
         thumbnailUrl,
         attachments,
         status,
@@ -168,7 +222,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
       if (initial?.id) res = await blogAPI.update(initial.id, payload);
       else res = await blogAPI.create(payload);
       if (!res.success) throw new Error(res.message || 'Lưu thất bại');
-      toast.success(status === 'published' ? 'Đã đăng bài' : 'Đã lưu');
+      toast.success(status === 'published' ? 'Đã đăng bài' : 'Đã lưu nháp');
       onSaved?.(res.data);
     } catch (e) {
       toast.error(e.message || 'Lỗi lưu bài');
@@ -179,85 +233,160 @@ function EditorForm({ initial, onSaved, onCancel }) {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-lg font-black text-slate-900">{initial?.id ? 'Sửa bài viết' : 'Soạn bài mới'}</h2>
-        <button type="button" onClick={onCancel} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400">
-          <X size={18} />
-        </button>
-      </div>
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Tiêu đề bài viết"
-        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-base font-bold outline-none focus:border-red-300"
-      />
-      <textarea
-        value={excerpt}
-        onChange={(e) => setExcerpt(e.target.value)}
-        placeholder="Mô tả ngắn (hiện trên card)"
-        rows={2}
-        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-300 resize-y"
-      />
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Nội dung bài viết…"
-        rows={12}
-        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-300 resize-y leading-relaxed"
-      />
-
-      {thumbnailUrl && (
-        <div className="relative w-full max-w-sm aspect-video rounded-xl overflow-hidden bg-slate-100">
-          <img src={resolveMediaUrl(thumbnailUrl)} alt="" className="w-full h-full object-cover" />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h2 className="text-lg font-black text-slate-900">{initial?.id ? 'Sửa bài viết' : 'Soạn bài mới'}</h2>
+          <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+            Tin nội bộ · {words} từ · ~{readMins} phút đọc
+            {initial?.status ? ` · ${statusLabel(initial.status)}` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setThumbnailUrl('')}
-            className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white"
+            onClick={() => setPreview((v) => !v)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${preview ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
           >
-            <X size={14} />
+            <span className="inline-flex items-center gap-1"><Eye size={13} /> {preview ? 'Soạn thảo' : 'Xem trước'}</span>
+          </button>
+          <button type="button" onClick={onCancel} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400">
+            <X size={18} />
           </button>
         </div>
-      )}
+      </div>
 
-      {attachments.length > 0 && (
-        <ul className="space-y-1.5">
-          {attachments.map((a, i) => (
-            <li key={`${a.url}-${i}`} className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
-              <FileText size={14} className="text-slate-400 shrink-0" />
-              <span className="truncate flex-1">{a.name || a.url}</span>
-              <span className="text-[10px] uppercase font-bold text-slate-400">{a.kind}</span>
+      {preview ? (
+        <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 sm:p-6 space-y-4">
+          {thumbnailUrl && (
+            <div className="rounded-xl overflow-hidden aspect-[21/9] bg-slate-100">
+              <img src={resolveMediaUrl(thumbnailUrl)} alt="" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <h1 className="text-2xl font-black text-slate-900">{title || 'Chưa có tiêu đề'}</h1>
+          {excerpt && (
+            <p className="text-base text-slate-600 font-medium border-l-4 border-red-500 pl-4">{excerpt}</p>
+          )}
+          <div
+            className="prose prose-slate max-w-none text-slate-800 text-[15px] leading-relaxed
+              [&_h2]:text-xl [&_h2]:font-black [&_h3]:text-lg [&_h3]:font-bold
+              [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
+              [&_img]:rounded-xl [&_img]:max-w-full [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3"
+            dangerouslySetInnerHTML={{ __html: resolveContentHtml(contentHtml) }}
+          />
+        </div>
+      ) : (
+        <>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Tiêu đề bài viết"
+            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-base font-bold outline-none focus:border-red-300"
+          />
+          <textarea
+            value={excerpt}
+            onChange={(e) => setExcerpt(e.target.value)}
+            placeholder="Mô tả ngắn (hiện trên card danh sách)"
+            rows={2}
+            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-300 resize-y"
+          />
+
+          <div className="space-y-2">
+            <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Ảnh bìa (card / đầu bài)</p>
+            {thumbnailUrl ? (
+              <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden bg-slate-100">
+                <img src={resolveMediaUrl(thumbnailUrl)} alt="" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setThumbnailUrl('')}
+                  className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                className="text-red-500 hover:underline"
-                onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                disabled={busy}
+                onClick={() => coverRef.current?.click()}
+                className="w-full max-w-md aspect-video rounded-xl border-2 border-dashed border-slate-200 text-slate-400 text-xs font-bold hover:border-red-300 hover:text-red-500 flex flex-col items-center justify-center gap-2"
               >
-                Xóa
+                <ImagePlus size={22} /> Chọn ảnh bìa
               </button>
-            </li>
-          ))}
-        </ul>
+            )}
+            {thumbnailUrl && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => coverRef.current?.click()}
+                className="text-xs font-bold text-red-600 hover:underline"
+              >
+                Đổi ảnh bìa
+              </button>
+            )}
+            <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={onCoverPick} />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Nội dung</p>
+            <NewsRichEditor
+              ref={editorRef}
+              value={contentHtml}
+              onChange={setContentHtml}
+              disabled={busy}
+              onRequestImage={() => inlineImgRef.current?.click()}
+            />
+            <input ref={inlineImgRef} type="file" accept="image/*" multiple className="hidden" onChange={onInlineImagePick} />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Tệp đính kèm (PDF, Word…)</p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
+                className="text-xs font-bold text-slate-600 hover:text-red-600 inline-flex items-center gap-1"
+              >
+                <Paperclip size={13} /> Thêm tệp
+              </button>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"
+              className="hidden"
+              onChange={onAttachPick}
+            />
+            {attachments.length > 0 ? (
+              <ul className="space-y-1.5">
+                {attachments.map((a, i) => (
+                  <li key={`${a.url}-${i}`} className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
+                    {a.kind === 'image' ? (
+                      <img src={resolveMediaUrl(a.url)} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <FileText size={14} className="text-slate-400 shrink-0" />
+                    )}
+                    <span className="truncate flex-1">{a.name || a.url}</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400">{a.kind}</span>
+                    <button
+                      type="button"
+                      className="text-red-500 hover:underline"
+                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                    >
+                      Xóa
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-slate-400">Không bắt buộc — dùng khi cần tải file, không phải ảnh trong bài.</p>
+            )}
+          </div>
+        </>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"
-          className="hidden"
-          onChange={(e) => {
-            uploadFiles(e.target.files);
-            e.target.value = '';
-          }}
-        />
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => fileRef.current?.click()}
-          className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
-        >
-          <ImagePlus size={14} /> Ảnh / file
-        </button>
+      <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
         <button
           type="button"
           disabled={busy}
@@ -282,6 +411,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
 export default function NewsPage({ session, role = 'admin' }) {
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { slug } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { socket } = useSocket() || {};
@@ -343,14 +473,30 @@ export default function NewsPage({ session, role = 'admin' }) {
     else if (mode === 'edit') {
       setDetail(null);
       if (editId) {
-        setEditing(null);
+        // Chỉ prefill khi đã có contentHtml (từ trang chi tiết). Card manage list thiếu field này.
+        const cached = location.state?.post;
+        if (
+          cached?.id
+          && String(cached.id) === String(editId)
+          && typeof cached.contentHtml === 'string'
+        ) {
+          setEditing(cached);
+        } else {
+          setEditing(null);
+        }
         setLoading(true);
-        blogAPI.get(editId, { manage: true })
+        blogAPI.getManage(editId)
           .then((res) => {
-            if (res.success) setEditing(res.data);
-            else toast.error(res.message || 'Không tải được bài để sửa');
+            if (res?.success && res.data?.id) setEditing(res.data);
+            else {
+              setEditing(null);
+              toast.error(res?.message || 'Không tải được bài để sửa');
+            }
           })
-          .catch(() => toast.error('Lỗi tải bài để sửa'))
+          .catch(() => {
+            setEditing(null);
+            toast.error('Lỗi tải bài để sửa');
+          })
           .finally(() => setLoading(false));
       } else {
         setEditing({});
@@ -361,7 +507,7 @@ export default function NewsPage({ session, role = 'admin' }) {
       setEditing(null);
       loadList(1);
     }
-  }, [slug, mode, editId, loadDetail, loadList, toast]);
+  }, [slug, mode, editId, loadDetail, loadList, toast, location.state]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -375,17 +521,31 @@ export default function NewsPage({ session, role = 'admin' }) {
   const openPost = (post) => navigate(`${base}/${post.slug}`);
 
   if (mode === 'edit' && canManage) {
-    if (editId && (loading || !editing?.id)) {
+    if (editId && loading && !editing?.id) {
       return (
         <div className="cms-viewport-fill flex items-center justify-center text-slate-400">
           <Loader2 className="animate-spin" size={28} />
         </div>
       );
     }
+    if (editId && !loading && !editing?.id) {
+      return (
+        <div className="cms-viewport-fill flex flex-col items-center justify-center gap-3 text-slate-500">
+          <p className="text-sm font-semibold">Không tải được bài viết để sửa</p>
+          <button
+            type="button"
+            onClick={() => navigate(base)}
+            className="px-3 py-2 rounded-xl border text-xs font-bold"
+          >
+            Quay lại
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="cms-viewport-fill w-full space-y-4">
         <EditorForm
-          key={editing?.id || 'new'}
+          key={`${editing?.id || 'new'}:${String(editing?.updatedAt || editing?.contentHtml?.length || 0)}`}
           initial={editing}
           onCancel={() => {
             setSearchParams({});
@@ -445,41 +605,51 @@ export default function NewsPage({ session, role = 'admin' }) {
           )}
           <div
             className="prose prose-slate max-w-none text-slate-800 leading-relaxed text-[15px]
-              [&_p]:mb-3 [&_img]:rounded-xl [&_img]:max-w-full"
-            dangerouslySetInnerHTML={{ __html: detail.contentHtml || '' }}
+              [&_h2]:text-xl [&_h2]:font-black [&_h2]:mt-5 [&_h2]:mb-2
+              [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-1.5
+              [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
+              [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3 [&_blockquote]:italic
+              [&_a]:text-red-600 [&_a]:underline
+              [&_img]:rounded-xl [&_img]:max-w-full [&_img]:my-3"
+            dangerouslySetInnerHTML={{ __html: resolveContentHtml(detail.contentHtml || '') }}
           />
-          {Array.isArray(detail.attachments) && detail.attachments.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-black uppercase tracking-wide text-slate-400">Tệp đính kèm</p>
-              <ul className="space-y-1.5">
-                {detail.attachments.map((a, i) => (
-                  <li key={`${a.url}-${i}`}>
-                    {a.kind === 'image' ? (
-                      <img src={resolveMediaUrl(a.url)} alt={a.name || ''} className="rounded-xl max-h-80 object-contain" />
-                    ) : a.kind === 'video' ? (
-                      // eslint-disable-next-line jsx-a11y/media-has-caption
-                      <video src={resolveMediaUrl(a.url)} controls className="rounded-xl w-full max-h-96 bg-black" />
-                    ) : (
-                      <a
-                        href={resolveMediaUrl(a.url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 text-sm font-bold text-red-600 hover:underline"
-                      >
-                        <Paperclip size={14} /> {a.name || 'Tải file'}
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {(() => {
+            const attachList = (Array.isArray(detail.attachments) ? detail.attachments : [])
+              .filter((a) => a?.url && a.url !== detail.thumbnailUrl);
+            if (!attachList.length) return null;
+            return (
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">Tệp đính kèm</p>
+                <ul className="space-y-1.5">
+                  {attachList.map((a, i) => (
+                    <li key={`${a.url}-${i}`}>
+                      {a.kind === 'image' ? (
+                        <img src={resolveMediaUrl(a.url)} alt={a.name || ''} className="rounded-xl max-h-80 object-contain" />
+                      ) : a.kind === 'video' ? (
+                        // eslint-disable-next-line jsx-a11y/media-has-caption
+                        <video src={resolveMediaUrl(a.url)} controls className="rounded-xl w-full max-h-96 bg-black" />
+                      ) : (
+                        <a
+                          href={resolveMediaUrl(a.url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 text-sm font-bold text-red-600 hover:underline"
+                        >
+                          <Paperclip size={14} /> {a.name || 'Tải file'}
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
           {canManage && (
             <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 className="px-3 py-2 rounded-xl border text-xs font-bold"
-                onClick={() => navigate(`${base}?mode=edit&id=${detail.id}`)}
+                onClick={() => navigate(`${base}?mode=edit&id=${detail.id}`, { state: { post: detail } })}
               >
                 Sửa
               </button>
@@ -640,7 +810,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                 <button
                   type="button"
                   className="text-xs font-bold text-slate-600 hover:text-red-600"
-                  onClick={() => navigate(`${base}?mode=edit&id=${p.id}`)}
+                  onClick={() => navigate(`${base}?mode=edit&id=${p.id}`, { state: { post: p } })}
                 >
                   Sửa
                 </button>

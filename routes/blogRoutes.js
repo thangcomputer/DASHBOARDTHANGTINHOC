@@ -66,11 +66,12 @@ function serializeCard(doc) {
 }
 
 function serializeDetail(doc) {
+  const o = doc.toObject ? doc.toObject() : { ...doc };
   return {
-    ...serializeCard(doc),
-    contentHtml: doc.contentHtml || '',
-    attachments: doc.attachments || [],
-    authorId: doc.authorId,
+    ...serializeCard(o),
+    contentHtml: o.contentHtml || '',
+    attachments: Array.isArray(o.attachments) ? o.attachments : [],
+    authorId: o.authorId,
   };
 }
 
@@ -82,13 +83,13 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-/** Cho phép subset HTML đơn giản từ editor nội bộ */
+/** Cho phép subset HTML từ editor nội bộ (không SEO) */
 function sanitizeHtml(html) {
   let s = String(html || '');
-  // bỏ script/iframe/on*
-  s = s.replace(/<\/?(script|iframe|object|embed|form)[^>]*>/gi, '');
+  s = s.replace(/<\/?(script|iframe|object|embed|form|meta|link|style)[^>]*>/gi, '');
   s = s.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
   s = s.replace(/javascript:/gi, '');
+  s = s.replace(/data:text\/html/gi, '');
   return s.slice(0, 200000);
 }
 
@@ -225,6 +226,17 @@ router.get('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req
   }
 });
 
+/** Chi tiết bài cho editor (đủ contentHtml + attachments) */
+router.get('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
+  try {
+    const doc = await BlogPost.findOne({ _id: req.params.id, deletedAt: null });
+    if (!doc) return res.status(404).json({ success: false, message: 'Không tìm thấy bài' });
+    res.json({ success: true, data: serializeDetail(doc) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.post('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
   try {
     const title = String(req.body.title || '').trim();
@@ -336,25 +348,36 @@ router.delete('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), asy
   }
 });
 
-router.post('/manage/upload', checkPermission(PERMISSIONS.MANAGE_BLOG), upload.array('files', 8), async (req, res) => {
-  try {
-    const files = req.files || [];
-    const items = files.map((f) => {
-      let kind = 'file';
-      if (f.mimetype.startsWith('image/')) kind = 'image';
-      else if (f.mimetype.startsWith('video/')) kind = 'video';
-      return {
-        url: `/uploads/blog/${f.filename}`,
-        name: f.originalname,
-        mime: f.mimetype,
-        size: f.size,
-        kind,
-      };
-    });
-    res.json({ success: true, data: items });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+router.post('/manage/upload', checkPermission(PERMISSIONS.MANAGE_BLOG), (req, res) => {
+  upload.array('files', 8)(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE'
+        ? 'File quá lớn'
+        : (err.message || 'Upload thất bại');
+      return res.status(400).json({ success: false, message: msg });
+    }
+    try {
+      const files = req.files || [];
+      if (!files.length) {
+        return res.status(400).json({ success: false, message: 'Không có file được gửi lên' });
+      }
+      const items = files.map((f) => {
+        let kind = 'file';
+        if (f.mimetype.startsWith('image/')) kind = 'image';
+        else if (f.mimetype.startsWith('video/')) kind = 'video';
+        return {
+          url: `/uploads/blog/${f.filename}`,
+          name: f.originalname,
+          mime: f.mimetype,
+          size: f.size,
+          kind,
+        };
+      });
+      return res.json({ success: true, data: items });
+    } catch (e) {
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  });
 });
 
 async function notifyPublished(io, post) {

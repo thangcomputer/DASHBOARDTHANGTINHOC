@@ -5,20 +5,40 @@ import { buildConversationId, normalizeChatRole } from '../utils/chatConversatio
 
 const FloatingMessengerContext = createContext(null);
 
-const MAX_OPEN_CHATS = 3;
-const STORAGE_KEY = 'cms_floating_messenger_v1';
+/** Số chat-head tối đa (kiểu Messenger) */
+const MAX_OPEN_CHATS = 6;
+const STORAGE_KEY = 'cms_floating_messenger_v2';
+
+function ensureExclusiveExpand(tabs, activeId) {
+  const list = Array.isArray(tabs) ? tabs.slice(0, MAX_OPEN_CHATS) : [];
+  if (!list.length) return list;
+  const openId = activeId && list.some((t) => t.id === activeId)
+    ? activeId
+    : list.find((t) => !t.minimized)?.id || null;
+  return list.map((t) => ({
+    ...t,
+    minimized: !openId || t.id !== openId,
+  }));
+}
 
 function loadPersisted() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { supportOpen: true, tabs: [] };
+    const raw = localStorage.getItem(STORAGE_KEY)
+      || localStorage.getItem('cms_floating_messenger_v1');
+    if (!raw) return { supportOpen: false, tabs: [], activeTabId: null };
     const parsed = JSON.parse(raw);
+    const tabs = Array.isArray(parsed.tabs) ? parsed.tabs.slice(0, MAX_OPEN_CHATS) : [];
+    const activeTabId = parsed.activeTabId
+      || tabs.find((t) => !t.minimized)?.id
+      || null;
     return {
-      supportOpen: parsed.supportOpen !== false,
-      tabs: Array.isArray(parsed.tabs) ? parsed.tabs.slice(0, MAX_OPEN_CHATS) : [],
+      // Mặc định đóng panel hỗ trợ — chat heads độc lập
+      supportOpen: parsed.supportOpen === true,
+      tabs: ensureExclusiveExpand(tabs, activeTabId),
+      activeTabId,
     };
   } catch {
-    return { supportOpen: true, tabs: [] };
+    return { supportOpen: false, tabs: [], activeTabId: null };
   }
 }
 
@@ -26,12 +46,13 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
   const initial = loadPersisted();
   const [supportOpen, setSupportOpen] = useState(initial.supportOpen);
   const [tabs, setTabs] = useState(initial.tabs);
-  const [activeTabId, setActiveTabId] = useState(initial.tabs[0]?.id || null);
+  const [activeTabId, setActiveTabId] = useState(initial.activeTabId);
 
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         supportOpen,
+        activeTabId,
         tabs: tabs.map((t) => ({
           id: t.id,
           user: t.user,
@@ -39,10 +60,15 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
         })),
       }));
     } catch { /* ignore */ }
-  }, [supportOpen, tabs]);
+  }, [supportOpen, tabs, activeTabId]);
 
-  const openChat = useCallback((person) => {
+  /**
+   * @param {object} person
+   * @param {{ expand?: boolean }} [opts] expand=false → chỉ tạo/cập nhật chat-head (tin đến)
+   */
+  const openChat = useCallback((person, opts = {}) => {
     if (!person?.id || !currentUserId) return null;
+    const expand = opts.expand !== false;
     const role = normalizeChatRole(person.role || 'admin');
     const myRole = normalizeChatRole(currentUserRole || 'student');
     const convId = buildConversationId(myRole, currentUserId, role, person.id);
@@ -56,43 +82,66 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
     setTabs((prev) => {
       const existing = prev.find((t) => t.id === convId);
       if (existing) {
-        return prev.map((t) => (t.id === convId ? { ...t, minimized: false, user } : t));
+        if (!expand) {
+          // Giữ nguyên cửa sổ đang mở; chỉ cập nhật avatar/tên
+          return prev.map((t) => (t.id === convId ? { ...t, user } : t));
+        }
+        // Mở hội thoại này → mọi người khác thu thành head tròn
+        return prev.map((t) => (
+          t.id === convId
+            ? { ...t, minimized: false, user }
+            : { ...t, minimized: true }
+        ));
       }
-      const next = [{ id: convId, user, minimized: false }, ...prev];
-      // Facebook-style: giữ tối đa MAX_OPEN_CHATS cửa sổ
-      return next.slice(0, MAX_OPEN_CHATS);
+      const head = { id: convId, user, minimized: !expand };
+      const rest = expand
+        ? prev.map((t) => ({ ...t, minimized: true }))
+        : prev;
+      return [head, ...rest].slice(0, MAX_OPEN_CHATS);
     });
-    setActiveTabId(convId);
-    setSupportOpen(true);
+
+    if (expand) {
+      setActiveTabId(convId);
+      setSupportOpen(false); // tách panel hỗ trợ khỏi cửa sổ chat
+    }
     return convId;
   }, [currentUserId, currentUserRole]);
 
   const closeChat = useCallback((convId) => {
     setTabs((prev) => {
       const next = prev.filter((t) => t.id !== convId);
-      setActiveTabId((cur) => (cur === convId ? (next[0]?.id || null) : cur));
+      setActiveTabId((cur) => {
+        if (cur !== convId) return cur;
+        const open = next.find((t) => !t.minimized);
+        return open?.id || null;
+      });
       return next;
     });
   }, []);
 
-  const toggleMinimize = useCallback((convId) => {
+  /** Thu cửa sổ đang mở thành chat-head */
+  const minimizeChat = useCallback((convId) => {
     setTabs((prev) => prev.map((t) => (
-      t.id === convId ? { ...t, minimized: !t.minimized } : t
+      t.id === convId ? { ...t, minimized: true } : t
     )));
+    setActiveTabId((cur) => (cur === convId ? null : cur));
   }, []);
 
+  /** Click head → mở cửa sổ; người trước đó trở lại head tròn */
   const focusChat = useCallback((convId) => {
     setActiveTabId(convId);
+    setSupportOpen(false);
     setTabs((prev) => prev.map((t) => (
-      t.id === convId ? { ...t, minimized: false } : t
+      t.id === convId
+        ? { ...t, minimized: false }
+        : { ...t, minimized: true }
     )));
   }, []);
 
-  // Event toàn site: window.dispatchEvent(new CustomEvent('cms:open-chat', { detail: { id, name, role } }))
   useEffect(() => {
     const onOpen = (e) => {
       const d = e?.detail;
-      if (d?.id) openChat(d);
+      if (d?.id) openChat(d, { expand: true });
     };
     window.addEventListener('cms:open-chat', onOpen);
     return () => window.removeEventListener('cms:open-chat', onOpen);
@@ -105,9 +154,9 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
     activeTabId,
     openChat,
     closeChat,
-    toggleMinimize,
+    minimizeChat,
     focusChat,
-  }), [supportOpen, tabs, activeTabId, openChat, closeChat, toggleMinimize, focusChat]);
+  }), [supportOpen, tabs, activeTabId, openChat, closeChat, minimizeChat, focusChat]);
 
   return (
     <FloatingMessengerContext.Provider value={value}>
@@ -126,7 +175,7 @@ export function useFloatingMessenger() {
       activeTabId: null,
       openChat: () => null,
       closeChat: () => {},
-      toggleMinimize: () => {},
+      minimizeChat: () => {},
       focusChat: () => {},
     };
   }

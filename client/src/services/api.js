@@ -1783,6 +1783,10 @@ export const blogAPI = {
     const res = await apiFetch(`/blog/posts/${encodeURIComponent(slugOrId)}${qs}`);
     return res.json();
   },
+  getManage: async (id) => {
+    const res = await apiFetch(`/blog/manage/posts/${encodeURIComponent(id)}`);
+    return res.json();
+  },
   manageList: async ({ page = 1, limit = 20, status, q } = {}) => {
     const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (status) qs.set('status', status);

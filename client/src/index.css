@@ -531,7 +531,7 @@
     }
   }
 
-  /* Floating Messenger (Facebook-style) */
+  /* Floating Messenger — chat-heads kiểu Messenger */
   .cms-fm-root {
     position: fixed;
     z-index: 85;
@@ -540,7 +540,7 @@
     display: flex;
     flex-direction: row-reverse;
     align-items: flex-end;
-    gap: 10px;
+    gap: 12px;
     pointer-events: none;
     max-width: calc(100vw - 1rem);
   }
@@ -551,6 +551,65 @@
     flex-direction: column;
     align-items: flex-end;
     gap: 10px;
+  }
+
+  .cms-fm-stage {
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .cms-fm-heads {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cms-fm-head-wrap {
+    position: relative;
+    width: 52px;
+    height: 52px;
+  }
+  .cms-fm-head-wrap:hover .cms-fm-head__close {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .cms-fm-head {
+    @apply relative w-[52px] h-[52px] rounded-full p-0 border-0 bg-transparent cursor-pointer;
+    filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.22));
+    transition: transform 0.15s ease;
+  }
+  .cms-fm-head:hover { transform: scale(1.06); }
+  .cms-fm-head:active { transform: scale(0.96); }
+
+  .cms-fm-head__avatar {
+    @apply w-full h-full rounded-full object-cover ring-[3px] ring-white;
+  }
+  .cms-fm-head__badge {
+    @apply absolute -top-0.5 -right-0.5 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white;
+  }
+  .cms-fm-head__online {
+    @apply absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white;
+  }
+  .cms-fm-head__close {
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    border: 0;
+    background: #0f172a;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    cursor: pointer;
+    z-index: 2;
   }
 
   .cms-fm-fab {
@@ -580,32 +639,9 @@
     scrollbar-width: none;
   }
   .cms-fm-support__body::-webkit-scrollbar { display: none; width: 0; height: 0; }
-  .cms-fm-support__tabs {
-    @apply px-3 py-2 border-t border-slate-100 shrink-0 bg-slate-50/80;
-  }
-
-  .cms-fm-tab-chip {
-    @apply text-[11px] font-bold px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:border-red-200 hover:text-red-600 transition;
-  }
-  .cms-fm-tab-chip.is-active {
-    @apply bg-red-600 text-white border-red-600;
-  }
-
-  .cms-fm-chats {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-end;
-    gap: 10px;
-    max-width: calc(100vw - 5.5rem);
-    overflow-x: auto;
-    overscroll-contain: contain;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .cms-fm-chats::-webkit-scrollbar { display: none; }
 
   .cms-fm-window {
-    width: min(320px, calc(100vw - 1.5rem));
+    width: min(320px, calc(100vw - 5.5rem));
     height: min(420px, calc(100dvh - 6rem));
     @apply bg-white rounded-2xl border border-slate-200 shadow-[0_12px_40px_rgba(15,23,42,0.18)] flex flex-col overflow-hidden shrink-0;
   }
@@ -614,7 +650,7 @@
     border-color: color-mix(in srgb, #dc2626 35%, #e2e8f0);
   }
   .cms-fm-window__head {
-    @apply flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 bg-white cursor-pointer shrink-0;
+    @apply flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 bg-white shrink-0;
   }
   .cms-fm-window__body {
     @apply flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2.5 space-y-1.5 bg-slate-50/60;
@@ -659,9 +695,11 @@
   .cms-fm-bubble.is-mine .cms-fm-file {
     @apply text-white;
   }
-
-  .cms-fm-pill {
-    @apply flex items-center gap-2 h-12 pl-1.5 pr-3 rounded-full bg-white border border-slate-200 shadow-lg hover:border-red-200 transition shrink-0;
+  .cms-fm-link {
+    @apply underline underline-offset-2 break-all font-semibold text-sky-700;
+  }
+  .cms-fm-link.is-mine {
+    @apply text-white;
   }
 
   @media (max-width: 639.98px) {
@@ -670,10 +708,11 @@
       align-items: flex-end;
       gap: 8px;
     }
-    .cms-fm-chats {
-      flex-direction: column;
-      align-items: flex-end;
-      max-width: calc(100vw - 1rem);
+    .cms-fm-heads {
+      flex-direction: row-reverse;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      max-width: calc(100vw - 5rem);
     }
     .cms-fm-window {
       width: min(100vw - 1rem, 360px);
