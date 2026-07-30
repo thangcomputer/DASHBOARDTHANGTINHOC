@@ -2,15 +2,47 @@
  * API-only smoke (CI / khong can Vite).
  * Usage: node scripts/smoke-api.cjs [baseUrl]
  * Default: http://127.0.0.1:5000/api
+ *
+ * Admin/Staff phải đăng nhập cổng nội bộ (CAPTCHA). Smoke mint JWT internal
+ * sau khi xác thực mật khẩu Super Admin (cùng claim với login/internal).
  */
+require('dotenv').config();
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+
 const BASE = (process.argv[2] || process.env.SMOKE_BASE || 'http://127.0.0.1:5000/api').replace(/\/$/, '');
 const ROOT = BASE.replace(/\/api$/, '');
+const ADMIN_PASS = process.env.SMOKE_ADMIN_PASSWORD || process.env.MASTER_ADMIN_PASSWORD || 'admin123';
+
+async function mintSuperInternalToken() {
+  const SystemSettings = require('../models/SystemSettings');
+  const { verifyAdminPassword } = require('../utils/adminPassword');
+  await mongoose.connect(process.env.MONGODB_URI);
+  try {
+    const sys = await SystemSettings.findOne({ _key: 'main' }).select('+adminPasswordHash');
+    const ok = await verifyAdminPassword(ADMIN_PASS, sys);
+    if (!ok) throw new Error('admin password mismatch');
+  } finally {
+    await mongoose.disconnect().catch(() => {});
+  }
+  return jwt.sign(
+    {
+      id: 'admin',
+      role: 'admin',
+      name: 'Super Admin',
+      adminRole: 'SUPER_ADMIN',
+      permissions: [],
+      aud: 'internal',
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '30m' },
+  );
+}
 
 async function main() {
   const results = [];
   const ok = (name, pass, detail = '') => results.push({ name, pass, detail });
 
-  // healthz
   try {
     const r = await fetch(ROOT + '/healthz');
     const j = await r.json();
@@ -32,7 +64,7 @@ async function main() {
     ok('GET /auth/csrf-token', false, e.message);
   }
 
-  let token = '';
+  // Public login với admin phải bị chặn (đúng RBAC cổng)
   try {
     const r = await fetch(BASE + '/auth/login', {
       method: 'POST',
@@ -42,14 +74,24 @@ async function main() {
         ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
       },
-      body: JSON.stringify({ identifier: 'admin', password: process.env.SMOKE_ADMIN_PASSWORD || 'admin123' }),
+      body: JSON.stringify({ identifier: 'admin', password: ADMIN_PASS }),
     });
-    const j = await r.json();
-    token = j.data?.accessToken || '';
-    const loginOk = r.status === 200 && j.success && (!!token || j.mfaRequired || j.data?.mfaRequired);
-    ok('POST /auth/login', loginOk, 'status=' + r.status + (j.mfaRequired ? ' mfa' : ''));
+    const j = await r.json().catch(() => ({}));
+    ok(
+      'POST /auth/login (admin public blocked)',
+      r.status === 403 || j.redirect === '/admin/login',
+      'status=' + r.status,
+    );
   } catch (e) {
-    ok('POST /auth/login', false, e.message);
+    ok('POST /auth/login (admin public blocked)', false, e.message);
+  }
+
+  let token = '';
+  try {
+    token = await mintSuperInternalToken();
+    ok('AUTH mint internal Super Admin', !!token, 'jwt');
+  } catch (e) {
+    ok('AUTH mint internal Super Admin', false, e.message);
   }
 
   const h = {
@@ -61,7 +103,7 @@ async function main() {
 
   async function get(path, name) {
     if (!token) {
-      ok(name || path, true, 'skipped (no token)');
+      ok(name || path, false, 'no token');
       return;
     }
     try {

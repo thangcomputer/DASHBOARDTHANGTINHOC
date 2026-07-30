@@ -1,7 +1,7 @@
 /**
  * Socket.io realtime messaging smoke test.
  *
- * Requires: backend running, MongoDB, seeded test accounts (tests/seed_test_accounts.js)
+ * Requires: backend running, MongoDB, seeded test accounts
  *
  * Env:
  *   API_ORIGIN=http://localhost:5000
@@ -10,32 +10,124 @@
  *   TEACHER_IDENTIFIER=0910000010 TEACHER_PASSWORD=Test@123
  *   STUDENT_IDENTIFIER=0900000010 STUDENT_PASSWORD=Test@123
  */
+require('dotenv').config();
 const path = require('path');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { io } = require(path.join(__dirname, '../client/node_modules/socket.io-client'));
 const { getMessagingRole } = require('../utils/messagingRoles');
 
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:5000';
 const SOCKET_ORIGIN = API_ORIGIN;
 
+const ACCOUNTS = {
+  admin: { identifier: process.env.ADMIN_IDENTIFIER || 'admin', password: process.env.ADMIN_PASSWORD || 'admin123' },
+  staff: { identifier: process.env.STAFF_IDENTIFIER || '0920000010', password: process.env.STAFF_PASSWORD || 'Test@123' },
+  teacher: { identifier: process.env.TEACHER_IDENTIFIER || '0910000010', password: process.env.TEACHER_PASSWORD || 'Test@123', roleHint: 'teacher' },
+  student: { identifier: process.env.STUDENT_IDENTIFIER || '0900000010', password: process.env.STUDENT_PASSWORD || 'Test@123', roleHint: 'student' },
+};
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function login(identifier, password, roleHint) {
-  const res = await axios.post(`${API_ORIGIN}/api/auth/login`, {
-    identifier, password, role: roleHint,
-  }, { timeout: 15_000 });
+async function getCsrf() {
+  const r = await axios.get(`${API_ORIGIN}/api/auth/csrf-token`);
+  const cookie = (r.headers['set-cookie'] || []).map((c) => c.split(';')[0]).join('; ');
+  return { csrf: r.data?.csrfToken || '', cookie };
+}
+
+async function mintInternal(payload) {
+  return jwt.sign({ ...payload, aud: 'internal' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+}
+
+async function ensureSameBranch() {
+  await mongoose.connect(process.env.MONGODB_URI);
+  try {
+    const Branch = require('../models/Branch');
+    const Teacher = require('../models/Teacher');
+    const Student = require('../models/Student');
+    let branch = await Branch.findOne({ code: 'CN1' }).lean();
+    if (!branch) {
+      const created = await Branch.create({ name: 'Chi nhánh QA CN1', code: 'CN1', isActive: true });
+      branch = created.toObject ? created.toObject() : created;
+    }
+    const set = { branchId: branch._id, branchCode: branch.code || 'CN1' };
+    await Teacher.updateMany(
+      { phone: { $in: [ACCOUNTS.staff.identifier, ACCOUNTS.teacher.identifier] } },
+      { $set: set },
+    );
+    await Student.updateMany({ phone: ACCOUNTS.student.identifier }, { $set: set });
+  } finally {
+    await mongoose.disconnect().catch(() => {});
+  }
+}
+
+async function login(key) {
+  const { identifier, password, roleHint } = ACCOUNTS[key];
+
+  if (key === 'admin' || key === 'staff') {
+    await mongoose.connect(process.env.MONGODB_URI);
+    try {
+      if (key === 'admin') {
+        const SystemSettings = require('../models/SystemSettings');
+        const { verifyAdminPassword } = require('../utils/adminPassword');
+        const sys = await SystemSettings.findOne({ _key: 'main' }).select('+adminPasswordHash');
+        if (!(await verifyAdminPassword(password, sys))) throw new Error('admin password mismatch');
+        const accessToken = await mintInternal({
+          id: 'admin', role: 'admin', name: 'Super Admin', adminRole: 'SUPER_ADMIN', permissions: [],
+        });
+        return {
+          key,
+          id: 'admin',
+          role: 'admin',
+          adminRole: 'SUPER_ADMIN',
+          name: 'Super Admin',
+          accessToken,
+          messagingRole: 'admin',
+        };
+      }
+      const Teacher = require('../models/Teacher');
+      const doc = await Teacher.findOne({ phone: identifier }).select('+password name role adminRole');
+      if (!doc?.password || !(await doc.comparePassword(password))) throw new Error(`staff login failed ${identifier}`);
+      const accessToken = await mintInternal({
+        id: String(doc._id),
+        role: 'staff',
+        name: doc.name,
+        adminRole: doc.adminRole || 'STAFF',
+        permissions: [],
+      });
+      return {
+        key,
+        id: String(doc._id),
+        role: 'staff',
+        adminRole: doc.adminRole || 'STAFF',
+        name: doc.name,
+        accessToken,
+        messagingRole: getMessagingRole({ id: doc._id, role: 'staff', adminRole: doc.adminRole }),
+      };
+    } finally {
+      await mongoose.disconnect().catch(() => {});
+    }
+  }
+
+  const { csrf, cookie } = await getCsrf();
+  const res = await axios.post(
+    `${API_ORIGIN}/api/auth/login`,
+    { identifier, password, role: roleHint, force: true },
+    { headers: { 'X-CSRF-Token': csrf, Cookie: cookie }, timeout: 15_000 },
+  );
   if (!res.data?.success) throw new Error(res.data?.message || 'login failed');
   const wrapper = res.data.data || {};
   const data = wrapper.user ? { ...wrapper.user, ...wrapper } : wrapper;
-  const accessToken = wrapper.accessToken || data.accessToken;
   return {
+    key,
     id: String(data.id || data._id),
     role: data.role,
     adminRole: data.adminRole,
     name: data.name,
-    accessToken,
+    accessToken: wrapper.accessToken || data.accessToken,
     messagingRole: getMessagingRole({
       id: data.id || data._id,
       role: data.role,
@@ -67,7 +159,6 @@ function connectSocket(user) {
       reject(err);
     });
 
-    // Wait until we appear in users:online with correct messaging role
     socket.on('users:online', (list) => {
       const found = list.some(
         (u) => String(u.userId) === String(user.id) && String(u.role) === String(user.messagingRole)
@@ -100,6 +191,7 @@ function waitForEvent(socket, event, predicate, timeoutMs = 8_000) {
 }
 
 async function sendMessage(sender, receiver, content) {
+  const { csrf, cookie } = await getCsrf();
   const res = await axios.post(`${API_ORIGIN}/api/messages`, {
     receiverId: receiver.id,
     receiverName: receiver.name || receiver.id,
@@ -108,10 +200,15 @@ async function sendMessage(sender, receiver, content) {
     isGroup: false,
     messageType: 'text',
   }, {
-    headers: { Authorization: `Bearer ${sender.accessToken}` },
+    headers: {
+      Authorization: `Bearer ${sender.accessToken}`,
+      'X-CSRF-Token': csrf,
+      Cookie: cookie,
+    },
     timeout: 15_000,
+    validateStatus: () => true,
   });
-  if (!res.data?.success) throw new Error(res.data?.message || 'send failed');
+  if (!res.data?.success) throw new Error(`send ${res.status}: ${res.data?.message || 'send failed'}`);
   return res.data.data;
 }
 
@@ -127,7 +224,7 @@ async function runCase(label, { sender, receiver, sockets, leakSockets }) {
   );
 
   const leakChecks = leakSockets
-    .filter((k) => k !== receiver.key)
+    .filter((k) => k !== receiver.key && k !== sender.key)
     .map((key) => waitForEvent(
       sockets[key],
       'message:receive',
@@ -138,41 +235,33 @@ async function runCase(label, { sender, receiver, sockets, leakSockets }) {
         if (String(e.message || '').startsWith('LEAK:')) throw e;
       }));
 
-  const sent = await sendMessage(sender, receiver, content);
-  const payload = await receivePromise;
-  await Promise.all(leakChecks);
+  try {
+    const sent = await sendMessage(sender, receiver, content);
+    const payload = await receivePromise;
+    await Promise.all(leakChecks);
 
-  if (String(payload.senderId) !== String(sender.id)) {
-    throw new Error(`wrong senderId on receive: ${payload.senderId}`);
+    if (String(payload.senderId) !== String(sender.id)) {
+      throw new Error(`wrong senderId on receive: ${payload.senderId}`);
+    }
+    if (String(payload.receiverId) !== String(receiver.id)) {
+      throw new Error(`wrong receiverId on receive: ${payload.receiverId}`);
+    }
+    void sent;
+    console.log(`✅ ok (${receiver.key} received, no leak)`);
+  } catch (e) {
+    receivePromise.catch(() => {});
+    Promise.all(leakChecks).catch(() => {});
+    throw e;
   }
-  if (String(payload.receiverId) !== String(receiver.id)) {
-    throw new Error(`wrong receiverId on receive: ${payload.receiverId}`);
-  }
-
-  console.log(`✅ ok (${receiver.key} received, no leak)`);
 }
 
 async function run() {
-  const admin = await login(
-    process.env.ADMIN_IDENTIFIER || 'admin',
-    process.env.ADMIN_PASSWORD || 'admin123',
-    'admin'
-  );
-  const staff = await login(
-    process.env.STAFF_IDENTIFIER || '0920000010',
-    process.env.STAFF_PASSWORD || 'Test@123',
-    'admin'
-  );
-  const teacher = await login(
-    process.env.TEACHER_IDENTIFIER || '0910000010',
-    process.env.TEACHER_PASSWORD || 'Test@123',
-    'teacher'
-  );
-  const student = await login(
-    process.env.STUDENT_IDENTIFIER || '0900000010',
-    process.env.STUDENT_PASSWORD || 'Test@123',
-    'student'
-  );
+  await ensureSameBranch();
+
+  const admin = await login('admin');
+  const staff = await login('staff');
+  const teacher = await login('teacher');
+  const student = await login('student');
 
   for (const u of [admin, staff, teacher, student]) {
     u.key = `${u.messagingRole}_${u.id}`;
@@ -231,7 +320,6 @@ async function run() {
     leakSockets: allKeys,
   });
 
-  // Privacy: HV nhắn staff — super admin không được nhận realtime
   console.log('\n→ privacy: student->staff (super admin must NOT receive)');
   const privacyContent = `[socket:privacy-student-staff] ${Date.now()}`;
   const privacyReceive = waitForEvent(

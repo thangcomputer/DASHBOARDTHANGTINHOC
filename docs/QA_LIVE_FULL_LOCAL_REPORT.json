@@ -1,0 +1,720 @@
+{
+  "at": "2026-07-30T04:52:26.863Z",
+  "api": "http://127.0.0.1:5000",
+  "web": "http://127.0.0.1:5173",
+  "seed": {
+    "students": 20,
+    "teachersActive": 5,
+    "pending": 1,
+    "staff": 3
+  },
+  "concurrentUsers": 29,
+  "pass": 117,
+  "fail": 0,
+  "total": 117,
+  "fails": [],
+  "results": [
+    {
+      "group": "BOOT",
+      "name": "API healthz",
+      "ok": true,
+      "detail": "{\"ok\":true,\"status\":\"healthy\",\"db\":\"up\",\"redis\":\"disabled\",\"queue\":\"inline\",\"uptime\":111,\"memory\":{\"rssMb\":142.8,\"heapUsedMb\":54}}"
+    },
+    {
+      "group": "BOOT",
+      "name": "Vite frontend",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "SEED",
+      "name": "20 HV + 5 GV + 3 Staff + pending",
+      "ok": true,
+      "detail": "{\"students\":20,\"teachersActive\":5,\"pending\":1,\"staff\":3}"
+    },
+    {
+      "group": "AUTH",
+      "name": "Super Admin (password verified + internal JWT)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "group": "AUTH",
+      "name": "Staff 0920000010",
+      "ok": true,
+      "detail": "ADMIN STAFF TEST 01"
+    },
+    {
+      "group": "AUTH",
+      "name": "Staff 0920000011",
+      "ok": true,
+      "detail": "ADMIN STAFF TEST 02"
+    },
+    {
+      "group": "AUTH",
+      "name": "Staff 0920000012",
+      "ok": true,
+      "detail": "ADMIN STAFF TEST 03"
+    },
+    {
+      "group": "AUTH",
+      "name": "Teacher 0910000010",
+      "ok": true,
+      "detail": "ms=52"
+    },
+    {
+      "group": "AUTH",
+      "name": "Teacher 0910000011",
+      "ok": true,
+      "detail": "ms=64"
+    },
+    {
+      "group": "AUTH",
+      "name": "Teacher 0910000012",
+      "ok": true,
+      "detail": "ms=64"
+    },
+    {
+      "group": "AUTH",
+      "name": "Teacher 0910000013",
+      "ok": true,
+      "detail": "ms=63"
+    },
+    {
+      "group": "AUTH",
+      "name": "Teacher 0910000014",
+      "ok": true,
+      "detail": "ms=63"
+    },
+    {
+      "group": "AUTH",
+      "name": "Teacher pending",
+      "ok": true,
+      "detail": "status=pending"
+    },
+    {
+      "group": "AUTH",
+      "name": "Login 20 students",
+      "ok": true,
+      "detail": "ok=20/20"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/students?limit=5",
+      "ok": true,
+      "detail": "status=200 22ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/teachers?limit=5",
+      "ok": true,
+      "detail": "status=200 8ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/staff",
+      "ok": true,
+      "detail": "status=200 17ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/bi/overview?period=1m",
+      "ok": true,
+      "detail": "status=200 16ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/files/stats",
+      "ok": true,
+      "detail": "status=200 13ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/backups/stats",
+      "ok": true,
+      "detail": "status=200 16ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/monitoring/overview",
+      "ok": true,
+      "detail": "status=200 14ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/notifications/count",
+      "ok": true,
+      "detail": "status=200 16ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/feed?page=1",
+      "ok": true,
+      "detail": "status=200 16ms"
+    },
+    {
+      "group": "ADMIN",
+      "name": "GET /api/blog/posts?limit=5",
+      "ok": true,
+      "detail": "status=200 14ms"
+    },
+    {
+      "group": "STAFF",
+      "name": "GET /api/students?limit=5",
+      "ok": true,
+      "detail": "status=200 22ms"
+    },
+    {
+      "group": "STAFF",
+      "name": "GET /api/teachers?limit=5",
+      "ok": true,
+      "detail": "status=200 9ms"
+    },
+    {
+      "group": "STAFF",
+      "name": "GET /api/feed?page=1",
+      "ok": true,
+      "detail": "status=200 15ms"
+    },
+    {
+      "group": "STAFF",
+      "name": "GET /api/notifications/count",
+      "ok": true,
+      "detail": "status=200 15ms"
+    },
+    {
+      "group": "STAFF",
+      "name": "Files stats = 403 (no system_settings)",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "group": "STAFF",
+      "name": "Backups denied",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "group": "TEACHER",
+      "name": "GET /api/students?limit=5",
+      "ok": true,
+      "detail": "status=200 23ms"
+    },
+    {
+      "group": "TEACHER",
+      "name": "GET /api/schedules?limit=5",
+      "ok": true,
+      "detail": "status=200 3ms"
+    },
+    {
+      "group": "TEACHER",
+      "name": "GET /api/assignments/course/Tin%20H%E1%BB%8Dc%20V%C4%83n%20Ph%C3%B2ng",
+      "ok": true,
+      "detail": "status=200 9ms"
+    },
+    {
+      "group": "TEACHER",
+      "name": "GET /api/notifications/count",
+      "ok": true,
+      "detail": "status=200 12ms"
+    },
+    {
+      "group": "TEACHER",
+      "name": "GET /api/feed?page=1",
+      "ok": true,
+      "detail": "status=200 15ms"
+    },
+    {
+      "group": "TEACHER",
+      "name": "GET /api/blog/posts?limit=5",
+      "ok": true,
+      "detail": "status=200 16ms"
+    },
+    {
+      "group": "TEACHER-TEST",
+      "name": "Đề thi GV",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "STUDENT",
+      "name": "GET /api/students/6a6acbc15ab3c7fd19735deb",
+      "ok": true,
+      "detail": "status=200 18ms"
+    },
+    {
+      "group": "STUDENT",
+      "name": "GET /api/schedules?limit=5",
+      "ok": true,
+      "detail": "status=200 11ms"
+    },
+    {
+      "group": "STUDENT",
+      "name": "GET /api/assignments/student/6a6acbc15ab3c7fd19735deb/course/Tin%20H%E1%BB%8Dc%20V%C4%83n%20Ph%C3%B2ng",
+      "ok": true,
+      "detail": "status=200 18ms"
+    },
+    {
+      "group": "STUDENT",
+      "name": "GET /api/notifications/count",
+      "ok": true,
+      "detail": "status=200 14ms"
+    },
+    {
+      "group": "STUDENT",
+      "name": "GET /api/feed?page=1",
+      "ok": true,
+      "detail": "status=200 15ms"
+    },
+    {
+      "group": "STUDENT",
+      "name": "GET /api/blog/posts?limit=5",
+      "ok": true,
+      "detail": "status=200 15ms"
+    },
+    {
+      "group": "CHAT",
+      "name": "Student → Super",
+      "ok": true,
+      "detail": "status=201 "
+    },
+    {
+      "group": "CHAT",
+      "name": "Teacher → Super",
+      "ok": true,
+      "detail": "status=201 "
+    },
+    {
+      "group": "CHAT",
+      "name": "Super conversations",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "CHAT",
+      "name": "Super unread",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "CHAT",
+      "name": "Teacher → Student",
+      "ok": true,
+      "detail": "status=201 "
+    },
+    {
+      "group": "ASSIGN",
+      "name": "Teacher tạo bài tập",
+      "ok": true,
+      "detail": "status=200 id=6a6ad85c43e40d10a32fb72f "
+    },
+    {
+      "group": "ASSIGN",
+      "name": "Teacher list theo khóa",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "ASSIGN",
+      "name": "Student list bài tập",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "ASSIGN",
+      "name": "Student nộp bài",
+      "ok": true,
+      "detail": "status=200 sub=6a6ad85ce944258f53a739bf "
+    },
+    {
+      "group": "ASSIGN",
+      "name": "Teacher chấm điểm",
+      "ok": true,
+      "detail": "status=200 "
+    },
+    {
+      "group": "EXAM",
+      "name": "Super mở khóa phòng thi",
+      "ok": true,
+      "detail": "status=200 Đã mở khóa phòng thi cho HỌC VIÊN TEST 01"
+    },
+    {
+      "group": "EXAM",
+      "name": "Student cấu hình đề",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "EXAM",
+      "name": "Student lưu tiến độ thi",
+      "ok": true,
+      "detail": "status=200 "
+    },
+    {
+      "group": "LOAD",
+      "name": "Concurrent 29 users",
+      "ok": true,
+      "detail": "fail=0 avg=38ms pmax=84ms wall=89ms"
+    },
+    {
+      "group": "UI-AUTH",
+      "name": "Page public login",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "UI-AUTH",
+      "name": "Page admin login",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Dashboard load",
+      "ok": true,
+      "detail": "/admin"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Tổng quan",
+      "ok": true,
+      "detail": "/admin#dashboard"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Bảng tin",
+      "ok": true,
+      "detail": "/admin/feed"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Tin tức",
+      "ok": true,
+      "detail": "/admin/news"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Hộp thư",
+      "ok": true,
+      "detail": "/admin/inbox"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Học Viên",
+      "ok": true,
+      "detail": "/admin#students"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Giảng Viên",
+      "ok": true,
+      "detail": "/admin#teachers"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Phân quyền NV",
+      "ok": true,
+      "detail": "/admin#staff"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Nhân sự",
+      "ok": true,
+      "detail": "/admin#hr"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Đào tạo GV",
+      "ok": true,
+      "detail": "/admin#training"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Đào tạo HV",
+      "ok": true,
+      "detail": "/admin#student-training"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Đánh giá",
+      "ok": true,
+      "detail": "/admin#evaluations"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Tài chính",
+      "ok": true,
+      "detail": "/admin#finance"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Doanh thu",
+      "ok": true,
+      "detail": "/admin#analytics"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route BI",
+      "ok": true,
+      "detail": "/admin/bi"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Cài đặt",
+      "ok": true,
+      "detail": "/admin#settings"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Logs",
+      "ok": true,
+      "detail": "/admin#logs"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Files",
+      "ok": true,
+      "detail": "/admin/files"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Backups",
+      "ok": true,
+      "detail": "/admin/backups"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Monitoring",
+      "ok": true,
+      "detail": "/admin/monitoring"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route AI",
+      "ok": true,
+      "detail": "/admin/ai"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Workflow",
+      "ok": true,
+      "detail": "/admin/workflows"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Builder",
+      "ok": true,
+      "detail": "/admin/builder"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Route Tenants",
+      "ok": true,
+      "detail": "/admin/tenants"
+    },
+    {
+      "group": "UI-ADMIN",
+      "name": "Feed Hỗ trợ nhanh/mascot",
+      "ok": true,
+      "detail": "nodes=2"
+    },
+    {
+      "group": "UI-STAFF",
+      "name": "Dashboard load",
+      "ok": true,
+      "detail": "/admin"
+    },
+    {
+      "group": "UI-STAFF",
+      "name": "Route Tổng quan",
+      "ok": true,
+      "detail": "/admin#dashboard"
+    },
+    {
+      "group": "UI-STAFF",
+      "name": "Route Bảng tin",
+      "ok": true,
+      "detail": "/admin/feed"
+    },
+    {
+      "group": "UI-STAFF",
+      "name": "Route Học Viên",
+      "ok": true,
+      "detail": "/admin#students"
+    },
+    {
+      "group": "UI-STAFF",
+      "name": "Route Giảng Viên",
+      "ok": true,
+      "detail": "/admin#teachers"
+    },
+    {
+      "group": "UI-STAFF",
+      "name": "Route Tài chính",
+      "ok": true,
+      "detail": "/admin#finance"
+    },
+    {
+      "group": "UI-STAFF",
+      "name": "Route Backups (expect redirect)",
+      "ok": true,
+      "detail": "/admin"
+    },
+    {
+      "group": "UI-STAFF",
+      "name": "Backups blocked/redirect",
+      "ok": true,
+      "detail": "/admin"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Dashboard load",
+      "ok": true,
+      "detail": "/teacher"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Tổng quan",
+      "ok": true,
+      "detail": "/teacher"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Bảng tin",
+      "ok": true,
+      "detail": "/teacher/feed"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Tin tức",
+      "ok": true,
+      "detail": "/teacher/news"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Học viên",
+      "ok": true,
+      "detail": "/teacher#students"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Lịch dạy",
+      "ok": true,
+      "detail": "/teacher#schedule"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Tài chính",
+      "ok": true,
+      "detail": "/teacher/finance"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Đào tạo",
+      "ok": true,
+      "detail": "/teacher#training"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Hộp thư",
+      "ok": true,
+      "detail": "/teacher/inbox"
+    },
+    {
+      "group": "UI-TEACHER",
+      "name": "Route Hồ sơ",
+      "ok": true,
+      "detail": "/teacher#profile"
+    },
+    {
+      "group": "UI-TEACHER-TEST",
+      "name": "Dashboard load",
+      "ok": true,
+      "detail": "/teacher/test"
+    },
+    {
+      "group": "UI-TEACHER-TEST",
+      "name": "Route Bài Test",
+      "ok": true,
+      "detail": "/teacher/test"
+    },
+    {
+      "group": "UI-TEACHER-TEST",
+      "name": "Màn hình bài test",
+      "ok": true,
+      "detail": "/teacher/test"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Dashboard load",
+      "ok": true,
+      "detail": "/student"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Tổng quan",
+      "ok": true,
+      "detail": "/student"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Bảng tin",
+      "ok": true,
+      "detail": "/student/feed"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Tin tức",
+      "ok": true,
+      "detail": "/student/news"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Phòng Thi",
+      "ok": true,
+      "detail": "/student/exam"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Lịch học",
+      "ok": true,
+      "detail": "/student#schedule"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Tài liệu",
+      "ok": true,
+      "detail": "/student#materials"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Hộp thư",
+      "ok": true,
+      "detail": "/student/inbox"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Đánh giá",
+      "ok": true,
+      "detail": "/student#evaluation"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Route Hồ sơ",
+      "ok": true,
+      "detail": "/student#profile"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Feed Hỗ trợ nhanh",
+      "ok": true,
+      "detail": "support=2"
+    },
+    {
+      "group": "UI-STUDENT",
+      "name": "Feed ẩn FAB nhắn tin",
+      "ok": true,
+      "detail": "fab=0"
+    }
+  ]
+}
