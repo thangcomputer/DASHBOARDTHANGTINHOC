@@ -530,21 +530,30 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           type: 'error',
           confirmText: 'Đóng',
         });
-        return;
+        setTuLuanSubmitting(false);
       }
-      setTuLuanSubmitting(false);
     }
+    // Kiểm tra lại điểm Trắc nghiệm
+    const finalScore = answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
+    const finalPct = TOTAL > 0 ? Math.round((finalScore / TOTAL) * 100) : 0;
+    const passedTN = finalPct >= 50;
+
+    const nextStatus = !passedTN ? 'khong_dat' : 'dang_thi';
+    const lockUntil = !passedTN ? Date.now() + 7 * 24 * 60 * 60 * 1000 : null;
+
     updateExamProgress({
+      tracNghiem: { score: finalScore, total: TOTAL },
       thucHanh: essayFileStored ? 'da_nop' : 'chua_nop',
-      status: essayFileStored ? 'dat' : 'dang_thi',
+      status: nextStatus,
+      ...(lockUntil ? { lockUntil } : {}),
       ...(essayFileStored ? { essayFile: essayFileStored } : {}),
     });
     setUploadDone(true);
     setPhase('result');
-    if (essayFileStored) {
+    if (essayFileStored && passedTN) {
       addNotification(null, 'admin', `📝 Học viên ${session.name || studentName} đã nộp bài thực hành môn ${meta.label}. Vui lòng chấm điểm.`);
     }
-  }, [uploadFile, updateExamProgress, showModal, addNotification, session.name, studentName, meta.label]);
+  }, [uploadFile, updateExamProgress, showModal, addNotification, session.name, studentName, meta.label, answers, questions, TOTAL]);
 
   handleFinalTuLuanRef.current = handleFinalTuLuan;
 

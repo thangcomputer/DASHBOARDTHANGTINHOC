@@ -52,17 +52,28 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
   const isApproved = isGlobalApproved || subject.meetsMilestone;
   const isLockedCountDown = subject.lockUntil && subject.lockUntil > Date.now();
 
+  const tnScore = subject.tracNghiem?.score ?? null;
+  const tnTotal = subject.tracNghiem?.total ?? 30;
+  const tnPct = subject.tracNghiem && tnTotal > 0 ? Math.round((tnScore / tnTotal) * 100) : null;
+  const tnFailed = tnPct !== null && tnPct < 50;
+
   const statusBadge = () => {
-    if (isLockedCountDown) {
+    if (isLockedCountDown || subject.status === 'khong_dat' || tnFailed) {
       return <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">RỚT</span>;
     }
-    switch (subject.status) {
-      case 'dat':       return <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">ĐẬU</span>;
-      case 'khong_dat': return <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">RỚT</span>;
-      case 'dang_thi':  return <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">ĐANG THI</span>;
-      case 'dang_khoa': return <span className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">ĐANG KHÓA</span>;
-      default:          return <span className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">CHƯA THI</span>;
+    if (subject.thucHanh === 'da_nop' && (subject.essayScore === null || subject.essayScore === undefined)) {
+      return <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">CHỜ CHẤM</span>;
     }
+    if (subject.status === 'dat' && (tnPct === null || tnPct >= 50) && (subject.essayScore == null || subject.essayScore >= 5)) {
+      return <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">ĐẬU</span>;
+    }
+    if (subject.status === 'dang_thi') {
+      return <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">ĐANG THI</span>;
+    }
+    if (subject.status === 'dang_khoa') {
+      return <span className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">ĐANG KHÓA</span>;
+    }
+    return <span className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">CHƯA THI</span>;
   };
 
   const tracNghiemDisplay = () => {
