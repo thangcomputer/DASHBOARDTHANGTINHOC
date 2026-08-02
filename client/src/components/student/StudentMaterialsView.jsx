@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { PlayCircle, FileText, BookOpen, HelpCircle, Download, Lock, Search, ChevronRight, Video, ClipboardList, Calendar, Clock, FileUp } from 'lucide-react';
+import { PlayCircle, FileText, BookOpen, HelpCircle, Download, Lock, Search, ChevronRight, Video, ClipboardList, Calendar, Clock, FileUp, Trophy } from 'lucide-react';
 import { htmlToPlainText } from '../../utils/htmlContent';
+import StudentQuizList from './StudentQuizList';
 
 export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSelectAssignment }) => {
   const [activeTab, setActiveTab] = useState('videos');
@@ -21,6 +22,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
   };
 
   const tabs = [
+    { key: 'quizzes', label: 'Trắc nghiệm GV', icon: Trophy, color: 'text-red-600', bgActive: 'bg-red-100 text-red-700' },
     { key: 'videos', label: 'Video học', icon: Video, color: 'text-purple-600', bgActive: 'bg-purple-100 text-purple-700' },
     { key: 'files', label: 'Tài liệu', icon: FileText, color: 'text-blue-600', bgActive: 'bg-blue-100 text-blue-700' },
     { key: 'guides', label: 'Bài tập', icon: ClipboardList, color: 'text-orange-600', bgActive: 'bg-orange-100 text-orange-700' },
@@ -92,7 +94,9 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
         </div>
       </div>
       {/* Content */}
-      {/* Content */}
+      {activeTab === 'quizzes' && (
+        <StudentQuizList />
+      )}
       {activeTab === 'videos' && (
         <div className="bg-white rounded-[20px] shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 overflow-hidden">
           <div className="divide-y divide-gray-100/50">

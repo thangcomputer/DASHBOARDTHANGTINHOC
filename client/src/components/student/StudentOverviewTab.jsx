@@ -116,6 +116,14 @@ export default function StudentOverviewTab({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 relative z-10">
                 {[
                   {
+                    onClick: () => navigate('/student/exam'),
+                    tone: 'bg-red-50/80 border-red-100 text-red-600',
+                    icon: Trophy,
+                    title: 'Trắc nghiệm buổi học',
+                    meta: 'Bài thi từ Giảng viên',
+                    metaClass: 'text-red-600 font-bold',
+                  },
+                  {
                     onClick: () => navigate('/student#materials'),
                     tone: 'bg-orange-50/70 border-orange-100 text-orange-600',
                     icon: ClipboardList,
