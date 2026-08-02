@@ -232,19 +232,26 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   const myNotifications = allNotifications.filter(n => {
     // Nếu có mảng receivers, kiểm tra quyền
-    if (n.receivers && n.receivers.length > 0) {
-      if (n.receivers.includes('ALL_ADMIN') && role !== 'admin') return false;
-      if (n.receivers.includes('ALL_TEACHER') && role !== 'teacher') return false;
-      if (n.receivers.includes('ALL_STUDENT') && role !== 'student') return false;
-      // Nếu có ID cụ thể trong receivers
-      const isForMe = (myId && n.receivers.includes(myId)) || 
-                      n.receivers.includes(role) || 
-                      (role === 'admin' && n.receivers.includes('ALL_ADMIN'));
-      if (!isForMe && !n.receivers.includes('ALL')) return false;
+    if (Array.isArray(n.receivers) && n.receivers.length > 0) {
+      const recs = n.receivers;
+      const isAdminRole = role === 'admin' || role === 'staff';
+      if (recs.includes('ALL_ADMIN') && !isAdminRole) return false;
+      if (recs.includes('ALL_TEACHER') && role !== 'teacher') return false;
+      if (recs.includes('ALL_STUDENT') && role !== 'student') return false;
+
+      const isForMe = (myId && recs.includes(myId)) ||
+                      recs.includes(role) ||
+                      (isAdminRole && recs.includes('ALL_ADMIN')) ||
+                      (role === 'teacher' && recs.includes('ALL_TEACHER')) ||
+                      (role === 'student' && recs.includes('ALL_STUDENT')) ||
+                      recs.includes('GLOBAL') ||
+                      recs.includes('ALL');
+      if (!isForMe) return false;
     }
     return ((myId && String(n.userId) === myId) || !n.userId) && 
            (n.role === role || !n.role);
   }).sort((a, b) => new Date(b.time || Date.now()) - new Date(a.time || Date.now()));
+
 
   const unreadCount = myNotifications.filter(n => !n.read).length;
 

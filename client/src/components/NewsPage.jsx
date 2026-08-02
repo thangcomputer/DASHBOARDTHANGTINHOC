@@ -523,7 +523,10 @@ export default function NewsPage({ session, role = 'admin' }) {
     return () => socket.off('blog:published', onPub);
   }, [socket, slug, mode, page, loadList]);
 
-  const openPost = (post) => navigate(`${base}/${post.slug}`);
+  const openPost = (post) => {
+    const manageQs = (canManage && post.status !== 'published') ? '?manage=1' : '';
+    navigate(`${base}/${post.slug}${manageQs}`);
+  };
 
   if (mode === 'edit' && canManage) {
     if (editId && loading && !editing?.id) {
@@ -557,14 +560,22 @@ export default function NewsPage({ session, role = 'admin' }) {
             navigate(base);
           }}
           onSaved={(data) => {
-            setSearchParams({});
-            if (data?.slug) navigate(`${base}/${data.slug}`);
-            else navigate(base);
+            if (data?.status === 'draft' || data?.status === 'hidden') {
+              setSearchParams({ mode: 'manage' });
+              navigate(`${base}?mode=manage`);
+            } else if (data?.slug) {
+              setSearchParams({});
+              navigate(`${base}/${data.slug}`);
+            } else {
+              setSearchParams({});
+              navigate(base);
+            }
           }}
         />
       </div>
     );
   }
+
 
   if (slug) {
     if (loading && !detail) {
@@ -690,18 +701,26 @@ export default function NewsPage({ session, role = 'admin' }) {
               )}
               <button
                 type="button"
-                className="px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1"
+                className="px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 hover:bg-red-50"
                 onClick={async () => {
                   if (!window.confirm('Xóa bài viết này?')) return;
                   const res = await blogAPI.remove(detail.id);
-                  if (res.success) {
-                    toast.success('Đã xóa');
-                    navigate(base);
+                  if (res?.success) {
+                    toast.success('Đã xóa bài viết');
+                    if (canManage) {
+                      setSearchParams({ mode: 'manage' });
+                      navigate(`${base}?mode=manage`);
+                    } else {
+                      navigate(base);
+                    }
+                  } else {
+                    toast.error(res?.message || 'Không thể xóa bài viết');
                   }
                 }}
               >
                 <Trash2 size={14} /> Xóa
               </button>
+
             </div>
           )}
           {related.length > 0 && (
@@ -819,6 +838,28 @@ export default function NewsPage({ session, role = 'admin' }) {
                 >
                   Sửa
                 </button>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!window.confirm(`Xóa bài viết "${p.title}"?`)) return;
+                    try {
+                      const res = await blogAPI.remove(p.id);
+                      if (res?.success) {
+                        toast.success('Đã xóa bài viết');
+                        loadList(page);
+                      } else {
+                        toast.error(res?.message || 'Không thể xóa bài viết');
+                      }
+                    } catch (err) {
+                      toast.error('Lỗi kết nối khi xóa bài viết');
+                    }
+                  }}
+                >
+                  <Trash2 size={13} /> Xóa
+                </button>
+
               </li>
             ))}
           </ul>

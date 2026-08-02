@@ -297,7 +297,8 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
 
   doc.courses = doc.enrollments.map(toClientCourse);
 
-  const primary = doc.enrollments.find((e) => e.isPrimary) || doc.enrollments[0];
+  const activeEnrollments = doc.enrollments.filter((e) => e.status !== 'cancelled' && e.status !== 'refunded');
+  const primary = activeEnrollments.find((e) => e.isPrimary) || activeEnrollments[0];
   if (primary) {
     doc.course = primary.courseName;
     doc.teacherId = primary.teacherId;
@@ -306,11 +307,18 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
     doc.remainingSessions = primary.remainingSessions;
     doc.totalSessions = primary.totalSessions;
     doc.grades = primary.grades?.length ? primary.grades : doc.grades;
+  } else {
+    doc.course = '';
+    doc.teacherId = null;
+    doc.teacherName = '';
+    doc.completedSessions = 0;
+    doc.remainingSessions = 0;
+    doc.totalSessions = 12;
   }
 
   const allNames = [];
   const seenN = new Set();
-  doc.enrollments.forEach((e) => {
+  doc.enrollments.filter((e) => e.status !== 'cancelled' && e.status !== 'refunded').forEach((e) => {
     const n = String(e.teacherName || '').trim();
     if (!n) return;
     const key = n.toLowerCase();
@@ -330,7 +338,7 @@ function studentMatchesTeacher(student, teacherId) {
   const tid = String(teacherId);
   if (teacherIdStr(student.teacherId) === tid) return true;
   const enrollments = getEnrollmentsFromStudent(student);
-  return enrollments.some((e) => teacherIdStr(e.teacherId) === tid);
+  return enrollments.some((e) => teacherIdStr(e.teacherId) === tid && e.status !== 'cancelled' && e.status !== 'refunded');
 }
 
 function expandStudentsForTeacher(students, teacherId) {
@@ -339,7 +347,8 @@ function expandStudentsForTeacher(students, teacherId) {
 
   students.forEach((student) => {
     const enrollments = getEnrollmentsFromStudent(student);
-    const mine = enrollments.filter((e) => teacherIdStr(e.teacherId) === tid);
+    const mine = enrollments.filter((e) => teacherIdStr(e.teacherId) === tid && e.status !== 'cancelled' && e.status !== 'refunded');
+
 
     if (mine.length > 0) {
       mine.forEach((enr, idx) => {

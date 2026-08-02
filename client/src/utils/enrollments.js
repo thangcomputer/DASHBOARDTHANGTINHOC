@@ -90,7 +90,7 @@ export function getClientEnrollments(student) {
       examUnlocked: e.examUnlocked === true,
     }));
   }
-  if (student.course) {
+  if (student.course && String(student.course).trim()) {
     const tid = teacherIdStr(student.teacherId);
     const completed = student.completedSessions ?? Math.max(0, (student.totalSessions || 12) - (student.remainingSessions ?? 0));
     return [{ id: 'main', enrollmentId: 'main', name: student.course, courseName: student.course,
@@ -111,13 +111,13 @@ export function getClientEnrollments(student) {
 
 /** Chỉ khóa đang hoạt động (ẩn khóa đã hủy khỏi danh sách ngoài / gán GV / học phí list). */
 export function getActiveClientEnrollments(student) {
-  return getClientEnrollments(student).filter((e) => e?.status !== 'cancelled');
+  return getClientEnrollments(student).filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
 }
 export function expandStudentsForTeacher(students, teacherId) {
   const tid = String(teacherId); const result = [];
   (students || []).filter(Boolean).forEach((student) => {
     const enrollments = getClientEnrollments(student);
-    const mine = enrollments.filter((e) => String(e.teacherId) === tid);
+    const mine = enrollments.filter((e) => String(e.teacherId) === tid && e?.status !== 'cancelled' && e?.status !== 'refunded');
     if (mine.length > 0) {
       mine.forEach((enr, idx) => result.push({ ...student, id: student.id || student._id,
         _enrollmentKey: `${student._id || student.id}-${enr.enrollmentId || idx}`,
@@ -132,7 +132,7 @@ export function expandStudentsForTeacher(students, teacherId) {
       }));
       return;
     }
-    if (teacherIdStr(student.teacherId) === tid) result.push({ ...student, _enrollmentKey: String(student._id || student.id) });
+    if (teacherIdStr(student.teacherId) === tid && (student.status !== 'Hoàn thành' && student.status !== 'Hủy')) result.push({ ...student, _enrollmentKey: String(student._id || student.id) });
   });
   return result;
 }

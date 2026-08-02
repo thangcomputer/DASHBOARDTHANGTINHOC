@@ -78,10 +78,23 @@ export function useDataRatings({ students, teachers, setTeachers, triggerBackgro
   }, [students, teachers, setTeachers, triggerBackgroundSync, addNotification]);
 
   const getTeacherRating = useCallback((teacherId) => {
-    const teacher = teachers.find(t => String(t.id) === String(teacherId));
-    if (!teacher || !teacher.ratings?.length) return { avg: 0, count: 0, ratings: [] };
-    const avg = Math.round((teacher.ratings.reduce((s, r) => s + (r.criteria?.stars || 0), 0) / teacher.ratings.length) * 10) / 10;
-    return { avg, count: teacher.ratings.length, ratings: teacher.ratings };
+    const teacher = teachers.find(t => String(t.id) === String(teacherId) || String(t._id) === String(teacherId));
+    if (!teacher || !teacher.ratings?.length) {
+      return { avg: teacher?.averageRating || 0, count: 0, ratings: [] };
+    }
+    const seen = new Set();
+    const uniqueRatings = [];
+    for (const r of teacher.ratings) {
+      const sid = String(r.studentId);
+      if (!seen.has(sid)) {
+        seen.add(sid);
+        uniqueRatings.push(r);
+      }
+    }
+    const avg = uniqueRatings.length > 0
+      ? Math.round((uniqueRatings.reduce((s, r) => s + (r.criteria?.stars || 0), 0) / uniqueRatings.length) * 10) / 10
+      : (teacher.averageRating || 0);
+    return { avg, count: uniqueRatings.length, ratings: uniqueRatings };
   }, [teachers]);
 
   return {
@@ -90,3 +103,4 @@ export function useDataRatings({ students, teachers, setTeachers, triggerBackgro
     getTeacherRating,
   };
 }
+

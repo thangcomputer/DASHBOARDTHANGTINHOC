@@ -9,7 +9,7 @@ import StudentProfileUpdateModal from './StudentProfileUpdateModal';
 import api from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import {
-  getClientEnrollments, scopeStudentToEnrollment, filterSchedulesByCourse,
+  getClientEnrollments, getActiveClientEnrollments, scopeStudentToEnrollment, filterSchedulesByCourse,
   filterStudentTrainingFiles,
   filterStudentTrainingVideos,
   enrichEnrollmentsWithTeachers,
@@ -49,7 +49,8 @@ const StudentDashboard = ({ onNavigate }) => {
   const studentData = useMemo(() => {
     if (!student) return null;
 
-    const courses = enrichEnrollmentsWithTeachers(getClientEnrollments(student), teachers);
+    const courses = enrichEnrollmentsWithTeachers(getActiveClientEnrollments(student), teachers);
+
     const namesFromCourses = uniqueTeacherNames(courses);
     
     // Properly handle populated vs unpopulated `teacherId`

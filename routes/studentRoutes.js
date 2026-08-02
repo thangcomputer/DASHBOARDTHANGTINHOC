@@ -1891,28 +1891,31 @@ function syncStudentFromPrimaryEnrollment(student) {
   if (!student?.enrollments?.length) return;
   const list = student.enrollments;
   const active = list.filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
-  const primary = active.find((e) => e.isPrimary)
-    || active[0]
-    || list.find((e) => e.isPrimary)
-    || list[0];
+  if (!active.length) {
+    student.course = '';
+    student.price = 0;
+    student.paid = false;
+    student.paidAt = undefined;
+    student.teacherId = null;
+    student.teacherName = '';
+    student.completedSessions = 0;
+    student.remainingSessions = 0;
+    student.totalSessions = 12;
+    return;
+  }
+  const primary = active.find((e) => e.isPrimary) || active[0];
   if (!primary) return;
   student.course = primary.courseName;
   student.price = Number(primary.price) || 0;
-  // Không còn khóa active → paid=false (kể cả khi primary là khóa đã hủy)
-  if (!active.length) {
-    student.paid = false;
-    student.teacherId = null;
-    student.teacherName = '';
-  } else {
-    student.paid = !!primary.paid;
-    student.teacherId = primary.teacherId || null;
-    student.teacherName = primary.teacherName || '';
-  }
+  student.paid = !!primary.paid;
+  student.teacherId = primary.teacherId || null;
+  student.teacherName = primary.teacherName || '';
   if (primary.paidAt) student.paidAt = primary.paidAt;
   student.totalSessions = primary.totalSessions || 12;
   student.remainingSessions = primary.remainingSessions ?? primary.totalSessions ?? 12;
   student.completedSessions = primary.completedSessions || 0;
 }
+
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/settings ─────────────────
 // Cập nhật quyền theo khóa: requireWebcam, examUnlocked
@@ -2540,7 +2543,16 @@ router.put('/:id/assign-teacher', [authMiddleware, checkPermission(PERMISSIONS.M
             receivers: String(student._id),
             link: '/student#profile',
           });
+        } else {
+          await NotificationService.send(io, {
+            type: 'COURSE',
+            title: '👨‍🏫 Phân công giảng viên phụ trách',
+            content: `Bạn đã được phân công Giảng viên ${teacherName} phụ trách khóa "${targetCourse || student.course}".`,
+            receivers: String(student._id),
+            link: '/student#profile',
+          });
         }
+
 
         io.to(teacherId.toString()).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId });

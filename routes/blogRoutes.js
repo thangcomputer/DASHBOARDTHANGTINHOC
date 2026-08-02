@@ -336,12 +336,16 @@ router.post('/manage/posts/:id/hide', checkPermission(PERMISSIONS.MANAGE_BLOG), 
 
 router.delete('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'ID bài viết không hợp lệ' });
+    }
     const post = await BlogPost.findOneAndUpdate(
       { _id: req.params.id, deletedAt: null },
       { deletedAt: new Date(), status: 'hidden' },
       { returnDocument: 'after' },
     );
-    if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài' });
+    if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết hoặc bài đã bị xóa' });
     res.json({ success: true, message: 'Đã xóa bài viết' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
