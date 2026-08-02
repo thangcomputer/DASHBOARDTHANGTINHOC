@@ -1,7 +1,30 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 
-export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA }) => {
+export function formatMaskedPhone(phoneStr, fallbackName = '', students = []) {
+  let raw = String(phoneStr || '').replace(/\D/g, '');
+
+  if (!raw && fallbackName && Array.isArray(students)) {
+    const found = students.find(
+      (s) => s?.name?.toLowerCase().trim() === String(fallbackName).toLowerCase().trim() || String(s?.id || s?._id) === String(phoneStr)
+    );
+    if (found?.phone || found?.zalo) {
+      raw = String(found.phone || found.zalo).replace(/\D/g, '');
+    }
+  }
+
+  if (raw.length >= 7) {
+    return raw.slice(0, raw.length - 4) + '****';
+  }
+
+  if (raw.length > 0) {
+    return raw + '****';
+  }
+
+  return '098*******';
+}
+
+export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA, students = [] }) => {
   if (!rating || rating.count === 0) return null;
 
   const StarIcons = ({ count, max = 5 }) => (
@@ -58,10 +81,12 @@ export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA }) => {
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
-                    {r.studentName?.substring(0, 2)}
+                    HV
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-800 truncate">{r.studentName}</p>
+                    <p className="text-sm font-bold text-slate-800 truncate">
+                      {formatMaskedPhone(r.studentPhone || r.phone || r.studentZalo || r.studentId, r.studentName, students)}
+                    </p>
                     <p className="text-[10px] sm:text-xs text-slate-400">{r.date}</p>
                   </div>
                 </div>

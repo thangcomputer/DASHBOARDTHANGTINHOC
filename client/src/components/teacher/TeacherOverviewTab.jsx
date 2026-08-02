@@ -209,7 +209,7 @@ export default function TeacherOverviewTab({
 
         {/* Right column */}
         <div className="lg:col-span-5 space-y-4 sm:space-y-5">
-          <TeacherRatingDisplay rating={teacherRating} RATING_CRITERIA={RATING_CRITERIA} />
+          <TeacherRatingDisplay rating={teacherRating} RATING_CRITERIA={RATING_CRITERIA} students={students} />
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="px-4 sm:px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
