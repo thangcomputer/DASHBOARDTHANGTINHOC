@@ -236,7 +236,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const [ledgerCard, setLedgerCard] = useState(null);
 
   useEffect(() => {
-    if (!studentId || activeTab !== 'finance') return;
+    if (!studentId) return;
     let cancelled = false;
     api.finance.studentCard(studentId)
       .then((res) => {
@@ -246,7 +246,8 @@ export default function StudentDetailModal({ studentId, onClose }) {
       })
       .catch(() => { if (!cancelled) setLedgerCard(null); });
     return () => { cancelled = true; };
-  }, [studentId, activeTab, data?.student?._id, data?.student?.paidAmount]);
+  }, [studentId, data?.student?._id, data?.student?.paidAmount]);
+
 
   const handleDeleteEnrollment = (enr) => {
     const sid = data?.student?._id || data?.student?.id || studentId;
@@ -546,11 +547,12 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const financeRegisteredFee = ledgerCard
     ? Number(ledgerCard.registeredFee) || 0
     : (scopedEnrollments.reduce((s, e) => s + (Number(e.price) || 0), 0) || Number(data?.student?.price) || 0);
+  const isStudentRootPaid = data?.student?.paid === true || data?.student?.paid === 'Đã đóng phí' || data?.student?.paid === 'true';
   const financePaidTotal = ledgerCard
     ? Number(ledgerCard.paidCashIn) || 0
     : (
       scopedEnrollments
-        .filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded' && isEnrollmentPaid(e))
+        .filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded' && (isEnrollmentPaid(e) || (e?.isPrimary && isStudentRootPaid)))
         .reduce((s, e) => s + (Number(e.price) || 0), 0)
     );
   const financeListedTotal = ledgerCard
@@ -559,13 +561,14 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const financeRefundedTotal = ledgerCard
     ? Number(ledgerCard.refundedCashOut) || 0
     : Math.max(financeRefundFromInvoices, summaryMetrics.refundedTotal || 0);
-  // Doanh thu thuần = Đã thanh toán − Đã hoàn (5tr − 500k = 4tr5)
+  // Doanh thu thuần = Đã thanh toán − Đã hoàn
   const financeNetCollected = ledgerCard?.netCollected != null
     ? Number(ledgerCard.netCollected) || 0
     : Math.max(0, financePaidTotal - financeRefundedTotal);
   const financeDebt = ledgerCard
     ? Number(ledgerCard.outstanding) || 0
-    : Math.max(0, financeListedTotal - financeNetCollected);
+    : Math.max(0, financeListedTotal - (isStudentRootPaid ? financeListedTotal : financeNetCollected));
+
   const financeAllPaid = summaryMetrics.enrollmentCount > 0
     && summaryMetrics.paidCount >= summaryMetrics.enrollmentCount;
   // Badge header theo khóa đang hoạt động (không phụ thuộc student.paid sau khi hoàn)
@@ -622,24 +625,44 @@ export default function StudentDetailModal({ studentId, onClose }) {
           quota[k] -= 1;
         });
 
-      return scoped
-        .filter((line) => !hidePaymentIds.has(String(line._id)))
-        .map((line) => {
-          const signed = Number(line.signedAmount != null ? line.signedAmount : (line.type === 'refund' ? -line.amount : line.amount)) || 0;
-          const isRefund = line.type === 'refund' || signed < 0;
-          return {
-            key: String(line._id),
-            maHoaDon: line.type === 'refund' ? `R-${String(line._id).slice(-6)}` : (line.invoiceId ? 'HĐ' : line.type?.toUpperCase?.() || '—'),
-            createdAt: line.postedAt || line.createdAt,
-            khoaHoc: line.courseName || '—',
-            ghiChu: line.note || (isRefund ? 'Hoàn học phí' : 'Thanh toán'),
-            hocPhi: signed,
-            isRefund,
-            synthetic: false,
-            ledgerType: line.type,
-            enrollmentId: line.enrollmentId ? String(line.enrollmentId) : '',
-          };
-        });
+      const rawScoped = scoped.filter((line) => !hidePaymentIds.has(String(line._id)));
+      rawScoped.sort((a, b) => new Date(a.postedAt || a.createdAt || 0) - new Date(b.postedAt || b.createdAt || 0));
+
+      let hdCounter = 0;
+      let rCounter = 0;
+
+      const mapped = rawScoped.map((line) => {
+        const signed = Number(line.signedAmount != null ? line.signedAmount : (line.type === 'refund' ? -line.amount : line.amount)) || 0;
+        const isRefund = line.type === 'refund' || signed < 0;
+
+        let code = line.maHoaDon;
+        if (isRefund) {
+          rCounter += 1;
+          if (!code || code === '—' || code.startsWith('R-')) {
+            code = `HOÀN-${String(rCounter).padStart(4, '0')}`;
+          }
+        } else {
+          hdCounter += 1;
+          if (!code || code === '—' || code === 'HĐ') {
+            code = `HĐ-${String(hdCounter).padStart(4, '0')}`;
+          }
+        }
+
+        return {
+          key: String(line._id),
+          maHoaDon: code,
+          createdAt: line.postedAt || line.createdAt,
+          khoaHoc: line.courseName || '—',
+          ghiChu: line.note || (isRefund ? 'Hoàn học phí' : 'Thanh toán'),
+          hocPhi: signed,
+          isRefund,
+          synthetic: false,
+          ledgerType: line.type,
+          enrollmentId: line.enrollmentId ? String(line.enrollmentId) : '',
+        };
+      });
+
+      return mapped.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
 
     const rows = [];
@@ -675,7 +698,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
         const refundAmt = Number(enr.refundedAmount) || 0;
         rows.push({
           key: `cancel-refund-${enr.enrollmentId || enr.id || idx}`,
-          maHoaDon: refundAmt > 0 ? `R-${String(enr.enrollmentId || enr.id || idx).slice(-6)}` : '—',
+          maHoaDon: '—',
           createdAt: enr.cancelledAt || enr.registeredAt,
           khoaHoc: courseName,
           ghiChu: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${String(enr.cancelReason || '').trim() || 'Admin hủy khóa'}`,
@@ -707,8 +730,27 @@ export default function StudentDetailModal({ studentId, onClose }) {
       });
     });
 
-    rows.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    return rows;
+    rows.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    let hdCounter = 0;
+    let rCounter = 0;
+    const formattedRows = rows.map((r) => {
+      let code = r.maHoaDon;
+      if (r.isRefund) {
+        rCounter += 1;
+        if (!code || code === '—' || code.startsWith('R-')) {
+          code = `HOÀN-${String(rCounter).padStart(4, '0')}`;
+        }
+      } else {
+        hdCounter += 1;
+        if (!code || code === '—' || code === 'HĐ') {
+          code = `HĐ-${String(hdCounter).padStart(4, '0')}`;
+        }
+      }
+      return { ...r, maHoaDon: code };
+    });
+
+    return formattedRows.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
   })();
 
   return (

@@ -382,7 +382,7 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
     const allowedFields = isAdminRole 
       ? [
           'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'bio', 'startDate', 'address',
-          'bankAccount', 'avatar', 'status', 'baseSalaryPerSession',
+          'bankAccount', 'avatar', 'status', 'baseSalaryPerSession', 'customStarBonusAmount',
           'assignedClasses', 'assignedStudents',
           'testScore', 'testStatus', 'testDate', 'testNotes', 'faceViolationCount',
           'testMcCorrect', 'testMcWrong', 'testMcTotal',

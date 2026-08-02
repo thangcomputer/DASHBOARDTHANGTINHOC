@@ -124,8 +124,12 @@ const TeacherSchema = new mongoose.Schema(
     // Lương cứng / buổi dạy (không phụ thuộc sao)
     baseSalaryPerSession: { type: Number, default: 0, min: 0 },
 
+    // Mức tiền thưởng sao hàng tháng khi đạt mốc đánh giá
+    customStarBonusAmount: { type: Number, default: 200000, min: 0 },
+
     /** Các tháng YYYY-MM đã chi thưởng sao (≥10 HV + ≥5★ → 200k/tháng) */
     starBonusPaidMonths: { type: [String], default: [] },
+
 
     // ── Thông tin thêm ────────────────────────────────────────────
     specialty: { type: String, default: '' }, // Chuyên môn: "THVP, Excel, ..."

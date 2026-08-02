@@ -301,23 +301,42 @@ export default function EditTeacherModal({
                     </div>
                     <div>
                       <label className="cms-label flex items-center gap-1.5">
-                        <Star size={12} className="text-amber-500" /> Thưởng sao
+                        <Star size={12} className="text-amber-500 fill-amber-500" /> Thưởng sao / tháng (VNĐ)
                       </label>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 h-full min-h-[44px]">
-                        <p className="text-xs text-slate-700 leading-snug">
-                          {formatStarBonusRule({
-                            minStudents: STAR_BONUS_MIN_STUDENTS,
-                            minStars: STAR_BONUS_MIN_STARS,
-                            bonusPerMonth: STAR_BONUS_AMOUNT,
-                          })}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {count > 0
-                            ? <>Sao HV: <strong className="text-amber-700">{avg}/5</strong> ({count} lượt)</>
-                            : 'Chưa có đánh giá từ HV'}
-                        </p>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={editTeacher.customStarBonusAmount != null ? editTeacher.customStarBonusAmount : 200000}
+                        onChange={(e) => setEditTeacher((p) => ({
+                          ...p,
+                          customStarBonusAmount: Number(e.target.value.replace(/\D/g, '')) || 0,
+                        }))}
+                        className="cms-input font-mono font-semibold tabular-nums"
+                        placeholder="200000"
+                      />
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {[100000, 200000, 300000, 500000].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setEditTeacher((p) => ({ ...p, customStarBonusAmount: amt }))}
+                            className={`text-xs font-semibold px-2 py-1 rounded-md border transition ${
+                              (editTeacher.customStarBonusAmount ?? 200000) === amt
+                                ? 'border-amber-400 bg-amber-50 text-amber-800'
+                                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {formatHoaHong(amt)}
+                          </button>
+                        ))}
                       </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {count > 0
+                          ? <>Đánh giá HV: <strong className="text-amber-700">{avg}/5★</strong> ({count} đánh giá)</>
+                          : 'Chưa có đánh giá từ HV'}
+                      </p>
                     </div>
+
                   </div>
                 </div>
               </section>
