@@ -345,17 +345,17 @@ export function filterStudentTrainingFiles(files, { enrollments, fallbackCourse,
   const hasEnrollment = !!(enrollments?.length || fallbackCourse);
 
   return list.filter((f) => {
-    // 1) Khớp môn của khóa HV đang xem / đang học
+    // 1) Khớp môn thi/môn học của khóa HV đang học (Excel, Word, PowerPoint, Canva...) -> Hiển thị ngay
     if (allowedSubjectIds?.length && itemMatchesSubjectIds(f, allowedSubjectIds, catalog)) {
-      return matchesActiveCourse(f, activeCourseName, enrollments);
+      return true;
     }
 
-    // 2) Gắn đúng khóa enrollment
+    // 2) Gắn đúng khóa enrollment (id / tên khóa)
     if (studentCanAccessTrainingItem(f, accessKeys, enrollments, fallbackCourse)) {
       return matchesActiveCourse(f, activeCourseName, enrollments);
     }
 
-    // 3) Tài liệu chung chưa gắn môn
+    // 3) Tài liệu chung chưa gắn môn cụ thể
     if (hasEnrollment && !resolveItemExamSubjects(f, catalog).length) {
       return matchesActiveCourse(f, activeCourseName, enrollments);
     }
