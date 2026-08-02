@@ -70,7 +70,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               <p className="text-[9px] text-red-500 mt-1 pl-1 italic">* Liên hệ Admin để đổi SĐT.</p>
             </div>
             <div>
-              <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">Zalo</label>
+              <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">SĐT Liên hệ 2</label>
               <div className="relative">
                 <input 
                   type="text" 

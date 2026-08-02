@@ -127,7 +127,7 @@ export default function StudentProfileTab({
               {[
                 { icon: Mail, label: 'Email', value: studentData.email || 'Chưa cập nhật' },
                 { icon: Phone, label: 'Số điện thoại', value: studentData.phone || studentData.zalo || 'Chưa cập nhật' },
-                { icon: MessageCircle, label: 'Zalo', value: studentData.zalo || 'Chưa cập nhật' },
+                { icon: Phone, label: 'SĐT Khác', value: studentData.zalo || 'Chưa cập nhật' },
                 { icon: MapPin, label: 'Địa chỉ', value: studentData.address || 'Chưa cập nhật' },
               ].map((item) => (
                 <li key={item.label} className="flex items-center gap-3 px-4 py-3 lg:px-5 lg:py-3.5 min-w-0 hover:bg-slate-50/60">
