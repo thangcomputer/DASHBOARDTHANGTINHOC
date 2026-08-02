@@ -368,49 +368,93 @@ const StudentDashboard = ({ onNavigate }) => {
   const studyLogs = useMemo(() => {
     if (!viewStudent) return [];
     const logs = [];
-    
-    // 1. Buổi học đã hoàn thành / Điểm danh
-    let sessionCount = (viewStudent.attendanceHistory || []).filter(item => !(item.note && item.note.toLowerCase().includes('bài nộp'))).length;
+    const seenKeys = new Set();
 
-    (viewStudent.attendanceHistory || []).forEach((item, idx) => {
+    const parseDateToMs = (dStr) => {
+      if (!dStr) return 0;
+      if (dStr instanceof Date) return dStr.getTime();
+      if (typeof dStr === 'number') return dStr;
+      const str = String(dStr).trim();
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const year = parseInt(parts[2], 10);
+          const dt = new Date(year, month, day);
+          if (!Number.isNaN(dt.getTime())) return dt.getTime();
+        }
+      }
+      const dt = new Date(str);
+      return Number.isNaN(dt.getTime()) ? 0 : dt.getTime();
+    };
+
+    // 1. Buổi học đã hoàn thành / Điểm danh / Bài nộp
+    const attList = Array.isArray(viewStudent.attendanceHistory) ? viewStudent.attendanceHistory : [];
+    let sessionCount = attList.filter(item => !(item.note && item.note.toLowerCase().includes('bài nộp'))).length;
+
+    attList.forEach((item, idx) => {
        let parsedDate = item.date;
        if (parsedDate && parsedDate.includes('T')) {
          parsedDate = new Date(parsedDate).toLocaleDateString('vi-VN');
        }
-       // Lấy exact time từ mySchedules
-       const sched = mySchedules?.find(s => new Date(s.date).toLocaleDateString('vi-VN') === parsedDate && s.status === 'completed');
-       
+       const sched = (mySchedules || []).find(s => new Date(s.date).toLocaleDateString('vi-VN') === parsedDate && s.status === 'completed');
        const isHomework = item.note && item.note.toLowerCase().includes('bài nộp');
+       const ts = parseDateToMs(item.date) || (sched ? parseDateToMs(sched.date) : 0) || (Date.now() - idx * 1000);
+
+       const itemKey = `att_${parsedDate}_${item.note || ''}_${idx}`;
+       seenKeys.add(itemKey);
 
        logs.push({
           type: isHomework ? 'homework' : 'attendance',
           date: parsedDate,
-          time: sched ? sched.startTime : '',
+          time: sched ? (sched.startTime ? `${sched.startTime}${sched.endTime ? ` - ${sched.endTime}` : ''}` : sched.time || '') : '',
           note: item.note || 'Đã điểm danh hoàn thành buổi học',
           grade: item.grade,
-          index: isHomework ? null : sessionCount--, // Không đếm bài nộp vào
-          timestamp: sched ? new Date(sched.updatedAt || sched.createdAt).getTime() : 0
+          index: isHomework ? null : sessionCount--,
+          timestamp: ts
        });
     });
 
-    // 2. Lịch đã hủy
-    (mySchedules || []).forEach(s => {
-       if (s.status === 'cancelled') {
-         logs.push({
-            type: 'cancelled',
-            date: new Date(s.date).toLocaleDateString('vi-VN'),
-            time: s.startTime,
-            note: s.note || 'Lịch học đã bị hủy',
-            grade: null,
-            index: null,
-            timestamp: new Date(s.updatedAt || s.createdAt).getTime()
-         });
+    // 2. Tất cả lịch sắp diễn ra & đã xếp của Giảng viên (status === 'scheduled' / 'upcoming')
+    (mySchedules || []).forEach((s, sIdx) => {
+       const dateStr = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
+       const ts = parseDateToMs(s.date) || Date.now();
+
+       if (s.status === 'scheduled' || s.status === 'upcoming') {
+         const key = `sched_${dateStr}_${s.startTime || sIdx}`;
+         if (!seenKeys.has(key)) {
+           seenKeys.add(key);
+           logs.push({
+              type: 'scheduled',
+              date: dateStr,
+              time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
+              note: s.title || s.subject || `Lịch học giảng viên xếp (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`,
+              grade: null,
+              index: null,
+              timestamp: ts
+           });
+         }
+       } else if (s.status === 'cancelled') {
+         const key = `cancel_${dateStr}_${s.startTime || sIdx}`;
+         if (!seenKeys.has(key)) {
+           seenKeys.add(key);
+           logs.push({
+              type: 'cancelled',
+              date: dateStr,
+              time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
+              note: s.note || 'Lịch học đã bị hủy',
+              grade: null,
+              index: null,
+              timestamp: ts
+           });
+         }
        }
     });
 
-    // Sắp xếp theo timestamp giảm dần nếu có, nếu không thì giữ nguyên (do attendanceHistory đã có thứ tự)
     return logs.sort((a, b) => b.timestamp - a.timestamp);
   }, [viewStudent, mySchedules]);
+
 
   const isNew = viewStudent?.completedSessions === 0;
 

@@ -170,23 +170,40 @@ export default function StudentOverviewTab({
               <div className="divide-y divide-slate-50">
                 {studyLogs.map((item, idx) => {
                   const isCancelled = item.type === 'cancelled';
+                  const isScheduled = item.type === 'scheduled';
+                  const isHomework = item.type === 'homework';
+
                   return (
                     <div
                       key={idx}
                       className={`px-4 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 ${
-                        isCancelled ? 'bg-red-50/30' : 'hover:bg-slate-50'
+                        isCancelled ? 'bg-red-50/30' : isScheduled ? 'bg-blue-50/30' : 'hover:bg-slate-50'
                       } transition-colors duration-200`}
                     >
                       <div className="flex items-start md:items-center gap-3 min-w-0">
                         <div
                           className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${
-                            isCancelled ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                            isCancelled
+                              ? 'bg-red-100 text-red-600'
+                              : isScheduled
+                              ? 'bg-blue-100 text-blue-600'
+                              : isHomework
+                              ? 'bg-purple-100 text-purple-600'
+                              : 'bg-emerald-100 text-emerald-600'
                           }`}
                         >
-                          {isCancelled ? <XCircle size={18} aria-hidden="true" /> : <CheckCircle size={18} aria-hidden="true" />}
+                          {isCancelled ? (
+                            <XCircle size={18} aria-hidden="true" />
+                          ) : isScheduled ? (
+                            <Calendar size={18} aria-hidden="true" />
+                          ) : isHomework ? (
+                            <ClipboardList size={18} aria-hidden="true" />
+                          ) : (
+                            <CheckCircle size={18} aria-hidden="true" />
+                          )}
                         </div>
                         <div className="min-w-0">
-                          <p className={`cms-sd-body font-bold truncate ${isCancelled ? 'text-red-700' : 'text-slate-800'}`}>
+                          <p className={`cms-sd-body font-bold truncate ${isCancelled ? 'text-red-700' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
                             {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
                           </p>
                           <p className="cms-sd-caption italic truncate mt-1">{item.note}</p>
@@ -202,6 +219,11 @@ export default function StudentOverviewTab({
                             {getGradeLabel(item.grade) || 'TB'}
                           </span>
                         </div>
+                      )}
+                      {isScheduled && (
+                        <span className="cms-sd-caption font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide shrink-0">
+                          Lịch sắp tới
+                        </span>
                       )}
                     </div>
                   );
