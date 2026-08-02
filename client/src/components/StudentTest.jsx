@@ -583,8 +583,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const secs   = timeLeft % 60;
 
   // ══════════════════════════════════════════════════════
-  // HARDWARE CHECK
+  // HARDWARE CHECK / MODE SELECTOR
   // ══════════════════════════════════════════════════════
+  const [examMode, setExamMode] = useState('lesson_quiz'); // 'lesson_quiz' | 'cert'
   const canStartExam = cameraReady && TOTAL > 0 && !questionsLoading;
 
   if (!STUDENT_ID) {
@@ -601,11 +602,55 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     );
   }
 
+  // ── Chọn chế độ Thi Trắc Nghệm Buổi Học (Do GV Tạo) hoặc Thi Chứng Chỉ Môn Học ──
   if (phase === 'hardware_check') return (
-    <div className="min-h-screen w-full bg-slate-900 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
-      <div className="absolute inset-0 border-[12px] border-blue-500/30 pointer-events-none rounded-[32px] m-4 animate-pulse" />
-      <div className="bg-white rounded-[28px] p-5 max-w-[320px] w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-blue-600 animate-in zoom-in duration-500 overflow-y-auto max-h-[90vh] no-scrollbar">
-         <h2 className="text-lg font-black text-slate-900 tracking-tight mt-0">Yêu cầu bật Camera</h2>
+    <div className="min-h-screen w-full bg-slate-900 flex flex-col p-4 sm:p-6 lg:p-8 space-y-4">
+      {/* Top mode switcher */}
+      <div className="max-w-5xl mx-auto w-full flex items-center justify-between gap-3 bg-slate-800/80 p-2 rounded-2xl border border-slate-700">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setExamMode('lesson_quiz')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+              examMode === 'lesson_quiz'
+                ? 'bg-red-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <Shield size={16} /> Trắc nghiệm buổi học (Giảng viên)
+          </button>
+          <button
+            type="button"
+            onClick={() => setExamMode('cert')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+              examMode === 'cert'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <Monitor size={16} /> Thi chứng nhận môn học
+          </button>
+        </div>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="px-3 py-1.5 rounded-xl bg-slate-700 text-slate-300 hover:text-white text-xs font-bold"
+          >
+            Quay lại
+          </button>
+        )}
+      </div>
+
+      {examMode === 'lesson_quiz' ? (
+        <div className="max-w-5xl mx-auto w-full">
+          <StudentQuizList />
+        </div>
+      ) : (
+        <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+          <div className="absolute inset-0 border-[12px] border-blue-500/30 pointer-events-none rounded-[32px] m-4 animate-pulse" />
+          <div className="bg-white rounded-[28px] p-5 max-w-[320px] w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-blue-600 animate-in zoom-in duration-500 overflow-y-auto max-h-[90vh] no-scrollbar">
+             <h2 className="text-lg font-black text-slate-900 tracking-tight mt-0">Yêu cầu bật Camera</h2>
          {questionsLoading && (
            <div className="mb-3 px-2 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold">
              Đang tải đề thi từ hệ thống...
@@ -701,7 +746,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
          <button type="button" onClick={() => onBack?.()} className="w-full mt-3 py-2 font-bold rounded-[14px] text-xs border border-slate-200 text-slate-600 hover:bg-slate-50">
            ← Quay lại
          </button>
+       </div>
       </div>
+      )}
     </div>
   );
 
