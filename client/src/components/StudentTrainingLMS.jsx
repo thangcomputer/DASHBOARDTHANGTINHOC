@@ -1259,13 +1259,22 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                     )}
                   </div>
 
-                  <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
-                    <AlertCircle size={14} className="text-amber-400/80 flex-shrink-0 mt-0.5" />
-                    <p className="text-amber-200/60 text-[11px] leading-relaxed">
-                      <strong className="text-amber-400/80">Lưu ý:</strong> Hệ thống chống tua video đã bật.
-                      Bạn phải xem hết thời lượng video để được ghi nhận tiến độ hoàn thành.
-                    </p>
-                  </div>
+                  {localStorage.getItem('admin_anti_seek_disabled') === 'true' ? (
+                    <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-3">
+                      <CheckCircle size={14} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-emerald-200/80 text-[11px] leading-relaxed">
+                        <strong className="text-emerald-400">Hệ thống chống tua:</strong> ĐÃ TẮT (Tự do tua video & xem các bài giảng).
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
+                      <AlertCircle size={14} className="text-amber-400/80 flex-shrink-0 mt-0.5" />
+                      <p className="text-amber-200/60 text-[11px] leading-relaxed">
+                        <strong className="text-amber-400/80">Lưu ý:</strong> Hệ thống chống tua video đã bật.
+                        Bạn phải xem hết thời lượng video để được ghi nhận tiến độ hoàn thành.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="pt-3 border-t border-white/[0.06] space-y-2">
                     <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Mô tả bài giảng</p>

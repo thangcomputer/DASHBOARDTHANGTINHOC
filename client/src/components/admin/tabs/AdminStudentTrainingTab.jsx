@@ -53,6 +53,7 @@ export default function AdminStudentTrainingTab() {
   } = useAdminTab();
 
   const [dbCourses, setDbCourses] = React.useState([]);
+  const [antiSeekEnabled, setAntiSeekEnabled] = React.useState(() => localStorage.getItem('admin_anti_seek_disabled') !== 'true');
 
   React.useEffect(() => {
     let cancelled = false;
@@ -85,10 +86,51 @@ export default function AdminStudentTrainingTab() {
                 />
               ) : (
               <>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
                   <BookOpen size={20} className="text-sky-700 shrink-0" /> Quản lý Đào tạo Học viên
                 </h2>
+              </div>
+
+              {/* Bảng điều khiển Bật/Tắt Chống tua video Toàn hệ thống dành cho Admin */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/25 p-3.5 sm:p-4 rounded-2xl shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0 font-extrabold text-base border border-amber-500/30">
+                    🛡️
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                      Chống tua Video Toàn hệ thống:
+                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-black uppercase ${
+                        antiSeekEnabled ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      }`}>
+                        {antiSeekEnabled ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                      {antiSeekEnabled
+                        ? 'Yêu cầu xem đủ 2/3 thời lượng video mới ghi nhận tiến độ hoàn thành.'
+                        : 'Cho phép người dùng tự do tua nhanh và chuyển bài học.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextState = !antiSeekEnabled;
+                    setAntiSeekEnabled(nextState);
+                    localStorage.setItem('admin_anti_seek_disabled', String(!nextState));
+                    localStorage.setItem('teacher_anti_seek', String(nextState));
+                    toast?.success(`Đã ${nextState ? 'BẬT' : 'TẮT'} chống tua video toàn hệ thống!`);
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm border shrink-0 ${
+                    antiSeekEnabled
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-700'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+                  }`}
+                >
+                  {antiSeekEnabled ? 'Tắt chống tua toàn hệ thống' : 'Bật chống tua toàn hệ thống'}
+                </button>
               </div>
 
               {/* Sub-tabs + primary action (laptop+: one row of tabs, action left-aligned) */}

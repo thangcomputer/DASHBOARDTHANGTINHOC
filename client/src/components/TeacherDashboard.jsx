@@ -477,7 +477,7 @@ const TeacherDashboard = ({ onNavigate }) => {
             startEditSchedule={startEditSchedule}
             cancelSchedule={cancelSchedule}
           />
-        ) : currentHash === 'assignments' ? (
+        ) : (currentHash === 'assignments' || currentHash === 'quizzes' || currentHash === 'test') ? (
           <div className="px-2 sm:px-4 md:px-8 py-4 sm:py-6 md:py-8">
             <TeacherAssignmentsView teacherId={TEACHER_ID} myStudents={students} />
           </div>
