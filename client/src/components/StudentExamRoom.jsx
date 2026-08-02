@@ -17,6 +17,7 @@ import {
   isExamUnlockedForSubject,
 } from '../utils/examSubjects';
 import { useIsDesktopExamDevice } from '../utils/examDevice';
+import StudentQuizList from './student/StudentQuizList';
 
 const STATUS_FILTERS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -296,6 +297,7 @@ const ScoreModal = ({ subjects, onClose }) => (
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const StudentExamRoom = ({ onNavigate, onStartExam }) => {
+  const [roomTab, setRoomTab] = useState('quiz'); // 'quiz' | 'cert'
   const [showScores, setShowScores] = useState(false);
   const [notifications] = useState(0);
   const [filterCourse, setFilterCourse] = useState('all');
@@ -435,25 +437,55 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
 
       {/* ── Main Content ── */}
       <div className="px-4 md:px-8 py-8 max-w-5xl mx-auto">
-        {/* Page Title Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-black text-gray-800">Danh sách môn thi</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {filterCourse === 'all'
-                ? `${allowedSubjectIds.length} môn thi từ ${Math.max(enrollments.length, 1)} khóa đã đăng ký`
-                : `${allowedSubjectIds.length} môn thi của khóa "${filterCourse}"`}
-              {' · '}Hệ thống sẽ tự động giám sát qua Camera.
-            </p>
-          </div>
+        {/* TAB SWITCHER */}
+        <div className="flex items-center gap-2 mb-6 border-b border-gray-200 pb-3">
           <button
             type="button"
-            onClick={() => setShowScores(true)}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-all active:scale-95 shadow-lg shadow-red-100 self-start sm:self-auto"
+            onClick={() => setRoomTab('quiz')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+              roomTab === 'quiz'
+                ? 'bg-red-600 text-white shadow-md'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
           >
-            <Trophy size={16} /> XEM ĐIỂM CỦA TÔI
+            <Trophy size={16} /> Trắc nghiệm buổi học (Giảng viên)
+          </button>
+          <button
+            type="button"
+            onClick={() => setRoomTab('cert')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+              roomTab === 'cert'
+                ? 'bg-red-600 text-white shadow-md'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            <Monitor size={16} /> Thi chứng nhận môn học
           </button>
         </div>
+
+        {roomTab === 'quiz' ? (
+          <StudentQuizList />
+        ) : (
+          <>
+            {/* Page Title Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-2xl font-black text-gray-800">Danh sách môn thi chứng nhận</h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  {filterCourse === 'all'
+                    ? `${allowedSubjectIds.length} môn thi từ ${Math.max(enrollments.length, 1)} khóa đã đăng ký`
+                    : `${allowedSubjectIds.length} môn thi của khóa "${filterCourse}"`}
+                  {' · '}Hệ thống sẽ tự động giám sát qua Camera.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScores(true)}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-all active:scale-95 shadow-lg shadow-red-100 self-start sm:self-auto"
+              >
+                <Trophy size={16} /> XEM ĐIỂM CỦA TÔI
+              </button>
+            </div>
 
         {!allowStartExam && (
           <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-amber-900">
@@ -566,14 +598,16 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
         </div>
         )}
 
-        {/* Info Banner */}
-        <div className="mt-8 bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 flex items-start gap-3">
-          <BarChart2 size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-blue-700">Điều kiện đạt môn thi</p>
-            <p className="text-xs text-blue-600 mt-1">Trắc nghiệm: đạt tối thiểu 50% số câu · Thực hành: nộp file đúng định dạng · Cả hai phần phải đạt mới tính qua môn.</p>
-          </div>
-        </div>
+            {/* Info Banner */}
+            <div className="mt-8 bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 flex items-start gap-3">
+              <BarChart2 size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-blue-700">Điều kiện đạt môn thi</p>
+                <p className="text-xs text-blue-600 mt-1">Trắc nghiệm: đạt tối thiểu 50% số câu · Thực hành: nộp file đúng định dạng · Cả hai phần phải đạt mới tính qua môn.</p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Score Modal ── */}
