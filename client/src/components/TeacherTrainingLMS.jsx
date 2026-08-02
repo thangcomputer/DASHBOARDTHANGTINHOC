@@ -1101,8 +1101,8 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           {/* INFO PANEL BELOW VIDEO */}
           <div className="flex flex-col flex-1 min-h-0">
 
-            {/* TAB BAR — 4 tabs */}
-            <div className="grid grid-cols-4 flex-shrink-0 border-b border-white/[0.06]" style={{ background: '#0d1117' }}>
+            {/* TAB BAR — 2 tabs */}
+            <div className="grid grid-cols-2 flex-shrink-0 border-b border-white/[0.06]" style={{ background: '#0d1117' }}>
               {LMS_PLAYER_TABS.map(t => (
                 <button
                   key={t.key}

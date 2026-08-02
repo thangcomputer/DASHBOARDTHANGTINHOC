@@ -25,7 +25,5 @@ export function formatLessonDisplayTitle(title, index = 0) {
 
 export const LMS_PLAYER_TABS = [
   { key: 'video', label: 'Bài giảng', shortLabel: 'Bài giảng' },
-  { key: 'list', label: 'Danh sách bài', shortLabel: 'DS bài' },
-  { key: 'data', label: 'Tài liệu', shortLabel: 'Tài liệu' },
-  { key: 'notice', label: 'Thông báo', shortLabel: 'Thông báo' },
+  { key: 'list', label: 'Danh sách bài', shortLabel: 'Danh sách bài' },
 ];
