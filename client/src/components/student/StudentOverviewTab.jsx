@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   PlayCircle, Clock, CheckCircle, MessageSquare, Download,
   BookOpen, Star, TrendingUp, Zap, Calendar, Video,
-  ClipboardList, ChevronRight, XCircle,
+  ClipboardList, ChevronRight, XCircle, Trophy,
 } from 'lucide-react';
 import { CourseSwitcher, StatCard } from './StudentShared';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
