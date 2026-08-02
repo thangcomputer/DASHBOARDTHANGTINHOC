@@ -160,7 +160,7 @@ export default function AdminStudentTrainingTab() {
                     {sTrainingTab === 'files' && (
                       <>
                         <div>
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Khóa học <span className="text-red-500">*</span></label>
+                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Khóa học (Không bắt buộc)</label>
                           <CmsSelect
                             value={sTrainingForm.courseId || ''}
                             onChange={(e) => {
@@ -174,16 +174,11 @@ export default function AdminStudentTrainingTab() {
                             }}
                             className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none bg-white"
                           >
-                            <option value="">— Chọn khóa học —</option>
+                            <option value="">— Chọn khóa học (tùy chọn) —</option>
                             {documentCourseOptions.map((c) => (
                               <option key={c.id} value={c.id}>{c.title}</option>
                             ))}
                           </CmsSelect>
-                          {!documentCourseOptions.length && (
-                            <p className="text-xs text-amber-600 mt-1">
-                              Chưa có khóa học. Tạo khóa tại <strong>Cài đặt hệ thống → Học phí khóa học</strong>, hoặc tab Quản lý Khóa học (video).
-                            </p>
-                          )}
                         </div>
                         <div>
                           <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tiêu đề</label>
@@ -230,20 +225,16 @@ export default function AdminStudentTrainingTab() {
                     />
                   </div>
                   <button onClick={() => {
-                    if (!sTrainingForm.title?.trim()) { 
-                        showGlobalModal({ title: 'Thiếu thông tin', content: 'Vui lòng nhập tiêu đề tài liệu!', type: 'warning' });
-                        return; 
-                    }
-                    if (sTrainingTab === 'files' && !sTrainingForm.courseId) {
-                      showGlobalModal({ title: 'Thiếu thông tin', content: 'Vui lòng chọn khóa học cho tài liệu này!', type: 'warning' });
-                      return;
-                    }
                     if (!sTrainingForm.examSubjects?.length) {
                       showGlobalModal({ title: 'Thiếu thông tin', content: 'Vui lòng chọn ít nhất một môn học!', type: 'warning' });
                       return;
                     }
                     const sTrainingPayload = sTrainingTab === 'files'
-                      ? { ...sTrainingForm, fileType: sTrainingForm.fileType || 'PDF' }
+                      ? { 
+                          ...sTrainingForm, 
+                          fileType: sTrainingForm.fileType || 'PDF',
+                          courseName: sTrainingForm.courseName || 'Tài liệu học tập',
+                        }
                       : sTrainingForm;
                     if (sTrainingForm.id) {
                       updateStudentTrainingItem(sTrainingTab, sTrainingForm.id, sTrainingPayload);
