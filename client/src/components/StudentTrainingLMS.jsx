@@ -1185,20 +1185,20 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         </div>
       </div>
 
-      {/* ─── BODY: 70 / 30 ────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0">
+      {/* ─── BODY: RESPONSIVE LAYOUT (Mobile: 1 cột; Desktop: 2 cột) ──────────────── */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto lg:overflow-hidden" style={{ background: '#0b1018' }}>
 
-        {/* ══ LEFT COLUMN ══ */}
-        <div className="flex flex-col flex-1 min-w-0 lg:flex-[0_0_75%] overflow-hidden">
+        {/* ══ LEFT COLUMN: Video & Details ══ */}
+        <div className="flex flex-col flex-1 min-w-0 lg:flex-[0_0_75%] overflow-y-auto lg:overflow-hidden custom-scrollbar-dark">
 
           {/* VIDEO WRAPPER — 16:9 */}
-          <div className="flex-shrink-0 px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 flex justify-center">
+          <div className="flex-shrink-0 px-2 sm:px-4 pt-2 sm:pt-4 pb-2 flex justify-center">
             <div
-              className="relative overflow-hidden shadow-2xl shadow-black/60 w-full"
+              className="relative overflow-hidden shadow-2xl shadow-black/80 w-full"
               style={{
                 borderRadius: '16px',
                 aspectRatio: '16 / 9',
-                maxHeight: '65vh',
+                maxHeight: '60vh',
                 margin: '0 auto',
               }}
             >
@@ -1220,14 +1220,13 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                   key={t.key}
                   type="button"
                   onClick={() => setCourseTab(t.key)}
-                  className={`px-1 sm:px-3 py-3 text-[9px] sm:text-[11px] font-bold tracking-wide border-b-2 transition-all truncate ${
+                  className={`px-3 py-3 text-xs sm:text-sm font-bold tracking-wide border-b-2 transition-all text-center truncate ${
                     courseTab === t.key
-                      ? 'text-white border-emerald-500'
+                      ? 'text-white border-emerald-500 bg-white/[0.03]'
                       : 'text-slate-500 border-transparent hover:text-slate-300'
                   }`}
                 >
-                  <span className="sm:hidden">{t.shortLabel}</span>
-                  <span className="hidden sm:inline">{t.label}</span>
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -1380,47 +1379,13 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                 </div>
               )}
 
-              {courseTab === 'data' && (
-                <div className="max-w-3xl space-y-3">
-                  {!selectedCourse.files || selectedCourse.files.length === 0 ? (
-                    <div className="text-center py-10 text-slate-600 text-sm">Khóa học này chưa có tài liệu đính kèm.</div>
-                  ) : selectedCourse.files.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer group">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[9px] font-black text-white ${file.type === 'PDF' ? 'bg-rose-500/80' : file.type === 'DOCX' ? 'bg-emerald-600/80' : 'bg-emerald-600/80'
-                          }`}>{file.type}</div>
-                        <div>
-                          <h4 className="font-semibold text-slate-200 text-sm">{file.title}</h4>
-                          <p className="text-[10px] text-slate-600 mt-0.5">{file.size}</p>
-                        </div>
-                      </div>
-                      <button type="button" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                        <Download size={13} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {courseTab === 'notice' && (
-                <div className="max-w-3xl space-y-3">
-                  {!selectedCourse.notices || selectedCourse.notices.length === 0 ? (
-                    <div className="text-center py-10 text-slate-600 text-sm">Không có thông báo mới nào từ ban quản trị.</div>
-                  ) : selectedCourse.notices.map((n, idx) => (
-                    <div key={idx} className="bg-white/[0.04] p-4 rounded-xl border border-white/[0.06]">
-                      <p className="text-[13px] text-slate-300 leading-relaxed">{n}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
             </div>
           </div>
         </div>
 
         {/* ══ RIGHT SIDEBAR ══ */}
         <div
-          className="hidden lg:flex flex-col lg:w-80 flex-shrink-0 border-l sticky top-4 h-[calc(100vh-100px)] overflow-hidden"
+          className="hidden lg:flex flex-col lg:w-80 flex-shrink-0 border-l h-full overflow-hidden"
           style={{ borderColor: 'rgba(255,255,255,0.06)', background: '#0b1018' }}
         >
 
