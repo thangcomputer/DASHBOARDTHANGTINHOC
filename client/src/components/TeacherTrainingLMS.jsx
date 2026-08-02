@@ -1078,11 +1078,11 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto lg:overflow-hidden" style={{ background: '#0b1018' }}>
 
         {/* ══ LEFT COLUMN: Video & Details ══ */}
-        <div className="flex flex-col flex-1 min-w-0 lg:flex-[0_0_75%] overflow-y-auto lg:overflow-hidden custom-scrollbar-dark">
+        <div className="flex flex-col flex-1 min-w-0 w-full overflow-y-auto lg:overflow-hidden custom-scrollbar-dark">
 
           {/* VIDEO WRAPPER — 16:9 */}
-          <div className="flex-shrink-0 px-2 sm:px-4 pt-2 sm:pt-4 pb-2 flex justify-center">
-            <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80 max-h-[60vh] mx-auto">
+          <div className="flex-shrink-0 px-2 sm:px-4 pt-2 sm:pt-4 pb-2 flex justify-center w-full">
+            <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80">
               <YouTubePlayerSecure
                 key={currentLesson?._id}
                 videoId={currentLesson?.videoUrl}
@@ -1099,7 +1099,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           </div>
 
           {/* INFO PANEL BELOW VIDEO */}
-          <div className="flex flex-col flex-1 min-h-0">
+          <div className="flex flex-col flex-1 min-h-0 w-full">
 
             {/* TAB BAR — Chỉ hiện trên Mobile/Tablet (lg:hidden) vì Desktop đã có Sidebar bên phải */}
             <div className="lg:hidden grid grid-cols-2 flex-shrink-0 border-b border-white/[0.06]" style={{ background: '#0d1117' }}>
@@ -1120,11 +1120,11 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             </div>
 
             {/* TAB CONTENT */}
-            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 custom-scrollbar-dark" style={{ background: '#0d1117' }}>
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 custom-scrollbar-dark w-full" style={{ background: '#0d1117' }}>
 
               {/* THÔNG TIN BÀI GIẢNG — Luôn hiện trên Desktop, trên Mobile thì hiện khi chọn tab video */}
               {currentLesson && (
-                <div className={`max-w-3xl space-y-4 sm:space-y-5 ${courseTab === 'video' ? 'block' : 'hidden lg:block'}`}>
+                <div className={`w-full space-y-4 sm:space-y-5 ${courseTab === 'video' ? 'block' : 'hidden lg:block'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <span className="inline-block text-[9px] font-black text-emerald-400/80 uppercase tracking-[0.15em] mb-2">
