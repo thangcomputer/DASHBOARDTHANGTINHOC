@@ -665,6 +665,7 @@ const builderRoutes      = require('./routes/builderRoutes');
 const tenantRoutes       = require('./routes/tenantRoutes');
 const feedRoutes         = require('./routes/feedRoutes');
 const blogRoutes         = require('./routes/blogRoutes');
+const quizRoutes         = require('./routes/quizRoutes');
 
 app.use('/api/auth',         authRoutes);
 app.use('/api/students',     studentRoutes);
@@ -674,6 +675,7 @@ app.use('/api/schedules',    scheduleRoutes);
 app.use('/api/courses',      courseRoutes);
 app.use('/api/teachers',     teacherRoutes);
 app.use('/api/assignments',  assignmentRoutes);
+app.use('/api/quizzes',      quizRoutes);
 app.use('/api/evaluations',  evaluationRoutes);
 app.use('/api/exam-results', examResultRoutes);
 app.use('/api/system-logs',  systemLogRoutes);

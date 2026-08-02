@@ -1827,6 +1827,39 @@ export const blogAPI = {
   },
 };
 
+export const quizzesAPI = {
+  getTeacherQuizzes: async () => {
+    const res = await apiFetch('/quizzes/teacher');
+    return res.json();
+  },
+  create: async (payload) => {
+    const res = await apiFetch('/quizzes/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+  remove: async (id) => {
+    const res = await apiFetch(`/quizzes/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+  getStudentQuizzes: async () => {
+    const res = await apiFetch('/quizzes/student');
+    return res.json();
+  },
+  getQuizForExam: async (id) => {
+    const res = await apiFetch(`/quizzes/${id}`);
+    return res.json();
+  },
+  submit: async (id, answers) => {
+    const res = await apiFetch(`/quizzes/${id}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    });
+    return res.json();
+  },
+};
+
 export default {
   auth:         authAPI,
   students:     studentsAPI,
@@ -1837,6 +1870,7 @@ export default {
   schedules:    schedulesAPI,
   evaluations:  evaluationsAPI,
   assignments:  assignmentsAPI,
+  quizzes:      quizzesAPI,
   examResults:  examResultsAPI,
   settings:     settingsAPI,
   systemLogs:   systemLogsAPI,

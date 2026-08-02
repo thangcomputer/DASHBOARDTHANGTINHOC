@@ -6,9 +6,12 @@ import api, { resolveMediaUrl, buildMediaDownloadUrl } from '../services/api';
 import { getGradeTextClasses } from '../utils/gradeColors';
 import { useModal } from '../utils/Modal.jsx';
 
+import TeacherQuizManager from './teacher/TeacherQuizManager';
+
 const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const location = useLocation();
   const { showModal } = useModal();
+  const [activeTab, setActiveTab] = useState('quiz'); // 'quiz' | 'file'
   // Compute unique courses from students
   const uniqueCourses = [...new Set((myStudents || []).map(s => s.course).filter(Boolean))];
   const [selectedCourse, setSelectedCourse] = useState(uniqueCourses[0] || '');
@@ -124,18 +127,48 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-          <span className="flex items-center gap-2"><Clipboard size={20} className="text-purple-600" /> Bài tập của:</span>
-          <CmsSelect 
-            value={selectedCourse} 
-            onChange={(e) => setSelectedCourse(e.target.value)}
-            className="border-2 border-purple-200 focus:border-purple-500 rounded-xl px-3 py-1.5 outline-none font-black text-blue-700 bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer text-sm"
-          >
-            {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
-          </CmsSelect>
-        </h2>
+    <div className="space-y-6 w-full">
+      {/* ── TAB SWITCHER DÀNH CHO GIẢNG VIÊN ── */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('quiz')}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+            activeTab === 'quiz'
+              ? 'bg-red-600 text-white shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Clipboard size={16} /> Bài thi Trắc nghiệm
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('file')}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+            activeTab === 'file'
+              ? 'bg-red-600 text-white shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <FileText size={16} /> Bài tập về nhà (Nộp file)
+        </button>
+      </div>
+
+      {activeTab === 'quiz' ? (
+        <TeacherQuizManager myStudents={myStudents} />
+      ) : (
+        <>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
+              <span className="flex items-center gap-2"><Clipboard size={20} className="text-purple-600" /> Bài tập của:</span>
+              <CmsSelect 
+                value={selectedCourse} 
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="border-2 border-purple-200 focus:border-purple-500 rounded-xl px-3 py-1.5 outline-none font-black text-blue-700 bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer text-sm"
+              >
+                {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
+              </CmsSelect>
+            </h2>
         <button 
           onClick={() => setShowCreateModal(true)}
           className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-purple-200 transition-all flex items-center gap-2 active:scale-95"
@@ -332,6 +365,8 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
             </form>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

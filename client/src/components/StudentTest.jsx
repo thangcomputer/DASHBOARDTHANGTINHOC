@@ -13,6 +13,7 @@ import { useModal } from '../utils/Modal.jsx';
 import { getStudentMcQuestionsForExam, normalizeMcCorrectIndex, getStudentPracticeFilesForSubject } from '../utils/htmlContent';
 import { EXAM_CAMERA_PERMISSION_LABEL } from '../utils/examUi';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../services/api';
+import StudentQuizList from './student/StudentQuizList';
 
 const SUBJECT_META = {
   coban:       { label: 'Máy vi tính (Cơ bản)', short: 'Cơ bản',     examFile: 'De_thi_Co_ban.docx', time: 90 * 60 },
