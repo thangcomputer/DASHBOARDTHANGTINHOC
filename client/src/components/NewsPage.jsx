@@ -741,7 +741,7 @@ export default function NewsPage({ session, role = 'admin' }) {
   }
 
   return (
-    <div className="cms-viewport-fill w-full space-y-4">
+    <div className="w-full space-y-4 pb-8">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2 truncate">

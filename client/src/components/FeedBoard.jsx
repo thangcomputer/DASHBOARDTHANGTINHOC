@@ -395,7 +395,7 @@ export default function FeedBoard({ session, role }) {
     isAdminLike(meRole, meId) || String(c.authorId) === meId || String(post.authorId) === meId;
 
   return (
-    <div className="cms-viewport-fill w-full">
+    <div className="w-full space-y-4 pb-8">
       <div className="flex items-start justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
@@ -451,8 +451,8 @@ export default function FeedBoard({ session, role }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 flex-1 min-h-0">
-        <div className="cms-viewport-scroll space-y-3 md:space-y-4 min-w-0">
+      <div className="space-y-4 w-full min-w-0">
+        <div className="space-y-3 md:space-y-4 min-w-0">
       <div className="cms-feed-composer">
         <div className="cms-feed-composer__row">
           <img

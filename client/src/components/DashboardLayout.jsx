@@ -514,8 +514,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               : isImmersivePage
                 ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
                 : role === 'student'
-                  ? 'flex-1 min-h-0 px-0 py-0 sm:px-4 sm:py-3 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
-                  : 'flex-1 min-h-0 px-2.5 py-1.5 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
+                  ? 'flex-1 min-h-0 px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
+                  : 'flex-1 min-h-0 px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 w-full max-w-full overflow-x-hidden overflow-y-auto hide-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-8'
           }
         >
           <div
