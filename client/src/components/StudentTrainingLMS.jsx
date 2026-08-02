@@ -1248,12 +1248,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                           Math.max(0, lessons.findIndex(l => String(l._id) === String(currentLesson._id)))
                         )}
                       </h1>
-                      {currentLesson.duration && (
-                        <span className="inline-flex items-center gap-1.5 mt-2 text-slate-500 text-[11px] font-semibold">
+                      {Number(currentLesson.duration) > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 mt-2 text-slate-400 text-[11px] font-semibold">
                           <Clock size={12} />
                           {Math.floor(currentLesson.duration / 60)} phút {String(currentLesson.duration % 60).padStart(2, '0')}s
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     {currentLesson.isCompleted && (
                       <div className="flex-shrink-0 flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-bold border border-emerald-500/20">
