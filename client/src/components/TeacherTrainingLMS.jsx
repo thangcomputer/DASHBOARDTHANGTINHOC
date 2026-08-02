@@ -110,6 +110,7 @@ const YouTubePlayerSecure = ({
   videoId, lessonId, courseId, duration: lessonDuration,
   initialWatchedSeconds = 0,
   onVideoEnded, onSaveProgress, onEligibilityReached, isLocked,
+  antiSeekEnabled = true,
 }) => {
   const playerRef = useRef(null);
   const containerRef = useRef(null);
@@ -152,11 +153,11 @@ const YouTubePlayerSecure = ({
   useEffect(() => {
     if (!totalDuration || !onEligibilityReached) return;
     const reqSecs = Math.ceil(totalDuration * 2 / 3);
-    // Kích hoạt duy nhất 1 lần khi đúng chạm mốc 2/3
-    if (displayWatched === reqSecs && displayWatched > 0) {
-       onEligibilityReached(displayWatched, totalDuration);
+    // Nếu tắt chống tua (antiSeekEnabled === false) hoặc xem đủ mốc 2/3
+    if (!antiSeekEnabled || (displayWatched >= reqSecs && displayWatched > 0)) {
+       onEligibilityReached(displayWatched || totalDuration, totalDuration);
     }
-  }, [displayWatched, totalDuration, onEligibilityReached]);
+  }, [displayWatched, totalDuration, onEligibilityReached, antiSeekEnabled]);
 
   // ── Giám sát tương tác Tab (Mới) ───────────────────────────────────────────
   useEffect(() => {
@@ -607,6 +608,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
   const [courseTab, setCourseTab] = useState('video'); // video | list | data | notice
   const [mainTab, setMainTab] = useState('courses'); // courses | guides | files
   const [expandedGuideKey, setExpandedGuideKey] = useState(null);
+  const [antiSeekEnabled, setAntiSeekEnabled] = useState(() => localStorage.getItem('teacher_anti_seek') !== 'false');
 
   // Lấy tiến độ các khóa học của GV để hiển thị bên ngoài (Bổ sung mới)
   useEffect(() => {
@@ -1094,6 +1096,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                 onSaveProgress={handleSaveProgress}
                 onEligibilityReached={handleEligibilityReached}
                 isLocked={!currentLesson?.isUnlocked}
+                antiSeekEnabled={antiSeekEnabled}
               />
             </div>
           </div>
@@ -1150,12 +1153,31 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                     )}
                   </div>
 
-                  <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
-                    <AlertCircle size={14} className="text-amber-400/80 flex-shrink-0 mt-0.5" />
-                    <p className="text-amber-200/60 text-[11px] leading-relaxed">
-                      <strong className="text-amber-400/80">Lưu ý:</strong> Hệ thống chống tua video đã bật.
-                      Bạn phải xem hết thời lượng video để được ghi nhận tiến độ hoàn thành.
-                    </p>
+                  <div className="flex items-center justify-between gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <AlertCircle size={15} className="text-amber-400/80 flex-shrink-0" />
+                      <p className="text-amber-200/70 text-[11px] sm:text-xs leading-relaxed min-w-0">
+                        <strong className="text-amber-400 font-bold">Hệ thống chống tua:</strong>{' '}
+                        {antiSeekEnabled
+                          ? 'ĐÃ BẬT (Phải xem đủ 2/3 thời lượng)'
+                          : 'ĐÃ TẮT (Tự do tua video & xem nội dung)'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextState = !antiSeekEnabled;
+                        setAntiSeekEnabled(nextState);
+                        localStorage.setItem('teacher_anti_seek', String(nextState));
+                      }}
+                      className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                        antiSeekEnabled
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                      }`}
+                    >
+                      {antiSeekEnabled ? 'Tắt chống tua' : 'Bật chống tua'}
+                    </button>
                   </div>
 
                   <div className="pt-3 border-t border-white/[0.06] space-y-2">
