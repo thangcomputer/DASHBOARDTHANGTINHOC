@@ -79,6 +79,26 @@ class NotificationService {
       link
     });
   }
+
+  /**
+   * Helper to notify branch staff + super admins only
+   */
+  static async notifyBranchAdmins(io, { branchId, title, content, payload = {}, link = '' }) {
+    const receivers = ['ALL_SUPER_ADMIN'];
+    if (branchId) {
+      receivers.push(`ALL_ADMIN_${branchId}`);
+    } else {
+      receivers.push('ALL_ADMIN');
+    }
+    return this.send(io, {
+      type: 'SYSTEM',
+      title,
+      content,
+      receivers,
+      payload,
+      link
+    });
+  }
 }
 
 module.exports = NotificationService;

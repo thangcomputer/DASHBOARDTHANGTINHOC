@@ -739,7 +739,13 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
     const io = req.app.get('io');
     if (io) {
       const NotificationService = require('../services/NotificationService');
-      NotificationService.notifyAdmins(io, '🆕 Học viên mới đăng ký', `Học viên ${student.name} đã đăng ký khóa học ${student.course}.`, { studentId: student._id }, '/admin/students');
+      NotificationService.notifyBranchAdmins(io, {
+        branchId: student.branchId,
+        title: '🆕 Học viên mới đăng ký',
+        content: `Học viên ${student.name} đã đăng ký khóa học ${student.course}.`,
+        payload: { studentId: student._id },
+        link: '/admin/students',
+      });
       
       io.emit('student:new', {
         studentId: student._id,

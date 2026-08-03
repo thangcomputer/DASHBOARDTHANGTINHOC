@@ -6,29 +6,61 @@ const logger = require('../config/logger');
 
 const VALID_TYPES = ['SYSTEM', 'COURSE', 'FINANCE', 'EVALUATION', 'MESSAGE', 'EXAM', 'SCHEDULE'];
 
+function getAccountCreationTime(user) {
+  if (user.createdAt) return new Date(user.createdAt);
+  if (user.created_at) return new Date(user.created_at);
+  const uid = String(user.id || user._id || '');
+  if (uid.length === 24 && /^[0-9a-fA-F]{24}$/.test(uid)) {
+    try {
+      const timestamp = parseInt(uid.substring(0, 8), 16) * 1000;
+      return new Date(timestamp);
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
 function buildReceiverMatch(user) {
   const userId = String(user.id || user._id || '');
   const role = user.role;
   const adminRole = user.adminRole;
   const branchId = user.branchId ? String(user.branchId) : '';
+  const userCreatedAt = getAccountCreationTime(user);
+
+  const isSuperAdmin = userId === 'admin' || adminRole === 'SUPER_ADMIN';
+  const isAdminSide = role === 'admin' || role === 'staff' || adminRole === 'SUPER_ADMIN' || adminRole === 'STAFF';
+
+  // Helper cho broad receivers — loại bỏ thông báo cũ trước ngày nhân viên được tạo
+  const broadCond = (rec) => {
+    if (!isSuperAdmin && userCreatedAt && !isNaN(userCreatedAt.getTime())) {
+      return { receivers: rec, createdAt: { $gte: userCreatedAt } };
+    }
+    return { receivers: rec };
+  };
 
   const match = [
     { receivers: userId },
-    { receivers: 'GLOBAL' },
+    broadCond('GLOBAL'),
   ];
 
-  const isAdminSide = role === 'admin' || role === 'staff' || adminRole === 'SUPER_ADMIN' || adminRole === 'STAFF';
-  if (isAdminSide) {
-    match.push({ receivers: 'ALL_ADMIN' });
-    if (branchId) match.push({ receivers: 'ALL_ADMIN_' + branchId });
+  if (isSuperAdmin) {
+    match.push(broadCond('ALL_ADMIN'));
+    match.push(broadCond('ALL_SUPER_ADMIN'));
+  } else if (isAdminSide) {
+    if (branchId) {
+      match.push(broadCond('ALL_ADMIN_' + branchId));
+      match.push(broadCond('ALL_STAFF_' + branchId));
+    } else {
+      match.push(broadCond('ALL_ADMIN'));
+    }
   }
+
   if (role === 'teacher') {
-    match.push({ receivers: 'ALL_TEACHER' });
-    if (branchId) match.push({ receivers: 'ALL_TEACHER_' + branchId });
+    match.push(broadCond('ALL_TEACHER'));
+    if (branchId) match.push(broadCond('ALL_TEACHER_' + branchId));
   }
   if (role === 'student') {
-    match.push({ receivers: 'ALL_STUDENT' });
-    if (branchId) match.push({ receivers: 'ALL_STUDENT_' + branchId });
+    match.push(broadCond('ALL_STUDENT'));
+    if (branchId) match.push(broadCond('ALL_STUDENT_' + branchId));
   }
 
   return { userId, match };
