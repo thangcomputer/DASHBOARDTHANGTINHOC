@@ -243,7 +243,7 @@ async function completeInternalLogin(user, userRole, deviceFingerprint) {
 }
 
 async function issueAdminTokens(sysSettings, audience = 'public') {
-  const dbAdminName = sysSettings?.adminName || 'Admin Thắng Tin Học';
+  const dbAdminName = (sysSettings?.adminName && !sysSettings.adminName.includes('PHÒNG ĐÀO TẠO')) ? sysSettings.adminName : 'SUPER ADMIN';
   const { accessToken, refreshToken } = generateTokens(
     {
       id: 'admin',

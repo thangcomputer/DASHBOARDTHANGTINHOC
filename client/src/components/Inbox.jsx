@@ -381,18 +381,28 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Helper tra cứu tên người gửi động chuẩn hệ thống ──────────────────────
   const resolveSenderName = useCallback((msg) => {
-    if (!msg) return 'Người gửi';
-    if (String(msg.senderId) === String(currentUserId)) return currentUserName;
-    if (msg.senderId === 'admin') {
+    if (!msg) return 'SUPER ADMIN';
+    const isPrimaryAdmin = String(msg.senderId) === 'admin' || msg.senderRole === 'admin';
+    if (isPrimaryAdmin) {
       const superDoc = (teachers || []).find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin');
-      if (superDoc?.name) return superDoc.name;
-      if (currentUserRole === 'admin' && currentUserName) return currentUserName;
+      const rawName = superDoc?.name || (currentUserRole === 'admin' ? currentUserName : '');
+      if (rawName && !rawName.includes('PHÒNG ĐÀO TẠO') && !rawName.includes('Phòng Đào Tạo')) return rawName;
+      return 'SUPER ADMIN';
+    }
+    if (String(msg.senderId) === String(currentUserId)) {
+      if (currentUserName.includes('PHÒNG ĐÀO TẠO') || currentUserName.includes('Phòng Đào Tạo')) return 'SUPER ADMIN';
+      return currentUserName;
     }
     const matchTeacher = (teachers || []).find(t => String(t.id || t._id) === String(msg.senderId));
-    if (matchTeacher?.name) return matchTeacher.name;
+    if (matchTeacher?.name) {
+      if (matchTeacher.name.includes('PHÒNG ĐÀO TẠO') || matchTeacher.name.includes('Phòng Đào Tạo')) return 'SUPER ADMIN';
+      return matchTeacher.name;
+    }
     const matchStudent = (students || []).find(s => String(s.id || s._id) === String(msg.senderId));
     if (matchStudent?.name) return matchStudent.name;
-    return msg.senderName || 'Người gửi';
+    const raw = msg.senderName || 'Người gửi';
+    if (raw.includes('PHÒNG ĐÀO TẠO') || raw.includes('Phòng Đào Tạo')) return 'SUPER ADMIN';
+    return raw;
   }, [currentUserId, currentUserName, currentUserRole, teachers, students]);
 
   // ─── Load messages khi chọn conversation ─────────────────────────────────────
