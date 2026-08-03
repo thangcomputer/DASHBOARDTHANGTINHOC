@@ -337,9 +337,9 @@ export default function TeacherOverviewTab({
             </div>
           </div>
 
-          {/* Card 2: Bảng tin Hoạt động gần đây & Thông báo từ Trung tâm */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-wrap gap-2">
+          {/* Card 2: Bảng tin Hoạt động gần đây & Thông báo từ Trung tâm (Chiều cao cố định h-[210px] không bị nhảy nhô lên xuống) */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 h-[210px] shrink-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-wrap gap-2 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                   <History size={16} />
@@ -354,14 +354,14 @@ export default function TeacherOverviewTab({
                 <button
                   type="button"
                   onClick={() => setActivityTab('recent')}
-                  className={`px-2 py-1 rounded-md transition ${activityTab === 'recent' ? 'bg-white text-indigo-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`px-2 py-1 rounded-md transition cursor-pointer ${activityTab === 'recent' ? 'bg-white text-indigo-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                   Hoạt động mới ({teacherActivities.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setActivityTab('announcements')}
-                  className={`px-2 py-1 rounded-md transition ${activityTab === 'announcements' ? 'bg-white text-indigo-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`px-2 py-1 rounded-md transition cursor-pointer ${activityTab === 'announcements' ? 'bg-white text-indigo-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                   Thông báo ({centerAnnouncements.length})
                 </button>
@@ -370,9 +370,16 @@ export default function TeacherOverviewTab({
 
             {/* TAB 1: Real Dynamic Activity Logs */}
             {activityTab === 'recent' && (
-              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+              <div className="flex-1 overflow-y-auto pr-1 space-y-2">
                 {teacherActivities.map((act) => (
-                  <div key={act.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition flex items-start justify-between gap-2">
+                  <div
+                    key={act.id}
+                    onClick={() => {
+                      if (act.type === 'grade') navigate('/teacher#students');
+                      else navigate('/teacher#schedule');
+                    }}
+                    className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-indigo-300 hover:bg-indigo-50/50 transition flex items-center justify-between gap-2 cursor-pointer group"
+                  >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                         <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${act.badgeColor}`}>
@@ -380,30 +387,40 @@ export default function TeacherOverviewTab({
                         </span>
                         <span className="text-[10px] text-slate-400 font-semibold">{act.date}</span>
                       </div>
-                      <p className="text-xs font-bold text-slate-800 truncate">{act.title}</p>
+                      <p className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{act.title}</p>
                       <p className="text-[11px] text-slate-500 truncate mt-0.5">{act.desc}</p>
                     </div>
+                    <ChevronRight size={14} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition shrink-0" />
                   </div>
                 ))}
 
                 {teacherActivities.length === 0 && (
-                  <div className="py-6 text-center text-slate-400 text-xs font-medium">Chưa có nhật ký hoạt động nào gần đây.</div>
+                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-xs font-medium py-4">
+                    Chưa có nhật ký hoạt động nào gần đây.
+                  </div>
                 )}
               </div>
             )}
 
             {/* TAB 2: Center Announcements */}
             {activityTab === 'announcements' && (
-              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+              <div className="flex-1 overflow-y-auto pr-1 space-y-2">
                 {centerAnnouncements.map((item) => (
-                  <div key={item.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700">
-                        {item.tag}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-medium">{item.date}</span>
+                  <div
+                    key={item.id}
+                    onClick={() => navigate('/teacher/inbox')}
+                    className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-300 hover:bg-blue-50/50 transition flex items-center justify-between gap-2 cursor-pointer group"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                          {item.tag}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">{item.date}</span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-800 leading-snug group-hover:text-blue-600 transition-colors">{item.title}</p>
                     </div>
-                    <p className="text-xs font-bold text-slate-800 leading-snug">{item.title}</p>
+                    <ChevronRight size={14} className="text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition shrink-0" />
                   </div>
                 ))}
               </div>
