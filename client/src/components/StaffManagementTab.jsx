@@ -10,7 +10,7 @@ import CmsSelect from './ui/CmsSelect';
 import {
   ShieldCheck, UserPlus, Edit2, Trash2, Save, X, Loader2,
   CheckSquare, Square, Key, Phone, User, Shield, Users,
-  AlertTriangle, CheckCircle2, Crown, UserCog, Building2, MoreVertical, ChevronDown, Search,
+  AlertTriangle, CheckCircle2, Crown, UserCog, Building2, MoreVertical, ChevronDown, Search, MessageSquare,
 } from 'lucide-react';
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
