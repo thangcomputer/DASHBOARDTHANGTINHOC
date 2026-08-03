@@ -23,7 +23,7 @@ import {
 } from '../utils/supportPresence';
 
 const ROLE_LABEL = {
-  admin: 'Hỗ trợ viên',
+  admin: 'Quản trị viên',
   staff: 'Hỗ trợ viên',
   teacher: 'GV',
   student: 'HV',
@@ -423,11 +423,11 @@ export default function FloatingMessenger({ session, role }) {
   const unreadConversations = useMemo(() => {
     const list = conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup);
     if (isSuper) return list.slice(0, 8);
-    // Non-super: nhận tin từ Admin hoặc Hỗ trợ viên (staff)
+    // Non-super: nhận tin từ Hỗ trợ viên (staff)
     return list.filter((c) => {
       const r = String(c.user?.role || '').toLowerCase();
       const ar = String(c.user?.adminRole || '').toUpperCase();
-      return r === 'staff' || ar === 'STAFF' || String(c.user?.id) === 'admin';
+      return r === 'staff' || ar === 'STAFF';
     }).slice(0, 8);
   }, [conversations, isSuper]);
 

@@ -70,23 +70,24 @@ export default function FeedBoard({ session, role }) {
   const meRole = role || session?.role || 'student';
   const isSuper = isSuperAdminViewer(session);
 
-  // Bảng tin: chỉ Hỗ trợ nhanh → Admin Super (không phải danh bạ nhắn tin)
+  // Bảng tin: Hỗ trợ nhanh trỏ tới Hỗ trợ viên (staff)
   const quickSupport = useMemo(() => {
-    const online = (onlineUsers || []).find(isSuperAdminPresence);
+    const online = (onlineUsers || []).find((u) => {
+      const r = String(u.role || '').toLowerCase();
+      return r === 'staff' || u.adminRole === 'STAFF';
+    });
     return {
-      id: 'admin',
+      id: online?.userId || 'staff',
       name: online?.name || 'Hỗ trợ viên',
-      role: 'admin',
+      role: 'staff',
       online: !!online,
     };
   }, [onlineUsers]);
 
   const openQuickSupport = useCallback(() => {
     if (isSuper) return;
-    setSupportOpen(false);
-    if (typeof openChat === 'function') openChat(quickSupport, { expand: true });
-    else openSiteChat(quickSupport);
-  }, [isSuper, openChat, setSupportOpen, quickSupport]);
+    setSupportOpen(true);
+  }, [isSuper, setSupportOpen]);
 
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(1);
