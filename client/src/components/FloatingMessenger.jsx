@@ -283,21 +283,21 @@ function ChatWindow({
             return (
               <div key={msgId} className={`group relative flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}>
                 {mine && !m.isRecalled && (
-                  <div className="relative shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="relative shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setActiveMsgOptions(showOptions ? null : msgId);
                       }}
-                      className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition"
+                      className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
                       title="Tùy chọn tin nhắn"
                     >
                       <MoreVertical size={14} />
                     </button>
                     {showOptions && (
                       <div
-                        className="absolute right-0 bottom-full mb-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1 w-36 text-xs font-semibold animate-in fade-in zoom-in-95 duration-150"
+                        className="absolute left-0 bottom-full mb-1 z-[100] bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 w-36 text-xs font-semibold animate-in fade-in zoom-in-95 duration-150 shadow-slate-900/15"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
@@ -306,10 +306,10 @@ function ChatWindow({
                             setActiveMsgOptions(null);
                             handleRecallMessage(msgId);
                           }}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 text-left transition"
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-red-600 hover:bg-red-50 text-left transition font-bold"
                         >
-                          <RotateCcw size={13} />
-                          <span>Thu hồi tin nhắn</span>
+                          <RotateCcw size={14} className="shrink-0 text-red-600" />
+                          <span className="whitespace-nowrap">Thu hồi tin nhắn</span>
                         </button>
                       </div>
                     )}
