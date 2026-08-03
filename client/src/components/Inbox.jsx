@@ -293,7 +293,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         id: convId,
         isGroup: false,
         isHidden: hiddenList.includes(convId),
-        user: { id: c.id, name: c.name, role: c.role, avatar: c.avatar, phone: c.phone || '', online: isUserOnline(c.id) },
+        user: { id: c.id, name: c.name, role: c.role, avatar: c.avatar, gender: c.gender, phone: c.phone || '', online: isUserOnline(c.id) },
         lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
         lastTime: existingConv?.lastTime || new Date('2000-01-01'),
         unread: existingConv?.unread || 0,
@@ -316,6 +316,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             name: seedContact.name,
             role,
             avatar: seedContact.avatar,
+            gender: seedContact.gender,
             phone: seedContact.phone || '',
             online: isUserOnline(seedContact.id),
           },
@@ -966,7 +967,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <Users size={20} />
                       ) : (
                         <img
-                          src={resolveAvatarUrl({ avatar: conv.user.avatar, role: conv.user.role })}
+                          src={resolveAvatarUrl({ avatar: conv.user.avatar, role: conv.user.role, name: conv.user.name, gender: conv.user.gender })}
                           alt={conv.user.name || ''}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -1132,7 +1133,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <Users size={16} />
                       ) : (
                         <img
-                          src={resolveAvatarUrl({ avatar: activeConv.user.avatar, role: activeConv.user.role })}
+                          src={resolveAvatarUrl({ avatar: activeConv.user.avatar, role: activeConv.user.role, name: activeConv.user.name, gender: activeConv.user.gender })}
                           alt={activeConv.user.name || ''}
                           className="w-full h-full object-cover"
                           onError={(e) => {

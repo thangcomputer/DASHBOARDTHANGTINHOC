@@ -56,6 +56,7 @@ router.get('/contacts', async (req, res) => {
       id:     doc._id.toString(),
       name:   doc.name || 'Không rõ tên',
       role,
+      gender: doc.gender || '',
       phone:  doc.phone || '',
       avatar: doc.avatar || String(doc.name || 'U').substring(0, 2).toUpperCase(),
       branchId:   doc.branchId   ? doc.branchId.toString()   : null,
@@ -69,7 +70,7 @@ router.get('/contacts', async (req, res) => {
 
     const superAdmins = await Teacher.find(
       { $or: [{ adminRole: 'SUPER_ADMIN' }, { role: 'admin', adminRole: { $ne: 'STAFF' } }] },
-      'name phone branchId branchCode avatar'
+      'name gender phone branchId branchCode avatar'
     ).lean();
 
     const seenAdminNames = new Set();
@@ -119,11 +120,11 @@ router.get('/contacts', async (req, res) => {
 
       const [staffDocs, teacherDocs, studentDocs] = await Promise.all([
         Teacher.find({ adminRole: 'STAFF', ...branchFilter },
-                     'name phone branchId branchCode avatar').lean(),
+                     'name gender phone branchId branchCode avatar').lean(),
         Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] }, ...branchFilter },
-                     'name phone branchId branchCode avatar').lean(),
+                     'name gender phone branchId branchCode avatar').lean(),
         Student.find({ ...branchFilter },
-                     'name phone branchId branchCode avatar').lean(),
+                     'name gender phone branchId branchCode avatar').lean(),
       ]);
 
       staffContacts   = staffDocs.map(d => ({
@@ -143,9 +144,9 @@ router.get('/contacts', async (req, res) => {
       if (!staffBranchId) {
         // STAFF chưa gán branch riêng → Hỗ trợ viên quản lý toàn bộ học viên & giảng viên
         const [staffDocs, teacherDocs, studentDocs] = await Promise.all([
-          Teacher.find({ adminRole: 'STAFF', _id: { $ne: userId } }, 'name phone branchId branchCode avatar').lean(),
-          Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] } }, 'name phone branchId branchCode avatar').lean(),
-          Student.find({}, 'name phone branchId branchCode avatar').lean(),
+          Teacher.find({ adminRole: 'STAFF', _id: { $ne: userId } }, 'name gender phone branchId branchCode avatar').lean(),
+          Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] } }, 'name gender phone branchId branchCode avatar').lean(),
+          Student.find({}, 'name gender phone branchId branchCode avatar').lean(),
         ]);
         staffContacts = staffDocs.map(d => ({ ...mapContact(d, 'staff'), name: staffDisplayName(d.name, d.branchCode) }));
         teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
@@ -154,15 +155,15 @@ router.get('/contacts', async (req, res) => {
         const [teacherDocs, studentDocs, otherStaffDocs] = await Promise.all([
           Teacher.find(
             { role: 'teacher', status: { $in: ['Active', 'active'] }, branchId: staffBranchId },
-            'name phone branchId branchCode avatar'
+            'name gender phone branchId branchCode avatar'
           ).lean(),
           Student.find(
             { branchId: staffBranchId },
-            'name phone branchId branchCode avatar'
+            'name gender phone branchId branchCode avatar'
           ).lean(),
           Teacher.find(
             { adminRole: 'STAFF', branchId: staffBranchId, _id: { $ne: userId } },
-            'name phone branchId branchCode avatar'
+            'name gender phone branchId branchCode avatar'
           ).lean(),
         ]);
 
@@ -195,9 +196,9 @@ router.get('/contacts', async (req, res) => {
 
       const [staffDocs, studentDocs] = await Promise.all([
         // STAFF (cả Hỗ trợ viên toàn hệ thống lẫn Staff cùng chi nhánh)
-        Teacher.find(staffQuery, 'name phone branchId branchCode avatar').lean(),
+        Teacher.find(staffQuery, 'name gender phone branchId branchCode avatar').lean(),
         // HV: teacherId cấp hồ sơ HOẶC phân công theo enrollment (đa khóa)
-        Student.find(studentQuery, 'name phone branchId branchCode avatar').lean(),
+        Student.find(studentQuery, 'name gender phone branchId branchCode avatar').lean(),
       ]);
 
       staffContacts   = staffDocs.map(d => ({
@@ -228,12 +229,12 @@ router.get('/contacts', async (req, res) => {
 
       const [staffDocs, teacherDocs] = await Promise.all([
         // STAFF (cả Hỗ trợ viên toàn hệ thống lẫn Staff cùng chi nhánh)
-        Teacher.find(staffQuery, 'name phone branchId branchCode avatar').lean(),
+        Teacher.find(staffQuery, 'name gender phone branchId branchCode avatar').lean(),
         // Mọi GV đang dạy (cấp hồ sơ + từng enrollment)
         teacherIdList.length
           ? Teacher.find(
               { _id: { $in: teacherIdList }, role: 'teacher' },
-              'name phone branchId branchCode avatar'
+              'name gender phone branchId branchCode avatar'
             ).lean()
           : Promise.resolve([]),
       ]);
