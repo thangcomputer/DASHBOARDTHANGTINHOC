@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calendar, Video, Clock, CheckCircle, XCircle, AlertCircle, FileText,
-  ChevronLeft, ChevronRight, User, BookOpen, Sparkles, MessageSquare, ExternalLink, Award
+  ChevronLeft, ChevronRight, User, BookOpen, Sparkles, MessageSquare, ExternalLink, Award, ClipboardList
 } from 'lucide-react';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
 
-export const ScheduleView = ({ schedules = [], student, setNoteModalSched }) => {
+export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displayGrades = [] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date().getDate());
 
@@ -28,7 +28,7 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched }) => 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
-  // Group schedules
+  // Group schedules by day of month
   const scheduleMap = useMemo(() => {
     const map = {};
     (schedules || []).forEach(s => {
@@ -45,6 +45,12 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched }) => 
   const activeDate = selectedDate ?? (isCurrentMonth ? todayDay : null);
   const selectedSchedules = activeDate ? (scheduleMap[activeDate] || []) : [];
   const isShowingToday = isCurrentMonth && activeDate === todayDay;
+
+  const [, setLiveTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTick((n) => n + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const days = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
@@ -109,9 +115,9 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched }) => 
         </div>
       </div>
 
-      {/* ── MAIN CALENDAR GRID & DETAIL PANEL ── */}
+      {/* ── MAIN CALENDAR GRID & RIGHT SIDE COLUMN ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
-        {/* Lịch tháng */}
+        {/* Lịch tháng (Trái) */}
         <div className="lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-5 min-w-0">
           <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 gap-2 min-w-0">
             <div className="flex items-center gap-2">
@@ -204,9 +210,10 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched }) => 
           </div>
         </div>
 
-        {/* Chi tiết lịch ngày được chọn */}
+        {/* Cột Bên Phải (Phụ trách: 1. Chi tiết ca học + 2. Nhật ký học tập & Điểm số) */}
         <div className="lg:col-span-5 space-y-4 min-w-0">
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 rounded-2xl sm:rounded-3xl p-5 text-white shadow-xl shadow-slate-900/10 border border-slate-800/60 min-h-[320px] flex flex-col justify-between">
+          {/* 1. Chi tiết lịch ngày được chọn */}
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 rounded-2xl sm:rounded-3xl p-5 text-white shadow-xl shadow-slate-900/10 border border-slate-800/60 min-h-[220px] flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                 <span className="text-xs font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
@@ -225,7 +232,7 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched }) => 
               </div>
 
               {selectedSchedules.length > 0 ? (
-                <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
                   {selectedSchedules.map((s) => {
                     const isOngoing = isScheduleOngoingNow(s);
                     return (
@@ -313,31 +320,134 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched }) => 
                   })}
                 </div>
               ) : (
-                <div className="py-10 text-center space-y-2">
-                  <div className="w-14 h-14 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center mx-auto text-indigo-300">
-                    <Sparkles size={26} />
+                <div className="py-6 text-center space-y-2">
+                  <div className="w-12 h-12 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center mx-auto text-indigo-300">
+                    <Sparkles size={22} />
                   </div>
                   <h4 className="text-sm font-bold text-white">Không có lịch học ngày này</h4>
                   <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                    Bạn có thể bấm chọn ngày khác trên bảng lịch hoặc tranh thủ ôn luyện trắc nghiệm &amp; tài liệu học tập nhé!
+                    Bạn có thể bấm chọn ngày khác trên bảng lịch hoặc tranh thủ ôn luyện trắc nghiệm nhé!
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="pt-3 border-t border-white/10 text-center">
+            <div className="pt-2.5 mt-2 border-t border-white/10 text-center">
               <span className="text-[11px] text-slate-400 font-semibold">
                 Cần hỗ trợ đổi buổi? Hãy dùng nút <strong>Ghi chú / Đổi lịch</strong> trên ca học.
               </span>
             </div>
+          </div>
+
+          {/* 2. Nhật ký học tập & Điểm số (Nằm ngay dưới cột bên phải) */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <ClipboardList size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                    Nhật ký học tập &amp; Điểm số
+                  </h3>
+                </div>
+              </div>
+              {displayGrades && displayGrades.length > 0 && (
+                <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                  {displayGrades.length} lượt ghi nhận
+                </span>
+              )}
+            </div>
+
+            {displayGrades && displayGrades.length > 0 ? (
+              <div className="divide-y divide-slate-100 max-h-[320px] overflow-y-auto pr-1">
+                {displayGrades.map((g, idx) => {
+                  let parsedDate = g.date;
+                  if (parsedDate && parsedDate.includes('T')) {
+                    parsedDate = new Date(parsedDate).toLocaleDateString('vi-VN');
+                  }
+                  const noteLower = (g.note || '').toLowerCase();
+                  const isUpdated = noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm');
+                  const isHomework = noteLower.includes('bài nộp') || isUpdated;
+                  const isQuiz = noteLower.includes('trắc nghiệm');
+
+                  return (
+                    <div
+                      key={g._idx ?? idx}
+                      className="py-3 px-1 hover:bg-slate-50/80 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between transition-colors duration-200"
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                          isQuiz ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                          isHomework ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                          'bg-blue-50 text-blue-600 border border-blue-100'
+                        }`}>
+                          {isQuiz ? <Award size={15} /> : isHomework ? <ClipboardList size={15} /> : <CheckCircle size={15} />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-extrabold text-slate-900 font-mono">
+                              {g.time ? `${g.time} - ${parsedDate}` : parsedDate}
+                            </span>
+                            {isUpdated ? (
+                              <span className="text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded-full">
+                                Cập nhật điểm
+                              </span>
+                            ) : isHomework ? (
+                              <span className="text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded-full">
+                                Bài nộp
+                              </span>
+                            ) : isQuiz ? (
+                              <span className="text-[9px] font-black uppercase bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.2 rounded-full">
+                                Trắc nghiệm
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded-full">
+                                Điểm danh
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 font-medium mt-0.5 leading-snug break-words">
+                            {g.note || 'Đã điểm danh hoàn thành buổi học'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
+                        {g.grade > 0 ? (
+                          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/60 px-2 py-1 rounded-lg">
+                            <span className={`text-sm font-black tabular-nums ${getGradeTextClasses(g.grade)}`}>
+                              {g.grade}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-bold">/10</span>
+                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${getGradePillClasses(g.grade)}`}>
+                              {getGradeLabel(g.grade) || 'TB'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-bold italic">--</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-6 text-center space-y-1">
+                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mx-auto text-slate-300 border border-slate-100">
+                  <FileText size={18} />
+                </div>
+                <p className="text-xs font-bold text-slate-700">Chưa có dữ liệu điểm danh</p>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                  Dữ liệu bài tập &amp; điểm số sẽ xuất hiện tại đây sau khi bắt đầu học.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
-
-// ─── Materials Section ──────────────────────────────────────────────────────
-
 
 export default ScheduleView;
