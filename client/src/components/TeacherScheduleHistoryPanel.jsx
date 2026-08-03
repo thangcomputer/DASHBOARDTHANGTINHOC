@@ -110,55 +110,62 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50/50 text-slate-500 text-[10px] uppercase font-black border-b border-slate-100 tracking-wider">
                 <tr>
-                  <th className="px-5 py-3 w-[150px]">Lúc</th>
-                  <th className="px-5 py-3 w-[120px]">Hành động</th>
-                  <th className="px-5 py-3">Chi tiết</th>
+                  <th className="px-4 py-3 w-[130px]">Lúc</th>
+                  <th className="px-4 py-3 w-[110px]">Hành động</th>
+                  <th className="px-4 py-3 w-[160px]">Tên học viên</th>
+                  <th className="px-4 py-3">Chi tiết</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {history.map(log => (
-                  <tr key={log._id} className="bg-white hover:bg-slate-50/50 transition-colors">
-                    <td className="px-5 py-3.5 whitespace-nowrap text-xs text-slate-500 font-medium">
-                      {new Date(log.createdAt).toLocaleString('vi-VN')}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {log.action === 'CREATED' ? (
-                        <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-100/50">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Đã xếp lịch
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-red-100/50">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Đã hủy lịch
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {log.action === 'CREATED' ? (
-                        <div className="text-xs text-slate-600">
-                          Lớp ngày: <span className="font-bold text-slate-800">{new Date(log.newValue?.date || log.scheduledDate).toLocaleDateString('vi-VN')}</span>, 
-                          Ca: <span className="font-bold text-slate-800">
-                            {log.newValue?.startTime ? `${log.newValue?.startTime} - ${log.newValue?.endTime}` : 'Chưa ghi nhận giờ'}
+                {history.map(log => {
+                  const studentName = log.studentName || log.newValue?.studentName || log.oldValue?.studentName || 'Chưa ghi nhận';
+                  return (
+                    <tr key={log._id} className="bg-white hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3.5 whitespace-nowrap text-xs text-slate-500 font-medium">
+                        {new Date(log.createdAt).toLocaleString('vi-VN')}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {log.action === 'CREATED' ? (
+                          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-100/50">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Đã xếp lịch
                           </span>
-                        </div>
-                      ) : (
-                        <div className="text-xs border-l-2 border-red-200 pl-2">
-                          <div className="text-slate-600 mb-1">
-                            Lớp ngày: <span className="font-bold text-slate-800">{new Date(log.scheduledDate || log.newValue?.date).toLocaleDateString('vi-VN')}</span>, 
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-red-100/50">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Đã hủy lịch
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-900">
+                        {studentName}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {log.action === 'CREATED' ? (
+                          <div className="text-xs text-slate-600">
+                            Lớp ngày: <span className="font-bold text-slate-800">{new Date(log.newValue?.date || log.scheduledDate).toLocaleDateString('vi-VN')}</span>, 
                             Ca: <span className="font-bold text-slate-800">
-                              {(log.newValue?.startTime || log.oldValue?.startTime) ? 
-                                `${log.newValue?.startTime || log.oldValue?.startTime} - ${log.newValue?.endTime || log.oldValue?.endTime}`
-                                : 'Chưa ghi nhận giờ'
-                              }
+                              {log.newValue?.startTime ? `${log.newValue?.startTime} - ${log.newValue?.endTime}` : 'Chưa ghi nhận giờ'}
                             </span>
                           </div>
-                          <div className="text-red-600 font-medium mt-1">
-                            Lý do: <span className="font-bold">{log.reason || 'Không rõ'}</span>
+                        ) : (
+                          <div className="text-xs border-l-2 border-red-200 pl-2">
+                            <div className="text-slate-600 mb-1">
+                              Lớp ngày: <span className="font-bold text-slate-800">{new Date(log.scheduledDate || log.newValue?.date).toLocaleDateString('vi-VN')}</span>, 
+                              Ca: <span className="font-bold text-slate-800">
+                                {(log.newValue?.startTime || log.oldValue?.startTime) ? 
+                                  `${log.newValue?.startTime || log.oldValue?.startTime} - ${log.newValue?.endTime || log.oldValue?.endTime}`
+                                  : 'Chưa ghi nhận giờ'
+                                }
+                              </span>
+                            </div>
+                            <div className="text-red-600 font-medium mt-1">
+                              Lý do: <span className="font-bold">{log.reason || 'Không rõ'}</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

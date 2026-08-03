@@ -616,6 +616,30 @@ router.post('/', authMiddleware, async (req, res) => {
       paymentStatus: paymentStatus,
     });
 
+    // Ghi bản ghi ScheduleHistory kèm tên học viên
+    try {
+      const actor = req.user || {};
+      await ScheduleHistory.create({
+        scheduleId: schedule._id,
+        actorId: actor.id || actor._id || teacherId,
+        actorName: actor.name || teacherName || 'Unknown',
+        actorRole: actor.role || 'teacher',
+        action: 'CREATED',
+        newValue: {
+          status: schedule.status,
+          date: schedule.date,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+        },
+        studentName: studentName || 'Học viên',
+        teacherName: teacherName || 'Giảng viên',
+        scheduledDate: schedule.date,
+        course: courseFinal,
+      });
+    } catch (histErr) {
+      logger.warn('[SCHEDULE] Create history log error:', histErr.message);
+    }
+
     // Populate để trả về đầy đủ
     await schedule.populate([
       { path: 'teacherId', select: 'name phone' },
@@ -1010,6 +1034,26 @@ router.get('/history/:teacherId', authMiddleware, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(Number(limit))
       .lean();
+
+    // Tự động bổ sung studentName cho các bản ghi lịch sử cũ nếu chưa có
+    const missingSchedIds = history.filter(h => !h.studentName && h.scheduleId).map(h => h.scheduleId);
+    if (missingSchedIds.length > 0) {
+      const schedules = await Schedule.find({ _id: { $in: missingSchedIds } }).select('_id studentName studentId').lean();
+      const missingStudentIds = schedules.filter(s => !s.studentName && s.studentId).map(s => s.studentId);
+      const students = missingStudentIds.length > 0 ? await Student.find({ _id: { $in: missingStudentIds } }).select('_id name').lean() : [];
+      const studentMap = new Map(students.map(s => [s._id.toString(), s.name]));
+
+      const schedMap = new Map(schedules.map(s => [
+        s._id.toString(),
+        s.studentName || studentMap.get(s.studentId?.toString()) || 'Học viên'
+      ]));
+
+      for (const h of history) {
+        if (!h.studentName && h.scheduleId && schedMap.has(h.scheduleId.toString())) {
+          h.studentName = schedMap.get(h.scheduleId.toString());
+        }
+      }
+    }
 
     // Thống kê nhanh
     const stats = {
