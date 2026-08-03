@@ -830,25 +830,25 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           </div>
         </div>
 
-        {/* Bảng điều khiển Bật/Tắt Chống tua video Toàn hệ thống */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/25 p-3.5 sm:p-4 rounded-2xl shadow-sm mb-6">
+        {/* Bảng điều khiển Bật/Tắt Chống tua video Dành riêng cho Giảng viên */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/25 p-3.5 sm:p-4 rounded-2xl shadow-sm mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0 font-extrabold text-base border border-amber-500/30">
-              🛡️
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-600 flex items-center justify-center shrink-0 font-extrabold text-base border border-blue-500/30">
+              🎓
             </div>
             <div>
               <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
-                Chống tua Video Toàn hệ thống:
+                Chống tua Video GIẢNG VIÊN:
                 <span className={`px-2 py-0.5 rounded-md text-[11px] font-black uppercase ${
-                  antiSeekEnabled ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  antiSeekEnabled ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                 }`}>
                   {antiSeekEnabled ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                 {antiSeekEnabled
-                  ? 'Yêu cầu xem đủ 2/3 thời lượng video mới ghi nhận tiến độ hoàn thành.'
-                  : 'Cho phép người dùng tự do tua nhanh và chuyển bài học.'}
+                  ? 'Yêu cầu giảng viên xem đủ 2/3 thời lượng video bài giảng.'
+                  : 'Cho phép giảng viên tự do tua nhanh video bài giảng.'}
               </p>
             </div>
           </div>
@@ -857,16 +857,16 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             onClick={() => {
               const nextState = !antiSeekEnabled;
               setAntiSeekEnabled(nextState);
-              localStorage.setItem('admin_anti_seek_disabled', String(!nextState));
+              localStorage.setItem('teacher_anti_seek_disabled', String(!nextState));
               localStorage.setItem('teacher_anti_seek', String(nextState));
             }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm border shrink-0 ${
               antiSeekEnabled
-                ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-700'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-700'
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
             }`}
           >
-            {antiSeekEnabled ? 'Tắt chống tua toàn hệ thống' : 'Bật chống tua toàn hệ thống'}
+            {antiSeekEnabled ? 'Tắt chống tua Giảng viên' : 'Bật chống tua Giảng viên'}
           </button>
         </div>
 

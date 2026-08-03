@@ -1259,7 +1259,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                     )}
                   </div>
 
-                  {localStorage.getItem('admin_anti_seek_disabled') === 'true' ? (
+                  {(localStorage.getItem('student_anti_seek_disabled') === 'true' || localStorage.getItem('admin_anti_seek_disabled') === 'true') ? (
                     <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-3">
                       <CheckCircle size={14} className="text-emerald-400 flex-shrink-0 mt-0.5" />
                       <p className="text-emerald-200/80 text-[11px] leading-relaxed">
