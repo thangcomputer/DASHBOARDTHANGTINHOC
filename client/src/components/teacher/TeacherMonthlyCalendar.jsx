@@ -192,7 +192,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                   : past ? 'Ngày đã qua, không thể sắp lịch' 
                   : 'Click để sắp lịch hôm này'
                 }
-                className={`relative aspect-square w-full min-h-[1.8rem] sm:min-h-[2.2rem] rounded-lg sm:rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all border
+                className={`relative w-full h-8 sm:h-9 md:h-9.5 rounded-lg sm:rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all border
                   ${
                     selected
                       ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20 z-10'

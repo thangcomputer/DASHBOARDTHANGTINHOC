@@ -172,7 +172,7 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                   key={day}
                   type="button"
                   onClick={() => setSelectedDate(day === selectedDate ? null : day)}
-                  className={`relative aspect-square w-full min-h-[1.8rem] sm:min-h-[2.2rem] rounded-lg sm:rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all duration-200 active:scale-95 border ${
+                  className={`relative w-full h-8 sm:h-9 md:h-9.5 rounded-lg sm:rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all duration-200 active:scale-95 border ${
                     isSelected
                       ? 'bg-red-600 border-red-600 text-white shadow-md shadow-red-500/20 z-10'
                       : isTodayCell
