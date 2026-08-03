@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import api from '../services/api';
+import { maskStudentPhone } from '../utils/studentMask';
 
 export const RATING_CRITERIA = {
   teaching: {
@@ -69,7 +70,8 @@ export function useDataRatings({ students, teachers, setTeachers, triggerBackgro
         content: comment
       });
       if (res && res.success === false) throw new Error(res.message);
-      addNotification(teacherId, 'teacher', `${student?.name || 'Học viên'} đã đánh giá bạn ${stars}/5 sao`);
+      const studentLabel = `Học viên ${maskStudentPhone(student?.phone || student?.zalo)}`;
+      addNotification(teacherId, 'teacher', `${studentLabel} đã đánh giá bạn ${stars}/5 sao`);
       triggerBackgroundSync();
     } catch (err) {
       setTeachers(previousTeachers);

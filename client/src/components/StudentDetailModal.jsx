@@ -6,7 +6,7 @@ import {
   MapPin, Phone, MessageSquare, Calendar, ChevronRight,
   TrendingUp, CreditCard, ClipboardList, ShieldCheck, 
   Printer, Loader2, AlertCircle, CheckCircle2, Star,
-  Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2, Edit3
+  Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2, Edit3, Award
 } from 'lucide-react';
 import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
@@ -356,6 +356,31 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const [showAddAssign, setShowAddAssign] = useState(false);
   const [newAssign, setNewAssign] = useState({ title: '', deadline: '', fileUrl: '', description: '' });
   const [assignTargetCourse, setAssignTargetCourse] = useState('');
+  
+  const [studentQuizzes, setStudentQuizzes] = useState([]);
+  const [loadingStudentQuizzes, setLoadingStudentQuizzes] = useState(false);
+
+  useEffect(() => {
+    if (!studentId || activeTab !== 'academic') return;
+    setLoadingStudentQuizzes(true);
+    api.quizzes.getAdminQuizzes()
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data)) {
+          const sid = String(studentId);
+          const list = [];
+          res.data.forEach((q) => {
+            const sub = (q.submissions || []).find((s) => String(s.studentId?._id || s.studentId) === sid)
+              || (q.mySubmission);
+            if (sub) {
+              list.push({ ...q, mySubmission: sub });
+            }
+          });
+          setStudentQuizzes(list);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingStudentQuizzes(false));
+  }, [activeTab, studentId]);
 
   const liveEnrollments = data?.student ? getClientEnrollments(data.student) : [];
   const liveFilterValid = courseFilter === 'all'
@@ -1644,32 +1669,82 @@ export default function StudentDetailModal({ studentId, onClose }) {
                        </div>
                     </div>
 
-                    {/* Đánh giá bài tập hàng ngày */}
-                    <div className="flex flex-col min-h-0">
-                       <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 shrink-0">
-                         <ClipboardList size={16} className="text-indigo-500" /> Tiến độ bài tập
-                       </h3>
-                       <div className="flex-1 min-h-0 max-h-[52vh] md:max-h-none overflow-y-auto overscroll-contain bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4 mt-2">
-                          {(!data.student.grades || data.student.grades.length === 0) ? (
-                            <p className="text-xs text-slate-400 italic py-4 text-center">Chưa có đánh giá bài tập</p>
-                          ) : (
-                            data.student.grades.map((g, i) => (
-                              <div key={i} className="flex gap-4">
-                                 <div className="flex flex-col items-center">
-                                    <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-xs font-black text-slate-400">
-                                       {g.grade}
-                                    </div>
-                                    {i < data.student.grades.length - 1 && <div className="w-px h-full bg-slate-100 my-1" />}
+                    {/* Đánh giá bài tập hàng ngày & Trắc nghiệm GV giao */}
+                    <div className="flex flex-col min-h-0 space-y-4">
+                       <div className="flex flex-col min-h-0">
+                         <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 shrink-0">
+                           <ClipboardList size={16} className="text-indigo-500" /> Tiến độ bài tập &amp; Điểm danh
+                         </h3>
+                         <div className="flex-1 min-h-0 max-h-[35vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3 mt-2">
+                            {(!data.student.grades || data.student.grades.length === 0) ? (
+                              <p className="text-xs text-slate-400 italic py-4 text-center">Chưa có đánh giá bài tập</p>
+                            ) : (
+                              data.student.grades.map((g, i) => (
+                                <div key={i} className="flex gap-3">
+                                   <div className="flex flex-col items-center">
+                                      <div className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center text-xs font-black text-slate-500">
+                                         {g.grade != null ? g.grade : '✓'}
+                                      </div>
+                                      {i < data.student.grades.length - 1 && <div className="w-px h-full bg-slate-100 my-1" />}
+                                   </div>
+                                   <div className="flex-1 pb-2">
+                                     <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">
+                                       {g.date ? fmtDateTimeVN(g.date) : 'Giai đoạn học'}
+                                     </p>
+                                      <p className="text-xs text-slate-700 font-semibold leading-relaxed">{g.note || 'Đã điểm danh hoàn thành buổi học'}</p>
+                                   </div>
+                                </div>
+                              ))
+                            )}
+                         </div>
+                       </div>
+
+                       {/* Trắc nghiệm Giảng viên giao */}
+                       <div className="flex flex-col min-h-0">
+                         <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 shrink-0">
+                           <Award size={16} className="text-red-500" /> Trắc nghiệm Giảng viên giao
+                         </h3>
+                         <div className="flex-1 min-h-0 max-h-[35vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3 mt-2">
+                           {loadingStudentQuizzes ? (
+                             <p className="text-xs text-slate-400 italic py-4 text-center">Đang tải nhật ký trắc nghiệm...</p>
+                           ) : studentQuizzes.length === 0 ? (
+                             <p className="text-xs text-slate-400 italic py-4 text-center">Chưa có bài trắc nghiệm nào từ Giảng viên</p>
+                           ) : (
+                             studentQuizzes.map((q) => {
+                               const sub = q.mySubmission;
+                               const isPassed = sub?.status === 'passed' || (sub?.score != null && sub.score >= 70);
+                               return (
+                                 <div key={q._id} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between gap-3">
+                                   <div className="min-w-0 flex-1">
+                                     <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                       {q.courseName || 'Bài thi bài học'}
+                                     </span>
+                                     <h4 className="font-bold text-slate-900 text-xs sm:text-sm mt-1 truncate">{q.title}</h4>
+                                     <p className="text-[10px] text-slate-400 font-medium">
+                                       Nộp: {sub?.submittedAt ? fmtDateTimeVN(sub.submittedAt) : 'Chưa nộp'}
+                                     </p>
+                                   </div>
+                                   <div className="text-right shrink-0">
+                                     {sub ? (
+                                       <>
+                                         <p className={`text-base font-black ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
+                                           {sub.correctCount ?? 0}/{sub.totalQuestions ?? 0} câu
+                                         </p>
+                                         <span className={`inline-block text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
+                                           isPassed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                                         }`}>
+                                           {sub.score != null ? `${sub.score}%` : (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT')}
+                                         </span>
+                                       </>
+                                     ) : (
+                                       <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Chưa làm</span>
+                                     )}
+                                   </div>
                                  </div>
-                                 <div className="flex-1 pb-4">
-                                   <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">
-                                     {g.date ? fmtDateTimeVN(g.date) : 'Giai đoạn học'}
-                                   </p>
-                                    <p className="text-xs text-slate-700 font-semibold leading-relaxed">{g.note}</p>
-                                 </div>
-                              </div>
-                            ))
-                          )}
+                               );
+                             })
+                           )}
+                         </div>
                        </div>
                     </div>
                   </div>

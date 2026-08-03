@@ -8,6 +8,7 @@ import {
 import { notificationsAPI } from '../services/api';
 import { useData } from '../context/DataContext';
 import { useToast } from '../utils/toast';
+import { formatNotificationStudentMask } from '../utils/studentMask';
 
 const TYPES = [
   { value: '', label: 'Tất cả' },
@@ -59,7 +60,7 @@ function resolveNavPath(path) {
 export default function NotificationCenterPage({ role = 'admin', session }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { markNotificationRead, dismissNotificationLocal } = useData();
+  const { markNotificationRead, dismissNotificationLocal, students } = useData();
   const isAdmin = role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF';
 
   const [items, setItems] = useState([]);
@@ -291,7 +292,9 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                     <h3 className={`text-sm truncate ${!n.read ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
                       {n.title}
                     </h3>
-                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message || n.content}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                      {formatNotificationStudentMask(n.message || n.content || n.text, students)}
+                    </p>
                   </button>
                   <div className="flex flex-col gap-1">
                     {!n.read && (

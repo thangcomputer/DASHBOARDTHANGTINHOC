@@ -365,6 +365,21 @@ const StudentDashboard = ({ onNavigate }) => {
       .sort((a, b) => b._sortKey - a._sortKey);
   }, [viewStudent?.grades]);
 
+  // ─── Quizzes State (Trắc nghiệm Giảng viên giao) ───
+  const [myQuizzes, setMyQuizzes] = useState([]);
+
+  const fetchMyQuizzes = useCallback(async () => {
+    if (!STUDENT_ID) return;
+    try {
+      const res = await api.quizzes.getStudentQuizzes();
+      if (res.success) setMyQuizzes(res.data || []);
+    } catch { /* ignore */ }
+  }, [STUDENT_ID]);
+
+  useEffect(() => {
+    fetchMyQuizzes();
+  }, [fetchMyQuizzes]);
+
   const studyLogs = useMemo(() => {
     if (!viewStudent) return [];
     const logs = [];
@@ -416,7 +431,31 @@ const StudentDashboard = ({ onNavigate }) => {
        });
     });
 
-    // 2. Tất cả lịch sắp diễn ra & đã xếp của Giảng viên (status === 'scheduled' / 'upcoming')
+    // 2. Trắc nghiệm từ Giảng viên giao (myQuizzes)
+    (myQuizzes || []).forEach((q, qIdx) => {
+       const sub = q.mySubmission;
+       if (!sub) return;
+       const dateStr = sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('vi-VN') : (q.createdAt ? new Date(q.createdAt).toLocaleDateString('vi-VN') : '');
+       const ts = parseDateToMs(sub.submittedAt || q.createdAt) || (Date.now() - qIdx * 1000);
+       const score10 = sub.score != null ? Math.round((sub.score / 10) * 10) / 10 : null;
+       const key = `quiz_${q._id || qIdx}_${sub.submittedAt || ''}`;
+       if (!seenKeys.has(key)) {
+         seenKeys.add(key);
+         logs.push({
+            type: 'quiz',
+            date: dateStr,
+            time: sub.submittedAt ? new Date(sub.submittedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            note: `Trắc nghiệm GV giao: ${q.title || 'Bài trắc nghiệm'} (${sub.correctCount ?? 0}/${sub.totalQuestions ?? 0} câu)`,
+            grade: score10,
+            rawScore: sub.score,
+            isPassed: sub.status === 'passed' || (sub.score != null && sub.score >= 70),
+            index: null,
+            timestamp: ts
+         });
+       }
+    });
+
+    // 3. Tất cả lịch sắp diễn ra & đã xếp của Giảng viên (status === 'scheduled' / 'upcoming')
     (mySchedules || []).forEach((s, sIdx) => {
        const dateStr = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
        const ts = parseDateToMs(s.date) || Date.now();
@@ -453,7 +492,7 @@ const StudentDashboard = ({ onNavigate }) => {
     });
 
     return logs.sort((a, b) => b.timestamp - a.timestamp);
-  }, [viewStudent, mySchedules]);
+  }, [viewStudent, mySchedules, myQuizzes]);
 
 
   const isNew = viewStudent?.completedSessions === 0;

@@ -14,6 +14,8 @@ import {
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award,
 } from 'lucide-react';
 
+import { formatNotificationStudentMask } from '../utils/studentMask';
+
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
   students: 'Học viên',
@@ -98,7 +100,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const location = useLocation();
   const toast = useToast();
   const { socket } = useSocket() || {};
-  const { teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead } = useData();
+  const { students, teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const myId = String(session?.id || session?._id || '');
 
@@ -437,7 +439,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                                       <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
                                     </div>
                                     {n.title && <h4 className={`text-sm font-semibold mb-0.5 break-anywhere ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</h4>}
-                                    <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>{n.text || n.message || n.content}</p>
+                                    <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>
+                                       {formatNotificationStudentMask(n.text || n.message || n.content, students)}
+                                     </p>
                                   </div>
                                 </div>
                               );

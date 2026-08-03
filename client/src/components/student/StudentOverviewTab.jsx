@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   PlayCircle, Clock, CheckCircle, MessageSquare, Download,
   BookOpen, Star, TrendingUp, Zap, Calendar, Video,
-  ClipboardList, ChevronRight, XCircle, Trophy,
+  ClipboardList, ChevronRight, XCircle, Trophy, Award,
 } from 'lucide-react';
 import { CourseSwitcher, StatCard } from './StudentShared';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
@@ -180,12 +180,14 @@ export default function StudentOverviewTab({
                   const isCancelled = item.type === 'cancelled';
                   const isScheduled = item.type === 'scheduled';
                   const isHomework = item.type === 'homework';
+                  const isQuiz = item.type === 'quiz';
+                  const isAttendance = item.type === 'attendance';
 
                   return (
                     <div
                       key={idx}
                       className={`px-4 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 ${
-                        isCancelled ? 'bg-red-50/30' : isScheduled ? 'bg-blue-50/30' : 'hover:bg-slate-50'
+                        isCancelled ? 'bg-red-50/30' : isScheduled ? 'bg-blue-50/30' : isQuiz ? 'bg-amber-50/20' : 'hover:bg-slate-50'
                       } transition-colors duration-200`}
                     >
                       <div className="flex items-start md:items-center gap-3 min-w-0">
@@ -197,6 +199,8 @@ export default function StudentOverviewTab({
                               ? 'bg-blue-100 text-blue-600'
                               : isHomework
                               ? 'bg-purple-100 text-purple-600'
+                              : isQuiz
+                              ? 'bg-amber-100 text-amber-600'
                               : 'bg-emerald-100 text-emerald-600'
                           }`}
                         >
@@ -206,6 +210,8 @@ export default function StudentOverviewTab({
                             <Calendar size={18} aria-hidden="true" />
                           ) : isHomework ? (
                             <ClipboardList size={18} aria-hidden="true" />
+                          ) : isQuiz ? (
+                            <Award size={18} aria-hidden="true" />
                           ) : (
                             <CheckCircle size={18} aria-hidden="true" />
                           )}
@@ -223,10 +229,19 @@ export default function StudentOverviewTab({
                             {item.grade}
                           </span>
                           <span className="text-xs text-slate-400 font-medium">/ 10</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getGradePillClasses(item.grade)}`}>
-                            {getGradeLabel(item.grade) || 'TB'}
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            isQuiz
+                              ? (item.isPassed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200')
+                              : getGradePillClasses(item.grade)
+                          }`}>
+                            {isQuiz ? (item.isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
                           </span>
                         </div>
+                      )}
+                      {!isCancelled && item.grade == null && isAttendance && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wide shrink-0">
+                          Đã hoàn thành
+                        </span>
                       )}
                       {isScheduled && (
                         <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide shrink-0">
