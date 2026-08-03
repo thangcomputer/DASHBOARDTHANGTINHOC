@@ -134,28 +134,38 @@ router.get('/contacts', async (req, res) => {
       const staffBranchId = staffUser?.branchId ? staffUser.branchId.toString() : null;
 
       if (!staffBranchId) {
-        // STAFF chưa có branch → chỉ thấy SuperAdmin
-        return res.json({ success: true, data: superAdminContacts });
+        // STAFF chưa gán branch riêng → Hỗ trợ viên quản lý toàn bộ học viên & giảng viên
+        const [staffDocs, teacherDocs, studentDocs] = await Promise.all([
+          Teacher.find({ adminRole: 'STAFF', _id: { $ne: userId } }, 'name phone branchId branchCode avatar').lean(),
+          Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] } }, 'name phone branchId branchCode avatar').lean(),
+          Student.find({}, 'name phone branchId branchCode avatar').lean(),
+        ]);
+        staffContacts = staffDocs.map(d => ({ ...mapContact(d, 'staff'), name: staffDisplayName(d.name, d.branchCode) }));
+        teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
+        studentContacts = studentDocs.map(d => mapContact(d, 'student'));
+      } else {
+        const [teacherDocs, studentDocs, otherStaffDocs] = await Promise.all([
+          Teacher.find(
+            { role: 'teacher', status: { $in: ['Active', 'active'] }, branchId: staffBranchId },
+            'name phone branchId branchCode avatar'
+          ).lean(),
+          Student.find(
+            { branchId: staffBranchId },
+            'name phone branchId branchCode avatar'
+          ).lean(),
+          Teacher.find(
+            { adminRole: 'STAFF', branchId: staffBranchId, _id: { $ne: userId } },
+            'name phone branchId branchCode avatar'
+          ).lean(),
+        ]);
+
+        staffContacts = otherStaffDocs.map(d => ({
+          ...mapContact(d, 'staff'),
+          name: staffDisplayName(d.name, d.branchCode),
+        }));
+        teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
+        studentContacts = studentDocs.map(d => mapContact(d, 'student'));
       }
-
-      const [teacherDocs, studentDocs] = await Promise.all([
-        Teacher.find(
-          { role: 'teacher', status: { $in: ['Active', 'active'] }, branchId: staffBranchId },
-          'name phone branchId branchCode avatar'
-        ).lean(),
-        Student.find(
-          { branchId: staffBranchId },
-          'name phone branchId branchCode avatar'
-        ).lean(),
-      ]);
-
-      const staffDoc = await Teacher.findById(userId).select('name branchCode').lean();
-      staffContacts = staffDoc ? [{
-        ...mapContact(staffDoc, 'staff'),
-        name: staffDisplayName(staffDoc.name, staffDoc.branchCode),
-      }] : [];
-      teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
-      studentContacts = studentDocs.map(d => mapContact(d, 'student'));
     }
 
     // ══ [4] TEACHER: chỉ thấy STAFF cùng branch + Student được phân công ══

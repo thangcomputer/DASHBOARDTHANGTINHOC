@@ -6,8 +6,14 @@
 import { normalizeChatRole } from './chatConversationId';
 
 export function isSuperAdminViewer(session) {
+  if (!session) return false;
   const id = String(session?.id || session?._id || '');
-  return id === 'admin' || session?.adminRole === 'SUPER_ADMIN';
+  if (id === 'admin' || session?.adminRole === 'SUPER_ADMIN' || session?.role === 'admin' || session?.role === 'staff' || session?.adminRole === 'STAFF') {
+    return true;
+  }
+  const perms = Array.isArray(session?.permissions) ? session.permissions : [];
+  if (perms.includes('manage_messages')) return true;
+  return false;
 }
 
 export function isSuperAdminPresence(u) {
