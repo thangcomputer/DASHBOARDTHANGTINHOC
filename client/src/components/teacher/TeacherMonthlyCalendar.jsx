@@ -124,39 +124,39 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
   };
 
   return (
-    <div className="flex flex-col lg:flex-row lg:items-start gap-4 md:gap-5 lg:gap-6 w-full min-w-0">
+    <div className="flex flex-col lg:flex-row lg:items-start gap-3 sm:gap-4 md:gap-5 w-full min-w-0">
       {/* ─ CALENDAR GRID ─ */}
-      <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-sm border-0 p-3 sm:p-5 md:p-6 w-full lg:flex-1 lg:min-w-0">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100/80 p-3 sm:p-4 md:p-5 w-full lg:flex-1 lg:min-w-0">
         {/* Header Nav */}
-        <div className="px-1 sm:px-2 py-3 sm:py-4 flex items-center justify-between mb-1 sm:mb-2 gap-2 min-w-0">
-          <h3 className="font-extrabold text-slate-800 text-sm sm:text-lg md:text-xl tracking-wide shrink-0">
+        <div className="px-1 py-1 sm:py-2 flex items-center justify-between mb-1 gap-2 min-w-0">
+          <h3 className="font-extrabold text-slate-800 text-sm sm:text-base md:text-lg tracking-wide shrink-0">
             Lịch theo tháng
           </h3>
-          <div className="flex items-center gap-1.5 sm:gap-3">
-            <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="p-1 sm:p-2 rounded-xl hover:bg-slate-50 transition text-slate-500 hover:text-slate-800 active:scale-95">
-              <ChevronLeft size={18} />
+          <div className="flex items-center gap-1 sm:gap-2">
+            <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-50 transition text-slate-500 hover:text-slate-800 active:scale-95">
+              <ChevronLeft size={16} />
             </button>
-            <div className="flex items-center gap-2 border-2 border-slate-100 rounded-xl px-3 py-1.5 sm:py-2 text-sm md:text-base font-bold text-slate-700 shadow-sm bg-white">
-              <span className="min-w-[90px] sm:min-w-[110px] text-center">tháng {month + 1} {year}</span>
-              <Calendar size={14} className="text-slate-400" />
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-2.5 py-1 text-xs sm:text-sm font-bold text-slate-700 shadow-sm bg-white">
+              <span className="min-w-[80px] sm:min-w-[100px] text-center">tháng {month + 1} {year}</span>
+              <Calendar size={13} className="text-slate-400" />
             </div>
-            <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="p-1 sm:p-2 rounded-xl hover:bg-slate-50 transition text-slate-500 hover:text-slate-800 active:scale-95">
-              <ChevronRight size={18} />
+            <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-50 transition text-slate-500 hover:text-slate-800 active:scale-95">
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>
 
         {/* Day labels */}
-        <div className="grid grid-cols-7 text-center px-1 border-b border-slate-50 pb-3 mb-3 md:pb-4 md:mb-4">
+        <div className="grid grid-cols-7 text-center px-1 border-b border-slate-50 pb-2 mb-2 sm:pb-2.5 sm:mb-2.5">
           {['CN','T2','T3','T4','T5','T6','T7'].map((d, i) => (
-            <div key={d} className={`text-xs md:text-[13px] font-black uppercase tracking-widest ${i === 0 ? 'text-orange-500' : 'text-slate-500'}`}>
+            <div key={d} className={`text-[11px] sm:text-xs font-black uppercase tracking-wider ${i === 0 ? 'text-orange-500' : 'text-slate-400'}`}>
               {d}
             </div>
           ))}
         </div>
 
         {/* Calendar cells */}
-        <div className="grid grid-cols-7 px-0.5 sm:px-1 gap-y-1.5 gap-x-1 sm:gap-y-2 sm:gap-x-1.5 md:gap-y-2.5 md:gap-x-2">
+        <div className="grid grid-cols-7 px-0.5 gap-1 sm:gap-1.5 md:gap-2">
           {days.map((day, idx) => {
             if (!day) return <div key={`e-${idx}`} />;
 
@@ -184,7 +184,7 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
                   : past ? 'Ngày đã qua, không thể sắp lịch' 
                   : 'Click để sắp lịch hôm này'
                 }
-                className={`relative aspect-square w-full min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.75rem] lg:min-h-[4.25rem] rounded-xl sm:rounded-[1.25rem] flex flex-col items-center justify-center text-sm md:text-base font-medium transition-all border
+                className={`relative aspect-square w-full min-h-[2.1rem] sm:min-h-[2.5rem] md:min-h-[2.85rem] lg:min-h-[3.15rem] rounded-lg sm:rounded-xl flex flex-col items-center justify-center text-xs sm:text-sm font-medium transition-all border
                   ${
                     selected
                       ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
@@ -361,12 +361,12 @@ export const MonthlyCalendar = ({ schedules, onEditSchedule, onAddSchedule, onCa
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-[2rem] md:rounded-[1.75rem] border-0 shadow-sm min-h-[300px] md:min-h-[280px] flex flex-col items-center justify-center text-slate-400 p-8 text-center border-dashed border-2 border-slate-100">
-          <div className="w-20 h-20 bg-slate-50 flex items-center justify-center rounded-[1.5rem] mb-4 text-teal-600/20">
-            <Calendar size={40} />
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-dashed border-slate-200 shadow-sm min-h-[160px] sm:min-h-[180px] flex flex-col items-center justify-center text-slate-400 p-5 text-center">
+          <div className="w-11 h-11 bg-slate-50 flex items-center justify-center rounded-2xl mb-2.5 text-teal-600/30">
+            <Calendar size={22} />
           </div>
-          <h3 className="text-lg font-bold text-slate-700 mb-2">Chưa chọn ngày</h3>
-          <p className="text-sm max-w-sm">Vui lòng bấm vào một ngày bất kỳ trên lịch để xem chi tiết hoặc sắp lịch mới.</p>
+          <h3 className="text-sm font-bold text-slate-700 mb-1">Chưa chọn ngày</h3>
+          <p className="text-xs text-slate-400 max-w-xs">Bấm vào một ngày trên lịch để xem chi tiết hoặc sắp lịch mới.</p>
         </div>
       )}
 
