@@ -37,7 +37,14 @@ const authMiddleware = async (req, res, next) => {
       if (decoded.role === 'student') {
         dbUser = await Student.findById(decoded.id).select('tokenVersion status').lean();
       } else {
-        dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role').lean();
+        dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role permissions adminRole createdAt branchId').lean();
+      }
+
+      if (dbUser) {
+        req.user.permissions = dbUser.permissions || decoded.permissions || [];
+        req.user.adminRole = dbUser.adminRole || decoded.adminRole;
+        if (dbUser.createdAt) req.user.createdAt = dbUser.createdAt;
+        if (dbUser.branchId) req.user.branchId = dbUser.branchId;
       }
 
       if (!dbUser) {

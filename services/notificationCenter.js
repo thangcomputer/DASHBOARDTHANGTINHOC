@@ -80,6 +80,22 @@ function mapForClient(doc, userId) {
   };
 }
 
+function isSupportStaffOnly(user) {
+  if (!user) return false;
+  if (user.id === 'admin' || user.adminRole === 'SUPER_ADMIN') return false;
+  const isStaff = user.role === 'staff' || user.adminRole === 'STAFF';
+  if (!isStaff) return false;
+
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  const hasStudentMgmt = perms.includes('manage_students');
+  const hasTeacherMgmt = perms.includes('manage_teachers');
+  const hasFinanceMgmt = perms.includes('manage_finance');
+
+  if (perms.length === 1 && perms.includes('manage_messages')) return true;
+  if (!hasStudentMgmt && !hasTeacherMgmt && !hasFinanceMgmt) return true;
+  return false;
+}
+
 async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = false } = {}) {
   const { userId, match } = buildReceiverMatch(user);
   const filter = {
@@ -94,6 +110,16 @@ async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = fals
     } else if (user.role === 'student') {
       filter['payload.targetAudience'] = { $ne: 'teacher' };
     }
+  }
+
+  if (isSupportStaffOnly(user)) {
+    filter.$and = filter.$and || [];
+    filter.$and.push({
+      type: { $nin: ['FINANCE', 'EVALUATION', 'EXAM', 'SCHEDULE', 'COURSE'] },
+      'payload.studentId': { $exists: false },
+      'payload.teacherId': { $exists: false },
+      title: { $not: /Học viên|Giảng viên|học phí|Đánh giá|Kỳ thi|Lịch dạy/i }
+    });
   }
 
   if (type && VALID_TYPES.includes(String(type).toUpperCase())) {
@@ -118,6 +144,16 @@ async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = fals
     } else if (user.role === 'student') {
       unreadFilter['payload.targetAudience'] = { $ne: 'teacher' };
     }
+  }
+
+  if (isSupportStaffOnly(user)) {
+    unreadFilter.$and = unreadFilter.$and || [];
+    unreadFilter.$and.push({
+      type: { $nin: ['FINANCE', 'EVALUATION', 'EXAM', 'SCHEDULE', 'COURSE'] },
+      'payload.studentId': { $exists: false },
+      'payload.teacherId': { $exists: false },
+      title: { $not: /Học viên|Giảng viên|học phí|Đánh giá|Kỳ thi|Lịch dạy/i }
+    });
   }
 
   const [rows, total, unread] = await Promise.all([
@@ -153,6 +189,16 @@ async function countUnread(user) {
     } else if (user.role === 'student') {
       filter['payload.targetAudience'] = { $ne: 'teacher' };
     }
+  }
+
+  if (isSupportStaffOnly(user)) {
+    filter.$and = filter.$and || [];
+    filter.$and.push({
+      type: { $nin: ['FINANCE', 'EVALUATION', 'EXAM', 'SCHEDULE', 'COURSE'] },
+      'payload.studentId': { $exists: false },
+      'payload.teacherId': { $exists: false },
+      title: { $not: /Học viên|Giảng viên|học phí|Đánh giá|Kỳ thi|Lịch dạy/i }
+    });
   }
 
   const count = await Notification.countDocuments(filter);
