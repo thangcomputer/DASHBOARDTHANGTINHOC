@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Calendar, ChevronRight, BookOpen, Award, Star, Zap, UserCheck, Clipboard,
   MessageSquare, GraduationCap, Users, Activity, Video, AlertTriangle, Bell,
-  CheckCircle2, ArrowRight
+  CheckCircle2, ArrowRight, History
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import TeacherRatingDisplay from './TeacherRatingDisplay';
@@ -12,6 +12,8 @@ export default function TeacherOverviewTab({
   navigate, totalMonthlyIncome, completed, totalDone, teacherName, currentTeacher,
   teacherRating, students, totalSess, avgGrade, mySchedules = [], myNotifs, RATING_CRITERIA,
 }) {
+  const [activityTab, setActivityTab] = useState('recent'); // 'recent' | 'announcements'
+
   const initials = (teacherName || 'GV').substring(0, 2).toUpperCase();
   const avatarTone = currentTeacher?.color || 'bg-indigo-600';
 
@@ -25,21 +27,73 @@ export default function TeacherOverviewTab({
     return (students || []).filter(s => !s.lastGrade || s.lastGrade < 5);
   }, [students]);
 
-  // Center announcements mock/real data
+  // Generate real dynamic activity logs from teacher's actions
+  const teacherActivities = useMemo(() => {
+    const list = [];
+
+    // 1. From completed schedules
+    (mySchedules || []).filter(s => s.status === 'completed').forEach(s => {
+      const d = new Date(s.date);
+      const dateStr = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+      list.push({
+        id: 'comp-' + (s._id || s.id),
+        type: 'attendance',
+        title: `Đã hoàn thành ca dạy ${s.startTime}${s.endTime ? ' - ' + s.endTime : ''}`,
+        desc: `Học viên: ${s.studentName || 'Học viên'} • Khóa: ${s.course}`,
+        date: dateStr,
+        timestamp: new Date(s.date).getTime(),
+        badge: 'Đã điểm danh',
+        badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      });
+    });
+
+    // 2. From upcoming/created schedules
+    (mySchedules || []).filter(s => s.status === 'scheduled').forEach(s => {
+      const d = new Date(s.date);
+      const dateStr = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+      list.push({
+        id: 'sched-' + (s._id || s.id),
+        type: 'schedule',
+        title: `Lên lịch ca dạy ngày ${dateStr}`,
+        desc: `Ca ${s.startTime} • Học viên: ${s.studentName || s.course}`,
+        date: dateStr,
+        timestamp: new Date(s.date).getTime(),
+        badge: 'Lịch dạy mới',
+        badgeColor: 'bg-blue-50 text-blue-700 border-blue-200'
+      });
+    });
+
+    // 3. From students with grades
+    (students || []).filter(s => s.lastGrade > 0).forEach(s => {
+      list.push({
+        id: 'grade-' + s.id,
+        type: 'grade',
+        title: `Ghi nhận điểm số ${s.lastGrade}/10 cho học viên ${s.name}`,
+        desc: `Khóa học: ${s.course}`,
+        date: 'Gần đây',
+        timestamp: Date.now() - 3600000,
+        badge: 'Điểm số',
+        badgeColor: 'bg-purple-50 text-purple-700 border-purple-200'
+      });
+    });
+
+    // Sort by timestamp descending
+    return list.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+  }, [mySchedules, students]);
+
+  // Center announcements data
   const centerAnnouncements = [
     {
       id: 1,
-      title: 'Thông báo quy trình Điểm danh & Nhập điểm số học viên',
+      title: 'Quy trình Điểm danh & Nhập điểm số tự động ghi nhận nhật ký học viên',
       date: '01/08/2026',
       tag: 'Quy định trung tâm',
-      type: 'important'
     },
     {
       id: 2,
-      title: 'Cập nhật tính năng Đổi lịch & Ghi chú trao đổi 2 chiều',
+      title: 'Cập nhật tính năng Đổi lịch dạy & Ghi chú trao đổi 2 chiều',
       date: '28/07/2026',
       tag: 'Hệ thống LMS',
-      type: 'update'
     }
   ];
 
@@ -241,7 +295,7 @@ export default function TeacherOverviewTab({
               <button
                 type="button"
                 onClick={() => navigate('/teacher#students')}
-                className="text-[11px] font-bold text-indigo-600 hover:underline shrink-0"
+                className="text-[11px] font-bold text-indigo-600 hover:underline shrink-0 cursor-pointer"
               >
                 Xem chi tiết →
               </button>
@@ -283,35 +337,77 @@ export default function TeacherOverviewTab({
             </div>
           </div>
 
-          {/* Card 2: Bảng tin & Thông báo từ Trung tâm */}
+          {/* Card 2: Bảng tin Hoạt động gần đây & Thông báo từ Trung tâm */}
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Bell size={16} />
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <History size={16} />
                 </div>
                 <h4 className="text-xs sm:text-sm font-black text-slate-900">
-                  📢 Thông báo từ Trung tâm
+                  ⚡️ Nhật ký Hoạt động &amp; Bảng tin
                 </h4>
               </div>
-              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                Mới nhất
-              </span>
+
+              {/* Sub tabs */}
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setActivityTab('recent')}
+                  className={`px-2 py-1 rounded-md transition ${activityTab === 'recent' ? 'bg-white text-indigo-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Hoạt động mới ({teacherActivities.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityTab('announcements')}
+                  className={`px-2 py-1 rounded-md transition ${activityTab === 'announcements' ? 'bg-white text-indigo-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Thông báo ({centerAnnouncements.length})
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              {centerAnnouncements.map((item) => (
-                <div key={item.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700">
-                      {item.tag}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-medium">{item.date}</span>
+            {/* TAB 1: Real Dynamic Activity Logs */}
+            {activityTab === 'recent' && (
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {teacherActivities.map((act) => (
+                  <div key={act.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${act.badgeColor}`}>
+                          {act.badge}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-semibold">{act.date}</span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-800 truncate">{act.title}</p>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">{act.desc}</p>
+                    </div>
                   </div>
-                  <p className="text-xs font-bold text-slate-800 leading-snug">{item.title}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+
+                {teacherActivities.length === 0 && (
+                  <div className="py-6 text-center text-slate-400 text-xs font-medium">Chưa có nhật ký hoạt động nào gần đây.</div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: Center Announcements */}
+            {activityTab === 'announcements' && (
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {centerAnnouncements.map((item) => (
+                  <div key={item.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                        {item.tag}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium">{item.date}</span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 leading-snug">{item.title}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Card 3: Cảnh báo & Lưu ý học viên */}
