@@ -726,10 +726,10 @@
     @apply p-1.5 overflow-hidden;
   }
   .cms-fm-bubble.is-mine {
-    @apply ml-auto bg-red-600 text-white rounded-br-md;
+    @apply bg-red-600 text-white rounded-br-md;
   }
   .cms-fm-bubble.is-theirs {
-    @apply mr-auto bg-white text-slate-800 border border-slate-100 rounded-bl-md;
+    @apply bg-white text-slate-800 border border-slate-100 rounded-bl-md;
   }
   .cms-fm-img {
     @apply block w-full max-h-48 object-cover rounded-xl;
