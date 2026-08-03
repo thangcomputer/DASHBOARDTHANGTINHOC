@@ -1233,28 +1233,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   </div>
                 )}
                 <div className="flex items-center gap-2 relative max-w-4xl mx-auto">
-                  <input type="file" ref={fileInputRef}  className="hidden" onChange={handleFileUpload} />
-                  <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleFileUpload} />
-
-                  <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100">
-                      <button
-                        onClick={() => imageInputRef.current?.click()}
-                        disabled={isUploading}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Gửi ảnh (tối đa 5MB, lưu 10 ngày)"
-                      >
-                        {isUploading ? <span className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
-                      </button>
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Đính kèm tài liệu (tối đa 5MB, lưu 10 ngày)"
-                      >
-                        <Paperclip size={20} />
-                      </button>
-                  </div>
-
                   <div className="flex-1 relative">
                     {showEmojis && (
                       <div className="absolute bottom-full left-0 mb-3 bg-white p-2 rounded-2xl shadow-2xl border border-gray-100 flex gap-2 animate-in fade-in slide-in-from-bottom-2 z-50">

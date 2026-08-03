@@ -830,46 +830,6 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           </div>
         </div>
 
-        {/* Bảng điều khiển Bật/Tắt Chống tua video Dành riêng cho Giảng viên */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/25 p-3.5 sm:p-4 rounded-2xl shadow-sm mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-600 flex items-center justify-center shrink-0 font-extrabold text-base border border-blue-500/30">
-              🎓
-            </div>
-            <div>
-              <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
-                Chống tua Video GIẢNG VIÊN:
-                <span className={`px-2 py-0.5 rounded-md text-[11px] font-black uppercase ${
-                  antiSeekEnabled ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                }`}>
-                  {antiSeekEnabled ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
-                </span>
-              </h3>
-              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                {antiSeekEnabled
-                  ? 'Yêu cầu giảng viên xem đủ 2/3 thời lượng video bài giảng.'
-                  : 'Cho phép giảng viên tự do tua nhanh video bài giảng.'}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const nextState = !antiSeekEnabled;
-              setAntiSeekEnabled(nextState);
-              localStorage.setItem('teacher_anti_seek_disabled', String(!nextState));
-              localStorage.setItem('teacher_anti_seek', String(nextState));
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm border shrink-0 ${
-              antiSeekEnabled
-                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-700'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
-            }`}
-          >
-            {antiSeekEnabled ? 'Tắt chống tua Giảng viên' : 'Bật chống tua Giảng viên'}
-          </button>
-        </div>
-
         {/* Admin Progress Panel */}
         {isAdmin && showAdminPanel && courses.length > 0 && (
           <div className="mb-10">
@@ -1136,7 +1096,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                 onSaveProgress={handleSaveProgress}
                 onEligibilityReached={handleEligibilityReached}
                 isLocked={!currentLesson?.isUnlocked}
-                antiSeekEnabled={antiSeekEnabled}
+                antiSeekEnabled={currentLesson?.antiSeek !== false}
               />
             </div>
           </div>
@@ -1197,8 +1157,8 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <AlertCircle size={15} className="text-amber-400/80 flex-shrink-0" />
                       <p className="text-amber-200/70 text-[11px] sm:text-xs leading-relaxed min-w-0">
-                        <strong className="text-amber-400 font-bold">Hệ thống chống tua:</strong>{' '}
-                        {antiSeekEnabled
+                        <strong className="text-amber-400 font-bold">Chống tua bài học này:</strong>{' '}
+                        {currentLesson?.antiSeek !== false
                           ? 'ĐÃ BẬT (Phải xem đủ 2/3 thời lượng)'
                           : 'ĐÃ TẮT (Tự do tua video & xem nội dung)'}
                       </p>
@@ -1206,17 +1166,17 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                     <button
                       type="button"
                       onClick={() => {
-                        const nextState = !antiSeekEnabled;
-                        setAntiSeekEnabled(nextState);
-                        localStorage.setItem('teacher_anti_seek', String(nextState));
+                        const nextVal = currentLesson?.antiSeek === false ? true : false;
+                        setCurrentLesson(prev => prev ? { ...prev, antiSeek: nextVal } : prev);
+                        setLessons(prev => prev.map(l => String(l._id) === String(currentLesson._id) ? { ...l, antiSeek: nextVal } : l));
                       }}
                       className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                        antiSeekEnabled
+                        currentLesson?.antiSeek !== false
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
                           : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                       }`}
                     >
-                      {antiSeekEnabled ? 'Tắt chống tua' : 'Bật chống tua'}
+                      {currentLesson?.antiSeek !== false ? 'Tắt chống tua bài này' : 'Bật chống tua bài này'}
                     </button>
                   </div>
 

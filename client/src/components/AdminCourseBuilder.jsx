@@ -14,6 +14,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
   const [tempTitle, setTempTitle] = useState('');
   const [tempUrl, setTempUrl] = useState('');
   const [tempDuration, setTempDuration] = useState(0);
+  const [tempAntiSeek, setTempAntiSeek] = useState(true);
 
   // --- CHAPTER ACTIONS ---
   const addChapter = () => {
@@ -54,7 +55,8 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
       title: 'Bài học mới',
       type: 'video',
       duration: 0,
-      videoUrl: ''
+      videoUrl: '',
+      antiSeek: true,
     };
     setChapters(chapters.map(c => {
       if (c.id === chapterId) {
@@ -282,6 +284,18 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                 />
                               </div>
                             </div>
+                            <div className="flex items-center gap-2 pt-1">
+                              <input
+                                type="checkbox"
+                                id={`antiSeek_${lesson.id}`}
+                                checked={tempAntiSeek}
+                                onChange={(e) => setTempAntiSeek(e.target.checked)}
+                                className="w-4 h-4 text-red-600 rounded focus:ring-red-500 cursor-pointer"
+                              />
+                              <label htmlFor={`antiSeek_${lesson.id}`} className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                                🛡️ Bật chống tua bài học này (xem đủ 2/3 thời lượng)
+                              </label>
+                            </div>
                             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
                               <button type="button" onClick={() => setEditingLessonId(null)} className="min-h-11 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-bold transition">Hủy</button>
                               <button
@@ -291,6 +305,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                   videoUrl: tempUrl,
                                   url: tempUrl,
                                   duration: parseInt(tempDuration, 10) || 0,
+                                  antiSeek: tempAntiSeek,
                                 })}
                                 className="min-h-11 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition"
                               >
@@ -311,10 +326,15 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                               <p className="text-sm font-bold text-slate-700 break-words leading-snug">
                                 Bài {lIdx + 1}: {lesson.title}
                               </p>
-                              <p className="text-[11px] text-slate-400 mt-1 break-all leading-relaxed">
-                                {lesson.videoUrl || lesson.url || 'Chưa thiết lập URL'}
+                              <p className="text-[11px] text-slate-400 mt-1 break-all leading-relaxed flex flex-wrap items-center gap-1.5">
+                                <span>{lesson.videoUrl || lesson.url || 'Chưa thiết lập URL'}</span>
                                 <span className="text-slate-300"> · </span>
-                                {lesson.duration || 0}s
+                                <span>{lesson.duration || 0}s</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                  lesson.antiSeek !== false ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                }`}>
+                                  {lesson.antiSeek !== false ? '🛡️ Chống tua: BẬT' : '⚡ Tua tự do'}
+                                </span>
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -325,6 +345,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                   setTempTitle(lesson.title);
                                   setTempUrl(lesson.videoUrl || lesson.url || '');
                                   setTempDuration(lesson.duration || 0);
+                                  setTempAntiSeek(lesson.antiSeek !== false);
                                 }}
                                 className="inline-flex items-center justify-center min-w-10 min-h-10 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl"
                                 aria-label="Sửa bài học"
