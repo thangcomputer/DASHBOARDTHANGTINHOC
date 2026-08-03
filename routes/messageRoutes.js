@@ -23,12 +23,10 @@ function toClientMessage(doc) {
 
 /** Hiển thị tin nhắn tới học viên: STAFF vs SUPER_ADMIN */
 const DEPT_STAFF_LABEL = 'Phòng Giáo Vụ';
-const DEPT_SUPER_LABEL = 'Phòng Tuyển Sinh';
+const DEPT_SUPER_LABEL = 'ADMIN CẤP CAO';
 
 function staffDisplayName(rawName, branchCode) {
-  const base = rawName || DEPT_STAFF_LABEL;
-  const bc = (branchCode || '').trim();
-  return bc ? `${base} (P.Giáo Vụ-${bc})` : `${base} (P.Giáo Vụ)`;
+  return (rawName && rawName.trim()) ? rawName.trim() : 'Nhân viên';
 }
 
 function deptOutboundToStudent(reqUser) {
@@ -64,7 +62,11 @@ router.get('/contacts', async (req, res) => {
       branchCode: doc.branchCode || ''
     });
 
-    // ────── [1] SuperAdmin luon được lay truoc (mọi role đèu tháy) ──────
+    // ────── [1] SuperAdmin luôn được lấy trước (mọi role đều thấy) ──────
+    const SystemSettings = require('../models/SystemSettings');
+    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
+    const systemAdminName = sysSettings?.adminName || 'Admin';
+
     const superAdmins = await Teacher.find(
       { $or: [{ adminRole: 'SUPER_ADMIN' }, { role: 'admin', adminRole: { $ne: 'STAFF' } }] },
       'name phone branchId branchCode avatar'
@@ -72,7 +74,7 @@ router.get('/contacts', async (req, res) => {
 
     const superAdminContacts = superAdmins.map(a => ({
       id:     a._id.toString(),
-      name:   a.name && a.name.trim() ? a.name.trim() : DEPT_SUPER_LABEL,
+      name:   (a.name && a.name.trim()) ? a.name.trim() : systemAdminName,
       role:   'admin',
       phone:  a.phone || '',
       avatar: a.avatar || String(a.name || 'AD').substring(0, 2).toUpperCase(),
@@ -82,12 +84,14 @@ router.get('/contacts', async (req, res) => {
 
     // Luôn đảm bảo có ít nhất 1 tài khoản Admin hệ thống (hardcoded 'admin')
     if (!superAdminContacts.some(c => c.id === 'admin')) {
+      const primarySuper = superAdmins.find(a => a.name) || {};
+      const actualName = primarySuper.name || systemAdminName;
       superAdminContacts.unshift({
         id: 'admin',
-        name: DEPT_SUPER_LABEL,
+        name: actualName,
         role: 'admin',
-        phone: '0935758462',
-        avatar: 'AD',
+        phone: primarySuper.phone || '0935758462',
+        avatar: primarySuper.avatar || 'AD',
         branchId: null,
         branchCode: 'HỆ THỐNG'
       });
@@ -602,29 +606,19 @@ router.post('/', async (req, res) => {
         }
     }
 
-    // Tên hiển thị: STAFF → "<tên gốc> (P.Giáo Vụ-CSx)", SUPER → "Phòng Tuyển Sinh"
     let finalSenderId = senderId;
-    let finalSenderName = senderName;
-    if (receiverRole === 'student' && (req.user.role === 'admin' || req.user.role === 'staff')) {
-      if (isStaffAccount(req.user)) {
-        finalSenderName = staffDisplayName(senderName, sBranch);
-      } else if (isSuperAdminAccount(req.user)) {
-        finalSenderName = DEPT_SUPER_LABEL;
-      }
-    }
+    let finalSenderName = senderName || 'Admin';
     
-    // Học viên → admin/staff: chỉ gộp receiverId = 'admin' khi nhắn vào hộp thư chung (id chữ "admin" hoặc không phải ObjectId).
-    // Nếu chọn staff / admin cụ thể (ObjectId) → lưu đúng receiverId để super admin không thấy tin nhắn riêng của chi nhánh.
     let finalReceiverId = isBroadcast ? receiverId : (isGroup ? groupId : receiverId);
-    let finalReceiverName = isBroadcast ? 'Thông báo hệ thống' : (isGroup ? 'Group' : resolvedReceiverName);
+    let finalReceiverName = isBroadcast ? 'Thông báo hệ thống' : (isGroup ? 'Group' : (resolvedReceiverName || 'Người nhận'));
     if (!isBroadcast && !isGroup && senderRole === 'student' && (receiverRole === 'admin' || receiverRole === 'staff')) {
       const rid = String(receiverId || '');
       if (rid === 'admin' || !mongoose.Types.ObjectId.isValid(rid)) {
         finalReceiverId = 'admin';
-        finalReceiverName = DEPT_SUPER_LABEL;
+        finalReceiverName = resolvedReceiverName || 'Admin';
       } else {
         finalReceiverId = rid;
-        finalReceiverName = staffDisplayName(resolvedReceiverName, rBranch);
+        finalReceiverName = resolvedReceiverName || 'Nhân viên';
       }
     }
 

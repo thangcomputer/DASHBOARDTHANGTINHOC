@@ -435,7 +435,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       if (!convMap[adminConvId]) {
         convMap[adminConvId] = {
           id: adminConvId,
-          user: { id: 'admin', name: 'Phòng Tuyển Sinh', role: 'admin', avatar: 'AD', online: true, branchCode: '' },
+          user: { id: 'admin', name: 'ADMIN CẤP CAO', role: 'admin', avatar: 'AD', online: true, branchCode: '' },
           lastMessage: 'Chưa có tin nhắn',
           lastTime: new Date(0),
           unread: 0,
@@ -461,7 +461,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       if (!convMap[adminConvId]) {
         convMap[adminConvId] = {
           id: adminConvId,
-          user: { id: 'admin', name: 'Phòng Tuyển Sinh', role: 'admin', avatar: 'AD', online: true, branchCode: '' },
+          user: { id: 'admin', name: 'ADMIN CẤP CAO', role: 'admin', avatar: 'AD', online: true, branchCode: '' },
           lastMessage: 'Chưa có tin nhắn',
           lastTime: new Date(0),
           unread: 0,
