@@ -113,7 +113,7 @@ export default function StudentOverviewTab({
                 <Zap size={20} className="text-yellow-500 fill-yellow-500 shrink-0" aria-hidden="true" />
                 <h3 className="cms-sd-section-title">Việc cần làm hôm nay</h3>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 relative z-10">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 relative z-10">
                 {[
                   {
                     onClick: () => navigate('/student/exam'),
