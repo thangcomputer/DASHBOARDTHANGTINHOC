@@ -81,7 +81,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
     // 2. Thêm các Hỗ trợ viên offline từ danh sách hệ thống (staffs)
     if (Array.isArray(staffs)) {
       staffs.forEach((st) => {
-        if (!st) return;
+        if (!st || st.status === 'Deleted' || st.status === 'inactive' || st.isDeleted) return;
         const r = String(st.role || '').toLowerCase();
         const ar = String(st.adminRole || '').toUpperCase();
         if (r === 'staff' || ar === 'STAFF' || st.permissions?.includes?.('manage_messages')) {

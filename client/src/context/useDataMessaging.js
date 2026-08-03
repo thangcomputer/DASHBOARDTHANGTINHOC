@@ -403,8 +403,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             finalName = matchedStaff.name;
             finalRole = 'staff';
           } else {
-            finalName = finalName || 'Người dùng';
-            finalRole = finalRole || 'user';
+            // Tài khoản đã bị xóa khỏi hệ thống -> Ẩn hoàn toàn, coi như chưa từng tồn tại
+            return;
           }
         }
 
