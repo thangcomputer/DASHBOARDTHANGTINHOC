@@ -35,7 +35,7 @@ export default function Avatar({
       : adminRole === 'STAFF' ? 'staff'
         : String(role || 'student').toLowerCase();
 
-  const url = resolveAvatarUrl({ avatar: src, role, adminRole });
+  const url = resolveAvatarUrl({ avatar: src, role, adminRole, name });
   const sizeClass =
     size === 'sm' ? 'w-8 h-8'
       : size === 'card' ? 'w-[52px] h-[52px]'

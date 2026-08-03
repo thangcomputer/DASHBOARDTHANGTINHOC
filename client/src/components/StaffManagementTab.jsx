@@ -560,11 +560,7 @@ function StaffCard({ s, deleting, isRootSuperAdmin, onEdit, onResetPw, onDelete 
     <article className="cms-rbac-card">
       <div className="flex items-start gap-3">
         <img
-          src={resolveAvatarUrl({
-            avatar: s.avatar,
-            role: 'admin',
-            adminRole: s.adminRole,
-          })}
+          src={resolveAvatarUrl({ ...s, role: 'staff' })}
           alt=""
           className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-slate-100 bg-white"
         />
