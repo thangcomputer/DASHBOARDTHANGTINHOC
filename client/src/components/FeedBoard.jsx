@@ -462,45 +462,7 @@ export default function FeedBoard({ session, role }) {
         </button>
       </div>
 
-      {/* Hỗ trợ nhanh — luôn hiện trên Bảng tin (mọi breakpoint) */}
-      <div className="shrink-0 cms-feed-support-card p-3 sm:p-4">
-        {isSuper ? (
-          <div className="flex items-center gap-3 sm:gap-4 min-h-[56px]">
-            <SupportMascot size={56} className="cms-support-mascot--feed" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-slate-800">Hỗ trợ nhanh</p>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Bạn đang là bộ phận hỗ trợ — học viên / GV gửi yêu cầu tới Admin Super.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={openQuickSupport}
-            className="cms-feed-support-cta"
-            title="Hỗ trợ nhanh — Admin Super"
-          >
-            <SupportMascot size={56} className="cms-support-mascot--feed" />
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block text-[11px] font-black uppercase tracking-wide text-red-600">
-                Hỗ trợ nhanh
-              </span>
-              <span className="block text-sm font-bold text-slate-800 mt-0.5 truncate">
-                {quickSupport.name}
-              </span>
-              <span className="block text-[11px] text-slate-500 font-medium mt-0.5">
-                {quickSupport.online
-                  ? 'Đang sẵn sàng — bấm để được hỗ trợ'
-                  : 'Bấm để gửi yêu cầu hỗ trợ'}
-              </span>
-            </span>
-            <span className="shrink-0 w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center">
-              <Headphones size={18} />
-            </span>
-          </button>
-        )}
-      </div>
+
 
       <div className="space-y-4 w-full min-w-0">
         <div className="space-y-3 md:space-y-4 min-w-0">

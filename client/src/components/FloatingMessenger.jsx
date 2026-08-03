@@ -21,6 +21,7 @@ import {
   isSuperAdminViewer,
   buildSupportDirectory,
 } from '../utils/supportPresence';
+import SupportMascot from './SupportMascot';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
@@ -562,8 +563,8 @@ export default function FloatingMessenger({ session, role }) {
       )}
 
       <div className="cms-fm-dock">
-        {/* Panel danh bạ nhắn tin — ẩn trên Bảng tin */}
-        {supportOpen && !isFeedPage ? (
+        {/* Panel danh bạ nhắn tin — hiển thị khi bấm Hỗ trợ viên */}
+        {supportOpen ? (
           <div className="cms-fm-support">
             <div className="cms-fm-support__head">
               <div className="min-w-0 flex-1">
@@ -706,21 +707,43 @@ export default function FloatingMessenger({ session, role }) {
           </div>
         )}
 
-        {/* FAB tin nhắn — các trang khác; Bảng tin dùng Hỗ trợ nhanh riêng; ẩn với admin */}
-        {!isFeedPage && !isSuper && (meRole === 'student' || meRole === 'teacher' || meRole === 'staff') && (
-          <button
-            type="button"
-            onClick={() => setSupportOpen((v) => !v)}
-            className="cms-fm-fab"
-            title={supportOpen ? 'Đóng danh bạ nhắn tin' : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : 'Nhắn tin')}
-            aria-label={supportOpen ? 'Đóng danh bạ nhắn tin' : 'Mở nhắn tin'}
-            aria-expanded={supportOpen}
-          >
-            {supportOpen ? <X size={22} /> : <MessageSquare size={22} />}
-            {!supportOpen && unreadTotal > 0 && (
-              <span className="cms-fm-fab__badge is-unread">{badgeLabel}</span>
+        {/* FAB Nhân vật vẫy tay Hỗ trợ viên góc dưới màn hình — ẩn với admin super */}
+        {!isSuper && (meRole === 'student' || meRole === 'teacher' || meRole === 'staff') && (
+          <div className="relative flex items-center gap-2 group">
+            {!supportOpen && (
+              <div
+                onClick={() => setSupportOpen(true)}
+                className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl shadow-slate-900/10 cursor-pointer hover:scale-105 hover:border-red-200 transition-all duration-200"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-black text-slate-800 tracking-tight">Hỗ trợ viên 24/7</span>
+              </div>
             )}
-          </button>
+
+            <button
+              type="button"
+              onClick={() => setSupportOpen((v) => !v)}
+              className="cms-fm-fab cms-fm-fab--mascot"
+              title={supportOpen ? 'Đóng danh bạ Hỗ trợ' : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : 'Liên hệ Hỗ trợ viên')}
+              aria-label={supportOpen ? 'Đóng danh bạ Hỗ trợ' : 'Mở Hỗ trợ viên'}
+              aria-expanded={supportOpen}
+            >
+              {supportOpen ? (
+                <X size={24} className="text-white shrink-0" />
+              ) : (
+                <div className="relative flex items-center justify-center w-full h-full overflow-visible">
+                  <SupportMascot size={52} waving={true} className="cms-support-mascot--fab" />
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-sm" title="Hoạt động" />
+                </div>
+              )}
+              {!supportOpen && unreadTotal > 0 && (
+                <span className="cms-fm-fab__badge is-unread">{badgeLabel}</span>
+              )}
+            </button>
+          </div>
         )}
       </div>
     </div>
