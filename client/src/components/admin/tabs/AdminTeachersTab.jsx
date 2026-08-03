@@ -196,21 +196,8 @@ export default function AdminTeachersTab() {
             </div>
           </div>
 
-          <div className="cms-students-search-sticky -mx-3 px-3 py-2 sm:-mx-4 sm:px-4 lg:mx-0 lg:px-0 lg:static lg:bg-transparent lg:backdrop-blur-none lg:border-0 lg:py-0">
-            <div className="relative w-full">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Tìm tên / SĐT..."
-                value={teacherSearch}
-                onChange={(e) => setTeacherSearch(e.target.value)}
-                className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none w-full transition-all"
-                aria-label="Tìm giảng viên"
-              />
-            </div>
-          </div>
-
-          <div className="cms-students-filters">
+          {/* Toolbar 1 hàng: Trạng thái | Tìm tên GV | Thêm giảng viên */}
+          <div className="grid grid-cols-1 md:grid-cols-[200px_minmax(0,1fr)_auto] gap-2.5 items-center w-full">
             <CmsSelect
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -223,24 +210,27 @@ export default function AdminTeachersTab() {
               <option value="locked">Đã khóa</option>
               <option value="file">File chờ kiểm tra</option>
             </CmsSelect>
-          </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="cms-teacher-steps !gap-1.5 flex-1 min-w-0 overflow-x-auto">
-              {PROCESS_STEPS.map((label, i) => (
-                <div key={label} className="cms-teacher-step !py-1 !px-1.5">
-                  <span className="cms-teacher-step__n !w-5 !h-5 !text-[10px]">{i + 1}</span>
-                  <span className="cms-teacher-step__label !text-[10px]">{label}</span>
-                </div>
-              ))}
+            <div className="relative w-full">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Tìm tên / SĐT giảng viên..."
+                value={teacherSearch}
+                onChange={(e) => setTeacherSearch(e.target.value)}
+                className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none w-full transition-all"
+                aria-label="Tìm giảng viên"
+              />
             </div>
+
             {isSuperAdmin && (
               <button
                 type="button"
                 onClick={() => setShowTeacherModal(true)}
-                className="cms-students-btn-primary !px-2.5 shrink-0"
+                className="cms-students-btn-primary h-11 !px-4 shrink-0 flex items-center justify-center gap-1.5 font-bold"
               >
-                <Plus size={15} /> Thêm giảng viên
+                <Plus size={16} />
+                <span>Thêm giảng viên</span>
               </button>
             )}
           </div>
