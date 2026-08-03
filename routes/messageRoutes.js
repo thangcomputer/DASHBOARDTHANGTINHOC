@@ -838,7 +838,10 @@ router.patch('/:messageId/recall', async (req, res) => {
     const message = await Message.findById(messageId);
     if (!message) return res.status(404).json({ success: false, message: 'Không tìm thấy tin nhắn' });
 
-    if (message.senderId !== userId) {
+    const isStaffOrAdmin = req.user.role === 'admin' || isStaffAccount(req.user);
+    const senderMatch = String(message.senderId) === String(userId) || 
+      (isStaffOrAdmin && (message.senderId === 'admin' || String(message.senderId) === String(userId)));
+    if (!senderMatch) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền thu hồi tin nhắn này' });
     }
 
