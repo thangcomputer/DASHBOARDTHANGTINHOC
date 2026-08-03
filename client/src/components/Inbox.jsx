@@ -225,6 +225,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
+  const [pendingImage, setPendingImage] = useState(null);
 
   const conversations = useMemo(() => {
     const list = [];
@@ -534,22 +535,91 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   };
 
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items || !activeConv) return;
+
+    let imageFile = null;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        imageFile = items[i].getAsFile();
+        break;
+      }
+    }
+
+    if (!imageFile) return;
+
+    e.preventDefault();
+
+    const file = imageFile;
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setUploadError('Ảnh quá lớn. Giới hạn 5MB.');
+      setTimeout(() => setUploadError(''), 4000);
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError('');
+
+    try {
+      const uploadRes = await messagesAPI.uploadMessageFile(file);
+      if (!uploadRes.success) throw new Error(uploadRes.message || 'Lỗi lưu trữ ảnh');
+
+      setPendingImage({
+        url: uploadRes.url,
+        fileName: file.name || 'screenshot.png',
+      });
+      toast.success('Đã dán ảnh từ bộ nhớ tạm! Nhấn Enter hoặc nút Gửi để gửi.');
+    } catch (err) {
+      setUploadError('Tải ảnh thất bại: ' + (err.message || ''));
+      setTimeout(() => setUploadError(''), 4000);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSend = async () => {
-    if (!newMsg.trim() || !activeConv) return;
-    const msgData = {
-      conversationId: activeConv.id,
-      senderId: currentUserId,
-      senderName: currentUserName,
-      senderRole: currentUserRole,
-      receiverId: activeConv.user.id,
-      receiverName: activeConv.user.name,
-      receiverRole: activeConv.user.role,
-      content: newMsg.trim(),
-      isGroup: activeConv.isGroup || false,
-      groupId: activeConv.isGroup ? activeConv.user.id : null
-    };
-    await ctxSendMessage(msgData);
-    setNewMsg('');
+    if ((!newMsg.trim() && !pendingImage) || !activeConv) return;
+    const contentText = newMsg.trim();
+
+    if (pendingImage) {
+      const msgData = {
+        conversationId: activeConv.id,
+        senderId: currentUserId,
+        senderName: currentUserName,
+        senderRole: currentUserRole,
+        receiverId: activeConv.user.id,
+        receiverName: activeConv.user.name,
+        receiverRole: activeConv.user.role,
+        content: contentText || '[Hình ảnh]',
+        messageType: 'image',
+        fileUrl: pendingImage.url,
+        fileName: pendingImage.fileName,
+        isGroup: activeConv.isGroup || false,
+        groupId: activeConv.isGroup ? activeConv.user.id : null,
+      };
+      await ctxSendMessage(msgData);
+      setPendingImage(null);
+      setNewMsg('');
+    } else if (contentText) {
+      const msgData = {
+        conversationId: activeConv.id,
+        senderId: currentUserId,
+        senderName: currentUserName,
+        senderRole: currentUserRole,
+        receiverId: activeConv.user.id,
+        receiverName: activeConv.user.name,
+        receiverRole: activeConv.user.role,
+        content: contentText,
+        messageType: 'text',
+        isGroup: activeConv.isGroup || false,
+        groupId: activeConv.isGroup ? activeConv.user.id : null,
+      };
+      await ctxSendMessage(msgData);
+      setNewMsg('');
+    }
+
     setShowEmojis(false);
     setTimeout(() => inputRef.current?.focus(), 50);
   };
@@ -1255,7 +1325,30 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </button>
                   </div>
 
-                  <div className="flex-1 relative">
+                  <div className="flex-1 relative flex flex-col justify-end">
+                    {pendingImage && (
+                      <div className="mb-2 p-2 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-200">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <img
+                            src={resolveMediaUrl(pendingImage.url)}
+                            alt="Preview"
+                            className="w-10 h-10 object-cover rounded-lg border border-blue-200 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">Ảnh từ bộ nhớ tạm (Clipboard)</p>
+                            <p className="text-[11px] text-blue-600 font-semibold truncate">{pendingImage.fileName}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPendingImage(null)}
+                          className="w-7 h-7 rounded-lg bg-white text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition shrink-0"
+                          title="Bỏ chọn ảnh"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
                     {showEmojis && (
                       <div className="absolute bottom-full left-0 mb-3 bg-white p-2 rounded-2xl shadow-2xl border border-gray-100 flex gap-2 animate-in fade-in slide-in-from-bottom-2 z-50">
                         {EMOJIS.map(e => (
@@ -1263,24 +1356,27 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         ))}
                       </div>
                     )}
-                    <input
-                      ref={inputRef}
-                      value={newMsg}
-                      onChange={e => setNewMsg(e.target.value)}
-                      onKeyDown={handleKeyPress}
-                      className="cms-input pl-4 pr-10"
-                      placeholder="Nhập tin nhắn..."
-                    />
-                    <button
-                      onClick={() => setShowEmojis(!showEmojis)}
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 transition-colors ${showEmojis ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                      <Smile size={18} />
-                    </button>
+                    <div className="relative w-full">
+                      <input
+                        ref={inputRef}
+                        value={newMsg}
+                        onChange={e => setNewMsg(e.target.value)}
+                        onKeyDown={handleKeyPress}
+                        onPaste={handlePaste}
+                        className="cms-input pl-4 pr-10 w-full"
+                        placeholder={pendingImage ? "Nhập thêm Lời nhắn (nếu có) rồi nhấn Enter..." : "Nhập tin nhắn..."}
+                      />
+                      <button
+                        onClick={() => setShowEmojis(!showEmojis)}
+                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 transition-colors ${showEmojis ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`}
+                      >
+                        <Smile size={18} />
+                      </button>
+                    </div>
                   </div>
                   <button
                     onClick={handleSend}
-                    disabled={!newMsg.trim()}
+                    disabled={!newMsg.trim() && !pendingImage}
                     className="cms-btn cms-btn-primary cms-btn-icon"
                     title="Gửi tin nhắn"
                   >

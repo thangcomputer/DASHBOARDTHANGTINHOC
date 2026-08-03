@@ -200,6 +200,28 @@ function ChatWindow({
     onSendLink(tab, link);
   };
 
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    let imageFile = null;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        imageFile = items[i].getAsFile();
+        break;
+      }
+    }
+    if (!imageFile || uploading) return;
+    e.preventDefault();
+    setUploading(true);
+    try {
+      await onSendFile(tab, imageFile);
+    } catch {
+      /* ignore */
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="cms-fm-window is-active">
       <div className="cms-fm-window__head">
@@ -232,7 +254,7 @@ function ChatWindow({
       <div className="cms-fm-window__body">
         {messages.length === 0 ? (
           <p className="text-center text-[12px] text-slate-400 py-8 px-3 font-medium">
-            Chat với {tab.user.name}. Có thể gửi ảnh hoặc dán link.
+            Chat với {tab.user.name}. Có thể gửi ảnh, dán ảnh màn hình hoặc dán link.
           </p>
         ) : (
           messages.map((m) => {
@@ -273,7 +295,14 @@ function ChatWindow({
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={uploading ? 'Đang tải ảnh…' : 'Aa'}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submit(e);
+            }
+          }}
+          onPaste={handlePaste}
+          placeholder={uploading ? 'Đang gửi ảnh…' : 'Aa (Dán ảnh Ctrl+V)'}
           disabled={uploading}
           className="cms-fm-input"
         />
