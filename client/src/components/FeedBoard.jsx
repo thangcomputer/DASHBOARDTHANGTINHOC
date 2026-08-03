@@ -536,7 +536,7 @@ export default function FeedBoard({ session, role }) {
             <article key={post.id} className="cms-feed-card">
               <div className="cms-feed-card__head">
                 <img
-                  src={resolveAvatarUrl({ avatar: post.authorAvatar, role: post.authorRole })}
+                  src={resolveAvatarUrl({ avatar: post.authorAvatar, role: post.authorRole, name: post.authorName, id: post.authorId, adminRole: post.authorAdminRole })}
                   alt=""
                   width={44}
                   height={44}
@@ -626,7 +626,7 @@ export default function FeedBoard({ session, role }) {
                         <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2 border border-slate-100">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <img
-                              src={resolveAvatarUrl({ avatar: c.authorAvatar, role: c.authorRole })}
+                              src={resolveAvatarUrl({ avatar: c.authorAvatar, role: c.authorRole, name: c.authorName, id: c.authorId, adminRole: c.authorAdminRole })}
                               alt=""
                               className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                             />
@@ -730,7 +730,7 @@ export default function FeedBoard({ session, role }) {
                             <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2 border border-slate-100 border-l-2 border-l-indigo-200">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <img
-                                  src={resolveAvatarUrl({ avatar: r.authorAvatar, role: r.authorRole })}
+                                  src={resolveAvatarUrl({ avatar: r.authorAvatar, role: r.authorRole, name: r.authorName, id: r.authorId, adminRole: r.authorAdminRole })}
                                   alt=""
                                   className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                                 />
