@@ -461,8 +461,8 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               title={label}
               aria-label={label}
               aria-current={activePanel === key ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 px-1 py-2.5 sm:py-3.5 text-[9px] sm:text-[11px] font-semibold tracking-wide transition-all min-w-0 ${
-                activePanel === key ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
+              className={`relative flex flex-col items-center justify-center gap-0.5 px-1 py-2.5 sm:py-3.5 text-xs sm:text-xs font-bold tracking-wide transition-all min-w-0 ${
+                activePanel === key ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               <Icon size={16} className="shrink-0" aria-hidden="true" />
@@ -481,22 +481,22 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                  {/* Stat Boxes — 3 cột trên mobile */}
                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
                     <div className="bg-blue-50/60 border border-blue-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
-                       <p className="text-[9px] sm:text-xs font-bold text-blue-400 uppercase tracking-wide mb-1">Đã học</p>
+                       <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-1">Đã học</p>
                        <h4 className="text-xl sm:text-4xl font-extrabold text-blue-600 leading-none tabular-nums">{done}</h4>
-                       <p className="text-[9px] sm:text-xs font-semibold text-blue-300 mt-1 uppercase">buổi</p>
+                       <p className="text-xs font-bold text-blue-400 mt-1 uppercase">buổi</p>
                     </div>
                     <div className="bg-amber-50/60 border border-amber-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
-                       <p className="text-[9px] sm:text-xs font-bold uppercase tracking-wide mb-1 text-amber-400">Còn lại</p>
+                       <p className="text-xs font-bold uppercase tracking-wide mb-1 text-amber-600">Còn lại</p>
                        <h4 className="text-xl sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{student.remainingSessions}</h4>
-                       <p className="text-[9px] sm:text-xs font-semibold mt-1 uppercase text-amber-300">buổi</p>
+                       <p className="text-xs font-bold mt-1 uppercase text-amber-400">buổi</p>
                     </div>
                     <div className="bg-purple-50/60 border border-purple-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
-                       <p className="text-[9px] sm:text-xs font-bold text-purple-400 uppercase tracking-wide mb-1">Điểm TB</p>
+                       <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-1">Điểm TB</p>
                        <div className="flex items-baseline justify-center gap-0.5">
                           <h4 className="text-xl sm:text-4xl font-extrabold text-purple-600 leading-none tabular-nums">{student.lastGrade || 0}</h4>
-                          <span className="text-[10px] sm:text-lg font-bold text-purple-300">/10</span>
+                          <span className="text-xs sm:text-lg font-bold text-purple-400">/10</span>
                        </div>
-                       <p className="text-[9px] sm:text-xs font-semibold text-purple-300 mt-1 uppercase hidden sm:block">Đánh giá chung</p>
+                       <p className="text-xs font-bold text-purple-400 mt-1 uppercase hidden sm:block">Đánh giá chung</p>
                     </div>
                  </div>
 

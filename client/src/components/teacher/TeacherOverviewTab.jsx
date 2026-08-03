@@ -23,7 +23,7 @@ export default function TeacherOverviewTab({
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 md:gap-8 h-full">
             <div className="space-y-3 sm:space-y-4 min-w-0">
               <div>
-                <p className="text-slate-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
+                <p className="text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wider mb-1">
                   Thu nhập tháng {new Date().getMonth() + 1}
                 </p>
                 <h3 className="text-xl sm:text-3xl md:text-4xl font-black tabular-nums tracking-tight">
@@ -33,16 +33,16 @@ export default function TeacherOverviewTab({
               </div>
               <div className="flex items-stretch gap-3 sm:gap-6">
                 <div className="flex flex-col min-w-0">
-                  <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wide">Học viên hoàn thành</span>
+                  <span className="text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wide">Học viên hoàn thành</span>
                   <span className="text-lg sm:text-2xl font-black text-emerald-400 tabular-nums mt-0.5">
-                    {completed} <span className="text-[10px] sm:text-xs text-slate-400 font-bold">người</span>
+                    {completed} <span className="text-xs text-slate-300 font-bold">người</span>
                   </span>
                 </div>
                 <div className="w-px self-stretch bg-white/10" aria-hidden="true" />
                 <div className="flex flex-col min-w-0">
-                  <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wide">Buổi dạy đã xong</span>
+                  <span className="text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wide">Buổi dạy đã xong</span>
                   <span className="text-lg sm:text-2xl font-black text-sky-400 tabular-nums mt-0.5">
-                    {totalDone} <span className="text-[10px] sm:text-xs text-slate-400 font-bold">buổi</span>
+                    {totalDone} <span className="text-xs text-slate-300 font-bold">buổi</span>
                   </span>
                 </div>
               </div>
@@ -63,8 +63,8 @@ export default function TeacherOverviewTab({
           <div className={`w-14 h-14 sm:w-20 sm:h-20 ${avatarTone} rounded-full sm:rounded-2xl flex items-center justify-center text-white text-lg sm:text-3xl font-black shadow-md mb-3 sm:mb-4`}>
             {initials}
           </div>
-          <h4 className="text-sm sm:text-lg font-black text-slate-800 mb-0.5 truncate max-w-full px-2">{teacherName}</h4>
-          <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 sm:mb-4">Giảng viên chuyên môn</p>
+          <h4 className="text-base sm:text-xl font-black text-slate-800 mb-0.5 truncate max-w-full px-2">{teacherName}</h4>
+          <p className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 sm:mb-4">Giảng viên chuyên môn</p>
           <div className="bg-amber-50/80 px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-amber-100/80 w-full">
             <div className="flex items-center justify-center gap-0.5 mb-1">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -77,7 +77,7 @@ export default function TeacherOverviewTab({
               ))}
             </div>
             <p className="text-xl sm:text-2xl font-black text-amber-600 leading-none tabular-nums">{teacherRating.avg || '—'}</p>
-            <p className="text-[10px] sm:text-xs font-bold text-amber-500/90 uppercase tracking-wide mt-1">
+            <p className="text-xs sm:text-sm font-bold text-amber-600 uppercase tracking-wide mt-1.5">
               {teacherRating.count} lượt đánh giá từ học viên
             </p>
           </div>
@@ -94,16 +94,16 @@ export default function TeacherOverviewTab({
         ].map(({ icon: Icon, label, value, sub, color, bg }) => (
           <div
             key={label}
-            className="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all group overflow-hidden relative min-w-0"
+            className="bg-white rounded-2xl p-3.5 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all group overflow-hidden relative min-w-0"
           >
             <div className={`absolute -right-3 -bottom-3 w-14 h-14 sm:w-20 sm:h-20 ${bg} rounded-full opacity-40 group-hover:scale-125 transition-transform duration-500 pointer-events-none`} aria-hidden="true" />
             <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-2.5 sm:mb-3.5 shadow-sm relative z-10`}>
               <Icon size={16} className="text-white sm:hidden" aria-hidden="true" />
               <Icon size={20} className="text-white hidden sm:block" aria-hidden="true" />
             </div>
-            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide mb-0.5 relative z-10">{label}</p>
+            <p className="text-xs sm:text-sm font-bold text-slate-600 uppercase tracking-wide mb-0.5 relative z-10">{label}</p>
             <p className="text-lg sm:text-2xl md:text-3xl font-black text-slate-800 relative z-10 truncate tabular-nums">{value}</p>
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-400 mt-0.5 relative z-10">{sub}</p>
+            <p className="text-xs font-medium text-slate-500 mt-1 relative z-10">{sub}</p>
           </div>
         ))}
       </div>
