@@ -506,7 +506,7 @@ export default function FeedBoard({ session, role }) {
       <div className="cms-feed-composer">
         <div className="cms-feed-composer__row">
           <img
-            src={resolveAvatarUrl({ avatar: session?.avatar, role: meRole, adminRole: session?.adminRole })}
+            src={resolveAvatarUrl({ ...session, role: meRole })}
             alt=""
             width={44}
             height={44}

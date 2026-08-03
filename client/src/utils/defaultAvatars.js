@@ -58,12 +58,12 @@ export function resolveAvatarUrl(userObj = {}) {
 
   // 2. Hỗ trợ viên (Hồ Sỹ Hiếu / Hỗ trợ viên / support) -> Nam hỗ trợ đeo tai nghe
   const isSupportOnly = perms.length === 1 && perms.includes('manage_messages');
-  if (uname.includes('hỗ trợ viên') || uname.includes('hồ sĩ hiếu') || uname.includes('hồ sỹ hiếu') || isSupportOnly) {
+  if (uname.includes('hỗ trợ viên') || uname.includes('hồ sĩ hiếu') || uname.includes('hồ sỹ hiếu') || isSupportOnly || r === 'staff') {
     return DEFAULT_AVATARS.support;
   }
 
   // 3. Staff / Admin chi nhánh -> Nữ nhân viên
-  if (r === 'staff' || ar === 'STAFF') {
+  if (ar === 'STAFF') {
     return DEFAULT_AVATARS.staff;
   }
 
