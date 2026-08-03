@@ -372,56 +372,68 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         // Xác định xem mình có phải là người gửi không (hộp chung 'admin' chỉ dành cho SUPER_ADMIN)
         const isMeSender = String(m.senderId) === sId || (isSuperAdmin && String(m.senderId) === 'admin');
 
-        const isStaffOrAdmin = sId === 'admin' || isSuperAdmin || currentUser?.role === 'staff' || currentUser?.role === 'admin';
+        const isViewerStaffOrAdmin = sId === 'admin' || isSuperAdmin || currentUser?.role === 'staff' || currentUser?.role === 'admin';
         const otherUserId = isMeSender ? m.receiverId : m.senderId;
-        let otherName = isMeSender ? m.receiverName : m.senderName;
         const otherRole = isMeSender ? m.receiverRole : m.senderRole;
 
         // Bỏ qua hội thoại tự chat với chính mình
         if (String(otherUserId) === String(sId)) return;
 
-        // Tra cứu tên mới nhất từ danh sách local (Teacher/Staff/Student/CurrentUser)
-        if (String(otherUserId) === String(currentUser?.id) || String(otherUserId) === String(currentUser?._id)) {
-          if (currentUser?.name) otherName = currentUser.name;
-        } else if (otherUserId === 'admin') {
-          if (!isStaffOrAdmin) {
-            otherName = 'HỖ TRỢ VIÊN';
+        let finalName = isMeSender ? m.receiverName : m.senderName;
+        let finalRole = otherRole;
+
+        // Tra cứu linh hoạt theo ID từ danh sách hệ thống local (Student / Teacher / Staff)
+        if (otherUserId === 'admin') {
+          if (!isViewerStaffOrAdmin) {
+            finalName = 'HỖ TRỢ VIÊN';
+            finalRole = 'staff';
           } else {
             const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
               || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
-            if (superDoc?.name) otherName = superDoc.name;
-            else if (currentUser?.name && currentUser?.role === 'admin') otherName = currentUser.name;
-            else otherName = 'Ban Quản trị';
+            finalName = superDoc?.name || 'Hộp thư Hỗ trợ';
+            finalRole = 'admin';
           }
-        } else if (otherRole === 'teacher' || otherRole === 'admin') {
-          const t = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
-          if (t?.name) otherName = t.name;
-        } else if (otherRole === 'staff') {
-          const st = safeStaffs.find(st => String(st.id || st._id) === String(otherUserId));
-          if (st?.name) otherName = st.name;
-        } else if (otherRole === 'student') {
-          const s = safeStudents.find(s => String(s.id || s._id) === String(otherUserId));
-          if (s?.name) otherName = s.name;
+        } else {
+          const matchedStudent = safeStudents.find(s => String(s.id || s._id) === String(otherUserId));
+          const matchedTeacher = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
+          const matchedStaff   = safeStaffs.find(st => String(st.id || st._id) === String(otherUserId));
+
+          if (matchedStudent) {
+            finalName = matchedStudent.name;
+            finalRole = 'student';
+          } else if (matchedTeacher) {
+            finalName = matchedTeacher.name;
+            finalRole = matchedTeacher.adminRole === 'SUPER_ADMIN' ? 'admin' : 'teacher';
+          } else if (matchedStaff) {
+            finalName = matchedStaff.name;
+            finalRole = 'staff';
+          } else {
+            finalName = finalName || 'Người dùng';
+            finalRole = finalRole || 'user';
+          }
+        }
+
+        // Dành riêng cho học viên / giảng viên khi nhắn tin với admin/staff hỗ trợ
+        if (!isViewerStaffOrAdmin && (otherUserId === 'admin' || finalRole === 'admin')) {
+          finalName = 'HỖ TRỢ VIÊN';
+          finalRole = 'staff';
         }
 
         // Ưu tiên lấy branchCode trực tiếp từ tin nhắn (nếu có), nếu không mới tìm trong list local
         let branchCode = isMeSender ? m.receiverBranchCode : m.senderBranchCode;
 
         if (!branchCode) {
-          if (otherRole === 'teacher') {
+          if (finalRole === 'teacher') {
             const t = safeTeachers.find(t => String(t.id) === String(otherUserId));
             branchCode = t?.branchCode || '';
-          } else if (otherRole === 'student') {
+          } else if (finalRole === 'student') {
             const s = safeStudents.find(s => String(s.id) === String(otherUserId));
             branchCode = s?.branchCode || '';
-          } else if (otherRole === 'admin' || otherRole === 'staff') {
+          } else if (finalRole === 'admin' || finalRole === 'staff') {
             const st = safeStaffs.find(st => String(st.id) === String(otherUserId) || String(st._id) === String(otherUserId));
             branchCode = st?.branchCode || '';
           }
         }
-
-        const finalRole = (!isStaffOrAdmin && (otherUserId === 'admin' || otherRole === 'admin')) ? 'staff' : otherRole;
-        const finalName = (!isStaffOrAdmin && otherUserId === 'admin') ? 'HỖ TRỢ VIÊN' : (otherName || 'Người dùng');
 
         convMap[m.convId] = {
           id: m.convId,
