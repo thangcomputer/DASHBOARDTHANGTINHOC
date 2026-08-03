@@ -12,6 +12,7 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
     zalo: student.zalo || '',
     email: student.email || '',
     address: student.address || '',
+    gender: student.gender || 'male',
   });
   const [loading, setLoading] = useState(false);
 
@@ -52,6 +53,34 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               readOnly
             />
             <p className="text-[9px] text-red-500 mt-1 pl-1 italic">* Tên không thể tự sửa. Vui lòng liên hệ Admin.</p>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">Giới tính chọn ảnh đại diện</label>
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, gender: 'male' })}
+                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                  formData.gender === 'male' || formData.gender === 'Nam'
+                    ? 'bg-teal-50 text-teal-700 border-teal-300 ring-2 ring-teal-400/20 shadow-sm'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                <span>👨 Nam (Cartoon Nam)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, gender: 'female' })}
+                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                  formData.gender === 'female' || formData.gender === 'Nữ'
+                    ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                <span>👩 Nữ (Cartoon Nữ)</span>
+              </button>
+            </div>
           </div>
           
           <div className="grid grid-cols-2 gap-4">

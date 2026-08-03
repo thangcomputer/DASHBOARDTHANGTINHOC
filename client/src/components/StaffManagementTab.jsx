@@ -83,6 +83,7 @@ function StaffModal({ staff, onClose, onSaved }) {
     permissions: staff?.permissions || (isEdit ? [] : DEFAULT_STAFF_PERMISSIONS),
     branchId:    staff?.branchId || '',
     status:      staff?.status || 'active',
+    gender:      staff?.gender || 'male',
   });
   const [saving, setSaving] = useState(false);
   const [permQuery, setPermQuery] = useState('');
@@ -223,6 +224,34 @@ function StaffModal({ staff, onClose, onSaved }) {
                   className="cms-input pl-10"
                   placeholder="Nguyễn Văn A"
                 />
+              </div>
+            </div>
+
+            <div>
+              <label className="cms-rbac-label">Giới tính chọn ảnh Cartoon <span className="text-red-500">*</span></label>
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, gender: 'male' }))}
+                  className={`flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                    form.gender === 'male' || form.gender === 'Nam'
+                      ? 'bg-sky-50 text-sky-700 border-sky-300 ring-2 ring-sky-400/20 shadow-sm'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>👨 Nam (Ảnh Cartoon Nam)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, gender: 'female' }))}
+                  className={`flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                    form.gender === 'female' || form.gender === 'Nữ'
+                      ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>👩 Nữ (Ảnh Cartoon Nữ)</span>
+                </button>
               </div>
             </div>
 
