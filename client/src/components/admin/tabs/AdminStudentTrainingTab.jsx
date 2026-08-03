@@ -4,7 +4,7 @@ import { useAdminTab } from '../AdminTabContext';
 import {
   BookOpen, Video, Download, HelpCircle, Trophy, Plus, Clock, Trash2,
   FileSpreadsheet, Edit3, X, Upload, Loader2, FileText, Save, Search,
-  CheckCircle2, XCircle, Layers,
+  CheckCircle2, XCircle, Layers, Award,
 } from 'lucide-react';
 import AdminCourseBuilder from '../../AdminCourseBuilder';
 import RichTextEditor from '../shared/RichTextEditor';
