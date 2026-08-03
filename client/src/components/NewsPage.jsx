@@ -462,6 +462,7 @@ export default function NewsPage({ session, role = 'admin' }) {
   const [qInput, setQInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
+  const [detailError, setDetailError] = useState('');
   const [related, setRelated] = useState([]);
   const [manageStatus, setManageStatus] = useState('');
   const [editing, setEditing] = useState(null);
@@ -486,21 +487,23 @@ export default function NewsPage({ session, role = 'admin' }) {
 
   const loadDetail = useCallback(async (s) => {
     setLoading(true);
+    setDetailError('');
     try {
-      const res = await blogAPI.get(s, { manage: canManage });
-      if (res.success) {
+      const res = await blogAPI.get(s, { manage: canManage && mode === 'manage' });
+      if (res.success && res.data) {
         setDetail(res.data);
         setRelated(res.related || []);
       } else {
-        toast.error(res.message || 'Không tìm thấy bài');
-        navigate(base);
+        setDetail(null);
+        setDetailError(res.message || 'Không tìm thấy bài viết');
       }
     } catch {
-      toast.error('Lỗi tải bài viết');
+      setDetail(null);
+      setDetailError('Lỗi tải bài viết');
     } finally {
       setLoading(false);
     }
-  }, [canManage, navigate, base, toast]);
+  }, [canManage, mode]);
 
   useEffect(() => {
     if (slug) loadDetail(slug);
@@ -511,6 +514,7 @@ export default function NewsPage({ session, role = 'admin' }) {
         return;
       }
       setDetail(null);
+      setDetailError('');
       if (editId) {
         // Chỉ prefill khi đã có contentHtml (từ trang chi tiết). Card manage list thiếu field này.
         const cached = location.state?.post;
@@ -543,6 +547,7 @@ export default function NewsPage({ session, role = 'admin' }) {
       }
     } else {
       setDetail(null);
+      setDetailError('');
       setEditing(null);
       loadList(1);
     }
@@ -562,7 +567,9 @@ export default function NewsPage({ session, role = 'admin' }) {
   }, [socket, slug, mode, page, loadList, role]);
 
   const openPost = (post) => {
-    const manageQs = (canManage && post.status !== 'published') ? '?manage=1' : '';
+    if (!post || !post.slug) return;
+    setDetailError('');
+    const manageQs = (canManage && mode === 'manage' && post.status !== 'published') ? '?manage=1' : '';
     navigate(`${base}/${post.slug}${manageQs}`);
   };
 
@@ -614,16 +621,41 @@ export default function NewsPage({ session, role = 'admin' }) {
     );
   }
 
-
   if (slug) {
-    if (loading && !detail) {
+    if (loading && !detail && !detailError) {
       return (
-        <div className="cms-viewport-fill flex items-center justify-center text-slate-400">
-          <Loader2 className="animate-spin" size={28} />
+        <div className="w-full py-16 flex flex-col items-center justify-center text-slate-400">
+          <Loader2 className="animate-spin mb-2 text-red-600" size={32} />
+          <p className="text-xs font-semibold">Đang tải bài viết...</p>
         </div>
       );
     }
-    if (!detail) return null;
+
+    if (detailError || (!loading && !detail)) {
+      return (
+        <div className="w-full py-12 px-4 flex flex-col items-center justify-center text-center space-y-4">
+          <div className="w-14 h-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center shadow-sm">
+            <Newspaper size={30} />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-base font-bold text-slate-900">Không thể xem bài viết</h2>
+            <p className="text-xs text-slate-500 max-w-sm font-medium">
+              {detailError || 'Bài viết không tồn tại hoặc đã bị ẩn.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDetailError('');
+              navigate(base);
+            }}
+            className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-black transition-colors"
+          >
+            Quay lại Tin tức
+          </button>
+        </div>
+      );
+    }
     const thumb = detail.thumbnailUrl ? resolveMediaUrl(detail.thumbnailUrl) : null;
     return (
       <div className="w-full space-y-6 pb-20 px-2 sm:px-4 text-left">
