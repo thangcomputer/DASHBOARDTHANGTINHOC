@@ -65,24 +65,19 @@ router.get('/contacts', async (req, res) => {
     // ────── [1] SuperAdmin luôn được lấy trước (mọi role đều thấy) ──────
     const SystemSettings = require('../models/SystemSettings');
     const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
-    const systemAdminName = (sysSettings?.adminName && !sysSettings.adminName.includes('PHÒNG ĐÀO TẠO')) ? sysSettings.adminName.trim() : 'SUPER ADMIN';
+    const systemAdminName = (sysSettings?.adminName && sysSettings.adminName.trim()) ? sysSettings.adminName.trim() : 'Admin';
 
     const superAdmins = await Teacher.find(
       { $or: [{ adminRole: 'SUPER_ADMIN' }, { role: 'admin', adminRole: { $ne: 'STAFF' } }] },
       'name phone branchId branchCode avatar'
     ).lean();
 
-    const normalizeSuperName = (name) => {
-      if (!name || name.includes('PHÒNG ĐÀO TẠO') || name.includes('Phòng Đào Tạo')) return 'SUPER ADMIN';
-      return name.trim();
-    };
-
     const superAdminContacts = superAdmins.map(a => ({
       id:     a._id.toString(),
-      name:   normalizeSuperName(a.name) || systemAdminName,
+      name:   (a.name && a.name.trim()) ? a.name.trim() : systemAdminName,
       role:   'admin',
       phone:  a.phone || '',
-      avatar: a.avatar || 'AD',
+      avatar: a.avatar || String(a.name || 'AD').substring(0, 2).toUpperCase(),
       branchId: a.branchId || null,
       branchCode: a.branchCode || ''
     }));
@@ -90,13 +85,13 @@ router.get('/contacts', async (req, res) => {
     // Luôn đảm bảo có ít nhất 1 tài khoản Admin hệ thống (hardcoded 'admin')
     if (!superAdminContacts.some(c => c.id === 'admin')) {
       const primarySuper = superAdmins.find(a => a.name) || {};
-      const actualName = normalizeSuperName(primarySuper.name) || systemAdminName;
+      const actualName = (primarySuper.name && primarySuper.name.trim()) ? primarySuper.name.trim() : systemAdminName;
       superAdminContacts.unshift({
         id: 'admin',
         name: actualName,
         role: 'admin',
         phone: primarySuper.phone || '0935758462',
-        avatar: primarySuper.avatar || 'AD',
+        avatar: primarySuper.avatar || String(actualName || 'AD').substring(0, 2).toUpperCase(),
         branchId: null,
         branchCode: 'HỆ THỐNG'
       });

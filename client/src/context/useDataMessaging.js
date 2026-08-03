@@ -395,12 +395,6 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           if (s?.name) otherName = s.name;
         }
 
-        if (!otherName || otherName.includes('PHÒNG ĐÀO TẠO') || otherName.includes('Phòng Đào Tạo')) {
-          if (otherUserId === 'admin' || otherRole === 'admin') {
-            otherName = 'SUPER ADMIN';
-          }
-        }
-
         // Ưu tiên lấy branchCode trực tiếp từ tin nhắn (nếu có), nếu không mới tìm trong list local
         let branchCode = isMeSender ? m.receiverBranchCode : m.senderBranchCode;
 
@@ -438,8 +432,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       }
     });
 
-    const rawAdminName = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')?.name || currentUser?.name || 'SUPER ADMIN';
-    const sysAdminName = (rawAdminName.includes('PHÒNG ĐÀO TẠO') || rawAdminName.includes('Phòng Đào Tạo')) ? 'SUPER ADMIN' : rawAdminName;
+    const sysAdminName = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')?.name || currentUser?.name || 'Admin';
 
     // 2. Add potential contacts
     if (userRole === 'student') {
