@@ -107,12 +107,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   useEffect(() => {
     if (!socket) return undefined;
     const onBlog = (payload) => {
+      if (payload?.targetAudience) {
+        if (role === 'teacher' && payload.targetAudience === 'student') return;
+        if (role === 'student' && payload.targetAudience === 'teacher') return;
+      }
       const title = payload?.title ? `Có bài viết mới: '${payload.title}'` : 'Có bài viết mới';
       toast.info(title);
     };
     socket.on('blog:published', onBlog);
     return () => socket.off('blog:published', onBlog);
-  }, [socket, toast]);
+  }, [socket, toast, role]);
 
   useEffect(() => {
     const key = `${role}_user`;

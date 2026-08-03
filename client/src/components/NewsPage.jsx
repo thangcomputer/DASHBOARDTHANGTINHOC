@@ -550,12 +550,16 @@ export default function NewsPage({ session, role = 'admin' }) {
 
   useEffect(() => {
     if (!socket) return undefined;
-    const onPub = () => {
+    const onPub = (payload) => {
+      if (payload?.targetAudience) {
+        if (role === 'teacher' && payload.targetAudience === 'student') return;
+        if (role === 'student' && payload.targetAudience === 'teacher') return;
+      }
       if (!slug && mode !== 'edit') loadList(page);
     };
     socket.on('blog:published', onPub);
     return () => socket.off('blog:published', onPub);
-  }, [socket, slug, mode, page, loadList]);
+  }, [socket, slug, mode, page, loadList, role]);
 
   const openPost = (post) => {
     const manageQs = (canManage && post.status !== 'published') ? '?manage=1' : '';

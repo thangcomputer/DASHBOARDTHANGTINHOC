@@ -54,6 +54,16 @@ async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = fals
     $or: match,
     dismissed_by: { $ne: userId },
   };
+
+  const isAdminSide = user.role === 'admin' || user.role === 'staff' || user.adminRole === 'SUPER_ADMIN' || user.adminRole === 'STAFF';
+  if (!isAdminSide) {
+    if (user.role === 'teacher') {
+      filter['payload.targetAudience'] = { $ne: 'student' };
+    } else if (user.role === 'student') {
+      filter['payload.targetAudience'] = { $ne: 'teacher' };
+    }
+  }
+
   if (type && VALID_TYPES.includes(String(type).toUpperCase())) {
     filter.type = String(type).toUpperCase();
   }
@@ -65,14 +75,23 @@ async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = fals
   const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
   const skip = (pageNum - 1) * limitNum;
 
+  const unreadFilter = {
+    $or: match,
+    dismissed_by: { $ne: userId },
+    read_by: { $ne: userId },
+  };
+  if (!isAdminSide) {
+    if (user.role === 'teacher') {
+      unreadFilter['payload.targetAudience'] = { $ne: 'student' };
+    } else if (user.role === 'student') {
+      unreadFilter['payload.targetAudience'] = { $ne: 'teacher' };
+    }
+  }
+
   const [rows, total, unread] = await Promise.all([
     Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
     Notification.countDocuments(filter),
-    Notification.countDocuments({
-      $or: match,
-      dismissed_by: { $ne: userId },
-      read_by: { $ne: userId },
-    }),
+    Notification.countDocuments(unreadFilter),
   ]);
 
   return {
@@ -89,11 +108,22 @@ async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = fals
 
 async function countUnread(user) {
   const { userId, match } = buildReceiverMatch(user);
-  const count = await Notification.countDocuments({
+  const filter = {
     $or: match,
     dismissed_by: { $ne: userId },
     read_by: { $ne: userId },
-  });
+  };
+
+  const isAdminSide = user.role === 'admin' || user.role === 'staff' || user.adminRole === 'SUPER_ADMIN' || user.adminRole === 'STAFF';
+  if (!isAdminSide) {
+    if (user.role === 'teacher') {
+      filter['payload.targetAudience'] = { $ne: 'student' };
+    } else if (user.role === 'student') {
+      filter['payload.targetAudience'] = { $ne: 'teacher' };
+    }
+  }
+
+  const count = await Notification.countDocuments(filter);
   return count;
 }
 

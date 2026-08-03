@@ -174,10 +174,19 @@ router.get('/posts/:slugOrId', async (req, res) => {
     const doc = await BlogPost.findOne(filter);
     if (!doc) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết' });
 
+    const isAdminSide = req.user?.role === 'admin' || req.user?.role === 'staff' || req.user?.adminRole === 'SUPER_ADMIN' || req.user?.adminRole === 'STAFF';
+
     if (manage) {
       const ok = await userHasPermission(req.user, PERMISSIONS.MANAGE_BLOG);
       if (!ok && doc.status !== 'published') {
         return res.status(403).json({ success: false, message: 'Không có quyền xem bản nháp' });
+      }
+    } else if (!isAdminSide) {
+      if (req.user?.role === 'teacher' && doc.targetAudience === 'student') {
+        return res.status(403).json({ success: false, message: 'Bài viết này dành cho Học viên' });
+      }
+      if (req.user?.role === 'student' && doc.targetAudience === 'teacher') {
+        return res.status(403).json({ success: false, message: 'Bài viết này dành cho Giảng viên' });
       }
     }
 
@@ -187,11 +196,21 @@ router.get('/posts/:slugOrId', async (req, res) => {
       doc.viewCount = (doc.viewCount || 0) + 1;
     }
 
-    const related = await BlogPost.find({
+    const relatedFilter = {
       deletedAt: null,
       status: 'published',
       _id: { $ne: doc._id },
-    })
+    };
+
+    if (!isAdminSide) {
+      if (req.user?.role === 'teacher') {
+        relatedFilter.targetAudience = { $in: ['all', 'teacher'] };
+      } else if (req.user?.role === 'student') {
+        relatedFilter.targetAudience = { $in: ['all', 'student'] };
+      }
+    }
+
+    const related = await BlogPost.find(relatedFilter)
       .sort({ publishedAt: -1 })
       .limit(4)
       .select('-contentHtml -attachments')
@@ -405,13 +424,28 @@ async function notifyPublished(io, post) {
   const title = `Có bài viết mới: '${post.title}'`;
   const content = post.excerpt || 'Mở Tin tức để đọc bài viết mới từ trung tâm.';
   const link = ''; // client tự navigate theo role + slug
+
+  let receivers;
+  if (post.targetAudience === 'teacher') {
+    receivers = ['ALL_ADMIN', 'ALL_TEACHER'];
+  } else if (post.targetAudience === 'student') {
+    receivers = ['ALL_ADMIN', 'ALL_STUDENT'];
+  } else {
+    receivers = 'GLOBAL';
+  }
+
   try {
     await NotificationService.send(io, {
       type: 'SYSTEM',
       title,
       content,
-      receivers: 'GLOBAL',
-      payload: { blogPostId: String(post._id), slug: post.slug, action: 'blog_published' },
+      receivers,
+      payload: {
+        blogPostId: String(post._id),
+        slug: post.slug,
+        targetAudience: post.targetAudience || 'all',
+        action: 'blog_published',
+      },
       link,
     });
     io.emit('blog:published', {
@@ -420,11 +454,52 @@ async function notifyPublished(io, post) {
       title: post.title,
       excerpt: post.excerpt || '',
       thumbnailUrl: post.thumbnailUrl || '',
+      targetAudience: post.targetAudience || 'all',
     });
   } catch (err) {
     logger.warn('[BLOG] notify:', err.message);
   }
 }
+
+/** Tự động đồng bộ các bản ghi thông báo tin tức cũ trong DB cho đúng receivers */
+async function syncOldBlogNotifications() {
+  try {
+    const Notification = require('../models/Notification');
+    const notifs = await Notification.find({ 'payload.action': 'blog_published' }).lean();
+    for (const n of notifs) {
+      const postId = n.payload?.blogPostId;
+      const slug = n.payload?.slug;
+      if (!postId && !slug) continue;
+
+      const post = await BlogPost.findOne({
+        $or: [{ _id: postId }, { slug: slug }],
+      }).select('targetAudience').lean();
+
+      if (!post) continue;
+      const audience = post.targetAudience || 'all';
+
+      let receivers;
+      if (audience === 'teacher') receivers = ['ALL_ADMIN', 'ALL_TEACHER'];
+      else if (audience === 'student') receivers = ['ALL_ADMIN', 'ALL_STUDENT'];
+      else receivers = ['GLOBAL'];
+
+      await Notification.updateOne(
+        { _id: n._id },
+        {
+          $set: {
+            receivers,
+            'payload.targetAudience': audience,
+          },
+        }
+      );
+    }
+  } catch (err) {
+    logger.warn('[BLOG] syncOldBlogNotifications error:', err.message);
+  }
+}
+
+// Gọi đồng bộ ngay khi load module
+setTimeout(syncOldBlogNotifications, 2000);
 
 // silence unused helper warning in some linters
 void escapeHtml;
