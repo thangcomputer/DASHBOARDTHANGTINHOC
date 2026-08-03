@@ -308,7 +308,7 @@ function ChatWindow({
                       </button>
                       {showOptions && (
                         <div
-                          className={`absolute ${isNearTop ? 'top-full mt-1' : 'bottom-full mb-1'} right-0 z-[200] bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 w-36 text-xs font-semibold animate-in fade-in zoom-in-95 duration-150 shadow-slate-900/20`}
+                          className={`absolute ${isNearTop ? 'top-full mt-1' : 'bottom-full mb-1'} left-0 z-[200] bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 w-36 text-xs font-semibold animate-in fade-in zoom-in-95 duration-150 shadow-slate-900/20`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
