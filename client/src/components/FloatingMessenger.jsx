@@ -283,9 +283,9 @@ function ChatWindow({
             const isNearTop = idx < 3 || idx < messages.length / 2;
 
             return (
-              <div key={msgId} className={`group relative flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}>
+              <div key={msgId} className={`group relative flex items-center gap-1 ${mine ? 'justify-end' : 'justify-start'}`}>
                 {mine && !m.isRecalled && (
-                  <div className="relative shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  <div className="relative shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                     <button
                       type="button"
                       onClick={() => handleRecallMessage(msgId)}
