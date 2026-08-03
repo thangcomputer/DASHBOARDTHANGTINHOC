@@ -92,7 +92,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId }) {
   if (buckets.admin.length) {
     groups.push({
       key: 'admin',
-      label: `Admin chi nhánh / Staff (${buckets.admin.length})`,
+      label: `Hỗ trợ viên & Quản trị (${buckets.admin.length})`,
       people: sortPeople(buckets.admin),
     });
   }

@@ -23,8 +23,8 @@ import {
 } from '../utils/supportPresence';
 
 const ROLE_LABEL = {
-  admin: 'Admin',
-  staff: 'Admin CN',
+  admin: 'Hỗ trợ viên',
+  staff: 'Hỗ trợ viên',
   teacher: 'GV',
   student: 'HV',
 };
