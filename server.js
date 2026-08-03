@@ -252,11 +252,11 @@ function mapOnlineUser(u) {
   };
 }
 
-/** Presence theo chi nhánh — Super Admin nhận full list qua ALL_ADMIN */
+/** Presence theo chi nhánh — Super Admin & Staff nhận full list qua ALL_ADMIN & ALL_STAFF */
 function broadcastOnlinePresence() {
   const all = presenceStore.listPresence();
   const full = all.map(mapOnlineUser);
-  io.to('ALL_ADMIN').emit('users:online', full);
+  io.to('ALL_ADMIN').to('ALL_STAFF').emit('users:online', full);
 
   const byBranch = new Map();
   for (const u of all) {
@@ -267,7 +267,7 @@ function broadcastOnlinePresence() {
 
   for (const [bid, users] of byBranch.entries()) {
     const room = bid === '_none' ? 'presence_none' : `presence_${bid}`;
-    const admins = full.filter((x) => x.role === 'admin' || x.userId === 'admin');
+    const admins = full.filter((x) => x.role === 'admin' || x.role === 'staff' || x.userId === 'admin');
     const localRows = users.map(mapOnlineUser);
     const seen = new Set();
     const payload = [];

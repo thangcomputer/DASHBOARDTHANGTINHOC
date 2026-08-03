@@ -154,7 +154,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const location = useLocation();
   const toast = useToast();
   const socketCtx = useSocket();
-  const { sendMessage: socketSend, onlineUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onContactListUpdated, socket } = socketCtx;
+  const { sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onContactListUpdated, socket } = socketCtx;
   const {
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, groups,
@@ -167,6 +167,42 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [seedContact, setSeedContact] = useState(null);
   const [hiddenList, setHiddenList] = useState([]);
   const [contactTab, setContactTab] = useState('all'); // 'all', 'student', 'teacher', 'admin', 'group'
+
+  const isUserOnline = useCallback((userId) => {
+    if (!userId || !onlineUsers || !Array.isArray(onlineUsers)) return false;
+    const targetStr = String(userId);
+    return onlineUsers.some(u => String(u.userId) === targetStr);
+  }, [onlineUsers]);
+
+  const getUserStatusText = useCallback((userId, isOnline) => {
+    if (isOnline) {
+      return (
+        <span className="text-emerald-600 font-bold flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Đang hoạt động
+        </span>
+      );
+    }
+    if (!userId || !lastSeenUsers) return <span className="text-slate-400">Offline</span>;
+    const lastSeenTime = lastSeenUsers[String(userId)];
+    if (!lastSeenTime) return <span className="text-slate-400">Offline</span>;
+
+    try {
+      const diffMs = Date.now() - new Date(lastSeenTime).getTime();
+      if (isNaN(diffMs) || diffMs < 0) return <span className="text-slate-400">Offline</span>;
+
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMins < 1) return <span className="text-slate-500 font-medium">Hoạt động vừa xong</span>;
+      if (diffMins < 60) return <span className="text-slate-500 font-medium">Hoạt động {diffMins} phút trước</span>;
+      if (diffHours < 24) return <span className="text-slate-500 font-medium">Hoạt động {diffHours} giờ trước</span>;
+      if (diffDays < 7) return <span className="text-slate-500 font-medium">Hoạt động {diffDays} ngày trước</span>;
+      return <span className="text-slate-400">Offline</span>;
+    } catch {
+      return <span className="text-slate-400">Offline</span>;
+    }
+  }, [lastSeenUsers]);
 
   useEffect(() => {
     (async () => {
@@ -254,7 +290,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         id: convId,
         isGroup: false,
         isHidden: hiddenList.includes(convId),
-        user: { id: c.id, name: c.name, role: c.role, avatar: c.avatar, phone: c.phone || '', online: onlineUsers ? onlineUsers.some(u => u.userId === c.id) : false },
+        user: { id: c.id, name: c.name, role: c.role, avatar: c.avatar, phone: c.phone || '', online: isUserOnline(c.id) },
         lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
         lastTime: existingConv?.lastTime || new Date('2000-01-01'),
         unread: existingConv?.unread || 0,
@@ -278,7 +314,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             role,
             avatar: seedContact.avatar,
             phone: seedContact.phone || '',
-            online: onlineUsers ? onlineUsers.some((u) => String(u.userId) === String(seedContact.id)) : true,
+            online: isUserOnline(seedContact.id),
           },
           lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
           lastTime: existingConv?.lastTime || new Date(),
@@ -938,7 +974,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         )}
                       </span>
                     )}
-                    {!isGroup && conv.user.online && (
+                    {!isGroup && isUserOnline(conv.user.id) && (
                       <span className="absolute bottom-0 left-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white z-20" />
                     )}
                   </div>
@@ -1084,7 +1120,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         />
                       )}
                     </div>
-                    {!activeConv.isGroup && activeConv.user.online && (
+                    {!activeConv.isGroup && isUserOnline(activeConv.user.id) && (
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
                     )}
                   </div>
@@ -1110,9 +1146,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                     </div>
                     <p className="text-xs text-slate-500 font-medium">
-                      {activeConv.isGroup ? 'Nhóm trò chuyện' : activeConv.user.online ? (
-                        <span className="text-emerald-600 font-semibold">● Đang hoạt động</span>
-                      ) : 'Offline'}
+                      {activeConv.isGroup
+                        ? 'Nhóm trò chuyện'
+                        : getUserStatusText(activeConv.user.id, isUserOnline(activeConv.user.id))}
                     </p>
                   </div>
                 </div>
