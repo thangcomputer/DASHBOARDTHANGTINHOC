@@ -122,15 +122,11 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
         andConditions.push({
           $or: [
             { paid: true },
-            { paid: 'true' },
-            { paid: 'Đã đóng phí' },
-            { paid: 1 },
             { 'enrollments.paid': true },
-            { 'enrollments.paid': 'true' },
-            { 'enrollments.paid': 'Đã đóng phí' },
-            { 'enrollments.paid': 1 },
             { 'enrollments.status': 'active' },
             { 'enrollments.status': 'completed' },
+            { 'enrollments.status': 'pending_payment' },
+            { course: { $exists: true, $ne: '' } },
           ],
         });
       } else if (paid === 'unpaid' || paid === 'refunded' || paid === 'false') {
@@ -140,10 +136,8 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
             { 'enrollments.status': 'refunded' },
             { 'enrollments.refundedAmount': { $gt: 0 } },
             { refundedAmount: { $gt: 0 } },
-            { paid: false },
-            { paid: 'false' },
-            { 'enrollments.paid': false },
-            { 'enrollments.paid': 'false' },
+            { status: 'cancelled' },
+            { status: 'refunded' },
           ],
         });
       }
