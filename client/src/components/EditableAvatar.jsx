@@ -85,14 +85,14 @@ export default function EditableAvatar({
         className={`w-full h-full object-cover transition-transform duration-300 ${editable ? 'group-hover:scale-105' : ''} ${imgClassName}`}
       />
       {editable && (
-        <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-white z-10 p-0.5">
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-center text-white z-10 p-0.5 pointer-events-none">
           {loading ? (
-            <Loader2 size={16} className="animate-spin text-white" />
+            <Loader2 size={16} className="animate-spin text-white shrink-0" />
           ) : (
-            <>
-              <Camera size={16} className="drop-shadow text-white" />
-              <span className="text-[9px] font-black mt-0.5 tracking-tight text-white drop-shadow leading-none">Đổi ảnh</span>
-            </>
+            <div className="flex flex-col items-center justify-center w-full h-full text-center leading-none gap-0.5">
+              <Camera size={15} className="drop-shadow text-white shrink-0" />
+              <span className="text-[9px] font-extrabold tracking-tight text-white drop-shadow text-center block w-full whitespace-nowrap leading-none">Đổi ảnh</span>
+            </div>
           )}
         </div>
       )}

@@ -554,17 +554,8 @@ export const authAPI = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const token = localStorage.getItem('thvp_token');
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const uploadRes = await fetch('/api/files/upload?category=avatars', {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-    const uploadData = await uploadRes.json();
-    if (!uploadData.success) throw new Error(uploadData.message || 'Upload ảnh thất bại');
+    const uploadData = await uploadWithAuth('/files/upload?category=avatars', formData);
+    if (!uploadData?.success) throw new Error(uploadData?.message || 'Upload ảnh thất bại');
     const avatarUrl = uploadData.data?.url || uploadData.url;
 
     const updateRes = await apiFetch('/auth/avatar', {
