@@ -622,8 +622,8 @@ export default function NewsPage({ session, role = 'admin' }) {
     if (!detail) return null;
     const thumb = detail.thumbnailUrl ? resolveMediaUrl(detail.thumbnailUrl) : null;
     return (
-      <div className="cms-viewport-fill w-full p-4 sm:p-6 lg:p-8">
-        <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-slate-100 p-6 sm:p-8 shadow-sm space-y-6">
+      <div className="w-full space-y-6 pb-20 px-2 sm:px-4 text-left">
+        <div className="w-full bg-white rounded-2xl border border-slate-100 p-6 sm:p-8 shadow-sm space-y-6">
 
           <button
             type="button"
@@ -761,7 +761,7 @@ export default function NewsPage({ session, role = 'admin' }) {
           {related.length > 0 && (
             <div className="pt-6 border-t border-slate-100">
               <h2 className="text-sm font-black uppercase tracking-wide text-slate-400 mb-3">Bài liên quan</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {related.map((p) => (
                   <NewsCard key={p.id} post={p} basePath={base} onOpen={openPost} />
                 ))}
