@@ -11,6 +11,7 @@ import { useData } from '../context/DataContext';
 import { isSoundMuted, setSoundMuted } from '../utils/sound';
 import { PERMISSIONS } from '../constants/permissions';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
+import EditableAvatar from './EditableAvatar';
 
 const formatTime = (date) => {
   if (!date) return '';
@@ -455,10 +456,12 @@ const AppSidebar = ({
       {(!collapsed || mobileOpen) && (
         <div data-guide-key="welcome" className="px-5 pt-8 pb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <img
-              src={avatarUrl}
-              alt={userName || initials}
-              className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-white/40 bg-white shadow-sm"
+            <EditableAvatar
+              avatar={session?.avatar}
+              name={userName}
+              role={role}
+              adminRole={session?.adminRole}
+              className="w-10 h-10 rounded-full border-2 border-white/40 bg-white shadow-sm flex-shrink-0"
             />
             <div className="min-w-0">
               <p className="text-white font-bold text-sm truncate">{userName || 'Người dùng'}</p>

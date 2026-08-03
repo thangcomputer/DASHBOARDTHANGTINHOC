@@ -5,6 +5,7 @@ import {
   GraduationCap, BadgeDollarSign, Wallet,
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
+import EditableAvatar from '../EditableAvatar';
 
 function openChangePassword() {
   window.dispatchEvent(new CustomEvent('open-change-password-modal'));
@@ -46,13 +47,12 @@ export default function StudentProfileTab({
         <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-emerald-400/10 rounded-full pointer-events-none" aria-hidden="true" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6 min-w-0">
           <div className="relative shrink-0 self-start sm:self-center">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl overflow-hidden border-2 border-white/35 bg-white shadow-lg">
-              <img
-                src={resolveAvatarUrl({ avatar: studentData.avatar, role: 'student' })}
-                alt={studentData.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
+            <EditableAvatar
+              avatar={studentData?.avatar}
+              name={studentData?.name}
+              role="student"
+              className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl border-2 border-white/35 bg-white shadow-lg"
+            />
             <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full border-2 border-white flex items-center justify-center">
               <CheckCircle size={12} className="text-white" aria-hidden="true" />
             </div>

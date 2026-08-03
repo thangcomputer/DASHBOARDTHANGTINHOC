@@ -4,10 +4,10 @@
  */
 
 export const DEFAULT_AVATARS = {
-  admin: '/avatars/admin.svg',
-  staff: '/avatars/staff.svg',
-  teacher: '/avatars/teacher.svg',
-  student: '/avatars/student.svg',
+  admin: '/avatars/admin.png',
+  staff: '/avatars/staff.png',
+  teacher: '/avatars/teacher.png',
+  student: '/avatars/student.png',
 };
 
 /** Chi chap nhan gia tri that su la URL/path anh */

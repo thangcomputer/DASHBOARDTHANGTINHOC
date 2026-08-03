@@ -550,6 +550,32 @@ export const apiFetch = async (endpoint, options = {}) => {
 
 // ─── AUTH API ───────────────────────────────────────────────────────────────
 export const authAPI = {
+  updateAvatar: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = localStorage.getItem('thvp_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const uploadRes = await fetch('/api/files/upload?category=avatars', {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    const uploadData = await uploadRes.json();
+    if (!uploadData.success) throw new Error(uploadData.message || 'Upload ảnh thất bại');
+    const avatarUrl = uploadData.data?.url || uploadData.url;
+
+    const updateRes = await apiFetch('/auth/avatar', {
+      method: 'POST',
+      body: JSON.stringify({ avatar: avatarUrl }),
+    });
+    const updateData = await updateRes.json();
+    if (!updateData.success) throw new Error(updateData.message || 'Cập nhật avatar thất bại');
+    return { success: true, avatar: avatarUrl };
+  },
+
   login: async (identifier, password) => {
     const res = await apiFetch('/auth/login', {
       method: 'POST',

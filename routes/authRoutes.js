@@ -1427,6 +1427,28 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── POST /api/auth/avatar ── Đổi avatar cá nhân cho mọi role ─────────────────
+router.post('/avatar', authMiddleware, async (req, res) => {
+  try {
+    const { avatar } = req.body || {};
+    if (!avatar) return res.status(400).json({ success: false, message: 'Thiếu đường dẫn avatar' });
+
+    const userId = req.user.id || req.user._id;
+    const role = req.user.role;
+
+    if (role === 'student') {
+      await Student.findByIdAndUpdate(userId, { avatar });
+    } else {
+      await Teacher.findByIdAndUpdate(userId, { avatar });
+    }
+
+    res.json({ success: true, message: 'Cập nhật avatar thành công', avatar });
+  } catch (error) {
+    logger.error('[AUTH] update avatar error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
 // ─── OTP Store (in-memory, key = phone+role) ─────────────────────────────────
 const otpStore = new Map(); // "phone:role" → { otp, expiresAt, userId, userName }
 

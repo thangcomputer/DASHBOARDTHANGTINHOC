@@ -7,8 +7,8 @@ const logger = require('../config/logger');
 const fileService = require('../services/fileService');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
 
-/** Category mọi role đã đăng nhập được upload (chat / bài tập). */
-const OPEN_UPLOAD_CATEGORIES = new Set(['messages', 'assignments']);
+/** Category mọi role đã đăng nhập được upload (chat / bài tập / avatar). */
+const OPEN_UPLOAD_CATEGORIES = new Set(['messages', 'assignments', 'avatars']);
 
 function requireUploadCategoryPermission(req, res, next) {
   const category = String(req.query.category || req.body?.category || 'general').toLowerCase();

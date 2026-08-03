@@ -8,6 +8,7 @@ import { teachersAPI, csrfFetch, resolveMediaUrl } from '../../services/api';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../utils/toast';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
+import EditableAvatar from '../EditableAvatar';
 import { showGlossyAlert } from './TeacherShared';
 
 export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
@@ -132,10 +133,11 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         <div className="absolute -right-16 -top-16 w-48 h-48 bg-white/5 rounded-full pointer-events-none" aria-hidden="true" />
         <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-red-500/10 rounded-full pointer-events-none" aria-hidden="true" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6 min-w-0">
-          <img
-            src={teacherAvatarUrl}
-            alt={currentTeacher?.name || 'GV'}
-            className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl object-cover border-2 border-white/30 shadow-lg bg-white shrink-0"
+          <EditableAvatar
+            avatar={currentTeacher?.avatar}
+            name={currentTeacher?.name}
+            role="teacher"
+            className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl border-2 border-white/30 shadow-lg bg-white shrink-0"
           />
           <div className="min-w-0 flex-1">
             <p className="text-[11px] sm:text-xs font-bold uppercase tracking-wide text-red-200/90">Hồ sơ cá nhân</p>

@@ -48,6 +48,20 @@ export const DataProvider = ({ children, user, onLogout }) => {
     }
   }, []);
 
+  const updateUserAvatar = useCallback((newAvatarUrl) => {
+    setCurrentUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, avatar: newAvatarUrl };
+      try {
+        localStorage.setItem('thvp_user', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    try {
+      window.dispatchEvent(new CustomEvent('user:avatar-updated', { detail: newAvatarUrl }));
+    } catch (e) {}
+  }, []);
+
   const {
     students,
     studentsPagination,
@@ -253,7 +267,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     copyTeacherQuestionBankToStudents,
     updateStudentExamMinutes, updateStudentEssayExamMinutes,
     setStudentExamFile, addCustomExamSubject,
-    addSystemLog, triggerBackgroundSync, toggleMessageReaction,
+    addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
   ]);
 
   const value = useMemo(
