@@ -72,32 +72,39 @@ router.get('/contacts', async (req, res) => {
       'name phone branchId branchCode avatar'
     ).lean();
 
-    const superAdminContacts = superAdmins.map(a => ({
-      id:     a._id.toString(),
-      name:   (systemAdminName && a.phone === 'admin') ? systemAdminName : ((a.name && a.name.trim()) ? a.name.trim() : (systemAdminName || 'Admin')),
-      role:   'admin',
-      phone:  a.phone || '',
-      avatar: a.avatar || String(systemAdminName || a.name || 'AD').substring(0, 2).toUpperCase(),
-      branchId: a.branchId || null,
-      branchCode: a.branchCode || ''
-    }));
+    const seenAdminNames = new Set();
+    const superAdminContacts = [];
 
-    // Luôn đảm bảo có ít nhất 1 tài khoản Admin hệ thống (id 'admin')
-    const primaryAdminContact = superAdminContacts.find(c => c.id === 'admin');
-    if (!primaryAdminContact) {
-      const primarySuper = superAdmins.find(a => a.name) || {};
-      const actualName = systemAdminName || (primarySuper.name && primarySuper.name.trim()) || 'Admin';
-      superAdminContacts.unshift({
+    for (const a of superAdmins) {
+      const actualName = (systemAdminName && a.phone === 'admin') ? systemAdminName : ((a.name && a.name.trim()) ? a.name.trim() : (systemAdminName || 'P ĐÀO TẠO (ADMIN)'));
+      const adminId = (a._id.toString() === 'admin' || a.phone === 'admin') ? 'admin' : a._id.toString();
+
+      const key = actualName.toLowerCase();
+      if (seenAdminNames.has(key)) continue;
+      seenAdminNames.add(key);
+
+      superAdminContacts.push({
+        id: adminId,
+        name: actualName,
+        role: 'admin',
+        phone: a.phone || '',
+        avatar: a.avatar || String(actualName || 'AD').substring(0, 2).toUpperCase(),
+        branchId: a.branchId || null,
+        branchCode: a.branchCode || ''
+      });
+    }
+
+    if (superAdminContacts.length === 0) {
+      const actualName = systemAdminName || 'P ĐÀO TẠO (ADMIN)';
+      superAdminContacts.push({
         id: 'admin',
         name: actualName,
         role: 'admin',
-        phone: primarySuper.phone || '0935758462',
-        avatar: primarySuper.avatar || String(actualName || 'AD').substring(0, 2).toUpperCase(),
+        phone: '0935758462',
+        avatar: String(actualName || 'AD').substring(0, 2).toUpperCase(),
         branchId: null,
         branchCode: 'HỆ THỐNG'
       });
-    } else if (systemAdminName) {
-      primaryAdminContact.name = systemAdminName;
     }
 
     let staffContacts    = [];

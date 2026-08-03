@@ -266,11 +266,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const conversations = useMemo(() => {
     const list = [];
 
-    // Dedupe contacts từ API (tránh duplicate key + lọc sai)
+    // Dedupe contacts từ API (tránh duplicate key + lọc trùng tên Super Admin)
     const seenContacts = new Set();
     const uniqueContacts = (contacts || []).filter((c) => {
-      const key = `${String(c?.id)}:${normalizeRole(c?.role)}`;
-      if (!c?.id || seenContacts.has(key)) return false;
+      if (!c?.id) return false;
+      const role = normalizeRole(c?.role);
+      const nameKey = String(c?.name || '').trim().toLowerCase();
+      const key = role === 'admin' ? `admin:${nameKey}` : `${String(c?.id)}:${role}`;
+      if (seenContacts.has(key)) return false;
       seenContacts.add(key);
       return true;
     });
