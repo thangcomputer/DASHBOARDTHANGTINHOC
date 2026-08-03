@@ -41,7 +41,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     if (onRecallReceive) {
       unsubRecall = onRecallReceive((data) => {
         setMessages(prev => prev.map(m =>
-          String(m.id) === String(data.messageId) ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' } : m
+          (String(m.id || m._id) === String(data.messageId) || String(m.id) === String(data.messageId))
+            ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' } : m
         ));
       });
     }

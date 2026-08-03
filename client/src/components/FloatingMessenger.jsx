@@ -706,8 +706,8 @@ export default function FloatingMessenger({ session, role }) {
           </div>
         )}
 
-        {/* FAB tin nhắn — các trang khác; Bảng tin dùng Hỗ trợ nhanh riêng */}
-        {!isFeedPage && (
+        {/* FAB tin nhắn — các trang khác; Bảng tin dùng Hỗ trợ nhanh riêng; ẩn với admin */}
+        {!isFeedPage && !isSuper && (meRole === 'student' || meRole === 'teacher' || meRole === 'staff') && (
           <button
             type="button"
             onClick={() => setSupportOpen((v) => !v)}
