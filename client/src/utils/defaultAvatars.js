@@ -42,6 +42,21 @@ export function looksLikeInitials(value) {
   return /^[\p{L}\p{N}]{1,4}$/u.test(s);
 }
 
+/** Helper: kiểm tra tên có chứa từ khóa nữ cho các bản ghi cũ chưa chọn gender */
+function legacyIsFemaleName(name = '') {
+  const s = String(name || '').toLowerCase().trim();
+  if (!s) return false;
+  const femaleKeywords = [
+    'thị', 'nga', 'trang', 'mai', 'linh', 'hương', 'hoa', 'hằng', 'hà', 'thảo', 'dung', 'phương',
+    'nhung', 'yến', 'ngọc', 'thu', 'lan', 'hiền', 'vân', 'quỳnh', 'như', 'trâm', 'bích', 'diệp',
+    'loan', 'oanh', 'tuyết', 'vy', 'nhi', 'hân', 'châu', 'đan', 'chân', 'tiên', 'mơ', 'liên', 'nữ',
+  ];
+  const words = s.split(/\s+/);
+  if (words.includes('thị')) return true;
+  const lastName = words[words.length - 1];
+  return femaleKeywords.includes(lastName);
+}
+
 export function resolveAvatarUrl(userObj = {}) {
   let avatar, role, adminRole, permissions, name, id, gender;
   if (typeof userObj === 'string') {
@@ -66,10 +81,12 @@ export function resolveAvatarUrl(userObj = {}) {
   const uname = String(name || '').toLowerCase();
   const perms = Array.isArray(permissions) ? permissions : [];
 
-  // Phân định giới tính trực tiếp từ gender chọn trong form (KHÔNG dùng thuật toán đoán tên)
+  // Xác định giới tính: Nếu có gender chọn trong form -> dùng 100%. Nếu bản ghi cũ chưa có gender -> kiểm tra từ khóa tên
   const gRaw = String(gender || '').trim().toLowerCase();
-  const isFemale = gRaw === 'female' || gRaw === 'nữ';
-  const isMale = gRaw === 'male' || gRaw === 'nam';
+  const hasExplicitGender = gRaw === 'female' || gRaw === 'nữ' || gRaw === 'male' || gRaw === 'nam';
+  const isFemale = hasExplicitGender
+    ? (gRaw === 'female' || gRaw === 'nữ')
+    : legacyIsFemaleName(name);
 
   // 1. Super Admin / Giám Đốc
   if (uid === 'admin' || ar === 'SUPER_ADMIN' || uname.includes('super admin') || uname.includes('p đào tạo')) {
@@ -77,7 +94,7 @@ export function resolveAvatarUrl(userObj = {}) {
     return DEFAULT_AVATARS.admin_male;
   }
 
-  // 2. Hỗ trợ viên chuyên trách (Hồ Sỹ Hiếu / Hỗ trợ viên / chỉ nhắn tin)
+  // 2. Hỗ trợ viên chuyên trách
   const isSupportOnly = perms.length === 1 && perms.includes('manage_messages');
   if (
     uname.includes('hỗ trợ viên') ||
@@ -92,7 +109,7 @@ export function resolveAvatarUrl(userObj = {}) {
 
   // 3. ADMIN-STAFF Chi nhánh (Hồ Thị Nga, Staff chi nhánh, v.v...)
   if (r === 'staff' || ar === 'STAFF') {
-    if (isMale) return DEFAULT_AVATARS.staff_male;
+    if (hasExplicitGender && !isFemale) return DEFAULT_AVATARS.staff_male;
     return DEFAULT_AVATARS.staff_female;
   }
 

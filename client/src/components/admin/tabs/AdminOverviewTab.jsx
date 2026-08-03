@@ -118,6 +118,7 @@ export default function AdminOverviewTab({
                     name={s.name}
                     role="student"
                     src={s.avatar}
+                    gender={s.gender}
                     color={color}
                   />
                   <div className="flex-1 min-w-0">
@@ -168,6 +169,7 @@ export default function AdminOverviewTab({
                       name={t.name}
                       role="teacher"
                       src={t.avatar}
+                      gender={t.gender}
                       color={active ? 'bg-red-600' : 'bg-amber-500'}
                     />
                     <div className="flex-1 min-w-0">
