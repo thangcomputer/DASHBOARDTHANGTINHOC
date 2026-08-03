@@ -56,30 +56,35 @@ export function resolveAvatarUrl(userObj = {}) {
     return DEFAULT_AVATARS.admin;
   }
 
-  // 2. Hỗ trợ viên (Hồ Sỹ Hiếu / Hỗ trợ viên / Staff) -> Nam hỗ trợ đeo tai nghe
+  // 2. Hỗ trợ viên chuyên trách (Hồ Sỹ Hiếu / Hỗ trợ viên / chỉ nhắn tin) -> Nam hỗ trợ đeo tai nghe
+  const isSupportOnly = perms.length === 1 && perms.includes('manage_messages');
   if (
-    r === 'staff' ||
-    ar === 'STAFF' ||
-    uname.includes('hỗ trợ') ||
+    uname.includes('hỗ trợ viên') ||
     uname.includes('hồ sĩ hiếu') ||
     uname.includes('hồ sỹ hiếu') ||
-    (perms.length === 1 && perms.includes('manage_messages'))
+    isSupportOnly ||
+    r === 'support'
   ) {
     return DEFAULT_AVATARS.support;
   }
 
-  // 3. Admin chung
+  // 3. ADMIN-STAFF Chi nhánh (Hồ Thị Nga, Staff chi nhánh, v.v...) -> Nữ nhân viên chi nhánh
+  if (r === 'staff' || ar === 'STAFF') {
+    return DEFAULT_AVATARS.staff;
+  }
+
+  // 4. Admin chung
   if (r === 'admin' || r === 'super_admin') {
     return DEFAULT_AVATARS.admin;
   }
 
-  // 4. Giảng viên
+  // 5. Giảng viên
   if (r === 'teacher') return DEFAULT_AVATARS.teacher;
 
-  // 5. Nhóm chat
+  // 6. Nhóm chat
   if (r === 'group') return DEFAULT_AVATARS.admin;
 
-  // 6. Học viên mặc định
+  // 7. Học viên mặc định
   return DEFAULT_AVATARS.student;
 }
 
