@@ -121,128 +121,130 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start w-full min-w-0">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch w-full min-w-0">
       {/* ─ LỊCH THÁNG (Cột Trái lg:col-span-7) ─ */}
-      <div className="lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-5 min-w-0">
-        {/* Header Nav */}
-        <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 gap-2 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Calendar size={18} />
+      <div className="lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-5 min-w-0 flex flex-col justify-between h-full">
+        <div>
+          {/* Header Nav */}
+          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 gap-2 min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Calendar size={18} />
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight">Lịch theo tháng</h3>
             </div>
-            <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight">Lịch theo tháng</h3>
-          </div>
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-              className="w-8 h-8 rounded-lg hover:bg-white transition-colors flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-none hover:shadow-sm"
-              title="Tháng trước"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-xs sm:text-sm font-extrabold text-slate-800 min-w-[6.5rem] text-center tabular-nums">
-              {monthNames[month]} {year}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-              className="w-8 h-8 rounded-lg hover:bg-white transition-colors flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-none hover:shadow-sm"
-              title="Tháng sau"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-
-        {/* Day labels */}
-        <div className="grid grid-cols-7 text-center border-b border-slate-100 pb-2.5 mb-2.5">
-          {['CN','T2','T3','T4','T5','T6','T7'].map((d, i) => (
-            <div key={d} className={`text-[11px] sm:text-xs font-black uppercase tracking-wider ${i === 0 ? 'text-red-500' : 'text-slate-400'}`}>
-              {d}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar cells */}
-        <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
-          {days.map((day, idx) => {
-            if (!day) return <div key={`e-${idx}`} />;
-
-            const daySchs  = scheduleMap[day] || [];
-            const past     = isPast(day);
-            const todayDay = isToday(day);
-            const selected = selectedDay === day;
-            const hasData  = daySchs.length > 0;
-            const canAddNew = !past && !hasData;
-
-            const isSunday = (idx % 7 === 0);
-
-            return (
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 p-1 rounded-xl">
               <button
-                key={day}
                 type="button"
-                onClick={() => {
-                  if (past && !hasData) return;
-                  setSelectedDay(day === selectedDay ? null : day);
-                  if (canAddNew && onAddSchedule) onAddSchedule(new Date(year, month, day));
-                }}
-                title={
-                  hasData ? daySchs.map(s => `${s.startTime} - ${s.studentName || s.course}${(s.topic || s.note) ? ` (${s.topic || s.note})` : ''}`).join('\n') 
-                  : past ? 'Ngày đã qua, không thể sắp lịch' 
-                  : 'Click để sắp lịch hôm này'
-                }
-                className={`relative w-full h-8 sm:h-9 md:h-9.5 rounded-lg sm:rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all border
-                  ${
-                    selected
-                      ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20 z-10'
-                    : todayDay && !hasData
-                      ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 ring-2 ring-indigo-200/60 font-black'
-                    : past && !hasData
-                      ? 'opacity-40 cursor-not-allowed border-transparent text-slate-500'
-                    : hasData 
-                      ? 'bg-teal-50/80 border-teal-100/60 hover:bg-teal-100/80 text-slate-800'
-                    : 'bg-white border-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-100 cursor-pointer'
-                  }
-                `}
+                onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+                className="w-8 h-8 rounded-lg hover:bg-white transition-colors flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-none hover:shadow-sm"
+                title="Tháng trước"
               >
-                <span className={`leading-none ${
-                  selected ? 'text-white font-extrabold' :
-                  isSunday && !selected ? 'text-orange-600 font-semibold' :
-                  (todayDay && !selected) ? 'text-blue-700 font-bold' :
-                  'text-slate-800 font-medium'
-                }`}>
-                  {day}
-                </span>
-
-                {/* Status dots */}
-                {hasData && (
-                  <div className="flex gap-0.5 mt-0.5 justify-center px-0.5">
-                    {daySchs.filter(s => s.status === 'scheduled').slice(0,2).map(s => (
-                      <div key={'s-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : selected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
-                    ))}
-                    {daySchs.filter(s => s.status === 'completed').slice(0,2).map(s => (
-                      <div key={'c-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-emerald-200' : 'bg-emerald-500'} shadow-sm`} />
-                    ))}
-                    {daySchs.filter(s => s.status === 'cancelled').slice(0,2).map(s => (
-                      <div key={'x-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-rose-200' : 'bg-red-400'} shadow-sm`} />
-                    ))}
-                  </div>
-                )}
-                
-                {/* Quick-add hint on empty future day */}
-                {canAddNew && !selected && (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-white/60 backdrop-blur-[1px] rounded-xl border border-dashed border-blue-300">
-                    <Plus size={12} className="text-blue-600" />
-                  </div>
-                )}
+                <ChevronLeft size={16} />
               </button>
-            );
-          })}
+              <span className="text-xs sm:text-sm font-extrabold text-slate-800 min-w-[6.5rem] text-center tabular-nums">
+                {monthNames[month]} {year}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+                className="w-8 h-8 rounded-lg hover:bg-white transition-colors flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-none hover:shadow-sm"
+                title="Tháng sau"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Day labels */}
+          <div className="grid grid-cols-7 text-center border-b border-slate-100 pb-2.5 mb-2.5">
+            {['CN','T2','T3','T4','T5','T6','T7'].map((d, i) => (
+              <div key={d} className={`text-[11px] sm:text-xs font-black uppercase tracking-wider ${i === 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar cells */}
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+            {days.map((day, idx) => {
+              if (!day) return <div key={`e-${idx}`} />;
+
+              const daySchs  = scheduleMap[day] || [];
+              const past     = isPast(day);
+              const todayDay = isToday(day);
+              const selected = selectedDay === day;
+              const hasData  = daySchs.length > 0;
+              const canAddNew = !past && !hasData;
+
+              const isSunday = (idx % 7 === 0);
+
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => {
+                    if (past && !hasData) return;
+                    setSelectedDay(day === selectedDay ? null : day);
+                    if (canAddNew && onAddSchedule) onAddSchedule(new Date(year, month, day));
+                  }}
+                  title={
+                    hasData ? daySchs.map(s => `${s.startTime} - ${s.studentName || s.course}${(s.topic || s.note) ? ` (${s.topic || s.note})` : ''}`).join('\n') 
+                    : past ? 'Ngày đã qua, không thể sắp lịch' 
+                    : 'Click để sắp lịch hôm này'
+                  }
+                  className={`relative w-full h-8 sm:h-9 md:h-9.5 rounded-lg sm:rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all border
+                    ${
+                      selected
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20 z-10'
+                      : todayDay && !hasData
+                        ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 ring-2 ring-indigo-200/60 font-black'
+                      : past && !hasData
+                        ? 'opacity-40 cursor-not-allowed border-transparent text-slate-500'
+                      : hasData 
+                        ? 'bg-teal-50/80 border-teal-100/60 hover:bg-teal-100/80 text-slate-800'
+                      : 'bg-white border-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-100 cursor-pointer'
+                    }
+                  `}
+                >
+                  <span className={`leading-none ${
+                    selected ? 'text-white font-extrabold' :
+                    isSunday && !selected ? 'text-orange-600 font-semibold' :
+                    (todayDay && !selected) ? 'text-blue-700 font-bold' :
+                    'text-slate-800 font-medium'
+                  }`}>
+                    {day}
+                  </span>
+
+                  {/* Status dots */}
+                  {hasData && (
+                    <div className="flex gap-0.5 mt-0.5 justify-center px-0.5">
+                      {daySchs.filter(s => s.status === 'scheduled').slice(0,2).map(s => (
+                        <div key={'s-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : selected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
+                      ))}
+                      {daySchs.filter(s => s.status === 'completed').slice(0,2).map(s => (
+                        <div key={'c-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-emerald-200' : 'bg-emerald-500'} shadow-sm`} />
+                      ))}
+                      {daySchs.filter(s => s.status === 'cancelled').slice(0,2).map(s => (
+                        <div key={'x-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-rose-200' : 'bg-red-400'} shadow-sm`} />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Quick-add hint on empty future day */}
+                  {canAddNew && !selected && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-white/60 backdrop-blur-[1px] rounded-xl border border-dashed border-blue-300">
+                      <Plus size={12} className="text-blue-600" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Legend */}
-        <div className="px-2 pt-2.5 mt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] sm:text-xs font-semibold text-slate-500">
+        <div className="px-2 pt-2.5 mt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] sm:text-xs font-semibold text-slate-500 shrink-0">
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" /> Đã dạy</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" /> Sắp tới</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" /> Đang diễn ra</span>
@@ -251,12 +253,12 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
       </div>
 
       {/* ─ CỘT BÊN PHẢI (Cột Phải lg:col-span-5: 1. Chi tiết ngày chọn + 2. Buổi dạy sắp tới) ─ */}
-      <div className="lg:col-span-5 space-y-3.5 min-w-0">
+      <div className="lg:col-span-5 flex flex-col gap-3.5 sm:gap-4 min-w-0 h-full justify-between">
         
         {/* 1. Chi tiết ca dạy ngày chọn (Dark Box Box) */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 rounded-2xl sm:rounded-3xl p-4 text-white shadow-xl shadow-slate-900/10 border border-slate-800/60 min-h-[170px] flex flex-col justify-between">
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 rounded-2xl sm:rounded-3xl p-4 text-white shadow-xl shadow-slate-900/10 border border-slate-800/60 flex-1 min-h-[170px] flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10">
+            <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10 shrink-0">
               <span className="text-xs font-black uppercase tracking-wider text-blue-300 flex items-center gap-1.5">
                 <Calendar size={13} className="text-yellow-400" />
                 {selectedDay
@@ -365,11 +367,17 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
               </div>
             )}
           </div>
+
+          <div className="pt-2 mt-1 border-t border-white/10 text-center shrink-0">
+            <span className="text-[10px] text-slate-400 font-semibold">
+              Cần hỗ trợ đổi buổi? Hãy dùng nút <strong>Ghi chú / Đổi lịch</strong> trên ca học.
+            </span>
+          </div>
         </div>
 
-        {/* 2. Danh sách Buổi dạy sắp tới trong tháng (Light Box với max-h 4 lượt) */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-3.5 sm:p-4 space-y-2.5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        {/* 2. Danh sách Buổi dạy sắp tới trong tháng (Khung cố định h-[250px] cho vừa 4 dòng, chưa đủ có khoảng trắng, quá 4 dòng có thanh cuộn) */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-3.5 sm:p-4 h-[250px] shrink-0 flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2 shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <Clock size={16} />
@@ -383,7 +391,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
             </span>
           </div>
 
-          <div className="divide-y divide-slate-100 max-h-[220px] overflow-y-auto pr-1 space-y-0.5">
+          <div className="flex-1 overflow-y-auto pr-1 divide-y divide-slate-100 space-y-0.5">
             {schedules
               .filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month)
               .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -424,7 +432,9 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
               })}
 
             {schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length === 0 && (
-              <div className="py-4 text-center text-slate-400 text-xs font-medium">Không có buổi nào sắp tới.</div>
+              <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 text-xs font-medium py-4">
+                Không có buổi nào sắp tới.
+              </div>
             )}
           </div>
         </div>
