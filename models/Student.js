@@ -18,6 +18,7 @@ const StudentSchema = new mongoose.Schema(
     googleId: { type: String, sparse: true, unique: true },
     zaloId: { type: String, sparse: true, unique: true },
     avatar: { type: String, default: '' },
+    gender: { type: String, enum: ['male', 'female', 'Nam', 'Nữ', ''], default: '' },
     age: {
       type: Number,
       min: [10, 'Tuổi tối thiểu là 10'],

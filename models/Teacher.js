@@ -34,6 +34,7 @@ const TeacherSchema = new mongoose.Schema(
     googleId: { type: String, sparse: true, unique: true },
     zaloId: { type: String, sparse: true, unique: true },
     avatar: { type: String, default: '' }, // URL ảnh đại diện
+    gender: { type: String, enum: ['male', 'female', 'Nam', 'Nữ', ''], default: '' },
 
     // ── Tài khoản đăng nhập ────────────────────────────────────────
     password: {
