@@ -373,7 +373,7 @@ export default function FloatingMessenger({ session, role }) {
   const isInbox = location.pathname.includes('/inbox');
   const toast = useToast();
   const { onlineUsers, onMessageReceive } = useSocket() || {};
-  const { sendMessage, getMessages, getConversations, markMessagesRead } = useData();
+  const { sendMessage, getMessages, getConversations, markMessagesRead, recallMessage } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
     openChat, closeChat, minimizeChat, focusChat,
