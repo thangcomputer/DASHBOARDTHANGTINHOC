@@ -617,7 +617,7 @@ export default function AdminStudentsTab() {
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="paid">Đã đóng phí</option>
-            <option value="unpaid">Chưa đóng phí</option>
+            <option value="unpaid">Hoàn học phí</option>
           </CmsSelect>
         </div>
 
