@@ -223,9 +223,11 @@ export function MessagesProvider({ user, children }) {
     try {
       const json = await api.messages.toggleReaction(messageId, type);
       if (json.success) {
-        setMessages((prev) => prev.map((m) =>
-          String(m.id) === String(messageId) ? { ...m, reactions: json.data } : m
-        ));
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m.id || m._id) === String(messageId) ? { ...m, reactions: json.data } : m
+          )
+        );
       }
     } catch {
       /* ignore */
@@ -236,11 +238,13 @@ export function MessagesProvider({ user, children }) {
     try {
       const json = await api.messages.recall(messageId);
       if (json.success) {
-        setMessages((prev) => prev.map((m) =>
-          String(m.id) === String(messageId)
-            ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' }
-            : m
-        ));
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m.id || m._id) === String(messageId)
+              ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' }
+              : m
+          )
+        );
       }
     } catch {
       /* ignore */
@@ -251,7 +255,7 @@ export function MessagesProvider({ user, children }) {
     try {
       const json = await api.messages.softDelete(messageId);
       if (json.success) {
-        setMessages((prev) => prev.filter((m) => String(m.id) !== String(messageId)));
+        setMessages((prev) => prev.filter((m) => String(m.id || m._id) !== String(messageId)));
       }
     } catch {
       /* ignore */

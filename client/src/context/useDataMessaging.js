@@ -265,8 +265,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     try {
       const json = await api.messages.toggleReaction(messageId, type);
       if (json.success) {
-        setMessages(prev => prev.map(m =>
-          String(m.id) === String(messageId) ? { ...m, reactions: json.data } : m
+        setMessages((prev) => prev.map((m) =>
+          String(m.id || m._id) === String(messageId) ? { ...m, reactions: json.data } : m
         ));
       }
     } catch (err) {
@@ -278,7 +278,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       const json = await api.messages.recall(messageId);
       if (json.success) {
         setMessages(prev => prev.map(m =>
-          String(m.id) === String(messageId) ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' } : m
+          String(m.id || m._id) === String(messageId) ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' } : m
         ));
       }
     } catch (err) {
@@ -290,7 +290,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       const json = await api.messages.softDelete(messageId);
       if (json.success) {
         // Chỉ ẩn/xóa khỏi mảng cục bộ trên giao diện của user này
-        setMessages(prev => prev.filter(m => String(m.id) !== String(messageId)));
+        setMessages(prev => prev.filter(m => String(m.id || m._id) !== String(messageId)));
       }
     } catch (err) {
     }
