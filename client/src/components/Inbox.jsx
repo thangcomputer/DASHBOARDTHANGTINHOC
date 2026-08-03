@@ -346,11 +346,33 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     });
 
     // Ai nhắn sau → lên đầu (theo thời gian tin gần nhất)
-    return list.sort((a, b) => {
+    const sortedList = list.sort((a, b) => {
       const timeA = new Date(a.lastTime || 0).getTime();
       const timeB = new Date(b.lastTime || 0).getTime();
       return timeB - timeA;
     });
+
+    // Lọc trùng lặp tuyệt đối danh sách hội thoại theo user (không user nào bị trùng 2 dòng)
+    const finalSeenUserKeys = new Set();
+    const deduplicatedList = [];
+
+    sortedList.forEach((item) => {
+      if (item.isGroup) {
+        deduplicatedList.push(item);
+        return;
+      }
+      const role = normalizeRole(item.user?.role);
+      const nameKey = String(item.user?.name || '').trim().toLowerCase();
+      const userKey = (role === 'admin' && (nameKey.includes('p đào tạo') || nameKey.includes('super admin')))
+        ? `admin:${nameKey}`
+        : `${String(item.user?.id)}:${role}`;
+
+      if (finalSeenUserKeys.has(userKey)) return;
+      finalSeenUserKeys.add(userKey);
+      deduplicatedList.push(item);
+    });
+
+    return deduplicatedList;
   }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact]);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef(null);

@@ -189,14 +189,13 @@ router.get('/contacts', async (req, res) => {
         ],
       };
 
+      const staffQuery = teacherBranchId
+        ? { adminRole: 'STAFF', $or: [{ branchId: teacherBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
+        : { adminRole: 'STAFF' };
+
       const [staffDocs, studentDocs] = await Promise.all([
-        // STAFF cùng chi nhánh
-        teacherBranchId
-          ? Teacher.find(
-              { adminRole: 'STAFF', branchId: teacherBranchId },
-              'name phone branchId branchCode avatar'
-            ).lean()
-          : Promise.resolve([]),
+        // STAFF (cả Hỗ trợ viên toàn hệ thống lẫn Staff cùng chi nhánh)
+        Teacher.find(staffQuery, 'name phone branchId branchCode avatar').lean(),
         // HV: teacherId cấp hồ sơ HOẶC phân công theo enrollment (đa khóa)
         Student.find(studentQuery, 'name phone branchId branchCode avatar').lean(),
       ]);
@@ -223,14 +222,13 @@ router.get('/contacts', async (req, res) => {
       });
       const teacherIdList = [...myTeacherIds].filter(Boolean);
 
+      const staffQuery = studentBranchId
+        ? { adminRole: 'STAFF', $or: [{ branchId: studentBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
+        : { adminRole: 'STAFF' };
+
       const [staffDocs, teacherDocs] = await Promise.all([
-        // STAFF cùng chi nhánh
-        studentBranchId
-          ? Teacher.find(
-              { adminRole: 'STAFF', branchId: studentBranchId },
-              'name phone branchId branchCode avatar'
-            ).lean()
-          : Promise.resolve([]),
+        // STAFF (cả Hỗ trợ viên toàn hệ thống lẫn Staff cùng chi nhánh)
+        Teacher.find(staffQuery, 'name phone branchId branchCode avatar').lean(),
         // Mọi GV đang dạy (cấp hồ sơ + từng enrollment)
         teacherIdList.length
           ? Teacher.find(

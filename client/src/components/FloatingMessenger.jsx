@@ -553,7 +553,7 @@ export default function FloatingMessenger({ session, role }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-slate-800 flex items-center gap-2">
                   <Headphones size={15} className="text-emerald-600 shrink-0" />
-                  {isSuper ? 'Đang hoạt động' : 'Hỗ trợ trung tâm'}
+                  {isSuper ? 'Đang hoạt động' : 'Hỗ trợ viên'}
                   {unreadTotal > 0 && (
                     <span className="cms-fm-unread-pill">{badgeLabel} mới</span>
                   )}

@@ -75,7 +75,7 @@ export default function FeedBoard({ session, role }) {
     const online = (onlineUsers || []).find(isSuperAdminPresence);
     return {
       id: 'admin',
-      name: online?.name || 'Hỗ trợ trung tâm',
+      name: online?.name || 'Hỗ trợ viên',
       role: 'admin',
       online: !!online,
     };
