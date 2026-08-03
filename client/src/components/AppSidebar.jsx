@@ -462,7 +462,18 @@ const AppSidebar = ({
             />
             <div className="min-w-0">
               <p className="text-white font-bold text-sm truncate">{userName || 'Người dùng'}</p>
-              <p className="text-white/50 text-xs">{config.brand.label}</p>
+              <p className="text-white/60 text-xs font-semibold tracking-wide">
+                {(() => {
+                  if (role === 'teacher') return 'GIẢNG VIÊN';
+                  if (role === 'student') return 'HỌC VIÊN';
+                  if (session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN') return 'QUẢN TRỊ';
+                  const perms = Array.isArray(session?.permissions) ? session.permissions : [];
+                  if (perms.length === 1 && perms.includes('manage_messages')) {
+                    return 'HỖ TRỢ VIÊN';
+                  }
+                  return 'ADMIN-STAFF';
+                })()}
+              </p>
             </div>
           </div>
         </div>

@@ -923,11 +923,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         className={`absolute -bottom-0.5 -right-0.5 z-20 text-[8px] px-1 min-w-[18px] h-4 rounded-md font-black leading-none flex items-center justify-center shadow-sm border border-white ${
                           conv.user.role === 'teacher' ? 'bg-amber-500 text-white'
                             : conv.user.role === 'student' ? 'bg-sky-500 text-white'
-                              : conv.user.role === 'admin' ? 'bg-rose-600 text-white'
+                              : conv.user.role === 'admin' ? (
+                                Array.isArray(conv.user.permissions) && conv.user.permissions.length === 1 && conv.user.permissions.includes('manage_messages')
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-rose-600 text-white'
+                              )
                                 : 'bg-slate-600 text-white'
                         }`}
                       >
-                        {conv.user.role === 'teacher' ? 'GV' : conv.user.role === 'student' ? 'HV' : conv.user.role === 'admin' ? 'AD' : 'NV'}
+                        {conv.user.role === 'teacher' ? 'GV' : conv.user.role === 'student' ? 'HV' : (
+                          Array.isArray(conv.user.permissions) && conv.user.permissions.length === 1 && conv.user.permissions.includes('manage_messages')
+                            ? 'HT'
+                            : 'AD'
+                        )}
                       </span>
                     )}
                     {!isGroup && conv.user.online && (

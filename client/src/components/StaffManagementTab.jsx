@@ -30,7 +30,11 @@ const PERMISSION_GROUPS = [
   { id: 'system', title: 'Hệ thống', icon: '⚙️', keys: ['system_settings', 'view_logs', 'view_evaluations'] },
 ];
 
-function RoleBadge({ adminRole }) {
+const DEFAULT_STAFF_PERMISSIONS = [
+  'manage_messages', 'manage_students', 'view_teachers', 'manage_schedule', 'manage_finance', 'manage_training'
+];
+
+function RoleBadge({ adminRole, permissions = [], branchName = '' }) {
   if (adminRole === 'SUPER_ADMIN') {
     return (
       <span className="cms-rbac-badge cms-rbac-badge-admin">
@@ -38,9 +42,17 @@ function RoleBadge({ adminRole }) {
       </span>
     );
   }
+  const isOnlyMessages = Array.isArray(permissions) && permissions.length === 1 && permissions.includes('manage_messages');
+  if (isOnlyMessages) {
+    return (
+      <span className="cms-rbac-badge bg-blue-50 text-blue-700 border border-blue-200">
+        <MessageSquare size={10} aria-hidden="true" /> HỖ TRỢ VIÊN
+      </span>
+    );
+  }
   return (
     <span className="cms-rbac-badge cms-rbac-badge-staff">
-      <UserCog size={10} aria-hidden="true" /> STAFF
+      <UserCog size={10} aria-hidden="true" /> ADMIN-STAFF {branchName ? `[${branchName}]` : ''}
     </span>
   );
 }
@@ -68,7 +80,7 @@ function StaffModal({ staff, onClose, onSaved }) {
     phone:       staff?.phone || '',
     password:    '',
     adminRole:   staff?.adminRole || 'STAFF',
-    permissions: staff?.permissions || [],
+    permissions: staff?.permissions || (isEdit ? [] : DEFAULT_STAFF_PERMISSIONS),
     branchId:    staff?.branchId || '',
     status:      staff?.status || 'active',
   });
@@ -83,6 +95,8 @@ function StaffModal({ staff, onClose, onSaved }) {
       .catch(() => {})
       .finally(() => setBranchLoading(false));
   }, []);
+
+  const isOnlyMessages = form.permissions.length === 1 && form.permissions.includes('manage_messages');
 
   const togglePerm = (key) => {
     setForm(f => ({
@@ -252,7 +266,7 @@ function StaffModal({ staff, onClose, onSaved }) {
               >
                 {[
                   { val: 'SUPER_ADMIN', label: 'Quản trị viên', icon: Crown },
-                  { val: 'STAFF', label: 'Nhân viên', icon: UserCog },
+                  { val: 'STAFF', label: 'Hỗ trợ viên / Admin-Staff', icon: UserCog },
                 ].map(({ val, label, icon: Icon }) => (
                   <button
                     key={val}
@@ -262,7 +276,7 @@ function StaffModal({ staff, onClose, onSaved }) {
                     onClick={() => setForm((f) => ({
                       ...f,
                       adminRole: val,
-                      permissions: val === 'SUPER_ADMIN' ? [] : f.permissions,
+                      permissions: val === 'SUPER_ADMIN' ? [] : (f.permissions.length ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
                       branchId: val === 'SUPER_ADMIN' ? '' : f.branchId,
                     }))}
                     className={`cms-rbac-segment-item ${form.adminRole === val ? 'is-active' : ''}`}
@@ -278,6 +292,15 @@ function StaffModal({ staff, onClose, onSaved }) {
               <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-[13px] text-amber-800 flex items-start gap-2">
                 <Crown size={14} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
                 <span>Quản trị viên quản lý <strong>toàn bộ hệ thống</strong>, không bị giới hạn theo chi nhánh.</span>
+              </div>
+            )}
+
+            {isStaff && (
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 flex items-center justify-between">
+                <span>Vai trò hiển thị tương ứng:</span>
+                <span className="font-bold text-slate-900">
+                  {isOnlyMessages ? '💬 HỖ TRỢ VIÊN (Chỉ tin nhắn)' : `🛡️ ADMIN-STAFF ${form.branchId ? '(Chi nhánh)' : ''}`}
+                </span>
               </div>
             )}
           </section>
@@ -323,7 +346,7 @@ function StaffModal({ staff, onClose, onSaved }) {
                     </CmsSelect>
                     {!form.branchId && (
                       <p className="text-[12px] text-amber-700 mt-1.5 flex items-center gap-1 font-medium">
-                        <AlertTriangle size={11} /> Bắt buộc chọn chi nhánh cho nhân viên
+                        <AlertTriangle size={11} /> Bắt buộc chọn chi nhánh cho tài khoản này
                       </p>
                     )}
                     {form.branchId && (() => {
@@ -342,10 +365,35 @@ function StaffModal({ staff, onClose, onSaved }) {
 
             {isStaff && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="cms-rbac-label !mb-0">
                     Phân quyền module ({form.permissions.length}/{ALL_PERMISSIONS.length})
                   </label>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, permissions: DEFAULT_STAFF_PERMISSIONS }))}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+                        !isOnlyMessages && form.permissions.length > 1
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      🛡️ Mặc định: Admin-Staff
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, permissions: ['manage_messages'] }))}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+                        isOnlyMessages
+                          ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      💬 Chỉ Hỗ trợ viên
+                    </button>
+                  </div>
                 </div>
 
                 <div className="cms-rbac-perm-search">
@@ -526,7 +574,7 @@ function StaffCard({ s, deleting, isRootSuperAdmin, onEdit, onResetPw, onDelete 
             <div className="min-w-0 space-y-1">
               <p className="text-base font-semibold text-slate-900 truncate leading-snug">{s.name}</p>
               <div className="flex flex-wrap items-center gap-1.5">
-                <RoleBadge adminRole={s.adminRole} />
+                <RoleBadge adminRole={s.adminRole} permissions={s.permissions} branchName={s.branchName || s.branchCode} />
                 <StatusBadge status={s.status} />
               </div>
             </div>
