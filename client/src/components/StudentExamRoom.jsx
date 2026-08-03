@@ -518,7 +518,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
       <div className="pt-6"></div>
 
       {/* ── Main Content ── */}
-      <div className="px-4 md:px-8 py-8 max-w-5xl mx-auto">
+      <div className="w-full px-2 sm:px-6 py-6 text-left">
         {/* TAB SWITCHER */}
         <div className="flex items-center gap-2 mb-6 border-b border-gray-200 pb-3">
           <button
@@ -656,7 +656,7 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
 
         {/* Subject Cards Grid */}
         {filteredSubjects.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
           {filteredSubjects.map(s => (
             <SubjectCard key={s.id} subject={s} onStart={handleStart} isGlobalApproved={!!isSubjectCourseUnlocked[s.id]} examSubjectsCatalog={examSubjectsCatalog} allowStartExam={allowStartExam} />
           ))}
