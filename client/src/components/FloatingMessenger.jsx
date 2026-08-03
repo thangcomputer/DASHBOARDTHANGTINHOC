@@ -248,6 +248,17 @@ function ChatWindow({
       </div>
 
       <form className="cms-fm-window__foot" onSubmit={submit}>
+        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
+        <button
+          type="button"
+          className="cms-fm-attach"
+          disabled={uploading}
+          onClick={() => imageRef.current?.click()}
+          title="Gửi ảnh"
+          aria-label="Gửi ảnh"
+        >
+          <ImagePlus size={16} />
+        </button>
         <button
           type="button"
           className="cms-fm-attach"
