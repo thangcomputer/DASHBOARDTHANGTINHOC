@@ -72,10 +72,10 @@ router.get('/contacts', async (req, res) => {
 
     const superAdminContacts = superAdmins.map(a => ({
       id:     a._id.toString(),
-      name:   DEPT_SUPER_LABEL,
+      name:   a.name && a.name.trim() ? a.name.trim() : DEPT_SUPER_LABEL,
       role:   'admin',
       phone:  a.phone || '',
-      avatar: 'AD',
+      avatar: a.avatar || String(a.name || 'AD').substring(0, 2).toUpperCase(),
       branchId: a.branchId || null,
       branchCode: a.branchCode || ''
     }));

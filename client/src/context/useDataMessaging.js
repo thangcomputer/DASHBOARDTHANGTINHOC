@@ -468,7 +468,28 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         };
       }
     } else if (userRole === 'admin') {
-      // Dùng ID thật của Staff để tạo convId riêng tư
+      // Dùng ID thật của Staff/Admin khác để tạo convId riêng tư
+      safeStaffs.filter(st => st && (st.id || st._id) && String(st.id || st._id) !== sId).forEach(st => {
+        const stId = String(st.id || st._id);
+        const convId = buildConversationId('admin', sId, 'admin', stId);
+        if (!convMap[convId]) {
+          convMap[convId] = {
+            id: convId,
+            user: {
+              id: stId,
+              name: st.name || 'Admin',
+              role: 'admin',
+              avatar: String(st.name || 'AD').substring(0, 2).toUpperCase(),
+              online: true,
+              branchCode: st.branchCode || ''
+            },
+            lastMessage: 'Chưa có tin nhắn',
+            lastTime: new Date(0),
+            unread: 0,
+          };
+        }
+      });
+
       teachers.filter(t => t && (t.status === 'Active' || t.status === 'active')).forEach(t => {
         const convId = buildConversationId('admin', sId, 'teacher', t.id);
         if (!convMap[convId]) {
