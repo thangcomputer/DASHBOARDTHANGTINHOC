@@ -380,14 +380,18 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         if (String(otherUserId) === String(currentUser?.id) || String(otherUserId) === String(currentUser?._id)) {
           if (currentUser?.name) otherName = currentUser.name;
         } else if (otherUserId === 'admin') {
-          const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
-            || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
-          if (superDoc?.name) otherName = superDoc.name;
-          else if (currentUser?.role === 'admin' && currentUser?.name) otherName = currentUser.name;
-        } else if (otherRole === 'teacher' || otherRole === 'admin') {
+          if (!isSuperAdmin) {
+            otherName = 'HỖ TRỢ VIÊN';
+          } else {
+            const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
+              || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
+            if (superDoc?.name) otherName = superDoc.name;
+            else if (currentUser?.role === 'admin' && currentUser?.name) otherName = currentUser.name;
+          }
+        } else if (otherRole === 'teacher' || (isSuperAdmin && otherRole === 'admin')) {
           const t = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
           if (t?.name) otherName = t.name;
-        } else if (otherRole === 'staff') {
+        } else if (otherRole === 'staff' || (!isSuperAdmin && otherRole === 'admin')) {
           const st = safeStaffs.find(st => String(st.id || st._id) === String(otherUserId));
           if (st?.name) otherName = st.name;
         } else if (otherRole === 'student') {
@@ -411,13 +415,16 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           }
         }
 
+        const finalRole = (!isSuperAdmin && (otherUserId === 'admin' || otherRole === 'admin')) ? 'staff' : otherRole;
+        const finalName = (!isSuperAdmin && otherUserId === 'admin') ? 'HỖ TRỢ VIÊN' : (otherName || 'Hỗ trợ viên');
+
         convMap[m.convId] = {
           id: m.convId,
           user: {
             id: otherUserId,
-            name: otherName || 'Người dùng',
-            role: otherRole,
-            avatar: String(otherName || 'U').substring(0, 2).toUpperCase(),
+            name: finalName,
+            role: finalRole,
+            avatar: String(finalName || 'H').substring(0, 2).toUpperCase(),
             online: true,
             branchCode: branchCode
           },

@@ -157,7 +157,7 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
 }
 
 function ChatWindow({
-  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendLink, onRecall,
+  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendLink, onRecall, onlineUsers = [], isSuper = false,
 }) {
   const toast = useToast();
   const [text, setText] = useState('');
@@ -166,6 +166,28 @@ function ChatWindow({
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const imageRef = useRef(null);
+
+  const isOnline = useMemo(() => {
+    if (tab.user.online !== undefined) return Boolean(tab.user.online);
+    if (!Array.isArray(onlineUsers)) return false;
+    const peerId = String(tab.user.id || '');
+    if (!peerId) return false;
+    return onlineUsers.some(u => String(u.userId || u.id) === peerId);
+  }, [onlineUsers, tab.user.id, tab.user.online]);
+
+  const displayRoleLabel = useMemo(() => {
+    if (!isSuper && (tab.user.role === 'staff' || tab.user.role === 'admin' || tab.user.id === 'admin')) {
+      return 'Hỗ trợ viên';
+    }
+    return ROLE_LABEL[tab.user.role] || tab.user.role || 'Hỗ trợ viên';
+  }, [isSuper, tab.user.role, tab.user.id]);
+
+  const displayName = useMemo(() => {
+    if (!isSuper && (tab.user.id === 'admin' || tab.user.role === 'admin')) {
+      return 'HỖ TRỢ VIÊN';
+    }
+    return tab.user.name || 'Hỗ trợ viên';
+  }, [isSuper, tab.user.id, tab.user.role, tab.user.name]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -248,16 +270,16 @@ function ChatWindow({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="relative shrink-0">
             <img
-              src={resolveAvatarUrl({ avatar: tab.user.avatar, role: tab.user.role, name: tab.user.name })}
+              src={resolveAvatarUrl({ avatar: tab.user.avatar, role: tab.user.role === 'admin' && !isSuper ? 'staff' : tab.user.role, name: displayName })}
               alt=""
               className="w-8 h-8 rounded-full object-cover"
             />
-            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
           </span>
           <div className="min-w-0">
-            <p className="text-[13px] font-bold text-slate-900 truncate leading-tight">{tab.user.name}</p>
-            <p className="text-[10px] text-emerald-600 font-semibold">
-              {ROLE_LABEL[tab.user.role] || tab.user.role} · Đang hoạt động
+            <p className="text-[13px] font-bold text-slate-900 truncate leading-tight">{displayName}</p>
+            <p className={`text-[10px] font-semibold ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
+              {displayRoleLabel} · {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến (Nhắn tin chờ)'}
             </p>
           </div>
         </div>
@@ -551,6 +573,8 @@ export default function FloatingMessenger({ session, role }) {
             key={openWindow.id}
             tab={openWindow}
             meId={meId}
+            onlineUsers={onlineUsers}
+            isSuper={isSuper}
             messages={getMessages(openWindow.id) || []}
             onClose={closeChat}
             onMinimize={minimizeChat}
