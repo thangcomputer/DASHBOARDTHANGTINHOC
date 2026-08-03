@@ -695,7 +695,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         )}
 
         {/* Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 border-b border-slate-200 pb-2 w-full mb-5 relative z-10">
+        <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-2 w-full mb-5 relative z-10">
           {[
             { key: 'courses', icon: PlayCircle, label: 'Video học tập', count: courses.length },
             { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
@@ -708,17 +708,17 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               onClick={() => setMainTab(t.key)}
               title={t.label}
               aria-label={t.label}
-              className={`relative flex w-full min-w-0 flex-row sm:flex-col items-center justify-center gap-1.5 px-2.5 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${mainTab === t.key
+              className={`relative flex w-full min-w-0 flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-sm font-semibold transition-all ${mainTab === t.key
                 ? 'bg-red-500 text-white shadow-sm'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
             >
-              <t.icon size={16} className="shrink-0" aria-hidden="true" />
-              <span className="text-xs sm:text-[11px] font-bold leading-tight text-center truncate">
+              <t.icon size={15} className="shrink-0" aria-hidden="true" />
+              <span className="text-[11px] leading-tight text-center line-clamp-2 min-h-[2.1rem]">
                 {t.label}
               </span>
               {t.count > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none shrink-0 ml-auto sm:ml-0 sm:absolute sm:top-1.5 sm:right-1.5 ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>
+                <span className={`absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
                   {t.count}
                 </span>
               )}

@@ -462,14 +462,14 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               title={label}
               aria-label={label}
               aria-current={activePanel === key ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 px-1 py-2.5 sm:py-3.5 text-xs sm:text-xs font-bold tracking-wide transition-all min-w-0 ${
+              className={`relative flex flex-col items-center justify-center gap-0.5 px-0.5 sm:px-1 py-2 sm:py-3.5 text-[10px] sm:text-xs font-bold tracking-wide transition-all min-w-0 ${
                 activePanel === key ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               <Icon size={16} className="shrink-0" aria-hidden="true" />
               <span className="truncate max-w-full leading-tight">{label}</span>
               {activePanel === key && (
-                <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-t-full" />
+                <div className="absolute bottom-0 left-1 right-1 h-0.5 bg-blue-600 rounded-t-full" />
               )}
             </button>
           ))}

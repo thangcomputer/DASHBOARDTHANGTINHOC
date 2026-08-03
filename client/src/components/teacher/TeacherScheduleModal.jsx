@@ -111,13 +111,13 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-red-600 px-6 py-4 text-white flex justify-between items-center">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="bg-red-600 px-6 py-4 text-white flex justify-between items-center shrink-0">
           <h3 className="font-bold flex items-center gap-2"><Calendar size={18}/> {(schedule?.id || schedule?._id) ? 'Cập nhật lịch học' : 'Xếp lịch học mới'}</h3>
           <button onClick={onClose}><X size={20}/></button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto">
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chọn học viên</label>
             <CmsSelect name="enrollmentKey" value={form.enrollmentKey} onChange={handleChange} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none">
