@@ -114,7 +114,8 @@ export default function SystemSettingsTab() {
 
   useEffect(() => {
     try {
-      const sess = JSON.parse(localStorage.getItem('admin_user') || '{}');
+      const sess = JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
+      if (sess?.name) setAdminName(sess.name);
       setIsSuperAdmin(sess?.id === 'admin' || sess?.adminRole === 'SUPER_ADMIN');
     } catch {
       setIsSuperAdmin(false);
@@ -759,9 +760,9 @@ export default function SystemSettingsTab() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                  <Lock size={14} className="text-red-600 shrink-0" /> Thông tin Admin
+                  <Lock size={14} className="text-red-600 shrink-0" /> Thông tin tài khoản đăng nhập
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Đổi tên hiển thị / mật khẩu đăng nhập</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Đổi tên hiển thị / mật khẩu cho tài khoản đang đăng nhập</p>
               </div>
               <button
                 type="button"

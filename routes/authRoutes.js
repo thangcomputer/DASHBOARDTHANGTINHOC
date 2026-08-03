@@ -1688,8 +1688,8 @@ router.post('/admin/reset-password', authMiddleware, async (req, res) => {
  */
 router.put('/admin/profile', authMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Chỉ Admin mới được thay đổi' });
+    if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+      return res.status(403).json({ success: false, message: 'Chỉ Admin/Nhân viên mới được thay đổi' });
     }
 
     const { name, oldPassword, newPassword } = req.body;
