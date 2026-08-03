@@ -1,20 +1,84 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Calendar, ChevronRight, BookOpen, Award, Star, Zap, UserCheck, Clipboard,
-  MessageSquare, GraduationCap, Users, Activity,
+  MessageSquare, GraduationCap, Users, Activity, Video, AlertTriangle, Bell,
+  CheckCircle2, ArrowRight
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import TeacherRatingDisplay from './TeacherRatingDisplay';
+import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 
 export default function TeacherOverviewTab({
   navigate, totalMonthlyIncome, completed, totalDone, teacherName, currentTeacher,
-  teacherRating, students, totalSess, avgGrade, mySchedules, myNotifs, RATING_CRITERIA,
+  teacherRating, students, totalSess, avgGrade, mySchedules = [], myNotifs, RATING_CRITERIA,
 }) {
   const initials = (teacherName || 'GV').substring(0, 2).toUpperCase();
   const avatarTone = currentTeacher?.color || 'bg-indigo-600';
 
+  // Check if there is a live schedule right now
+  const ongoingSchedule = useMemo(() => {
+    return (mySchedules || []).find(s => s.status === 'scheduled' && isScheduleOngoingNow(s));
+  }, [mySchedules]);
+
+  // Filter students needing attention (grade < 5 or missing grade)
+  const attentionStudents = useMemo(() => {
+    return (students || []).filter(s => !s.lastGrade || s.lastGrade < 5);
+  }, [students]);
+
+  // Center announcements mock/real data
+  const centerAnnouncements = [
+    {
+      id: 1,
+      title: 'Thông báo quy trình Điểm danh & Nhập điểm số học viên',
+      date: '01/08/2026',
+      tag: 'Quy định trung tâm',
+      type: 'important'
+    },
+    {
+      id: 2,
+      title: 'Cập nhật tính năng Đổi lịch & Ghi chú trao đổi 2 chiều',
+      date: '28/07/2026',
+      tag: 'Hệ thống LMS',
+      type: 'update'
+    }
+  ];
+
   return (
-    <div className="px-4 md:px-8 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
+    <div className="px-4 md:px-8 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0">
+      
+      {/* ── LIVE ONGOING SCHEDULE BANNER (Hiển thị nổi bật khi có lớp đang diễn ra) ── */}
+      {ongoingSchedule && (
+        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-indigo-700 text-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-xl shadow-red-500/20 flex flex-col sm:flex-row items-center justify-between gap-4 border border-red-400/30 animate-pulse">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+              <Video size={20} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-xs font-black uppercase tracking-wider text-red-100">CA DẠY ĐANG DIỄN RA</span>
+              </div>
+              <h4 className="text-sm sm:text-base font-black text-white truncate mt-0.5">
+                👤 {ongoingSchedule.studentName || 'Học viên'} &bull; <span className="text-yellow-300">{ongoingSchedule.course}</span>
+              </h4>
+              <p className="text-xs text-red-100 font-medium">
+                Thời gian: {ongoingSchedule.startTime} - {ongoingSchedule.endTime}
+              </p>
+            </div>
+          </div>
+
+          {ongoingSchedule.linkHoc && (
+            <a
+              href={ongoingSchedule.linkHoc}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full sm:w-auto px-5 py-2.5 bg-white text-red-600 hover:bg-red-50 rounded-xl text-xs sm:text-sm font-black shadow-lg transition active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <Video size={16} /> VÀO LỚP NGAY
+            </a>
+          )}
+        </div>
+      )}
 
       {/* ── Income + Profile ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
@@ -50,7 +114,7 @@ export default function TeacherOverviewTab({
             <button
               type="button"
               onClick={() => navigate('/teacher/finance')}
-              className="w-full md:w-auto shrink-0 bg-white/10 hover:bg-white/15 border border-white/10 px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all flex items-center justify-center gap-2 group min-h-11"
+              className="w-full md:w-auto shrink-0 bg-white/10 hover:bg-white/15 border border-white/10 px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all flex items-center justify-center gap-2 group min-h-11 cursor-pointer"
             >
               Chi tiết thu nhập
               <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
@@ -84,7 +148,7 @@ export default function TeacherOverviewTab({
         </div>
       </div>
 
-      {/* ── Stats ── */}
+      {/* ── Stats Summary Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
           { icon: Users, label: 'Đang dạy', value: students.length, sub: 'học viên', color: 'from-indigo-500 to-indigo-600', bg: 'bg-indigo-50' },
@@ -149,7 +213,7 @@ export default function TeacherOverviewTab({
               key={label}
               type="button"
               onClick={action}
-              className={`${tint} border rounded-xl p-3 sm:p-4 text-left transition-all active:scale-[0.98] min-h-[4.25rem]`}
+              className={`${tint} border rounded-xl p-3 sm:p-4 text-left transition-all active:scale-[0.98] min-h-[4.25rem] cursor-pointer`}
             >
               <div className="flex items-center gap-2 mb-1">
                 <Icon size={16} className="text-white/90 shrink-0" aria-hidden="true" />
@@ -161,85 +225,152 @@ export default function TeacherOverviewTab({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-        {/* Students */}
-        <div className="lg:col-span-7 space-y-3 sm:space-y-4">
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <h3 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2 min-w-0">
-              <GraduationCap size={16} className="text-indigo-600 shrink-0" aria-hidden="true" />
-              <span className="truncate">Học viên được phân công</span>
-            </h3>
-          </div>
-          {students.map((s) => {
-            const done = s.totalSessions - s.remainingSessions;
-            const pct = Math.round((done / s.totalSessions) * 100) || 0;
-            return (
-              <div
-                key={s.id}
-                className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-100 flex items-center gap-3 sm:gap-4 hover:shadow-md transition group"
+      {/* ── 2-COLUMN BALANCED CONTENT GRID ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
+        
+        {/* CỘT TRÁI (lg:col-span-7) */}
+        <div className="lg:col-span-7 space-y-4 sm:space-y-5 flex flex-col justify-between">
+          
+          {/* Card 1: Học viên được phân công */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between gap-2 min-w-0 pb-2 border-b border-slate-100">
+              <h3 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2 min-w-0">
+                <GraduationCap size={18} className="text-indigo-600 shrink-0" aria-hidden="true" />
+                <span className="truncate">Học viên được phân công ({students.length})</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => navigate('/teacher#students')}
+                className="text-[11px] font-bold text-indigo-600 hover:underline shrink-0"
               >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 bg-slate-50 shadow-sm border border-slate-100">
-                  <img src={resolveAvatarUrl({ role: 'student' })} alt="" className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">{s.name}</p>
-                  <p className="text-[10px] sm:text-xs text-slate-400 truncate mt-0.5">{s.course}</p>
-                  <div className="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden max-w-[11rem] sm:max-w-none">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${pct >= 70 ? 'bg-emerald-400' : pct >= 40 ? 'bg-amber-400' : 'bg-indigo-400'}`}
-                      style={{ width: `${pct}%` }}
-                    />
+                Xem chi tiết →
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+              {students.map((s) => {
+                const done = s.totalSessions - s.remainingSessions;
+                const pct = Math.round((done / s.totalSessions) * 100) || 0;
+                return (
+                  <div
+                    key={s.id}
+                    className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex items-center gap-3 hover:bg-indigo-50/40 transition group"
+                  >
+                    <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white shadow-sm border border-slate-200">
+                      <img src={resolveAvatarUrl({ role: 'student' })} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{s.name}</p>
+                      <p className="text-[10px] sm:text-xs text-slate-400 truncate">{s.course}</p>
+                      <div className="h-1.5 bg-slate-200/60 rounded-full mt-1.5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xs sm:text-sm font-black text-slate-800 tabular-nums">{pct}%</p>
+                      <p className="text-[10px] text-slate-400 tabular-nums">{done}/{s.totalSessions} buổi</p>
+                    </div>
                   </div>
+                );
+              })}
+
+              {students.length === 0 && (
+                <div className="py-6 text-center text-slate-400 text-xs font-medium">Chưa được phân công học viên nào.</div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 2: Bảng tin & Thông báo từ Trung tâm */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Bell size={16} />
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm sm:text-lg font-black text-slate-800 tabular-nums">{pct}%</p>
-                  <p className="text-[10px] sm:text-xs text-slate-400 tabular-nums">{done}/{s.totalSessions}</p>
-                </div>
+                <h4 className="text-xs sm:text-sm font-black text-slate-900">
+                  📢 Thông báo từ Trung tâm
+                </h4>
               </div>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => navigate('/teacher#students')}
-            className="w-full text-xs sm:text-sm font-bold text-indigo-600 bg-indigo-50 py-2.5 sm:py-3 rounded-xl hover:bg-indigo-100 transition flex items-center justify-center gap-1 min-h-11"
-          >
-            Quản lý chi tiết <ChevronRight size={14} aria-hidden="true" />
-          </button>
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                Mới nhất
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {centerAnnouncements.map((item) => (
+                <div key={item.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                      {item.tag}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">{item.date}</span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-800 leading-snug">{item.title}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Card 3: Cảnh báo & Lưu ý học viên */}
+          {attentionStudents.length > 0 && (
+            <div className="bg-amber-50/80 rounded-2xl border border-amber-200/80 p-3.5 sm:p-4 space-y-2">
+              <div className="flex items-center gap-2 text-amber-800">
+                <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                <h4 className="text-xs sm:text-sm font-black">Học viên cần lưu ý điểm số ({attentionStudents.length})</h4>
+              </div>
+              <p className="text-[11px] text-amber-700 font-medium">
+                Các học viên sau chưa có điểm bài nộp hoặc điểm trung bình cần được cải thiện:
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {attentionStudents.map((st) => (
+                  <span key={st.id} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 shadow-2xs">
+                    👤 {st.name} ({st.course})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
 
-        {/* Right column */}
-        <div className="lg:col-span-5 space-y-4 sm:space-y-5">
+        {/* CỘT PHẢI (lg:col-span-5) */}
+        <div className="lg:col-span-5 space-y-4 sm:space-y-5 flex flex-col justify-between">
+          {/* Đánh giá từ học viên */}
           <TeacherRatingDisplay rating={teacherRating} RATING_CRITERIA={RATING_CRITERIA} students={students} />
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          {/* Lịch dạy sắp tới */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="px-4 sm:px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
               <h4 className="font-bold text-slate-700 text-xs sm:text-sm flex items-center gap-2 min-w-0">
                 <Calendar size={14} className="text-indigo-500 shrink-0" aria-hidden="true" />
-                <span className="truncate">Lịch dạy sắp tới</span>
+                <span className="truncate">Lịch dạy sắp tới trong tuần</span>
               </h4>
               <button
                 type="button"
                 onClick={() => navigate('/teacher#schedule')}
-                className="text-[10px] sm:text-xs text-indigo-600 font-bold hover:underline shrink-0"
+                className="text-[10px] sm:text-xs text-indigo-600 font-bold hover:underline shrink-0 cursor-pointer"
               >
                 Xem tất cả →
               </button>
             </div>
-            <div className="divide-y divide-slate-50">
-              {mySchedules.filter((s) => s.status === 'scheduled').slice(0, 3).length === 0 && (
-                <p className="px-4 sm:px-5 py-4 text-xs text-slate-400 text-center">Chưa có lịch dạy.</p>
+            <div className="divide-y divide-slate-50 max-h-[220px] overflow-y-auto pr-1">
+              {mySchedules.filter((s) => s.status === 'scheduled').slice(0, 4).length === 0 && (
+                <p className="px-4 sm:px-5 py-4 text-xs text-slate-400 text-center">Chưa có lịch dạy sắp tới.</p>
               )}
-              {mySchedules.filter((s) => s.status === 'scheduled').slice(0, 3).map((s) => (
-                <div key={s.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 hover:bg-indigo-50/30 transition">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-50 flex flex-col items-center justify-center text-indigo-600 flex-shrink-0">
-                    <span className="text-sm font-black tabular-nums">{new Date(s.date).getDate()}</span>
-                    <span className="text-[8px] font-bold opacity-60">T{new Date(s.date).getMonth() + 1}</span>
+              {mySchedules.filter((s) => s.status === 'scheduled').slice(0, 4).map((s) => (
+                <div key={s._id || s.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 hover:bg-indigo-50/30 transition">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 flex flex-col items-center justify-center text-indigo-600 flex-shrink-0">
+                    <span className="text-xs font-black tabular-nums">{new Date(s.date).getDate()}</span>
+                    <span className="text-[7px] font-bold opacity-60">T{new Date(s.date).getMonth() + 1}</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{s.topic}</p>
-                    <p className="text-[10px] sm:text-xs text-slate-400 truncate">{s.startTime} · {s.studentName}</p>
+                    <p className="text-xs font-semibold text-slate-800 truncate">{s.studentName || s.course}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{s.startTime} · {s.course}</p>
                   </div>
-                  <span className="text-[10px] sm:text-xs text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg flex-shrink-0">
+                  <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg flex-shrink-0">
                     {s.startTime}
                   </span>
                 </div>
@@ -247,7 +378,8 @@ export default function TeacherOverviewTab({
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-slate-800 to-zinc-900 rounded-2xl p-4 sm:p-5 text-white shadow-sm">
+          {/* Tóm tắt hoạt động */}
+          <div className="bg-gradient-to-br from-slate-800 to-zinc-900 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <Activity size={15} className="text-sky-400 shrink-0" aria-hidden="true" />
               <h4 className="font-bold text-xs sm:text-sm">Tóm tắt hoạt động</h4>
@@ -265,6 +397,7 @@ export default function TeacherOverviewTab({
               ))}
             </div>
           </div>
+
         </div>
       </div>
     </div>
