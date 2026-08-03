@@ -6,6 +6,7 @@ const PERMISSIONS = {
   MANAGE_STUDENTS: 'manage_students',
   MANAGE_SCHEDULE: 'manage_schedule',
   MANAGE_FINANCE: 'manage_finance',
+  MANAGE_MESSAGES: 'manage_messages',
   MANAGE_TRAINING: 'manage_training',
   MANAGE_STUDENT_TRAINING: 'manage_student_training',
   MANAGE_STAFF: 'manage_staff',

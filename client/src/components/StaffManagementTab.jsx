@@ -20,6 +20,7 @@ import { staffAPI, apiFetch } from '../services/api';
 
 /** Nhóm quyền để Accordion UI — không đổi key/API */
 const PERMISSION_GROUPS = [
+  { id: 'messages', title: 'Hộp thư & Support', icon: '💬', keys: ['manage_messages'] },
   { id: 'students', title: 'Học viên', icon: '📚', keys: ['manage_students'] },
   { id: 'teachers', title: 'Giảng viên', icon: '👨‍🏫', keys: ['view_teachers'] },
   { id: 'schedule', title: 'Lịch dạy', icon: '📅', keys: ['manage_schedule'] },

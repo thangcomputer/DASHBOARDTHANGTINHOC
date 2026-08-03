@@ -96,6 +96,18 @@ export function useAdminDashboardState() {
 
   // Chặn mở tab bằng URL hash khi không có quyền (menu đã ẩn nhưng URL vẫn vào được)
   useEffect(() => {
+    // Nếu là Staff (không phải SuperAdmin) chỉ có quyền Hộp thư (manage_messages)
+    if (_sess && _sess.id !== 'admin' && _sess.adminRole !== 'SUPER_ADMIN') {
+      const perms = _sess.permissions || [];
+      const hasOtherPerms = Object.values(TAB_PERMISSION).some((p) => perms.includes(p));
+      if (!hasOtherPerms && perms.includes(PERMISSIONS.MANAGE_MESSAGES)) {
+        if (location.pathname === '/admin' && (activeTab === 'dashboard' || activeTab === 'overview')) {
+          navigate('/admin/inbox', { replace: true });
+          return undefined;
+        }
+      }
+    }
+
     if (activeTab === 'dashboard') return undefined;
     if (activeTab === 'staff' && !isSuperAdmin) {
       navigate('/admin#dashboard', { replace: true });
@@ -112,8 +124,7 @@ export function useAdminDashboardState() {
       navigate('/admin#dashboard', { replace: true });
     }
     return undefined;
-    // session snapshot from localStorage; isSuperAdmin covers role change
-  }, [activeTab, isSuperAdmin, navigate]);
+  }, [activeTab, isSuperAdmin, navigate, location.pathname]);
 
   const [deleteModal, setDeleteModal] = useState(null);
   const [resetPwModal, setResetPwModal] = useState(null);

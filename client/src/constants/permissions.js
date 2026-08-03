@@ -7,6 +7,7 @@ export const PERMISSIONS = {
   MANAGE_STUDENTS:    'manage_students',      // Học viên: xem/thêm/sửa/xóa
   MANAGE_SCHEDULE:    'manage_schedule',      // Lịch dạy: quản lý lịch giảng dạy
   MANAGE_FINANCE:     'manage_finance',       // Tài chính: thu chi, thanh toán, báo cáo
+  MANAGE_MESSAGES:    'manage_messages',      // ⭐ Hộp thư & Tin nhắn hỗ trợ
   MANAGE_TRAINING:    'manage_training',      // Đào tạo GV: module đào tạo
   MANAGE_STUDENT_TRAINING: 'manage_student_training', // Đào tạo HV: module đào tạo học viên
   MANAGE_STAFF:       'manage_staff',         // Phân quyền NV: chỉ Super Admin
@@ -24,6 +25,7 @@ export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.MANAGE_STUDENTS,     label: 'Quản lý Học viên',           desc: 'Xem, thêm, sửa, xóa học viên' },
   { key: PERMISSIONS.VIEW_TEACHERS,       label: '👁️ Xem Giảng viên',         desc: 'Chỉ xem danh sách GV chi nhánh (không thêm/sửa/xóa)' },
   { key: PERMISSIONS.MANAGE_SCHEDULE,     label: 'Lịch dạy',                   desc: 'Quản lý lịch giảng dạy' },
+  { key: PERMISSIONS.MANAGE_MESSAGES,     label: '💬 Hộp thư & Support',       desc: 'Chat, tư vấn, xem và gửi tin nhắn hỗ trợ học viên / giảng viên' },
   { key: PERMISSIONS.MANAGE_FINANCE,      label: 'Tài chính (toàn quyền)',     desc: 'Thu chi, thanh toán lương, quản lý tài chính' },
   { key: PERMISSIONS.VIEW_BRANCH_REVENUE, label: '📊 Xem Báo cáo doanh thu',  desc: 'Chỉ xem doanh thu chi nhánh (read-only)' },
   { key: PERMISSIONS.MANAGE_TRAINING,     label: 'Đào tạo GV',             desc: 'Module đào tạo giảng viên' },

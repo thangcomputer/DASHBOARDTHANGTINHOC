@@ -69,10 +69,14 @@ const MENU_CONFIG = {
   admin: {
     brand: { label: 'QUẢN TRỊ', color: 'from-slate-900 to-indigo-950' },
     items: [
-      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/admin', hash: 'dashboard' },
-      { key: 'feed',      icon: Newspaper,       label: 'Bảng tin',  path: '/admin/feed' },
-      { key: 'news',      icon: FileText,        label: 'Tin tức',   path: '/admin/news' },
-      { key: 'inbox',     icon: MessageSquare,   label: 'Hộp thư',   path: '/admin/inbox' },
+      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/admin', hash: 'dashboard', permission: [
+        PERMISSIONS.MANAGE_STUDENTS, PERMISSIONS.VIEW_TEACHERS, PERMISSIONS.MANAGE_SCHEDULE,
+        PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.MANAGE_HR,
+        PERMISSIONS.SYSTEM_SETTINGS, PERMISSIONS.VIEW_BRANCH_REVENUE
+      ]},
+      { key: 'feed',      icon: Newspaper,       label: 'Bảng tin',  path: '/admin/feed',  permission: [PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES] },
+      { key: 'news',      icon: FileText,        label: 'Tin tức',   path: '/admin/news',  permission: [PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES] },
+      { key: 'inbox',     icon: MessageSquare,   label: 'Hộp thư',   path: '/admin/inbox', permission: PERMISSIONS.MANAGE_MESSAGES },
       {
         key: 'people-group',
         label: 'Quản lý',
