@@ -95,42 +95,79 @@ async function createTuitionInvoice({ student, courseName, amount, note = '' }) 
 router.get('/', [authMiddleware, branchFilter], async (req, res) => {
   try {
     const { teacherId, paid, status, course, search, page, limit, branch_id } = req.query;
-    // Khởi tạo filter với branchFilter (tự động {} cho SUPER_ADMIN, {branchId:...} cho STAFF)
-    const filter = { ...req.branchFilter };
+    const andConditions = [];
 
-    // SUPER_ADMIN: cho phép lọc theo branch_id từ query (Global Branch Filter)
-    // STAFF: bỏ qua branch_id từ query, BẮT BUỘC dùng branch của chính họ (đã set trong branchFilter)
+    if (req.branchFilter && Object.keys(req.branchFilter).length > 0) {
+      andConditions.push(req.branchFilter);
+    }
     if (branch_id && branch_id !== 'all' && !req.userBranchId) {
-      // Chỉ SUPER_ADMIN mới vào đây (userBranchId undefined = không bị lock)
-      filter.branchId = branch_id;
+      andConditions.push({ branchId: branch_id });
     }
 
-    // Nếu là Teacher, chỉ được xem học viên của mình (kể cả qua enrollments)
     if (req.user.role === 'teacher') {
-      filter.$or = [
-        { teacherId: req.user.id },
-        { 'enrollments.teacherId': req.user.id },
-      ];
+      andConditions.push({
+        $or: [
+          { teacherId: req.user.id },
+          { 'enrollments.teacherId': req.user.id },
+        ],
+      });
     } else if (req.user.role === 'admin' || req.user.role === 'staff') {
-      if (teacherId) filter.teacherId = teacherId;
+      if (teacherId) andConditions.push({ teacherId });
     } else {
-      // Student không được phép xem danh sách này
       return res.status(403).json({ success: false, message: 'Quyền truy cập bị từ chối' });
     }
 
-    if (teacherId) filter.teacherId = teacherId;
-    if (paid !== undefined) filter.paid = paid === 'true';
-    if (status) filter.status = status;
-    if (course) filter.course = { $regex: sanitizeRegex(course), $options: 'i' };
+    if (paid && paid !== 'all') {
+      if (paid === 'paid' || paid === 'true') {
+        andConditions.push({
+          $or: [
+            { paid: true },
+            { 'enrollments.paid': true },
+            { 'enrollments.paid': 'Đã đóng phí' },
+            { 'enrollments.paid': 1 },
+          ],
+        });
+      } else if (paid === 'unpaid' || paid === 'refunded' || paid === 'false') {
+        andConditions.push({
+          $or: [
+            { 'enrollments.status': 'cancelled' },
+            { 'enrollments.status': 'refunded' },
+            { 'enrollments.refundedAmount': { $gt: 0 } },
+            { paid: false },
+            { 'enrollments.paid': false },
+          ],
+        });
+      }
+    }
+
+    if (status) andConditions.push({ status });
+
+    if (course && course !== 'all') {
+      const cReg = { $regex: sanitizeRegex(course), $options: 'i' };
+      andConditions.push({
+        $or: [
+          { course: cReg },
+          { 'enrollments.courseName': cReg },
+          { 'enrollments.name': cReg },
+        ],
+      });
+    }
+
     if (search) {
       const s = sanitizeRegex(search);
-      filter.$or = [
-        { name: { $regex: s, $options: 'i' } },
-        { zalo: { $regex: s, $options: 'i' } },
-        { phone: { $regex: s, $options: 'i' } },
-        { course: { $regex: s, $options: 'i' } },
-      ];
+      const sReg = { $regex: s, $options: 'i' };
+      andConditions.push({
+        $or: [
+          { name: sReg },
+          { zalo: sReg },
+          { phone: sReg },
+          { course: sReg },
+          { 'enrollments.courseName': sReg },
+        ],
+      });
     }
+
+    const filter = andConditions.length > 0 ? { $and: andConditions } : {};
 
     // ── Pagination ──────────────────────────────────────────────────
     const pageNum = Math.max(1, parseInt(page) || 1);
