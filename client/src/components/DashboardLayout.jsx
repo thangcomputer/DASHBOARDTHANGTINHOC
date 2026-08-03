@@ -525,10 +525,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           <div
             className={
               isInboxPage || isBiPage
-                ? 'cms-page min-w-0 mx-auto max-w-7xl xl:max-w-[90rem] 2xl:max-w-[100rem] flex-1 min-h-0 h-full flex flex-col overflow-hidden'
+                ? 'cms-page min-w-0 w-full max-w-full flex-1 min-h-0 h-full flex flex-col overflow-hidden'
                 : isImmersivePage
                   ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
-                  : 'cms-page min-w-0 mx-auto max-w-7xl xl:max-w-[90rem] 2xl:max-w-[100rem]'
+                  : 'cms-page min-w-0 w-full max-w-full'
             }
           >
             <Outlet />
