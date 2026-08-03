@@ -323,15 +323,17 @@ export default function TeacherOverviewTab({
                 const done = s.totalSessions - s.remainingSessions;
                 const pct = Math.round((done / s.totalSessions) * 100) || 0;
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={s.id}
-                    className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex items-center gap-3 hover:bg-indigo-50/40 transition group"
+                    onClick={() => navigate('/teacher#students')}
+                    className="w-full text-left bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex items-center gap-3 hover:bg-indigo-50/60 hover:border-indigo-200 transition group cursor-pointer"
                   >
                     <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white shadow-sm border border-slate-200">
                       <img src={resolveAvatarUrl({ role: 'student' })} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{s.name}</p>
+                      <p className="text-xs sm:text-sm font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{s.name}</p>
                       <p className="text-[10px] sm:text-xs text-slate-400 truncate">{s.course}</p>
                       <div className="h-1.5 bg-slate-200/60 rounded-full mt-1.5 overflow-hidden">
                         <div
@@ -344,7 +346,8 @@ export default function TeacherOverviewTab({
                       <p className="text-xs sm:text-sm font-black text-slate-800 tabular-nums">{pct}%</p>
                       <p className="text-[10px] text-slate-400 tabular-nums">{done}/{s.totalSessions} buổi</p>
                     </div>
-                  </div>
+                    <ChevronRight size={15} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition shrink-0" />
+                  </button>
                 );
               })}
 
