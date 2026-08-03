@@ -379,6 +379,22 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   }, [currentUserId, syncMessages]);
 
+  // ─── Helper tra cứu tên người gửi động chuẩn hệ thống ──────────────────────
+  const resolveSenderName = useCallback((msg) => {
+    if (!msg) return 'Người gửi';
+    if (String(msg.senderId) === String(currentUserId)) return currentUserName;
+    if (msg.senderId === 'admin') {
+      const superDoc = (teachers || []).find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin');
+      if (superDoc?.name) return superDoc.name;
+      if (currentUserRole === 'admin' && currentUserName) return currentUserName;
+    }
+    const matchTeacher = (teachers || []).find(t => String(t.id || t._id) === String(msg.senderId));
+    if (matchTeacher?.name) return matchTeacher.name;
+    const matchStudent = (students || []).find(s => String(s.id || s._id) === String(msg.senderId));
+    if (matchStudent?.name) return matchStudent.name;
+    return msg.senderName || 'Người gửi';
+  }, [currentUserId, currentUserName, currentUserRole, teachers, students]);
+
   // ─── Load messages khi chọn conversation ─────────────────────────────────────
   useEffect(() => {
     if (activeConv) {
@@ -386,7 +402,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setMessages(msgs.map(m => ({
         id: m.id,
         senderId: m.senderId,
-        senderName: m.senderName,
+        senderName: resolveSenderName(m),
         senderRole: m.senderRole || (m.senderId === 'admin' ? 'admin' : activeConv.user.role),
         content: m.content,
         time: m.time,
@@ -400,7 +416,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       })));
       markMessagesRead(activeConv.id, currentUserId, (currentUserRole === 'admin') ? ['admin'] : []);
     }
-  }, [activeConv, ctxGetMessages, markMessagesRead, currentUserId]);
+  }, [activeConv, ctxGetMessages, markMessagesRead, currentUserId, resolveSenderName]);
 
   // ─── Socket real-time listeners ──────────────────────────────────────────────
   useEffect(() => {
@@ -415,7 +431,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             const mappedMsg = {
               id: data._id,
               senderId: data.senderId,
-              senderName: data.senderName,
+              senderName: resolveSenderName(data),
               senderRole: data.senderRole,
               content: data.content,
               time: new Date(data.createdAt || Date.now()),

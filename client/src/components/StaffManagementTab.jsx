@@ -34,7 +34,7 @@ function RoleBadge({ adminRole }) {
   if (adminRole === 'SUPER_ADMIN') {
     return (
       <span className="cms-rbac-badge cms-rbac-badge-admin">
-        <Crown size={10} aria-hidden="true" /> SUPER ADMIN
+        <Crown size={10} aria-hidden="true" /> ADMIN CẤP CAO
       </span>
     );
   }
@@ -438,11 +438,75 @@ function StaffModal({ staff, onClose, onSaved }) {
   );
 }
 
-function StaffCard({ s, deleting, onEdit, onDelete }) {
+function ResetPasswordModal({ staff, onClose, onSaved }) {
+  const [newPassword, setNewPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
+  const handleReset = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('Mật khẩu mới phải từ 6 ký tự trở lên');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await staffAPI.update(staff._id, { password: newPassword });
+      if (res.success) {
+        toast.success(`✅ Đã reset mật khẩu cho "${staff.name}"`);
+        if (onSaved) onSaved(res.data);
+        onClose();
+      } else {
+        toast.error(res.message || 'Lỗi reset mật khẩu');
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Lỗi kết nối server');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="cms-sheet-backdrop" onClick={onClose} aria-hidden="true" />
+      <div className="cms-sheet w-full max-w-md p-5 bg-white rounded-2xl space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <Key className="text-blue-600" size={18} /> Reset mật khẩu: {staff.name}
+          </h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={18} />
+          </button>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">Mật khẩu mới (≥6 ký tự)</label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:border-blue-500"
+            placeholder="Nhập mật khẩu mới..."
+          />
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">Hủy</button>
+          <button type="button" onClick={handleReset} disabled={saving} className="cms-btn cms-btn-primary">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Reset mật khẩu
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function StaffCard({ s, deleting, isRootSuperAdmin, onEdit, onResetPw, onDelete }) {
   const perms = s.permissions || [];
   const visible = perms.slice(0, 3);
   const rest = perms.slice(3);
   const sheetId = `staff-perms-${s._id}`;
+
+  const isTargetSuper = s.adminRole === 'SUPER_ADMIN';
+  const canManage = isTargetSuper ? isRootSuperAdmin : true;
+  const disabledReason = !canManage ? 'Chỉ Admin Super mới được thao tác với Admin Cấp Cao' : '';
 
   return (
     <article className="cms-rbac-card">
@@ -467,7 +531,7 @@ function StaffCard({ s, deleting, onEdit, onDelete }) {
               </div>
             </div>
 
-            {/* Action menu — details, no extra React state */}
+            {/* Action menu — details */}
             <details className="cms-rbac-menu relative flex-shrink-0">
               <summary
                 className="cms-rbac-menu-trigger"
@@ -479,54 +543,59 @@ function StaffCard({ s, deleting, onEdit, onDelete }) {
                 <button
                   type="button"
                   role="menuitem"
-                  className="cms-rbac-menu-item"
+                  disabled={!canManage}
+                  title={disabledReason}
+                  className="cms-rbac-menu-item disabled:opacity-40 disabled:cursor-not-allowed"
                   onClick={(e) => {
+                    if (!canManage) return;
                     e.currentTarget.closest('details')?.removeAttribute('open');
                     onEdit();
                   }}
                 >
                   <Edit2 size={14} /> Sửa
                 </button>
+
                 <button
                   type="button"
                   role="menuitem"
-                  className="cms-rbac-menu-item"
-                  disabled
-                  aria-disabled="true"
-                  title="Sắp có"
+                  disabled={!canManage}
+                  title={disabledReason}
+                  className="cms-rbac-menu-item disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={(e) => {
+                    if (!canManage) return;
+                    e.currentTarget.closest('details')?.removeAttribute('open');
+                    onResetPw();
+                  }}
                 >
                   <Key size={14} /> Reset mật khẩu
                 </button>
+
                 <button
                   type="button"
                   role="menuitem"
-                  className="cms-rbac-menu-item"
+                  disabled={!canManage}
+                  title={disabledReason}
+                  className="cms-rbac-menu-item disabled:opacity-40 disabled:cursor-not-allowed"
                   onClick={(e) => {
+                    if (!canManage) return;
                     e.currentTarget.closest('details')?.removeAttribute('open');
                     onEdit();
                   }}
                 >
                   <Shield size={14} /> Đổi quyền
                 </button>
+
                 <button
                   type="button"
                   role="menuitem"
-                  className="cms-rbac-menu-item"
-                  disabled
-                  aria-disabled="true"
-                  title="Sắp có"
-                >
-                  <AlertTriangle size={14} /> Khóa
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
+                  disabled={!canManage || deleting}
+                  title={disabledReason}
                   onClick={(e) => {
+                    if (!canManage) return;
                     e.currentTarget.closest('details')?.removeAttribute('open');
                     onDelete();
                   }}
-                  disabled={deleting}
-                  className="cms-rbac-menu-item cms-rbac-menu-item-danger"
+                  className="cms-rbac-menu-item cms-rbac-menu-item-danger disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                   Xóa
@@ -616,7 +685,17 @@ export default function StaffManagementTab() {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [modal, setModal]         = useState(undefined); // undefined=hidden, null=add, obj=edit
+  const [resetPwStaff, setResetPwStaff] = useState(null);
   const [deleting, setDeleting]   = useState(null);
+
+  const isRootSuperAdmin = useMemo(() => {
+    try {
+      const sess = JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
+      return sess?.id === 'admin';
+    } catch {
+      return false;
+    }
+  }, []);
 
   const fetchStaff = useCallback(() => {
     setLoading(true);
@@ -629,9 +708,13 @@ export default function StaffManagementTab() {
   useEffect(() => { fetchStaff(); }, [fetchStaff]);
 
   const handleDelete = async (s) => {
+    if (s.adminRole === 'SUPER_ADMIN' && !isRootSuperAdmin) {
+      toast.error('Chỉ Admin Super (Hệ thống) mới có quyền xóa tài khoản Admin Cấp Cao.');
+      return;
+    }
     showModal({
       title: 'Xoá tài khoản nội bộ?',
-      content: `Bạnh có chắc chắn muốn xoá tài khoản nhân viên "${s.name}"? Người dùng này sẽ không còn quyền truy cập vào hệ thống.`,
+      content: `Bạn có chắc chắn muốn xoá tài khoản "${s.name}"? Người dùng này sẽ không còn quyền truy cập vào hệ thống.`,
       type: 'error',
       confirmText: 'Xoá vĩnh viễn',
       cancelText: 'Huỷ bỏ',
@@ -667,6 +750,10 @@ export default function StaffManagementTab() {
         <StaffModal staff={modal} onClose={() => setModal(undefined)} onSaved={handleSaved} />
       )}
 
+      {resetPwStaff && (
+        <ResetPasswordModal staff={resetPwStaff} onClose={() => setResetPwStaff(null)} onSaved={handleSaved} />
+      )}
+
       <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between shrink-0">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
@@ -675,7 +762,11 @@ export default function StaffManagementTab() {
             </span>
             <span className="truncate">Tài khoản & Phân quyền nội bộ</span>
           </h3>
-          <p className="text-[12px] text-slate-500 mt-1 pl-11">Chỉ Super Admin quản lý trang này</p>
+          <p className="text-[12px] text-slate-500 mt-1 pl-11">
+            {isRootSuperAdmin
+              ? 'Admin Super — Toàn quyền quản lý toàn bộ hệ thống'
+              : 'Admin Cấp Cao — Toàn quyền quản lý Nhân viên (Không sửa/xóa/reset pass Admin Cấp Cao)'}
+          </p>
         </div>
         <button
           type="button"
@@ -691,13 +782,13 @@ export default function StaffManagementTab() {
         <summary className="cms-rbac-policy-summary">
           <span className="flex items-center gap-2 font-semibold text-sky-900">
             <Shield size={14} className="text-sky-600" aria-hidden="true" />
-            Chính sách RBAC
+            Chính sách phân quyền RBAC
           </span>
           <ChevronDown size={16} className="cms-rbac-accordion-chevron text-sky-600" aria-hidden="true" />
         </summary>
         <div className="cms-rbac-policy-body text-[13px] text-sky-900/90 leading-relaxed">
-          <strong>RBAC:</strong> Super Admin thấy toàn bộ menu. Nhân viên (Staff) chỉ thấy menu tương ứng với quyền đã được cấp.
-          Backend cũng chặn API 403 nếu Staff truy cập route không có quyền.
+          <strong>Admin Super (Hệ thống):</strong> Toàn quyền quản lý tất cả tài khoản (Admin Cấp Cao và Nhân viên).<br />
+          <strong>Admin Cấp Cao:</strong> Toàn quyền tạo, sửa, đổi quyền, reset mật khẩu và xóa đối với Nhân viên (Staff). Không thể tự đổi quyền, reset mật khẩu hay xóa tài khoản Admin Cấp Cao.
         </div>
       </details>
 
@@ -717,7 +808,9 @@ export default function StaffManagementTab() {
               key={s._id}
               s={s}
               deleting={deleting === s._id}
+              isRootSuperAdmin={isRootSuperAdmin}
               onEdit={() => setModal(s)}
+              onResetPw={() => setResetPwStaff(s)}
               onDelete={() => handleDelete(s)}
             />
           ))}

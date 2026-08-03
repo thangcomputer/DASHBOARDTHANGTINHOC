@@ -377,8 +377,13 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         const otherRole = isMeSender ? m.receiverRole : m.senderRole;
 
         // Tra cứu tên mới nhất từ danh sách local (Teacher/Staff/Student/CurrentUser) để luôn trùng khớp tên hệ thống hiện tại!
-        if (otherUserId === 'admin' || String(otherUserId) === String(currentUser?.id) || String(otherUserId) === String(currentUser?._id)) {
+        if (String(otherUserId) === String(currentUser?.id) || String(otherUserId) === String(currentUser?._id)) {
           if (currentUser?.name) otherName = currentUser.name;
+        } else if (otherUserId === 'admin') {
+          const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
+            || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
+          if (superDoc?.name) otherName = superDoc.name;
+          else if (currentUser?.role === 'admin' && currentUser?.name) otherName = currentUser.name;
         } else if (otherRole === 'teacher' || otherRole === 'admin') {
           const t = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
           if (t?.name) otherName = t.name;
