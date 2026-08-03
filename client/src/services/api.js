@@ -1772,9 +1772,10 @@ export const feedAPI = {
 
 // ─── TIN TỨC / BLOG TRUNG TÂM ────────────────────────────────────────────────
 export const blogAPI = {
-  list: async ({ page = 1, limit = 12, q } = {}) => {
+  list: async ({ page = 1, limit = 12, q, target } = {}) => {
     const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (q) qs.set('q', q);
+    if (target) qs.set('target', target);
     const res = await apiFetch(`/blog/posts?${qs}`);
     return res.json();
   },

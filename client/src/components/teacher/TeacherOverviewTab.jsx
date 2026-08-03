@@ -31,19 +31,21 @@ export default function TeacherOverviewTab({
 
   useEffect(() => {
     let unmounted = false;
-    blogAPI.getPosts({ limit: 6, target: 'teacher' })
-      .then(res => {
-        if (!unmounted && res?.success && Array.isArray(res.data) && res.data.length > 0) {
-          setCenterAnnouncements(res.data.map(p => ({
-            id: p.id || p._id,
-            title: p.title,
-            date: p.publishedAt ? new Date(p.publishedAt).toLocaleDateString('vi-VN') : '',
-            tag: p.targetAudience === 'teacher' ? 'Dành cho Giảng viên' : 'Thông báo chung',
-            slug: p.slug,
-          })));
-        }
-      })
-      .catch(() => {});
+    if (blogAPI?.list) {
+      blogAPI.list({ limit: 6, target: 'teacher' })
+        .then(res => {
+          if (!unmounted && res?.success && Array.isArray(res.data) && res.data.length > 0) {
+            setCenterAnnouncements(res.data.map(p => ({
+              id: p.id || p._id,
+              title: p.title,
+              date: p.publishedAt ? new Date(p.publishedAt).toLocaleDateString('vi-VN') : '',
+              tag: p.targetAudience === 'teacher' ? 'Dành cho Giảng viên' : 'Thông báo chung',
+              slug: p.slug,
+            })));
+          }
+        })
+        .catch(() => {});
+    }
     return () => { unmounted = true; };
   }, []);
 
