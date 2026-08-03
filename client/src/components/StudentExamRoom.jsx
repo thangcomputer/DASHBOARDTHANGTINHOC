@@ -218,82 +218,164 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
 };
 
 // ─── Score Modal ──────────────────────────────────────────────────────────────
-const ScoreModal = ({ subjects, onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
-      <div className="bg-gradient-to-r from-red-600 to-red-500 px-6 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Trophy size={22} className="text-white" />
-          <h2 className="text-white font-black text-lg">BẢNG ĐIỂM CỦA TÔI</h2>
+const ScoreModal = ({ subjects, onClose }) => {
+  const [activeTab, setActiveTab] = React.useState('cert'); // 'cert' | 'quizzes'
+  const [quizzes, setQuizzes] = React.useState([]);
+  const [loadingQuizzes, setLoadingQuizzes] = React.useState(false);
+
+  React.useEffect(() => {
+    if (activeTab === 'quizzes') {
+      setLoadingQuizzes(true);
+      api.quizzes.getStudentQuizzes()
+        .then((res) => {
+          if (res.success) setQuizzes(res.data || []);
+        })
+        .catch(() => {})
+        .finally(() => setLoadingQuizzes(false));
+    }
+  }, [activeTab]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="bg-gradient-to-r from-red-600 to-red-500 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Trophy size={22} className="text-white" />
+            <h2 className="text-white font-black text-lg">NHẬT KÝ ĐIỂM SỐ CỦA TÔI</h2>
+          </div>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-2xl font-bold leading-none">×</button>
         </div>
-        <button onClick={onClose} className="text-white/70 hover:text-white text-2xl font-bold leading-none">×</button>
-      </div>
-      <div className="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
-        {subjects.map(s => {
-          const meta = getExamSubjectMeta(s.id);
-          const tn = s.tracNghiem;
-          const tnPct = tn ? Math.round((tn.score / tn.total) * 100) : null;
-          const hasEssay = s.thucHanh === 'da_nop';
-          const essayScore = s.essayScore;
-          const attempt = s.attemptCount || 0;
-          return (
-            <div key={s.id} className="rounded-2xl bg-gray-50 border border-gray-100 overflow-hidden">
-              {/* Subject header */}
-              <div className="flex items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 ${meta.bg} rounded-xl flex items-center justify-center`}>
-                    <span className="text-white font-black text-sm">{meta.short}</span>
+
+        {/* Tab switcher */}
+        <div className="flex bg-slate-100 p-1 border-b border-slate-200">
+          <button
+            type="button"
+            onClick={() => setActiveTab('cert')}
+            className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition ${
+              activeTab === 'cert' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Thi Chứng Nhận Môn
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('quizzes')}
+            className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition ${
+              activeTab === 'quizzes' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Trắc Nghệm Giảng Viên Giao
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
+          {activeTab === 'cert' ? (
+            subjects.map(s => {
+              const meta = getExamSubjectMeta(s.id);
+              const tn = s.tracNghiem;
+              const tnPct = tn ? Math.round((tn.score / tn.total) * 100) : null;
+              const hasEssay = s.thucHanh === 'da_nop';
+              const essayScore = s.essayScore;
+              const attempt = s.attemptCount || 0;
+              return (
+                <div key={s.id} className="rounded-2xl bg-gray-50 border border-gray-100 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 ${meta.bg} rounded-xl flex items-center justify-center`}>
+                        <span className="text-white font-black text-sm">{meta.short}</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-gray-800 text-sm">{meta.label}</span>
+                        {attempt > 0 && <span className="ml-2 text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">Lần {attempt + 1}</span>}
+                      </div>
+                    </div>
+                    {s.status === 'dat' && <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">ĐẠT</span>}
+                    {s.status === 'khong_dat' && <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">CHƯA ĐẠT</span>}
+                    {(!s.status || s.status === 'chua_thi') && <span className="text-[10px] font-bold text-gray-400">Chưa thi</span>}
                   </div>
-                  <div>
-                    <span className="font-bold text-gray-800 text-sm">{meta.label}</span>
-                    {attempt > 0 && <span className="ml-2 text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">Lần {attempt + 1}</span>}
-                  </div>
+                  {(tn || hasEssay) && (
+                    <div className="flex border-t border-gray-100 divide-x divide-gray-100">
+                      <div className="flex-1 px-4 py-3 text-center">
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Trắc nghiệm</p>
+                        {tn ? (
+                          <>
+                            <p className={`text-xl font-black ${tnPct >= 50 ? 'text-green-600' : 'text-red-500'}`}>{tn.score}/{tn.total}</p>
+                            <p className="text-[10px] text-gray-400 font-semibold">{tnPct}%</p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-300 font-bold">--</p>
+                        )}
+                      </div>
+                      <div className="flex-1 px-4 py-3 text-center">
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Thực hành</p>
+                        {essayScore !== null && essayScore !== undefined ? (
+                          <>
+                            <p className={`text-xl font-black ${essayScore >= 5 ? 'text-green-600' : 'text-red-500'}`}>{essayScore}/10</p>
+                            <p className="text-[10px] text-gray-400 font-semibold">Đã chấm</p>
+                          </>
+                        ) : hasEssay ? (
+                          <>
+                            <p className="text-sm font-bold text-amber-500">⏳</p>
+                            <p className="text-[10px] text-amber-500 font-semibold">Chờ chấm</p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-300 font-bold">--</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {s.status === 'dat' && <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">ĐẠT</span>}
-                {s.status === 'khong_dat' && <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">CHƯA ĐẠT</span>}
-                {(!s.status || s.status === 'chua_thi') && <span className="text-[10px] font-bold text-gray-400">Chưa thi</span>}
-              </div>
-              {/* Scores row */}
-              {(tn || hasEssay) && (
-                <div className="flex border-t border-gray-100 divide-x divide-gray-100">
-                  {/* Trắc nghiệm */}
-                  <div className="flex-1 px-4 py-3 text-center">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Trắc nghiệm</p>
-                    {tn ? (
-                      <>
-                        <p className={`text-xl font-black ${tnPct >= 50 ? 'text-green-600' : 'text-red-500'}`}>{tn.score}/{tn.total}</p>
-                        <p className="text-[10px] text-gray-400 font-semibold">{tnPct}%</p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-300 font-bold">--</p>
+              );
+            })
+          ) : (
+            loadingQuizzes ? (
+              <div className="py-8 text-center text-slate-400 text-xs font-bold">Đang tải nhật ký điểm số...</div>
+            ) : quizzes.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">Chưa có nhật ký bài trắc nghiệm nào từ Giảng viên.</div>
+            ) : (
+              quizzes.map((q) => {
+                const sub = q.mySubmission;
+                const isPassed = sub?.status === 'passed' || (sub?.score != null && sub.score >= 70);
+                return (
+                  <div key={q._id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                        {q.courseName || 'Bài thi bài học'}
+                      </span>
+                      {sub ? (
+                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${
+                          isPassed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                        }`}>
+                          {isPassed ? 'ĐẠT' : 'CHƯA ĐẠT'}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Chưa làm</span>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{q.title}</h4>
+                      <p className="text-[11px] text-slate-500 font-medium">Giảng viên: {q.teacherName || 'GV'}</p>
+                    </div>
+                    {sub && (
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
+                        <span className="text-slate-500 font-medium">
+                          Nộp lúc: {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString('vi-VN') : '---'}
+                        </span>
+                        <span className={`font-black text-sm ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {sub.correctCount ?? 0}/{sub.totalQuestions ?? 0} câu ({sub.score ?? 0}%)
+                        </span>
+                      </div>
                     )}
                   </div>
-                  {/* Tự luận */}
-                  <div className="flex-1 px-4 py-3 text-center">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Thực hành</p>
-                    {essayScore !== null && essayScore !== undefined ? (
-                      <>
-                        <p className={`text-xl font-black ${essayScore >= 5 ? 'text-green-600' : 'text-red-500'}`}>{essayScore}/10</p>
-                        <p className="text-[10px] text-gray-400 font-semibold">Đã chấm</p>
-                      </>
-                    ) : hasEssay ? (
-                      <>
-                        <p className="text-sm font-bold text-amber-500">⏳</p>
-                        <p className="text-[10px] text-amber-500 font-semibold">Chờ chấm</p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-300 font-bold">--</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                );
+              })
+            )
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const StudentExamRoom = ({ onNavigate, onStartExam }) => {

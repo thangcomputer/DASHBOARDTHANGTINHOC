@@ -1828,6 +1828,10 @@ export const blogAPI = {
 };
 
 export const quizzesAPI = {
+  getAdminQuizzes: async () => {
+    const res = await apiFetch('/quizzes/admin/all');
+    return res.json();
+  },
   getTeacherQuizzes: async () => {
     const res = await apiFetch('/quizzes/teacher');
     return res.json();

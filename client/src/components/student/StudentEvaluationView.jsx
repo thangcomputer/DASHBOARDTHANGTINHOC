@@ -47,10 +47,10 @@ export const EvaluationView = ({
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex w-full max-w-2xl mx-auto bg-slate-100 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-slate-200/50 gap-1">
+      <div className="flex w-full max-w-xl mx-auto bg-slate-100 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-slate-200/50 gap-1">
         <button 
           onClick={() => setActiveTab('admin')}
-          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide sm:tracking-widest transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide sm:tracking-widest transition-all ${
             activeTab === 'admin' ? 'bg-white text-red-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -60,23 +60,13 @@ export const EvaluationView = ({
         </button>
         <button 
           onClick={() => setActiveTab('teacher')}
-          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide sm:tracking-widest transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide sm:tracking-widest transition-all ${
             activeTab === 'teacher' ? 'bg-white text-yellow-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           <User size={13} className="shrink-0 sm:hidden" />
           <User size={14} className="shrink-0 hidden sm:block" />
           <span className="leading-tight text-center">Đánh giá GV</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('quiz_history')}
-          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide sm:tracking-widest transition-all ${
-            activeTab === 'quiz_history' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <BookOpen size={13} className="shrink-0 sm:hidden" />
-          <BookOpen size={14} className="shrink-0 hidden sm:block" />
-          <span className="leading-tight text-center">Nhật ký điểm Trắc nghiệm</span>
         </button>
       </div>
 

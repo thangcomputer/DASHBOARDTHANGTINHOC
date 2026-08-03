@@ -12,6 +12,7 @@ import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 import api, { apiFetch, buildMediaDownloadUrl } from '../../../services/api';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
+import AdminTeacherQuizHistoryPanel from '../shared/AdminTeacherQuizHistoryPanel';
 
 function mergeDocumentCourseOptions(dbCourses, lmsVideos) {
   const merged = [];
@@ -142,6 +143,7 @@ export default function AdminStudentTrainingTab() {
                   { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
                   { key: 'questions', icon: HelpCircle, label: 'Ngân hàng câu hỏi', count: studentQuestions?.length || 0 },
                   { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: (students || []).reduce((acc, s) => acc + (s.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').length, 0) },
+                  { key: 'quizzes', icon: Award, label: 'Lịch sử Trắc nghiệm GV', count: 'Mới' },
                 ].map(t => (
                   <button
                     key={t.key}
@@ -637,8 +639,12 @@ export default function AdminStudentTrainingTab() {
                 );
               })()}
 
+              {sTrainingTab === 'quizzes' && (
+                <AdminTeacherQuizHistoryPanel />
+              )}
+
               {/* List items (training content) */}
-              {sTrainingTab !== 'exam-results' && sTrainingTab !== 'questions' && (
+              {sTrainingTab !== 'exam-results' && sTrainingTab !== 'questions' && sTrainingTab !== 'quizzes' && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {(studentTrainingData?.[sTrainingTab] || []).map(item => (
                       <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition border-b border-gray-50 last:border-b-0">

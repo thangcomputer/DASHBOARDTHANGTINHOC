@@ -225,4 +225,18 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
   }
 });
 
+// ── GET /api/quizzes/admin/all: Admin xem toàn bộ lịch sử tạo bài trắc nghiệm của tất cả giảng viên ─
+router.get('/admin/all', authMiddleware, async (req, res) => {
+  try {
+    const quizzes = await LessonQuiz.find()
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({ success: true, data: quizzes });
+  } catch (err) {
+    logger.error('[QUIZ] Admin fetch all error:', err.message);
+    return res.status(500).json({ success: false, message: 'Lỗi máy chủ khi tải lịch sử trắc nghiệm Admin' });
+  }
+});
+
 module.exports = router;
