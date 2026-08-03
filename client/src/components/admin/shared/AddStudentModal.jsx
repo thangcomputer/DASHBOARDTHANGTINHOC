@@ -22,7 +22,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
   // ── Form state ────────────────────────────────────────────────────────────
   const [dbCourses, setDbCourses] = useState([]);
   const [form, setForm] = useState({
-    name: '', age: '', phone: '', zalo: '',
+    name: '', age: '', phone: '', zalo: '', gender: 'male',
     courseId: '', course: '', price: 0, totalSessions: 12,
     paid: false, teacherId: '', learningMode: 'OFFLINE', branchId: '', branchCode: ''
   });
@@ -387,8 +387,36 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                   value={form.name}
                   onChange={handleChange}
                   className="cms-input uppercase"
-                  placeholder="VD: Nguyễn Văn A"
+                  placeholder="VD: NGUYỄN VĂN A"
                 />
+              </div>
+
+              <div>
+                <label className="cms-label">Giới tính chọn ảnh Cartoon <span className="text-red-500">*</span></label>
+                <div className="flex items-center gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, gender: 'male' }))}
+                    className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+                      form.gender === 'male' || form.gender === 'Nam'
+                        ? 'bg-sky-50 text-sky-700 border-sky-300 ring-2 ring-sky-400/20 shadow-sm'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>👨 Nam (Cartoon Nam)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, gender: 'female' }))}
+                    className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+                      form.gender === 'female' || form.gender === 'Nữ'
+                        ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>👩 Nữ (Cartoon Nữ)</span>
+                  </button>
+                </div>
               </div>
 
               <div className="cms-form-row">

@@ -101,7 +101,7 @@ const RegistrationForm = ({ onNavigate }) => {
   const [coursesLoading, setCoursesLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    name: '', age: '', zalo: '',
+    name: '', age: '', zalo: '', gender: 'male',
     courseId:        '',
     course:          '',
     price:           0,
@@ -426,6 +426,36 @@ const RegistrationForm = ({ onNavigate }) => {
                   </label>
                   <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="NGUYỄN VĂN A"
                     className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none uppercase font-semibold text-gray-800 placeholder:font-normal placeholder:text-gray-400 placeholder:uppercase transition-all" />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
+                    Giới tính chọn ảnh đại diện Cartoon
+                  </label>
+                  <div className="flex items-center gap-3 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(f => ({ ...f, gender: 'male' }))}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+                        formData.gender === 'male' || formData.gender === 'Nam'
+                          ? 'bg-red-50 text-red-700 border-red-500 shadow-sm'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span>👨 Nam (Cartoon Nam)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(f => ({ ...f, gender: 'female' }))}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+                        formData.gender === 'female' || formData.gender === 'Nữ'
+                          ? 'bg-rose-50 text-rose-700 border-rose-500 shadow-sm'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span>👩 Nữ (Cartoon Nữ)</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
