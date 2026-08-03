@@ -251,6 +251,56 @@ export default function FeedBoard({ session, role }) {
     });
   };
 
+  const handlePastePost = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const ext = file.type.split('/')[1] || 'png';
+          const pastedFile = new File([file], `paste_${Date.now()}_${i}.${ext}`, { type: file.type });
+          files.push(pastedFile);
+        }
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      setPendingFiles((prev) => {
+        const next = [...prev, ...files].slice(0, 6);
+        setPreviews(next.map((f) => URL.createObjectURL(f)));
+        return next;
+      });
+      toast.success(`Đã dán ${files.length} ảnh xem trước. Bấm "Đăng bài" để đăng.`);
+    }
+  };
+
+  const handlePasteComment = (postId, e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const ext = file.type.split('/')[1] || 'png';
+          const pastedFile = new File([file], `paste_${Date.now()}_${i}.${ext}`, { type: file.type });
+          files.push(pastedFile);
+        }
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      setCommentFiles((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), ...files].slice(0, 3) }));
+      setCommentPreviews((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), ...files.map((f) => URL.createObjectURL(f))].slice(0, 3),
+      }));
+      toast.success(`Đã dán ${files.length} ảnh xem trước. Bấm gửi để bình luận.`);
+    }
+  };
+
   const removePending = (idx) => {
     setPendingFiles((prev) => {
       const next = prev.filter((_, i) => i !== idx);
@@ -462,7 +512,15 @@ export default function FeedBoard({ session, role }) {
             height={44}
             className="cms-feed-composer__avatar"
           />
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2} maxLength={5000} placeholder="Bạn muốn hỏi gì về bài học? Viết câu hỏi tại đây..." className="cms-feed-composer__input" />
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onPaste={handlePastePost}
+            rows={2}
+            maxLength={5000}
+            placeholder="Bạn muốn hỏi gì về bài học? Viết câu hỏi tại đây... (Có thể dán ảnh từ clipboard)"
+            className="cms-feed-composer__input"
+          />
         </div>
         {previews.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -669,6 +727,7 @@ export default function FeedBoard({ session, role }) {
                             <input
                               value={commentDrafts[post.id] || ''}
                               onChange={(e) => setCommentDrafts((d) => ({ ...d, [post.id]: e.target.value }))}
+                              onPaste={(e) => handlePasteComment(post.id, e)}
                               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComment(post.id); } }}
                               placeholder={'Trả lời ' + replyTo[post.id]?.name + '...'}
                               className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-100"
