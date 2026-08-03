@@ -863,7 +863,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
         {mainTab === 'courses' && (
           loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="bg-gray-100 animate-pulse rounded-[32px] h-64" />
               ))}
@@ -875,7 +875,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {courses.map((course, idx) => {
                  const gradients = [
                     "from-blue-600 to-indigo-700",

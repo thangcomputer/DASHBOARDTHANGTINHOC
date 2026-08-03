@@ -728,7 +728,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
 
         {mainTab === 'courses' && (
           loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="bg-gray-100 animate-pulse rounded-[32px] h-64" />
               ))}
@@ -740,9 +740,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               <p className="text-xs mt-1">Chưa có video đào tạo phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
             </div>
           ) : (
-            <div className={`grid gap-4 md:gap-6 ${
-              courses.length <= 2 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-            }`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {courses.map((course, idx) => {
                 const gradients = [
                   "from-blue-600 to-indigo-700",
