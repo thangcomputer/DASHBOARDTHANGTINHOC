@@ -561,7 +561,7 @@ export default function FloatingMessenger({ session, role }) {
                 <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
                   {isSuper
                     ? 'Học viên, giảng viên, admin chi nhánh đang online'
-                    : 'Chỉ chat với Admin Super — Inbox dùng riêng cho tin đầy đủ'}
+                    : 'Gửi tin nhắn trực tiếp tới bộ phận Hỗ trợ viên'}
                 </p>
               </div>
               <button
