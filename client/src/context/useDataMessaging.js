@@ -355,11 +355,10 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     const isSuperAdmin = sId === 'admin' || (safeTeachers.find(t => String(t.id) === sId)?.adminRole === 'SUPER_ADMIN');
     const userRole = (sId === 'admin' || (safeTeachers.find(t => String(t.id) === sId)?.adminRole)) ? 'admin' : (safeStudents.find(s => String(s.id) === sId) ? 'student' : 'teacher');
 
-    // Kênh nhắn tin hỗ trợ ('admin') CHỈ dành riêng cho Hỗ trợ viên (isSupportStaff), Admin không nhận tin hỗ trợ
     const userMsgs = safeMessages.filter(m => {
       const isDirect = String(m.senderId) === sId || String(m.receiverId) === sId;
-      const isSupportMailbox = isSupportStaff && (String(m.senderId) === 'admin' || String(m.receiverId) === 'admin');
-      return isDirect || isSupportMailbox;
+      const isAdminOrSupportMailbox = (isSuperAdmin || isSupportStaff) && (String(m.senderId) === 'admin' || String(m.receiverId) === 'admin');
+      return isDirect || isAdminOrSupportMailbox;
     });
     const convMap = {};
 
@@ -384,16 +383,11 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         let finalRole = otherRole;
 
         // Tra cứu linh hoạt theo ID từ danh sách hệ thống local (Student / Teacher / Staff)
-        if (otherUserId === 'admin') {
-          if (!isViewerStaffOrAdmin) {
-            finalName = 'HỖ TRỢ VIÊN';
-            finalRole = 'staff';
-          } else {
-            const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
-              || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
-            finalName = superDoc?.name || 'Hộp thư Hỗ trợ';
-            finalRole = 'admin';
-          }
+        if (otherUserId === 'admin' || otherRole === 'admin') {
+          const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
+            || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
+          finalName = superDoc?.name || (isMeSender ? m.receiverName : m.senderName) || 'P ĐÀO TẠO (ADMIN)';
+          finalRole = 'admin';
         } else {
           const matchedStudent = safeStudents.find(s => String(s.id || s._id) === String(otherUserId));
           const matchedTeacher = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
@@ -412,12 +406,6 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             finalName = finalName || 'Người dùng';
             finalRole = finalRole || 'user';
           }
-        }
-
-        // Dành riêng cho học viên / giảng viên khi nhắn tin với admin/staff hỗ trợ
-        if (!isViewerStaffOrAdmin && (otherUserId === 'admin' || finalRole === 'admin')) {
-          finalName = 'HỖ TRỢ VIÊN';
-          finalRole = 'staff';
         }
 
         // Ưu tiên lấy branchCode trực tiếp từ tin nhắn (nếu có), nếu không mới tìm trong list local

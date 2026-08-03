@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 function normalizeChatRole(role) {
   if (!role) return role;
   const r = String(role).toLowerCase();
-  if (r === 'staff') return 'admin';
   return r;
 }
 
@@ -18,14 +17,12 @@ function buildConversationId(senderRole, senderId, receiverRole, receiverId) {
   const sid = String(senderId == null ? '' : senderId);
   const rid = String(receiverId == null ? '' : receiverId);
 
+  // Admin ↔ Student: Thống nhất duy nhất 1 thread giữa Admin và Student
   if (sr === 'admin' && rr === 'student') {
-    // Staff/admin cụ thể → HV: tách theo senderId (để mỗi staff có thread riêng)
-    const adminSideId = sid === 'admin' || !isMongoObjectId24(sid) ? 'admin' : sid;
-    return ['admin_' + adminSideId, 'student_' + rid].sort().join('__');
+    return ['admin_admin', 'student_' + rid].sort().join('__');
   }
   if (sr === 'student' && rr === 'admin') {
-    const adminSideId = rid === 'admin' || !isMongoObjectId24(rid) ? 'admin' : rid;
-    return ['admin_' + adminSideId, 'student_' + sid].sort().join('__');
+    return ['admin_admin', 'student_' + sid].sort().join('__');
   }
 
   return [sr + '_' + sid, rr + '_' + rid].sort().join('__');
