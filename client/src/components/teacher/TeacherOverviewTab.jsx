@@ -354,8 +354,8 @@ export default function TeacherOverviewTab({
             </div>
           </div>
 
-          {/* Card 2: Bảng tin Hoạt động gần đây & Thông báo từ Trung tâm (Chiều cao cố định h-[210px] không bị nhảy nhô lên xuống) */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 h-[210px] shrink-0 flex flex-col justify-between">
+          {/* Card 2: Bảng tin Hoạt động gần đây & Thông báo từ Trung tâm (Chiều cao cố định h-[260px] vừa đủ 3 dòng không bị cắt chữ) */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 h-[260px] shrink-0 flex flex-col justify-between">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-wrap gap-2 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
