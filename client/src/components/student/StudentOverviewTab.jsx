@@ -129,7 +129,7 @@ export default function StudentOverviewTab({
                     icon: ClipboardList,
                     title: 'Bài tập về nhà',
                     meta: `${pendingHw} bài cần nộp`,
-                    metaClass: 'text-orange-600',
+                    metaClass: 'text-orange-600 font-bold',
                   },
                   {
                     onClick: () => navigate('/student#schedule'),
@@ -137,7 +137,7 @@ export default function StudentOverviewTab({
                     icon: Calendar,
                     title: 'Lịch học sắp tới',
                     meta: `${upcomingScheduleCount} buổi sắp tới`,
-                    metaClass: 'text-blue-600',
+                    metaClass: 'text-blue-600 font-bold',
                   },
                   {
                     onClick: () => setSupportOpen(true),
@@ -145,7 +145,7 @@ export default function StudentOverviewTab({
                     icon: MessageSquare,
                     title: 'Tin nhắn & Phản hồi',
                     meta: `${myUnreadMsgs} tin nhắn mới`,
-                    metaClass: 'text-purple-600',
+                    metaClass: 'text-purple-600 font-bold',
                   },
                 ].map((item) => (
                   <button
@@ -158,8 +158,8 @@ export default function StudentOverviewTab({
                       <item.icon size={20} aria-hidden="true" />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="cms-sd-card-title !text-[15px] leading-snug">{item.title}</h4>
-                      <p className={`cms-sd-caption font-semibold mt-1 ${item.metaClass}`}>{item.meta}</p>
+                      <h4 className="text-sm sm:text-[15px] font-bold text-slate-900 leading-snug">{item.title}</h4>
+                      <p className={`text-xs font-bold mt-1 ${item.metaClass}`}>{item.meta}</p>
                     </div>
                   </button>
                 ))}
@@ -173,7 +173,7 @@ export default function StudentOverviewTab({
                   <Clock size={20} className="text-blue-500 shrink-0" aria-hidden="true" />
                   Nhật ký học tập
                 </h3>
-                <span className="cms-sd-caption shrink-0 tabular-nums">{studyLogs.length} sự kiện</span>
+                <span className="text-xs font-bold text-slate-500 shrink-0 tabular-nums">{studyLogs.length} sự kiện</span>
               </div>
               <div className="divide-y divide-slate-50">
                 {studyLogs.map((item, idx) => {
@@ -211,10 +211,10 @@ export default function StudentOverviewTab({
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className={`cms-sd-body font-bold truncate ${isCancelled ? 'text-red-700' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
+                          <p className={`text-sm font-bold truncate ${isCancelled ? 'text-red-700' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
                             {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
                           </p>
-                          <p className="cms-sd-caption italic truncate mt-1">{item.note}</p>
+                          <p className="text-xs text-slate-500 font-medium truncate mt-0.5">{item.note}</p>
                         </div>
                       </div>
                       {!isCancelled && item.grade != null && (
@@ -222,14 +222,14 @@ export default function StudentOverviewTab({
                           <span className={`text-[15px] font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>
                             {item.grade}
                           </span>
-                          <span className="cms-sd-caption">/ 10</span>
-                          <span className={`cms-sd-caption font-bold px-2 py-0.5 rounded-full ${getGradePillClasses(item.grade)}`}>
+                          <span className="text-xs text-slate-400 font-medium">/ 10</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getGradePillClasses(item.grade)}`}>
                             {getGradeLabel(item.grade) || 'TB'}
                           </span>
                         </div>
                       )}
                       {isScheduled && (
-                        <span className="cms-sd-caption font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide shrink-0">
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide shrink-0">
                           Lịch sắp tới
                         </span>
                       )}
@@ -241,8 +241,8 @@ export default function StudentOverviewTab({
                     <div className="cms-sd-empty__icon">
                       <Clock size={22} aria-hidden="true" />
                     </div>
-                    <p className="cms-sd-body font-semibold text-slate-600">Chưa có sự kiện nào được ghi nhận.</p>
-                    <p className="cms-sd-caption max-w-[18rem]">
+                    <p className="text-sm font-bold text-slate-600">Chưa có sự kiện nào được ghi nhận.</p>
+                    <p className="text-xs text-slate-500 font-medium max-w-[18rem]">
                       Dữ liệu sẽ xuất hiện sau khi bắt đầu học.
                     </p>
                     <button
@@ -260,13 +260,13 @@ export default function StudentOverviewTab({
 
           <aside className="lg:col-span-4 cms-sd-stack min-w-0">
             <section className="rounded-[16px] p-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.06)] bg-slate-700">
-              <h3 className="cms-sd-caption font-bold uppercase tracking-wide text-slate-300 flex items-center gap-2 mb-3">
+              <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-300 flex items-center gap-2 mb-3">
                 <Download size={16} aria-hidden="true" /> Tài liệu
               </h3>
               <div className="space-y-2">
                 {docs.length === 0 ? (
                   <div className="cms-sd-empty !py-5 !gap-1.5">
-                    <p className="cms-sd-caption text-slate-300">Chưa có tài liệu.</p>
+                    <p className="text-xs text-slate-300 font-medium">Chưa có tài liệu.</p>
                   </div>
                 ) : (
                   docs.map((m) => (
@@ -276,13 +276,13 @@ export default function StudentOverviewTab({
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className={`cms-sd-caption font-extrabold px-1.5 py-0.5 rounded shrink-0 ${
+                          className={`text-xs font-extrabold px-1.5 py-0.5 rounded shrink-0 ${
                             m.type === 'PDF' ? 'bg-red-500' : m.type === 'XLSX' ? 'bg-green-500' : 'bg-orange-500'
                           }`}
                         >
                           {m.type}
                         </span>
-                        <span className="cms-sd-body text-white truncate">{m.name}</span>
+                        <span className="text-sm font-semibold text-white truncate">{m.name}</span>
                       </div>
                       <Download size={16} className="text-sky-300 shrink-0 ml-2" aria-hidden="true" />
                     </div>

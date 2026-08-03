@@ -7,11 +7,11 @@ export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
     >
       <Icon size={20} className="text-white" aria-hidden="true" />
     </div>
-    <p className="cms-sd-caption font-medium text-slate-500">{label}</p>
-    <p className="mt-1.5 text-[15px] font-extrabold text-slate-900 leading-none tabular-nums">
-      {value}
+    <p className="text-xs sm:text-sm font-bold text-slate-600 truncate">{label}</p>
+    <p className="mt-1.5 text-lg sm:text-2xl font-black text-slate-900 leading-none tabular-nums flex items-baseline gap-1">
+      <span>{value}</span>
       {sub != null && sub !== '' && (
-        <span className="cms-sd-caption font-medium text-slate-400 ml-1">{sub}</span>
+        <span className="text-xs font-medium text-slate-500">{sub}</span>
       )}
     </p>
   </div>
