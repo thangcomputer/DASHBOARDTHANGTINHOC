@@ -165,115 +165,10 @@ export default function StudentOverviewTab({
                 ))}
               </div>
             </section>
-
-            {/* Study log */}
-            <section className="cms-sd-card !p-0 overflow-hidden">
-              <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
-                <h3 className="cms-sd-section-title flex items-center gap-2 min-w-0">
-                  <Clock size={20} className="text-blue-500 shrink-0" aria-hidden="true" />
-                  Nhật ký học tập
-                </h3>
-                <span className="text-xs font-bold text-slate-500 shrink-0 tabular-nums">{studyLogs.length} sự kiện</span>
-              </div>
-              <div className="divide-y divide-slate-50">
-                {studyLogs.map((item, idx) => {
-                  const isCancelled = item.type === 'cancelled';
-                  const isScheduled = item.type === 'scheduled';
-                  const isHomework = item.type === 'homework';
-                  const isQuiz = item.type === 'quiz';
-                  const isAttendance = item.type === 'attendance';
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`px-4 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 ${
-                        isCancelled ? 'bg-red-50/30' : isScheduled ? 'bg-blue-50/30' : isQuiz ? 'bg-amber-50/20' : 'hover:bg-slate-50'
-                      } transition-colors duration-200`}
-                    >
-                      <div className="flex items-start md:items-center gap-3 min-w-0">
-                        <div
-                          className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${
-                            isCancelled
-                              ? 'bg-red-100 text-red-600'
-                              : isScheduled
-                              ? 'bg-blue-100 text-blue-600'
-                              : isHomework
-                              ? 'bg-purple-100 text-purple-600'
-                              : isQuiz
-                              ? 'bg-amber-100 text-amber-600'
-                              : 'bg-emerald-100 text-emerald-600'
-                          }`}
-                        >
-                          {isCancelled ? (
-                            <XCircle size={18} aria-hidden="true" />
-                          ) : isScheduled ? (
-                            <Calendar size={18} aria-hidden="true" />
-                          ) : isHomework ? (
-                            <ClipboardList size={18} aria-hidden="true" />
-                          ) : isQuiz ? (
-                            <Award size={18} aria-hidden="true" />
-                          ) : (
-                            <CheckCircle size={18} aria-hidden="true" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className={`text-sm font-bold truncate ${isCancelled ? 'text-red-700' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
-                            {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
-                          </p>
-                          <p className="text-xs text-slate-500 font-medium truncate mt-0.5">{item.note}</p>
-                        </div>
-                      </div>
-                      {!isCancelled && item.grade != null && (
-                        <div className="flex items-center gap-2 md:text-right shrink-0 ml-13 md:ml-0 pl-[52px] md:pl-0">
-                          <span className={`text-[15px] font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>
-                            {item.grade}
-                          </span>
-                          <span className="text-xs text-slate-400 font-medium">/ 10</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            isQuiz
-                              ? (item.isPassed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200')
-                              : getGradePillClasses(item.grade)
-                          }`}>
-                            {isQuiz ? (item.isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
-                          </span>
-                        </div>
-                      )}
-                      {!isCancelled && item.grade == null && isAttendance && (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wide shrink-0">
-                          Đã hoàn thành
-                        </span>
-                      )}
-                      {isScheduled && (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide shrink-0">
-                          Lịch sắp tới
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-                {studyLogs.length === 0 && (
-                  <div className="cms-sd-empty">
-                    <div className="cms-sd-empty__icon">
-                      <Clock size={22} aria-hidden="true" />
-                    </div>
-                    <p className="text-sm font-bold text-slate-600">Chưa có sự kiện nào được ghi nhận.</p>
-                    <p className="text-xs text-slate-500 font-medium max-w-[18rem]">
-                      Dữ liệu sẽ xuất hiện sau khi bắt đầu học.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/student#schedule')}
-                      className="cms-sd-btn mt-2 bg-slate-900 text-white hover:bg-slate-800"
-                    >
-                      Xem lịch học
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
           </div>
 
           <aside className="lg:col-span-4 cms-sd-stack min-w-0">
+            {/* Tài liệu */}
             <section className="rounded-[16px] p-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.06)] bg-slate-700">
               <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-300 flex items-center gap-2 mb-3">
                 <Download size={16} aria-hidden="true" /> Tài liệu
@@ -313,25 +208,105 @@ export default function StudentOverviewTab({
               </button>
             </section>
 
-            <div className="hidden lg:flex flex-col gap-4">
-              <button
-                type="button"
-                onClick={() => {
-                  if (studentData.teacherId) {
-                    openSiteChat({
-                      id: String(studentData.teacherId),
-                      name: studentData.teacherName || 'Giảng viên',
-                      role: 'teacher',
-                    });
-                  } else {
-                    setSupportOpen(true);
-                  }
-                }}
-                className="cms-sd-btn w-full bg-white border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600"
-              >
-                <MessageSquare size={18} aria-hidden="true" /> Nhắn tin Giảng viên
-              </button>
-            </div>
+            {/* Nhật ký học tập — Nằm dưới phần Tài liệu ở cột bên phải */}
+            <section className="cms-sd-card !p-0 overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
+                <h3 className="cms-sd-section-title flex items-center gap-2 min-w-0">
+                  <Clock size={18} className="text-blue-500 shrink-0" aria-hidden="true" />
+                  Nhật ký học tập
+                </h3>
+                <span className="text-xs font-bold text-slate-500 shrink-0 tabular-nums">{studyLogs.length} sự kiện</span>
+              </div>
+              <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
+                {studyLogs.map((item, idx) => {
+                  const isCancelled = item.type === 'cancelled';
+                  const isScheduled = item.type === 'scheduled';
+                  const isHomework = item.type === 'homework';
+                  const isQuiz = item.type === 'quiz';
+                  const isAttendance = item.type === 'attendance';
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`px-3.5 py-3 flex flex-col justify-between gap-1.5 ${
+                        isCancelled ? 'bg-red-50/30' : isScheduled ? 'bg-blue-50/30' : isQuiz ? 'bg-amber-50/20' : 'hover:bg-slate-50'
+                      } transition-colors duration-200`}
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <div
+                          className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
+                            isCancelled
+                              ? 'bg-red-100 text-red-600'
+                              : isScheduled
+                              ? 'bg-blue-100 text-blue-600'
+                              : isHomework
+                              ? 'bg-purple-100 text-purple-600'
+                              : isQuiz
+                              ? 'bg-amber-100 text-amber-600'
+                              : 'bg-emerald-100 text-emerald-600'
+                          }`}
+                        >
+                          {isCancelled ? (
+                            <XCircle size={15} aria-hidden="true" />
+                          ) : isScheduled ? (
+                            <Calendar size={15} aria-hidden="true" />
+                          ) : isHomework ? (
+                            <ClipboardList size={15} aria-hidden="true" />
+                          ) : isQuiz ? (
+                            <Award size={15} aria-hidden="true" />
+                          ) : (
+                            <CheckCircle size={15} aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className={`text-xs font-bold truncate ${isCancelled ? 'text-red-700' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
+                              {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
+                            </p>
+                            {isScheduled && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide shrink-0">
+                                SẮP TỚI
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">{item.note}</p>
+                        </div>
+                      </div>
+
+                      {!isCancelled && item.grade != null && (
+                        <div className="flex items-center justify-end gap-1.5 shrink-0 pl-10">
+                          <span className={`text-xs font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>
+                            {item.grade} / 10
+                          </span>
+                          <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                            isQuiz
+                              ? (item.isPassed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200')
+                              : getGradePillClasses(item.grade)
+                          }`}>
+                            {isQuiz ? (item.isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
+                          </span>
+                        </div>
+                      )}
+                      {!isCancelled && item.grade == null && isAttendance && (
+                        <div className="flex items-center justify-end pl-10">
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wide shrink-0">
+                            Đã hoàn thành
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {studyLogs.length === 0 && (
+                  <div className="cms-sd-empty !py-6">
+                    <div className="cms-sd-empty__icon">
+                      <Clock size={20} aria-hidden="true" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-600">Chưa có sự kiện nào.</p>
+                  </div>
+                )}
+              </div>
+            </section>
           </aside>
         </div>
       </div>
