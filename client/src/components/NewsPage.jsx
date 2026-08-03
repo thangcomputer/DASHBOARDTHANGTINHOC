@@ -61,6 +61,9 @@ function NewsCard({ post, basePath, onOpen }) {
             NEW
           </span>
         )}
+        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black tracking-wide shadow-sm">
+          {post.targetAudience === 'teacher' ? '👨‍🏫 Giảng viên' : post.targetAudience === 'student' ? '🎓 Học viên' : '🌐 Tất cả'}
+        </span>
       </div>
       <div className="p-3.5 sm:p-4 flex flex-col flex-1 gap-2 min-w-0">
         <h3 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-red-600 transition-colors">
@@ -128,6 +131,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
   const [excerpt, setExcerpt] = useState(() => initial?.excerpt || '');
   const [contentHtml, setContentHtml] = useState(() => initial?.contentHtml || '');
   const [thumbnailUrl, setThumbnailUrl] = useState(() => initial?.thumbnailUrl || '');
+  const [targetAudience, setTargetAudience] = useState(() => initial?.targetAudience || 'all');
   const [attachments, setAttachments] = useState(() => (
     Array.isArray(initial?.attachments) ? initial.attachments : []
   ));
@@ -218,6 +222,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
         thumbnailUrl,
         attachments,
         status,
+        targetAudience,
       };
       let res;
       if (initial?.id) res = await blogAPI.update(initial.id, payload);
@@ -280,9 +285,37 @@ function EditorForm({ initial, onSaved, onCancel }) {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Tiêu đề bài viết"
+            placeholder="Tiêu đề bài viết / thông báo"
             className="w-full border border-slate-200 rounded-xl px-4 py-3 text-base font-bold outline-none focus:border-red-300"
           />
+
+          {/* ── BỘ CHỌN ĐỐI TƯỢNG NHẬN TIN ── */}
+          <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+              Đối tượng nhận tin (Bài viết này đăng cho ai?)
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {[
+                { key: 'all', label: '🌐 Tất cả mọi người' },
+                { key: 'teacher', label: '👨‍🏫 Chỉ Giảng viên' },
+                { key: 'student', label: '🎓 Chỉ Học viên' },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setTargetAudience(opt.key)}
+                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    targetAudience === opt.key
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <textarea
             value={excerpt}
             onChange={(e) => setExcerpt(e.target.value)}

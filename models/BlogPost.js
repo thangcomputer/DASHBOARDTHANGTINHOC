@@ -49,6 +49,12 @@ const blogPostSchema = new mongoose.Schema({
     default: 'draft',
     index: true,
   },
+  targetAudience: {
+    type: String,
+    enum: ['all', 'teacher', 'student'],
+    default: 'all',
+    index: true,
+  },
   publishedAt: { type: Date, default: null, index: true },
   viewCount: { type: Number, default: 0, min: 0 },
   deletedAt: { type: Date, default: null, index: true },

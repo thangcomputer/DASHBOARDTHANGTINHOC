@@ -57,6 +57,7 @@ function serializeCard(doc) {
     authorName: o.authorName || 'Admin',
     authorRole: o.authorRole,
     status: o.status,
+    targetAudience: o.targetAudience || 'all',
     publishedAt: o.publishedAt,
     viewCount: o.viewCount || 0,
     isNew: isNewPost(o.publishedAt),
@@ -122,7 +123,17 @@ router.get('/posts', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(40, Math.max(1, parseInt(req.query.limit, 10) || 12));
     const q = String(req.query.q || '').trim();
+    const target = String(req.query.target || '').trim();
     const filter = { deletedAt: null, status: 'published' };
+
+    if (target && ['all', 'teacher', 'student'].includes(target)) {
+      filter.targetAudience = { $in: ['all', target] };
+    } else if (req.user?.role === 'teacher') {
+      filter.targetAudience = { $in: ['all', 'teacher'] };
+    } else if (req.user?.role === 'student') {
+      filter.targetAudience = { $in: ['all', 'student'] };
+    }
+
     if (q) {
       filter.$or = [
         { title: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
@@ -243,6 +254,7 @@ router.post('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG), async (re
     if (!title) return res.status(400).json({ success: false, message: 'Thiếu tiêu đề' });
     const slug = await uniqueSlug(req.body.slug || title);
     const status = ['draft', 'published', 'hidden'].includes(req.body.status) ? req.body.status : 'draft';
+    const targetAudience = ['all', 'teacher', 'student'].includes(req.body.targetAudience) ? req.body.targetAudience : 'all';
     const publishedAt = status === 'published' ? new Date() : null;
 
     const post = await BlogPost.create({
@@ -256,6 +268,7 @@ router.post('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG), async (re
       authorName: req.user.name || 'Admin',
       authorRole: req.user.role === 'staff' ? 'staff' : 'admin',
       status,
+      targetAudience,
       publishedAt,
     });
 
@@ -283,6 +296,9 @@ router.put('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), async 
     if (req.body.thumbnailUrl != null) post.thumbnailUrl = String(req.body.thumbnailUrl).trim();
     if (Array.isArray(req.body.attachments)) post.attachments = req.body.attachments;
     if (req.body.slug) post.slug = await uniqueSlug(req.body.slug, post._id);
+    if (req.body.targetAudience && ['all', 'teacher', 'student'].includes(req.body.targetAudience)) {
+      post.targetAudience = req.body.targetAudience;
+    }
 
     const prevStatus = post.status;
     if (req.body.status && ['draft', 'published', 'hidden'].includes(req.body.status)) {

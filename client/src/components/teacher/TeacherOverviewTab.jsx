@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Calendar, ChevronRight, BookOpen, Award, Star, Zap, UserCheck, Clipboard,
   MessageSquare, GraduationCap, Users, Activity, Video, AlertTriangle, Bell,
   CheckCircle2, ArrowRight, History
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
+import { blogAPI } from '../../services/api';
 import TeacherRatingDisplay from './TeacherRatingDisplay';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 
@@ -13,6 +14,38 @@ export default function TeacherOverviewTab({
   teacherRating, students, totalSess, avgGrade, mySchedules = [], myNotifs, RATING_CRITERIA,
 }) {
   const [activityTab, setActivityTab] = useState('recent'); // 'recent' | 'announcements'
+  const [centerAnnouncements, setCenterAnnouncements] = useState([
+    {
+      id: 1,
+      title: 'Quy trình Điểm danh & Nhập điểm số tự động ghi nhận nhật ký học viên',
+      date: '01/08/2026',
+      tag: 'Quy định trung tâm',
+    },
+    {
+      id: 2,
+      title: 'Cập nhật tính năng Đổi lịch dạy & Ghi chú trao đổi 2 chiều',
+      date: '28/07/2026',
+      tag: 'Hệ thống LMS',
+    }
+  ]);
+
+  useEffect(() => {
+    let unmounted = false;
+    blogAPI.getPosts({ limit: 6, target: 'teacher' })
+      .then(res => {
+        if (!unmounted && res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setCenterAnnouncements(res.data.map(p => ({
+            id: p.id || p._id,
+            title: p.title,
+            date: p.publishedAt ? new Date(p.publishedAt).toLocaleDateString('vi-VN') : '',
+            tag: p.targetAudience === 'teacher' ? 'Dành cho Giảng viên' : 'Thông báo chung',
+            slug: p.slug,
+          })));
+        }
+      })
+      .catch(() => {});
+    return () => { unmounted = true; };
+  }, []);
 
   const initials = (teacherName || 'GV').substring(0, 2).toUpperCase();
   const avatarTone = currentTeacher?.color || 'bg-indigo-600';
@@ -80,22 +113,6 @@ export default function TeacherOverviewTab({
     // Sort by timestamp descending
     return list.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
   }, [mySchedules, students]);
-
-  // Center announcements data
-  const centerAnnouncements = [
-    {
-      id: 1,
-      title: 'Quy trình Điểm danh & Nhập điểm số tự động ghi nhận nhật ký học viên',
-      date: '01/08/2026',
-      tag: 'Quy định trung tâm',
-    },
-    {
-      id: 2,
-      title: 'Cập nhật tính năng Đổi lịch dạy & Ghi chú trao đổi 2 chiều',
-      date: '28/07/2026',
-      tag: 'Hệ thống LMS',
-    }
-  ];
 
   return (
     <div className="px-4 md:px-8 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0">
