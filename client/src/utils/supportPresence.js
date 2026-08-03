@@ -23,16 +23,18 @@ export function isSuperAdminPresence(u) {
 const ROLE_RANK = { admin: 0, staff: 0, teacher: 1, student: 2 };
 
 function personFromPresence(u) {
-  const roleKey = normalizeChatRole(u.role || 'student');
+  const rawRole = String(u.role || 'student').toLowerCase();
+  const roleKey = normalizeChatRole(rawRole);
   const uid = String(u.userId || '');
   let labelRole = roleKey;
-  // staff presence thường là role staff → hiển thị Admin chi nhánh
-  if (String(u.role || '').toLowerCase() === 'staff') labelRole = 'staff';
+  if (rawRole === 'staff') labelRole = 'staff';
   return {
     id: uid,
-    name: u.name || (roleKey === 'admin' ? 'Admin' : roleKey === 'teacher' ? 'Giảng viên' : 'Học viên'),
-    role: roleKey,
+    name: u.name || (rawRole === 'staff' ? 'Hỗ trợ viên' : roleKey === 'admin' ? 'Quản trị viên' : roleKey === 'teacher' ? 'Giảng viên' : 'Học viên'),
+    role: rawRole === 'staff' ? 'staff' : roleKey,
+    adminRole: u.adminRole || (rawRole === 'staff' ? 'STAFF' : null),
     displayRole: labelRole,
+    avatar: u.avatar || '',
     online: true,
     branchId: u.branchId || null,
   };

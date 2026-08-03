@@ -33,8 +33,10 @@ export function resolveAvatarUrl({ avatar, role = 'student', adminRole = null } 
   if (isAvatarUrl(raw)) return raw;
 
   const r = String(role || 'student').toLowerCase();
-  if (r === 'admin' || adminRole === 'SUPER_ADMIN' || r === 'super_admin') return DEFAULT_AVATARS.admin;
-  if (r === 'staff' || adminRole === 'STAFF') return DEFAULT_AVATARS.staff;
+  const ar = String(adminRole || '').toUpperCase();
+
+  if (r === 'staff' || ar === 'STAFF') return DEFAULT_AVATARS.staff;
+  if (r === 'admin' || ar === 'SUPER_ADMIN' || r === 'super_admin') return DEFAULT_AVATARS.admin;
   if (r === 'teacher') return DEFAULT_AVATARS.teacher;
   if (r === 'group') return DEFAULT_AVATARS.admin;
   return DEFAULT_AVATARS.student;
