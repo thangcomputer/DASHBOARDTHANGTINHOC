@@ -48,26 +48,27 @@ export function buildSupportDirectory({ session, onlineUsers, meId }) {
   const users = Array.isArray(onlineUsers) ? onlineUsers : [];
 
   if (!isSuperAdminViewer(session)) {
-    const online = users.find((u) => {
+    const staffOnline = users.filter((u) => {
       const r = String(u.role || '').toLowerCase();
-      return r === 'staff' || u.adminRole === 'STAFF' || isSuperAdminPresence(u);
+      return r === 'staff' || u.adminRole === 'STAFF';
     });
+    
     return {
       mode: 'support_only',
-      groups: [{
+      groups: staffOnline.length > 0 ? [{
         key: 'support',
         label: 'Hỗ trợ viên trực tuyến',
-        people: [{
-          id: online?.userId || 'admin',
-          name: online?.name || 'Hỗ trợ viên',
+        people: staffOnline.map((u) => ({
+          id: u.userId,
+          name: u.name || 'Hỗ trợ viên',
           role: 'staff',
           displayRole: 'staff',
           adminRole: 'STAFF',
           permissions: ['manage_messages'],
-          avatar: online?.avatar || '',
-          online: !!online,
-        }],
-      }],
+          avatar: u.avatar || '',
+          online: true,
+        })),
+      }] : [],
     };
   }
 
