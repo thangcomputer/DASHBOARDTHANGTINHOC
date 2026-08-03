@@ -54,11 +54,11 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
   const isToday = (d) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
       {/* Lịch tháng */}
       <div className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-w-0">
-        <div className="px-3.5 sm:px-5 py-3 border-b border-slate-100 flex flex-col gap-2 xs:flex-row xs:items-center xs:justify-between min-w-0">
-          <h3 className="text-base font-extrabold text-slate-800 uppercase tracking-tight">Lịch theo tháng</h3>
+        <div className="px-3 sm:px-4 py-2.5 border-b border-slate-100 flex flex-col gap-1.5 xs:flex-row xs:items-center xs:justify-between min-w-0">
+          <h3 className="text-sm sm:text-base font-extrabold text-slate-800 uppercase tracking-tight">Lịch theo tháng</h3>
           <div className="flex items-center gap-1.5">
             <button type="button" onClick={prevMonth} className="w-9 h-9 rounded-lg hover:bg-slate-100 transition-colors duration-200 flex items-center justify-center" aria-label="Tháng trước">
               <ChevronRight size={16} className="text-slate-500 rotate-180" aria-hidden="true" />
@@ -127,8 +127,8 @@ export const ScheduleView = ({ schedules, student, setNoteModalSched }) => {
       </div>
 
       {/* Chi tiết lịch */}
-      <div className="lg:col-span-5 space-y-3 sm:space-y-4 min-w-0">
-        <div className="bg-gradient-to-br from-[#203DB5] to-[#1E3A8A] rounded-2xl p-4 sm:p-6 text-white shadow-md">
+      <div className="lg:col-span-5 space-y-3 min-w-0">
+        <div className="bg-gradient-to-br from-[#203DB5] to-[#1E3A8A] rounded-2xl p-3.5 sm:p-5 text-white shadow-md">
           <p className="text-blue-200 text-xs font-bold uppercase tracking-wide mb-3 flex items-center gap-2 leading-snug">
             <Calendar size={14} className="text-yellow-400 shrink-0" aria-hidden="true" />
             <span className="min-w-0">
