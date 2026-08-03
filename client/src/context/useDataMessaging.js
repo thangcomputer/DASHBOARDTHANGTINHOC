@@ -372,26 +372,31 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         // Xác định xem mình có phải là người gửi không (hộp chung 'admin' chỉ dành cho SUPER_ADMIN)
         const isMeSender = String(m.senderId) === sId || (isSuperAdmin && String(m.senderId) === 'admin');
 
+        const isStaffOrAdmin = sId === 'admin' || isSuperAdmin || currentUser?.role === 'staff' || currentUser?.role === 'admin';
         const otherUserId = isMeSender ? m.receiverId : m.senderId;
         let otherName = isMeSender ? m.receiverName : m.senderName;
         const otherRole = isMeSender ? m.receiverRole : m.senderRole;
 
-        // Tra cứu tên mới nhất từ danh sách local (Teacher/Staff/Student/CurrentUser) để luôn trùng khớp tên hệ thống hiện tại!
+        // Bỏ qua hội thoại tự chat với chính mình
+        if (String(otherUserId) === String(sId)) return;
+
+        // Tra cứu tên mới nhất từ danh sách local (Teacher/Staff/Student/CurrentUser)
         if (String(otherUserId) === String(currentUser?.id) || String(otherUserId) === String(currentUser?._id)) {
           if (currentUser?.name) otherName = currentUser.name;
         } else if (otherUserId === 'admin') {
-          if (!isSuperAdmin) {
+          if (!isStaffOrAdmin) {
             otherName = 'HỖ TRỢ VIÊN';
           } else {
             const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
               || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
             if (superDoc?.name) otherName = superDoc.name;
-            else if (currentUser?.role === 'admin' && currentUser?.name) otherName = currentUser.name;
+            else if (currentUser?.name && currentUser?.role === 'admin') otherName = currentUser.name;
+            else otherName = 'Ban Quản trị';
           }
-        } else if (otherRole === 'teacher' || (isSuperAdmin && otherRole === 'admin')) {
+        } else if (otherRole === 'teacher' || otherRole === 'admin') {
           const t = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
           if (t?.name) otherName = t.name;
-        } else if (otherRole === 'staff' || (!isSuperAdmin && otherRole === 'admin')) {
+        } else if (otherRole === 'staff') {
           const st = safeStaffs.find(st => String(st.id || st._id) === String(otherUserId));
           if (st?.name) otherName = st.name;
         } else if (otherRole === 'student') {
@@ -415,8 +420,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           }
         }
 
-        const finalRole = (!isSuperAdmin && (otherUserId === 'admin' || otherRole === 'admin')) ? 'staff' : otherRole;
-        const finalName = (!isSuperAdmin && otherUserId === 'admin') ? 'HỖ TRỢ VIÊN' : (otherName || 'Hỗ trợ viên');
+        const finalRole = (!isStaffOrAdmin && (otherUserId === 'admin' || otherRole === 'admin')) ? 'staff' : otherRole;
+        const finalName = (!isStaffOrAdmin && otherUserId === 'admin') ? 'HỖ TRỢ VIÊN' : (otherName || 'Người dùng');
 
         convMap[m.convId] = {
           id: m.convId,
