@@ -634,10 +634,10 @@ router.post('/', async (req, res) => {
       const rid = String(receiverId || '');
       if (rid === 'admin' || !mongoose.Types.ObjectId.isValid(rid)) {
         finalReceiverId = 'admin';
-        finalReceiverName = resolvedReceiverName || 'Admin';
+        finalReceiverName = resolvedReceiverName || 'HỖ TRỢ VIÊN';
       } else {
         finalReceiverId = rid;
-        finalReceiverName = resolvedReceiverName || 'Nhân viên';
+        finalReceiverName = resolvedReceiverName || 'Hỗ trợ viên';
       }
     }
 

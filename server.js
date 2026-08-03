@@ -424,7 +424,7 @@ io.on('connection', (socket) => {
       const rid = String(data.receiverId || '');
       if (rid === 'admin' || !mongoose.Types.ObjectId.isValid(rid)) {
         finalReceiverId = 'admin';
-        finalReceiverName = DEPT_SUPER;
+        finalReceiverName = 'HỖ TRỢ VIÊN';
       } else {
         finalReceiverId = rid;
         finalReceiverName = staffDisplayName(finalReceiverName, rBranch);
@@ -604,7 +604,7 @@ app.notifyUser = (role, userId, eventName, data) => {
   const strUserId = String(userId);
 
   if (strUserId === 'admin') {
-    io.to('ALL_ADMIN').emit(eventName, data);
+    io.to('ALL_ADMIN').to('ALL_STAFF').emit(eventName, data);
     return true;
   }
 
