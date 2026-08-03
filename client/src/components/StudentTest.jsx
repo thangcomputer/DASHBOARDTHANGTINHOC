@@ -606,7 +606,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   if (phase === 'hardware_check') return (
     <div className="min-h-screen w-full bg-slate-900 flex flex-col p-4 sm:p-6 lg:p-8 space-y-4">
       {/* Top mode switcher */}
-      <div className="max-w-5xl mx-auto w-full flex items-center justify-between gap-3 bg-slate-800/80 p-2 rounded-2xl border border-slate-700">
+      <div className="w-full flex items-center justify-between gap-3 bg-slate-800/80 p-2 rounded-2xl border border-slate-700">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -643,7 +643,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       </div>
 
       {examMode === 'lesson_quiz' ? (
-        <div className="max-w-5xl mx-auto w-full">
+        <div className="w-full">
           <StudentQuizList />
         </div>
       ) : (
