@@ -235,19 +235,17 @@ export function MessagesProvider({ user, children }) {
   }, []);
 
   const recallMessage = useCallback(async (messageId) => {
-    try {
-      const json = await api.messages.recall(messageId);
-      if (json.success) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            String(m.id || m._id) === String(messageId)
-              ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' }
-              : m
-          )
-        );
-      }
-    } catch {
-      /* ignore */
+    const json = await api.messages.recall(messageId);
+    if (json.success) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          String(m.id || m._id) === String(messageId)
+            ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' }
+            : m
+        )
+      );
+    } else {
+      throw new Error(json.message || 'Không thể thu hồi tin nhắn');
     }
   }, []);
 
