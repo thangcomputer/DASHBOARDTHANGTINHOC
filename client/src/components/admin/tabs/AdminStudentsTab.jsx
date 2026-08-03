@@ -701,6 +701,7 @@ export default function AdminStudentsTab() {
                   name={s.name}
                   role="student"
                   src={s.avatar}
+                  gender={s.gender}
                   color={studentHasActivePaid(s, enrollments) ? 'bg-sky-500' : 'bg-red-500'}
                 />
                 <div className="flex-1 min-w-0">
@@ -884,6 +885,7 @@ export default function AdminStudentsTab() {
                         name={s.name}
                         role="student"
                         src={s.avatar}
+                        gender={s.gender}
                         color={studentHasActivePaid(s, enrollments) ? 'bg-sky-500' : 'bg-red-500'}
                       />
                       <div className="min-w-0">

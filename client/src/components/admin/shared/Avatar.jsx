@@ -26,6 +26,7 @@ export default function Avatar({
   role = 'student',
   adminRole = null,
   name = '',
+  gender = '',
   size = 'md',
   className = '',
   showRoleBadge = true,
@@ -35,7 +36,7 @@ export default function Avatar({
       : adminRole === 'STAFF' ? 'staff'
         : String(role || 'student').toLowerCase();
 
-  const url = resolveAvatarUrl({ avatar: src, role, adminRole, name });
+  const url = resolveAvatarUrl({ avatar: src, role, adminRole, name, gender });
   const sizeClass =
     size === 'sm' ? 'w-8 h-8'
       : size === 'card' ? 'w-[52px] h-[52px]'
