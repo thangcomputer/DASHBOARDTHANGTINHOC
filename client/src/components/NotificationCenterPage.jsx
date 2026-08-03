@@ -3,7 +3,7 @@ import CmsSelect from './ui/CmsSelect';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, CheckCheck, ChevronLeft, ChevronRight, Filter, Loader2,
-  Trash2, Megaphone, RefreshCw,
+  Trash2, Megaphone, RefreshCw, X, ExternalLink,
 } from 'lucide-react';
 import { notificationsAPI } from '../services/api';
 import { useData } from '../context/DataContext';
@@ -55,7 +55,7 @@ function resolveNavPath(path) {
 }
 
 /**
- * Notification Center — trang day du cho admin / teacher / student.
+ * Notification Center — trang đầy đủ thông báo hệ thống với Modal Chi tiết & cuộn trang mượt mà.
  */
 export default function NotificationCenterPage({ role = 'admin', session }) {
   const navigate = useNavigate();
@@ -72,6 +72,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const [selectedNotif, setSelectedNotif] = useState(null);
 
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [bcTitle, setBcTitle] = useState('');
@@ -120,6 +121,9 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       setItems((prev) => prev.filter((n) => String(n.id || n._id) !== String(id)));
       setTotal((t) => Math.max(0, t - 1));
       setUnread((u) => Math.max(0, u - 1));
+      if (selectedNotif && String(selectedNotif.id || selectedNotif._id) === String(id)) {
+        setSelectedNotif(null);
+      }
     } finally {
       setBusyId(null);
     }
@@ -137,7 +141,11 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       return;
     }
     const path = resolveNavPath(n.path);
-    if (path) navigate(path);
+    if (path) {
+      navigate(path);
+    } else {
+      setSelectedNotif(n);
+    }
   };
 
   const onBroadcast = async () => {
@@ -170,8 +178,8 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   };
 
   return (
-    <div className="cms-viewport-fill w-full space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+    <div className="w-full max-w-5xl mx-auto space-y-4 pb-28 sm:pb-32 px-1 sm:px-4 min-h-screen overflow-y-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0 pt-2">
         <div className="min-w-0">
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <Bell className="text-red-600" size={22} /> Trung tâm thông báo
@@ -268,7 +276,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         </label>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden min-h-[250px]">
         {loading ? (
           <div className="p-12 flex justify-center text-gray-400">
             <Loader2 className="animate-spin" size={28} />
@@ -282,9 +290,10 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
               return (
                 <li
                   key={id}
-                  className={`p-4 flex gap-3 hover:bg-gray-50 transition ${!n.read ? 'bg-red-50/30' : ''}`}
+                  className={`p-4 flex gap-3 hover:bg-gray-50 transition cursor-pointer ${!n.read ? 'bg-red-50/30' : ''}`}
+                  onClick={() => onOpen(n)}
                 >
-                  <button type="button" onClick={() => onOpen(n)} className="flex-1 text-left min-w-0">
+                  <div className="flex-1 text-left min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-0.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-red-600">{n.type}</span>
                       <span className="text-[10px] text-gray-400 font-bold">{formatTime(n.time || n.createdAt)}</span>
@@ -295,8 +304,8 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                     <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
                       {formatNotificationStudentMask(n.message || n.content || n.text, students)}
                     </p>
-                  </button>
-                  <div className="flex flex-col gap-1">
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {!n.read && (
                       <button
                         type="button"
@@ -326,24 +335,85 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       </div>
 
       {pages > 1 && (
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 py-3 sticky bottom-4 bg-white/90 backdrop-blur-md border border-gray-200/80 rounded-2xl shadow-lg w-fit mx-auto px-6 z-10">
           <button
             type="button"
             disabled={page <= 1 || loading}
-            onClick={() => load(page - 1)}
-            className="p-2 rounded-xl border border-gray-200 disabled:opacity-40"
+            onClick={() => {
+              load(page - 1);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="p-2 rounded-xl border border-gray-200 hover:bg-gray-100 disabled:opacity-40 transition-colors"
           >
             <ChevronLeft size={18} />
           </button>
-          <span className="text-xs font-bold text-gray-600">Trang {page}/{pages}</span>
+          <span className="text-xs font-bold text-gray-700">Trang {page} / {pages}</span>
           <button
             type="button"
             disabled={page >= pages || loading}
-            onClick={() => load(page + 1)}
-            className="p-2 rounded-xl border border-gray-200 disabled:opacity-40"
+            onClick={() => {
+              load(page + 1);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="p-2 rounded-xl border border-gray-200 hover:bg-gray-100 disabled:opacity-40 transition-colors"
           >
             <ChevronRight size={18} />
           </button>
+        </div>
+      )}
+
+      {/* ── Modal Chi tiết Thông báo ── */}
+      {selectedNotif && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 relative border border-slate-100 animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded-md inline-block mb-1">
+                  {selectedNotif.type || 'HỆ THỐNG'}
+                </span>
+                <h2 className="text-base font-black text-slate-900 leading-snug">
+                  {selectedNotif.title}
+                </h2>
+                <p className="text-[11px] text-gray-400 font-medium mt-0.5">
+                  {formatTime(selectedNotif.time || selectedNotif.createdAt)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedNotif(null)}
+                className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 text-sm text-slate-700 leading-relaxed whitespace-pre-line pr-1 font-medium">
+              {formatNotificationStudentMask(selectedNotif.message || selectedNotif.content || selectedNotif.text, students)}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
+              {resolveNavPath(selectedNotif.path) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const path = resolveNavPath(selectedNotif.path);
+                    setSelectedNotif(null);
+                    if (path) navigate(path);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1.5"
+                >
+                  <ExternalLink size={14} /> Đi tới liên kết
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSelectedNotif(null)}
+                className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
