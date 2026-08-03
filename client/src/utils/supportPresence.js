@@ -43,32 +43,87 @@ function personFromPresence(u) {
 /**
  * @returns {{ mode: 'directory'|'support_only', groups: Array<{ key: string, label: string, people: object[] }> }}
  */
-export function buildSupportDirectory({ session, onlineUsers, meId }) {
+export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] }) {
   const me = String(meId || session?.id || session?._id || '');
   const users = Array.isArray(onlineUsers) ? onlineUsers : [];
 
   if (!isSuperAdminViewer(session)) {
-    const staffOnline = users.filter((u) => {
+    const onlineStaffMap = new Map();
+    users.forEach((u) => {
       const r = String(u.role || '').toLowerCase();
-      return r === 'staff' || u.adminRole === 'STAFF';
+      const ar = String(u.adminRole || '').toUpperCase();
+      if (r === 'staff' || ar === 'STAFF') {
+        const uid = String(u.userId || u.id || '');
+        if (uid) {
+          onlineStaffMap.set(uid, {
+            id: uid,
+            name: u.name || 'Hỗ trợ viên',
+            role: 'staff',
+            displayRole: 'staff',
+            adminRole: 'STAFF',
+            permissions: ['manage_messages'],
+            avatar: u.avatar || '',
+            online: true,
+          });
+        }
+      }
     });
-    
+
+    const peopleList = [];
+    const seenIds = new Set();
+
+    // 1. Ưu tiên Hỗ trợ viên đang online
+    onlineStaffMap.forEach((person, uid) => {
+      seenIds.add(uid);
+      peopleList.push(person);
+    });
+
+    // 2. Thêm các Hỗ trợ viên offline từ danh sách hệ thống (staffs)
+    if (Array.isArray(staffs)) {
+      staffs.forEach((st) => {
+        if (!st) return;
+        const r = String(st.role || '').toLowerCase();
+        const ar = String(st.adminRole || '').toUpperCase();
+        if (r === 'staff' || ar === 'STAFF' || st.permissions?.includes?.('manage_messages')) {
+          const stId = String(st.id || st._id || '');
+          if (stId && stId !== me && !seenIds.has(stId)) {
+            seenIds.add(stId);
+            peopleList.push({
+              id: stId,
+              name: st.name || 'Hỗ trợ viên',
+              role: 'staff',
+              displayRole: 'staff',
+              adminRole: 'STAFF',
+              permissions: st.permissions || ['manage_messages'],
+              avatar: st.avatar || '',
+              online: false,
+            });
+          }
+        }
+      });
+    }
+
+    // 3. Dự phòng: Luôn có kênh "Bộ phận Hỗ trợ" nếu chưa có tài khoản staff cụ thể nào
+    if (peopleList.length === 0) {
+      peopleList.push({
+        id: 'admin',
+        name: 'Bộ phận Hỗ trợ (Phòng Giáo vụ)',
+        role: 'staff',
+        displayRole: 'staff',
+        adminRole: 'STAFF',
+        permissions: ['manage_messages'],
+        avatar: '',
+        online: false,
+      });
+    }
+
     return {
       mode: 'support_only',
-      groups: staffOnline.length > 0 ? [{
+      groups: [{
         key: 'support',
-        label: 'Hỗ trợ viên trực tuyến',
-        people: staffOnline.map((u) => ({
-          id: u.userId,
-          name: u.name || 'Hỗ trợ viên',
-          role: 'staff',
-          displayRole: 'staff',
-          adminRole: 'STAFF',
-          permissions: ['manage_messages'],
-          avatar: u.avatar || '',
-          online: true,
-        })),
-      }] : [],
+        label: 'Hỗ trợ viên',
+        people: peopleList,
+      }],
     };
   }
 

@@ -385,7 +385,7 @@ export default function FloatingMessenger({ session, role }) {
   const isInbox = location.pathname.includes('/inbox');
   const toast = useToast();
   const { onlineUsers, onMessageReceive } = useSocket() || {};
-  const { sendMessage, getMessages, getConversations, markMessagesRead, recallMessage } = useData();
+  const { sendMessage, getMessages, getConversations, markMessagesRead, recallMessage, staffs } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
     openChat, closeChat, minimizeChat, focusChat,
@@ -416,8 +416,8 @@ export default function FloatingMessenger({ session, role }) {
   }, [conversations]);
 
   const directory = useMemo(
-    () => buildSupportDirectory({ session, onlineUsers, meId }),
-    [session, onlineUsers, meId],
+    () => buildSupportDirectory({ session, onlineUsers, meId, staffs }),
+    [session, onlineUsers, meId, staffs],
   );
 
   const unreadConversations = useMemo(() => {
@@ -666,7 +666,7 @@ export default function FloatingMessenger({ session, role }) {
                                 <span className="block text-[11px] text-slate-500 font-medium">
                                   {ROLE_LABEL[p.displayRole] || ROLE_LABEL[p.role] || p.role}
                                   {' · '}
-                                  {online ? 'Đang hoạt động' : 'Ngoại tuyến'}
+                                  {online ? 'Đang hoạt động' : 'Ngoại tuyến (Nhắn tin chờ)'}
                                 </span>
                               </span>
                               {peerUnread > 0 ? (
