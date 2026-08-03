@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
-  ImagePlus, Link2, Loader2,
+  ImagePlus, Link2, Loader2, MoreVertical, RotateCcw,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
@@ -156,10 +156,12 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
 }
 
 function ChatWindow({
-  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendLink,
+  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendLink, onRecall,
 }) {
+  const toast = useToast();
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [activeMsgOptions, setActiveMsgOptions] = useState(null);
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const imageRef = useRef(null);
@@ -171,6 +173,23 @@ function ChatWindow({
   useEffect(() => {
     inputRef.current?.focus();
   }, [tab.id]);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMsgOptions(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleRecallMessage = async (msgId) => {
+    try {
+      if (onRecall) {
+        await onRecall(msgId);
+        toast.success('Đã thu hồi tin nhắn');
+      }
+    } catch {
+      toast.error('Không thể thu hồi tin nhắn');
+    }
+  };
 
   const submit = (e) => {
     e?.preventDefault?.();
@@ -259,8 +278,43 @@ function ChatWindow({
         ) : (
           messages.map((m) => {
             const mine = String(m.senderId) === String(meId);
+            const msgId = m.id || m._id;
+            const showOptions = activeMsgOptions === msgId;
             return (
-              <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+              <div key={msgId} className={`group relative flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}>
+                {mine && !m.isRecalled && (
+                  <div className="relative shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMsgOptions(showOptions ? null : msgId);
+                      }}
+                      className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition"
+                      title="Tùy chọn tin nhắn"
+                    >
+                      <MoreVertical size={14} />
+                    </button>
+                    {showOptions && (
+                      <div
+                        className="absolute right-0 bottom-full mb-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1 w-36 text-xs font-semibold animate-in fade-in zoom-in-95 duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMsgOptions(null);
+                            handleRecallMessage(msgId);
+                          }}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 text-left transition"
+                        >
+                          <RotateCcw size={13} />
+                          <span>Thu hồi tin nhắn</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <MessageBubble m={m} mine={mine} />
               </div>
             );
@@ -486,6 +540,7 @@ export default function FloatingMessenger({ session, role }) {
             onSend={handleSend}
             onSendFile={handleSendFile}
             onSendLink={handleSendLink}
+            onRecall={recallMessage}
           />
         </div>
       )}
