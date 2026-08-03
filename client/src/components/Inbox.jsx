@@ -932,6 +932,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             {conv.user.branchCode}
                           </span>
                         )}
+                        {currentUserRole === 'admin' && conv.user.phone && (
+                          <a 
+                            href={`https://zalo.me/${conv.user.phone.replace(/\s+/g, '')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:scale-110 transition-transform cursor-pointer flex-shrink-0"
+                            title="Chat Zalo"
+                          >
+                            <span className="bg-brand-zalo text-white text-[9px] font-black px-1.5 py-0.5 rounded-sm tracking-wide shadow-sm">Zalo</span>
+                          </a>
+                        )}
 
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -1059,6 +1071,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <span className="bg-emerald-100 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-md shadow-sm">
                           Cơ sở: {activeConv.user.branchCode}
                         </span>
+                      )}
+                      {currentUserRole === 'admin' && activeConv.user.phone && (
+                        <a 
+                          href={`https://zalo.me/${activeConv.user.phone.replace(/\s+/g, '')}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="hover:scale-110 transition-transform cursor-pointer"
+                          title="Chat Zalo"
+                        >
+                          <span className="bg-brand-zalo text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm tracking-wide">Zalo</span>
+                        </a>
                       )}
 
                     </div>
