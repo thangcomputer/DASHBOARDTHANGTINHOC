@@ -1702,10 +1702,15 @@ router.put('/admin/profile', authMiddleware, async (req, res) => {
 
       let changed = false;
 
-      // Đổi tên
+      // Đổi tên — đồng bộ cả SystemSettings và Teacher collection
       if (name && name.trim()) {
-        sysSettings.adminName = name.trim();
+        const newName = name.trim();
+        sysSettings.adminName = newName;
         changed = true;
+        await Teacher.updateMany(
+          { $or: [{ adminRole: 'SUPER_ADMIN' }, { role: 'admin', adminRole: { $ne: 'STAFF' } }] },
+          { $set: { name: newName } }
+        );
       }
 
       // Đổi mật khẩu
@@ -1742,7 +1747,7 @@ router.put('/admin/profile', authMiddleware, async (req, res) => {
       return res.json({
         success: true,
         message: 'Cập nhật thông tin Admin thành công!',
-        data: { name: sysSettings.adminName || 'Admin Thắng Tin Học' }
+        data: { name: sysSettings.adminName || 'Admin' }
       });
     }
 
@@ -1751,9 +1756,14 @@ router.put('/admin/profile', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
     }
 
-    // Đổi tên
+    // Đổi tên — nếu là Super Admin thì đồng bộ cả SystemSettings
     if (name && name.trim()) {
-      user.name = name.trim();
+      const newName = name.trim();
+      user.name = newName;
+      if (user.role === 'admin' || user.adminRole === 'SUPER_ADMIN') {
+        await SystemSettings.findOneAndUpdate({ _key: 'main' }, { $set: { adminName: newName } }, { upsert: true });
+        await invalidateSettingsCache();
+      }
     }
 
     // Đổi mật khẩu (yêu cầu mật khẩu cũ)

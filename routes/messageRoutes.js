@@ -65,7 +65,7 @@ router.get('/contacts', async (req, res) => {
     // ────── [1] SuperAdmin luôn được lấy trước (mọi role đều thấy) ──────
     const SystemSettings = require('../models/SystemSettings');
     const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
-    const systemAdminName = (sysSettings?.adminName && sysSettings.adminName.trim()) ? sysSettings.adminName.trim() : 'Admin';
+    const systemAdminName = (sysSettings?.adminName && sysSettings.adminName.trim()) ? sysSettings.adminName.trim() : null;
 
     const superAdmins = await Teacher.find(
       { $or: [{ adminRole: 'SUPER_ADMIN' }, { role: 'admin', adminRole: { $ne: 'STAFF' } }] },
@@ -74,18 +74,19 @@ router.get('/contacts', async (req, res) => {
 
     const superAdminContacts = superAdmins.map(a => ({
       id:     a._id.toString(),
-      name:   (a.name && a.name.trim()) ? a.name.trim() : systemAdminName,
+      name:   (systemAdminName && a.phone === 'admin') ? systemAdminName : ((a.name && a.name.trim()) ? a.name.trim() : (systemAdminName || 'Admin')),
       role:   'admin',
       phone:  a.phone || '',
-      avatar: a.avatar || String(a.name || 'AD').substring(0, 2).toUpperCase(),
+      avatar: a.avatar || String(systemAdminName || a.name || 'AD').substring(0, 2).toUpperCase(),
       branchId: a.branchId || null,
       branchCode: a.branchCode || ''
     }));
 
-    // Luôn đảm bảo có ít nhất 1 tài khoản Admin hệ thống (hardcoded 'admin')
-    if (!superAdminContacts.some(c => c.id === 'admin')) {
+    // Luôn đảm bảo có ít nhất 1 tài khoản Admin hệ thống (id 'admin')
+    const primaryAdminContact = superAdminContacts.find(c => c.id === 'admin');
+    if (!primaryAdminContact) {
       const primarySuper = superAdmins.find(a => a.name) || {};
-      const actualName = (primarySuper.name && primarySuper.name.trim()) ? primarySuper.name.trim() : systemAdminName;
+      const actualName = systemAdminName || (primarySuper.name && primarySuper.name.trim()) || 'Admin';
       superAdminContacts.unshift({
         id: 'admin',
         name: actualName,
@@ -95,6 +96,8 @@ router.get('/contacts', async (req, res) => {
         branchId: null,
         branchCode: 'HỆ THỐNG'
       });
+    } else if (systemAdminName) {
+      primaryAdminContact.name = systemAdminName;
     }
 
     let staffContacts    = [];
