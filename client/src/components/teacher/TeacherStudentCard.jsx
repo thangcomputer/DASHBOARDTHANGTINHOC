@@ -7,7 +7,7 @@ import {
   ChevronRight, BookOpen, Award, Zap, BarChart3, Users, Eye, X, XCircle,
   Search, Download, AlertCircle, Clipboard, Send, UserCheck, Check,
   Activity, Trash2, Ban, PlayCircle, Phone, Mail, Edit3, Shield,
-  Plus, Loader2,
+  Plus, Loader2, History,
 } from 'lucide-react';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
@@ -372,6 +372,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
     { key: 'assignments', icon: BookOpen, label: 'Bài tập' },
     { key: 'link', icon: Video, label: 'Link học' },
     { key: 'grade', icon: Award, label: 'Đánh giá' },
+    { key: 'logs', icon: History, label: 'Nhật ký' },
   ];
 
   if (isDetailed) {
@@ -451,8 +452,8 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
         </div>
         </div>
 
-        {/* Tabs — 4 cột, icon + nhãn rõ ràng */}
-        <div className="grid grid-cols-4 w-full bg-white border-b border-slate-100">
+        {/* Tabs — 5 cột: Tiến độ, Bài tập, Link học, Đánh giá, Nhật ký */}
+        <div className="grid grid-cols-5 w-full bg-white border-b border-slate-100">
           {panels.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -869,6 +870,112 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                       {gradeSaved ? 'Đã lưu ✓' : 'Lưu kết quả đánh giá'}
                     </button>
                  </div>
+              </div>
+           )}
+
+           {activePanel === 'logs' && (
+              <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-10 duration-500">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                      <History size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-black text-slate-800">
+                        Nhật ký Hoạt động &amp; Lịch sử Học viên
+                      </h3>
+                      <p className="text-[11px] text-slate-400 font-medium">
+                        Điểm danh, lịch sử nộp bài tập và quá trình cập nhật điểm số
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
+                    {(student.grades || []).length} lượt ghi nhận
+                  </span>
+                </div>
+
+                {/* Dynamic timeline list */}
+                <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                  {student.grades && student.grades.length > 0 ? (
+                    student.grades.map((g, idx) => {
+                      let parsedDate = g.date;
+                      if (parsedDate && parsedDate.includes('T')) {
+                        parsedDate = new Date(parsedDate).toLocaleDateString('vi-VN');
+                      }
+                      const noteLower = (g.note || '').toLowerCase();
+                      const isUpdated = noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm');
+                      const isHomework = noteLower.includes('bài nộp') || isUpdated;
+                      const isQuiz = noteLower.includes('trắc nghiệm');
+
+                      return (
+                        <div
+                          key={g._idx ?? idx}
+                          className="bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 transition flex items-center justify-between gap-3"
+                        >
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs mt-0.5 ${
+                              isQuiz ? 'bg-purple-100 text-purple-700' :
+                              isHomework ? 'bg-emerald-100 text-emerald-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {isQuiz ? <Award size={16} /> : isHomework ? <Clipboard size={16} /> : <CheckCircle size={16} />}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-black text-slate-900 font-mono">
+                                  {g.time ? `${g.time} — ${parsedDate}` : parsedDate}
+                                </span>
+                                {isUpdated ? (
+                                  <span className="text-[9px] font-black uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200">
+                                    Cập nhật điểm
+                                  </span>
+                                ) : isHomework ? (
+                                  <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200">
+                                    Bài nộp
+                                  </span>
+                                ) : isQuiz ? (
+                                  <span className="text-[9px] font-black uppercase bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md border border-purple-200">
+                                    Trắc nghiệm
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-black uppercase bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200">
+                                    Điểm danh
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-600 font-medium mt-1 leading-snug">
+                                {g.note || 'Đã điểm danh hoàn thành buổi học'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            {g.grade > 0 ? (
+                              <div className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs inline-flex items-baseline gap-0.5">
+                                <span className={`text-sm font-black tabular-nums ${
+                                  g.grade >= 8 ? 'text-emerald-600' : g.grade >= 6.5 ? 'text-blue-600' : g.grade >= 5 ? 'text-amber-600' : 'text-rose-600'
+                                }`}>
+                                  {g.grade}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-bold">/10</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400 font-bold italic">--</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 text-xs font-medium space-y-2">
+                      <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
+                        <History size={20} />
+                      </div>
+                      <p className="font-bold text-slate-600">Chưa có nhật ký hoạt động nào</p>
+                      <p className="text-[11px] text-slate-400">Các lượt điểm danh, bài nộp và chấm điểm sẽ được tự động hiển thị ở đây.</p>
+                    </div>
+                  )}
+                </div>
               </div>
            )}
         </div>
