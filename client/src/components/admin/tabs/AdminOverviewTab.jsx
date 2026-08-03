@@ -121,8 +121,8 @@ export default function AdminOverviewTab({
                     color={color}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-semibold text-slate-900 truncate leading-snug">{s.name}</p>
-                    <p className="text-[13px] text-slate-500 truncate mt-0.5">{s.course || 'Chưa chọn khóa'}</p>
+                    <p className="text-sm sm:text-[15px] font-bold text-slate-900 truncate leading-snug">{s.name}</p>
+                    <p className="text-xs sm:text-[13px] text-slate-500 font-medium truncate mt-0.5">{s.course || 'Chưa chọn khóa'}</p>
                   </div>
                   <span className={`cms-dash-badge flex-shrink-0 ${badgeClass}`}>
                     {badgeText}
@@ -171,8 +171,8 @@ export default function AdminOverviewTab({
                       color={active ? 'bg-red-600' : 'bg-amber-500'}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-base font-semibold text-slate-900 truncate leading-snug">{t.name}</p>
-                      <p className="text-[13px] text-slate-500 truncate mt-0.5">
+                      <p className="text-sm sm:text-[15px] font-bold text-slate-900 truncate leading-snug">{t.name}</p>
+                      <p className="text-xs sm:text-[13px] text-slate-500 font-medium truncate mt-0.5">
                         {t.phone}{t.branchCode ? ` · ${t.branchCode}` : ''}
                       </p>
                     </div>
@@ -197,7 +197,7 @@ export default function AdminOverviewTab({
 
       {/* Quick access */}
       <section>
-        <h3 className="text-[13px] font-semibold text-slate-500 mb-3 px-0.5">
+        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 px-0.5">
           Truy cập nhanh hệ thống
         </h3>
         <div className="cms-quick-grid">
@@ -214,8 +214,8 @@ export default function AdminOverviewTab({
                   <Icon size={20} aria-hidden="true" />
                 </span>
                 <span className="flex-1 min-w-0 text-left">
-                  <span className="block text-[15px] font-semibold text-slate-900 leading-tight">{q.label}</span>
-                  <span className="block text-[12px] sm:text-[13px] text-slate-500 mt-0.5 truncate">{q.desc}</span>
+                  <span className="block text-sm sm:text-[15px] font-bold text-slate-900 leading-tight">{q.label}</span>
+                  <span className="block text-xs sm:text-[13px] text-slate-500 font-medium mt-0.5 truncate">{q.desc}</span>
                 </span>
                 <ChevronRight size={18} className="text-slate-400 flex-shrink-0" aria-hidden="true" />
               </button>

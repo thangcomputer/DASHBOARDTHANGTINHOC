@@ -2899,9 +2899,10 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   }
 
   .cms-kpi-value {
-    @apply font-bold text-slate-900 leading-none tracking-tight;
-    font-size: clamp(1.375rem, 4.2vw, 1.75rem);
-    margin-top: 2px;
+    @apply font-black text-slate-900 leading-none tracking-tight;
+    font-size: clamp(1.35rem, 3.2vw, 1.75rem);
+    margin-top: 4px;
+    margin-bottom: 2px;
   }
 
   .cms-dash-panel {
