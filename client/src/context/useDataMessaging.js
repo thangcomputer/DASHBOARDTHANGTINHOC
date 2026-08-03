@@ -373,8 +373,22 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         const isMeSender = String(m.senderId) === sId || (isSuperAdmin && String(m.senderId) === 'admin');
 
         const otherUserId = isMeSender ? m.receiverId : m.senderId;
-        const otherName = isMeSender ? m.receiverName : m.senderName;
+        let otherName = isMeSender ? m.receiverName : m.senderName;
         const otherRole = isMeSender ? m.receiverRole : m.senderRole;
+
+        // Tra cứu tên mới nhất từ danh sách local (Teacher/Staff/Student/CurrentUser) để luôn trùng khớp tên hệ thống hiện tại!
+        if (otherUserId === 'admin' || String(otherUserId) === String(currentUser?.id) || String(otherUserId) === String(currentUser?._id)) {
+          if (currentUser?.name) otherName = currentUser.name;
+        } else if (otherRole === 'teacher' || otherRole === 'admin') {
+          const t = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
+          if (t?.name) otherName = t.name;
+        } else if (otherRole === 'staff') {
+          const st = safeStaffs.find(st => String(st.id || st._id) === String(otherUserId));
+          if (st?.name) otherName = st.name;
+        } else if (otherRole === 'student') {
+          const s = safeStudents.find(s => String(s.id || s._id) === String(otherUserId));
+          if (s?.name) otherName = s.name;
+        }
 
         // Ưu tiên lấy branchCode trực tiếp từ tin nhắn (nếu có), nếu không mới tìm trong list local
         let branchCode = isMeSender ? m.receiverBranchCode : m.senderBranchCode;
@@ -396,7 +410,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           id: m.convId,
           user: {
             id: otherUserId,
-            name: otherName,
+            name: otherName || 'Người dùng',
             role: otherRole,
             avatar: String(otherName || 'U').substring(0, 2).toUpperCase(),
             online: true,
@@ -412,6 +426,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         };
       }
     });
+
+    const sysAdminName = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')?.name || currentUser?.name || 'Admin';
 
     // 2. Add potential contacts
     if (userRole === 'student') {
@@ -435,7 +451,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       if (!convMap[adminConvId]) {
         convMap[adminConvId] = {
           id: adminConvId,
-          user: { id: 'admin', name: 'ADMIN CẤP CAO', role: 'admin', avatar: 'AD', online: true, branchCode: '' },
+          user: { id: 'admin', name: sysAdminName, role: 'admin', avatar: 'AD', online: true, branchCode: '' },
           lastMessage: 'Chưa có tin nhắn',
           lastTime: new Date(0),
           unread: 0,
@@ -461,7 +477,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       if (!convMap[adminConvId]) {
         convMap[adminConvId] = {
           id: adminConvId,
-          user: { id: 'admin', name: 'ADMIN CẤP CAO', role: 'admin', avatar: 'AD', online: true, branchCode: '' },
+          user: { id: 'admin', name: sysAdminName, role: 'admin', avatar: 'AD', online: true, branchCode: '' },
           lastMessage: 'Chưa có tin nhắn',
           lastTime: new Date(0),
           unread: 0,
