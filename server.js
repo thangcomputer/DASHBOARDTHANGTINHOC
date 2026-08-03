@@ -400,36 +400,11 @@ io.on('connection', (socket) => {
     const rBranch = receiver?.branchCode || '';
 
     // Chuẩn hoá payload (giống messageRoutes)
-    const DEPT_STAFF = 'Phòng Giáo Vụ';
-    const DEPT_SUPER = 'Phòng Tuyển Sinh';
-    const staffDisplayName = (rawName, branchCode) => {
-      const base = rawName || DEPT_STAFF;
-      const bc = String(branchCode || '').trim();
-      return bc ? `${base} (P.Giáo Vụ-${bc})` : `${base} (P.Giáo Vụ)`;
-    };
-
     let finalSenderId = data.senderId;
-    let finalSenderName = data.senderName;
-    if (data.receiverRole === 'student' && (u.role === 'admin' || u.role === 'staff')) {
-      if (isStaff) {
-        finalSenderName = staffDisplayName(finalSenderName, sBranch);
-      } else {
-        finalSenderName = DEPT_SUPER;
-      }
-    }
+    let finalSenderName = data.senderName || u.name || 'Người dùng';
 
     let finalReceiverId = data.receiverId;
-    let finalReceiverName = data.receiverName;
-    if (data.senderRole === 'student' && isOneSideStudent && (data.receiverRole === 'admin' || data.receiverRole === 'staff')) {
-      const rid = String(data.receiverId || '');
-      if (rid === 'admin' || !mongoose.Types.ObjectId.isValid(rid)) {
-        finalReceiverId = 'admin';
-        finalReceiverName = 'HỖ TRỢ VIÊN';
-      } else {
-        finalReceiverId = rid;
-        finalReceiverName = staffDisplayName(finalReceiverName, rBranch);
-      }
-    }
+    let finalReceiverName = data.receiverName || 'Người nhận';
 
     const msgPayload = {
       ...data,

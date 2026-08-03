@@ -386,7 +386,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         if (otherUserId === 'admin' || otherRole === 'admin') {
           const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
             || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
-          finalName = superDoc?.name || (isMeSender ? m.receiverName : m.senderName) || 'P ĐÀO TẠO (ADMIN)';
+          finalName = superDoc?.name || (isMeSender ? m.receiverName : m.senderName) || 'Ban Quản trị';
           finalRole = 'admin';
         } else {
           const matchedStudent = safeStudents.find(s => String(s.id || s._id) === String(otherUserId));

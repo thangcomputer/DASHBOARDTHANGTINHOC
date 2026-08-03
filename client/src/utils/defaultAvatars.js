@@ -88,8 +88,8 @@ export function resolveAvatarUrl(userObj = {}) {
     ? (gRaw === 'female' || gRaw === 'nữ')
     : legacyIsFemaleName(name);
 
-  // 1. Super Admin / Giám Đốc
-  if (uid === 'admin' || ar === 'SUPER_ADMIN' || uname.includes('super admin') || uname.includes('p đào tạo')) {
+  // 1. Super Admin / Giám Đốc / Admin
+  if (uid === 'admin' || ar === 'SUPER_ADMIN' || r === 'admin' || r === 'super_admin') {
     if (isFemale) return DEFAULT_AVATARS.admin_female;
     return DEFAULT_AVATARS.admin_male;
   }

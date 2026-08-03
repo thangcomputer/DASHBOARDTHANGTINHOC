@@ -1041,9 +1041,7 @@ router.post('/broadcast', async (req, res) => {
       const conversationId = buildConversationId(userRole, userId, receiverRole, receiverId);
 
       const finalSenderId = userId;
-      const finalSenderName = (receiverRole === 'student')
-        ? (adminRole === 'STAFF' ? staffDisplayName(userName, senderDoc?.branchCode) : DEPT_SUPER_LABEL)
-        : userName;
+      const finalSenderName = userName || 'Người gửi';
 
       const newMsg = new Message({
         conversationId,

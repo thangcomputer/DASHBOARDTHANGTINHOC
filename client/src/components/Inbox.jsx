@@ -363,10 +363,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         return;
       }
       const role = normalizeRole(item.user?.role);
-      const nameKey = String(item.user?.name || '').trim().toLowerCase();
-      const userKey = (role === 'admin' && (nameKey.includes('p đào tạo') || nameKey.includes('super admin')))
-        ? `admin:${nameKey}`
-        : `${String(item.user?.id)}:${role}`;
+      const userKey = `${String(item.user?.id)}:${role}`;
 
       if (finalSeenUserKeys.has(userKey)) return;
       finalSeenUserKeys.add(userKey);
