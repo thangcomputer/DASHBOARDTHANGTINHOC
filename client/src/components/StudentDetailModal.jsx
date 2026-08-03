@@ -103,7 +103,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
   const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'attendance' | 'finance' | 'academic' | 'edit'
   const [courseFilter, setCourseFilter] = useState('all'); // 'all' | enrollmentId
   const [editForm, setEditForm] = useState({
-    name: '', email: '', phone: '', age: '', zalo: '', password: '',
+    name: '', email: '', phone: '', age: '', zalo: '', password: '', gender: 'male',
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -125,8 +125,9 @@ export default function StudentDetailModal({ studentId, onClose }) {
       age: s.age != null && s.age !== '' ? String(s.age) : '',
       zalo: s.zalo || '',
       password: '',
+      gender: s.gender || 'male',
     });
-  }, [data?.student?._id, data?.student?.name, data?.student?.email, data?.student?.phone, data?.student?.age, data?.student?.zalo]);
+  }, [data?.student?._id, data?.student?.name, data?.student?.email, data?.student?.phone, data?.student?.age, data?.student?.zalo, data?.student?.gender]);
 
   const reloadProfile = () => {
     if (!studentId) return;
@@ -145,6 +146,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
     }
     const payload = {
       name: String(editForm.name || '').trim().toUpperCase(),
+      gender: editForm.gender || 'male',
       email: String(editForm.email || '').trim().toLowerCase(),
       phone: String(editForm.phone || '').trim(),
       zalo: String(editForm.zalo || '').trim(),
@@ -832,7 +834,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                 <div className="relative shrink-0 mt-1">
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white flex items-center justify-center shadow-md border-2 border-white overflow-hidden">
                     <img
-                      src={resolveAvatarUrl({ avatar: data.student?.avatar, role: 'student' })}
+                      src={resolveAvatarUrl({ avatar: data.student?.avatar, role: 'student', name: data.student?.name, gender: data.student?.gender })}
                       className="w-full h-full object-cover"
                       alt={data.student?.name || 'avatar'}
                     />
@@ -1770,6 +1772,33 @@ export default function StudentDetailModal({ studentId, onClose }) {
                         className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:ring-2 focus:ring-indigo-200"
                         placeholder="VD: NGUYỄN VĂN A"
                       />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Giới tính chọn ảnh Cartoon <span className="text-red-500">*</span></label>
+                      <div className="flex items-center gap-3 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditForm(f => ({ ...f, gender: 'male' }))}
+                          className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+                            editForm.gender === 'male' || editForm.gender === 'Nam'
+                              ? 'bg-sky-50 text-sky-700 border-sky-300 ring-2 ring-sky-400/20 shadow-sm'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>👨 Nam (Cartoon Nam)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditForm(f => ({ ...f, gender: 'female' }))}
+                          className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+                            editForm.gender === 'female' || editForm.gender === 'Nữ'
+                              ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>👩 Nữ (Cartoon Nữ)</span>
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Email</label>

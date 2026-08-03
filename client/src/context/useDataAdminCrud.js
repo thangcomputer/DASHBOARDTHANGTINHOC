@@ -21,6 +21,7 @@ export function useDataAdminCrud({
   const addStudent = useCallback(async (student) => {
     const payload = {
       name:          student.name,
+      gender:        student.gender || 'male',
       age:           student.age || undefined,
       phone:         student.phone || '',
       zalo:          student.zalo || student.phone || '',
