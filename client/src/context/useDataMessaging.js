@@ -351,14 +351,15 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     const safeTeachers = teachers.filter(Boolean);
     const safeStaffs = staffs.filter(Boolean);
     const safeMessages = messages.filter(Boolean);
+    const isSupportStaff = currentUser?.role === 'staff' || currentUser?.adminRole === 'STAFF' || safeStaffs.some(st => String(st.id || st._id) === sId);
     const isSuperAdmin = sId === 'admin' || (safeTeachers.find(t => String(t.id) === sId)?.adminRole === 'SUPER_ADMIN');
     const userRole = (sId === 'admin' || (safeTeachers.find(t => String(t.id) === sId)?.adminRole)) ? 'admin' : (safeStudents.find(s => String(s.id) === sId) ? 'student' : 'teacher');
 
-    // Filter messages where user is sender or receiver; only SUPER_ADMIN can see receiverId='admin' mailbox
+    // Kênh nhắn tin hỗ trợ ('admin') CHỈ dành riêng cho Hỗ trợ viên (isSupportStaff), Admin không nhận tin hỗ trợ
     const userMsgs = safeMessages.filter(m => {
       const isDirect = String(m.senderId) === sId || String(m.receiverId) === sId;
-      const isAdminMailbox = isSuperAdmin && (String(m.senderId) === 'admin' || String(m.receiverId) === 'admin');
-      return isDirect || isAdminMailbox;
+      const isSupportMailbox = isSupportStaff && (String(m.senderId) === 'admin' || String(m.receiverId) === 'admin');
+      return isDirect || isSupportMailbox;
     });
     const convMap = {};
 
@@ -369,10 +370,10 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       const existingTime = existing ? new Date(existing.lastTime).getTime() : 0;
 
       if (!existing || mTime > existingTime) {
-        // Xác định xem mình có phải là người gửi không (hộp chung 'admin' chỉ dành cho SUPER_ADMIN)
-        const isMeSender = String(m.senderId) === sId || (isSuperAdmin && String(m.senderId) === 'admin');
+        // Hỗ trợ viên nhận diện tin nhắn trong hộp chung hỗ trợ
+        const isMeSender = String(m.senderId) === sId || (isSupportStaff && String(m.senderId) === 'admin');
 
-        const isViewerStaffOrAdmin = sId === 'admin' || isSuperAdmin || currentUser?.role === 'staff' || currentUser?.role === 'admin';
+        const isViewerStaffOrAdmin = isSupportStaff || sId === 'admin' || isSuperAdmin || currentUser?.role === 'staff' || currentUser?.role === 'admin';
         const otherUserId = isMeSender ? m.receiverId : m.senderId;
         const otherRole = isMeSender ? m.receiverRole : m.senderRole;
 

@@ -604,7 +604,7 @@ app.notifyUser = (role, userId, eventName, data) => {
   const strUserId = String(userId);
 
   if (strUserId === 'admin') {
-    io.to('ALL_ADMIN').to('ALL_STAFF').emit(eventName, data);
+    io.to('ALL_STAFF').emit(eventName, data);
     return true;
   }
 
