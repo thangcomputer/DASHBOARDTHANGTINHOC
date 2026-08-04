@@ -133,7 +133,7 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
         aria-label={`Mở chat với ${tab.user.name}`}
       >
         <img
-          src={resolveAvatarUrl({ avatar: tab.user.avatar, role: tab.user.role, name: tab.user.name })}
+          src={resolveAvatarUrl(tab.user)}
           alt=""
           className="cms-fm-head__avatar"
         />
@@ -264,7 +264,7 @@ function ChatWindow({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="relative shrink-0">
             <img
-              src={resolveAvatarUrl({ avatar: tab.user.avatar, role: tab.user.role === 'admin' && !isSuper ? 'staff' : tab.user.role, name: displayName })}
+              src={resolveAvatarUrl({ ...tab.user, role: tab.user.role === 'admin' && !isSuper ? 'staff' : tab.user.role, name: displayName })}
               alt=""
               className="w-8 h-8 rounded-full object-cover"
             />
@@ -628,7 +628,7 @@ export default function FloatingMessenger({ session, role }) {
                         >
                           <span className="relative shrink-0">
                             <img
-                              src={resolveAvatarUrl({ role: c.user.role, name: c.user.name })}
+                              src={resolveAvatarUrl(c.user)}
                               alt=""
                               className="w-9 h-9 rounded-full object-cover"
                             />
@@ -671,7 +671,7 @@ export default function FloatingMessenger({ session, role }) {
                             >
                               <span className="relative shrink-0">
                                 <img
-                                  src={resolveAvatarUrl({ role: p.displayRole || p.role, name: p.name })}
+                                  src={resolveAvatarUrl({ ...p, role: p.displayRole || p.role })}
                                   alt=""
                                   className="w-9 h-9 rounded-full object-cover"
                                 />

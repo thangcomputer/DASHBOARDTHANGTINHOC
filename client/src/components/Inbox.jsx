@@ -964,7 +964,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <Users size={20} />
                       ) : (
                         <img
-                          src={resolveAvatarUrl({ avatar: conv.user.avatar, role: conv.user.role, name: conv.user.name, gender: conv.user.gender })}
+                          src={resolveAvatarUrl(conv.user)}
                           alt={conv.user.name || ''}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -1130,7 +1130,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <Users size={16} />
                       ) : (
                         <img
-                          src={resolveAvatarUrl({ avatar: activeConv.user.avatar, role: activeConv.user.role, name: activeConv.user.name, gender: activeConv.user.gender })}
+                          src={resolveAvatarUrl(activeConv.user)}
                           alt={activeConv.user.name || ''}
                           className="w-full h-full object-cover"
                           onError={(e) => {
