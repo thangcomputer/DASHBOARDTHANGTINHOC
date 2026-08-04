@@ -103,7 +103,7 @@ export function resolveAvatarUrl(userObj = {}) {
   // 3. ADMIN-STAFF Chi nhánh
   if (r === 'staff' || ar === 'STAFF') {
     if (isFemale) return DEFAULT_AVATARS.staff_female;
-    return DEFAULT_AVATARS.support_male;
+    return DEFAULT_AVATARS.staff_male;
   }
 
   // 4. Admin chung

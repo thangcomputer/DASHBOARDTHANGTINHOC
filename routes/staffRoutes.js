@@ -45,7 +45,7 @@ router.get('/', guard, async (req, res) => {
 // ── POST /api/staff ────────────────────────────────────────────────────────────
 router.post('/', guard, async (req, res) => {
   try {
-    const { name, phone, password, adminRole = 'STAFF', permissions = [], branchId } = req.body;
+    const { name, phone, password, adminRole = 'STAFF', permissions = [], branchId, gender } = req.body;
 
     if (!name || !phone || !password)
       return res.status(400).json({ success: false, message: 'Thiếu tên, số điện thoại hoặc mật khẩu' });
@@ -95,6 +95,7 @@ router.post('/', guard, async (req, res) => {
       branchId:    (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') ? null : (branchId  || null),
       branchCode:  (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') ? ''   : branchCode,
       status:    'active',
+      gender:    gender || 'male',
       approvedBy: req.user?.name || 'Admin',
       approvedAt: new Date(),
     });
@@ -132,11 +133,12 @@ router.put('/:id', guard, async (req, res) => {
       });
     }
 
-    const { name, adminRole, permissions = [], status, password, branchId } = req.body;
+    const { name, adminRole, permissions = [], status, password, branchId, gender } = req.body;
     const updates = {};
 
     if (name)   updates.name   = name;
     if (status) updates.status = status;
+    if (gender) updates.gender = gender;
 
     if (adminRole) {
       // Đổi vai trò sang SUPER_ADMIN hoặc từ SUPER_ADMIN xuống STAFF: chỉ dành cho Root Admin
