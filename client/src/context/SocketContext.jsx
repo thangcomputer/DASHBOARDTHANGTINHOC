@@ -142,6 +142,11 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       if (role === 'admin' || role === 'staff') {
         newSocket.emit('admin:join');
       }
+
+      // Re-join group rooms after reconnect
+      try {
+        window.dispatchEvent(new CustomEvent('cms:socket-reconnected'));
+      } catch { /* ignore */ }
     });
 
     newSocket.on('connect_error', () => {

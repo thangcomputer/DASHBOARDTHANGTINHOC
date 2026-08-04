@@ -1,7 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
 import api from '../services/api';
-import { playMessageSound } from '../utils/sound';
-import { isMessageFromSelf } from '../lib/messagingRoles';
 import { buildConversationId } from '../utils/chatConversationId';
 import { useSocket } from './SocketContext';
 import { loadState } from './dataStorage';
@@ -58,9 +56,6 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
 
     if (onMessageReceive) {
       unsubMsg = onMessageReceive((data) => {
-        if (!isMessageFromSelf(data, currentUser)) {
-          playMessageSound();
-        }
         setMessages(prev => {
           if (prev.some(m => String(m.id) === String(data._id))) return prev;
 
@@ -125,7 +120,12 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     };
   }, [onGroupNew, onRecallReceive, onMessageReceive, onReactionReceive, currentUser]);
 
-  useEffect(() => { localStorage.setItem('thvp_messages', JSON.stringify(messages)); }, [messages]);
+  useEffect(() => {
+    try {
+      const capped = messages.length > 2000 ? messages.slice(-2000) : messages;
+      localStorage.setItem('thvp_messages', JSON.stringify(capped));
+    } catch { /* localStorage quota exceeded — ignore */ }
+  }, [messages]);
   useEffect(() => { localStorage.setItem('thvp_groups', JSON.stringify(groups)); }, [groups]);
 
   // Gửi tin nhắn qua API → lưu MongoDB → phát Socket.io

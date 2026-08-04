@@ -348,6 +348,32 @@ io.on('connection', (socket) => {
   });
 
   // ── Nhắn tin 1-1 — luôn lấy người gửi từ JWT (socket.user), không tin client ──
+  // BUG-13: Simple rate limiting cho socket events
+  const socketRateMap = new Map();
+  const SOCKET_MSG_LIMIT = 30; // max messages per window
+  const SOCKET_MSG_WINDOW = 10_000; // 10 seconds
+
+  function checkSocketRate(key) {
+    const now = Date.now();
+    let entry = socketRateMap.get(key);
+    if (!entry || now - entry.start > SOCKET_MSG_WINDOW) {
+      entry = { start: now, count: 0 };
+      socketRateMap.set(key);
+    }
+    entry.count++;
+    socketRateMap.set(key, entry);
+    return entry.count <= SOCKET_MSG_LIMIT;
+  }
+
+  // Cleanup rate map mỗi 30 giây
+  const rateCleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of socketRateMap) {
+      if (now - v.start > SOCKET_MSG_WINDOW * 2) socketRateMap.delete(k);
+    }
+  }, 30_000);
+  socket.on('disconnect', () => { /* cleanup handled below */ });
+
   socket.on('message:send', async (data) => {
     if (!socket.user) return;
     const u = socket.user;
@@ -355,18 +381,28 @@ io.on('connection', (socket) => {
     const senderId = String(u.id || u._id);
     const senderName = u.name || 'User';
     const isStaff = senderMessagingRole === 'staff';
-    data = {
-      ...data,
-      senderId,
-      senderName,
-      senderRole: senderMessagingRole,
-    };
 
+    // BUG-13: Rate limit check
+    if (!checkSocketRate(`msg_${senderId}`)) return;
+
+    // BUG-06: Validate content
+    const rawContent = String(data.content || '').trim();
     const isBroadcast =
       data.receiverId === 'ALL_USERS' ||
       data.receiverId === 'ALL_STUDENTS' ||
       data.receiverId === 'ALL_TEACHERS' ||
       String(data.receiverId || '').startsWith('ALL_BRANCH_');
+    const isFileMsg = data.messageType === 'file' || data.messageType === 'image';
+    if (!isFileMsg && !isBroadcast && !rawContent) return; // Reject empty text
+    if (rawContent.length > 2000) return; // Reject overlength
+
+    data = {
+      ...data,
+      content: rawContent,
+      senderId,
+      senderName,
+      senderRole: senderMessagingRole,
+    };
 
     if (!isBroadcast && !data.isGroup) {
       try {
@@ -448,15 +484,44 @@ io.on('connection', (socket) => {
   // ── Đánh dấu đã đọc ──
   socket.on('message:read', ({ conversationId, readerId }) => {
     if (!socket.user || socketUserId(socket.user) !== String(readerId || '')) return;
-    socket.broadcast.emit('message:read_ack', { conversationId, readerId });
+    // BUG-05: Chỉ emit cho participant trong conversation, không broadcast toàn bộ
+    const parts = String(conversationId || '').split('__').filter(Boolean);
+    parts.forEach(p => {
+      const sepIdx = p.indexOf('_');
+      if (sepIdx <= 0) return;
+      const id = p.slice(sepIdx + 1);
+      if (id && id !== String(readerId)) {
+        io.to(id).emit('message:read_ack', { conversationId, readerId });
+      }
+    });
   });
 
-  // ── Đán dấu đang gõ ──
+  // ── Đánh dấu đang gõ ──
   socket.on('typing:start', ({ conversationId, userId, userName }) => {
-    socket.broadcast.emit('typing:show', { conversationId, userId, userName });
+    if (!socket.user) return;
+    // BUG-05: Chỉ emit cho đối phương trong conversation
+    const parts = String(conversationId || '').split('__').filter(Boolean);
+    parts.forEach(p => {
+      const sepIdx = p.indexOf('_');
+      if (sepIdx <= 0) return;
+      const id = p.slice(sepIdx + 1);
+      if (id && id !== String(userId)) {
+        io.to(id).emit('typing:show', { conversationId, userId, userName });
+      }
+    });
   });
   socket.on('typing:stop', ({ conversationId, userId }) => {
-    socket.broadcast.emit('typing:hide', { conversationId, userId });
+    if (!socket.user) return;
+    // BUG-05: Chỉ emit cho đối phương
+    const parts = String(conversationId || '').split('__').filter(Boolean);
+    parts.forEach(p => {
+      const sepIdx = p.indexOf('_');
+      if (sepIdx <= 0) return;
+      const id = p.slice(sepIdx + 1);
+      if (id && id !== String(userId)) {
+        io.to(id).emit('typing:hide', { conversationId, userId });
+      }
+    });
   });
 
   // ── Nhận report vi phạm thi ──
@@ -568,6 +633,9 @@ io.on('connection', (socket) => {
       trimLastSeenMap();
       await presenceStore.removePresence(hit.key);
     }
+    // Cleanup socket rate map
+    socketRateMap.clear();
+    clearInterval(rateCleanup);
     broadcastOnlinePresence();
     io.emit('users:lastSeen', Object.fromEntries(lastSeenMap));
     console.log(`❌ Socket disconnected: ${socket.id}`);

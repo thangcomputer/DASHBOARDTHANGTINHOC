@@ -12,4 +12,6 @@ const conversationVisibilitySchema = new mongoose.Schema({
   timestamps: true,
 });
 
+conversationVisibilitySchema.index({ hiddenByUsers: 1 });
+
 module.exports = mongoose.model('ConversationVisibility', conversationVisibilitySchema);

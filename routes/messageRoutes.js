@@ -353,7 +353,7 @@ router.get('/search/:userId', async (req, res) => {
 
     if (!q) return res.json({ success: true, data: [] });
 
-    const sanitizeRegex = require('../middleware/sanitizeRegex');
+    const { sanitizeRegex } = require('../middleware/sanitizeRegex');
     const safeQ = sanitizeRegex(q);
 
     const isSuperAdmin = isSuperAdminAccount(req.user);
@@ -692,11 +692,8 @@ router.post('/', async (req, res) => {
         req.app.notifyUser(message.receiverRole, message.receiverId, 'message:receive', clientMessage);
 
         // 2. Confirm lại cho người gửi (để UI gửi xong cập nhật)
-        if (senderRole !== 'admin' && senderRole !== 'staff') {
-          // Nếu là HV/GV gửi cho Admin -> notifyUser người nhận đã xử lý ở bước 1
-          // Chỉ cần gửi confirm lại cho người gửi
-          req.app.notifyUser(senderRole, senderId, 'message:sent', clientMessage);
-        }
+        // Luôn gửi confirm cho mọi sender (bao gồm admin/staff) - BUG-14 fix
+        req.app.notifyUser(senderRole, senderId, 'message:sent', clientMessage);
       }
     }
 
@@ -782,6 +779,22 @@ router.patch('/:messageId/reaction', async (req, res) => {
     const message = await Message.findById(messageId);
     if (!message) return res.status(404).json({ success: false, message: 'Không tìm thấy tin nhắn' });
 
+    // BUG-04: Kiểm tra user thuộc cuộc hội thoại
+    if (message.isGroup && message.groupId) {
+      const group = await Group.findById(message.groupId).select('participants').lean();
+      const isMember = group && (group.participants || []).some(p => String(p.userId) === String(userId));
+      if (!isMember && !isSuperAdminAccount(req.user)) {
+        return res.status(403).json({ success: false, message: 'Bạn không thuộc nhóm chat này' });
+      }
+    } else {
+      const isParticipant = String(message.senderId) === String(userId) ||
+        String(message.receiverId) === String(userId) ||
+        (isSuperAdminAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin'));
+      if (!isParticipant) {
+        return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
+      }
+    }
+
     // Kiểm tra đã có reaction chưa
     const existingIdx = message.reactions.findIndex(r => r.userId === userId && r.type === type);
     
@@ -799,7 +812,6 @@ router.patch('/:messageId/reaction', async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       if (message.isGroup && message.groupId) {
-        // Phát cho cả room group
         io.to(`group_${message.groupId}`).emit('message:reaction', { 
            messageId: message._id, 
            reactions: message.reactions,
@@ -807,11 +819,14 @@ router.patch('/:messageId/reaction', async (req, res) => {
            conversationId: message.conversationId 
         });
       } else {
-        // Thông báo cho cả 2 bên (sender & receiver)
+        // BUG-16: Parse conversationId đúng bằng indexOf thay vì split
         const parts = (message.conversationId || '').split('__');
         parts.forEach(p => {
           if (!p) return;
-          const [role, id] = p.split('_');
+          const sepIdx = p.indexOf('_');
+          if (sepIdx <= 0) return;
+          const role = p.slice(0, sepIdx);
+          const id = p.slice(sepIdx + 1);
           if (role && id) {
             req.app.notifyUser(role, id, 'message:reaction', { 
               messageId: message._id, 
@@ -853,6 +868,12 @@ router.patch('/:messageId/recall', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Chỉ có thể thu hồi tin nhắn trong vòng 24 giờ kể từ lúc gửi' });
     }
 
+    // BUG-11: Xóa file đính kèm khi thu hồi
+    if (['file', 'image'].includes(message.messageType) && message.fileUrl && !message.fileExpired) {
+      const { expireMessageFile } = require('../utils/messageFileRetention');
+      await expireMessageFile(message, { save: false });
+    }
+
     message.isRecalled = true;
     message.content = 'Tin nhắn đã được thu hồi';
     await message.save();
@@ -865,13 +886,20 @@ router.patch('/:messageId/recall', async (req, res) => {
            groupId: message.groupId 
         });
       } else {
-        const parts = message.conversationId.split('__');
+        // BUG-08: Parse conversationId đúng bằng indexOf thay vì split('_')
+        const parts = (message.conversationId || '').split('__');
         parts.forEach(p => {
-          const [role, id] = p.split('_');
-          req.app.notifyUser(role, id, 'message:recall', { 
-            messageId: message._id, 
-            conversationId: message.conversationId 
-          });
+          if (!p) return;
+          const sepIdx = p.indexOf('_');
+          if (sepIdx <= 0) return;
+          const role = p.slice(0, sepIdx);
+          const id = p.slice(sepIdx + 1);
+          if (role && id) {
+            req.app.notifyUser(role, id, 'message:recall', { 
+              messageId: message._id, 
+              conversationId: message.conversationId 
+            });
+          }
         });
       }
     }
@@ -890,6 +918,22 @@ router.patch('/:messageId/soft-delete', async (req, res) => {
 
     const message = await Message.findById(messageId);
     if (!message) return res.status(404).json({ success: false, message: 'Không tìm thấy tin nhắn' });
+
+    // BUG-04: Kiểm tra user thuộc cuộc hội thoại trước khi cho xóa
+    if (message.isGroup && message.groupId) {
+      const group = await Group.findById(message.groupId).select('participants').lean();
+      const isMember = group && (group.participants || []).some(p => String(p.userId) === String(userId));
+      if (!isMember && !isSuperAdminAccount(req.user)) {
+        return res.status(403).json({ success: false, message: 'Bạn không thuộc nhóm chat này' });
+      }
+    } else {
+      const isParticipant = String(message.senderId) === String(userId) ||
+        String(message.receiverId) === String(userId) ||
+        (isSuperAdminAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin'));
+      if (!isParticipant) {
+        return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
+      }
+    }
 
     // Thêm userId vào mảng hiddenFor nếu chưa có
     if (!message.hiddenFor) message.hiddenFor = [];
@@ -911,9 +955,32 @@ router.post('/groups', async (req, res) => {
         return res.status(403).json({ success: false, message: 'Học viên không có quyền tạo nhóm' });
     }
     const { name, participants } = req.body;
+
+    // BUG-03: Validate tên nhóm
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Tên nhóm không được để trống' });
+    }
+
+    // BUG-03: Validate & sanitize participants
+    if (!Array.isArray(participants) || participants.length === 0) {
+      return res.status(400).json({ success: false, message: 'Danh sách thành viên không hợp lệ' });
+    }
+    const validRoles = ['admin', 'teacher', 'student', 'staff'];
+    const sanitizedParticipants = participants
+      .filter(p => p && typeof p === 'object' && p.userId && p.name && validRoles.includes(p.role))
+      .map(p => ({
+        userId: String(p.userId).slice(0, 50),
+        name: String(p.name).slice(0, 100),
+        role: p.role,
+        joinedAt: new Date(),
+      }));
+    if (sanitizedParticipants.length === 0) {
+      return res.status(400).json({ success: false, message: 'Không có thành viên hợp lệ' });
+    }
+
     const group = await Group.create({
-      name,
-      participants: [...participants, { userId: req.user.id, name: req.user.name, role: req.user.role }],
+      name: String(name).trim().slice(0, 100),
+      participants: [...sanitizedParticipants, { userId: req.user.id, name: req.user.name, role: req.user.role }],
       createdBy: { userId: req.user.id, name: req.user.name }
     });
 
@@ -953,6 +1020,16 @@ router.delete('/groups/:groupId', async (req, res) => {
         return res.status(403).json({ success: false, message: 'Học viên không có quyền xóa nhóm' });
     }
     const { groupId } = req.params;
+
+    // BUG-02: Kiểm tra quyền — chỉ creator hoặc SuperAdmin mới được xóa nhóm
+    const group = await Group.findById(groupId).select('createdBy').lean();
+    if (!group) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm' });
+    }
+    const isCreator = String(group.createdBy?.userId) === String(req.user.id);
+    if (!isCreator && !isSuperAdminAccount(req.user)) {
+      return res.status(403).json({ success: false, message: 'Chỉ người tạo nhóm hoặc Super Admin mới có quyền xóa nhóm' });
+    }
     
     // Xóa tất cả tin nhắn của nhóm này
     await Message.deleteMany({ conversationId: `group_${groupId}` });
@@ -1027,9 +1104,9 @@ router.post('/broadcast', async (req, res) => {
     const io = req.app.get('io');
     const results = [];
 
-    // Tạo tin nhắn cho từng người nhận
+    // BUG-07: Tạo tin nhắn hàng loạt bằng insertMany thay vì loop save
+    const bulkDocs = [];
     for (const target of targets) {
-      // Không tự gửi cho chính mình
       if (target._id.toString() === userId) continue;
 
       const receiverId = target._id.toString();
@@ -1040,13 +1117,10 @@ router.post('/broadcast', async (req, res) => {
 
       const conversationId = buildConversationId(userRole, userId, receiverRole, receiverId);
 
-      const finalSenderId = userId;
-      const finalSenderName = userName || 'Người gửi';
-
-      const newMsg = new Message({
+      bulkDocs.push({
         conversationId,
-        senderId: finalSenderId,
-        senderName: finalSenderName,
+        senderId: userId,
+        senderName: userName || 'Người gửi',
         senderRole: userRole,
         senderBranchCode: senderDoc?.branchCode || '',
         receiverId,
@@ -1055,21 +1129,30 @@ router.post('/broadcast', async (req, res) => {
         receiverBranchCode: target.branchCode || '',
         content,
         messageType,
-        fileUrl,
-        fileName,
+        fileUrl: fileUrl || '',
+        fileName: fileName || '',
       });
+    }
 
-      await newMsg.save();
-      results.push(newMsg);
+    // Batch insert (tối đa 200 mỗi lần để tránh quá tải)
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < bulkDocs.length; i += BATCH_SIZE) {
+      const batch = bulkDocs.slice(i, i + BATCH_SIZE);
+      const saved = await Message.insertMany(batch, { ordered: false });
+      results.push(...saved);
+    }
 
-      // Emit socket real-time
-      if (io) {
-        const msgPayload = toClientMessage(newMsg);
-        // 1. Gửi trực tiếp cho người nhận qua room cá nhân
-        io.to(receiverId).emit('message:receive', msgPayload);
-        // 2. Đồng bộ cho admin/staff online
-        io.to('ALL_ADMIN').emit('message:receive', msgPayload);
-        io.to('ALL_STAFF').emit('message:receive', msgPayload);
+    // Emit socket real-time cho từng người nhận
+    if (io) {
+      for (const msg of results) {
+        const msgPayload = toClientMessage(msg);
+        io.to(String(msg.receiverId)).emit('message:receive', msgPayload);
+      }
+      // Đồng bộ 1 lần cho admin/staff
+      if (results.length > 0) {
+        const lastPayload = toClientMessage(results[results.length - 1]);
+        io.to('ALL_ADMIN').emit('message:receive', lastPayload);
+        io.to('ALL_STAFF').emit('message:receive', lastPayload);
       }
     }
 
