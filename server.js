@@ -325,7 +325,7 @@ io.on('connection', (socket) => {
       if (socket.user.adminRole === 'STAFF' || messagingRole === 'staff') {
         socket.join('ALL_STAFF');
       }
-      if (userId === 'admin' || socket.user?.adminRole === 'SUPER_ADMIN') {
+      if (userId === 'admin' || socket.user?.adminRole === 'SUPER_ADMIN' || socket.user?.adminRole === 'HIGH_ADMIN') {
         socket.join('ALL_ADMIN');
       }
 
@@ -579,7 +579,7 @@ io.on('connection', (socket) => {
     const uid = socketUserId(socket.user);
     const role = getMessagingRole(socket.user);
     if (role !== 'teacher' && !isAdminSocketUser(socket.user)) return;
-    if (uid !== String(teacherId) && socket.user.id !== 'admin' && socket.user.adminRole !== 'SUPER_ADMIN') return;
+    if (uid !== String(teacherId) && socket.user.id !== 'admin' && socket.user.adminRole !== 'SUPER_ADMIN' && socket.user.adminRole !== 'HIGH_ADMIN') return;
     socket.join(`teacher_${teacherId}`);
     console.log(`👨‍🏫 Teacher ${teacherId} joined room teacher_${teacherId}`);
   });
@@ -589,7 +589,7 @@ io.on('connection', (socket) => {
     const uid = socketUserId(socket.user);
     const role = getMessagingRole(socket.user);
     if (role !== 'student' && !isAdminSocketUser(socket.user)) return;
-    if (uid !== String(studentId) && socket.user.id !== 'admin' && socket.user.adminRole !== 'SUPER_ADMIN') return;
+    if (uid !== String(studentId) && socket.user.id !== 'admin' && socket.user.adminRole !== 'SUPER_ADMIN' && socket.user.adminRole !== 'HIGH_ADMIN') return;
     socket.join(`student_${studentId}`);
     console.log(`🎓 Student ${studentId} joined room student_${studentId}`);
   });
@@ -612,7 +612,7 @@ io.on('connection', (socket) => {
       const group = await Group.findById(groupId).select('participants').lean();
       if (!group) return;
       const isMember = (group.participants || []).some((p) => String(p.userId) === uid);
-      if (!isMember && socket.user.id !== 'admin' && socket.user.adminRole !== 'SUPER_ADMIN') return;
+      if (!isMember && socket.user.id !== 'admin' && socket.user.adminRole !== 'SUPER_ADMIN' && socket.user.adminRole !== 'HIGH_ADMIN') return;
       socket.join(`group_${groupId}`);
       console.log(`💬 Socket ${socket.id} joined group_${groupId}`);
     } catch (err) {

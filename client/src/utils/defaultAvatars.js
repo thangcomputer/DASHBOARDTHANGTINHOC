@@ -89,7 +89,7 @@ export function resolveAvatarUrl(userObj = {}) {
     : legacyIsFemaleName(name);
 
   // 1. Super Admin / Giám Đốc / Admin
-  if (uid === 'admin' || ar === 'SUPER_ADMIN' || r === 'admin' || r === 'super_admin') {
+  if (uid === 'admin' || ar === 'SUPER_ADMIN' || ar === 'HIGH_ADMIN' || r === 'admin' || r === 'super_admin') {
     if (isFemale) return DEFAULT_AVATARS.admin_female;
     return DEFAULT_AVATARS.admin_male;
   }

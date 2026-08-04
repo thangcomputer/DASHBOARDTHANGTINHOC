@@ -8,7 +8,7 @@ import { normalizeChatRole } from './chatConversationId';
 export function isSuperAdminViewer(session) {
   if (!session) return false;
   const id = String(session?.id || session?._id || '');
-  if (id === 'admin' || session?.adminRole === 'SUPER_ADMIN' || session?.role === 'admin' || session?.role === 'staff' || session?.adminRole === 'STAFF') {
+  if (id === 'admin' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'HIGH_ADMIN' || session?.role === 'admin' || session?.role === 'staff' || session?.adminRole === 'STAFF') {
     return true;
   }
   const perms = Array.isArray(session?.permissions) ? session.permissions : [];

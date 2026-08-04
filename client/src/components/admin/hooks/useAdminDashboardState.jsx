@@ -89,6 +89,7 @@ export function useAdminDashboardState() {
 
   const _sess = JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
   const isSuperAdmin = _sess?.id === 'admin' || _sess?.adminRole === 'SUPER_ADMIN';
+  const isHighAdmin = _sess?.adminRole === 'HIGH_ADMIN';
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -97,7 +98,7 @@ export function useAdminDashboardState() {
   // Chặn mở tab bằng URL hash khi không có quyền (menu đã ẩn nhưng URL vẫn vào được)
   useEffect(() => {
     // Nếu là Staff (không phải SuperAdmin) chỉ có quyền Hộp thư (manage_messages)
-    if (_sess && _sess.id !== 'admin' && _sess.adminRole !== 'SUPER_ADMIN') {
+    if (_sess && _sess.id !== 'admin' && _sess.adminRole !== 'SUPER_ADMIN' && _sess.adminRole !== 'HIGH_ADMIN') {
       const perms = _sess.permissions || [];
       const hasOtherPerms = Object.values(TAB_PERMISSION).some((p) => perms.includes(p));
       if (!hasOtherPerms && perms.includes(PERMISSIONS.MANAGE_MESSAGES)) {
@@ -109,7 +110,7 @@ export function useAdminDashboardState() {
     }
 
     if (activeTab === 'dashboard') return undefined;
-    if (activeTab === 'staff' && !isSuperAdmin) {
+    if (activeTab === 'staff' && !isSuperAdmin && !isHighAdmin) {
       navigate('/admin#dashboard', { replace: true });
       return undefined;
     }

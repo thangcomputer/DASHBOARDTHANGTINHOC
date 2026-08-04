@@ -33,8 +33,9 @@ export default function Avatar({
 }) {
   const normalized =
     adminRole === 'SUPER_ADMIN' ? 'admin'
-      : adminRole === 'STAFF' ? 'staff'
-        : String(role || 'student').toLowerCase();
+      : adminRole === 'HIGH_ADMIN' ? 'admin'
+        : adminRole === 'STAFF' ? 'staff'
+          : String(role || 'student').toLowerCase();
 
   const url = resolveAvatarUrl({ avatar: src, role, adminRole, name, gender });
   const sizeClass =

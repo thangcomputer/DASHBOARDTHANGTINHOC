@@ -20,6 +20,22 @@ export const PERMISSIONS = {
   VIEW_TEACHERS:      'view_teachers',        // ⭐ Xem danh sách giảng viên (read-only)
 };
 
+/** Enum các adminRole — dùng chung thay vì hard-code string */
+export const ADMIN_ROLES = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  HIGH_ADMIN: 'HIGH_ADMIN',
+  STAFF: 'STAFF',
+};
+
+/** Quyền mặc định khi tạo HIGH_ADMIN — có thể điều chỉnh sau */
+export const HIGH_ADMIN_DEFAULT_PERMISSIONS = [
+  'manage_students', 'view_teachers', 'manage_schedule',
+  'manage_messages', 'manage_finance', 'view_branch_revenue',
+  'manage_training', 'manage_student_training',
+  'manage_hr', 'manage_blog',
+  'view_logs', 'view_evaluations',
+];
+
 /** Danh sách toàn bộ permissions với label tiếng Việt (dùng trong form phân quyền) */
 export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.MANAGE_STUDENTS,     label: 'Quản lý Học viên',           desc: 'Xem, thêm, sửa, xóa học viên' },
@@ -43,6 +59,8 @@ export function hasPermission(session, permKey) {
   if (!session) return false;
   if (session.id === 'admin') return true;
   if (session.adminRole === 'SUPER_ADMIN') return true;
+  // HIGH_ADMIN: kiểm tra từ permissions array (KHÔNG bypass toàn quyền)
+  // STAFF: tương tự
   const perms = session.permissions || [];
   return perms.includes(permKey);
 }

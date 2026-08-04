@@ -15,6 +15,9 @@ const { sanitizeMessages, sanitizeMessageDoc } = require('../utils/messageFileRe
 const { normalizeMulterFile } = require('../utils/escapeRegex');
 const isStaffAccount = (u = {}) => u.role === 'staff' || u.adminRole === 'STAFF';
 const isSuperAdminAccount = (u = {}) => u.id === 'admin' || u.adminRole === 'SUPER_ADMIN';
+const isHighAdminAccount = (u = {}) => u.adminRole === 'HIGH_ADMIN';
+/** SUPER_ADMIN + HIGH_ADMIN — chia sẻ admin mailbox */
+const isAdminLevelAccount = (u = {}) => isSuperAdminAccount(u) || isHighAdminAccount(u);
 
 function toClientMessage(doc) {
   const plain = doc?.toObject ? doc.toObject() : { ...(doc || {}) };
@@ -31,7 +34,7 @@ function staffDisplayName(rawName, branchCode) {
 
 function deptOutboundToStudent(reqUser) {
   if (isStaffAccount(reqUser)) return DEPT_STAFF_LABEL;
-  if (isSuperAdminAccount(reqUser)) return DEPT_SUPER_LABEL;
+  if (isAdminLevelAccount(reqUser)) return DEPT_SUPER_LABEL;
   if (reqUser.role === 'admin' || reqUser.role === 'staff') return DEPT_SUPER_LABEL;
   return null;
 }
@@ -113,7 +116,7 @@ router.get('/contacts', async (req, res) => {
     let studentContacts  = [];
 
     // ══ [2] SUPER_ADMIN: xem toàn hệ thống, có hỗ trợ filter branch ══
-    if (adminRole === 'SUPER_ADMIN') {
+    if (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') {
       const branchFilter = queryBranchId && queryBranchId !== 'all'
         ? { branchId: queryBranchId }
         : {};
@@ -278,7 +281,7 @@ router.get('/conversations/:userId', async (req, res) => {
     }
 
     // Branch Filtering logic
-    const isSuperAdmin = isSuperAdminAccount(req.user);
+    const isSuperAdmin = isAdminLevelAccount(req.user);
     const userBranch = req.user.branchCode || '';
 
     const matchQuery = { 
@@ -286,7 +289,7 @@ router.get('/conversations/:userId', async (req, res) => {
         { senderId: userId },
         { receiverId: userId },
         // Hộp chung admin (admin_admin) chỉ dành cho SUPER_ADMIN
-        ...(isSuperAdminAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
+        ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
       ]
     };
 
@@ -297,7 +300,7 @@ router.get('/conversations/:userId', async (req, res) => {
           { senderBranchCode: userBranch },
           { receiverBranchCode: userBranch },
           // Không leak hộp chung admin cho STAFF/TEACHER
-          ...(isSuperAdminAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
+          ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
         ]}
       ];
     }
@@ -310,7 +313,7 @@ router.get('/conversations/:userId', async (req, res) => {
         lastMessage: { $first: '$$ROOT' },
         unreadCount: { $sum: { $cond: [
           { $and: [
-            { $in: ['$receiverId', isSuperAdminAccount(req.user) ? ['admin', String(userId)] : [String(userId)]] },
+            { $in: ['$receiverId', isAdminLevelAccount(req.user) ? ['admin', String(userId)] : [String(userId)]] },
             { $eq: ['$isRead', false] },
           ]}, 1, 0,
         ]}},
@@ -356,14 +359,14 @@ router.get('/search/:userId', async (req, res) => {
     const { sanitizeRegex } = require('../middleware/sanitizeRegex');
     const safeQ = sanitizeRegex(q);
 
-    const isSuperAdmin = isSuperAdminAccount(req.user);
+    const isSuperAdmin = isAdminLevelAccount(req.user);
     const userBranch = req.user.branchCode || '';
 
     const searchQuery = {
       $or: [
         { senderId: userId }, 
         { receiverId: userId },
-        ...(isSuperAdminAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
+        ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
       ],
       content: { $regex: safeQ, $options: 'i' }
     };
@@ -410,7 +413,7 @@ router.get('/:conversationId', async (req, res) => {
       const hasSelf = parts.some((p) => p.endsWith(`_${req.user.id}`));
       if (hasSelf) return true;
       // Chỉ super admin (hardcoded admin / SUPER_ADMIN) mới được xem hộp chung admin_admin
-      if (isStaffOrAdmin && isSuperAdminAccount(req.user)) {
+      if (isStaffOrAdmin && isAdminLevelAccount(req.user)) {
         return parts.includes('admin_admin');
       }
       return false;
@@ -449,7 +452,7 @@ router.get('/sync/:userId', async (req, res) => {
       $or: [
         { senderId: userId },
         { receiverId: userId },
-        ...(isSuperAdminAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
+        ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
         ...(groupIds.length > 0 ? [{ conversationId: { $in: groupIds.map(id => `group_${id}`) } }] : [])
       ],
       hiddenFor: { $ne: userId }
@@ -552,7 +555,7 @@ router.post('/', async (req, res) => {
         return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm chat' });
       }
       const isMember = (group.participants || []).some((p) => String(p.userId) === String(senderId));
-      if (!isMember && !isSuperAdminAccount(req.user)) {
+      if (!isMember && !isAdminLevelAccount(req.user)) {
         return res.status(403).json({ success: false, message: 'Bạn không thuộc nhóm chat này' });
       }
     }
@@ -617,7 +620,7 @@ router.post('/', async (req, res) => {
     }
 
     // ⭐ CHỐNG CHÉO CHI NHÁNH (Cross-Branch Protection)
-    const isSuperAdmin = isSuperAdminAccount(req.user);
+    const isSuperAdmin = isAdminLevelAccount(req.user);
     if (!isSuperAdmin && (senderRole === 'admin' || senderRole === 'staff') && receiverRole === 'student') {
         // Staff messaging student
         if (sBranch && rBranch && sBranch !== rBranch) {
@@ -742,7 +745,7 @@ router.put('/read/:conversationId', async (req, res) => {
       const parts = String(conversationId || '').split('__').filter(Boolean);
       const hasSelf = parts.some((p) => p.endsWith(`_${readerId}`));
       if (hasSelf) allowed = true;
-      else if (isStaffOrAdmin && isSuperAdminAccount(req.user) && parts.includes('admin_admin')) {
+      else if (isStaffOrAdmin && isAdminLevelAccount(req.user) && parts.includes('admin_admin')) {
         allowed = true;
       }
     }
@@ -750,7 +753,7 @@ router.put('/read/:conversationId', async (req, res) => {
         return res.status(403).json({ success: false, message: 'Thao tác không hợp lệ' });
     }
 
-    const receiverTargets = isSuperAdminAccount(req.user)
+    const receiverTargets = isAdminLevelAccount(req.user)
       ? ['admin', String(readerId)]
       : [String(readerId)];
 
@@ -783,13 +786,13 @@ router.patch('/:messageId/reaction', async (req, res) => {
     if (message.isGroup && message.groupId) {
       const group = await Group.findById(message.groupId).select('participants').lean();
       const isMember = group && (group.participants || []).some(p => String(p.userId) === String(userId));
-      if (!isMember && !isSuperAdminAccount(req.user)) {
+      if (!isMember && !isAdminLevelAccount(req.user)) {
         return res.status(403).json({ success: false, message: 'Bạn không thuộc nhóm chat này' });
       }
     } else {
       const isParticipant = String(message.senderId) === String(userId) ||
         String(message.receiverId) === String(userId) ||
-        (isSuperAdminAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin'));
+        (isAdminLevelAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin'));
       if (!isParticipant) {
         return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
       }
@@ -923,13 +926,13 @@ router.patch('/:messageId/soft-delete', async (req, res) => {
     if (message.isGroup && message.groupId) {
       const group = await Group.findById(message.groupId).select('participants').lean();
       const isMember = group && (group.participants || []).some(p => String(p.userId) === String(userId));
-      if (!isMember && !isSuperAdminAccount(req.user)) {
+      if (!isMember && !isAdminLevelAccount(req.user)) {
         return res.status(403).json({ success: false, message: 'Bạn không thuộc nhóm chat này' });
       }
     } else {
       const isParticipant = String(message.senderId) === String(userId) ||
         String(message.receiverId) === String(userId) ||
-        (isSuperAdminAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin'));
+        (isAdminLevelAccount(req.user) && (message.senderId === 'admin' || message.receiverId === 'admin'));
       if (!isParticipant) {
         return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
       }
@@ -1027,7 +1030,7 @@ router.delete('/groups/:groupId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm' });
     }
     const isCreator = String(group.createdBy?.userId) === String(req.user.id);
-    if (!isCreator && !isSuperAdminAccount(req.user)) {
+    if (!isCreator && !isAdminLevelAccount(req.user)) {
       return res.status(403).json({ success: false, message: 'Chỉ người tạo nhóm hoặc Super Admin mới có quyền xóa nhóm' });
     }
     
@@ -1050,7 +1053,7 @@ router.get('/unread/:userId', async (req, res) => {
     if (req.user.id !== userId) {
        return res.status(403).json({ success: false, message: 'Quyền truy cập bị từ chối' });
     }
-    const receiverTargets = isSuperAdminAccount(req.user) ? ['admin', String(userId)] : [String(userId)];
+    const receiverTargets = isAdminLevelAccount(req.user) ? ['admin', String(userId)] : [String(userId)];
     const count = await Message.countDocuments({
       receiverId: { $in: receiverTargets },
       isRead: false,

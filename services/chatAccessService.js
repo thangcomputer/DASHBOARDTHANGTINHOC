@@ -11,6 +11,9 @@ function isStaff(u) {
 function isSuper(u) {
   return u?.id === 'admin' || u?.adminRole === 'SUPER_ADMIN';
 }
+function isHighAdmin(u) {
+  return u?.adminRole === 'HIGH_ADMIN';
+}
 
 /**
  * @returns {Promise<{ ok: boolean, message?: string }>}
@@ -22,6 +25,7 @@ async function assertCanDirectMessage(sender, receiverId, receiverRole) {
 
   if (rid.startsWith('ALL_')) return { ok: true };
   if (isSuper(sender)) return { ok: true };
+  if (isHighAdmin(sender)) return { ok: true }; // HIGH_ADMIN: toàn quyền nhắn tin
 
   if (sender.role === 'student' && (rRole === 'admin' || rid === 'admin')) {
     return { ok: true };

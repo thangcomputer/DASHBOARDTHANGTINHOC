@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
-import { ALL_PERMISSIONS } from '../constants/permissions';
+import { ALL_PERMISSIONS, HIGH_ADMIN_DEFAULT_PERMISSIONS } from '../constants/permissions';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { staffAPI, apiFetch } from '../services/api';
 
@@ -38,7 +38,14 @@ function RoleBadge({ adminRole, permissions = [], branchName = '' }) {
   if (adminRole === 'SUPER_ADMIN') {
     return (
       <span className="cms-rbac-badge cms-rbac-badge-admin">
-        <Crown size={10} aria-hidden="true" /> ADMIN CẤP CAO
+        <Crown size={10} aria-hidden="true" /> SUPER ADMIN
+      </span>
+    );
+  }
+  if (adminRole === 'HIGH_ADMIN') {
+    return (
+      <span className="cms-rbac-badge" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fbbf24' }}>
+        <Shield size={10} aria-hidden="true" /> ADMIN CẤP CAO
       </span>
     );
   }
@@ -123,7 +130,7 @@ function StaffModal({ staff, onClose, onSaved }) {
     try {
       const payload = {
         ...form,
-        branchId: form.adminRole === 'SUPER_ADMIN' ? null : (form.branchId || null),
+        branchId: (form.adminRole === 'SUPER_ADMIN' || form.adminRole === 'HIGH_ADMIN') ? null : (form.branchId || null),
       };
       const res = isEdit
         ? await staffAPI.update(staff._id, payload)
@@ -294,7 +301,8 @@ function StaffModal({ staff, onClose, onSaved }) {
                 aria-labelledby="rbac-role-label"
               >
                 {[
-                  { val: 'SUPER_ADMIN', label: 'Quản trị viên', icon: Crown },
+                  ...(isRootSuperAdmin ? [{ val: 'SUPER_ADMIN', label: 'Super Admin', icon: Crown }] : []),
+                  ...(isRootSuperAdmin ? [{ val: 'HIGH_ADMIN', label: 'Admin cấp cao', icon: ShieldCheck }] : []),
                   { val: 'STAFF', label: 'Hỗ trợ viên / Admin-Staff', icon: UserCog },
                 ].map(({ val, label, icon: Icon }) => (
                   <button
@@ -305,8 +313,8 @@ function StaffModal({ staff, onClose, onSaved }) {
                     onClick={() => setForm((f) => ({
                       ...f,
                       adminRole: val,
-                      permissions: val === 'SUPER_ADMIN' ? [] : (f.permissions.length ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
-                      branchId: val === 'SUPER_ADMIN' ? '' : f.branchId,
+                      permissions: val === 'SUPER_ADMIN' ? [] : val === 'HIGH_ADMIN' ? (f.permissions.length ? f.permissions : HIGH_ADMIN_DEFAULT_PERMISSIONS) : (f.permissions.length ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
+                      branchId: (val === 'SUPER_ADMIN' || val === 'HIGH_ADMIN') ? '' : f.branchId,
                     }))}
                     className={`cms-rbac-segment-item ${form.adminRole === val ? 'is-active' : ''}`}
                   >
@@ -582,6 +590,7 @@ function StaffCard({ s, deleting, isRootSuperAdmin, onEdit, onResetPw, onDelete 
   const sheetId = `staff-perms-${s._id}`;
 
   const isTargetSuper = s.adminRole === 'SUPER_ADMIN';
+  const isTargetHighAdmin = s.adminRole === 'HIGH_ADMIN';
   const canManage = isTargetSuper ? isRootSuperAdmin : true;
   const disabledReason = !canManage ? 'Chỉ Admin Super mới được thao tác với Admin Cấp Cao' : '';
 
@@ -781,7 +790,7 @@ export default function StaffManagementTab() {
   useEffect(() => { fetchStaff(); }, [fetchStaff]);
 
   const handleDelete = async (s) => {
-    if (s.adminRole === 'SUPER_ADMIN' && !isRootSuperAdmin) {
+    if ((s.adminRole === 'SUPER_ADMIN' || s.adminRole === 'HIGH_ADMIN') && !isRootSuperAdmin) {
       toast.error('Chỉ Admin Super (Hệ thống) mới có quyền xóa tài khoản Admin Cấp Cao.');
       return;
     }

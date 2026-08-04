@@ -19,6 +19,10 @@ function actorIsSuperAdmin(req) {
   return req.user?.id === 'admin' || req.user?.adminRole === 'SUPER_ADMIN';
 }
 
+function actorIsHighAdminOrAbove(req) {
+  return actorIsSuperAdmin(req) || req.user?.adminRole === 'HIGH_ADMIN';
+}
+
 /** Staff không được gán quyền vượt quá quyền của chính mình. */
 async function sanitizeAssignedPermissions(req, permissions) {
   const list = Array.isArray(permissions) ? permissions.map(String) : [];
@@ -50,7 +54,15 @@ router.post('/', guard, async (req, res) => {
     if (adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(req)) {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ Admin Super (Hệ thống) mới được phép tạo thêm tài khoản Admin Cấp Cao.',
+        message: 'Chỉ Admin Super (Hệ thống) mới được phép tạo thêm tài khoản Super Admin.',
+      });
+    }
+
+    // Tạo HIGH_ADMIN chỉ dành cho SUPER_ADMIN trở lên
+    if (adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(req)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ Super Admin mới được phép tạo tài khoản Admin cấp cao.',
       });
     }
 
@@ -69,17 +81,19 @@ router.post('/', guard, async (req, res) => {
     if (exists)
       return res.status(409).json({ success: false, message: 'Số điện thoại đã được sử dụng' });
 
-    const safePermissions = adminRole === 'SUPER_ADMIN'
+    const safePermissions = (adminRole === 'SUPER_ADMIN')
       ? []
       : await sanitizeAssignedPermissions(req, permissions);
 
+    const resolvedRole = (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') ? 'admin' : 'staff';
+
     const newStaff = await Teacher.create({
       name, phone, password,
-      role:        adminRole === 'SUPER_ADMIN' ? 'admin' : 'staff',
+      role:        resolvedRole,
       adminRole,
       permissions: safePermissions,
-      branchId:    adminRole === 'SUPER_ADMIN' ? null : (branchId  || null),
-      branchCode:  adminRole === 'SUPER_ADMIN' ? ''   : branchCode,
+      branchId:    (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') ? null : (branchId  || null),
+      branchCode:  (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') ? ''   : branchCode,
       status:    'active',
       approvedBy: req.user?.name || 'Admin',
       approvedAt: new Date(),
@@ -87,7 +101,7 @@ router.post('/', guard, async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Đã tạo tài khoản ${adminRole === 'SUPER_ADMIN' ? 'Admin Cấp Cao' : 'Nhân viên'}: ${name}`,
+      message: `Đã tạo tài khoản ${adminRole === 'SUPER_ADMIN' ? 'Super Admin' : adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : 'Nhân viên'}: ${name}`,
       data: { ...newStaff.toObject(), password: undefined },
     });
   } catch (err) {
@@ -102,11 +116,19 @@ router.put('/:id', guard, async (req, res) => {
     const target = await Teacher.findById(req.params.id).select('adminRole').lean();
     if (!target) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
 
-    // Nếu target là SUPER_ADMIN (Admin Cấp Cao), chỉ Admin Super (id === admin) mới được sửa/reset pass/đổi quyền
+    // Nếu target là SUPER_ADMIN, chỉ Admin Super (id === admin) mới được sửa
     if (target.adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(req)) {
       return res.status(403).json({
         success: false,
-        message: 'Tài khoản Admin Cấp Cao không thể tự đổi quyền, reset mật khẩu hay chỉnh sửa tài khoản Admin Cấp Cao khác. Chỉ Admin Super mới được thực hiện.',
+        message: 'Chỉ Admin Super mới được chỉnh sửa tài khoản Super Admin.',
+      });
+    }
+
+    // Nếu target là HIGH_ADMIN, chỉ SUPER_ADMIN trở lên mới được sửa
+    if (target.adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(req)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ Super Admin mới được chỉnh sửa tài khoản Admin cấp cao.',
       });
     }
 
@@ -132,6 +154,11 @@ router.put('/:id', guard, async (req, res) => {
         updates.permissions = [];
         updates.branchId    = null;
         updates.branchCode  = '';
+      } else if (adminRole === 'HIGH_ADMIN') {
+        updates.role        = 'admin';
+        updates.permissions = await sanitizeAssignedPermissions(req, permissions);
+        updates.branchId    = null;
+        updates.branchCode  = '';
       } else {
         updates.role        = 'staff';
         updates.permissions = await sanitizeAssignedPermissions(req, permissions);
@@ -146,7 +173,7 @@ router.put('/:id', guard, async (req, res) => {
           updates.branchCode = '';
         }
       }
-    } else if (target.adminRole === 'STAFF') {
+    } else if (target.adminRole === 'STAFF' || target.adminRole === 'HIGH_ADMIN') {
       if (permissions) updates.permissions = await sanitizeAssignedPermissions(req, permissions);
       if (branchId) {
         const branch = await Branch.findById(branchId);
@@ -180,11 +207,17 @@ router.delete('/:id', guard, async (req, res) => {
     const target = await Teacher.findById(req.params.id).select('adminRole').lean();
     if (!target) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
 
-    // Chỉ Admin Super mới được xóa Admin Cấp Cao. Admin Cấp Cao có quyền xóa Staff.
+    // Chỉ Admin Super mới được xóa SUPER_ADMIN. Chỉ SUPER_ADMIN trở lên mới xóa HIGH_ADMIN.
     if (target.adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(req)) {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ Admin Super mới được xóa tài khoản Admin Cấp Cao.',
+        message: 'Chỉ Admin Super mới được xóa tài khoản Super Admin.',
+      });
+    }
+    if (target.adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(req)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ Super Admin mới được xóa tài khoản Admin cấp cao.',
       });
     }
 

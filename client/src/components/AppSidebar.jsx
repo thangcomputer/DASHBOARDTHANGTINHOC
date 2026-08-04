@@ -282,6 +282,15 @@ const AppSidebar = ({
   const canSeeItem = (item) => {
     if (role !== 'admin' && role !== 'staff') return true;
     if (session?.id === 'admin' || adminRole === 'SUPER_ADMIN') return true;
+    // HIGH_ADMIN: check permissions (không bypass toàn quyền)
+    if (adminRole === 'HIGH_ADMIN') {
+      if (item.superAdminOnly) return false;
+      if (!item.permission) return true;
+      if (Array.isArray(item.permission)) {
+        return item.permission.some((p) => userPermissions.includes(p));
+      }
+      return userPermissions.includes(item.permission);
+    }
     if (item.superAdminOnly) return false;
     if (!item.permission) return true;
     if (Array.isArray(item.permission)) {
@@ -470,6 +479,7 @@ const AppSidebar = ({
                   if (role === 'teacher') return 'GIẢNG VIÊN';
                   if (role === 'student') return 'HỌC VIÊN';
                   if (session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN') return 'QUẢN TRỊ';
+                  if (session?.adminRole === 'HIGH_ADMIN') return 'ADMIN CẤP CAO';
                   const perms = Array.isArray(session?.permissions) ? session.permissions : [];
                   if (perms.length === 1 && perms.includes('manage_messages')) {
                     return 'HỖ TRỢ VIÊN';

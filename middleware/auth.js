@@ -185,6 +185,21 @@ async function assertStaffPermissions(req, res, matcher) {
     return true;
   }
 
+  // HIGH_ADMIN: có quyền rộng nhưng KHÔNG bypass — phải check permissions
+  if (user.adminRole === 'HIGH_ADMIN') {
+    req.user.adminRole = 'HIGH_ADMIN';
+    const perms = Array.isArray(user.permissions) ? user.permissions : [];
+    req.user.permissions = perms;
+    if (!matcher(perms)) {
+      res.status(403).json({
+        success: false,
+        message: '403 Forbidden: Bạn không có quyền thực hiện thao tác này.',
+      });
+      return false;
+    }
+    return true;
+  }
+
   const perms = Array.isArray(user.permissions) ? user.permissions : [];
   if (!matcher(perms)) {
     res.status(403).json({
@@ -208,6 +223,9 @@ async function userHasPermission(reqUser, requiredPermission) {
     const user = await Teacher.findById(reqUser.id).select('adminRole permissions').lean();
     if (!user) return false;
     if (user.adminRole === 'SUPER_ADMIN') return true;
+    if (user.adminRole === 'HIGH_ADMIN') {
+      return Array.isArray(user.permissions) && user.permissions.includes(requiredPermission);
+    }
     return Array.isArray(user.permissions) && user.permissions.includes(requiredPermission);
   } catch {
     return false;
@@ -287,12 +305,13 @@ const branchFilter = async (req, res, next) => {
       // 🛡️ SECURITY FIX: Chỉ thực sự là SUPER_ADMIN mới được xem toàn bộ.
       // Nếu không có branchId mà cũng KHÔNG phải SUPER_ADMIN, ép về branchId=null (không thấy gì hoặc lỗi)
       const isActuallySuper = user.adminRole === 'SUPER_ADMIN';
+      const isHighAdmin = user.adminRole === 'HIGH_ADMIN';
 
-      if (isActuallySuper || !user.branchId) {
+      if (isActuallySuper || isHighAdmin || !user.branchId) {
         const qBranch = req.query.branch_id;
-        if (qBranch && qBranch !== 'all' && qBranch !== '' && isActuallySuper) {
+        if (qBranch && qBranch !== 'all' && qBranch !== '' && (isActuallySuper || isHighAdmin)) {
           req.branchFilter = { branchId: qBranch };
-        } else if (isActuallySuper) {
+        } else if (isActuallySuper || isHighAdmin) {
           req.branchFilter = {};
         } else {
           // Admin nhưng không có branchId và không phải Super Admin? Giới hạn về null để an toàn
@@ -320,7 +339,7 @@ const branchFilter = async (req, res, next) => {
 
 async function applyTenantScopeIfAny(req) {
   const isPlatformAdmin =
-    req.user?.id === 'admin' || req.user?.adminRole === 'SUPER_ADMIN';
+    req.user?.id === 'admin' || req.user?.adminRole === 'SUPER_ADMIN' || req.user?.adminRole === 'HIGH_ADMIN';
   if (!isPlatformAdmin) return;
 
   const raw =
@@ -389,11 +408,34 @@ const requireInternalToken = (req, res, next) => {
   });
 };
 
+/**
+ * isHighAdminOrAbove — Cho phép HIGH_ADMIN hoặc SUPER_ADMIN
+ * Dùng cho các route quản lý staff nhưng không yêu cầu SUPER_ADMIN
+ */
+const isHighAdminOrAbove = async (req, res, next) => {
+  if (req.user && req.user.id === 'admin') return next();
+  try {
+    if (!req.user?.id) {
+      return res.status(403).json({ success: false, message: 'Quyền truy cập bị từ chối' });
+    }
+    const user = await Teacher.findById(req.user.id).select('adminRole').lean();
+    if (user?.adminRole === 'SUPER_ADMIN' || user?.adminRole === 'HIGH_ADMIN') {
+      req.user.adminRole = user.adminRole;
+      return next();
+    }
+  } catch (err) {
+    logger.error('[isHighAdminOrAbove] error:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi xác thực quyền' });
+  }
+  return res.status(403).json({ success: false, message: 'Quyền truy cập bị từ chối: Yêu cầu Admin cấp cao hoặc Super Admin' });
+};
+
 module.exports = {
   authMiddleware,
   isAdmin,
   isTeacher,
   isSuperAdmin,
+  isHighAdminOrAbove,
   checkPermission,
   checkAnyPermission,
   userHasPermission,
