@@ -52,7 +52,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
     users.forEach((u) => {
       const r = String(u.role || '').toLowerCase();
       const ar = String(u.adminRole || '').toUpperCase();
-      if (r === 'staff' || ar === 'STAFF') {
+      if (r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT') {
         const uid = String(u.userId || u.id || '');
         if (uid) {
           onlineStaffMap.set(uid, {
@@ -60,7 +60,8 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
             name: u.name || 'Hỗ trợ viên',
             role: 'staff',
             displayRole: 'staff',
-            adminRole: 'STAFF',
+            adminRole: u.adminRole || 'STAFF',
+            gender: u.gender || '',
             permissions: ['manage_messages'],
             avatar: u.avatar || '',
             online: true,
@@ -84,7 +85,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
         if (!st || st.status === 'Deleted' || st.status === 'inactive' || st.isDeleted) return;
         const r = String(st.role || '').toLowerCase();
         const ar = String(st.adminRole || '').toUpperCase();
-        if (r === 'staff' || ar === 'STAFF' || st.permissions?.includes?.('manage_messages')) {
+        if (r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT' || st.permissions?.includes?.('manage_messages')) {
           const stId = String(st.id || st._id || '');
           if (stId && stId !== me && !seenIds.has(stId)) {
             seenIds.add(stId);
@@ -93,7 +94,8 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
               name: st.name || 'Hỗ trợ viên',
               role: 'staff',
               displayRole: 'staff',
-              adminRole: 'STAFF',
+              adminRole: st.adminRole || 'STAFF',
+              gender: st.gender || '',
               permissions: st.permissions || ['manage_messages'],
               avatar: st.avatar || '',
               online: false,
