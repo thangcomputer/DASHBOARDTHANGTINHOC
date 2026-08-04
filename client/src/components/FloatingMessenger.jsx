@@ -401,7 +401,7 @@ export default function FloatingMessenger({ session, role }) {
   const location = useLocation();
   const isInbox = location.pathname.includes('/inbox');
   const toast = useToast();
-  const { onlineUsers, onMessageReceive } = useSocket() || {};
+  const { onlineUsers, onMessageReceive, onContactListUpdated } = useSocket() || {};
   const { sendMessage, getMessages, getConversations, markMessagesRead, recallMessage, staffs } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
@@ -432,9 +432,26 @@ export default function FloatingMessenger({ session, role }) {
     return map;
   }, [conversations]);
 
+  const [fmContacts, setFmContacts] = useState([]);
+  useEffect(() => {
+    if (isSuper) return;
+    const fetchContacts = () => {
+      messagesAPI.getContacts().then((res) => {
+        if (res?.success) setFmContacts(res.data);
+      }).catch(() => {});
+    };
+    fetchContacts();
+    if (onContactListUpdated) {
+      const unsub = onContactListUpdated(() => fetchContacts());
+      return unsub;
+    }
+  }, [isSuper, onContactListUpdated]);
+
+  const effectiveStaffs = isSuper ? staffs : (fmContacts.length > 0 ? fmContacts : staffs);
+
   const directory = useMemo(
-    () => buildSupportDirectory({ session, onlineUsers, meId, staffs }),
-    [session, onlineUsers, meId, staffs],
+    () => buildSupportDirectory({ session, onlineUsers, meId, staffs: effectiveStaffs }),
+    [session, onlineUsers, meId, effectiveStaffs],
   );
 
   const unreadConversations = useMemo(() => {
