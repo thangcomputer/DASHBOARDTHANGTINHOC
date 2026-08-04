@@ -76,7 +76,9 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
       id: String(person.id),
       name: person.name || (role === 'admin' ? 'Admin' : 'Giảng viên'),
       role,
-      avatar: person.avatar || '',
+      adminRole: person.adminRole || person.user?.adminRole || null,
+      gender: person.gender || person.user?.gender || '',
+      avatar: person.avatar || person.user?.avatar || '',
     };
 
     setTabs((prev) => {
