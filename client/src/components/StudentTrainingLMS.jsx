@@ -106,10 +106,13 @@ const CircularProgress = ({ progress, size = 112 }) => {
 
 // ─── Helper: Gọi API training-lms ────────────────────────────────────────────
 const lmsApiFetch = async (endpoint, options = {}) => {
-  // Thử token giảng viên trước, fallback sang admin
   const token =
+    localStorage.getItem('student_access_token') ||
     localStorage.getItem('teacher_access_token') ||
     localStorage.getItem('admin_access_token') ||
+    (() => {
+      try { return JSON.parse(localStorage.getItem('student_user') || '{}').token; } catch { return null; }
+    })() ||
     (() => {
       try { return JSON.parse(localStorage.getItem('teacher_user') || '{}').token; } catch { return null; }
     })() ||
@@ -552,14 +555,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   const handleEligibilityReached = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse) return;
     try {
-      const token = localStorage.getItem('teacher_access_token') ||
-        (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
-        localStorage.getItem('admin_access_token');
-
-      const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-      await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
+      await lmsApiFetch('/complete-lesson', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           lessonId: currentLesson._id || currentLesson.id,
           courseId: selectedCourse._id || selectedCourse.id,
@@ -588,16 +585,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
 
     setCompleting(true);
     try {
-      const token =
-        localStorage.getItem('student_access_token') ||
-        (localStorage.getItem('student_user') ? JSON.parse(localStorage.getItem('student_user')).token : '') ||
-        localStorage.getItem('admin_access_token') ||
-        '';
-
-      const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-      await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
+      await lmsApiFetch('/complete-lesson', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           lessonId: currentLesson._id || currentLesson.id,
           courseId: selectedCourse._id || selectedCourse.id,
@@ -626,14 +615,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   // Handle lưu progress tạm thời
   const handleSaveProgress = useCallback((lessonId, watchedSeconds) => {
     if (!selectedCourse) return;
-    const token = localStorage.getItem('teacher_access_token') ||
-      (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
-      localStorage.getItem('admin_access_token');
-
-    const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-    csrfFetch(`${API_BASE}/training-lms/save-watch-progress`, {
+    
+    lmsApiFetch('/save-watch-progress', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         lessonId: lessonId,
         courseId: selectedCourse._id || selectedCourse.id,
@@ -668,9 +652,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             )}
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight leading-snug">
-                Trung tâm đào tạo nội bộ</h1>
+                Tài liệu học tập</h1>
               <p className="text-slate-500 font-medium mt-1 text-xs sm:text-sm leading-relaxed">
-                Hoàn thành chương trình để được chứng nhận đủ điều kiện nhận lớp
+                Xem video bài giảng và hoàn thành bài tập về nhà để nắm vững kiến thức
               </p>
             </div>
           </div>
@@ -787,7 +771,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                       </div>
                       <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
                         {htmlToPlainText(course.description || course.desc) ||
-                          'Hoàn thành khóa học nội bộ này để nâng cao kỹ năng sư phạm và chuyên môn giảng dạy.'}
+                          'Hoàn thành khóa học này để nâng cao kiến thức và kỹ năng thực hành.'}
                       </p>
 
                       <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
