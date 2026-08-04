@@ -13,7 +13,7 @@ const logger = require('../config/logger');
 const { buildConversationId } = require('../utils/chatConversationId');
 const { sanitizeMessages, sanitizeMessageDoc } = require('../utils/messageFileRetention');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
-const isStaffAccount = (u = {}) => u.role === 'staff' || u.adminRole === 'STAFF';
+const isStaffAccount = (u = {}) => u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';
 const isSuperAdminAccount = (u = {}) => u.id === 'admin' || u.adminRole === 'SUPER_ADMIN';
 const isHighAdminAccount = (u = {}) => u.adminRole === 'HIGH_ADMIN';
 /** SUPER_ADMIN + HIGH_ADMIN — chia sẻ admin mailbox */
@@ -122,7 +122,7 @@ router.get('/contacts', async (req, res) => {
         : {};
 
       const [staffDocs, teacherDocs, studentDocs] = await Promise.all([
-        Teacher.find({ adminRole: 'STAFF', ...branchFilter },
+        Teacher.find({ adminRole: { $in: ['STAFF', 'SUPPORT'] }, ...branchFilter },
                      'name gender phone branchId branchCode avatar').lean(),
         Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] }, ...branchFilter },
                      'name gender phone branchId branchCode avatar').lean(),
@@ -147,7 +147,7 @@ router.get('/contacts', async (req, res) => {
       if (!staffBranchId) {
         // STAFF chưa gán branch riêng → Hỗ trợ viên quản lý toàn bộ học viên & giảng viên
         const [staffDocs, teacherDocs, studentDocs] = await Promise.all([
-          Teacher.find({ adminRole: 'STAFF', _id: { $ne: userId } }, 'name gender phone branchId branchCode avatar').lean(),
+          Teacher.find({ adminRole: { $in: ['STAFF', 'SUPPORT'] }, _id: { $ne: userId } }, 'name gender phone branchId branchCode avatar').lean(),
           Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] } }, 'name gender phone branchId branchCode avatar').lean(),
           Student.find({}, 'name gender phone branchId branchCode avatar').lean(),
         ]);
@@ -165,7 +165,7 @@ router.get('/contacts', async (req, res) => {
             'name gender phone branchId branchCode avatar'
           ).lean(),
           Teacher.find(
-            { adminRole: 'STAFF', branchId: staffBranchId, _id: { $ne: userId } },
+            { adminRole: { $in: ['STAFF', 'SUPPORT'] }, branchId: staffBranchId, _id: { $ne: userId } },
             'name gender phone branchId branchCode avatar'
           ).lean(),
         ]);
@@ -194,8 +194,8 @@ router.get('/contacts', async (req, res) => {
       };
 
       const staffQuery = teacherBranchId
-        ? { adminRole: 'STAFF', $or: [{ branchId: teacherBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
-        : { adminRole: 'STAFF' };
+        ? { adminRole: { $in: ['STAFF', 'SUPPORT'] }, $or: [{ branchId: teacherBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
+        : { adminRole: { $in: ['STAFF', 'SUPPORT'] } };
 
       const [staffDocs, studentDocs] = await Promise.all([
         // STAFF (cả Hỗ trợ viên toàn hệ thống lẫn Staff cùng chi nhánh)
@@ -227,8 +227,8 @@ router.get('/contacts', async (req, res) => {
       const teacherIdList = [...myTeacherIds].filter(Boolean);
 
       const staffQuery = studentBranchId
-        ? { adminRole: 'STAFF', $or: [{ branchId: studentBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
-        : { adminRole: 'STAFF' };
+        ? { adminRole: { $in: ['STAFF', 'SUPPORT'] }, $or: [{ branchId: studentBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
+        : { adminRole: { $in: ['STAFF', 'SUPPORT'] } };
 
       const [staffDocs, teacherDocs] = await Promise.all([
         // STAFF (cả Hỗ trợ viên toàn hệ thống lẫn Staff cùng chi nhánh)
