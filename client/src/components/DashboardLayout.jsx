@@ -279,7 +279,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     isInboxPage || isBiPage || (role === 'teacher' && location.pathname === '/teacher/test');
   const showAdminBranch = role === 'admin';
   const roleLabel = role === 'admin'
-    ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')
+    ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : session?.adminRole === 'SUPPORT' ? 'Chuyên viên Hỗ trợ' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')
     : role;
 
   return (

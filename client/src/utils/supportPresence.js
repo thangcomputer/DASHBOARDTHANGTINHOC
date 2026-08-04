@@ -8,7 +8,7 @@ import { normalizeChatRole } from './chatConversationId';
 export function isSuperAdminViewer(session) {
   if (!session) return false;
   const id = String(session?.id || session?._id || '');
-  if (id === 'admin' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'HIGH_ADMIN' || session?.role === 'admin' || session?.role === 'staff' || session?.adminRole === 'STAFF') {
+  if (id === 'admin' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'HIGH_ADMIN' || session?.adminRole === 'SUPPORT' || session?.role === 'admin' || session?.role === 'staff' || session?.adminRole === 'STAFF') {
     return true;
   }
   const perms = Array.isArray(session?.permissions) ? session.permissions : [];
@@ -103,19 +103,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
       });
     }
 
-    // 3. Dự phòng: Luôn có kênh "Bộ phận Hỗ trợ" nếu chưa có tài khoản staff cụ thể nào
-    if (peopleList.length === 0) {
-      peopleList.push({
-        id: 'admin',
-        name: 'Bộ phận Hỗ trợ (Phòng Giáo vụ)',
-        role: 'staff',
-        displayRole: 'staff',
-        adminRole: 'STAFF',
-        permissions: ['manage_messages'],
-        avatar: '',
-        online: false,
-      });
-    }
+
 
     return {
       mode: 'support_only',

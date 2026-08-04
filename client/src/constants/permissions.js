@@ -25,6 +25,7 @@ export const ADMIN_ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   HIGH_ADMIN: 'HIGH_ADMIN',
   STAFF: 'STAFF',
+  SUPPORT: 'SUPPORT',
 };
 
 /** Quyền mặc định khi tạo HIGH_ADMIN — có thể điều chỉnh sau */
@@ -35,6 +36,9 @@ export const HIGH_ADMIN_DEFAULT_PERMISSIONS = [
   'manage_hr', 'manage_blog',
   'view_logs', 'view_evaluations',
 ];
+
+/** Quyền mặc định cho SUPPORT */
+export const SUPPORT_DEFAULT_PERMISSIONS = ['manage_messages'];
 
 /** Danh sách toàn bộ permissions với label tiếng Việt (dùng trong form phân quyền) */
 export const ALL_PERMISSIONS = [

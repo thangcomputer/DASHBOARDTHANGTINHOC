@@ -256,7 +256,7 @@ function mapOnlineUser(u) {
 function broadcastOnlinePresence() {
   const all = presenceStore.listPresence();
   const full = all.map(mapOnlineUser);
-  io.to('ALL_ADMIN').to('ALL_STAFF').emit('users:online', full);
+  io.to('ALL_ADMIN').to('ALL_STAFF').to('ALL_SUPPORT').emit('users:online', full);
 
   const byBranch = new Map();
   for (const u of all) {
@@ -324,6 +324,9 @@ io.on('connection', (socket) => {
 
       if (socket.user.adminRole === 'STAFF' || messagingRole === 'staff') {
         socket.join('ALL_STAFF');
+      }
+      if (socket.user.adminRole === 'SUPPORT' || messagingRole === 'support') {
+        socket.join('ALL_SUPPORT');
       }
       if (userId === 'admin' || socket.user?.adminRole === 'SUPER_ADMIN' || socket.user?.adminRole === 'HIGH_ADMIN') {
         socket.join('ALL_ADMIN');
@@ -469,7 +472,7 @@ io.on('connection', (socket) => {
     } else if (data.receiverId?.startsWith('ALL_BRANCH_')) {
       if (!isAdminSocketUser(u)) return;
       const bCode = data.receiverId.replace('ALL_BRANCH_', '');
-      io.to(`ALL_STUDENT_${bCode}`).to(`ALL_TEACHER_${bCode}`).to(`ALL_STAFF_${bCode}`).emit('message:receive', msgPayload);
+      io.to(`ALL_STUDENT_${bCode}`).to(`ALL_TEACHER_${bCode}`).to(`ALL_STAFF_${bCode}`).to(`ALL_SUPPORT_${bCode}`).emit('message:receive', msgPayload);
     }
     // 2) Direct message: room theo userId (Redis adapter cross-instance)
     else {

@@ -95,14 +95,7 @@ export function resolveAvatarUrl(userObj = {}) {
   }
 
   // 2. Hỗ trợ viên chuyên trách
-  const isSupportOnly = perms.length === 1 && perms.includes('manage_messages');
-  if (
-    uname.includes('hỗ trợ viên') ||
-    uname.includes('hồ sĩ hiếu') ||
-    uname.includes('hồ sỹ hiếu') ||
-    isSupportOnly ||
-    r === 'support'
-  ) {
+  if (ar === 'SUPPORT' || r === 'support') {
     if (isFemale) return DEFAULT_AVATARS.support_female;
     return DEFAULT_AVATARS.support_male;
   }

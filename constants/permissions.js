@@ -24,6 +24,7 @@ const ADMIN_ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   HIGH_ADMIN: 'HIGH_ADMIN',
   STAFF: 'STAFF',
+  SUPPORT: 'SUPPORT',
 };
 
 /** Quyền mặc định khi tạo HIGH_ADMIN — có thể điều chỉnh sau */
@@ -35,4 +36,6 @@ const HIGH_ADMIN_DEFAULT_PERMISSIONS = [
   'view_logs', 'view_evaluations',
 ];
 
-module.exports = { PERMISSIONS, ADMIN_ROLES, HIGH_ADMIN_DEFAULT_PERMISSIONS };
+const SUPPORT_DEFAULT_PERMISSIONS = ['manage_messages'];
+
+module.exports = { PERMISSIONS, ADMIN_ROLES, HIGH_ADMIN_DEFAULT_PERMISSIONS, SUPPORT_DEFAULT_PERMISSIONS };

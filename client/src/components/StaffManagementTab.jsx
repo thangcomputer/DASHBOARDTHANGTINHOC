@@ -10,11 +10,11 @@ import CmsSelect from './ui/CmsSelect';
 import {
   ShieldCheck, UserPlus, Edit2, Trash2, Save, X, Loader2,
   CheckSquare, Square, Key, Phone, User, Shield, Users,
-  AlertTriangle, CheckCircle2, Crown, UserCog, Building2, MoreVertical, ChevronDown, Search, MessageSquare,
+  AlertTriangle, CheckCircle2, Crown, UserCog, Building2, MoreVertical, ChevronDown, Search, MessageSquare, Headset,
 } from 'lucide-react';
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
-import { ALL_PERMISSIONS, HIGH_ADMIN_DEFAULT_PERMISSIONS } from '../constants/permissions';
+import { ALL_PERMISSIONS, HIGH_ADMIN_DEFAULT_PERMISSIONS, SUPPORT_DEFAULT_PERMISSIONS } from '../constants/permissions';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { staffAPI, apiFetch } from '../services/api';
 
@@ -39,6 +39,13 @@ function RoleBadge({ adminRole, permissions = [], branchName = '' }) {
     return (
       <span className="cms-rbac-badge cms-rbac-badge-admin">
         <Crown size={10} aria-hidden="true" /> SUPER ADMIN
+      </span>
+    );
+  }
+  if (adminRole === 'SUPPORT') {
+    return (
+      <span className="cms-rbac-badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+        <Headset size={10} aria-hidden="true" /> HỖ TRỢ VIÊN
       </span>
     );
   }
@@ -130,7 +137,7 @@ function StaffModal({ staff, onClose, onSaved }) {
     try {
       const payload = {
         ...form,
-        branchId: (form.adminRole === 'SUPER_ADMIN' || form.adminRole === 'HIGH_ADMIN') ? null : (form.branchId || null),
+        branchId: (form.adminRole === 'SUPER_ADMIN' || form.adminRole === 'HIGH_ADMIN' || form.adminRole === 'SUPPORT') ? null : (form.branchId || null),
       };
       const res = isEdit
         ? await staffAPI.update(staff._id, payload)
@@ -303,6 +310,7 @@ function StaffModal({ staff, onClose, onSaved }) {
                 {[
                   ...(isRootSuperAdmin ? [{ val: 'SUPER_ADMIN', label: 'Super Admin', icon: Crown }] : []),
                   ...(isRootSuperAdmin ? [{ val: 'HIGH_ADMIN', label: 'Admin cấp cao', icon: ShieldCheck }] : []),
+                  { val: 'SUPPORT', label: 'Chuyên viên Hỗ trợ', icon: Headset },
                   { val: 'STAFF', label: 'Hỗ trợ viên / Admin-Staff', icon: UserCog },
                 ].map(({ val, label, icon: Icon }) => (
                   <button
@@ -313,8 +321,8 @@ function StaffModal({ staff, onClose, onSaved }) {
                     onClick={() => setForm((f) => ({
                       ...f,
                       adminRole: val,
-                      permissions: val === 'SUPER_ADMIN' ? [] : val === 'HIGH_ADMIN' ? (f.permissions.length ? f.permissions : HIGH_ADMIN_DEFAULT_PERMISSIONS) : (f.permissions.length ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
-                      branchId: (val === 'SUPER_ADMIN' || val === 'HIGH_ADMIN') ? '' : f.branchId,
+                      permissions: val === 'SUPER_ADMIN' ? [] : val === 'HIGH_ADMIN' ? (f.permissions.length ? f.permissions : HIGH_ADMIN_DEFAULT_PERMISSIONS) : val === 'SUPPORT' ? SUPPORT_DEFAULT_PERMISSIONS : (f.permissions.length ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
+                      branchId: (val === 'SUPER_ADMIN' || val === 'HIGH_ADMIN' || val === 'SUPPORT') ? '' : f.branchId,
                     }))}
                     className={`cms-rbac-segment-item ${form.adminRole === val ? 'is-active' : ''}`}
                   >

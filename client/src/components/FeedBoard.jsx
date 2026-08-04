@@ -77,9 +77,9 @@ export default function FeedBoard({ session, role }) {
       return r === 'staff' || u.adminRole === 'STAFF';
     });
     return {
-      id: online?.userId || 'staff',
+      id: online?.userId || null,
       name: online?.name || 'Hỗ trợ viên',
-      role: 'staff',
+      role: 'support',
       online: !!online,
     };
   }, [onlineUsers]);

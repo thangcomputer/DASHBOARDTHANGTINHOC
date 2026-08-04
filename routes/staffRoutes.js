@@ -92,8 +92,8 @@ router.post('/', guard, async (req, res) => {
       role:        resolvedRole,
       adminRole,
       permissions: safePermissions,
-      branchId:    (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') ? null : (branchId  || null),
-      branchCode:  (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') ? ''   : branchCode,
+      branchId:    (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') ? null : (branchId  || null),
+      branchCode:  (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') ? ''   : branchCode,
       status:    'active',
       approvedBy: req.user?.name || 'Admin',
       approvedAt: new Date(),
@@ -101,7 +101,7 @@ router.post('/', guard, async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Đã tạo tài khoản ${adminRole === 'SUPER_ADMIN' ? 'Super Admin' : adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : 'Nhân viên'}: ${name}`,
+      message: `Đã tạo tài khoản ${adminRole === 'SUPER_ADMIN' ? 'Super Admin' : adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : adminRole === 'SUPPORT' ? 'Chuyên viên Hỗ trợ' : 'Nhân viên'}: ${name}`,
       data: { ...newStaff.toObject(), password: undefined },
     });
   } catch (err) {
@@ -156,6 +156,11 @@ router.put('/:id', guard, async (req, res) => {
         updates.branchCode  = '';
       } else if (adminRole === 'HIGH_ADMIN') {
         updates.role        = 'admin';
+        updates.permissions = await sanitizeAssignedPermissions(req, permissions);
+        updates.branchId    = null;
+        updates.branchCode  = '';
+      } else if (adminRole === 'SUPPORT') {
+        updates.role        = 'staff';
         updates.permissions = await sanitizeAssignedPermissions(req, permissions);
         updates.branchId    = null;
         updates.branchCode  = '';

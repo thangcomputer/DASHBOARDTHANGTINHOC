@@ -1,5 +1,5 @@
 /** Zalo Admin hỗ trợ cấp mật khẩu / tư vấn (hotline trung tâm). */
-export const ADMIN_ZALO_PHONE = '0935758462';
+export const ADMIN_ZALO_PHONE = import.meta.env.VITE_SUPPORT_PHONE || '';
 
 export function buildForgotPasswordZaloMessage({ name, phone, role }) {
   const roleLabel = role === 'teacher' ? 'Giảng viên' : 'Học viên';

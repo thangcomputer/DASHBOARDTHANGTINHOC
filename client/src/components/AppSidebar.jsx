@@ -480,9 +480,10 @@ const AppSidebar = ({
                   if (role === 'student') return 'HỌC VIÊN';
                   if (session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN') return 'QUẢN TRỊ';
                   if (session?.adminRole === 'HIGH_ADMIN') return 'ADMIN CẤP CAO';
+                  if (session?.adminRole === 'SUPPORT') return 'CHUYÊN VIÊN HỖ TRỢ';
                   const perms = Array.isArray(session?.permissions) ? session.permissions : [];
                   if (perms.length === 1 && perms.includes('manage_messages')) {
-                    return 'HỖ TRỢ VIÊN';
+                    return 'CHUYÊN VIÊN HỖ TRỢ';
                   }
                   return 'ADMIN-STAFF';
                 })()}

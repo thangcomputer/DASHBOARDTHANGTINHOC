@@ -176,18 +176,12 @@ function ChatWindow({
   }, [onlineUsers, tab.user.id, tab.user.online]);
 
   const displayRoleLabel = useMemo(() => {
-    if (!isSuper && (tab.user.role === 'staff' || tab.user.role === 'admin' || tab.user.id === 'admin')) {
-      return 'Hỗ trợ viên';
-    }
     return ROLE_LABEL[tab.user.role] || tab.user.role || 'Hỗ trợ viên';
-  }, [isSuper, tab.user.role, tab.user.id]);
+  }, [tab.user.role]);
 
   const displayName = useMemo(() => {
-    if (!isSuper && (tab.user.id === 'admin' || tab.user.role === 'admin')) {
-      return 'HỖ TRỢ VIÊN';
-    }
     return tab.user.name || 'Hỗ trợ viên';
-  }, [isSuper, tab.user.id, tab.user.role, tab.user.name]);
+  }, [tab.user.name]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -466,7 +460,8 @@ export default function FloatingMessenger({ session, role }) {
       if (!data) return;
       if (String(data.senderId) === meId) return;
       const forMe = String(data.receiverId) === meId
-        || (meRole === 'admin' && String(data.receiverId) === 'admin');
+        || (meRole === 'admin' && String(data.receiverId) === 'admin')
+        || (meRole === 'support' && String(data.receiverId) === 'support');
       if (!forMe && !data.isGroup) return;
 
       const peer = {

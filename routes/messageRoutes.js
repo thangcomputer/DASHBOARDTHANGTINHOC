@@ -99,13 +99,13 @@ router.get('/contacts', async (req, res) => {
     }
 
     if (superAdminContacts.length === 0) {
-      const actualName = systemAdminName || 'P ĐÀO TẠO (ADMIN)';
+      const actualName = systemAdminName || 'Hệ Thống';
       superAdminContacts.push({
         id: 'admin',
         name: actualName,
         role: 'admin',
-        phone: '0935758462',
-        avatar: String(actualName || 'AD').substring(0, 2).toUpperCase(),
+        phone: '',
+        avatar: String(actualName).substring(0, 2).toUpperCase(),
         branchId: null,
         branchCode: 'HỆ THỐNG'
       });
@@ -116,7 +116,7 @@ router.get('/contacts', async (req, res) => {
     let studentContacts  = [];
 
     // ══ [2] SUPER_ADMIN: xem toàn hệ thống, có hỗ trợ filter branch ══
-    if (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') {
+    if (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') {
       const branchFilter = queryBranchId && queryBranchId !== 'all'
         ? { branchId: queryBranchId }
         : {};
@@ -633,14 +633,14 @@ router.post('/', async (req, res) => {
     
     let finalReceiverId = isBroadcast ? receiverId : (isGroup ? groupId : receiverId);
     let finalReceiverName = isBroadcast ? 'Thông báo hệ thống' : (isGroup ? 'Group' : (resolvedReceiverName || 'Người nhận'));
-    if (!isBroadcast && !isGroup && senderRole === 'student' && (receiverRole === 'admin' || receiverRole === 'staff')) {
+    if (!isBroadcast && !isGroup && senderRole === 'student' && (receiverRole === 'admin' || receiverRole === 'staff' || receiverRole === 'support')) {
       const rid = String(receiverId || '');
       if (rid === 'admin' || !mongoose.Types.ObjectId.isValid(rid)) {
         finalReceiverId = 'admin';
-        finalReceiverName = resolvedReceiverName || 'HỖ TRỢ VIÊN';
+        finalReceiverName = resolvedReceiverName || 'Quản trị viên';
       } else {
         finalReceiverId = rid;
-        finalReceiverName = resolvedReceiverName || 'Hỗ trợ viên';
+        finalReceiverName = resolvedReceiverName || 'Nhân viên';
       }
     }
 

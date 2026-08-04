@@ -306,15 +306,16 @@ const branchFilter = async (req, res, next) => {
       // Nếu không có branchId mà cũng KHÔNG phải SUPER_ADMIN, ép về branchId=null (không thấy gì hoặc lỗi)
       const isActuallySuper = user.adminRole === 'SUPER_ADMIN';
       const isHighAdmin = user.adminRole === 'HIGH_ADMIN';
+      const isSupport = user.adminRole === 'SUPPORT';
 
-      if (isActuallySuper || isHighAdmin || !user.branchId) {
+      if (isActuallySuper || isHighAdmin || isSupport || !user.branchId) {
         const qBranch = req.query.branch_id;
-        if (qBranch && qBranch !== 'all' && qBranch !== '' && (isActuallySuper || isHighAdmin)) {
+        if (qBranch && qBranch !== 'all' && qBranch !== '' && (isActuallySuper || isHighAdmin || isSupport)) {
           req.branchFilter = { branchId: qBranch };
-        } else if (isActuallySuper || isHighAdmin) {
+        } else if (isActuallySuper || isHighAdmin || isSupport) {
           req.branchFilter = {};
         } else {
-          // Admin nhưng không có branchId và không phải Super Admin? Giới hạn về null để an toàn
+          // Admin nhưng không có branchId và không phải Super/High/Support Admin? Giới hạn về null để an toàn
           req.branchFilter = { branchId: null };
         }
       } else {

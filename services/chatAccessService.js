@@ -14,6 +14,9 @@ function isSuper(u) {
 function isHighAdmin(u) {
   return u?.adminRole === 'HIGH_ADMIN';
 }
+function isSupport(u) {
+  return u?.adminRole === 'SUPPORT';
+}
 
 /**
  * @returns {Promise<{ ok: boolean, message?: string }>}
@@ -26,8 +29,9 @@ async function assertCanDirectMessage(sender, receiverId, receiverRole) {
   if (rid.startsWith('ALL_')) return { ok: true };
   if (isSuper(sender)) return { ok: true };
   if (isHighAdmin(sender)) return { ok: true }; // HIGH_ADMIN: toàn quyền nhắn tin
+  if (isSupport(sender)) return { ok: true };   // SUPPORT: toàn quyền nhắn tin
 
-  if (sender.role === 'student' && (rRole === 'admin' || rid === 'admin')) {
+  if (sender.role === 'student' && (rRole === 'admin' || rRole === 'support' || rid === 'admin')) {
     return { ok: true };
   }
 
@@ -38,14 +42,14 @@ async function assertCanDirectMessage(sender, receiverId, receiverRole) {
       if (studentMatchesTeacher(st, rid)) return { ok: true };
       return { ok: false, message: 'Chi nhan tin giao vien dang day ban' };
     }
-    if (rRole === 'staff' || rRole === 'admin') {
+    if (rRole === 'staff' || rRole === 'admin' || rRole === 'support') {
       if (rid === 'admin') return { ok: true };
       const [st, staff] = await Promise.all([
         Student.findById(sender.id).select('branchId branchCode').lean(),
         Teacher.findById(rid).select('adminRole branchId branchCode role').lean(),
       ]);
       if (!staff) return { ok: false, message: 'Khong tim thay lien he' };
-      if (staff.adminRole === 'SUPER_ADMIN' || staff.role === 'admin') return { ok: true };
+      if (staff.adminRole === 'SUPER_ADMIN' || staff.adminRole === 'HIGH_ADMIN' || staff.adminRole === 'SUPPORT' || staff.role === 'admin') return { ok: true };
       if (staff.adminRole === 'STAFF' || staff.role === 'staff') {
         const sb = st?.branchId ? String(st.branchId) : '';
         const tb = staff.branchId ? String(staff.branchId) : '';
@@ -65,14 +69,14 @@ async function assertCanDirectMessage(sender, receiverId, receiverRole) {
       if (studentMatchesTeacher(st, sender.id)) return { ok: true };
       return { ok: false, message: 'Chi nhan tin hoc vien duoc phan cong' };
     }
-    if (rRole === 'admin' || rRole === 'staff' || rid === 'admin') {
+    if (rRole === 'admin' || rRole === 'staff' || rRole === 'support' || rid === 'admin') {
       if (rid === 'admin') return { ok: true };
       const [t, peer] = await Promise.all([
         Teacher.findById(sender.id).select('branchId branchCode').lean(),
         Teacher.findById(rid).select('adminRole branchId branchCode role').lean(),
       ]);
       if (!peer) return { ok: false, message: 'Khong tim thay lien he' };
-      if (peer.adminRole === 'SUPER_ADMIN') return { ok: true };
+      if (peer.adminRole === 'SUPER_ADMIN' || peer.adminRole === 'HIGH_ADMIN' || peer.adminRole === 'SUPPORT') return { ok: true };
       const tb = t?.branchId ? String(t.branchId) : '';
       const pb = peer.branchId ? String(peer.branchId) : '';
       if (tb && pb && tb === pb) return { ok: true };

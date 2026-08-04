@@ -89,7 +89,7 @@ const TeacherSchema = new mongoose.Schema(
     // Phân quyền nội bộ (chỉ áp dụng với role === 'admin' hoặc 'staff')
     adminRole: {
       type: String,
-      enum: ['SUPER_ADMIN', 'HIGH_ADMIN', 'STAFF'],
+      enum: ['SUPER_ADMIN', 'HIGH_ADMIN', 'STAFF', 'SUPPORT'],
       default: null,  // null = không phải tài khoản nội bộ
     },
     permissions: {
