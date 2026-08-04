@@ -382,6 +382,10 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         let finalName = isMeSender ? m.receiverName : m.senderName;
         let finalRole = otherRole;
 
+        let finalAdminRole = null;
+        let finalGender = '';
+        let finalAvatar = '';
+
         // Tra cứu linh hoạt theo ID từ danh sách hệ thống local (Student / Teacher / Staff)
         if (otherUserId === 'admin' || otherRole === 'admin') {
           const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
@@ -396,12 +400,20 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           if (matchedStudent) {
             finalName = matchedStudent.name;
             finalRole = 'student';
+            finalGender = matchedStudent.gender;
+            finalAvatar = matchedStudent.avatar;
           } else if (matchedTeacher) {
             finalName = matchedTeacher.name;
             finalRole = matchedTeacher.adminRole === 'SUPER_ADMIN' ? 'admin' : 'teacher';
+            finalAdminRole = matchedTeacher.adminRole;
+            finalGender = matchedTeacher.gender;
+            finalAvatar = matchedTeacher.avatar;
           } else if (matchedStaff) {
             finalName = matchedStaff.name;
             finalRole = 'staff';
+            finalAdminRole = matchedStaff.adminRole;
+            finalGender = matchedStaff.gender;
+            finalAvatar = matchedStaff.avatar;
           } else {
             // Tài khoản đã bị xóa khỏi hệ thống -> Ẩn hoàn toàn, coi như chưa từng tồn tại
             return;
@@ -430,7 +442,9 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             id: otherUserId,
             name: finalName,
             role: finalRole,
-            avatar: String(finalName || 'H').substring(0, 2).toUpperCase(),
+            adminRole: finalAdminRole,
+            gender: finalGender,
+            avatar: finalAvatar || String(finalName || 'H').substring(0, 2).toUpperCase(),
             online: true,
             branchCode: branchCode
           },

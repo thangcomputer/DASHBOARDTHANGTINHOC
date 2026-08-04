@@ -444,7 +444,7 @@ export default function FloatingMessenger({ session, role }) {
     return list.filter((c) => {
       const r = String(c.user?.role || '').toLowerCase();
       const ar = String(c.user?.adminRole || '').toUpperCase();
-      return r === 'staff' || ar === 'STAFF';
+      return r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT';
     }).slice(0, 8);
   }, [conversations, isSuper]);
 
