@@ -113,7 +113,12 @@ export function useDataTraining(currentUser) {
     if (!currentUser) return;
     const isStaff = currentUser.role === 'admin' || currentUser.role === 'staff';
     const isTeacher = currentUser.role === 'teacher';
-    if (!isStaff && !isTeacher) {
+    
+    const perms = currentUser.permissions || [];
+    const isSuper = currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN';
+    const hasSystemPerm = isSuper || perms.includes('system_settings');
+
+    if (!isTeacher && (!isStaff || !hasSystemPerm)) {
       setTeacherExamBankHydrated(false);
       return;
     }
@@ -161,7 +166,12 @@ export function useDataTraining(currentUser) {
   }, [currentUser?.id, currentUser?.role]);
 
   useEffect(() => {
-    if (currentUser?.role !== 'admin' && currentUser?.role !== 'staff') {
+    const isStaff = currentUser?.role === 'admin' || currentUser?.role === 'staff';
+    const perms = currentUser?.permissions || [];
+    const isSuper = currentUser?.id === 'admin' || currentUser?.adminRole === 'SUPER_ADMIN' || currentUser?.adminRole === 'HIGH_ADMIN';
+    const hasSystemPerm = isSuper || perms.includes('system_settings');
+
+    if (!isStaff || !hasSystemPerm) {
       setStudentExamBankHydrated(false);
       return;
     }

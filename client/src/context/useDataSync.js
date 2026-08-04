@@ -51,19 +51,29 @@ export function useDataSync({
       const promises = [];
 
       if (isAdmin) {
+        const perms = currentUser.permissions || [];
+        const isSuper = currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN';
+        const hasPerm = (p) => isSuper || perms.includes(p);
+        const dummyRes = { success: true, data: [] };
+
         // Admin: students handled by StudentsContext.fetchStudentsPaginated, skip here
-        promises.push(api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })));
+        promises.push(hasPerm('manage_schedule') ? api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
       } else if (isTeacher) {
         // Teacher students: StudentsContext (SWR) owns list — tránh double-fetch
         promises.push(api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })));
       }
 
       if (isAdmin) {
-        promises.push(api.teachers.getAll().catch(() => ({ success: false })));
-        promises.push(api.staff.getAll().catch(() => ({ success: false })));
-        promises.push(api.transactions.getAll({ limit: 200 }).catch(() => ({ success: false })));
-        promises.push(api.examResults.getAll({ limit: 200 }).catch(() => ({ success: false })));
-        promises.push(api.evaluations.getPrivate().catch(() => ({ success: false })));
+        const perms = currentUser.permissions || [];
+        const isSuper = currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN';
+        const hasPerm = (p) => isSuper || perms.includes(p);
+        const dummyRes = { success: true, data: [] };
+
+        promises.push(hasPerm('view_teachers') ? api.teachers.getAll().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
+        promises.push((hasPerm('manage_staff') || hasPerm('manage_hr') || isSuper) ? api.staff.getAll().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
+        promises.push(hasPerm('manage_finance') ? api.transactions.getAll({ limit: 200 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
+        promises.push((hasPerm('manage_training') || hasPerm('manage_students')) ? api.examResults.getAll({ limit: 200 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
+        promises.push(hasPerm('view_evaluations') ? api.evaluations.getPrivate().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
       } else if (isTeacher) {
         promises.push(api.transactions.getByTeacher(currentUser.id).catch(() => ({ success: false })));
         promises.push(api.teachers.getById(currentUser.id || currentUser._id).catch(() => ({ success: false })));
@@ -78,10 +88,12 @@ export function useDataSync({
       promises.push(api.messages.getGroups(currentUser.id || currentUser._id).catch(() => ({ success: false })));
 
       // Fetch training data for all (Admin & Teacher)
-      promises.push(api.settings.getTrainingData().catch(() => ({ success: false })));
+      const isAdminTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_training')) : false;
+      promises.push((isAdmin && !isAdminTrainingPerm) ? Promise.resolve({ success: true, data: {} }) : api.settings.getTrainingData().catch(() => ({ success: false })));
 
       // Fetch student training data for all (Admin & Student)
-      promises.push(api.settings.getStudentTrainingData().catch(() => ({ success: false })));
+      const isAdminStudentTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_student_training')) : false;
+      promises.push((isAdmin && !isAdminStudentTrainingPerm) ? Promise.resolve({ success: true, data: {} }) : api.settings.getStudentTrainingData().catch(() => ({ success: false })));
 
       const results = await Promise.all(promises);
       let idx = 0;
@@ -155,7 +167,7 @@ export function useDataSync({
         }
       }
 
-      if (isStudent || isAdmin) {
+      if (isStudent || (isAdmin && (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('system_settings')))) {
         const examCfg = await api.settings.getStudentExamConfig().catch(() => null);
         if (examCfg?.success && examCfg.data) {
           applyStudentExamConfigFromServer(examCfg.data);
