@@ -273,7 +273,7 @@ function ChatWindow({
           <div className="min-w-0">
             <p className="text-[13px] font-bold text-slate-900 truncate leading-tight">{displayName}</p>
             <p className={`text-[10px] font-semibold ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
-              {displayRoleLabel} · {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến (Nhắn tin chờ)'}
+              {displayRoleLabel} · {isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}
             </p>
           </div>
         </div>
@@ -686,7 +686,7 @@ export default function FloatingMessenger({ session, role }) {
                                 <span className="block text-[11px] text-slate-500 font-medium">
                                   {ROLE_LABEL[p.displayRole] || ROLE_LABEL[p.role] || p.role}
                                   {' · '}
-                                  {online ? 'Đang hoạt động' : 'Ngoại tuyến (Nhắn tin chờ)'}
+                                  {online ? 'Trực tuyến' : 'Ngoại tuyến'}
                                 </span>
                               </span>
                               {peerUnread > 0 ? (

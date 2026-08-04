@@ -178,17 +178,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (isOnline) {
       return (
         <span className="text-emerald-600 font-bold flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Đang hoạt động
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Trực tuyến
         </span>
       );
     }
-    if (!userId || !lastSeenUsers) return <span className="text-slate-400">Offline</span>;
+    if (!userId || !lastSeenUsers) return <span className="text-slate-400">Ngoại tuyến</span>;
     const lastSeenTime = lastSeenUsers[String(userId)];
-    if (!lastSeenTime) return <span className="text-slate-400">Offline</span>;
+    if (!lastSeenTime) return <span className="text-slate-400">Ngoại tuyến</span>;
 
     try {
       const diffMs = Date.now() - new Date(lastSeenTime).getTime();
-      if (isNaN(diffMs) || diffMs < 0) return <span className="text-slate-400">Offline</span>;
+      if (isNaN(diffMs) || diffMs < 0) return <span className="text-slate-400">Ngoại tuyến</span>;
 
       const diffMins = Math.floor(diffMs / (1000 * 60));
       const diffHours = Math.floor(diffMins / 60);
@@ -198,9 +198,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (diffMins < 60) return <span className="text-slate-500 font-medium">Hoạt động {diffMins} phút trước</span>;
       if (diffHours < 24) return <span className="text-slate-500 font-medium">Hoạt động {diffHours} giờ trước</span>;
       if (diffDays < 7) return <span className="text-slate-500 font-medium">Hoạt động {diffDays} ngày trước</span>;
-      return <span className="text-slate-400">Offline</span>;
+      return <span className="text-slate-400">Ngoại tuyến</span>;
     } catch {
-      return <span className="text-slate-400">Offline</span>;
+      return <span className="text-slate-400">Ngoại tuyến</span>;
     }
   }, [lastSeenUsers]);
 
