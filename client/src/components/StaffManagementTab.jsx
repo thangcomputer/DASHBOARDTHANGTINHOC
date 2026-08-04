@@ -82,7 +82,7 @@ function StatusBadge({ status }) {
 }
 
 // ── Modal Thêm/Sửa ────────────────────────────────────────────────────────────
-function StaffModal({ staff, onClose, onSaved }) {
+function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
   const toast  = useToast();
   const isEdit = !!staff?._id;
 
@@ -837,7 +837,7 @@ export default function StaffManagementTab() {
   return (
     <div className="cms-rbac cms-viewport-fill">
       {modal !== undefined && (
-        <StaffModal staff={modal} onClose={() => setModal(undefined)} onSaved={handleSaved} />
+        <StaffModal staff={modal} onClose={() => setModal(undefined)} onSaved={handleSaved} isRootSuperAdmin={isRootSuperAdmin} />
       )}
 
       {resetPwStaff && (
