@@ -226,8 +226,8 @@ const LoginPage = ({ onLogin }) => {
         </div>
 
         {/* CỘT PHẢI */}
-        <div className="w-full md:w-1/2 flex items-center justify-center px-[15px] py-8 sm:p-8 lg:p-20 relative bg-[#0f172a] min-w-0 overflow-y-auto">
-          <div className="w-full max-w-md space-y-8 sm:space-y-10 z-10">
+        <div className="w-full md:w-1/2 flex flex-col px-[15px] py-8 sm:p-8 lg:p-20 relative bg-[#0f172a] min-w-0 overflow-y-auto">
+          <div className="w-full max-w-md space-y-8 sm:space-y-10 z-10 my-auto mx-auto">
             <div className="text-center md:text-left flex flex-col items-center md:items-start animate-in fade-in zoom-in duration-700">
               <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-14 sm:h-16 mb-6 sm:mb-8 max-w-[min(100%,220px)] brightness-110 object-contain" />
               <div className="space-y-4 w-full">
