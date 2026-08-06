@@ -1049,7 +1049,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                       Chọn một đáp án · Có thể sửa trước khi nộp
                     </p>
                   </div>
-                  <div className="min-h-0 flex-1 space-y-1 overflow-y-auto py-1 pr-0.5 md:space-y-1.5 md:py-1.5 hide-scrollbar">
+                  <div className="min-h-0 flex-1 space-y-1 overflow-y-auto py-1 pr-0.5 md:space-y-1.5 md:py-1.5">
                     {q.options.map((opt, i) => (
                       <button
                         key={i}
@@ -1224,7 +1224,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           </main>
 
           <aside className="order-2 flex max-h-[32vh] min-h-0 flex-col lg:order-1 lg:col-span-4 lg:max-h-none xl:col-span-3">
-            <div className="hide-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain lg:gap-3">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain lg:gap-3">
               <div className="shrink-0 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-lg shadow-slate-200/40 backdrop-blur-sm md:p-4">
                 <div className="mb-4 flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-600">

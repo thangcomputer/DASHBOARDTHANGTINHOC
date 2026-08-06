@@ -165,7 +165,7 @@ export default function BiDashboardPage() {
           ))}
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 hide-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4">
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi icon={Users} label="Học viên mới" value={k.studentsNew ?? 0} delta={k.studentsNewChange} sub={`Tổng ${k.studentsTotal ?? 0}`} />
             <Kpi icon={DollarSign} label="Doanh thu thuần (kỳ)" value={fmtMoney(k.revenuePeriod)} delta={k.revenueChange} color="text-emerald-600" bg="bg-emerald-50" sub={`Tỷ lệ TT ${k.paidRate ?? 0}%`} />

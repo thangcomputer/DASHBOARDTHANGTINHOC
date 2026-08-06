@@ -169,7 +169,7 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
 
   if (!passed) {
     return (
-      <div className="hide-scrollbar flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
+      <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
         <div className="bg-white rounded-[40px] p-8 sm:p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600 animate-in zoom-in duration-300">
           <div className="text-6xl sm:text-7xl mb-3 leading-none select-none" role="img" aria-label="Buồn">😢</div>
           <h2 className="text-2xl sm:text-3xl font-black text-red-600 uppercase italic">CHƯA ĐẠT</h2>
@@ -214,7 +214,7 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
   }
 
   return (
-    <div className="hide-scrollbar flex h-full min-h-0 max-h-[100dvh] w-full flex-col overflow-hidden bg-black items-center justify-center p-4 sm:p-5">
+    <div className="flex h-full min-h-0 max-h-[100dvh] w-full flex-col overflow-hidden bg-black items-center justify-center p-4 sm:p-5">
       <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl border-t-[10px] border-green-600">
         <div className="text-5xl sm:text-6xl mb-2 leading-none select-none" role="img" aria-label="Vui">😊</div>
         <h2 className="text-xl sm:text-2xl font-black uppercase italic text-green-600">ĐẠT TRẮC NGHIỆM</h2>
@@ -1095,7 +1095,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
 
   // UI LAYOUTS
   if (phase === 'banned') return (
-    <div className="hide-scrollbar flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
+    <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
       <div className="bg-white rounded-[40px] p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600">
         <XCircle size={80} className="text-red-600 mx-auto mb-6" />
         <h2 className="text-3xl font-black text-red-600 uppercase italic">BÀI THI BỊ HỦY</h2>
@@ -1401,7 +1401,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
 
     if (practicalExpired) {
       return (
-        <div className="hide-scrollbar flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
+        <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
           <div className="bg-white rounded-[40px] p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600">
             <XCircle size={72} className="text-red-600 mx-auto mb-4" />
             <h2 className="text-2xl font-black text-red-600 uppercase italic">HẾT GIỜ NỘP BÀI</h2>

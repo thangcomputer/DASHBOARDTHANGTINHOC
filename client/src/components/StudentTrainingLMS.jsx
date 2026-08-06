@@ -145,18 +145,197 @@ const extractYouTubeId = (url = '') => {
 // ─── PLAYER LINH HOẠT CHO HỌC VIÊN ─────────────────────────────────────────────
 
 
-const StudentVideoPlayer = ({ videoId, lessonId }) => {
+const StudentVideoPlayer = ({
+  videoId,
+  lessonId,
+  courseId,
+  initialWatchedSeconds = 0,
+  antiSeekEnabled = true,
+  onSaveProgress,
+  onVideoEnded,
+  onEligibilityReached,
+}) => {
   const yId = extractYouTubeId(videoId);
-  const [started, setStarted] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [overlayVisible, setOverlayVisible] = useState(true);
+  const [hasEnded, setHasEnded] = useState(false);
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [displayWatched, setDisplayWatched] = useState(0);
+  const [isTabActive, setIsTabActive] = useState(true);
+
+  const playerRef = useRef(null);
+  const containerRef = useRef(null);
+  const intervalRef = useRef(null);
+  const autoSaveTimerRef = useRef(null);
+  const pauseTimeoutRef = useRef(null);
+
+  // Restore watched seconds from sessionStorage or initialWatchedSeconds
+  const bestInitial = useMemo(() => {
+    const sessionWatched = sessionStorage.getItem(`student_lms_watched_${lessonId}`);
+    if (sessionWatched !== null) {
+      return Number(sessionWatched);
+    }
+    return Number(initialWatchedSeconds) || 0;
+  }, [lessonId, initialWatchedSeconds]);
+
+  const actualWatchedRef = useRef(bestInitial);
 
   useEffect(() => {
-    setStarted(false);
-  }, [lessonId, yId]);
+    actualWatchedRef.current = bestInitial;
+    setDisplayWatched(bestInitial);
+    setHasEnded(false);
+    setOverlayVisible(true);
+  }, [lessonId, bestInitial]);
 
-  const embedParams = 'rel=0&controls=1&modestbranding=1&playsinline=1';
-  const iframeSrc = yId
-    ? `https://www.youtube.com/embed/${yId}?${embedParams}${started ? '&autoplay=1' : ''}`
-    : '';
+  // ── Auto-Unlock khi đạt 2/3 ──────────────────────────────────────────
+  useEffect(() => {
+    if (!totalDuration || !onEligibilityReached) return;
+    const reqSecs = Math.ceil(totalDuration * 2 / 3);
+    // Nếu tắt chống tua (antiSeekEnabled === false) hoặc xem đủ mốc 2/3
+    if (!antiSeekEnabled || (displayWatched >= reqSecs && displayWatched > 0)) {
+      onEligibilityReached(displayWatched || totalDuration, totalDuration);
+    }
+  }, [displayWatched, totalDuration, onEligibilityReached, antiSeekEnabled]);
+
+  // ── Giám sát tương tác Tab ───────────────────────────────────────────
+  useEffect(() => {
+    const handleInactive = () => {
+      setIsTabActive(false);
+      if (playerRef.current?.pauseVideo) {
+        try { playerRef.current.pauseVideo(); } catch (e) { void 0 }
+      }
+    };
+    const handleActive = () => {
+      setIsTabActive(true);
+    };
+    const handleVisibilityChange = () => {
+      if (document.hidden) handleInactive();
+      else handleActive();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleInactive);
+    window.addEventListener("focus", handleActive);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleInactive);
+      window.removeEventListener("focus", handleActive);
+    };
+  }, []);
+
+  // ── Khởi tạo YouTube Iframe API ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!videoId) return;
+
+    const initPlayer = () => {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      setIsReady(false);
+      setHasEnded(false);
+
+      playerRef.current = new window.YT.Player(`student-yt-player-${lessonId}`, {
+        videoId: extractYouTubeId(videoId),
+        playerVars: {
+          controls: 1,           // Cho phép tua nhưng đếm giây thực tế
+          rel: 0,
+          modestbranding: 1,
+          iv_load_policy: 3,
+          fs: 0,
+          start: bestInitial ? Math.floor(bestInitial) : 0,
+          playsinline: 1,
+          enablejsapi: 1,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: (event) => {
+            setIsReady(true);
+            const dur = event.target.getDuration();
+            if (dur > 0) setTotalDuration(dur);
+            if (bestInitial > 0) {
+              event.target.seekTo(bestInitial, true);
+            }
+          },
+          onStateChange: handleStateChange,
+        },
+      });
+    };
+
+    if (window.YT?.Player) {
+      initPlayer();
+    } else {
+      if (!document.getElementById('yt-api-script')) {
+        const tag = document.createElement('script');
+        tag.id = 'yt-api-script';
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      }
+      window.onYouTubeIframeAPIReady = initPlayer;
+    }
+
+    return () => {
+      clearInterval(intervalRef.current);
+      clearInterval(autoSaveTimerRef.current);
+      playerRef.current?.destroy?.();
+      playerRef.current = null;
+    };
+  }, [videoId, lessonId]);
+
+  // ── Đếm giây thực tế khi PLAYING ─────────────────────────────────────────────
+  const startCounting = useCallback(() => {
+    if (intervalRef.current) return;
+    intervalRef.current = setInterval(() => {
+      actualWatchedRef.current += 1;
+      setDisplayWatched(actualWatchedRef.current);
+      sessionStorage.setItem(`student_lms_watched_${lessonId}`, actualWatchedRef.current);
+    }, 1000);
+  }, [lessonId]);
+
+  const stopCounting = useCallback(() => {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }, []);
+
+  // ── Auto-save mỗi 30 giây ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isReady || !lessonId || !courseId) return;
+    autoSaveTimerRef.current = setInterval(() => {
+      if (actualWatchedRef.current > 0 && onSaveProgress) {
+        onSaveProgress(lessonId, actualWatchedRef.current);
+      }
+    }, 30000);
+    return () => clearInterval(autoSaveTimerRef.current);
+  }, [isReady, lessonId, courseId, onSaveProgress]);
+
+  const handleStateChange = useCallback((event) => {
+    const state = event.data;
+    if (state === window.YT.PlayerState.PLAYING) {
+      setOverlayVisible(false);
+      setIsPaused(false);
+      startCounting();
+      if (!totalDuration || totalDuration === 0) {
+        const dur = event.target.getDuration?.();
+        if (dur > 0) setTotalDuration(dur);
+      }
+    }
+    if (state === window.YT.PlayerState.PAUSED) {
+      stopCounting();
+      setIsPaused(true);
+      clearTimeout(pauseTimeoutRef.current);
+      pauseTimeoutRef.current = setTimeout(() => setIsPaused(false), 1200);
+    }
+    if (state === window.YT.PlayerState.ENDED) {
+      stopCounting();
+      setHasEnded(true);
+      setOverlayVisible(true);
+      if (onVideoEnded) {
+        onVideoEnded(actualWatchedRef.current, totalDuration);
+      }
+    }
+  }, [onVideoEnded, startCounting, stopCounting, totalDuration]);
 
   if (!yId) {
     return (
@@ -169,66 +348,48 @@ const StudentVideoPlayer = ({ videoId, lessonId }) => {
 
   return (
     <div className="flex flex-col w-full h-full">
-      <div className="relative flex-1 min-h-[160px] bg-black rounded-2xl overflow-hidden shadow-2xl">
-        <iframe
-          key={`${yId}-${started ? 'play' : 'hold'}`}
-          className="absolute inset-0 w-full h-full"
-          src={iframeSrc}
-          title="YouTube video player"
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-        />
-        {!started && (
-          <button
-            type="button"
-            onClick={() => setStarted(true)}
-            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 p-6 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-            aria-label="Nhấn để bắt đầu học"
-          >
-            {/* Nền tối + lưới nhẹ (gợi tài liệu / học tập) */}
-            <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-[2px]" />
-            <div
-              className="absolute inset-0 opacity-[0.22]"
-              style={{
-                backgroundImage: `
-                  linear-gradient(rgba(59, 130, 246, 0.12) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(59, 130, 246, 0.12) 1px, transparent 1px)
-                `,
-                backgroundSize: '44px 44px',
-              }}
-            />
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              {[
-                'left-[8%] top-[12%]', 'left-[22%] top-[8%]', 'left-[78%] top-[14%]', 'left-[88%] top-[22%]',
-                'left-[12%] bottom-[18%]', 'left-[30%] bottom-[12%]', 'left-[70%] bottom-[16%]', 'left-[84%] bottom-[10%]',
-              ].map((pos, i) => (
-                <FileBox
-                  key={i}
-                  className={`absolute h-10 w-10 text-slate-500/25 md:h-12 md:w-12 ${pos}`}
-                  strokeWidth={1.25}
-                />
-              ))}
-            </div>
+      <div ref={containerRef} className="relative w-full h-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg group">
+        <div id={`student-yt-player-${lessonId}`} className="absolute inset-0 w-full h-full" />
 
-            <span className="relative z-10 flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center md:h-[5.5rem] md:w-[5.5rem]">
-              <span
-                className="pointer-events-none absolute inset-0 scale-[1.35] rounded-full bg-emerald-400/45 blur-2xl motion-safe:animate-pulse"
-                aria-hidden
-              />
-              <span
-                className="pointer-events-none absolute -inset-2 rounded-full border border-emerald-300/50 motion-safe:animate-ping"
-                style={{ animationDuration: '2.2s' }}
-                aria-hidden
-              />
-              <span className="relative flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-green-700 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.18),0_0_28px_rgba(52,211,153,0.95),0_0_52px_rgba(16,185,129,0.55),0_12px_40px_-8px_rgba(21,128,61,0.55)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.22),0_0_36px_rgba(52,211,153,1),0_0_72px_rgba(16,185,129,0.5),0_14px_44px_-8px_rgba(21,128,61,0.6)] active:scale-95">
-                <Play className="ml-1 h-9 w-9 fill-white text-white md:h-11 md:w-11" strokeWidth={0} />
-              </span>
-            </span>
-            <p className="relative z-10 text-center text-sm font-black tracking-tight text-white drop-shadow-md md:text-base">
-              Nhấn để bắt đầu học
+        {/* ▶️ PREMIUM OVERLAY */}
+        {overlayVisible && (
+          <div
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, rgba(10,14,24,0.88) 0%, rgba(15,25,50,0.75) 100%)', backdropFilter: 'blur(2px)' }}
+            onContextMenu={e => e.preventDefault()}
+          >
+            <div className="absolute top-4 left-4 flex items-center gap-2">
+              <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest uppercase shadow-lg">THẮNG TIN HỌC</div>
+              <div className="bg-white/10 text-white/60 text-[9px] font-bold px-2 py-0.5 rounded backdrop-blur-sm border border-white/10">Nội dung độc quyền</div>
+            </div>
+            <button
+              onClick={() => playerRef.current?.playVideo?.()}
+              className="relative w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)', boxShadow: '0 0 40px rgba(16,185,129,0.45), 0 8px 32px rgba(0,0,0,0.4)' }}
+            >
+              <div className="absolute inset-0 rounded-full border-2 border-emerald-300/40 animate-ping" />
+              <Play size={32} className="text-white ml-1 drop-shadow-lg" fill="white" />
+            </button>
+            <p className="mt-5 text-white/70 text-sm font-semibold tracking-wide">Nhấn để bắt đầu học</p>
+            {hasEnded && <span className="mt-2 text-emerald-400 text-xs font-bold flex items-center gap-1.5"><CheckCircle size={13} /> Đã xem xong — Xem lại?</span>}
+          </div>
+        )}
+
+        {/* INACTIVE TAB OVERLAY */}
+        {!isTabActive && !overlayVisible && (
+          <div
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 text-center bg-slate-950/95"
+            style={{ backdropFilter: 'blur(4px)' }}
+            onContextMenu={e => e.preventDefault()}
+          >
+            <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-4">
+              <Lock size={28} />
+            </div>
+            <h3 className="text-red-400 font-black text-sm uppercase tracking-wider">Video Đã Tạm Dừng</h3>
+            <p className="text-slate-400 text-xs mt-2 max-w-[240px] leading-relaxed">
+              Bạn đã chuyển tab hoặc rời khỏi trang học. Vui lòng quay lại tab này để tiếp tục học.
             </p>
-          </button>
+          </div>
         )}
       </div>
     </div>
@@ -1187,6 +1348,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                 key={currentLesson?._id}
                 videoId={currentLesson?.videoUrl}
                 lessonId={currentLesson?._id}
+                courseId={selectedCourse?._id || selectedCourse?.id}
+                initialWatchedSeconds={currentLesson?.watchedSeconds || 0}
+                antiSeekEnabled={currentLesson?.antiSeek !== false}
+                onSaveProgress={handleSaveProgress}
+                onVideoEnded={handleVideoEnded}
+                onEligibilityReached={handleEligibilityReached}
               />
             </div>
           </div>
@@ -1243,7 +1410,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                     )}
                   </div>
 
-                  {(localStorage.getItem('student_anti_seek_disabled') === 'true' || localStorage.getItem('admin_anti_seek_disabled') === 'true') ? (
+                  {(currentLesson?.antiSeek === false || localStorage.getItem('student_anti_seek_disabled') === 'true' || localStorage.getItem('admin_anti_seek_disabled') === 'true') ? (
                     <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-3">
                       <CheckCircle size={14} className="text-emerald-400 flex-shrink-0 mt-0.5" />
                       <p className="text-emerald-200/80 text-[11px] leading-relaxed">
