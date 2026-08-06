@@ -921,58 +921,48 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                 </span>
             </div>
           </div>
-          <div className="relative grid grid-cols-1 gap-2.5 p-2.5 md:gap-3 md:p-3 lg:grid-cols-12 lg:items-center lg:gap-4">
-            <div className="flex min-w-0 flex-col justify-center gap-2 lg:col-span-4">
-              <div className="flex flex-wrap items-center gap-1.5 md:gap-2 lg:justify-start">
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 font-mono text-xs text-slate-100 shadow-inner shadow-black/30 md:px-3 md:py-2 md:text-xs">
-                  <Shield size={12} className="shrink-0 text-sky-400" />
-                  <span className="text-slate-400">SBD</span>
-                  <span className="font-bold text-white">{studentSbd}</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 text-xs text-slate-200 shadow-inner shadow-black/30 md:px-3 md:py-2 md:text-xs">
-                  <LayoutGrid size={12} className="shrink-0 text-sky-400" />
-                  <span className="font-semibold text-white">{TOTAL}</span>
-                  <span className="text-slate-400">câu TN</span>
-                </span>
-              </div>
-              <div
-                className={`flex w-full max-w-[13.5rem] shrink-0 flex-col items-center text-center self-start rounded-xl border px-3 py-2 shadow-md backdrop-blur-md md:px-3.5 md:py-2.5 ${
+          <div className="relative grid grid-cols-1 gap-2 p-2 md:p-2.5 lg:grid-cols-12 lg:items-center lg:gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 md:gap-2 lg:col-span-5 lg:justify-start">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 font-mono text-xs text-slate-100 shadow-inner md:px-3 md:py-2">
+                <Shield size={12} className="shrink-0 text-sky-400" />
+                <span className="text-slate-400">SBD:</span>
+                <span className="font-bold text-white">{studentSbd}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 text-xs text-slate-200 shadow-inner md:px-3 md:py-2">
+                <LayoutGrid size={12} className="shrink-0 text-sky-400" />
+                <span className="font-semibold text-white">{TOTAL}</span>
+                <span className="text-slate-400">câu TN</span>
+              </span>
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-inner transition-all md:px-3 md:py-2 ${
                   timeLeft < 300
-                    ? 'border-red-500/45 bg-gradient-to-b from-red-950/50 to-red-950/30 shadow-[0_0_28px_-8px_rgba(239,68,68,0.4)]'
-                    : 'border-white/15 bg-gradient-to-b from-white/10 to-black/25'
+                    ? 'border-red-500/45 bg-red-950/60 text-red-200 animate-pulse'
+                    : 'border-white/15 bg-black/35 text-white'
                 }`}
               >
-                <p className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-widest text-slate-300 md:text-xs">
-                  <Clock size={12} className="shrink-0 text-sky-400" />
-                  {tab === 'tu_luan' ? 'Thời gian TL' : 'Thời gian TN'}
-                </p>
-                <p
-                  className={`mt-0.5 w-full text-center font-mono text-2xl font-black tabular-nums leading-none tracking-tight md:text-3xl ${
-                    timeLeft < 300 ? 'text-red-200' : 'text-white'
-                  }`}
-                >
+                <Clock size={12} className="shrink-0 text-sky-400" />
+                <span>{tab === 'tu_luan' ? 'TL' : 'TN'}:</span>
+                <span className="font-mono font-black">
                   {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-                </p>
-              </div>
+                </span>
+              </span>
             </div>
 
-            <div className="flex flex-col items-center text-center lg:col-span-4 lg:px-1">
+            <div className="flex items-center gap-3 lg:col-span-3 lg:justify-center">
               <ExamBrandLogo
                 resolvedUrl={webLogoUrl}
-                className="h-8 w-auto max-w-[min(100%,200px)] md:h-9 lg:h-10"
+                className="h-6 w-auto max-w-[min(100%,130px)] md:h-7"
               />
-              <p className="mt-1.5 text-xs font-bold uppercase tracking-[0.16em] text-indigo-300 md:mt-2 md:text-xs">
-                Hệ thống thi trực tuyến
-              </p>
-              <h1 className="mt-0.5 text-lg font-black leading-tight tracking-tight text-white md:text-xl lg:text-2xl">
-                Ca thi
-              </h1>
-              <p className="mt-0.5 text-sm font-bold text-indigo-200 md:text-base lg:text-lg">{meta.label}</p>
+              <div className="h-6 w-[1px] bg-white/20 hidden md:block" />
+              <div className="text-left hidden md:block">
+                <h1 className="text-xs font-black leading-none text-white uppercase tracking-wider">Ca thi</h1>
+                <p className="text-[10px] font-bold text-indigo-300 mt-0.5 leading-none">{meta.label}</p>
+              </div>
             </div>
 
             <div className="flex min-w-0 w-full flex-col lg:col-span-4 lg:items-end">
               <div className="w-full max-w-[17.5rem] min-w-0 lg:flex lg:justify-end">
-                <CameraHeaderPanel monitorRef={monitorRef} variant="large" />
+                <CameraHeaderPanel monitorRef={monitorRef} variant="default" />
               </div>
             </div>
           </div>
