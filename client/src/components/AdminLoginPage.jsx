@@ -250,22 +250,22 @@ const AdminLoginPage = ({ onLogin }) => {
         </div>
 
         {/* RIGHT COLUMN: ADMIN GATEWAY */}
-        <div className="w-full md:w-[40%] flex flex-col px-[15px] py-8 sm:p-8 lg:p-14 relative bg-[#020617]/50 backdrop-blur-3xl min-w-0 overflow-y-auto">
+        <div className="w-full md:w-[40%] flex flex-col px-[15px] py-6 sm:p-8 lg:py-10 lg:px-14 xl:py-14 relative bg-[#020617]/50 backdrop-blur-3xl min-w-0 overflow-y-auto">
           
-          <div className="w-full max-w-md space-y-12 z-10 my-auto mx-auto">
-            <div className="text-center space-y-6 animate-in fade-in zoom-in duration-700">
+          <div className="w-full max-w-md space-y-6 sm:space-y-8 z-10 my-auto mx-auto">
+            <div className="text-center space-y-4 animate-in fade-in zoom-in duration-700">
               <div className="relative inline-block">
                 <div className="absolute inset-0 bg-red-600 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-16 sm:h-20 max-w-[min(100%,200px)] relative z-10 object-contain mx-auto" />
+                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-12 sm:h-16 max-w-[min(100%,180px)] relative z-10 object-contain mx-auto" />
               </div>
               
-              <div className="space-y-3">
-                <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">Cổng Admin</h2>
-                <p className="text-slate-400 font-bold uppercase text-xs tracking-[0.2em] sm:tracking-[0.4em]">Xác thực quyền truy cập hệ thống</p>
+              <div className="space-y-2">
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Cổng Admin</h2>
+                <p className="text-slate-400 font-bold uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.3em]">Xác thực quyền truy cập hệ thống</p>
               </div>
             </div>
 
-            <form onSubmit={mfaToken ? handleMfaVerify : handleLogin} className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
+            <form onSubmit={mfaToken ? handleMfaVerify : handleLogin} className="space-y-4 sm:space-y-5 animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
               {error && (
                 <div role="alert" className="bg-[#1a0505] border-l-4 border-red-600 p-5 rounded-2xl flex items-center gap-4 text-red-400 text-[11px] font-black tracking-widest shadow-2xl">
                   <AlertTriangle size={20} className="flex-shrink-0" aria-hidden="true" />
@@ -311,7 +311,7 @@ const AdminLoginPage = ({ onLogin }) => {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     autoComplete="username"
-                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-5 py-4 sm:py-5 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
+                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-5 py-3.5 sm:py-4 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
                     placeholder="Nhập tài khoản quản trị"
                   />
                 </div>
@@ -330,7 +330,7 @@ const AdminLoginPage = ({ onLogin }) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
-                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-14 py-4 sm:py-5 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
+                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-14 py-3.5 sm:py-4 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
                     placeholder="••••••••••••"
                   />
                   <button
@@ -378,7 +378,7 @@ const AdminLoginPage = ({ onLogin }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="group w-full bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-3xl py-5 font-black uppercase tracking-[0.2em] shadow-2xl shadow-red-900/40 hover:from-red-700 hover:to-rose-800 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-4 border border-white/10"
+                className="group w-full bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-3xl py-4 font-black uppercase tracking-[0.2em] shadow-2xl shadow-red-900/40 hover:from-red-700 hover:to-rose-800 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-4 border border-white/10"
               >
                 {loading ? (
                   <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
@@ -392,7 +392,7 @@ const AdminLoginPage = ({ onLogin }) => {
             </form>
 
             {/* Terminal Style Footer */}
-            <div className="text-center pt-10 animate-in fade-in duration-1000 delay-500">
+            <div className="text-center pt-6 animate-in fade-in duration-1000 delay-500">
                <div className="bg-slate-900/50 border border-white/5 rounded-2xl p-4 inline-block">
                   <p className="text-xs font-mono text-slate-600">
                     TERMINAL ID: <span className="text-red-500/70">ADMIN-01X8</span> <br />

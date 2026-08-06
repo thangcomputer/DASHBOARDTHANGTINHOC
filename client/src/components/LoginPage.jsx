@@ -226,10 +226,10 @@ const LoginPage = ({ onLogin }) => {
         </div>
 
         {/* CỘT PHẢI */}
-        <div className="w-full md:w-1/2 flex flex-col px-[15px] py-8 sm:p-8 lg:p-20 relative bg-[#0f172a] min-w-0 overflow-y-auto">
-          <div className="w-full max-w-md space-y-8 sm:space-y-10 z-10 my-auto mx-auto">
+        <div className="w-full md:w-1/2 flex flex-col px-[15px] py-6 sm:p-8 lg:py-10 lg:px-16 xl:py-14 xl:px-20 relative bg-[#0f172a] min-w-0 overflow-y-auto">
+          <div className="w-full max-w-md space-y-6 sm:space-y-8 z-10 my-auto mx-auto">
             <div className="text-center md:text-left flex flex-col items-center md:items-start animate-in fade-in zoom-in duration-700">
-              <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-14 sm:h-16 mb-6 sm:mb-8 max-w-[min(100%,220px)] brightness-110 object-contain" />
+              <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-12 sm:h-14 mb-4 sm:mb-6 max-w-[min(100%,200px)] brightness-110 object-contain" />
               <div className="space-y-4 w-full">
                 <div className="inline-flex bg-white/5 p-1 rounded-2xl border border-white/10 mb-2 max-w-full" role="tablist" aria-label="Chọn vai trò đăng nhập">
                   <button type="button" role="tab" aria-selected={role === 'student'} onClick={() => setRole('student')} className={`px-4 xs:px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${role === 'student' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Học viên</button>
@@ -240,14 +240,14 @@ const LoginPage = ({ onLogin }) => {
               </div>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200" noValidate>
+            <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200" noValidate>
               {inactivityMsg && (
                 <div role="status" className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center gap-3 text-amber-300 text-sm font-bold">
                   <Clock size={18} aria-hidden="true" /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
                 </div>
               )}
               {error && <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 text-sm font-bold"><AlertCircle size={18} aria-hidden="true" /> {error}</div>}
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5">
                   <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">{role === 'student' ? 'SỐ ĐIỆN THOẠI HOẶC EMAIL' : 'TÀI KHOẢN GIẢNG VIÊN'}</label>
                   <div className="relative group">
@@ -282,9 +282,9 @@ const LoginPage = ({ onLogin }) => {
               </button>
             </form>
 
-            <div className="text-center pt-8 animate-in fade-in duration-1000 delay-500">
+            <div className="text-center pt-6 animate-in fade-in duration-1000 delay-500">
               <p className="text-slate-400 text-sm font-medium">Chưa có tài khoản? <button type="button" onClick={() => window.open(`https://zalo.me/${ADMIN_ZALO_PHONE}`, '_blank', 'noopener,noreferrer')} className="text-white font-black hover:text-red-500 transition-colors ml-1">Liên hệ Admin</button></p>
-              <div className="mt-10 flex flex-col items-center gap-2">
+              <div className="mt-6 sm:mt-8 flex flex-col items-center gap-2">
                 <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Hỗ trợ kỹ thuật</p>
                 <p className="text-xs font-bold text-slate-400">Hotline: 093 5758 462</p>
               </div>
