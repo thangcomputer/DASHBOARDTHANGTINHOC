@@ -1298,7 +1298,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       </div>
 
       {/* ExamMonitor (logic only) */}
-      <ExamMonitor ref={monitorRef} isActive={phase === 'test'} onViolate={handleViolation} onResetExam={handleResetExam} requireWebcam={requireWebcam} />
+      <ExamMonitor ref={monitorRef} isActive={phase === 'test'} onViolate={handleViolation} onResetExam={handleResetExam} requireWebcam={requireWebcam} enableTabGuard={tab !== 'tu_luan'} />
 
       {/* ══════════ MODALS ══════════ */}
       {showSubmitConfirm && (
