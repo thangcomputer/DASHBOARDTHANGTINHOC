@@ -105,7 +105,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
 
   const isLocked = subject.status === 'dang_khoa';
   const canStart  = allowStartExam && isApproved && !isLocked && !isLockedCountDown && (subject.status === 'chua_thi' || !subject.status);
-  const isOngoing = allowStartExam && isApproved && !isLocked && !isLockedCountDown && subject.status === 'dang_thi';
+  const isOngoing = allowStartExam && isApproved && !isLocked && !isLockedCountDown && subject.status === 'dang_thi' && subject.thucHanh !== 'da_nop';
   const canRetry  = allowStartExam && isApproved && !isLocked && !isLockedCountDown && subject.status === 'khong_dat';
   const isPassed  = subject.status === 'dat';
   const wouldBeAbleToStart =
@@ -199,6 +199,15 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
                 className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-orange-100"
               >
                 <Play size={15} /> Tiếp tục thi
+              </button>
+            )}
+            {subject.status === 'dang_thi' && subject.thucHanh === 'da_nop' && (
+              <button
+                type="button"
+                disabled
+                className="w-full py-2.5 bg-amber-50 border border-amber-200 text-amber-600 font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-not-allowed"
+              >
+                <Clock size={15} /> Đã nộp bài (Chờ chấm)
               </button>
             )}
             {isPassed && (

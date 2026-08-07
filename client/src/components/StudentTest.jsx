@@ -201,14 +201,22 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   useEffect(() => {
     setAnswers(Array(TOTAL).fill(null));
     setCurrentQ(0);
-    setIsTracNghiemSubmitted(false);
-    setTab('trac_nghiem');
-  }, [questionIdsKey, TOTAL]);
 
-  useEffect(() => {
-    examPhaseRef.current = 'mc';
-    setTimeLeft(meta.time);
-  }, [meta.time, subjectId]);
+    const progressEntry = student?.examProgress?.find(s => s.id === subjectId);
+    const alreadyPassedTN = progressEntry?.status === 'dang_thi' && progressEntry?.tracNghiem;
+
+    if (alreadyPassedTN) {
+      setIsTracNghiemSubmitted(true);
+      setTab('tu_luan');
+      examPhaseRef.current = 'essay';
+      setTimeLeft(meta.essayTime);
+    } else {
+      setIsTracNghiemSubmitted(false);
+      setTab('trac_nghiem');
+      examPhaseRef.current = 'mc';
+      setTimeLeft(meta.time);
+    }
+  }, [questionIdsKey, TOTAL, student, subjectId, meta.essayTime, meta.time]);
 
   // ── BỎ QUA YÊU CẦU CAMERA NẾU ADMIN ĐÃ TẮT (theo khóa của môn thi) ──
   useEffect(() => {
@@ -539,8 +547,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     const finalPct = TOTAL > 0 ? Math.round((finalScore / TOTAL) * 100) : 0;
     const passedTN = finalPct >= 50;
 
-    const nextStatus = !passedTN ? 'khong_dat' : 'dang_thi';
-    const lockUntil = !passedTN ? Date.now() + 7 * 24 * 60 * 60 * 1000 : null;
+    const hasEssayFile = !!essayFileStored;
+    const nextStatus = (!passedTN || !hasEssayFile) ? 'khong_dat' : 'dang_thi';
+    const lockUntil = (!passedTN || !hasEssayFile) ? Date.now() + 7 * 24 * 60 * 60 * 1000 : null;
 
     updateExamProgress({
       tracNghiem: { score: finalScore, total: TOTAL },
@@ -1322,7 +1331,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           onConfirm={() => {
             setShowNoFileConfirm(false);
             setUploadDone(true);
-            updateExamProgress({ thucHanh: 'chua_nop', status: 'dang_thi' });
+            updateExamProgress({
+              thucHanh: 'chua_nop',
+              status: 'khong_dat',
+              lockUntil: Date.now() + 7 * 24 * 60 * 60 * 1000
+            });
             setPhase('result');
           }}
           onCancel={() => setShowNoFileConfirm(false)}
