@@ -542,9 +542,16 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         setTuLuanSubmitting(false);
       }
     }
-    // Kiểm tra lại điểm Trắc nghiệm
-    const finalScore = answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
-    const finalPct = TOTAL > 0 ? Math.round((finalScore / TOTAL) * 100) : 0;
+    // Lấy điểm trắc nghiệm đã có hoặc tính mới từ answers
+    const progressEntry = student?.examProgress?.find(s => s.id === subjectId);
+    const hasExistingTN = progressEntry?.tracNghiem && typeof progressEntry.tracNghiem.score === 'number';
+
+    const finalScore = hasExistingTN 
+      ? progressEntry.tracNghiem.score 
+      : answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
+
+    const finalTotal = hasExistingTN ? (progressEntry.tracNghiem.total || TOTAL) : TOTAL;
+    const finalPct = finalTotal > 0 ? Math.round((finalScore / finalTotal) * 100) : 0;
     const passedTN = finalPct >= 50;
 
     const hasEssayFile = !!essayFileStored;
@@ -552,7 +559,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     const lockUntil = (!passedTN || !hasEssayFile) ? Date.now() + 7 * 24 * 60 * 60 * 1000 : null;
 
     updateExamProgress({
-      tracNghiem: { score: finalScore, total: TOTAL },
+      tracNghiem: { score: finalScore, total: finalTotal },
       thucHanh: essayFileStored ? 'da_nop' : 'chua_nop',
       status: nextStatus,
       ...(lockUntil ? { lockUntil } : {}),
@@ -585,9 +592,13 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     if (file) setUploadFile(file);
   };
 
-  const score  = answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
-  const pct    = TOTAL > 0 ? Math.round((score / TOTAL) * 100) : 0;
-  const passed = TOTAL > 0 && pct >= 50;
+  const progressEntry = student?.examProgress?.find(s => s.id === subjectId);
+  const hasExistingTN = progressEntry?.tracNghiem && typeof progressEntry.tracNghiem.score === 'number';
+
+  const score  = hasExistingTN ? progressEntry.tracNghiem.score : answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
+  const finalTotal = hasExistingTN ? (progressEntry.tracNghiem.total || TOTAL) : TOTAL;
+  const pct    = finalTotal > 0 ? Math.round((score / finalTotal) * 100) : 0;
+  const passed = finalTotal > 0 && pct >= 50;
   const mins   = Math.floor(timeLeft / 60);
   const secs   = timeLeft % 60;
 
