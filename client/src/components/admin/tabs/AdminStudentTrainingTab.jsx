@@ -546,43 +546,76 @@ export default function AdminStudentTrainingTab() {
                                         </span>
                                       </button>
                                     </div>
-                                  ) : r.status === 'khong_dat' ? (
-                                    <button
-                                      onClick={() => {
-                                        showGlobalModal({
-                                          title: 'Cho học viên thi lại?',
-                                          content: `Bạn có chắc muốn reset môn "${r.subjectLabel}" cho học viên ${r.studentName}? Học viên sẽ được phép thi lại.`,
-                                          type: 'question',
-                                          confirmText: 'Cho thi lại',
-                                          cancelText: 'Huỷ',
-                                          onConfirm: async () => {
-                                            const student = (students || []).find(s => (s._id || s.id) === r.studentId);
-                                            if (!student) return;
-                                            const progress = (student.examProgress || []).map(ep => ({...ep}));
-                                            const epIdx = progress.findIndex(ep => ep.id === r.subjectId);
-                                            if (epIdx === -1) return;
-                                            progress[epIdx].attemptCount = (progress[epIdx].attemptCount || 0) + 1;
-                                            progress[epIdx].lockUntil = null;
-                                            progress[epIdx].status = 'chua_thi';
-                                            progress[epIdx].tracNghiem = null;
-                                            progress[epIdx].thucHanh = 'chua_nop';
-                                            progress[epIdx].essayScore = null;
-                                            progress[epIdx].essayFile = null;
-                                            try {
-                                              await ctxUpdateStudent(r.studentId, { examProgress: progress });
-                                              toast.success(`Đã mở cho ${r.studentName} thi lại "${r.subjectLabel}"!`);
-                                              // 🔔 Thông báo cho học viên
-                                              addNotification(r.studentId, 'student', `🔓 Môn ${r.subjectLabel} đã được cấp quyền thi lại! Bạn có thể vào thi ngay.`);
-                                            } catch (err) {
-                                              toast.error('Lỗi khi reset bài thi!');
+                                   ) : (r.status === 'khong_dat' || r.status === 'dang_thi') ? (
+                                    <div className="flex flex-col gap-1 items-center justify-center">
+                                      <button
+                                        onClick={() => {
+                                          showGlobalModal({
+                                            title: 'Cho học viên thi lại?',
+                                            content: `Bạn có chắc muốn reset môn "${r.subjectLabel}" cho học viên ${r.studentName}? Học viên sẽ được phép thi lại ngay lập tức.`,
+                                            type: 'question',
+                                            confirmText: 'Cho thi lại',
+                                            cancelText: 'Huỷ',
+                                            onConfirm: async () => {
+                                              const student = (students || []).find(s => (s._id || s.id) === r.studentId);
+                                              if (!student) return;
+                                              const progress = (student.examProgress || []).map(ep => ({...ep}));
+                                              const epIdx = progress.findIndex(ep => ep.id === r.subjectId);
+                                              if (epIdx === -1) return;
+                                              progress[epIdx].attemptCount = (progress[epIdx].attemptCount || 0) + 1;
+                                              progress[epIdx].lockUntil = null;
+                                              progress[epIdx].status = 'chua_thi';
+                                              progress[epIdx].tracNghiem = null;
+                                              progress[epIdx].thucHanh = 'chua_nop';
+                                              progress[epIdx].essayScore = null;
+                                              progress[epIdx].essayFile = null;
+                                              try {
+                                                await ctxUpdateStudent(r.studentId, { examProgress: progress });
+                                                toast.success(`Đã mở cho ${r.studentName} thi lại "${r.subjectLabel}"!`);
+                                                addNotification(r.studentId, 'student', `🔓 Môn ${r.subjectLabel} đã được cấp quyền thi lại! Bạn có thể vào thi ngay.`);
+                                              } catch (err) {
+                                                toast.error('Lỗi khi reset bài thi!');
+                                              }
                                             }
-                                          }
-                                        });
-                                      }}
-                                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold transition border border-blue-200"
-                                    >
-                                      🔓 Cho thi lại
-                                    </button>
+                                          });
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-600 text-white hover:bg-red-700 rounded-lg text-xs font-black transition whitespace-nowrap"
+                                      >
+                                        Cho thi lại
+                                      </button>
+                                      {r.status === 'dang_thi' && (
+                                        <button
+                                          onClick={() => {
+                                            showGlobalModal({
+                                              title: 'Hủy bài / Đánh rớt?',
+                                              content: `Bạn có chắc muốn HỦY BÀI và ĐÁNH RỚT môn "${r.subjectLabel}" của học viên ${r.studentName}? Học viên sẽ bị khóa thi lại trong 7 ngày.`,
+                                              type: 'warning',
+                                              confirmText: 'Đánh rớt',
+                                              cancelText: 'Huỷ',
+                                              onConfirm: async () => {
+                                                const student = (students || []).find(s => (s._id || s.id) === r.studentId);
+                                                if (!student) return;
+                                                const progress = (student.examProgress || []).map(ep => ({...ep}));
+                                                const epIdx = progress.findIndex(ep => ep.id === r.subjectId);
+                                                if (epIdx === -1) return;
+                                                progress[epIdx].status = 'khong_dat';
+                                                progress[epIdx].lockUntil = Date.now() + 7 * 24 * 60 * 60 * 1000;
+                                                try {
+                                                  await ctxUpdateStudent(r.studentId, { examProgress: progress });
+                                                  toast.success(`Đã đánh rớt môn "${r.subjectLabel}" của ${r.studentName}!`);
+                                                  addNotification(r.studentId, 'student', `❌ Môn ${r.subjectLabel} đã bị đánh rớt và khóa thi lại trong 7 ngày.`);
+                                                } catch (err) {
+                                                  toast.error('Lỗi khi đánh rớt học viên!');
+                                                }
+                                              }
+                                            });
+                                          }}
+                                          className="text-[10px] text-gray-500 hover:text-red-500 font-bold transition whitespace-nowrap"
+                                        >
+                                          Hủy & Đánh rớt
+                                        </button>
+                                      )}
+                                    </div>
                                   ) : (
                                     <span className="text-xs text-gray-300">—</span>
                                   )}
