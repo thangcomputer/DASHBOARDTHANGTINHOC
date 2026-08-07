@@ -559,7 +559,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     const lockUntil = (!passedTN || !hasEssayFile) ? Date.now() + 7 * 24 * 60 * 60 * 1000 : null;
 
     updateExamProgress({
-      tracNghiem: { score: finalScore, total: finalTotal },
+      ...(hasExistingTN ? {} : { tracNghiem: { score: finalScore, total: finalTotal } }),
       thucHanh: essayFileStored ? 'da_nop' : 'chua_nop',
       status: nextStatus,
       ...(lockUntil ? { lockUntil } : {}),
