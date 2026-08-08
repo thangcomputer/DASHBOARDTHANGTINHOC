@@ -22,6 +22,14 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'socket.io-client',
+      'lucide-react',
+      'swr',
+    ],
     exclude: ['@tensorflow-models/face-detection', '@mediapipe/face_detection']
   },
   build: {

@@ -79,17 +79,23 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     };
 
     const effectiveToken = resolveToken();
+    // Chưa đăng nhập: không mở socket (tránh spam WS qua Vite proxy trên trang login)
+    if (!userId || !effectiveToken) {
+      setSocket(null);
+      setIsConnected(false);
+      return undefined;
+    }
+
     const sessionUser = { id: userId, role, adminRole };
 
     const newSocket = io(SOCKET_URL, {
-      transports: ['polling', 'websocket'],
-      // Không giới hạn số lần reconnect — blip mạng không được “chết” socket vĩnh viễn
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 15000,
       randomizationFactor: 0.4,
-      timeout: 20000,
+      timeout: 8000,
       auth: { token: effectiveToken },
     });
 

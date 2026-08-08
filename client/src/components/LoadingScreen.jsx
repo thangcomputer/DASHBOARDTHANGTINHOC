@@ -1,10 +1,12 @@
 /**
- * LoadingScreen.jsx — 4 kiểu loading screen toàn màn hình
- * Được render bọc App khi khởi tạo, tuỳ vào loadingStyle từ API.
+ * LoadingScreen.jsx — splash khi khởi tạo app (tuỳ loadingStyle từ API).
+ * Không được chặn login lâu: delay ngắn, abort fetch nhanh.
  */
 import { useEffect, useState } from 'react';
 
-const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
+const API = import.meta.env.VITE_API_URL || '';
+/** Dev: gần như bỏ splash. Prod: tối đa 400ms sau khi settings về (trước đây cố định 1500ms). */
+const SPLASH_MS = import.meta.env.DEV ? 0 : 400;
 
 export default function LoadingScreen({ onReady }) {
   const [style, setStyle] = useState(1);
@@ -12,10 +14,39 @@ export default function LoadingScreen({ onReady }) {
   const [show, setShow] = useState(true);
 
   useEffect(() => {
-    // Fetch web settings rồi hiện loading 1.5s
-    fetch(`${API}/api/settings/web`)
-      .then(r => r.json())
-      .then(res => {
+    let cancelled = false;
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const kill = setTimeout(() => ctrl?.abort(), 2500);
+
+    const finish = () => {
+      if (cancelled) return;
+      const hide = () => {
+        if (cancelled) return;
+        setShow(false);
+        onReady?.();
+      };
+      if (SPLASH_MS <= 0) hide();
+      else setTimeout(hide, SPLASH_MS);
+    };
+
+    // Trang login: bỏ splash ngay — không chờ settings
+    try {
+      const path = window.location.pathname || '';
+      if (/\/(login|admin\/login|dangkykhoahoc)(\/|$)/i.test(path) || path === '/') {
+        clearTimeout(kill);
+        finish();
+        return () => {
+          cancelled = true;
+          clearTimeout(kill);
+          ctrl?.abort();
+        };
+      }
+    } catch { /* ignore */ }
+
+    fetch(`${API}/api/settings/web`, { signal: ctrl?.signal, credentials: 'include' })
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled) return;
         if (res.success && res.data) {
           setStyle(res.data.loadingStyle || 1);
           setLogoUrl(res.data.logoUrl || '');
@@ -23,12 +54,16 @@ export default function LoadingScreen({ onReady }) {
       })
       .catch(() => {})
       .finally(() => {
-        setTimeout(() => {
-          setShow(false);
-          onReady?.();
-        }, 1500);
+        clearTimeout(kill);
+        finish();
       });
-  }, []);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(kill);
+      ctrl?.abort();
+    };
+  }, [onReady]);
 
   if (!show) return null;
 
@@ -90,7 +125,6 @@ export default function LoadingScreen({ onReady }) {
         }
       `}</style>
 
-      {/* Style 1: Gradient Spinner */}
       {style === 1 && (
         <div className="flex flex-col items-center gap-6">
           <div className="loading-gradient-ring" />
@@ -98,7 +132,6 @@ export default function LoadingScreen({ onReady }) {
         </div>
       )}
 
-      {/* Style 2: Logo Pulse */}
       {style === 2 && (
         <div className="flex flex-col items-center gap-6">
           <div className="loading-pulse-logo">
@@ -120,7 +153,6 @@ export default function LoadingScreen({ onReady }) {
         </div>
       )}
 
-      {/* Style 3: Typewriter */}
       {style === 3 && (
         <div className="flex flex-col items-center gap-6">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-2xl mb-2">
@@ -130,7 +162,6 @@ export default function LoadingScreen({ onReady }) {
         </div>
       )}
 
-      {/* Style 4: 3D Cube */}
       {style === 4 && (
         <div className="flex flex-col items-center gap-6" style={{ perspective: '600px' }}>
           <div className="loading-cube-3d" style={{ transformStyle: 'preserve-3d' }} />
