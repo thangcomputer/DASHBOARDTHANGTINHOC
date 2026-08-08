@@ -14,6 +14,7 @@
     "test:cqrs": "node --test tests/integration/cqrsMiddleware.test.js tests/integration/cqrsMoney.memory.test.js tests/integration/salaryCqrs.test.js tests/integration/outboxWorker.test.js tests/integration/validateEnv.cqrs.test.js",
     "cqrs:smoke": "node scripts/cqrs-smoke.js",
     "cqrs:smoke:memory": "CQRS_SMOKE_MEMORY=1 node scripts/cqrs-smoke.js",
+    "local:up": "node scripts/local-up-memory.cjs",
     "lint": "eslint .",
     "smoke": "node scripts/smoke-local.cjs",
     "smoke:api": "node scripts/smoke-api.cjs",

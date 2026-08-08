@@ -39,10 +39,12 @@ const AdminLoginPage = ({ onLogin }) => {
   const [userInputCaptcha, setUserInputCaptcha] = useState('');
   const [captchaId, setCaptchaId] = useState('');
   const [captchaSvg, setCaptchaSvg] = useState('');
+  const [captchaDevHint, setCaptchaDevHint] = useState('');
 
   // CAPTCHA do server sinh — dùng 1 lần, phải làm mới sau mỗi lần gửi
   const generateCaptcha = React.useCallback(async () => {
     setUserInputCaptcha('');
+    setCaptchaDevHint('');
     try {
       const res = await fetch(`${API_BASE}/auth/captcha`, { credentials: 'include' });
       const data = await res.json();
@@ -50,6 +52,11 @@ const AdminLoginPage = ({ onLogin }) => {
         setCaptchaId(data.cid);
         // Bọc trong data-URI để trình duyệt render SVG trong sandbox của <img>
         setCaptchaSvg(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.svg)}`);
+        // Dev/local: server trả `answer` khi NODE_ENV !== production — gợi ý + điền sẵn
+        if (import.meta.env.DEV && data.answer) {
+          setCaptchaDevHint(String(data.answer));
+          setUserInputCaptcha(String(data.answer));
+        }
       }
     } catch {
       setCaptchaSvg('');
@@ -127,9 +134,12 @@ const AdminLoginPage = ({ onLogin }) => {
       if (data.success) {
         finishLogin(data);
       } else {
-        setError(data.message?.toUpperCase() || 'TÀI KHOẢN HOẶC MẬT KHẨU KHÔNG ĐÚNG');
-        toast.error('Truy cập bị từ chối!');
-        setPassword('');
+        const msg = data.message || (response.status === 400
+          ? 'Mã bảo vệ không đúng hoặc đã hết hạn — bấm làm mới mã'
+          : 'Tài khoản hoặc mật khẩu không đúng');
+        setError(String(msg).toUpperCase());
+        toast.error(data.captchaError ? 'Sai mã bảo vệ — đã cấp mã mới' : 'Truy cập bị từ chối!');
+        if (!data.captchaError) setPassword('');
         generateCaptcha(); // CAPTCHA dùng 1 lần — cấp mã mới cho lần thử tiếp theo
       }
     } catch (err) {
@@ -370,7 +380,14 @@ const AdminLoginPage = ({ onLogin }) => {
                   onChange={(e) => setUserInputCaptcha(e.target.value)}
                   className="w-full bg-white/[0.03] border-2 border-white/5 rounded-2xl px-5 py-4 text-white text-center text-xs font-black outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all placeholder:text-slate-700 uppercase tracking-widest"
                   placeholder="Nhập mã hiển thị ở trên"
+                  autoComplete="off"
                 />
+                {captchaDevHint ? (
+                  <p className="text-[10px] font-mono text-emerald-400/90 ml-1">
+                    DEV hint: <span className="font-black tracking-widest">{captchaDevHint}</span>
+                    {' '}· tài khoản <span className="text-white/80">admin</span> / <span className="text-white/80">admin123</span>
+                  </p>
+                ) : null}
               </div>
               </>
               )}
