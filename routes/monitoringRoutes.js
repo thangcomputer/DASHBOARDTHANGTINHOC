@@ -17,9 +17,23 @@ router.get('/metrics', guard, (req, res) => {
   res.json({ success: true, data: monitoring.getMetrics() });
 });
 
+// GET /api/monitoring/outbox — backlog Outbox (ops)
+router.get('/outbox', guard, async (req, res) => {
+  try {
+    const data = await monitoring.getOutboxStats();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/monitoring/overview — dashboard
-router.get('/overview', guard, (req, res) => {
-  res.json({ success: true, data: monitoring.getOverview() });
+router.get('/overview', guard, async (req, res) => {
+  try {
+    res.json({ success: true, data: await monitoring.getOverview() });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // POST /api/monitoring/metrics/reset — Super Admin / admin reset counters
