@@ -67,7 +67,16 @@ Overview alerts: `OUTBOX_FAILED`, `OUTBOX_BACKLOG`, `OUTBOX_WORKER_OFF`.
 - `shared/cqrs/middleware.js` — `requireFinanceCqrs` / teacher / invoice / student
 - Routes vẫn phẳng; middleware gắn trước handler money/create
 
-## Rollback vận hành
+## Deploy / triển khai
+
+1. Merge PR vào `main` khi CI xanh
+2. Staging/prod **Mongo URI phải có** `?replicaSet=` hoặc `mongodb+srv`
+3. Docker: `docker compose up -d --build` (đã `rs0` + worker Outbox)
+4. Smoke sau deploy:
+   - `curl -s $HOST/healthz`
+   - `MONGODB_URI=... npm run cqrs:smoke`
+   - Admin login qua cổng nội bộ (`/api/auth/login/internal`)
+5. Kill-switch tạm: `ENABLE_CQRS=false` (endpoint money/create → 503)
 
 ```env
 ENABLE_CQRS=false

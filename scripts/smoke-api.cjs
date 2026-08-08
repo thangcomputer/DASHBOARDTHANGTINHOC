@@ -2,9 +2,30 @@
  * API-only smoke (CI / khong can Vite).
  * Usage: node scripts/smoke-api.cjs [baseUrl]
  * Default: http://127.0.0.1:5000/api
+ *
+ * Admin login qua /auth/login/internal + captcha (cổng nội bộ).
+ * Dev/CI: GET /auth/captcha trả `answer` khi NODE_ENV !== production.
  */
 const BASE = (process.argv[2] || process.env.SMOKE_BASE || 'http://127.0.0.1:5000/api').replace(/\/$/, '');
 const ROOT = BASE.replace(/\/api$/, '');
+
+function mergeCookies(existing, setCookieList) {
+  const map = new Map();
+  String(existing || '')
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .forEach((pair) => {
+      const i = pair.indexOf('=');
+      if (i > 0) map.set(pair.slice(0, i), pair.slice(i + 1));
+    });
+  for (const raw of setCookieList || []) {
+    const first = String(raw).split(';')[0];
+    const i = first.indexOf('=');
+    if (i > 0) map.set(first.slice(0, i), first.slice(i + 1));
+  }
+  return [...map.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
+}
 
 async function main() {
   const results = [];
@@ -24,7 +45,7 @@ async function main() {
   try {
     const r = await fetch(BASE + '/auth/csrf-token', { credentials: 'include' });
     const setCookie = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [];
-    cookie = setCookie.map((c) => c.split(';')[0]).join('; ');
+    cookie = mergeCookies(cookie, setCookie);
     const j = await r.json();
     csrf = j.csrfToken || '';
     ok('GET /auth/csrf-token', r.status === 200 && !!csrf, 'status=' + r.status);
@@ -32,9 +53,29 @@ async function main() {
     ok('GET /auth/csrf-token', false, e.message);
   }
 
+  let captchaId = '';
+  let captchaAnswer = '';
+  try {
+    const r = await fetch(BASE + '/auth/captcha', {
+      headers: cookie ? { Cookie: cookie } : {},
+    });
+    const setCookie = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [];
+    cookie = mergeCookies(cookie, setCookie);
+    const j = await r.json();
+    captchaId = j.cid || '';
+    captchaAnswer = j.answer || '';
+    ok(
+      'GET /auth/captcha',
+      r.status === 200 && !!captchaId && !!captchaAnswer,
+      'status=' + r.status + (captchaAnswer ? ' hint=yes' : ' hint=no')
+    );
+  } catch (e) {
+    ok('GET /auth/captcha', false, e.message);
+  }
+
   let token = '';
   try {
-    const r = await fetch(BASE + '/auth/login', {
+    const r = await fetch(BASE + '/auth/login/internal', {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -42,14 +83,21 @@ async function main() {
         ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
       },
-      body: JSON.stringify({ identifier: 'admin', password: process.env.SMOKE_ADMIN_PASSWORD || 'admin123' }),
+      body: JSON.stringify({
+        identifier: 'admin',
+        password: process.env.SMOKE_ADMIN_PASSWORD || 'admin123',
+        captchaId: captchaId || 'smoke',
+        captchaAnswer: captchaAnswer || 'smoke',
+      }),
     });
+    const setCookie = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [];
+    cookie = mergeCookies(cookie, setCookie);
     const j = await r.json();
     token = j.data?.accessToken || '';
     const loginOk = r.status === 200 && j.success && (!!token || j.mfaRequired || j.data?.mfaRequired);
-    ok('POST /auth/login', loginOk, 'status=' + r.status + (j.mfaRequired ? ' mfa' : ''));
+    ok('POST /auth/login/internal', loginOk, 'status=' + r.status + (j.mfaRequired ? ' mfa' : '') + (j.message ? ' ' + j.message : ''));
   } catch (e) {
-    ok('POST /auth/login', false, e.message);
+    ok('POST /auth/login/internal', false, e.message);
   }
 
   const h = {
