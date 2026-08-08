@@ -101,8 +101,16 @@ const superAdminOnlyTeacher = async (req, res, next) => {
 
 // ─── POST /api/teachers ───────────────────────────────────────────────────────
 // Chỉ Super Admin được tạo giảng viên
+// Strangler: ENABLE_CQRS_TEACHER=true → transaction + outbox (welcome async)
 router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], async (req, res) => {
   try {
+    const { isTeacherCqrs } = require('../shared/cqrs/flags');
+    if (isTeacherCqrs()) {
+      const { createTeacherCqrs } = require('../services/cqrs/createTeacherCqrs');
+      const result = await createTeacherCqrs(req);
+      return res.status(result.status).json(result.body);
+    }
+
     const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
@@ -211,8 +219,9 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       const msg = Object.values(error.errors || {}).map((e) => e.message).join(', ');
       return res.status(400).json({ success: false, message: msg || 'Dữ liệu không hợp lệ' });
     }
-    logger.error('[TEACHERS] Create error:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    const status = error.status || error.statusCode || 500;
+    if (status >= 500) logger.error('[TEACHERS] Create error:', error);
+    return res.status(status).json({ success: false, message: error.message || 'Lỗi server' });
   }
 });
 

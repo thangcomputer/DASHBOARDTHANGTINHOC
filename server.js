@@ -217,6 +217,10 @@ const { apiRateLimitUnlessAuth } = require('./middleware/apiRateLimit');
 app.use('/api', apiRateLimitUnlessAuth);
 
 connectDB();
+const { registerOutboxHandlers } = require('./shared/outbox/registerHandlers');
+registerOutboxHandlers();
+const outboxWorker = require('./shared/outbox/OutboxWorker');
+outboxWorker.start();
 
 // ==========================================
 // SOCKET.IO - REAL-TIME
@@ -973,6 +977,7 @@ const { initJobQueue, closeJobQueue } = require('./services/queue/jobQueue');
 async function shutdown(signal) {
   logger.info({ signal }, 'Shutting down');
   try {
+    try { outboxWorker.stop(); } catch (_) { /* ignore */ }
     await new Promise((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     });

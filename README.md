@@ -54,8 +54,18 @@ Bắt buộc — `validateEnv` sẽ chặn khởi động nếu thiếu/yếu.
 |------|-------|--------|
 | `JWT_SECRET` | Ký access token | dev ≥ 16 ký tự, prod ≥ 32 ký tự |
 | `JWT_REFRESH_SECRET` | Ký refresh token | **Phải khác** `JWT_SECRET` |
-| `MONGODB_URI` | Chuỗi kết nối MongoDB | |
+| `MONGODB_URI` | Chuỗi kết nối MongoDB | CQRS cần `?replicaSet=` hoặc `mongodb+srv` |
 | `CLIENT_URL` | URL frontend | **Bắt buộc** khi `NODE_ENV=production` |
+
+Tuỳ chọn CQRS / Outbox (mặc định **tắt** CQRS — xem [cqrs-phase-a-rollout.md](docs/architecture/cqrs-phase-a-rollout.md)):
+
+| Biến | Mặc định | Mô tả |
+|------|----------|--------|
+| `ENABLE_CQRS_STUDENT_CREATE` | tắt | Outbox welcome sau `POST /api/students` |
+| `ENABLE_CQRS_TEACHER` | tắt | TX + Outbox `POST /api/teachers` |
+| `ENABLE_CQRS_INVOICE` | tắt | TX + Outbox `POST /api/invoices` |
+| `RUN_OUTBOX_WORKER` | `1` | `0` trên API khi có worker riêng |
+| `OUTBOX_LEASE_MS` | `60000` | Reclaim event `PROCESSING` kẹt |
 
 Tuỳ chọn:
 

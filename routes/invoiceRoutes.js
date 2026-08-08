@@ -100,8 +100,21 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // ─── POST /api/invoices ────────────────────────────────────────────────────────
 // Tạo hóa đơn thủ công (Admin) — dùng field names từ Student schema mới
+// Strangler: ENABLE_CQRS_INVOICE=true → transaction + outbox (PDF async)
 router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
+    const { isInvoiceCqrs } = require('../shared/cqrs/flags');
+    if (isInvoiceCqrs()) {
+      const { createInvoiceCqrs } = require('../services/cqrs/createInvoiceCqrs');
+      try {
+        const result = await createInvoiceCqrs(req);
+        return res.status(result.status).json(result.body);
+      } catch (cqrsErr) {
+        const status = cqrsErr.status || cqrsErr.statusCode || 400;
+        return res.status(status).json({ success: false, message: cqrsErr.message });
+      }
+    }
+
     const { hocVienId, ghiChu } = req.body;
 
     const student = await Student.findById(hocVienId);

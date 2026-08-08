@@ -564,6 +564,9 @@ router.post('/import', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDE
 // ─── POST /api/students ──────────────────────────────────────────────────────────────────
 router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter], async (req, res) => {
   try {
+    const { isStudentCreateCqrs } = require('../shared/cqrs/flags');
+    const cqrsStudent = isStudentCreateCqrs();
+
     // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) — random + isFirstLogin
     const plainPassword = req.body.password != null && String(req.body.password).trim() !== ''
       ? String(req.body.password).trim()
@@ -758,15 +761,26 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
       }
     }
 
-    const welcome = await sendAccountWelcome(io, {
-      role: 'student',
-      userId: student._id,
-      name: student.name,
-      phone: student.phone,
-      zalo: student.zalo,
-      email: student.email,
-      password: plainPassword,
-    });
+    let welcome = { queued: false, notified: false };
+    if (cqrsStudent) {
+      // Defer welcome to OutboxWorker (StudentCreatedEvent)
+      const { enqueueStudentCreatedOutbox } = require('../services/cqrs/enqueueStudentCreatedOutbox');
+      await enqueueStudentCreatedOutbox({
+        student,
+        plainPassword,
+        actorId: req.user?.id || req.user?._id,
+      });
+    } else {
+      welcome = await sendAccountWelcome(io, {
+        role: 'student',
+        userId: student._id,
+        name: student.name,
+        phone: student.phone,
+        zalo: student.zalo,
+        email: student.email,
+        password: plainPassword,
+      });
+    }
 
     // Populate branch để logger và frontend có tên chi nhánh (không chỉ ObjectId)
     const Branch = require('../models/Branch');
