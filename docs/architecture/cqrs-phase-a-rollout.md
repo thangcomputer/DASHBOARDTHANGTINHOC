@@ -10,7 +10,7 @@ Strangler CQRS trên layout phẳng hiện tại (`routes/` + `services/cqrs/` +
 |------|----------|-----------------|
 | `ENABLE_CQRS_TEACHER` | `POST /api/teachers` | Teacher + Outbox cùng transaction; welcome qua Outbox |
 | `ENABLE_CQRS_INVOICE` | `POST /api/invoices` | Invoice + Outbox cùng transaction; PDF qua Outbox |
-| `ENABLE_CQRS_STUDENT_CREATE` | `POST /api/students` | Legacy create + Outbox welcome (TX full student+ledger = follow-up) |
+| `ENABLE_CQRS_STUDENT_CREATE` | `POST /api/students` | **TX atomic**: Student (+ Invoice + Ledger nếu paid) + Outbox welcome |
 
 ## MongoDB replica set
 

@@ -61,7 +61,7 @@ Tuỳ chọn CQRS / Outbox (mặc định **tắt** CQRS — xem [cqrs-phase-a-r
 
 | Biến | Mặc định | Mô tả |
 |------|----------|--------|
-| `ENABLE_CQRS_STUDENT_CREATE` | tắt | Outbox welcome sau `POST /api/students` |
+| `ENABLE_CQRS_STUDENT_CREATE` | tắt | TX + Outbox `POST /api/students` |
 | `ENABLE_CQRS_TEACHER` | tắt | TX + Outbox `POST /api/teachers` |
 | `ENABLE_CQRS_INVOICE` | tắt | TX + Outbox `POST /api/invoices` |
 | `RUN_OUTBOX_WORKER` | `1` | `0` trên API khi có worker riêng |

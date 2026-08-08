@@ -60,21 +60,26 @@ async function nextInvoiceCode() {
   return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
-async function createTuitionInvoice({ student, courseName, amount, note = '' }) {
+async function createTuitionInvoice({ student, courseName, amount, note = '', session = null }) {
   const hocPhi = Number(amount) || 0;
   if (!student?._id || hocPhi <= 0) return null;
   try {
     let maHD = await nextInvoiceCode();
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
-        return await Invoice.create({
+        const payload = {
           maHoaDon: maHD,
           hocVien: student._id,
           hoTen: student.name,
           khoaHoc: courseName || student.course || 'Học phí',
           hocPhi,
           ghiChu: note || `Thanh toán khóa ${courseName || student.course || ''}`.trim(),
-        });
+        };
+        if (session) {
+          const [doc] = await Invoice.create([payload], { session });
+          return doc;
+        }
+        return await Invoice.create(payload);
       } catch (err) {
         if (err?.code === 11000) {
           maHD = await nextInvoiceCode();
@@ -684,58 +689,127 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
       if (!student.paymentMethod) student.paymentMethod = 'cash';
     }
 
-    await student.save();
-
-    // Tạo hóa đơn + ledger ngay khi thêm HV đã thanh toán (fail-closed: Ledger bắt buộc)
     let createdInvoice = null;
-    if (isPaidOnCreate && price > 0) {
-      createdInvoice = await createTuitionInvoice({
-        student,
-        courseName,
-        amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
-        note: `Thanh toán khi thêm học viên — ${courseName}`,
-      });
+    if (cqrsStudent) {
+      // Atomic path: Student (+ Invoice + Ledger if paid) + OutboxEvent
+      const { withTransaction } = require('../shared/cqrs/withTransaction');
+      const OutboxEvent = require('../shared/outbox/OutboxEvent');
       try {
-        const primaryEnr = student.enrollments?.[0];
-        await settlePayment({
-          student,
-          amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
-          invoice: createdInvoice,
-          enrollmentId: primaryEnr?._id ? String(primaryEnr._id) : '',
-          courseName,
-          source: 'student_create_paid',
-          sourceRef: createdInvoice?.maHoaDon || `create:${student._id}`,
-          idempotencyKey: `payment:create:${student._id}:${primaryEnr?._id || createdInvoice?.maHoaDon || 'nohd'}`,
-          actor: financeActor(req),
-          note: 'Thanh toán khi thêm học viên',
-          reqMeta: financeReqMeta(req, student),
+        const txResult = await withTransaction(async (session) => {
+          await student.save({ session });
+          let invoice = null;
+          if (isPaidOnCreate && price > 0) {
+            invoice = await createTuitionInvoice({
+              student,
+              courseName,
+              amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
+              note: `Thanh toán khi thêm học viên — ${courseName}`,
+              session,
+            });
+            if (!invoice) {
+              const err = new Error('Không tạo được hóa đơn trong transaction');
+              err.status = 500;
+              throw err;
+            }
+            const primaryEnr = student.enrollments?.[0];
+            await settlePayment({
+              student,
+              amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
+              invoice,
+              enrollmentId: primaryEnr?._id ? String(primaryEnr._id) : '',
+              courseName,
+              source: 'student_create_paid',
+              sourceRef: invoice?.maHoaDon || `create:${student._id}`,
+              idempotencyKey: `payment:create:${student._id}:${primaryEnr?._id || invoice?.maHoaDon || 'nohd'}`,
+              actor: financeActor(req),
+              note: 'Thanh toán khi thêm học viên',
+              reqMeta: financeReqMeta(req, student),
+              session,
+            });
+          }
+          await OutboxEvent.create([{
+            eventType: 'StudentCreatedEvent',
+            aggregateType: 'Student',
+            aggregateId: student._id,
+            payload: {
+              studentId: student._id,
+              name: student.name,
+              phone: student.phone,
+              zalo: student.zalo,
+              email: student.email,
+              plainPassword,
+            },
+            status: 'PENDING',
+            branchId: student.branchId || undefined,
+            actorId: (req.user?._id && require('mongoose').isValidObjectId(req.user._id))
+              ? req.user._id
+              : undefined,
+          }], { session });
+          return { invoice };
         });
-        bustFinanceCaches();
-      } catch (ledgerErr) {
-        logger.error('[STUDENTS] ledger settle on create FAILED — rollback paid: %s', ledgerErr.message);
-        // Rollback cache + void invoice (không để paid không có Ledger)
-        if (Array.isArray(student.enrollments)) {
-          student.enrollments.forEach((e) => {
-            e.paid = false;
-            e.paidAt = undefined;
-            e.status = 'pending_payment';
-          });
-          student.markModified('enrollments');
-        }
-        student.paid = false;
-        student.paidAmount = 0;
-        student.paidAt = undefined;
-        await student.save();
-        if (createdInvoice?._id) {
-          try {
-            await Invoice.findByIdAndUpdate(createdInvoice._id, { status: 'void' });
-          } catch { /* ignore */ }
-        }
-        return res.status(500).json({
+        createdInvoice = txResult.invoice;
+        if (createdInvoice) bustFinanceCaches();
+      } catch (txErr) {
+        logger.error('[STUDENTS] CQRS create TX failed: %s', txErr.message);
+        const status = txErr.status || txErr.statusCode || 500;
+        return res.status(status).json({
           success: false,
-          message: 'Đã tạo HV nhưng ghi sổ cái thất bại — trạng thái thu đã rollback. Thử thu lại.',
-          data: { studentId: student._id },
+          message: txErr.message || 'Tạo học viên thất bại (CQRS transaction)',
         });
+      }
+    } else {
+      await student.save();
+
+      // Tạo hóa đơn + ledger ngay khi thêm HV đã thanh toán (fail-closed: Ledger bắt buộc)
+      if (isPaidOnCreate && price > 0) {
+        createdInvoice = await createTuitionInvoice({
+          student,
+          courseName,
+          amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
+          note: `Thanh toán khi thêm học viên — ${courseName}`,
+        });
+        try {
+          const primaryEnr = student.enrollments?.[0];
+          await settlePayment({
+            student,
+            amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
+            invoice: createdInvoice,
+            enrollmentId: primaryEnr?._id ? String(primaryEnr._id) : '',
+            courseName,
+            source: 'student_create_paid',
+            sourceRef: createdInvoice?.maHoaDon || `create:${student._id}`,
+            idempotencyKey: `payment:create:${student._id}:${primaryEnr?._id || createdInvoice?.maHoaDon || 'nohd'}`,
+            actor: financeActor(req),
+            note: 'Thanh toán khi thêm học viên',
+            reqMeta: financeReqMeta(req, student),
+          });
+          bustFinanceCaches();
+        } catch (ledgerErr) {
+          logger.error('[STUDENTS] ledger settle on create FAILED — rollback paid: %s', ledgerErr.message);
+          // Rollback cache + void invoice (không để paid không có Ledger)
+          if (Array.isArray(student.enrollments)) {
+            student.enrollments.forEach((e) => {
+              e.paid = false;
+              e.paidAt = undefined;
+              e.status = 'pending_payment';
+            });
+            student.markModified('enrollments');
+          }
+          student.paid = false;
+          student.paidAmount = 0;
+          student.paidAt = undefined;
+          await student.save();
+          if (createdInvoice?._id) {
+            try {
+              await Invoice.findByIdAndUpdate(createdInvoice._id, { status: 'void' });
+            } catch { /* ignore */ }
+          }
+          return res.status(500).json({
+            success: false,
+            message: 'Đã tạo HV nhưng ghi sổ cái thất bại — trạng thái thu đã rollback. Thử thu lại.',
+            data: { studentId: student._id },
+          });
+        }
       }
     }
 
@@ -763,13 +837,8 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
 
     let welcome = { queued: false, notified: false };
     if (cqrsStudent) {
-      // Defer welcome to OutboxWorker (StudentCreatedEvent)
-      const { enqueueStudentCreatedOutbox } = require('../services/cqrs/enqueueStudentCreatedOutbox');
-      await enqueueStudentCreatedOutbox({
-        student,
-        plainPassword,
-        actorId: req.user?.id || req.user?._id,
-      });
+      // Welcome already queued via OutboxEvent inside TX
+      welcome = { queued: false, notified: false };
     } else {
       welcome = await sendAccountWelcome(io, {
         role: 'student',

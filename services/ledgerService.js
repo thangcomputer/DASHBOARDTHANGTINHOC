@@ -20,7 +20,7 @@ function signedOf(doc) {
  * Insert ledger entry (idempotent theo idempotencyKey).
  * @returns {{ entry, created: boolean }}
  */
-async function postEntry(payload) {
+async function postEntry(payload, opts = {}) {
   const key = String(payload.idempotencyKey || '').trim();
   if (!key) {
     const err = new Error('Thiếu idempotencyKey cho ledger');
@@ -34,8 +34,11 @@ async function postEntry(payload) {
     throw err;
   }
 
+  const session = opts.session || null;
+  const createOpts = session ? { session } : undefined;
+
   try {
-    const entry = await LedgerEntry.create({
+    const docs = await LedgerEntry.create([{
       idempotencyKey: key,
       type: payload.type,
       amount,
@@ -56,11 +59,13 @@ async function postEntry(payload) {
       postedBy: payload.postedBy || '',
       postedByRole: payload.postedByRole || '',
       reversesEntryId: payload.reversesEntryId || null,
-    });
-    return { entry, created: true };
+    }], createOpts);
+    return { entry: docs[0], created: true };
   } catch (err) {
     if (err && err.code === 11000) {
-      const existing = await LedgerEntry.findOne({ idempotencyKey: key });
+      const q = LedgerEntry.findOne({ idempotencyKey: key });
+      if (session) q.session(session);
+      const existing = await q;
       return { entry: existing, created: false };
     }
     throw err;
@@ -83,6 +88,7 @@ async function settlePayment({
   note = '',
   metadata = {},
   reqMeta = {},
+  session = null,
 }) {
   const amt = Math.abs(Number(amount) || 0);
   if (!(amt > 0)) return { entry: null, created: false };
@@ -109,7 +115,7 @@ async function settlePayment({
     metadata,
     postedBy: actor.id || '',
     postedByRole: actor.role || '',
-  });
+  }, { session });
 
   // Trùng idempotencyKey chỉ OK khi cùng HV + số tiền + cùng enrollment (nếu đang gắn enrollment).
   // Tránh: đăng ký lại khóa / key cũ không enrollmentId → không ghi PAYMENT mới nhưng enrollment vẫn paid.
@@ -130,7 +136,7 @@ async function settlePayment({
     }
   }
 
-  if (created) {
+  if (created && !session) {
     try {
       await writeAudit({
         action: 'payment.settle',
