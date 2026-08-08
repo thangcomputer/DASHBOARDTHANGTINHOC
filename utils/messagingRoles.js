@@ -4,6 +4,7 @@
  */
 function getMessagingRole({ id, role, adminRole } = {}) {
   if (String(id) === 'admin') return 'admin';
+  if (adminRole === 'SUPER_ADMIN') return 'admin';
   if (adminRole === 'HIGH_ADMIN') return 'admin';
   if (adminRole === 'SUPPORT') return 'staff';
   if (adminRole === 'STAFF' || role === 'staff') return 'staff';

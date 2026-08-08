@@ -3,6 +3,7 @@ export function getMessagingRole(user) {
   user = user || {};
   const id = String(user.id || user._id || "");
   if (id === "admin") return "admin";
+  if (user.adminRole === "SUPER_ADMIN") return "admin";
   if (user.adminRole === "HIGH_ADMIN") return "admin";
   if (user.adminRole === "SUPPORT") return "staff";
   if (user.adminRole === "STAFF" || user.role === "staff") return "staff";
