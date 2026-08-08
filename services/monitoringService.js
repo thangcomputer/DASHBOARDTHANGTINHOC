@@ -6,6 +6,7 @@ const os = require('os');
 const { metricsCollector } = require('./metricsCollector');
 const { isRedisEnabled, isRedisReady } = require('../config/redis');
 const { getQueueMode } = require('./queue/jobQueue');
+const { shouldRunOutboxWorker } = require('../shared/outbox/config');
 
 function memSnapshot() {
   const m = process.memoryUsage();
@@ -49,6 +50,12 @@ function socketAdapterStatus() {
   };
 }
 
+function outboxWorkerStatus() {
+  return {
+    workerEnabled: shouldRunOutboxWorker(),
+  };
+}
+
 /**
  * Public-ish health (dung cho /healthz va monitoring/health).
  */
@@ -57,6 +64,7 @@ function getHealth() {
   const redis = redisStatus();
   const queue = queueStatus();
   const socketAdapter = socketAdapterStatus();
+  const outbox = outboxWorkerStatus();
   const mem = memSnapshot();
   const ok = db.status === 'up';
   return {
@@ -69,6 +77,7 @@ function getHealth() {
     db,
     redis,
     queue,
+    outbox,
     socketAdapter,
     memory: mem,
     timestamp: new Date().toISOString(),
@@ -79,17 +88,24 @@ function getMetrics() {
   return metricsCollector.snapshot();
 }
 
-function getOverview() {
+async function getOutboxStats() {
+  const { getOutboxStats: loadStats } = require('../shared/outbox/stats');
+  return loadStats();
+}
+
+async function getOverview() {
   const health = getHealth();
   const metrics = getMetrics();
+  const outboxStats = await getOutboxStats();
   return {
-    health,
+    health: { ...health, outboxStats },
     metrics,
-    alerts: buildAlerts(health, metrics),
+    outbox: outboxStats,
+    alerts: buildAlerts(health, metrics, outboxStats),
   };
 }
 
-function buildAlerts(health, metrics) {
+function buildAlerts(health, metrics, outboxStats = null) {
   const alerts = [];
   if (health.db.status !== 'up') {
     alerts.push({ level: 'critical', code: 'DB_DOWN', message: 'MongoDB khong san sang' });
@@ -118,6 +134,29 @@ function buildAlerts(health, metrics) {
       message: 'Heap dang dung ' + health.memory.heapUsedMb + ' MB',
     });
   }
+  if (outboxStats?.available) {
+    if (Number(outboxStats.failed) > 0) {
+      alerts.push({
+        level: 'warning',
+        code: 'OUTBOX_FAILED',
+        message: `Outbox FAILED=${outboxStats.failed}`,
+      });
+    }
+    if (Number(outboxStats.pending) >= 50) {
+      alerts.push({
+        level: 'warning',
+        code: 'OUTBOX_BACKLOG',
+        message: `Outbox PENDING=${outboxStats.pending}`,
+      });
+    }
+    if (outboxStats.workerEnabled === false && Number(outboxStats.pending) > 0) {
+      alerts.push({
+        level: 'warning',
+        code: 'OUTBOX_WORKER_OFF',
+        message: 'Outbox worker tat nhung con PENDING',
+      });
+    }
+  }
   return alerts;
 }
 
@@ -130,6 +169,7 @@ module.exports = {
   getHealth,
   getMetrics,
   getOverview,
+  getOutboxStats,
   resetMetrics,
   memSnapshot,
 };

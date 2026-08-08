@@ -9,15 +9,14 @@ const {
   sumFinancialRevenue,
   listLedgerEntries,
   getStudentFinanceCard,
-  voidLedgerEntry,
   reconciliationReport,
   rebuildDailySnapshots,
   syncStudentFinanceCache,
-  postDiscount,
 } = require('../services/ledgerService');
 const Student = require('../models/Student');
 const logger = require('../config/logger');
 const { isLedgerSot } = require('../utils/financeFlags');
+const { requireFinanceCqrs } = require('../shared/cqrs/middleware');
 
 const guard = [
   authMiddleware,
@@ -125,14 +124,10 @@ router.get('/students/:id', guard, async (req, res) => {
 });
 
 // POST /api/finance/ledger/:id/void
-router.post('/ledger/:id/void', manageGuard, async (req, res) => {
+router.post('/ledger/:id/void', manageGuard, requireFinanceCqrs, async (req, res) => {
   try {
-    const result = await voidLedgerEntry({
-      entryId: req.params.id,
-      reason: req.body?.reason || '',
-      actor: actorOf(req),
-      createReversal: req.body?.createReversal !== false,
-    });
+    const { voidLedgerCqrs } = require('../services/cqrs');
+    const result = await voidLedgerCqrs(req);
     return res.json({
       success: true,
       message: result.created ? 'Đã void dòng ledger' : 'Dòng đã void trước đó',
@@ -144,27 +139,11 @@ router.post('/ledger/:id/void', manageGuard, async (req, res) => {
   }
 });
 
-// POST /api/finance/discount — ghi discount/coupon
-router.post('/discount', manageGuard, async (req, res) => {
+// POST /api/finance/discount — ghi discount/coupon (TX)
+router.post('/discount', manageGuard, requireFinanceCqrs, async (req, res) => {
   try {
-    const { studentId, amount, kind, enrollmentId, courseName, note, sourceRef } = req.body || {};
-    if (!studentId) {
-      return res.status(400).json({ success: false, message: 'Thiếu studentId' });
-    }
-    const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
-    }
-    const { entry, created } = await postDiscount({
-      student,
-      amount,
-      kind: kind === 'coupon' ? 'coupon' : 'discount',
-      enrollmentId,
-      courseName,
-      sourceRef: sourceRef || `discount:${studentId}:${enrollmentId || 'x'}`,
-      actor: actorOf(req),
-      note: note || '',
-    });
+    const { postDiscountCqrs } = require('../services/cqrs');
+    const { entry, created } = await postDiscountCqrs(req, { actorOf });
     return res.json({ success: true, created, data: entry });
   } catch (err) {
     const status = err.status || 500;

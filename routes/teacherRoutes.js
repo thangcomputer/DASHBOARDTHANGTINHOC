@@ -12,11 +12,9 @@ const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
-const { sendAccountWelcome } = require('../services/accountWelcome');
 const NotificationService = require('../services/NotificationService');
-const { generateTempPassword } = require('../utils/tempPassword');
-const { postSalary } = require('../services/ledgerService');
-const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
+const { computeStarBonusSummary } = require('../services/teacherStarBonus');
+const { requireTeacherCqrs, requireFinanceCqrs } = require('../shared/cqrs/middleware');
 
 const router = express.Router();
 
@@ -100,109 +98,12 @@ const superAdminOnlyTeacher = async (req, res, next) => {
 };
 
 // ─── POST /api/teachers ───────────────────────────────────────────────────────
-// Chỉ Super Admin được tạo giảng viên
-router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], async (req, res) => {
+// Chỉ Super Admin — hướng mới: TX Teacher + Outbox (welcome async)
+router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter, requireTeacherCqrs], async (req, res) => {
   try {
-    const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession } = req.body;
-    if (!name || !phone) {
-      return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
-    }
-    const emailTrim = (rawEmail || '').trim();
-    const email = emailTrim && emailTrim !== 'email@example.com' ? emailTrim : undefined;
-    try {
-      const { assertUniqueContact } = require('../utils/uniqueContact');
-      await assertUniqueContact({ phone, zalo: phone, email });
-    } catch (dupErr) {
-      if (dupErr.status === 409) {
-        return res.status(409).json({ success: false, message: dupErr.message });
-      }
-      throw dupErr;
-    }
-    if (password && String(password).trim().length > 0 && String(password).trim().length < 6) {
-      return res.status(400).json({ success: false, message: 'Mật khẩu phải ít nhất 6 ký tự' });
-    }
-
-    // ⭐ Xác định branchId:
-    //   - STAFF → bắt buộc dùng branchId của chính họ (không được chọn chi nhánh khác)
-    //   - SUPER_ADMIN → dùng branchId từ request body (dropdown chọn), hoặc null
-    let finalBranchId   = null;
-    let finalBranchCode = '';
-    if (req.userBranchId) {
-      // STAFF → ép branchId
-      finalBranchId   = req.userBranchId;
-      finalBranchCode = req.userBranchCode || '';
-    } else if (reqBranchId) {
-      // SUPER_ADMIN chọn chi nhánh
-      finalBranchId   = reqBranchId;
-      finalBranchCode = reqBranchCode || '';
-    }
-
-    // Auto-Approve Logic: Nếu Admin gán chi nhánh ngay từ lúc tạo, tự động duyệt
-    const isAssigningBranch = !!(finalBranchId || finalBranchCode);
-    
-    const normalizedSubjectIds = Array.isArray(subjectIds)
-      ? [...new Set(subjectIds.map((id) => String(id).trim()).filter(Boolean))]
-      : [];
-
-    const plainPassword = password && String(password).trim()
-      ? String(password).trim()
-      : generateTempPassword(8);
-    const teacher = await Teacher.create({
-      name,
-      phone,
-      email,
-      specialty: specialty || normalizedSubjectIds.join(', '),
-      subjectIds: normalizedSubjectIds,
-      startDate: startDate || Date.now(),
-      address:   address   || '',
-      password:  plainPassword,
-      status:    status || 'inactive',
-      testStatus: null,
-      role: 'teacher',
-      isFirstLogin: true,
-      branchId:   finalBranchId,
-      branchCode: finalBranchCode,
-      baseSalaryPerSession: Math.max(0, Number(baseSalaryPerSession) || 0),
-    });
-
-    // Emit socket cho Admin thấy real-time
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('teacher:new', {
-        teacherId: teacher._id,
-        name: teacher.name,
-        branchCode: teacher.branchCode,
-        message: `Giảng viên mới: ${teacher.name} — Chi nhánh: ${teacher.branchCode || 'Chưa phân'}`,
-      });
-      NotificationService.notifyAdmins(
-        io,
-        '🆕 Giảng viên mới',
-        `Đã tạo giảng viên ${teacher.name} (${teacher.phone}).`,
-        { teacherId: teacher._id },
-        '/admin/teachers',
-      ).catch((err) => logger.warn('[TEACHERS] notifyAdmins:', err.message));
-    }
-
-    const welcome = await sendAccountWelcome(io, {
-      role: 'teacher',
-      userId: teacher._id,
-      name: teacher.name,
-      phone: teacher.phone,
-      email: teacher.email,
-      password: plainPassword,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: `Đã tạo giảng viên ${teacher.name}`,
-      data: {
-        ...teacher.toObject(),
-        password: undefined,
-        tempPassword: plainPassword,
-        welcomeQueued: welcome.queued,
-        welcomeNotified: welcome.notified,
-      },
-    });
+    const { createTeacherCqrs } = require('../services/cqrs');
+    const result = await createTeacherCqrs(req);
+    return res.status(result.status).json(result.body);
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'Số điện thoại đã tồn tại' });
@@ -211,8 +112,9 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       const msg = Object.values(error.errors || {}).map((e) => e.message).join(', ');
       return res.status(400).json({ success: false, message: msg || 'Dữ liệu không hợp lệ' });
     }
-    logger.error('[TEACHERS] Create error:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
+    const status = error.status || error.statusCode || 500;
+    if (status >= 500) logger.error('[TEACHERS] Create error:', error);
+    return res.status(status).json({ success: false, message: error.message || 'Lỗi server' });
   }
 });
 
@@ -911,353 +813,64 @@ router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.M
 });
 
 // ─── PUT /api/teachers/:id/finance/pay-flexible ──────────────────────────────────
-// Thanh toán linh hoạt: Admin tự chọn số buổi và số tiền, FIFO (cũ nhất trước)
-// Có thể cộng thưởng sao tích lũy (includeStarBonus)
-router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
+// Hướng mới: TX claim sessions + Transaction + salary ledger (+ star bonus)
+router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher, requireFinanceCqrs], async (req, res) => {
   try {
-    const { sessionsCount, amount, note, includeStarBonus, starBonusMonths } = req.body;
-    const idempotencyKey = String(
-      req.headers['idempotency-key'] || req.body.idempotencyKey || ''
-    ).trim() || null;
+    const { payTeacherFlexibleCqrs } = require('../services/cqrs');
+    const result = await payTeacherFlexibleCqrs(req);
+    const { paidSessions, markedSessions, totalAmount, starBonusAmount, starBonusMonths, transaction, idempotent } = result;
 
-    const paidCount = Math.max(0, Number(sessionsCount) || 0);
-    const wantBonus = includeStarBonus === true || includeStarBonus === 'true' || includeStarBonus === 1;
-
-    if (paidCount <= 0 && !wantBonus) {
-      return res.status(400).json({ success: false, message: 'Số buổi thanh toán phải lớn hơn 0 (hoặc bật thưởng sao)' });
-    }
-    if (!amount || Number(amount) <= 0) {
-      return res.status(400).json({ success: false, message: 'Số tiền thanh toán phải lớn hơn 0' });
-    }
-    if (Number(amount) > 500000000) {
-      return res.status(400).json({ success: false, message: `Số tiền vượt giới hạn 500 triệu/lần` });
-    }
-
-    if (idempotencyKey) {
-      const existing = await Transaction.findOne({ idempotencyKey }).lean();
-      if (existing) {
-        return res.json({
-          success: true,
-          message: 'Giao dịch đã tồn tại (idempotent)',
-          data: {
-            paidSessions: paidCount,
-            markedSessions: 0,
-            totalAmount: existing.amount,
-            starBonusAmount: existing.starBonusAmount || 0,
-            starBonusMonths: existing.starBonusMonths || [],
-            transaction: existing,
-            idempotent: true,
-          },
+    if (!idempotent) {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('teacher:financeUpdated', {
+          teacherId: req.params.id,
+          message: `Admin đã thanh toán ${Number(totalAmount).toLocaleString('vi-VN')}đ`
+            + (paidSessions > 0 ? ` cho ${paidSessions} buổi` : '')
+            + (starBonusAmount > 0 ? ` (gồm thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ)` : '')
+            + '.',
         });
+        io.emit('transactions:new', transaction);
+        io.emit('revenue:updated', { amount: Number(totalAmount), type: 'salary' });
       }
-    }
-
-    const teacher = await Teacher.findById(req.params.id);
-    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
-
-    let bonusPayout = { payoutMonths: [], payoutBonusAmount: 0 };
-    if (wantBonus) {
-      bonusPayout = await resolveBonusForPayout(
-        teacher,
-        Array.isArray(starBonusMonths) ? starBonusMonths : null
-      );
-      if (paidCount <= 0 && bonusPayout.payoutBonusAmount <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Không có thưởng sao đủ điều kiện để thanh toán',
-        });
-      }
-    }
-    const starBonusAmount = Number(bonusPayout.payoutBonusAmount) || 0;
-    const starBonusMonthKeys = Array.isArray(bonusPayout.payoutMonths) ? bonusPayout.payoutMonths : [];
-
-    // Tìm buổi chưa thanh toán theo FIFO (chỉ tính các buổi đã hoàn thành - completed)
-    let sessionIds = [];
-    let actualCount = 0;
-    if (paidCount > 0) {
-      const pendingSessions = await Schedule.find({
-        teacherId: req.params.id,
-        status: 'completed',
-        is_paid_to_teacher: { $ne: true }
-      }).sort({ date: 1, createdAt: 1 }).limit(paidCount);
-
-      sessionIds = pendingSessions.map(s => s._id);
-
-      if (sessionIds.length > 0) {
-        const claim = await Schedule.updateMany(
-          {
-            _id: { $in: sessionIds },
-            status: 'completed',
-            is_paid_to_teacher: { $ne: true },
-          },
-          { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-        );
-        actualCount = claim.modifiedCount || 0;
-      }
-    }
-
-    const now = new Date();
-    const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
-    const bonusNote = starBonusAmount > 0
-      ? ` + thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ (${starBonusMonthKeys.join(', ')})`
-      : '';
-    const defaultDesc = paidCount > 0
-      ? `Thù lao ${paidCount} buổi dạy${bonusNote}`
-      : `Thưởng sao giảng viên${bonusNote}`;
-
-    let transaction;
-    try {
-      transaction = await Transaction.create({
-        teacherId: req.params.id,
-        teacherName: teacher.name,
-        teacherPhone: teacher.phone || '',
-        amount: Number(amount),
-        description: note || defaultDesc,
-        month: monthLabel,
-        status: 'confirmed',
-        confirmedBy: req.user?.name || 'Admin',
-        confirmedAt: now,
-        bankName: teacher.bankAccount?.bankName || '',
-        bankAccount: teacher.bankAccount?.accountNumber || '',
-        note: note || '',
-        starBonusAmount,
-        starBonusMonths: starBonusMonthKeys,
-        ...(idempotencyKey ? { idempotencyKey } : {}),
-      });
-    } catch (createErr) {
-      // Rollback claim nếu tạo phiếu chi thất bại (tránh buổi bị đánh dấu paid mà không có ledger)
-      if (actualCount > 0 && sessionIds.length > 0 && !(createErr?.code === 11000 && idempotencyKey)) {
-        try {
-          await Schedule.updateMany(
-            { _id: { $in: sessionIds }, is_paid_to_teacher: true },
-            { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
-          );
-        } catch (rollbackErr) {
-          logger.error('[TEACHERS] Pay rollback failed:', rollbackErr);
-        }
-      }
-      if (createErr?.code === 11000 && idempotencyKey) {
-        const existing = await Transaction.findOne({ idempotencyKey }).lean();
-        if (existing) {
-          return res.json({
-            success: true,
-            message: 'Giao dịch đã tồn tại (idempotent)',
-            data: {
-              paidSessions: paidCount,
-              markedSessions: actualCount,
-              totalAmount: existing.amount,
-              starBonusAmount: existing.starBonusAmount || 0,
-              starBonusMonths: existing.starBonusMonths || [],
-              transaction: existing,
-              idempotent: true,
-            },
-          });
-        }
-      }
-      throw createErr;
-    }
-
-    // P2: post Ledger salary — fail-closed (rollback Transaction + sessions nếu Ledger lỗi)
-    try {
-      await postSalary({
-        teacher,
-        amount: Number(amount),
-        transaction,
-        branchId: teacher.branchId || null,
-        idempotencyKey: `salary:tx:${transaction._id}`,
-        sourceRef: `tx:${transaction._id}`,
-        actor: { id: req.user?.id || req.user?._id || '', role: req.user?.role || 'admin', name: req.user?.name || '' },
-        note: note || defaultDesc,
-        metadata: {
-          sessionsCount: paidCount,
-          sessionIds: sessionIds.map(String),
-          starBonusAmount,
-          starBonusMonths: starBonusMonthKeys,
-        },
-      });
-    } catch (ledgerErr) {
-      logger.error('[FINANCE] salary ledger (pay-flexible) FAILED — rollback: %s', ledgerErr.message);
-      try {
-        await Transaction.findByIdAndUpdate(transaction._id, { status: 'cancelled' });
-        if (sessionIds.length > 0) {
-          await Schedule.updateMany(
-            { _id: { $in: sessionIds }, is_paid_to_teacher: true },
-            { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
-          );
-        }
-      } catch (rbErr) {
-        logger.error('[FINANCE] pay-flexible rollback failed: %s', rbErr.message);
-      }
-      return res.status(500).json({
-        success: false,
-        message: 'Ghi sổ lương thất bại — đã hủy phiếu chi. Thử lại.',
-      });
-    }
-
-    // Đánh dấu tháng thưởng đã chi sau khi Ledger OK
-    if (starBonusMonthKeys.length > 0) {
-      try {
-        await Teacher.findByIdAndUpdate(req.params.id, {
-          $addToSet: { starBonusPaidMonths: { $each: starBonusMonthKeys } },
-        });
-      } catch (bonusMarkErr) {
-        logger.error('[FINANCE] Mark starBonusPaidMonths failed: %s', bonusMarkErr.message);
-      }
-    }
-
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('teacher:financeUpdated', {
-        teacherId: req.params.id,
-        message: `Admin đã thanh toán ${Number(amount).toLocaleString('vi-VN')}đ`
-          + (paidCount > 0 ? ` cho ${paidCount} buổi` : '')
-          + (starBonusAmount > 0 ? ` (gồm thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ)` : '')
-          + '.',
-      });
-      io.emit('transactions:new', transaction);
-      io.emit('revenue:updated', { amount: Number(amount), type: 'salary' });
     }
 
     return res.json({
       success: true,
-      message: paidCount > 0
-        ? `Thanh toán thành công ${paidCount} buổi`
-          + (starBonusAmount > 0 ? ` + thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ` : '')
-        : `Thanh toán thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ`,
+      message: idempotent
+        ? 'Giao dịch đã tồn tại (idempotent)'
+        : (paidSessions > 0
+          ? `Thanh toán thành công ${paidSessions} buổi`
+            + (starBonusAmount > 0 ? ` + thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ` : '')
+          : `Thanh toán thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ`),
       data: {
-        paidSessions: paidCount,
-        markedSessions: actualCount,
-        totalAmount: Number(amount),
+        paidSessions,
+        markedSessions,
+        totalAmount,
         starBonusAmount,
-        starBonusMonths: starBonusMonthKeys,
+        starBonusMonths,
         transaction,
-      }
+        ...(idempotent ? { idempotent: true } : {}),
+      },
     });
   } catch (error) {
-    logger.error('[FINANCE] Flexible pay error:', error);
-    return res.status(500).json({ success: false, message: 'Lỗi server: ' + error.message });
+    const status = error.status || error.statusCode || 500;
+    if (status >= 500) logger.error('[FINANCE] Flexible pay error:', error);
+    return res.status(status).json({ success: false, message: error.message || 'Lỗi server' });
   }
 });
 
 // ─── PUT /api/teachers/:id/finance/pay-all ──────────────────────────────────────
-router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
+router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher, requireFinanceCqrs], async (req, res) => {
   try {
-    const teacher = await Teacher.findById(req.params.id);
-    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
-
-    // Tìm các buổi chưa thanh toán
-    const pendingSessionsCount = await Schedule.countDocuments({
-      teacherId: req.params.id,
-      status: 'completed',
-      is_paid_to_teacher: { $ne: true }
-    });
-
-    if (pendingSessionsCount === 0) {
-      return res.status(400).json({ success: false, message: 'Không có buổi dạy nào cần thanh toán' });
-    }
-
-    const salaryPerSession = teacher.baseSalaryPerSession || 0;
-    const estimatedAmount = pendingSessionsCount * salaryPerSession;
-
-    // Validation: Không cho phép thanh toán 0đ hoặc số phi lý (> 500 triệu/lần)
-    if (estimatedAmount <= 0) {
-      return res.status(400).json({ success: false, message: `Giảng viên chưa được cấu hình mức lương/buổi. Vui lòng Admin cập nhật trường "Lương/buổi" trước khi thanh toán.` });
-    }
-    if (estimatedAmount > 500000000) {
-      return res.status(400).json({ success: false, message: `Số tiền thanh toán (${estimatedAmount.toLocaleString('vi-VN')}đ) vượt quá giới hạn 500 triệu. Vui lòng kiểm tra lại mức lương/buổi.` });
-    }
-
-    // Claim atomic theo danh sách _id đã chọn — rollback chỉ các id này nếu create fail
-    const pendingSessions = await Schedule.find({
-      teacherId: req.params.id,
-      status: 'completed',
-      is_paid_to_teacher: { $ne: true }
-    }).select('_id').lean();
-
-    const sessionIds = pendingSessions.map((s) => s._id);
-    if (sessionIds.length === 0) {
-      return res.status(409).json({ success: false, message: 'Các buổi đã được thanh toán bởi yêu cầu khác' });
-    }
-
-    const claim = await Schedule.updateMany(
-      {
-        _id: { $in: sessionIds },
-        status: 'completed',
-        is_paid_to_teacher: { $ne: true }
-      },
-      { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-    );
-
-    const paidCount = claim.modifiedCount || 0;
-    if (paidCount === 0) {
-      return res.status(409).json({ success: false, message: 'Các buổi đã được thanh toán bởi yêu cầu khác' });
-    }
-
-    const totalAmount = paidCount * salaryPerSession;
-
-    // Tạo giao dịch thanh toán
-    const now = new Date();
-    let transaction;
-    try {
-      transaction = await Transaction.create({
-        teacherId: req.params.id,
-        teacherName: teacher.name,
-        teacherPhone: teacher.phone,
-        amount: totalAmount,
-        description: `Thanh toán thù lao ${paidCount} buổi dạy`,
-        month: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
-        status: 'confirmed',
-        confirmedBy: req.user.name || 'Admin',
-        confirmedAt: now,
-        bankName: teacher.bankAccount?.bankName || '',
-        bankAccount: teacher.bankAccount?.accountNumber || ''
-      });
-    } catch (createErr) {
-      try {
-        await Schedule.updateMany(
-          { _id: { $in: sessionIds }, is_paid_to_teacher: true },
-          { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
-        );
-      } catch (rollbackErr) {
-        logger.error('[FINANCE] Pay-all rollback failed:', rollbackErr);
-      }
-      throw createErr;
-    }
-
-    try {
-      await postSalary({
-        teacher,
-        amount: totalAmount,
-        transaction,
-        branchId: teacher.branchId || null,
-        idempotencyKey: `salary:tx:${transaction._id}`,
-        sourceRef: `tx:${transaction._id}`,
-        actor: { id: req.user?.id || req.user?._id || '', role: req.user?.role || 'admin', name: req.user?.name || '' },
-        note: `Thanh toán thù lao ${paidCount} buổi dạy`,
-        metadata: { sessionsCount: paidCount, sessionIds: sessionIds.map(String) },
-      });
-    } catch (ledgerErr) {
-      logger.error('[FINANCE] salary ledger (pay-all) FAILED — rollback: %s', ledgerErr.message);
-      try {
-        await Transaction.findByIdAndUpdate(transaction._id, { status: 'cancelled' });
-        await Schedule.updateMany(
-          { _id: { $in: sessionIds }, is_paid_to_teacher: true },
-          { $set: { is_paid_to_teacher: false, paymentStatus: 'unpaid' } }
-        );
-      } catch (rbErr) {
-        logger.error('[FINANCE] pay-all rollback failed: %s', rbErr.message);
-      }
-      return res.status(500).json({
-        success: false,
-        message: 'Ghi sổ lương thất bại — đã hủy phiếu chi. Thử lại.',
-      });
-    }
+    const { payTeacherAllCqrs } = require('../services/cqrs');
+    const { paidSessions, totalAmount, transaction } = await payTeacherAllCqrs(req);
 
     const io = req.app.get('io');
     if (io) {
       io.emit('teacher:financeUpdated', {
         teacherId: req.params.id,
-        message: `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${paidCount} buổi dạy.`
+        message: `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${paidSessions} buổi dạy.`,
       });
       io.emit('transactions:new', transaction);
       io.emit('revenue:updated', { amount: totalAmount, type: 'salary' });
@@ -1266,15 +879,12 @@ router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.
     return res.json({
       success: true,
       message: 'Đã thanh toán thành công',
-      data: {
-        paidSessions: paidCount,
-        totalAmount,
-        transaction
-      }
+      data: { paidSessions, totalAmount, transaction },
     });
   } catch (error) {
-    logger.error('[FINANCE] Pay error:', error);
-    return res.status(500).json({ success: false, message: 'Lỗi server' });
+    const status = error.status || error.statusCode || 500;
+    if (status >= 500) logger.error('[FINANCE] Pay error:', error);
+    return res.status(status).json({ success: false, message: status >= 500 ? 'Lỗi server' : error.message });
   }
 });
 

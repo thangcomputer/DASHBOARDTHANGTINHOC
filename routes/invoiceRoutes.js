@@ -8,6 +8,7 @@ const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const { enqueueInvoicePdf, enqueueInvoiceEmail } = require('../services/queue/jobQueue');
 const logger = require('../config/logger');
+const { requireInvoiceCqrs } = require('../shared/cqrs/middleware');
 
 // ─── GET /api/invoices ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy hóa đơn (STAFF bị giới hạn theo chi nhánh)
@@ -99,44 +100,18 @@ router.get('/:id', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /api/invoices ────────────────────────────────────────────────────────
-// Tạo hóa đơn thủ công (Admin) — dùng field names từ Student schema mới
-router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+// Tạo hóa đơn thủ công — hướng mới: TX Invoice + Outbox (PDF async)
+router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), requireInvoiceCqrs, async (req, res) => {
   try {
-    const { hocVienId, ghiChu } = req.body;
-
-    const student = await Student.findById(hocVienId);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
-    }
-
-    // Tạo mã hóa đơn
-    const count = await Invoice.countDocuments();
-    const now   = new Date();
-    const maHD  = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
-
-    const invoice = await Invoice.create({
-      maHoaDon: maHD,
-      hocVien:  student._id,
-      hoTen:    student.name,     // Student schema: name (không phải hoTen)
-      khoaHoc:  student.course,   // Student schema: course (không phải khoaHoc)
-      hocPhi:   student.price,    // Student schema: price (không phải hocPhi)
-      ghiChu:   ghiChu || '',
-      status:   'issued',
-    });
-
-    // C4: Tạo HĐ thủ công ≠ thu tiền. Không set student.paid — dùng PUT /students/:id/pay.
-
-    // Sinh PDF nền (uploads/invoices) — không chặn response
-    enqueueInvoicePdf({ invoiceId: invoice._id.toString() }).catch((err) => {
-      logger.warn('[INVOICE] enqueue pdf on create:', err.message);
-    });
-
-    res.status(201).json({ success: true, data: invoice });
+    const { createInvoiceCqrs } = require('../services/cqrs');
+    const result = await createInvoiceCqrs(req);
+    return res.status(result.status).json(result.body);
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'Mã hóa đơn đã tồn tại' });
     }
-    res.status(400).json({ success: false, message: error.message });
+    const status = error.status || error.statusCode || 400;
+    return res.status(status).json({ success: false, message: error.message });
   }
 });
 

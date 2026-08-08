@@ -20,7 +20,7 @@ function signedOf(doc) {
  * Insert ledger entry (idempotent theo idempotencyKey).
  * @returns {{ entry, created: boolean }}
  */
-async function postEntry(payload) {
+async function postEntry(payload, opts = {}) {
   const key = String(payload.idempotencyKey || '').trim();
   if (!key) {
     const err = new Error('Thiếu idempotencyKey cho ledger');
@@ -34,8 +34,11 @@ async function postEntry(payload) {
     throw err;
   }
 
+  const session = opts.session || null;
+  const createOpts = session ? { session } : undefined;
+
   try {
-    const entry = await LedgerEntry.create({
+    const docs = await LedgerEntry.create([{
       idempotencyKey: key,
       type: payload.type,
       amount,
@@ -56,11 +59,13 @@ async function postEntry(payload) {
       postedBy: payload.postedBy || '',
       postedByRole: payload.postedByRole || '',
       reversesEntryId: payload.reversesEntryId || null,
-    });
-    return { entry, created: true };
+    }], createOpts);
+    return { entry: docs[0], created: true };
   } catch (err) {
     if (err && err.code === 11000) {
-      const existing = await LedgerEntry.findOne({ idempotencyKey: key });
+      const q = LedgerEntry.findOne({ idempotencyKey: key });
+      if (session) q.session(session);
+      const existing = await q;
       return { entry: existing, created: false };
     }
     throw err;
@@ -83,6 +88,7 @@ async function settlePayment({
   note = '',
   metadata = {},
   reqMeta = {},
+  session = null,
 }) {
   const amt = Math.abs(Number(amount) || 0);
   if (!(amt > 0)) return { entry: null, created: false };
@@ -109,7 +115,7 @@ async function settlePayment({
     metadata,
     postedBy: actor.id || '',
     postedByRole: actor.role || '',
-  });
+  }, { session });
 
   // Trùng idempotencyKey chỉ OK khi cùng HV + số tiền + cùng enrollment (nếu đang gắn enrollment).
   // Tránh: đăng ký lại khóa / key cũ không enrollmentId → không ghi PAYMENT mới nhưng enrollment vẫn paid.
@@ -130,7 +136,7 @@ async function settlePayment({
     }
   }
 
-  if (created) {
+  if (created && !session) {
     try {
       await writeAudit({
         action: 'payment.settle',
@@ -173,6 +179,7 @@ async function postRefund({
   note = '',
   metadata = {},
   reqMeta = {},
+  session = null,
 }) {
   const amt = Math.abs(Number(amount) || 0);
   if (!(amt > 0)) {
@@ -203,9 +210,9 @@ async function postRefund({
     postedBy: actor.id || '',
     postedByRole: actor.role || '',
     reversesEntryId: originalEntryId || null,
-  });
+  }, { session });
 
-  if (created) {
+  if (created && !session) {
     try {
       await writeAudit({
         action: 'payment.refund',
@@ -448,7 +455,7 @@ async function listLedgerEntries({
  * khi settlePayment trả created:false do trùng idempotency mà UI vẫn giữ paid + HĐ.
  * Chỉ match theo enrollmentId (không soft-match courseName — tránh gắn nhầm payment khóa đã hủy).
  */
-async function healOrphanEnrollmentPayments(student) {
+async function healOrphanEnrollmentPayments(student, { session = null } = {}) {
   if (!student?._id) return { healed: 0 };
   const enrollments = Array.isArray(student.enrollments) ? student.enrollments : [];
   const paidActive = enrollments.filter((e) => {
@@ -459,11 +466,13 @@ async function healOrphanEnrollmentPayments(student) {
   });
   if (!paidActive.length) return { healed: 0 };
 
-  const payments = await LedgerEntry.find({
+  let paymentsQ = LedgerEntry.find({
     studentId: student._id,
     type: 'payment',
     status: 'posted',
-  }).select('enrollmentId amount').lean();
+  }).select('enrollmentId amount');
+  if (session) paymentsQ = paymentsQ.session(session);
+  const payments = await paymentsQ.lean();
 
   const covered = new Set(
     payments
@@ -486,6 +495,7 @@ async function healOrphanEnrollmentPayments(student) {
         sourceRef: `heal:${student._id}:${enrId}`,
         idempotencyKey: `payment:heal:${student._id}:${enrId}`,
         note: `Heal PAYMENT thiếu cho khóa ${enr.courseName || enrId}`,
+        session,
       });
       if (created) {
         healed += 1;
@@ -504,6 +514,7 @@ async function healOrphanEnrollmentPayments(student) {
         enrId,
         err.message,
       );
+      if (session) throw err;
     }
   }
   return { healed };
@@ -523,9 +534,13 @@ async function getStudentFinanceCard(studentId) {
     throw err;
   }
 
-  // Tự heal trước khi cộng KPI — đóng lệch "HĐ có / enrollment paid / Ledger thiếu"
+  // Tự heal trước khi cộng KPI — chỉ khi CQRS/RS bật, trong một TX (không ghi lẻ ngoài TX)
   try {
-    await healOrphanEnrollmentPayments(student);
+    const { isFinanceCqrs } = require('../shared/cqrs/flags');
+    if (isFinanceCqrs()) {
+      const { withTransaction } = require('../shared/cqrs/withTransaction');
+      await withTransaction(async (session) => healOrphanEnrollmentPayments(student, { session }));
+    }
   } catch (err) {
     logger.warn('[ledger] heal on finance card: %s', err.message);
   }
@@ -606,6 +621,7 @@ async function postSalary({
   actor = {},
   note = '',
   metadata = {},
+  session = null,
 }) {
   const amt = Math.abs(Number(amount) || 0);
   if (!(amt > 0)) {
@@ -633,7 +649,7 @@ async function postSalary({
     },
     postedBy: actor.id || actor.name || '',
     postedByRole: actor.role || 'admin',
-  });
+  }, { session });
 }
 
 /**
@@ -645,8 +661,11 @@ async function voidLedgerEntry({
   reason = '',
   actor = {},
   createReversal = true,
+  session = null,
 }) {
-  const entry = await LedgerEntry.findById(entryId);
+  let q = LedgerEntry.findById(entryId);
+  if (session) q = q.session(session);
+  const entry = await q;
   if (!entry) {
     const err = new Error('Không tìm thấy dòng ledger');
     err.status = 404;
@@ -663,7 +682,7 @@ async function voidLedgerEntry({
     voidedAt: new Date().toISOString(),
     voidedBy: actor.id || actor.name || '',
   };
-  await entry.save();
+  await entry.save(session ? { session } : undefined);
 
   let reversal = null;
   if (createReversal && Number(entry.amount) > 0) {
@@ -693,7 +712,7 @@ async function voidLedgerEntry({
       postedBy: actor.id || '',
       postedByRole: actor.role || '',
       reversesEntryId: entry._id,
-    });
+    }, { session });
     reversal = { entry: rev, created };
   }
 
@@ -714,6 +733,7 @@ async function postDiscount({
   actor = {},
   note = '',
   metadata = {},
+  session = null,
 }) {
   const type = kind === 'coupon' ? 'coupon' : 'discount';
   const amt = Math.abs(Number(amount) || 0);
@@ -738,7 +758,7 @@ async function postDiscount({
     metadata,
     postedBy: actor.id || '',
     postedByRole: actor.role || '',
-  });
+  }, { session });
 }
 
 /**

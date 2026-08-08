@@ -28,4 +28,20 @@ test('getHealth returns structure', () => {
   assert.ok(h.db);
   assert.ok(h.memory);
   assert.ok(h.queue);
+  assert.ok(h.outbox);
+  assert.equal(typeof h.outbox.workerEnabled, 'boolean');
+});
+
+test('getOverview includes outbox stats async', async () => {
+  const o = await monitoring.getOverview();
+  assert.ok(o.health);
+  assert.ok(o.outbox);
+  assert.equal(typeof o.outbox.workerEnabled, 'boolean');
+  assert.ok(Array.isArray(o.alerts));
+});
+
+test('getOutboxStats returns shape when db down', async () => {
+  const s = await monitoring.getOutboxStats();
+  assert.equal(typeof s.workerEnabled, 'boolean');
+  assert.equal(typeof s.available, 'boolean');
 });
