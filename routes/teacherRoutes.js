@@ -12,9 +12,7 @@ const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
-const { sendAccountWelcome } = require('../services/accountWelcome');
 const NotificationService = require('../services/NotificationService');
-const { generateTempPassword } = require('../utils/tempPassword');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
 
@@ -100,117 +98,20 @@ const superAdminOnlyTeacher = async (req, res, next) => {
 };
 
 // ─── POST /api/teachers ───────────────────────────────────────────────────────
-// Chỉ Super Admin được tạo giảng viên
-// Strangler: ENABLE_CQRS_TEACHER=true → transaction + outbox (welcome async)
+// Chỉ Super Admin — hướng mới: TX Teacher + Outbox (welcome async)
 router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], async (req, res) => {
   try {
-    const { isTeacherCqrs } = require('../shared/cqrs/flags');
-    if (isTeacherCqrs()) {
-      const { createTeacherCqrs } = require('../services/cqrs/createTeacherCqrs');
-      const result = await createTeacherCqrs(req);
-      return res.status(result.status).json(result.body);
-    }
-
-    const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession } = req.body;
-    if (!name || !phone) {
-      return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
-    }
-    const emailTrim = (rawEmail || '').trim();
-    const email = emailTrim && emailTrim !== 'email@example.com' ? emailTrim : undefined;
-    try {
-      const { assertUniqueContact } = require('../utils/uniqueContact');
-      await assertUniqueContact({ phone, zalo: phone, email });
-    } catch (dupErr) {
-      if (dupErr.status === 409) {
-        return res.status(409).json({ success: false, message: dupErr.message });
-      }
-      throw dupErr;
-    }
-    if (password && String(password).trim().length > 0 && String(password).trim().length < 6) {
-      return res.status(400).json({ success: false, message: 'Mật khẩu phải ít nhất 6 ký tự' });
-    }
-
-    // ⭐ Xác định branchId:
-    //   - STAFF → bắt buộc dùng branchId của chính họ (không được chọn chi nhánh khác)
-    //   - SUPER_ADMIN → dùng branchId từ request body (dropdown chọn), hoặc null
-    let finalBranchId   = null;
-    let finalBranchCode = '';
-    if (req.userBranchId) {
-      // STAFF → ép branchId
-      finalBranchId   = req.userBranchId;
-      finalBranchCode = req.userBranchCode || '';
-    } else if (reqBranchId) {
-      // SUPER_ADMIN chọn chi nhánh
-      finalBranchId   = reqBranchId;
-      finalBranchCode = reqBranchCode || '';
-    }
-
-    // Auto-Approve Logic: Nếu Admin gán chi nhánh ngay từ lúc tạo, tự động duyệt
-    const isAssigningBranch = !!(finalBranchId || finalBranchCode);
-    
-    const normalizedSubjectIds = Array.isArray(subjectIds)
-      ? [...new Set(subjectIds.map((id) => String(id).trim()).filter(Boolean))]
-      : [];
-
-    const plainPassword = password && String(password).trim()
-      ? String(password).trim()
-      : generateTempPassword(8);
-    const teacher = await Teacher.create({
-      name,
-      phone,
-      email,
-      specialty: specialty || normalizedSubjectIds.join(', '),
-      subjectIds: normalizedSubjectIds,
-      startDate: startDate || Date.now(),
-      address:   address   || '',
-      password:  plainPassword,
-      status:    status || 'inactive',
-      testStatus: null,
-      role: 'teacher',
-      isFirstLogin: true,
-      branchId:   finalBranchId,
-      branchCode: finalBranchCode,
-      baseSalaryPerSession: Math.max(0, Number(baseSalaryPerSession) || 0),
-    });
-
-    // Emit socket cho Admin thấy real-time
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('teacher:new', {
-        teacherId: teacher._id,
-        name: teacher.name,
-        branchCode: teacher.branchCode,
-        message: `Giảng viên mới: ${teacher.name} — Chi nhánh: ${teacher.branchCode || 'Chưa phân'}`,
+    const { isTeacherCqrs, requireReplicaOrThrow } = require('../shared/cqrs/flags');
+    if (!isTeacherCqrs()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Luồng tạo GV cũ đã tắt. Bật replica set (MONGODB_URI=?replicaSet=) hoặc ENABLE_CQRS_TEACHER=true.',
       });
-      NotificationService.notifyAdmins(
-        io,
-        '🆕 Giảng viên mới',
-        `Đã tạo giảng viên ${teacher.name} (${teacher.phone}).`,
-        { teacherId: teacher._id },
-        '/admin/teachers',
-      ).catch((err) => logger.warn('[TEACHERS] notifyAdmins:', err.message));
     }
-
-    const welcome = await sendAccountWelcome(io, {
-      role: 'teacher',
-      userId: teacher._id,
-      name: teacher.name,
-      phone: teacher.phone,
-      email: teacher.email,
-      password: plainPassword,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: `Đã tạo giảng viên ${teacher.name}`,
-      data: {
-        ...teacher.toObject(),
-        password: undefined,
-        tempPassword: plainPassword,
-        welcomeQueued: welcome.queued,
-        welcomeNotified: welcome.notified,
-      },
-    });
+    requireReplicaOrThrow();
+    const { createTeacherCqrs } = require('../services/cqrs/createTeacherCqrs');
+    const result = await createTeacherCqrs(req);
+    return res.status(result.status).json(result.body);
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'Số điện thoại đã tồn tại' });

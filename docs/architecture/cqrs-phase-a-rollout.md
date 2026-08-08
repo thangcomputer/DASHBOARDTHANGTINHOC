@@ -1,28 +1,35 @@
 # CQRS Phase A–C — Rollout checklist
 
-Strangler CQRS trên layout phẳng hiện tại (`routes/` + `services/cqrs/` + `shared/outbox/`).
+Hướng mới trên layout phẳng (`routes/` + `services/cqrs/` + `shared/outbox/`).
+**Luồng cũ (create/pay/refund không TX) đã gỡ** — không còn dual-path strangler.
 
-**Không** mount toàn bộ `modules/` ảo — chỉ endpoint đã wire + feature flag.
+## Policy flag
 
-## Flags (mặc định tắt)
+Mỗi flag (`ENABLE_CQRS_TEACHER` / `INVOICE` / `STUDENT_CREATE` / `FINANCE`):
 
-| Biến | Endpoint | Hành vi khi bật |
-|------|----------|-----------------|
-| `ENABLE_CQRS_TEACHER` | `POST /api/teachers` | Teacher + Outbox cùng transaction; welcome qua Outbox |
-| `ENABLE_CQRS_INVOICE` | `POST /api/invoices` | Invoice + Outbox cùng transaction; PDF qua Outbox |
-| `ENABLE_CQRS_STUDENT_CREATE` | `POST /api/students` | **TX atomic**: Student (+ Invoice + Ledger nếu paid) + Outbox welcome |
+1. Explicit `false`/`0` → tắt endpoint (503)
+2. Explicit `true`/`1` → bật
+3. Master `ENABLE_CQRS=false` → tắt tất cả
+4. **Unset → bật nếu `MONGODB_URI` có `replicaSet=` hoặc `mongodb+srv`**
+
+| Biến | Endpoint | Hành vi |
+|------|----------|---------|
+| `ENABLE_CQRS_TEACHER` | `POST /api/teachers` | Teacher + Outbox cùng TX; welcome qua Outbox |
+| `ENABLE_CQRS_INVOICE` | `POST /api/invoices` | Invoice + Outbox cùng TX; PDF qua Outbox |
+| `ENABLE_CQRS_STUDENT_CREATE` | `POST /api/students` | Student (+ Invoice + Ledger nếu paid) + Outbox welcome |
+| `ENABLE_CQRS_FINANCE` | `PUT .../pay`, `PUT .../refund` | Claim/ledger/refund trong một TX |
 
 ## MongoDB replica set
 
-Bắt buộc khi bật teacher/invoice CQRS (multi-doc transaction).
+Bắt buộc cho hướng mới (multi-doc transaction).
 
-Docker Compose đã cấu hình `mongo --replSet rs0` và URI:
+Docker Compose: `mongo --replSet rs0` và URI:
 
 ```text
 mongodb://mongo:27017/dashboardthangtinhoc?replicaSet=rs0
 ```
 
-`validateEnv`: flag CQRS bật mà URI không có `replicaSet=` / `mongodb+srv` → warn (dev) / throw (prod).
+`validateEnv`: CQRS bật mà URI không có `replicaSet=` / `mongodb+srv` → warn (dev) / throw (prod).
 
 ## Outbox
 
@@ -39,24 +46,22 @@ Events:
 - `StudentCreatedEvent` → welcome
 - `InvoiceCreatedEvent` → enqueue PDF
 
-## Thứ tự bật staging (khuyến nghị)
+## Staging / prod
 
 1. Replica set OK (`rs.status()` PRIMARY)
-2. Sync indexes / collections sẵn sàng
-3. Bật `ENABLE_CQRS_TEACHER=true` → tạo GV → kiểm Outbox `PROCESSED`
-4. Bật `ENABLE_CQRS_INVOICE=true` → tạo HĐ → PDF queue
-5. Bật `ENABLE_CQRS_STUDENT_CREATE=true` → welcome async
-6. Prod: từng flag, có thể tắt ngay để rollback
+2. Sync indexes
+3. Để trống flag (auto-on với RS) hoặc bật tường minh
+4. Tạo GV / HĐ / HV / pay → kiểm Outbox `PROCESSED` + ledger
+5. Kill-switch tạm: `ENABLE_CQRS=false` (endpoint trả 503 — **không** quay lại legacy)
 
-## Rollback
+## Rollback vận hành
 
 ```env
-ENABLE_CQRS_TEACHER=false
-ENABLE_CQRS_INVOICE=false
-ENABLE_CQRS_STUDENT_CREATE=false
+ENABLE_CQRS=false
 ```
 
-Restart API. Middleware auth/branch không đổi.
+Hoặc tắt từng flag. Restart API. Middleware auth/branch không đổi.
+Muốn chạy lại luồng cũ phải revert code — không còn path song song.
 
 ## Code map
 
@@ -65,7 +70,7 @@ Restart API. Middleware auth/branch không đổi.
 | Flags | `shared/cqrs/flags.js` |
 | Transaction helper | `shared/cqrs/withTransaction.js` |
 | Outbox model/worker | `shared/outbox/` |
-| Teacher CQRS | `services/cqrs/createTeacherCqrs.js` |
-| Invoice CQRS | `services/cqrs/createInvoiceCqrs.js` |
-| Student outbox | `services/cqrs/enqueueStudentCreatedOutbox.js` |
-| Stranglers | `routes/teacherRoutes.js`, `invoiceRoutes.js`, `studentRoutes.js` |
+| Teacher / Invoice create | `services/cqrs/createTeacherCqrs.js`, `createInvoiceCqrs.js` |
+| Pay / Refund | `services/cqrs/payStudentCqrs.js`, `refundStudentCqrs.js` |
+| Tuition invoice helper | `services/cqrs/tuitionInvoice.js` |
+| Routes | `routes/teacherRoutes.js`, `invoiceRoutes.js`, `studentRoutes.js` |

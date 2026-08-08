@@ -49,9 +49,12 @@ services:
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
       MASTER_ADMIN_PASSWORD: ${MASTER_ADMIN_PASSWORD:-}
       BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-1}
-      ENABLE_CQRS_STUDENT_CREATE: ${ENABLE_CQRS_STUDENT_CREATE:-false}
-      ENABLE_CQRS_TEACHER: ${ENABLE_CQRS_TEACHER:-false}
-      ENABLE_CQRS_INVOICE: ${ENABLE_CQRS_INVOICE:-false}
+      # CQRS auto-on với replicaSet URI; kill-switch: ENABLE_CQRS=false
+      ENABLE_CQRS: ${ENABLE_CQRS:-}
+      ENABLE_CQRS_STUDENT_CREATE: ${ENABLE_CQRS_STUDENT_CREATE:-}
+      ENABLE_CQRS_TEACHER: ${ENABLE_CQRS_TEACHER:-}
+      ENABLE_CQRS_INVOICE: ${ENABLE_CQRS_INVOICE:-}
+      ENABLE_CQRS_FINANCE: ${ENABLE_CQRS_FINANCE:-}
     volumes:
       - api_uploads:/app/uploads
       - api_backups:/app/backups

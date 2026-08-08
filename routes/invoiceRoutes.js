@@ -99,57 +99,26 @@ router.get('/:id', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /api/invoices ────────────────────────────────────────────────────────
-// Tạo hóa đơn thủ công (Admin) — dùng field names từ Student schema mới
-// Strangler: ENABLE_CQRS_INVOICE=true → transaction + outbox (PDF async)
+// Tạo hóa đơn thủ công — hướng mới: TX Invoice + Outbox (PDF async)
 router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
-    const { isInvoiceCqrs } = require('../shared/cqrs/flags');
-    if (isInvoiceCqrs()) {
-      const { createInvoiceCqrs } = require('../services/cqrs/createInvoiceCqrs');
-      try {
-        const result = await createInvoiceCqrs(req);
-        return res.status(result.status).json(result.body);
-      } catch (cqrsErr) {
-        const status = cqrsErr.status || cqrsErr.statusCode || 400;
-        return res.status(status).json({ success: false, message: cqrsErr.message });
-      }
+    const { isInvoiceCqrs, requireReplicaOrThrow } = require('../shared/cqrs/flags');
+    if (!isInvoiceCqrs()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Luồng tạo HĐ cũ đã tắt. Bật replica set (MONGODB_URI=?replicaSet=) hoặc ENABLE_CQRS_INVOICE=true.',
+      });
     }
-
-    const { hocVienId, ghiChu } = req.body;
-
-    const student = await Student.findById(hocVienId);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
-    }
-
-    // Tạo mã hóa đơn
-    const count = await Invoice.countDocuments();
-    const now   = new Date();
-    const maHD  = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
-
-    const invoice = await Invoice.create({
-      maHoaDon: maHD,
-      hocVien:  student._id,
-      hoTen:    student.name,     // Student schema: name (không phải hoTen)
-      khoaHoc:  student.course,   // Student schema: course (không phải khoaHoc)
-      hocPhi:   student.price,    // Student schema: price (không phải hocPhi)
-      ghiChu:   ghiChu || '',
-      status:   'issued',
-    });
-
-    // C4: Tạo HĐ thủ công ≠ thu tiền. Không set student.paid — dùng PUT /students/:id/pay.
-
-    // Sinh PDF nền (uploads/invoices) — không chặn response
-    enqueueInvoicePdf({ invoiceId: invoice._id.toString() }).catch((err) => {
-      logger.warn('[INVOICE] enqueue pdf on create:', err.message);
-    });
-
-    res.status(201).json({ success: true, data: invoice });
+    requireReplicaOrThrow();
+    const { createInvoiceCqrs } = require('../services/cqrs/createInvoiceCqrs');
+    const result = await createInvoiceCqrs(req);
+    return res.status(result.status).json(result.body);
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'Mã hóa đơn đã tồn tại' });
     }
-    res.status(400).json({ success: false, message: error.message });
+    const status = error.status || error.statusCode || 400;
+    return res.status(status).json({ success: false, message: error.message });
   }
 });
 

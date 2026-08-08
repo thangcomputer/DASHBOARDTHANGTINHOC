@@ -179,6 +179,7 @@ async function postRefund({
   note = '',
   metadata = {},
   reqMeta = {},
+  session = null,
 }) {
   const amt = Math.abs(Number(amount) || 0);
   if (!(amt > 0)) {
@@ -209,9 +210,9 @@ async function postRefund({
     postedBy: actor.id || '',
     postedByRole: actor.role || '',
     reversesEntryId: originalEntryId || null,
-  });
+  }, { session });
 
-  if (created) {
+  if (created && !session) {
     try {
       await writeAudit({
         action: 'payment.refund',
