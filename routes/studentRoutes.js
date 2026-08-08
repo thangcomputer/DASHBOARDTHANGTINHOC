@@ -474,19 +474,28 @@ router.post('/import', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDE
     // Gán chi nhánh tự động: STAFF chỉ được nhập vào CS của mình
     const branchId = req.userBranchId || null;
 
+    // Import không ghi ledger/invoice — luôn tạo unpaid; thu phí qua PUT .../pay (CQRS).
+    let claimedPaidSkipped = 0;
     const studentsToInsert = rawStudents.map(s => {
       const {
         password: _omitPassword,
         refreshToken: _omitRefresh,
         tokenVersion: _omitTv,
+        paid: _omitPaid,
+        paidAt: _omitPaidAt,
+        paidAmount: _omitPaidAmount,
+        paymentMethod: _omitPayMethod,
         ...safe
       } = s || {};
+      const claimedPaid = s.paid === true || s.paid === 'Đã đóng phí' || s.paid === 'true' || s.paid === 1;
+      if (claimedPaid) claimedPaidSkipped += 1;
       return {
         ...safe,
         name: s.name?.toUpperCase()?.trim(),
         branchId: branchId || s.branchId || null,
         status: s.status || 'Chờ xếp lớp',
-        paid: s.paid === true || s.paid === 'Đã đóng phí',
+        paid: false,
+        paidAmount: 0,
         learningMode: ['ONLINE', 'OFFLINE'].includes(s.learningMode?.toUpperCase())
           ? s.learningMode.toUpperCase()
           : 'OFFLINE',
@@ -499,10 +508,14 @@ router.post('/import', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDE
 
     const result = await Student.insertMany(studentsToInsert, { ordered: false });
 
+    const paidNote = claimedPaidSkipped
+      ? ` ${claimedPaidSkipped} dòng đánh dấu đã đóng phí được nhập unpaid — thu qua API pay.`
+      : '';
     res.json({
       success: true,
-      message: `Đã nhập thành công ${result.length} học viên.`,
-      count: result.length
+      message: `Đã nhập thành công ${result.length} học viên.${paidNote}`,
+      count: result.length,
+      forcedUnpaid: claimedPaidSkipped,
     });
   } catch (err) {
     if (err.name === 'BulkWriteError' || err.code === 11000) {

@@ -61,6 +61,12 @@ Overview alerts: `OUTBOX_FAILED`, `OUTBOX_BACKLOG`, `OUTBOX_WORKER_OFF`.
 5. Tạo GV / HĐ / HV / pay / lương → kiểm Outbox `PROCESSED` + ledger
 6. Kill-switch tạm: `ENABLE_CQRS=false` (endpoint trả 503 — **không** quay lại legacy)
 
+### Ghi chú an toàn SoT
+
+- `POST /api/students/import`: luôn tạo **unpaid** (không ghi ledger). Dòng Excel “đã đóng” bị ép unpaid — thu qua `PUT .../pay`.
+- Finance card GET: heal orphan PAYMENT chỉ chạy khi `ENABLE_CQRS_FINANCE` (auto-on RS), trong **một TX**.
+- Smoke: `cqrs:smoke` gồm teacher create + pay/refund + outbox stats.
+
 ## Modular layout (nhẹ)
 
 - `services/cqrs/index.js` — barrel export (không mount `modules/` ảo)

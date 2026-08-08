@@ -455,7 +455,7 @@ async function listLedgerEntries({
  * khi settlePayment trả created:false do trùng idempotency mà UI vẫn giữ paid + HĐ.
  * Chỉ match theo enrollmentId (không soft-match courseName — tránh gắn nhầm payment khóa đã hủy).
  */
-async function healOrphanEnrollmentPayments(student) {
+async function healOrphanEnrollmentPayments(student, { session = null } = {}) {
   if (!student?._id) return { healed: 0 };
   const enrollments = Array.isArray(student.enrollments) ? student.enrollments : [];
   const paidActive = enrollments.filter((e) => {
@@ -466,11 +466,13 @@ async function healOrphanEnrollmentPayments(student) {
   });
   if (!paidActive.length) return { healed: 0 };
 
-  const payments = await LedgerEntry.find({
+  let paymentsQ = LedgerEntry.find({
     studentId: student._id,
     type: 'payment',
     status: 'posted',
-  }).select('enrollmentId amount').lean();
+  }).select('enrollmentId amount');
+  if (session) paymentsQ = paymentsQ.session(session);
+  const payments = await paymentsQ.lean();
 
   const covered = new Set(
     payments
@@ -493,6 +495,7 @@ async function healOrphanEnrollmentPayments(student) {
         sourceRef: `heal:${student._id}:${enrId}`,
         idempotencyKey: `payment:heal:${student._id}:${enrId}`,
         note: `Heal PAYMENT thiếu cho khóa ${enr.courseName || enrId}`,
+        session,
       });
       if (created) {
         healed += 1;
@@ -511,6 +514,7 @@ async function healOrphanEnrollmentPayments(student) {
         enrId,
         err.message,
       );
+      if (session) throw err;
     }
   }
   return { healed };
@@ -530,9 +534,13 @@ async function getStudentFinanceCard(studentId) {
     throw err;
   }
 
-  // Tự heal trước khi cộng KPI — đóng lệch "HĐ có / enrollment paid / Ledger thiếu"
+  // Tự heal trước khi cộng KPI — chỉ khi CQRS/RS bật, trong một TX (không ghi lẻ ngoài TX)
   try {
-    await healOrphanEnrollmentPayments(student);
+    const { isFinanceCqrs } = require('../shared/cqrs/flags');
+    if (isFinanceCqrs()) {
+      const { withTransaction } = require('../shared/cqrs/withTransaction');
+      await withTransaction(async (session) => healOrphanEnrollmentPayments(student, { session }));
+    }
   } catch (err) {
     logger.warn('[ledger] heal on finance card: %s', err.message);
   }
