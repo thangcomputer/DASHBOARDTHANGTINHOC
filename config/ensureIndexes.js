@@ -33,6 +33,8 @@ const Tenant = require('../models/Tenant');
 const FeedPost = require('../models/FeedPost');
 const BlogPost = require('../models/BlogPost');
 const SepayWebhookEvent = require('../models/SepayWebhookEvent');
+const LedgerEntry = require('../models/LedgerEntry');
+const OutboxEvent = require('../shared/outbox/OutboxEvent');
 
 async function ensureIndexes() {
   try {
@@ -69,6 +71,8 @@ async function ensureIndexes() {
       FeedPost.syncIndexes(),
       BlogPost.syncIndexes(),
       SepayWebhookEvent.syncIndexes(),
+      LedgerEntry.syncIndexes(),
+      OutboxEvent.syncIndexes(),
     ]);
     console.log('✅ MongoDB indexes đã đồng bộ');
   } catch (err) {

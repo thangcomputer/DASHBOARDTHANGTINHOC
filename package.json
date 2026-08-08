@@ -11,6 +11,9 @@
     "test": "node tests/run.js",
     "test:integration": "node tests/run.js integration",
     "test:ci": "node tests/run.js",
+    "test:cqrs": "node --test tests/integration/cqrsMiddleware.test.js tests/integration/cqrsMoney.memory.test.js tests/integration/salaryCqrs.test.js tests/integration/outboxWorker.test.js tests/integration/validateEnv.cqrs.test.js",
+    "cqrs:smoke": "node scripts/cqrs-smoke.js",
+    "cqrs:smoke:memory": "CQRS_SMOKE_MEMORY=1 node scripts/cqrs-smoke.js",
     "lint": "eslint .",
     "smoke": "node scripts/smoke-local.cjs",
     "smoke:api": "node scripts/smoke-api.cjs",
@@ -66,6 +69,7 @@
     "@playwright/test": "^1.59.1",
     "eslint": "^9.39.4",
     "globals": "^17.4.0",
+    "mongodb-memory-server": "^10.4.3",
     "playwright": "^1.59.1"
   }
 }

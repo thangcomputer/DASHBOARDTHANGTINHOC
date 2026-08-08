@@ -54,7 +54,10 @@ Overview alerts: `OUTBOX_FAILED`, `OUTBOX_BACKLOG`, `OUTBOX_WORKER_OFF`.
 1. Replica set OK (`rs.status()` PRIMARY)
 2. Sync indexes
 3. Để trống flag (auto-on với RS) hoặc bật tường minh
-4. Smoke: `MONGODB_URI='...replicaSet=rs0' node scripts/cqrs-smoke.js`
+4. Smoke:
+   - Staging RS: `npm run cqrs:smoke`
+   - Local không Mongo: `npm run cqrs:smoke:memory` (mongodb-memory-server)
+   - TX tests: `npm run test:cqrs`
 5. Tạo GV / HĐ / HV / pay / lương → kiểm Outbox `PROCESSED` + ledger
 6. Kill-switch tạm: `ENABLE_CQRS=false` (endpoint trả 503 — **không** quay lại legacy)
 
