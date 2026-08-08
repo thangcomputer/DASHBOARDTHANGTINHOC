@@ -17,7 +17,7 @@ Mỗi flag (`ENABLE_CQRS_TEACHER` / `INVOICE` / `STUDENT_CREATE` / `FINANCE`):
 | `ENABLE_CQRS_TEACHER` | `POST /api/teachers` | Teacher + Outbox cùng TX; welcome qua Outbox |
 | `ENABLE_CQRS_INVOICE` | `POST /api/invoices` | Invoice + Outbox cùng TX; PDF qua Outbox |
 | `ENABLE_CQRS_STUDENT_CREATE` | `POST /api/students` | Student (+ Invoice + Ledger nếu paid) + Outbox welcome |
-| `ENABLE_CQRS_FINANCE` | `PUT .../pay`, `.../refund`, enrollment pay/add-paid/cancel-refund, SePay settle | Claim/ledger/refund trong một TX |
+| `ENABLE_CQRS_FINANCE` | pay/refund HV, enrollment, SePay, chi lương GV, confirm/cancel phiếu, void ledger | Claim/ledger trong một TX |
 
 ## MongoDB replica set
 
@@ -77,6 +77,8 @@ Muốn chạy lại luồng cũ phải revert code — không còn path song son
 | Pay / Refund | `services/cqrs/payStudentCqrs.js`, `refundStudentCqrs.js` |
 | Enrollment pay / add-paid / cancel | `payEnrollmentCqrs.js`, `addEnrollmentPaidCqrs.js`, `cancelEnrollmentCqrs.js` |
 | SePay settle | `services/cqrs/sepaySettleCqrs.js` |
+| Teacher salary pay | `payTeacherFlexibleCqrs.js`, `payTeacherAllCqrs.js` |
+| Confirm/cancel/void | `salaryTransactionCqrs.js` |
 | Tuition invoice helper | `services/cqrs/tuitionInvoice.js` |
 | Outbox stats | `shared/outbox/stats.js` → `GET /api/monitoring/outbox` |
 | Routes | `routes/teacherRoutes.js`, `invoiceRoutes.js`, `studentRoutes.js`, `webhookRoutes.js` |

@@ -9,7 +9,6 @@ const {
   sumFinancialRevenue,
   listLedgerEntries,
   getStudentFinanceCard,
-  voidLedgerEntry,
   reconciliationReport,
   rebuildDailySnapshots,
   syncStudentFinanceCache,
@@ -127,12 +126,15 @@ router.get('/students/:id', guard, async (req, res) => {
 // POST /api/finance/ledger/:id/void
 router.post('/ledger/:id/void', manageGuard, async (req, res) => {
   try {
-    const result = await voidLedgerEntry({
-      entryId: req.params.id,
-      reason: req.body?.reason || '',
-      actor: actorOf(req),
-      createReversal: req.body?.createReversal !== false,
-    });
+    const { isFinanceCqrs } = require('../shared/cqrs/flags');
+    if (!isFinanceCqrs()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Luồng void ledger cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
+      });
+    }
+    const { voidLedgerCqrs } = require('../services/cqrs/salaryTransactionCqrs');
+    const result = await voidLedgerCqrs(req);
     return res.json({
       success: true,
       message: result.created ? 'Đã void dòng ledger' : 'Dòng đã void trước đó',

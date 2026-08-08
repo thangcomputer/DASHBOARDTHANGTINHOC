@@ -11,8 +11,6 @@ const { authMiddleware, checkPermission, isTeacher, branchFilter } = require('..
 const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
-const { postSalary, voidLedgerEntry } = require('../services/ledgerService');
-const LedgerEntry = require('../models/LedgerEntry');
 const { allowHardDeleteFinance } = require('../utils/financeFlags');
 
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
@@ -226,120 +224,61 @@ router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), as
 });
 
 // ─── PUT /api/transactions/:id/confirm ────────────────────────────────────────
-// Admin xác nhận đã thanh toán lương
+// Hướng mới: confirm + salary ledger trong một TX
 router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
-    const { confirmedBy = 'Admin' } = req.body;
-
-    const transaction = await Transaction.findByIdAndUpdate(
-      req.params.id,
-      { status: 'confirmed', confirmedBy, confirmedAt: new Date() },
-      { returnDocument: 'after' }
-    ).populate('teacherId', 'name phone');
-
-    if (!transaction) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
-    }
-
-    try {
-      const teacherDoc = transaction.teacherId?._id
-        ? transaction.teacherId
-        : await Teacher.findById(transaction.teacherId).lean();
-      await postSalary({
-        teacher: teacherDoc,
-        amount: transaction.amount,
-        transaction,
-        branchId: teacherDoc?.branchId || transaction.branchId || null,
-        idempotencyKey: `salary:tx:${transaction._id}`,
-        sourceRef: `tx:${transaction._id}`,
-        actor: { id: req.user?.id || '', role: req.user?.role || 'admin', name: confirmedBy },
-        note: transaction.description || `Chi lương ${transaction.month || ''}`,
-      });
-    } catch (ledgerErr) {
-      logger.error('[TRANSACTIONS] salary ledger on confirm FAILED — rollback: %s', ledgerErr.message);
-      try {
-        await Transaction.findByIdAndUpdate(transaction._id, {
-          status: 'pending',
-          confirmedBy: '',
-          confirmedAt: null,
-        });
-      } catch (rbErr) {
-        logger.error('[TRANSACTIONS] confirm rollback failed: %s', rbErr.message);
-      }
-      return res.status(500).json({
+    const { isFinanceCqrs } = require('../shared/cqrs/flags');
+    if (!isFinanceCqrs()) {
+      return res.status(503).json({
         success: false,
-        message: 'Ghi sổ lương thất bại — phiếu vẫn pending. Thử lại.',
+        message: 'Luồng xác nhận lương cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
       });
     }
+    const { confirmTransactionCqrs } = require('../services/cqrs/salaryTransactionCqrs');
+    const { transaction } = await confirmTransactionCqrs(req);
 
-    // Thông báo real-time cho giảng viên
     const io = req.app.get('io');
     if (io) {
       const NotificationService = require('../services/NotificationService');
-      await NotificationService.send(io, {
-        type: 'FINANCE',
-        title: '✅ Lương đã được thanh toán',
-        content: `Đã xác nhận thanh toán ${transaction.amount.toLocaleString('vi-VN')}đ cho ${transaction.month}`,
-        receivers: transaction.teacherId._id.toString(),
-        link: '/teacher/finance'
-      });
-
+      const teacherId = transaction.teacherId?._id || transaction.teacherId;
+      if (teacherId) {
+        await NotificationService.send(io, {
+          type: 'FINANCE',
+          title: '✅ Lương đã được thanh toán',
+          content: `Đã xác nhận thanh toán ${transaction.amount.toLocaleString('vi-VN')}đ cho ${transaction.month}`,
+          receivers: teacherId.toString(),
+          link: '/teacher/finance',
+        });
+      }
       io.emit('revenue:updated', { amount: transaction.amount, type: 'salary' });
       io.emit('data:refresh', { type: 'transaction', id: transaction._id });
     }
 
     res.json({ success: true, data: transaction });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const status = err.status || err.statusCode || 500;
+    if (status >= 500) logger.error('[TRANSACTIONS] Confirm error:', err);
+    res.status(status).json({ success: false, message: err.message });
   }
 });
 
 // ─── PUT /api/transactions/:id/cancel ─────────────────────────────────────────
 router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
-    const prev = await Transaction.findById(req.params.id);
-    if (!prev) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
+    const { isFinanceCqrs } = require('../shared/cqrs/flags');
+    if (!isFinanceCqrs()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Luồng hủy phiếu lương cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
+      });
     }
-    if (prev.status === 'cancelled') {
-      return res.json({ success: true, data: prev });
-    }
-
-    const transaction = await Transaction.findByIdAndUpdate(
-      req.params.id,
-      { status: 'cancelled' },
-      { returnDocument: 'after' }
-    );
-
-    // H8: hủy phiếu confirmed → void SALARY ledger
-    if (prev.status === 'confirmed') {
-      try {
-        const salaryEntry = await LedgerEntry.findOne({
-          type: 'salary',
-          status: 'posted',
-          $or: [
-            { sourceRef: `tx:${prev._id}` },
-            { idempotencyKey: `salary:tx:${prev._id}` },
-            { 'metadata.transactionId': String(prev._id) },
-          ],
-        });
-        if (salaryEntry) {
-          await voidLedgerEntry({
-            entryId: salaryEntry._id,
-            reason: `Hủy phiếu chi ${prev._id}`,
-            actor: { id: req.user?.id || '', role: req.user?.role || 'admin' },
-            createReversal: true,
-          });
-        }
-      } catch (voidErr) {
-        logger.error('[TRANSACTIONS] void salary on cancel: %s', voidErr.message);
-        // Không rollback cancel phiếu — admin có thể void tay; log để reconcile
-      }
-    }
-
+    const { cancelTransactionCqrs } = require('../services/cqrs/salaryTransactionCqrs');
+    const { transaction } = await cancelTransactionCqrs(req);
     res.json({ success: true, data: transaction });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const status = err.status || err.statusCode || 500;
+    if (status >= 500) logger.error('[TRANSACTIONS] Cancel error:', err);
+    res.status(status).json({ success: false, message: err.message });
   }
 });
 

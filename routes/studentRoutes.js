@@ -2391,76 +2391,85 @@ router.post('/:id/reset-history', authMiddleware, checkPermission(PERMISSIONS.MA
 // ─── PUT /api/students/:id/pay-teacher (THANH TOÁN LƯƠNG TRÊN TỪNG HỌC VIÊN) ───
 router.put('/:id/pay-teacher', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
   try {
-    const { action } = req.body; // 'PARTIAL' (thanh toán cộng dồn) hoặc 'PAID_IN_ADVANCE' (trả trước trọn gói)
-    const studentId = req.params.id;
+    const { isFinanceCqrs, requireReplicaOrThrow } = require('../shared/cqrs/flags');
+    if (!isFinanceCqrs()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Luồng trả lương theo HV cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
+      });
+    }
+    requireReplicaOrThrow();
 
-    const student = await Student.findById(studentId);
-    if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    const { action } = req.body; // 'PARTIAL' hoặc 'PAID_IN_ADVANCE'
+    const studentId = req.params.id;
+    const { withTransaction } = require('../shared/cqrs/withTransaction');
+    const Schedule = require('../models/Schedule');
+
+    const result = await withTransaction(async (session) => {
+      const student = await Student.findById(studentId).session(session);
+      if (!student) {
+        const err = new Error('Không tìm thấy học viên');
+        err.status = 404;
+        throw err;
+      }
+
+      if (action === 'PAID_IN_ADVANCE') {
+        student.teacher_payment_status = 'PAID_IN_ADVANCE';
+        await student.save({ session });
+        const updated = await Schedule.updateMany(
+          { studentId, status: 'completed', is_paid_to_teacher: false },
+          { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } },
+          { session }
+        );
+        return {
+          student,
+          action: 'PAID_IN_ADVANCE',
+          paidSessions: updated.modifiedCount || 0,
+          message: 'Đã thiết lập thanh toán TRỌN GÓI. Mọi buổi điểm danh tiếp theo sẽ tự động tick Đã thanh toán.',
+        };
+      }
+
+      const updated = await Schedule.updateMany(
+        { studentId, status: 'completed', is_paid_to_teacher: false },
+        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } },
+        { session }
+      );
+      if (student.teacher_payment_status === 'UNPAID') {
+        student.teacher_payment_status = 'PARTIAL';
+        await student.save({ session });
+      }
+      return {
+        student,
+        action: 'PARTIAL',
+        paidSessions: updated.modifiedCount || 0,
+        message: `Thanh toán thành công ${updated.modifiedCount || 0} buổi dạy của HV ${student.name}.`,
+      };
+    });
 
     const io = req.app.get('io');
-    const teacherId = student.teacherId ? String(student.teacherId) : '';
-    const notifyTeacher = async (content, payload = {}) => {
-      if (!io || !teacherId) return;
+    const teacherId = result.student.teacherId ? String(result.student.teacherId) : '';
+    if (io && teacherId) {
       const NotificationService = require('../services/NotificationService');
+      const content = result.action === 'PAID_IN_ADVANCE'
+        ? `Admin đã thiết lập TRẢ TRƯỚC cho học viên ${result.student.name}. Đã xác nhận thanh toán ${result.paidSessions} buổi đã hoàn thành (các buổi sau sẽ tự động tick đã thanh toán).`
+        : `Admin đã thanh toán ${result.paidSessions} buổi dạy của học viên ${result.student.name}.`;
       await NotificationService.send(io, {
         type: 'FINANCE',
         title: '💵 Đã thanh toán lương (theo học viên)',
         content,
         receivers: teacherId,
-        payload: { studentId: String(student._id), ...payload },
+        payload: { studentId: String(result.student._id), action: result.action, paidSessions: result.paidSessions },
         link: '/teacher/finance',
       });
-    };
-
-    if (action === 'PAID_IN_ADVANCE') {
-      // 1. Chuyển trạng thái của học viên thành TRẢ TRƯỚC Toàn bộ
-      student.teacher_payment_status = 'PAID_IN_ADVANCE';
-      await student.save();
-
-      // 2. Chuyển tất cả buổi "đã học/chưa học" đang pending thành PAID
-      const updated = await Schedule.updateMany(
-        { studentId, status: 'completed', is_paid_to_teacher: false },
-        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-      );
-
-      await notifyTeacher(
-        `Admin đã thiết lập TRẢ TRƯỚC cho học viên ${student.name}. Đã xác nhận thanh toán ${updated.modifiedCount || 0} buổi đã hoàn thành (các buổi sau sẽ tự động tick đã thanh toán).`,
-        { action: 'PAID_IN_ADVANCE', paidSessions: updated.modifiedCount || 0 }
-      );
-
-      if (io) {
-        io.emit('student:updated', student._id.toString());
-        io.emit('data:refresh', { type: 'student', id: student._id.toString(), action: 'pay_teacher' });
-      }
-
-      return res.json({ success: true, message: 'Đã thiết lập thanh toán TRỌN GÓI. Mọi buổi điểm danh tiếp theo sẽ tự động tick Đã thanh toán.' });
-    } else {
-      // PARTIAL (Thanh toán cộng dồn các buổi dang dở hiện tại)
-      const updated = await Schedule.updateMany(
-        { studentId, status: 'completed', is_paid_to_teacher: false },
-        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-      );
-
-      if (student.teacher_payment_status === 'UNPAID') {
-        student.teacher_payment_status = 'PARTIAL';
-        await student.save();
-      }
-
-      await notifyTeacher(
-        `Admin đã thanh toán ${updated.modifiedCount || 0} buổi dạy của học viên ${student.name}.`,
-        { action: 'PARTIAL', paidSessions: updated.modifiedCount || 0 }
-      );
-
-      if (io) {
-        io.emit('student:updated', student._id.toString());
-        io.emit('data:refresh', { type: 'student', id: student._id.toString(), action: 'pay_teacher' });
-      }
-
-      return res.json({ success: true, message: `Thanh toán thành công ${updated.modifiedCount} buổi dạy của HV ${student.name}.` });
+      io.emit('student:updated', result.student._id.toString());
+      io.emit('data:refresh', { type: 'student', id: result.student._id.toString(), action: 'pay_teacher' });
     }
+
+    return res.json({ success: true, message: result.message });
   } catch (error) {
-    logger.error('[STUDENTS] Pay Teacher error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    const status = error.status || error.statusCode || 500;
+    if (status >= 500) logger.error('[STUDENTS] Pay Teacher error:', error);
+    res.status(status).json({ success: false, message: error.message });
   }
 });
 

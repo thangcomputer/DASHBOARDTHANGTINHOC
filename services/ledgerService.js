@@ -613,6 +613,7 @@ async function postSalary({
   actor = {},
   note = '',
   metadata = {},
+  session = null,
 }) {
   const amt = Math.abs(Number(amount) || 0);
   if (!(amt > 0)) {
@@ -640,7 +641,7 @@ async function postSalary({
     },
     postedBy: actor.id || actor.name || '',
     postedByRole: actor.role || 'admin',
-  });
+  }, { session });
 }
 
 /**
@@ -652,8 +653,11 @@ async function voidLedgerEntry({
   reason = '',
   actor = {},
   createReversal = true,
+  session = null,
 }) {
-  const entry = await LedgerEntry.findById(entryId);
+  let q = LedgerEntry.findById(entryId);
+  if (session) q = q.session(session);
+  const entry = await q;
   if (!entry) {
     const err = new Error('Không tìm thấy dòng ledger');
     err.status = 404;
@@ -670,7 +674,7 @@ async function voidLedgerEntry({
     voidedAt: new Date().toISOString(),
     voidedBy: actor.id || actor.name || '',
   };
-  await entry.save();
+  await entry.save(session ? { session } : undefined);
 
   let reversal = null;
   if (createReversal && Number(entry.amount) > 0) {
@@ -700,7 +704,7 @@ async function voidLedgerEntry({
       postedBy: actor.id || '',
       postedByRole: actor.role || '',
       reversesEntryId: entry._id,
-    });
+    }, { session });
     reversal = { entry: rev, created };
   }
 
