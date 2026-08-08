@@ -54,8 +54,15 @@ Overview alerts: `OUTBOX_FAILED`, `OUTBOX_BACKLOG`, `OUTBOX_WORKER_OFF`.
 1. Replica set OK (`rs.status()` PRIMARY)
 2. Sync indexes
 3. Để trống flag (auto-on với RS) hoặc bật tường minh
-4. Tạo GV / HĐ / HV / pay → kiểm Outbox `PROCESSED` + ledger
-5. Kill-switch tạm: `ENABLE_CQRS=false` (endpoint trả 503 — **không** quay lại legacy)
+4. Smoke: `MONGODB_URI='...replicaSet=rs0' node scripts/cqrs-smoke.js`
+5. Tạo GV / HĐ / HV / pay / lương → kiểm Outbox `PROCESSED` + ledger
+6. Kill-switch tạm: `ENABLE_CQRS=false` (endpoint trả 503 — **không** quay lại legacy)
+
+## Modular layout (nhẹ)
+
+- `services/cqrs/index.js` — barrel export (không mount `modules/` ảo)
+- `shared/cqrs/middleware.js` — `requireFinanceCqrs` / teacher / invoice / student
+- Routes vẫn phẳng; middleware gắn trước handler money/create
 
 ## Rollback vận hành
 
@@ -78,7 +85,9 @@ Muốn chạy lại luồng cũ phải revert code — không còn path song son
 | Enrollment pay / add-paid / cancel | `payEnrollmentCqrs.js`, `addEnrollmentPaidCqrs.js`, `cancelEnrollmentCqrs.js` |
 | SePay settle | `services/cqrs/sepaySettleCqrs.js` |
 | Teacher salary pay | `payTeacherFlexibleCqrs.js`, `payTeacherAllCqrs.js` |
-| Confirm/cancel/void | `salaryTransactionCqrs.js` |
+| Confirm/cancel/void/discount | `salaryTransactionCqrs.js`, `postDiscountCqrs.js` |
+| Barrel + middleware | `services/cqrs/index.js`, `shared/cqrs/middleware.js` |
+| Smoke script | `scripts/cqrs-smoke.js` |
 | Tuition invoice helper | `services/cqrs/tuitionInvoice.js` |
 | Outbox stats | `shared/outbox/stats.js` → `GET /api/monitoring/outbox` |
 | Routes | `routes/teacherRoutes.js`, `invoiceRoutes.js`, `studentRoutes.js`, `webhookRoutes.js` |

@@ -725,6 +725,7 @@ async function postDiscount({
   actor = {},
   note = '',
   metadata = {},
+  session = null,
 }) {
   const type = kind === 'coupon' ? 'coupon' : 'discount';
   const amt = Math.abs(Number(amount) || 0);
@@ -749,7 +750,7 @@ async function postDiscount({
     metadata,
     postedBy: actor.id || '',
     postedByRole: actor.role || '',
-  });
+  }, { session });
 }
 
 /**

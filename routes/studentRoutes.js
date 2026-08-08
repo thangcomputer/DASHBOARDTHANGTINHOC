@@ -23,6 +23,7 @@ const { refundStudentCqrs } = require('../services/cqrs/refundStudentCqrs');
 const { payEnrollmentCqrs } = require('../services/cqrs/payEnrollmentCqrs');
 const { addEnrollmentPaidCqrs } = require('../services/cqrs/addEnrollmentPaidCqrs');
 const { cancelEnrollmentCqrs } = require('../services/cqrs/cancelEnrollmentCqrs');
+const { requireFinanceCqrs, requireStudentCreateCqrs, assertFinanceCqrs } = require('../shared/cqrs/middleware');
 
 function financeActor(req) {
   return {
@@ -519,16 +520,8 @@ router.post('/import', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDE
 // ─── POST /api/students ────────────────────────────────────────────────────────
 // Admin thêm học viên mới
 // ─── POST /api/students ──────────────────────────────────────────────────────────────────
-router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter], async (req, res) => {
+router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, requireStudentCreateCqrs], async (req, res) => {
   try {
-    const { isStudentCreateCqrs, requireReplicaOrThrow } = require('../shared/cqrs/flags');
-    if (!isStudentCreateCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng tạo HV cũ đã tắt. Bật replica set (MONGODB_URI=?replicaSet=) hoặc ENABLE_CQRS_STUDENT_CREATE=true.',
-      });
-    }
-    requireReplicaOrThrow();
 
     // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) — random + isFirstLogin
     const plainPassword = req.body.password != null && String(req.body.password).trim() !== ''
@@ -1194,16 +1187,8 @@ router.patch('/:id/price', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_F
 
 // ─── PUT /api/students/:id/pay ─────────────────────────────────────────────────
 // Hướng mới: TX claim unpaid → enrollments → invoice → ledger
-router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess, requireFinanceCqrs], async (req, res) => {
   try {
-    const { isFinanceCqrs } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng thu phí cũ đã tắt. Bật replica set (MONGODB_URI=?replicaSet=) hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-
     const { student, invoice } = await payStudentCqrs(req, {
       financeActor,
       financeReqMeta,
@@ -1248,16 +1233,8 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
 
 // ─── PUT /api/students/:id/refund ─────────────────────────────────────────────
 // Hướng mới: TX ledger refund + cập nhật trạng thái paid
-router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess, requireFinanceCqrs], async (req, res) => {
   try {
-    const { isFinanceCqrs } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng hoàn phí cũ đã tắt. Bật replica set (MONGODB_URI=?replicaSet=) hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-
     const {
       student,
       ledgerEntry,
@@ -1666,14 +1643,8 @@ router.post('/:id/enrollments', [authMiddleware, checkPermission(PERMISSIONS.MAN
     let createdInvoice = null;
 
     if (isPaid && resolvedPrice > 0) {
-      const { isFinanceCqrs } = require('../shared/cqrs/flags');
-      if (!isFinanceCqrs()) {
-        return res.status(503).json({
-          success: false,
-          message: 'Luồng thu phí cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-        });
-      }
       try {
+        assertFinanceCqrs();
         const paidResult = await addEnrollmentPaidCqrs({
           studentId: student._id,
           enrollmentPayload,
@@ -1771,16 +1742,8 @@ router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermi
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/pay ──────────────────────
 // Hướng mới: TX claim enrollment → invoice → ledger
-router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess, requireFinanceCqrs], async (req, res) => {
   try {
-    const { isFinanceCqrs } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng thu phí cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-
     const { student: fresh, invoice, claimedEnr, amount } = await payEnrollmentCqrs(req, {
       financeActor,
       financeReqMeta,
@@ -1846,12 +1809,10 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission
           message: '403 Forbidden: Hoàn tiền khi hủy khóa cần quyền quản lý tài chính.',
         });
       }
-      const { isFinanceCqrs } = require('../shared/cqrs/flags');
-      if (!isFinanceCqrs()) {
-        return res.status(503).json({
-          success: false,
-          message: 'Luồng hoàn phí cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-        });
+      try {
+        assertFinanceCqrs();
+      } catch (flagErr) {
+        return res.status(flagErr.status || 503).json({ success: false, message: flagErr.message });
       }
     }
 
@@ -2389,17 +2350,8 @@ router.post('/:id/reset-history', authMiddleware, checkPermission(PERMISSIONS.MA
 });
 
 // ─── PUT /api/students/:id/pay-teacher (THANH TOÁN LƯƠNG TRÊN TỪNG HỌC VIÊN) ───
-router.put('/:id/pay-teacher', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/pay-teacher', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess, requireFinanceCqrs], async (req, res) => {
   try {
-    const { isFinanceCqrs, requireReplicaOrThrow } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng trả lương theo HV cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-    requireReplicaOrThrow();
-
     const { action } = req.body; // 'PARTIAL' hoặc 'PAID_IN_ADVANCE'
     const studentId = req.params.id;
     const { withTransaction } = require('../shared/cqrs/withTransaction');

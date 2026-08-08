@@ -14,6 +14,7 @@ const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
 const NotificationService = require('../services/NotificationService');
 const { computeStarBonusSummary } = require('../services/teacherStarBonus');
+const { requireTeacherCqrs, requireFinanceCqrs } = require('../shared/cqrs/middleware');
 
 const router = express.Router();
 
@@ -98,17 +99,9 @@ const superAdminOnlyTeacher = async (req, res, next) => {
 
 // ─── POST /api/teachers ───────────────────────────────────────────────────────
 // Chỉ Super Admin — hướng mới: TX Teacher + Outbox (welcome async)
-router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], async (req, res) => {
+router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter, requireTeacherCqrs], async (req, res) => {
   try {
-    const { isTeacherCqrs, requireReplicaOrThrow } = require('../shared/cqrs/flags');
-    if (!isTeacherCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng tạo GV cũ đã tắt. Bật replica set (MONGODB_URI=?replicaSet=) hoặc ENABLE_CQRS_TEACHER=true.',
-      });
-    }
-    requireReplicaOrThrow();
-    const { createTeacherCqrs } = require('../services/cqrs/createTeacherCqrs');
+    const { createTeacherCqrs } = require('../services/cqrs');
     const result = await createTeacherCqrs(req);
     return res.status(result.status).json(result.body);
   } catch (error) {
@@ -821,16 +814,9 @@ router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.M
 
 // ─── PUT /api/teachers/:id/finance/pay-flexible ──────────────────────────────────
 // Hướng mới: TX claim sessions + Transaction + salary ledger (+ star bonus)
-router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
+router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher, requireFinanceCqrs], async (req, res) => {
   try {
-    const { isFinanceCqrs } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng chi lương cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-    const { payTeacherFlexibleCqrs } = require('../services/cqrs/payTeacherFlexibleCqrs');
+    const { payTeacherFlexibleCqrs } = require('../services/cqrs');
     const result = await payTeacherFlexibleCqrs(req);
     const { paidSessions, markedSessions, totalAmount, starBonusAmount, starBonusMonths, transaction, idempotent } = result;
 
@@ -875,16 +861,9 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
 });
 
 // ─── PUT /api/teachers/:id/finance/pay-all ──────────────────────────────────────
-router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
+router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher, requireFinanceCqrs], async (req, res) => {
   try {
-    const { isFinanceCqrs } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng chi lương cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-    const { payTeacherAllCqrs } = require('../services/cqrs/payTeacherAllCqrs');
+    const { payTeacherAllCqrs } = require('../services/cqrs');
     const { paidSessions, totalAmount, transaction } = await payTeacherAllCqrs(req);
 
     const io = req.app.get('io');

@@ -12,11 +12,11 @@ const {
   reconciliationReport,
   rebuildDailySnapshots,
   syncStudentFinanceCache,
-  postDiscount,
 } = require('../services/ledgerService');
 const Student = require('../models/Student');
 const logger = require('../config/logger');
 const { isLedgerSot } = require('../utils/financeFlags');
+const { requireFinanceCqrs } = require('../shared/cqrs/middleware');
 
 const guard = [
   authMiddleware,
@@ -124,16 +124,9 @@ router.get('/students/:id', guard, async (req, res) => {
 });
 
 // POST /api/finance/ledger/:id/void
-router.post('/ledger/:id/void', manageGuard, async (req, res) => {
+router.post('/ledger/:id/void', manageGuard, requireFinanceCqrs, async (req, res) => {
   try {
-    const { isFinanceCqrs } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng void ledger cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-    const { voidLedgerCqrs } = require('../services/cqrs/salaryTransactionCqrs');
+    const { voidLedgerCqrs } = require('../services/cqrs');
     const result = await voidLedgerCqrs(req);
     return res.json({
       success: true,
@@ -146,27 +139,11 @@ router.post('/ledger/:id/void', manageGuard, async (req, res) => {
   }
 });
 
-// POST /api/finance/discount — ghi discount/coupon
-router.post('/discount', manageGuard, async (req, res) => {
+// POST /api/finance/discount — ghi discount/coupon (TX)
+router.post('/discount', manageGuard, requireFinanceCqrs, async (req, res) => {
   try {
-    const { studentId, amount, kind, enrollmentId, courseName, note, sourceRef } = req.body || {};
-    if (!studentId) {
-      return res.status(400).json({ success: false, message: 'Thiếu studentId' });
-    }
-    const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
-    }
-    const { entry, created } = await postDiscount({
-      student,
-      amount,
-      kind: kind === 'coupon' ? 'coupon' : 'discount',
-      enrollmentId,
-      courseName,
-      sourceRef: sourceRef || `discount:${studentId}:${enrollmentId || 'x'}`,
-      actor: actorOf(req),
-      note: note || '',
-    });
+    const { postDiscountCqrs } = require('../services/cqrs');
+    const { entry, created } = await postDiscountCqrs(req, { actorOf });
     return res.json({ success: true, created, data: entry });
   } catch (err) {
     const status = err.status || 500;

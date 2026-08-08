@@ -12,6 +12,7 @@ const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { allowHardDeleteFinance } = require('../utils/financeFlags');
+const { requireFinanceCqrs } = require('../shared/cqrs/middleware');
 
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
@@ -225,16 +226,9 @@ router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), as
 
 // ─── PUT /api/transactions/:id/confirm ────────────────────────────────────────
 // Hướng mới: confirm + salary ledger trong một TX
-router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), requireFinanceCqrs, async (req, res) => {
   try {
-    const { isFinanceCqrs } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng xác nhận lương cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-    const { confirmTransactionCqrs } = require('../services/cqrs/salaryTransactionCqrs');
+    const { confirmTransactionCqrs } = require('../services/cqrs');
     const { transaction } = await confirmTransactionCqrs(req);
 
     const io = req.app.get('io');
@@ -263,16 +257,9 @@ router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
 });
 
 // ─── PUT /api/transactions/:id/cancel ─────────────────────────────────────────
-router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), requireFinanceCqrs, async (req, res) => {
   try {
-    const { isFinanceCqrs } = require('../shared/cqrs/flags');
-    if (!isFinanceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng hủy phiếu lương cũ đã tắt. Bật replica set hoặc ENABLE_CQRS_FINANCE=true.',
-      });
-    }
-    const { cancelTransactionCqrs } = require('../services/cqrs/salaryTransactionCqrs');
+    const { cancelTransactionCqrs } = require('../services/cqrs');
     const { transaction } = await cancelTransactionCqrs(req);
     res.json({ success: true, data: transaction });
   } catch (err) {

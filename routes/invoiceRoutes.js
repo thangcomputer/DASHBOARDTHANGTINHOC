@@ -8,6 +8,7 @@ const { PERMISSIONS } = require('../constants/permissions');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const { enqueueInvoicePdf, enqueueInvoiceEmail } = require('../services/queue/jobQueue');
 const logger = require('../config/logger');
+const { requireInvoiceCqrs } = require('../shared/cqrs/middleware');
 
 // ─── GET /api/invoices ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy hóa đơn (STAFF bị giới hạn theo chi nhánh)
@@ -100,17 +101,9 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // ─── POST /api/invoices ────────────────────────────────────────────────────────
 // Tạo hóa đơn thủ công — hướng mới: TX Invoice + Outbox (PDF async)
-router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), requireInvoiceCqrs, async (req, res) => {
   try {
-    const { isInvoiceCqrs, requireReplicaOrThrow } = require('../shared/cqrs/flags');
-    if (!isInvoiceCqrs()) {
-      return res.status(503).json({
-        success: false,
-        message: 'Luồng tạo HĐ cũ đã tắt. Bật replica set (MONGODB_URI=?replicaSet=) hoặc ENABLE_CQRS_INVOICE=true.',
-      });
-    }
-    requireReplicaOrThrow();
-    const { createInvoiceCqrs } = require('../services/cqrs/createInvoiceCqrs');
+    const { createInvoiceCqrs } = require('../services/cqrs');
     const result = await createInvoiceCqrs(req);
     return res.status(result.status).json(result.body);
   } catch (error) {
