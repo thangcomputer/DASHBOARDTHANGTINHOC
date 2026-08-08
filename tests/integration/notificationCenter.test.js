@@ -11,11 +11,18 @@ test('buildReceiverMatch: admin gets ALL_ADMIN', () => {
   assert.ok(receivers.includes('ALL_ADMIN'));
 });
 
-test('buildReceiverMatch: staff gets ALL_ADMIN', () => {
+test('buildReceiverMatch: staff with branch gets branch-scoped admin receivers', () => {
   const { match } = buildReceiverMatch({ id: 's1', role: 'staff', adminRole: 'STAFF', branchId: 'b1' });
   const receivers = match.map((m) => m.receivers);
-  assert.ok(receivers.includes('ALL_ADMIN'));
   assert.ok(receivers.includes('ALL_ADMIN_b1'));
+  assert.ok(receivers.includes('ALL_STAFF_b1'));
+  assert.ok(!receivers.includes('ALL_ADMIN'), 'branch staff must not receive global ALL_ADMIN');
+});
+
+test('buildReceiverMatch: staff without branch gets ALL_ADMIN', () => {
+  const { match } = buildReceiverMatch({ id: 's2', role: 'staff', adminRole: 'STAFF' });
+  const receivers = match.map((m) => m.receivers);
+  assert.ok(receivers.includes('ALL_ADMIN'));
 });
 
 test('buildReceiverMatch: teacher gets ALL_TEACHER', () => {

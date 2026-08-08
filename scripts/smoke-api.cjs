@@ -76,6 +76,7 @@ async function main() {
   await get('/students?limit=1', 'GET /students');
   await get('/teachers?limit=1', 'GET /teachers');
   await get('/monitoring/overview', 'GET /monitoring/overview');
+  await get('/monitoring/outbox', 'GET /monitoring/outbox');
   await get('/bi/overview?period=1m', 'GET /bi/overview');
   await get('/workflows/definitions', 'GET /workflows/definitions');
   await get('/ai/status', 'GET /ai/status');

@@ -52,8 +52,12 @@ async function createTuitionInvoice({ student, courseName, amount, note = '', se
         throw err;
       }
     }
-    return null;
+    const err = new Error('Không tạo được mã hóa đơn duy nhất sau nhiều lần thử');
+    err.status = 500;
+    throw err;
   } catch (err) {
+    // Outside TX: soft-skip (legacy callers). Inside TX: fail closed.
+    if (session) throw err;
     logger.warn('[INVOICE] create skipped:', err.message);
     return null;
   }
