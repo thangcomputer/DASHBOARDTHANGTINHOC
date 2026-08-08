@@ -457,11 +457,11 @@ export default function FloatingMessenger({ session, role }) {
   const unreadConversations = useMemo(() => {
     const list = conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup);
     if (isSuper) return list.slice(0, 8);
-    // Non-super: nhận tin từ Hỗ trợ viên (staff)
+    // Non-super: nhận tin từ Hỗ trợ viên (staff) và admin
     return list.filter((c) => {
       const r = String(c.user?.role || '').toLowerCase();
       const ar = String(c.user?.adminRole || '').toUpperCase();
-      return r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT';
+      return r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT' || r === 'admin' || ar === 'SUPER_ADMIN';
     }).slice(0, 8);
   }, [conversations, isSuper]);
 
