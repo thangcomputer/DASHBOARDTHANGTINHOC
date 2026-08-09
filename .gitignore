@@ -50,6 +50,26 @@ artifacts/mongo_data/
 # Thư mục lồng nhau nhầm (bản copy utils) — không đưa lên Git
 /dashboardthangtinhoc/
 
+# One-shot generators / local probes (do not re-commit to root)
+/implement_*.js
+/plan_sprint*.js
+/temp_*.js
+/test_*.js
+/fix_*.js
+/fix.js
+/forensic.js
+/get_admin.js
+/create_student.js
+/init_rs.js
+/mock_*.js
+/chaos_*.js
+/check_contacts.js
+/check_env.js
+/check_rs.js
+/check_rs_status.js
+/scripts/_tmp_*
+/scripts/_teacher_monolith.jsx
+
 # Deploy scripts with local credentials (use deploy/full_deploy.example.cjs)
 full_deploy.cjs
 deploy/full_deploy.cjs
