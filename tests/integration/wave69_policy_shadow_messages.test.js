@@ -394,13 +394,15 @@ test('Wave6.9 static: routes keep legacy + shadow; CQRS OFF; no global Policy', 
     );
   }
   assert.ok(src.includes('messagesCutoverGate') || src.includes('messagesGuard'));
-  assert.ok(src.includes('assertCanDirectMessage'));
+  assert.ok(src.includes('sendCanonicalMessage'));
+  const dms = fs.readFileSync(path.join(ROOT, 'services/directMessageService.js'), 'utf8');
+  assert.ok(dms.includes('assertCanDirectMessage'));
   assert.ok(src.includes('authMiddleware'));
   assert.ok(!src.includes('checkPermission'));
   assert.ok(!src.includes('MANAGE_MESSAGES'));
   assert.ok(!/new Message\(req\.body\)/.test(src));
   assert.ok(!/findOneAndUpdate\([^,]+,\s*req\.body/.test(src));
-  assert.ok(src.includes('Message.create({'));
+  assert.ok(src.includes('Message.create({') || dms.includes('Message.create('));
   assert.ok(server.includes("app.use('/api/messages'"));
   assert.ok(!server.includes("require('./modules/chat"));
   assert.ok(server.includes("socket.on('message:send'"));
@@ -430,10 +432,12 @@ test('Wave6.9 static: shadow middleware always next(); never HTTP deny', () => {
   assert.ok(src.includes('POLICY_MISMATCH') || src.includes('POLICY_SHADOW_ERROR'));
 });
 
-test('Wave6.9 inventory: modules/chat UNMOUNTED; live chatAccessService used', () => {
+test('Wave6.9 inventory: modules/chat UNMOUNTED; live chatAccess via directMessageService', () => {
   const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+  const dms = fs.readFileSync(path.join(ROOT, 'services/directMessageService.js'), 'utf8');
   assert.ok(server.includes("require('./routes/messageRoutes')"));
-  assert.ok(server.includes("require('./services/chatAccessService')"));
+  assert.ok(server.includes('sendCanonicalMessage') || server.includes('directMessageService'));
+  assert.ok(dms.includes('chatAccessService'));
   assert.ok(!server.includes("modules/chat/routes/messageRoutes"));
   assert.ok(fs.existsSync(path.join(ROOT, 'modules/chat/routes/messageRoutes.js')));
 });

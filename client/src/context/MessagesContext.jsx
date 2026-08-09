@@ -6,6 +6,8 @@ import { useStudentsContext } from './StudentsContext';
 import { useTeachersContext } from './TeachersContext';
 import { isTeacherActive } from '../constants/teacherStatus';
 
+import { buildConversationId } from '../utils/chatConversationId';
+
 const MessagesContext = createContext(null);
 
 function groupsKey(user) {
@@ -21,14 +23,14 @@ async function fetchGroups([, userId]) {
 }
 
 const makeConvId = (role1, id1, role2, id2) =>
-  [`${role1}_${id1}`, `${role2}_${id2}`].sort().join('__');
+  buildConversationId(role1, id1, role2, id2);
 
 export function MessagesProvider({ user, children }) {
   const [messages, setMessages] = useState([]);
   const { students } = useStudentsContext();
   const { teachers } = useTeachersContext();
   const {
-    onGroupNew, onRecallReceive, onReactionReceive, onMessageReceive,
+    onGroupNew, onRecallReceive, onReactionReceive, onMessageReceive, onMessageSent,
   } = useSocket();
 
   const { data: groups = [], mutate: mutateGroups, isValidating } = useSWR(
@@ -44,6 +46,48 @@ export function MessagesProvider({ user, children }) {
     let unsubRecall;
     let unsubReaction;
     let unsubMsg;
+    let unsubSent;
+
+    const upsert = (data) => {
+      if (!data?._id) return;
+      setMessages((prev) => {
+        if (prev.some((m) => String(m.id) === String(data._id))) {
+          return prev.filter((m) => !(String(m.id).startsWith('temp_')
+            && String(m.content || '') === String(data.content || '')
+            && String(m.convId) === String(data.conversationId)));
+        }
+        const mappedMsg = {
+          id: data._id,
+          convId: data.conversationId,
+          senderId: data.senderId,
+          senderName: data.senderName,
+          senderRole: data.senderRole,
+          receiverId: data.receiverId,
+          content: data.content,
+          time: new Date(data.createdAt || Date.now()),
+          read: data.isRead || false,
+          isGroup: data.isGroup || false,
+          groupId: data.groupId,
+          isRecalled: data.isRecalled || false,
+          messageType: data.messageType || 'text',
+          fileName: data.fileName,
+          fileUrl: data.fileUrl,
+          fileExpired: data.fileExpired || false,
+          reactions: data.reactions || [],
+        };
+        const tempIdx = prev.findIndex(
+          (m) => String(m.id).startsWith('temp_')
+            && String(m.convId) === String(data.conversationId)
+            && String(m.content || '') === String(data.content || ''),
+        );
+        if (tempIdx !== -1) {
+          const updated = [...prev];
+          updated[tempIdx] = mappedMsg;
+          return updated;
+        }
+        return [...prev, mappedMsg];
+      });
+    };
 
     if (onGroupNew) {
       unsubGroup = onGroupNew((newGroup) => {
@@ -72,57 +116,23 @@ export function MessagesProvider({ user, children }) {
       });
     }
 
-    if (onMessageReceive) {
-      unsubMsg = onMessageReceive((data) => {
-        setMessages((prev) => {
-          if (prev.some((m) => String(m.id) === String(data._id))) return prev;
-
-          const mappedMsg = {
-            id: data._id,
-            convId: data.conversationId,
-            senderId: data.senderId,
-            senderName: data.senderName,
-            senderRole: data.senderRole,
-            receiverId: data.receiverId,
-            content: data.content,
-            time: new Date(data.createdAt || Date.now()),
-            read: data.isRead || false,
-            isGroup: data.isGroup || false,
-            groupId: data.groupId,
-            isRecalled: data.isRecalled || false,
-            messageType: data.messageType || 'text',
-            fileName: data.fileName,
-            fileUrl: data.fileUrl,
-            fileExpired: data.fileExpired || false,
-            reactions: data.reactions || [],
-          };
-
-          const tempIdx = prev.findIndex(
-            (m) => String(m.id).startsWith('temp_') && m.senderId === data.senderId && m.content === data.content
-          );
-          if (tempIdx !== -1) {
-            const updated = [...prev];
-            updated[tempIdx] = mappedMsg;
-            return updated;
-          }
-          return [...prev, mappedMsg];
-        });
-      });
-    }
+    if (onMessageReceive) unsubMsg = onMessageReceive(upsert);
+    if (onMessageSent) unsubSent = onMessageSent(upsert);
 
     return () => {
       if (unsubGroup) unsubGroup();
       if (unsubRecall) unsubRecall();
       if (unsubReaction) unsubReaction();
       if (unsubMsg) unsubMsg();
+      if (unsubSent) unsubSent();
     };
-  }, [onGroupNew, onRecallReceive, onMessageReceive, onReactionReceive, mutateGroups]);
+  }, [onGroupNew, onRecallReceive, onMessageReceive, onMessageSent, onReactionReceive, mutateGroups]);
 
   const sendMessage = useCallback(async (msg) => {
     const tempId = `temp_${Date.now()}`;
     const convId = msg.isGroup && msg.groupId
       ? `group_${msg.groupId}`
-      : [`${msg.senderRole}_${msg.senderId}`, `${msg.receiverRole}_${msg.receiverId}`].sort().join('__');
+      : buildConversationId(msg.senderRole, msg.senderId, msg.receiverRole, msg.receiverId);
     const newMsg = {
       id: tempId,
       convId,
@@ -159,10 +169,25 @@ export function MessagesProvider({ user, children }) {
         groupId: msg.groupId || null,
       });
       if (res?.success && res?.data?._id) {
-        setMessages((prev) => prev.map((m) =>
-          m.id === tempId ? { ...m, id: res.data._id } : m
-        ));
-        return { ...newMsg, id: res.data._id };
+        setMessages((prev) => {
+          if (prev.some((m) => String(m.id) === String(res.data._id))) {
+            return prev.filter((m) => m.id !== tempId);
+          }
+          return prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  id: res.data._id,
+                  convId: res.data.conversationId || m.convId,
+                  senderId: res.data.senderId,
+                  senderRole: res.data.senderRole,
+                  receiverId: res.data.receiverId,
+                  receiverRole: res.data.receiverRole,
+                }
+              : m
+          );
+        });
+        return { ...newMsg, id: res.data._id, convId: res.data.conversationId || convId };
       }
     } catch {
       /* optimistic UI kept */

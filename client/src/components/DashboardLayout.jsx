@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { formatNotificationStudentMask } from '../utils/studentMask';
+import { getMessagingRole } from '../lib/messagingRoles';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -283,9 +284,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     : role;
 
   return (
+import { getMessagingRole } from '../lib/messagingRoles';
+...
     <FloatingMessengerProvider
       currentUserId={myId}
-      currentUserRole={role === 'staff' ? 'admin' : role}
+      currentUserRole={getMessagingRole(session) || role}
     >
     <div className="flex h-[100dvh] max-h-[100dvh] bg-[#f8fafc] relative font-sans overflow-hidden">
       {isRefetching ? (

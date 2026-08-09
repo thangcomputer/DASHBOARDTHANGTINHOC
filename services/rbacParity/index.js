@@ -8,4 +8,5 @@ module.exports = {
   ...require('./runtimeSoakEvidence'),
   ...require('./finalReadiness'),
   ...require('./runtimeEvidence820'),
+  ...require('./runtimeEvidenceExport'),
 };

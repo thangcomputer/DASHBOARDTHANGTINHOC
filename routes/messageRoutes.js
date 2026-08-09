@@ -18,12 +18,16 @@ const Teacher = require('../models/Teacher');
 const ConversationVisibility = require('../models/ConversationVisibility');
 const logger = require('../config/logger');
 const { buildConversationId } = require('../utils/chatConversationId');
+const {
+  getMessagingRole,
+  canAccessDirectConversation,
+} = require('../utils/messagingRoles');
 const { sanitizeMessages, sanitizeMessageDoc } = require('../utils/messageFileRetention');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
 const isStaffAccount = (u = {}) => u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';
 const isSuperAdminAccount = (u = {}) => u.id === 'admin' || u.adminRole === 'SUPER_ADMIN';
 const isHighAdminAccount = (u = {}) => u.adminRole === 'HIGH_ADMIN';
-/** SUPER_ADMIN + HIGH_ADMIN — chia sẻ admin mailbox */
+/** SUPER_ADMIN + HIGH_ADMIN — chia sẻ admin mailbox legacy (không gồm STAFF/SUPPORT) */
 const isAdminLevelAccount = (u = {}) => isSuperAdminAccount(u) || isHighAdminAccount(u);
 
 function toClientMessage(doc) {
@@ -292,11 +296,12 @@ router.get('/conversations/:userId', messagesGuard('conversations'), async (req,
     const isSuperAdmin = isAdminLevelAccount(req.user);
     const userBranch = req.user.branchCode || '';
 
+    // Legacy shared admin mailbox (senderId/receiverId === 'admin') — SUPER/HIGH only.
+    // STAFF/SUPPORT must not inherit other staff's admin_admin traffic.
     const matchQuery = { 
       $or: [
         { senderId: userId },
         { receiverId: userId },
-        // Hộp chung admin (admin_admin) chỉ dành cho SUPER_ADMIN
         ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
       ]
     };
@@ -413,19 +418,22 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
   try {
     const { conversationId } = req.params;
 
-    // Bảo vệ: Phải là một trong hai bên trong conversationId (hoặc Admin)
-    // conversationId format: role_id__role_id (sorted)
-    const isStaffOrAdmin = req.user.role === 'admin' || isStaffAccount(req.user);
-    const isParticipant = (() => {
-      const parts = String(conversationId || '').split('__').filter(Boolean);
-      const hasSelf = parts.some((p) => p.endsWith(`_${req.user.id}`));
-      if (hasSelf) return true;
-      // Chỉ super admin (hardcoded admin / SUPER_ADMIN) mới được xem hộp chung admin_admin
-      if (isStaffOrAdmin && isAdminLevelAccount(req.user)) {
-        return parts.includes('admin_admin');
+    // Bảo vệ: participant canonical HOẶC legacy admin_admin chỉ SUPER/HIGH
+    const isGroupConv = String(conversationId || '').startsWith('group_');
+    let isParticipant = false;
+    if (isGroupConv) {
+      const mongoose = require('mongoose');
+      const groupId = String(conversationId).slice('group_'.length);
+      if (mongoose.Types.ObjectId.isValid(groupId)) {
+        const g = await Group.findOne({
+          _id: groupId,
+          'participants.userId': String(req.user.id),
+        }).select('_id').lean();
+        isParticipant = !!g || isAdminLevelAccount(req.user);
       }
-      return false;
-    })();
+    } else {
+      isParticipant = canAccessDirectConversation(conversationId, req.user);
+    }
 
     if (!isParticipant) {
       return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
@@ -456,6 +464,7 @@ router.get('/sync/:userId', messagesGuard('sync'), async (req, res) => {
     const groupIds = userGroups.map(g => String(g._id));
 
     // Lấy tin nhắn cá nhân + tin nhắn nhóm
+    // Legacy receiverId/senderId 'admin' chỉ cho SUPER/HIGH — không fan-out cho STAFF
     const messages = await Message.find({
       $or: [
         { senderId: userId },
@@ -544,10 +553,8 @@ router.post('/upload', messagesGuard('upload'), upload.single('file'), async (re
 // ── Gửi tin nhắn ──
 router.post('/', messagesGuard('send'), async (req, res) => {
   try {
-    // Luôn dùng ID và Role từ token để ngăn chặn giả mạo (impersonation)
     const senderId = req.user.id;
-    // Thống nhất role admin cho cả SUPER_ADMIN và STAFF trong hệ thống Chat
-    const senderRole = isStaffAccount(req.user) ? 'admin' : req.user.role;
+    const senderRole = getMessagingRole(req.user);
     const senderName = req.user.name;
 
     const { receiverId, receiverName, receiverRole, content, isGroup, groupId, messageType, fileUrl, fileName } = req.body;
@@ -557,158 +564,56 @@ router.post('/', messagesGuard('send'), async (req, res) => {
       return res.status(403).json({ success: false, message: 'Chỉ admin/staff được gửi thông báo broadcast' });
     }
 
-    if (isGroup && groupId) {
-      const group = await Group.findById(groupId).select('participants').lean();
-      if (!group) {
-        return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm chat' });
-      }
-      const isMember = (group.participants || []).some((p) => String(p.userId) === String(senderId));
-      if (!isMember && !isAdminLevelAccount(req.user)) {
-        return res.status(403).json({ success: false, message: 'Bạn không thuộc nhóm chat này' });
-      }
-    }
-
-    // Enforce contacts matrix cho DM (không áp dụng broadcast/group)
-    if (!isBroadcast && !(isGroup && groupId)) {
-      const { assertCanDirectMessage } = require('../services/chatAccessService');
-      const access = await assertCanDirectMessage(req.user, receiverId, receiverRole);
-      if (!access.ok) {
-        return res.status(403).json({ success: false, message: access.message || 'Không được nhắn tin đến người này' });
-      }
-    }
-
-    let conversationId;
-    if (isGroup && groupId) {
-      conversationId = `group_${groupId}`;
-    } else if (isBroadcast) {
-      conversationId = req.body.conversationId || [`${senderRole}_${senderId}`, `system_${String(receiverId).replace(/[^a-zA-Z0-9_]/g, '_')}`].sort().join('__');
-    } else {
-      // Luôn tính từ server (bỏ qua client) để HV→staff có conversationId riêng, không gộp nhầm với hộp admin
-      conversationId = buildConversationId(senderRole, senderId, receiverRole, receiverId);
-    }
-
-    // Tìm branchCode của cả 2 bên để lưu vào Message (Cần check ID hợp lệ tránh lỗi findById('admin'))
-    const Teacher = require('../models/Teacher');
-    const Student = require('../models/Student');
-    const mongoose = require('mongoose');
-    
-    let sBranch = '';
-    if (senderId === 'admin') {
-      sBranch = 'HỆ THỐNG';
-    } else if (mongoose.Types.ObjectId.isValid(senderId)) {
-      if (senderRole === 'teacher' || senderRole === 'admin' || senderRole === 'staff') {
-        const t = await Teacher.findById(senderId).select('branchCode').lean();
-        sBranch = t?.branchCode || '';
-      } else if (senderRole === 'student') {
-        const s = await Student.findById(senderId).select('branchCode').lean();
-        sBranch = s?.branchCode || '';
-      }
-    }
-
-    let rBranch = '';
-    let resolvedReceiverName = receiverName;
-    if (!isGroup) {
-      if (receiverId === 'admin') {
-        rBranch = 'HỆ THỐNG';
-        if (!resolvedReceiverName) resolvedReceiverName = 'Admin';
-      } else if (mongoose.Types.ObjectId.isValid(receiverId)) {
-        if (receiverRole === 'teacher' || receiverRole === 'admin' || receiverRole === 'staff') {
-          const t = await Teacher.findById(receiverId).select('branchCode name').lean();
-          rBranch = t?.branchCode || '';
-          if (!resolvedReceiverName) resolvedReceiverName = t?.name || 'Người nhận';
-        } else if (receiverRole === 'student') {
-          const s = await Student.findById(receiverId).select('branchCode name').lean();
-          rBranch = s?.branchCode || '';
-          if (!resolvedReceiverName) resolvedReceiverName = s?.name || 'Học viên';
-        }
-      }
-    }
-    if (!resolvedReceiverName && !isBroadcast && !isGroup) {
-      resolvedReceiverName = 'Người nhận';
-    }
-
-    // ⭐ CHỐNG CHÉO CHI NHÁNH (Cross-Branch Protection)
-    const isSuperAdmin = isAdminLevelAccount(req.user);
-    if (!isSuperAdmin && (senderRole === 'admin' || senderRole === 'staff') && receiverRole === 'student') {
-        // Staff messaging student
-        if (sBranch && rBranch && sBranch !== rBranch) {
-            return res.status(403).json({ success: false, message: 'Bạn không được phép nhắn tin cho học viên chi nhánh khác' });
-        }
-    }
-
-    let finalSenderId = senderId;
-    let finalSenderName = senderName || 'Admin';
-    
-    let finalReceiverId = isBroadcast ? receiverId : (isGroup ? groupId : receiverId);
-    let finalReceiverName = isBroadcast ? 'Thông báo hệ thống' : (isGroup ? 'Group' : (resolvedReceiverName || 'Người nhận'));
-    if (!isBroadcast && !isGroup && senderRole === 'student' && (receiverRole === 'admin' || receiverRole === 'staff' || receiverRole === 'support')) {
-      const rid = String(receiverId || '');
-      if (rid === 'admin' || !mongoose.Types.ObjectId.isValid(rid)) {
-        finalReceiverId = 'admin';
-        finalReceiverName = resolvedReceiverName || 'Quản trị viên';
-      } else {
-        finalReceiverId = rid;
-        finalReceiverName = resolvedReceiverName || 'Nhân viên';
-      }
-    }
-
-    const message = await Message.create({
-      conversationId, 
-      senderId: finalSenderId, 
-      senderName: finalSenderName, 
-      senderRole,
-      senderBranchCode: sBranch,
-      receiverId: finalReceiverId, 
-      receiverName: finalReceiverName, 
-      receiverRole: isBroadcast ? 'system' : (isGroup ? 'admin' : receiverRole), 
-      receiverBranchCode: rBranch,
-      content,
-      messageType: messageType || 'text',
-      fileUrl: fileUrl || '',
-      fileName: fileName || '',
-      isGroup: isGroup || false,
-      groupId: isGroup ? groupId : null,
-    });
-
-    // Cập nhật Group lastMessage
-    if (isGroup && groupId) {
-      await Group.findByIdAndUpdate(groupId, {
-        lastMessage: { content, senderName, sentAt: new Date() }
+    // Broadcast keeps dedicated path (role/global rooms). DM/group use canonical service.
+    if (isBroadcast) {
+      const conversationId = req.body.conversationId || [`${senderRole}_${senderId}`, `system_${String(receiverId).replace(/[^a-zA-Z0-9_]/g, '_')}`].sort().join('__');
+      const message = await Message.create({
+        conversationId,
+        senderId,
+        senderName: senderName || 'Admin',
+        senderRole,
+        senderBranchCode: '',
+        receiverId,
+        receiverName: 'Thông báo hệ thống',
+        receiverRole: 'system',
+        receiverBranchCode: '',
+        content,
+        messageType: messageType || 'text',
+        fileUrl: fileUrl || '',
+        fileName: fileName || '',
+        isGroup: false,
+        groupId: null,
       });
-    }
-
-    // Chỉ bỏ ẩn cho người gửi/nhận — không reset ẩn của user khác
-    const unhideIds = [...new Set(
-      [finalSenderId, finalReceiverId, senderId]
-        .filter(Boolean)
-        .map(String)
-    )];
-    if (unhideIds.length) {
-      await ConversationVisibility.findOneAndUpdate(
-        { conversationId },
-        { $pullAll: { hiddenByUsers: unhideIds } },
-        { upsert: true }
-      );
-    }
-
-    // Gửi qua Socket.io real-time
-    const io = req.app.get('io');
-    const clientMessage = toClientMessage(message);
-    if (io) {
-      if (isGroup && groupId) {
-        // Phát cho cả room group
-        io.to(`group_${groupId}`).emit('message:receive', clientMessage);
-      } else {
-        // 1. Gửi cho người nhận (dùng bản đã lưu — receiverId có thể là 'admin' hoặc ObjectId staff/admin cụ thể)
-        req.app.notifyUser(message.receiverRole, message.receiverId, 'message:receive', clientMessage);
-
-        // 2. Confirm lại cho người gửi (để UI gửi xong cập nhật)
-        // Luôn gửi confirm cho mọi sender (bao gồm admin/staff) - BUG-14 fix
+      const clientMessage = toClientMessage(message);
+      const io = req.app.get('io');
+      if (io) {
+        if (receiverId === 'ALL_USERS') io.emit('message:receive', clientMessage);
+        else if (receiverId === 'ALL_STUDENTS') io.to('ALL_STUDENT').emit('message:receive', clientMessage);
+        else if (receiverId === 'ALL_TEACHERS') io.to('ALL_TEACHER').emit('message:receive', clientMessage);
         req.app.notifyUser(senderRole, senderId, 'message:sent', clientMessage);
       }
+      return res.status(201).json({ success: true, data: clientMessage });
     }
 
-    res.status(201).json({ success: true, data: clientMessage });
+    const { sendCanonicalMessage } = require('../services/directMessageService');
+    const result = await sendCanonicalMessage({
+      sender: req.user,
+      receiverId,
+      receiverName,
+      receiverRole,
+      content,
+      messageType,
+      fileUrl,
+      fileName,
+      isGroup,
+      groupId,
+      notifyUser: req.app.notifyUser,
+      io: req.app.get('io'),
+    });
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ success: false, message: result.message });
+    }
+    return res.status(201).json({ success: true, data: result.clientMessage });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -750,12 +655,7 @@ router.put('/read/:conversationId', messagesGuard('read'), async (req, res) => {
         allowed = !!g;
       }
     } else {
-      const parts = String(conversationId || '').split('__').filter(Boolean);
-      const hasSelf = parts.some((p) => p.endsWith(`_${readerId}`));
-      if (hasSelf) allowed = true;
-      else if (isStaffOrAdmin && isAdminLevelAccount(req.user) && parts.includes('admin_admin')) {
-        allowed = true;
-      }
+      allowed = canAccessDirectConversation(conversationId, req.user);
     }
     if (!allowed) {
         return res.status(403).json({ success: false, message: 'Thao tác không hợp lệ' });

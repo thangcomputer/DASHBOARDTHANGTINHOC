@@ -25,7 +25,8 @@ const formatTime = (date) => {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 };
 
-const normalizeRole = (role) => (role === 'staff' ? 'admin' : role);
+// Keep contact/messaging roles canonical — do NOT collapse staff→admin (splits threads).
+const normalizeRole = (role) => (role === 'support' ? 'staff' : role);
 
 const isAttachmentExpired = (msg) =>
   Boolean(msg?.fileExpired) ||

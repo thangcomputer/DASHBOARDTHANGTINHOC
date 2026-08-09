@@ -209,6 +209,9 @@ app.get('/healthz', (req, res) => {
   });
 });
 
+// Phase 8.20C — loopback-only RUNTIME evidence export (NOT under /api public proxy)
+app.use('/internal/rbac', require('./routes/internalRbacRoutes'));
+
 // Request metrics (Phase 10) — truoc routes API
 app.use(require('./middleware/requestMetrics'));
 
@@ -391,151 +394,129 @@ io.on('connection', (socket) => {
   socket.on('message:send', async (data) => {
     if (!socket.user) return;
     const u = socket.user;
-    const senderMessagingRole = getMessagingRole(u);
     const senderId = String(u.id || u._id);
-    const senderName = u.name || 'User';
-    const isStaff = senderMessagingRole === 'staff';
 
-    // BUG-13: Rate limit check
     if (!checkSocketRate(`msg_${senderId}`)) return;
 
-    // BUG-06: Validate content
-    const rawContent = String(data.content || '').trim();
+    const rawContent = String(data?.content || '').trim();
     const isBroadcast =
-      data.receiverId === 'ALL_USERS' ||
-      data.receiverId === 'ALL_STUDENTS' ||
-      data.receiverId === 'ALL_TEACHERS' ||
-      String(data.receiverId || '').startsWith('ALL_BRANCH_');
-    const isFileMsg = data.messageType === 'file' || data.messageType === 'image';
-    if (!isFileMsg && !isBroadcast && !rawContent) return; // Reject empty text
-    if (rawContent.length > 2000) return; // Reject overlength
+      data?.receiverId === 'ALL_USERS' ||
+      data?.receiverId === 'ALL_STUDENTS' ||
+      data?.receiverId === 'ALL_TEACHERS' ||
+      String(data?.receiverId || '').startsWith('ALL_BRANCH_');
+    const isFileMsg = data?.messageType === 'file' || data?.messageType === 'image';
+    if (!isFileMsg && !isBroadcast && !rawContent) return;
+    if (rawContent.length > 2000) return;
 
-    data = {
-      ...data,
-      content: rawContent,
-      senderId,
-      senderName,
-      senderRole: senderMessagingRole,
-    };
-
-    if (!isBroadcast && !data.isGroup) {
-      try {
-        const { assertCanDirectMessage } = require('./services/chatAccessService');
-        const access = await assertCanDirectMessage(u, data.receiverId, data.receiverRole);
-        if (!access.ok) return;
-      } catch {
-        return;
+    // Broadcast stays on role/global rooms (admin/staff only) — not private DM path
+    if (isBroadcast) {
+      if (!isAdminSocketUser(u)) return;
+      const senderMessagingRole = getMessagingRole(u);
+      const convId = buildConversationId(
+        senderMessagingRole,
+        senderId,
+        'system',
+        String(data.receiverId).replace(/[^a-zA-Z0-9_]/g, '_'),
+      );
+      const msgPayload = {
+        _id: `msg_${Date.now()}`,
+        content: rawContent,
+        senderId,
+        senderName: u.name || 'User',
+        senderRole: senderMessagingRole,
+        receiverId: data.receiverId,
+        receiverRole: 'system',
+        conversationId: convId,
+        messageType: data.messageType || 'text',
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      };
+      if (data.receiverId === 'ALL_USERS') io.emit('message:receive', msgPayload);
+      else if (data.receiverId === 'ALL_STUDENTS') io.to('ALL_STUDENT').emit('message:receive', msgPayload);
+      else if (data.receiverId === 'ALL_TEACHERS') io.to('ALL_TEACHER').emit('message:receive', msgPayload);
+      else if (String(data.receiverId).startsWith('ALL_BRANCH_')) {
+        const bCode = String(data.receiverId).replace('ALL_BRANCH_', '');
+        io.to(`ALL_STUDENT_${bCode}`).to(`ALL_TEACHER_${bCode}`).to(`ALL_STAFF_${bCode}`).to(`ALL_SUPPORT_${bCode}`).emit('message:receive', msgPayload);
       }
+      socket.emit('message:sent', msgPayload);
+      return;
     }
 
-    // data = { senderId, senderName, senderRole, receiverId, receiverRole, content }
-    // Tìm người nhận (Hỗ trợ linh hoạt cả prefix admin_ và staff_)
-    let receiver = onlineUsers.get(`${data.receiverRole}_${data.receiverId}`);
-    if (!receiver && (data.receiverRole === 'admin' || data.receiverRole === 'staff')) {
-      const altRole = data.receiverRole === 'admin' ? 'staff' : 'admin';
-      receiver = onlineUsers.get(`${altRole}_${data.receiverId}`);
+    try {
+      const { sendCanonicalMessage } = require('./services/directMessageService');
+      const result = await sendCanonicalMessage({
+        sender: u,
+        receiverId: data.receiverId,
+        receiverName: data.receiverName,
+        receiverRole: data.receiverRole,
+        content: rawContent,
+        messageType: data.messageType || 'text',
+        fileUrl: data.fileUrl || '',
+        fileName: data.fileName || '',
+        isGroup: Boolean(data.isGroup),
+        groupId: data.groupId || null,
+        notifyUser: app.notifyUser,
+        io,
+      });
+      if (!result.ok) return;
+      socket.emit('message:sent', result.clientMessage);
+    } catch {
+      return;
     }
-
-    const isOneSideStudent = (data.senderRole === 'student' || data.receiverRole === 'student');
-
-    const convId = buildConversationId(data.senderRole, data.senderId, data.receiverRole, data.receiverId);
-
-    // Lấy branchCode người gửi để hiển thị badge (GV/HV/Staff)
-    let sender = onlineUsers.get(`${data.senderRole}_${data.senderId}`);
-    if (!sender && (data.senderRole === 'admin' || data.senderRole === 'staff')) {
-      const altRole = data.senderRole === 'admin' ? 'staff' : 'admin';
-      sender = onlineUsers.get(`${altRole}_${data.senderId}`);
-    }
-    const sBranch = sender?.branchCode || '';
-    const rBranch = receiver?.branchCode || '';
-
-    // Chuẩn hoá payload (giống messageRoutes)
-    let finalSenderId = data.senderId;
-    let finalSenderName = data.senderName || u.name || 'Người dùng';
-
-    let finalReceiverId = data.receiverId;
-    let finalReceiverName = data.receiverName || 'Người nhận';
-
-    const msgPayload = {
-      ...data,
-      _id: data._id || `msg_${Date.now()}`,
-      senderId: finalSenderId,
-      senderName: finalSenderName,
-      receiverId: finalReceiverId,
-      receiverName: finalReceiverName,
-      conversationId: convId,
-      senderBranchCode: sBranch,
-      receiverBranchCode: rBranch,
-      createdAt: new Date().toISOString(),
-      isRead: false,
-    };
-
-    // 1) Broadcast (chỉ admin/staff)
-    if (data.receiverId === 'ALL_USERS') {
-      if (!isAdminSocketUser(u)) return;
-      io.emit('message:receive', msgPayload);
-    } else if (data.receiverId === 'ALL_STUDENTS') {
-      if (!isAdminSocketUser(u)) return;
-      io.to('ALL_STUDENT').emit('message:receive', msgPayload);
-    } else if (data.receiverId === 'ALL_TEACHERS') {
-      if (!isAdminSocketUser(u)) return;
-      io.to('ALL_TEACHER').emit('message:receive', msgPayload);
-    } else if (data.receiverId?.startsWith('ALL_BRANCH_')) {
-      if (!isAdminSocketUser(u)) return;
-      const bCode = data.receiverId.replace('ALL_BRANCH_', '');
-      io.to(`ALL_STUDENT_${bCode}`).to(`ALL_TEACHER_${bCode}`).to(`ALL_STAFF_${bCode}`).to(`ALL_SUPPORT_${bCode}`).emit('message:receive', msgPayload);
-    }
-    // 2) Direct message: room theo userId (Redis adapter cross-instance)
-    else {
-      const rid = String(finalReceiverId || data.receiverId || '');
-      if (rid) io.to(rid).emit('message:receive', msgPayload);
-    }
-
-    // 5. Gửi confirm cho chính người gửi
-    socket.emit('message:sent', msgPayload);
   });
 
   // ── Đánh dấu đã đọc ──
-  socket.on('message:read', ({ conversationId, readerId }) => {
-    if (!socket.user || socketUserId(socket.user) !== String(readerId || '')) return;
-    // BUG-05: Chỉ emit cho participant trong conversation, không broadcast toàn bộ
-    const parts = String(conversationId || '').split('__').filter(Boolean);
-    parts.forEach(p => {
-      const sepIdx = p.indexOf('_');
-      if (sepIdx <= 0) return;
-      const id = p.slice(sepIdx + 1);
-      if (id && id !== String(readerId)) {
-        io.to(id).emit('message:read_ack', { conversationId, readerId });
+  socket.on('message:read', ({ conversationId }) => {
+    if (!socket.user) return;
+    const readerId = socketUserId(socket.user);
+    const { canAccessDirectConversation, parseDirectConversationTokens } = require('./utils/messagingRoles');
+    const cid = String(conversationId || '');
+    if (cid.startsWith('group_')) {
+      const gid = cid.slice('group_'.length);
+      if (!socket.rooms.has(`group_${gid}`)) return;
+      socket.to(`group_${gid}`).emit('message:read_ack', { conversationId: cid, readerId });
+      return;
+    }
+    if (!canAccessDirectConversation(cid, socket.user)) return;
+    const tokens = parseDirectConversationTokens(cid) || [];
+    for (const t of tokens) {
+      if (t?.id && String(t.id) !== readerId) {
+        io.to(String(t.id)).emit('message:read_ack', { conversationId: cid, readerId });
       }
-    });
+    }
   });
 
   // ── Đánh dấu đang gõ ──
-  socket.on('typing:start', ({ conversationId, userId, userName }) => {
+  socket.on('typing:start', ({ conversationId, userName }) => {
     if (!socket.user) return;
-    // BUG-05: Chỉ emit cho đối phương trong conversation
-    const parts = String(conversationId || '').split('__').filter(Boolean);
-    parts.forEach(p => {
-      const sepIdx = p.indexOf('_');
-      if (sepIdx <= 0) return;
-      const id = p.slice(sepIdx + 1);
-      if (id && id !== String(userId)) {
-        io.to(id).emit('typing:show', { conversationId, userId, userName });
+    const userId = socketUserId(socket.user);
+    const { canAccessDirectConversation, parseDirectConversationTokens, getMessagingRole: gmr } = require('./utils/messagingRoles');
+    const cid = String(conversationId || '');
+    if (!canAccessDirectConversation(cid, socket.user)) return;
+    const tokens = parseDirectConversationTokens(cid) || [];
+    for (const t of tokens) {
+      if (t?.id && String(t.id) !== userId) {
+        io.to(String(t.id)).emit('typing:show', {
+          conversationId: cid,
+          userId,
+          userName: userName || socket.user.name || 'User',
+          userRole: gmr(socket.user),
+        });
       }
-    });
+    }
   });
-  socket.on('typing:stop', ({ conversationId, userId }) => {
+  socket.on('typing:stop', ({ conversationId }) => {
     if (!socket.user) return;
-    // BUG-05: Chỉ emit cho đối phương
-    const parts = String(conversationId || '').split('__').filter(Boolean);
-    parts.forEach(p => {
-      const sepIdx = p.indexOf('_');
-      if (sepIdx <= 0) return;
-      const id = p.slice(sepIdx + 1);
-      if (id && id !== String(userId)) {
-        io.to(id).emit('typing:hide', { conversationId, userId });
+    const userId = socketUserId(socket.user);
+    const { canAccessDirectConversation, parseDirectConversationTokens } = require('./utils/messagingRoles');
+    const cid = String(conversationId || '');
+    if (!canAccessDirectConversation(cid, socket.user)) return;
+    const tokens = parseDirectConversationTokens(cid) || [];
+    for (const t of tokens) {
+      if (t?.id && String(t.id) !== userId) {
+        io.to(String(t.id)).emit('typing:hide', { conversationId: cid, userId });
       }
-    });
+    }
   });
 
   // ── Nhận report vi phạm thi ──
@@ -677,13 +658,15 @@ io.on('connection', (socket) => {
 app.notifyUser = (role, userId, eventName, data) => {
   const strUserId = String(userId);
 
+  // Legacy root "admin": target root admin room + SUPER/HIGH (ALL_ADMIN).
+  // NEVER fan-out private messages to ALL_STAFF / ALL_SUPPORT.
   if (strUserId === 'admin') {
-    io.to('ALL_STAFF').emit(eventName, data);
+    io.to('admin').to('ALL_ADMIN').emit(eventName, data);
     return true;
   }
 
   const tryRoles = new Set([role, getMessagingRole({ id: strUserId, role })]);
-  if (role === 'admin' || role === 'staff') {
+  if (role === 'admin' || role === 'staff' || role === 'support') {
     tryRoles.add('admin');
     tryRoles.add('staff');
   }
@@ -697,6 +680,7 @@ app.notifyUser = (role, userId, eventName, data) => {
     }
   }
 
+  // Canonical private delivery: userId room joined at connect
   io.to(strUserId).emit(eventName, data);
   return true;
 };

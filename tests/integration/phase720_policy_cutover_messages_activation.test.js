@@ -410,7 +410,9 @@ test('Phase7.20 middleware order + only messageRoutes uses messagesCutoverGate',
   for (const a of ACTIONS) {
     assert.ok(routes.includes(`messagesGuard('${a}')`), a);
   }
-  assert.ok(routes.includes('assertCanDirectMessage'));
+  assert.ok(routes.includes('sendCanonicalMessage'));
+  const dms = fs.readFileSync(path.join(ROOT, 'services/directMessageService.js'), 'utf8');
+  assert.ok(dms.includes('assertCanDirectMessage'));
   assert.ok(!routes.includes('checkPermission'));
   assert.ok(server.includes("socket.on('message:send'"));
 });

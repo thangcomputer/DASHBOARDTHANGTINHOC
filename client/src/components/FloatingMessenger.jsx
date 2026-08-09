@@ -15,6 +15,7 @@ import { useData } from '../context/DataContext';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { normalizeChatRole } from '../utils/chatConversationId';
+import { getMessagingRole } from '../lib/messagingRoles';
 import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { useToast } from '../utils/toast';
 import {
@@ -410,7 +411,7 @@ export default function FloatingMessenger({ session, role }) {
 
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';
-  const meRole = normalizeChatRole(role || session?.role || 'student');
+  const meRole = normalizeChatRole(getMessagingRole(session) || role || session?.role || 'student');
   const isSuper = isSuperAdminViewer(session);
 
   const conversations = useMemo(

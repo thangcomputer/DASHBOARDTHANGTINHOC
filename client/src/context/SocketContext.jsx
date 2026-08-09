@@ -2,61 +2,78 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { io } from 'socket.io-client';
 import { playMessageSound, playNotifySound } from '../utils/sound';
 import { getMessagingRole, isMessageFromSelf } from '../lib/messagingRoles';
-
-const SocketContext = createContext(null);
-
 import { API_BASE, SOCKET_BASE, apiFetch } from '../services/api';
 
+const SocketContext = createContext(null);
 const SOCKET_URL = SOCKET_BASE;
 
+/** Refresh events owned by SocketProvider (must off by same reference). */
+const DATA_REFRESH_EVENTS = [
+  'schedule:new', 'schedule:updated', 'schedule:completed', 'schedule:cancelled',
+  'assignment:new', 'assignment:graded', 'assignment:submitted', 'assignment:updated', 'assignment:deleted',
+  'teacher:updated', 'exam:unlocked',
+  'student:new', 'student:assigned', 'student:history_reset',
+  'submission:new', 'submission:graded',
+  'transactions:new', 'teacher:financeUpdated', 'tuition:paid', 'revenue:updated',
+  'teacher:scored', 'teacher:approved', 'teacher:practical_submitted', 'teacher:rejected', 'teacher:new',
+  'evaluation:admin_feedback', 'evaluation:teacher_rating',
+];
+
 export const SocketProvider = ({ userId, role, name, token, adminRole, children }) => {
-  const [socket, setSocket]             = useState(null);
-  const [isConnected, setIsConnected]   = useState(false);
-  const [onlineUsers, setOnlineUsers]   = useState([]);
-  const [lastSeenUsers, setLastSeenUsers] = useState({}); // { userId: ISOString }
+  const [socket, setSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [lastSeenUsers, setLastSeenUsers] = useState({});
   const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
   const messageCallbacksRef = useRef(new Set());
+  const messageSentCallbacksRef = useRef(new Set());
   const reactionCallbacksRef = useRef(new Set());
   const recallCallbacksRef = useRef(new Set());
   const groupNewCallbackRef = useRef(null);
   const dataRefreshCallbacksRef = useRef(new Set());
-  const contactListUpdatedCallbackRef = useRef(null); // CONTACT_LIST_UPDATED
+  const contactListUpdatedCallbackRef = useRef(null);
   const readAckCallbackRef = useRef(new Set());
 
-  // Đăng ký callback nhận tin nhắn real-time
   const onMessageReceive = useCallback((callback) => {
     messageCallbacksRef.current.add(callback);
     return () => messageCallbacksRef.current.delete(callback);
   }, []);
 
-  // Đăng ký callback nhận reaction
+  const onMessageSent = useCallback((callback) => {
+    messageSentCallbacksRef.current.add(callback);
+    return () => messageSentCallbacksRef.current.delete(callback);
+  }, []);
+
   const onReactionReceive = useCallback((callback) => {
     reactionCallbacksRef.current.add(callback);
     return () => reactionCallbacksRef.current.delete(callback);
   }, []);
 
-  // Đăng ký callback nhận thu hồi tin nhắn
   const onRecallReceive = useCallback((callback) => {
     recallCallbacksRef.current.add(callback);
     return () => recallCallbacksRef.current.delete(callback);
   }, []);
 
-  // Đăng ký callback khi có nhóm mới
   const onGroupNew = useCallback((callback) => {
     groupNewCallbackRef.current = callback;
+    return () => {
+      if (groupNewCallbackRef.current === callback) groupNewCallbackRef.current = null;
+    };
   }, []);
 
-  // Đăng ký callback khi cần refresh data (ví dụ assign teacher)
   const onDataRefresh = useCallback((callback) => {
     dataRefreshCallbacksRef.current.add(callback);
     return () => dataRefreshCallbacksRef.current.delete(callback);
   }, []);
 
-  // Đăng ký callback khi danh bạ cần cập nhật (CONTACT_LIST_UPDATED)
   const onContactListUpdated = useCallback((callback) => {
     contactListUpdatedCallbackRef.current = callback;
-    return () => { contactListUpdatedCallbackRef.current = null; };
+    return () => {
+      if (contactListUpdatedCallbackRef.current === callback) {
+        contactListUpdatedCallbackRef.current = null;
+      }
+    };
   }, []);
 
   const onReadAck = useCallback((callback) => {
@@ -83,7 +100,6 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
     const newSocket = io(SOCKET_URL, {
       transports: ['polling', 'websocket'],
-      // Không giới hạn số lần reconnect — blip mạng không được “chết” socket vĩnh viễn
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -92,6 +108,15 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       timeout: 20000,
       auth: { token: effectiveToken },
     });
+
+    let refreshDebounceTimer = null;
+    const triggerRefresh = (data) => {
+      if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
+      refreshDebounceTimer = setTimeout(() => {
+        refreshDebounceTimer = null;
+        dataRefreshCallbacksRef.current.forEach((cb) => cb(data));
+      }, 320);
+    };
 
     const pauseReconnectIfOffline = () => {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -118,18 +143,13 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
         window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: true } }));
       } catch { /* ignore */ }
     };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('offline', onBrowserOffline);
-      window.addEventListener('online', onBrowserOnline);
-    }
 
-    newSocket.on('connect', () => {
+    const onConnect = () => {
       setIsConnected(true);
       try {
         window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: true } }));
       } catch { /* ignore */ }
 
-      // Đăng ký user
       if (userId && role && name) {
         newSocket.emit('register', { userId, role, name });
       }
@@ -142,178 +162,165 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       if (role === 'admin' || role === 'staff') {
         newSocket.emit('admin:join');
       }
-
-      // Re-join group rooms after reconnect
       try {
         window.dispatchEvent(new CustomEvent('cms:socket-reconnected'));
       } catch { /* ignore */ }
-    });
+    };
 
-    newSocket.on('connect_error', () => {
+    const onConnectError = () => {
       setIsConnected(false);
       pauseReconnectIfOffline();
-    });
+    };
 
-    if (userId) {
-      // API call to fetch existing unread notifications when initialized/refreshed
-      apiFetch('/notifications/unread')
-        .then(res => res.json())
-        .then(data => {
-           if (data.success && data.data) {
-             setNotifications(data.data.map(n => ({ 
-               ...n, 
-               id: n._id, 
-               read: Array.isArray(n.read_by) && n.read_by.includes(String(userId)),
-               message: n.content || n.message,
-               time: n.createdAt || n.time 
-             })));
-           }
-        })
-        .catch(err => void 0);
-    }
-
-    newSocket.on('disconnect', () => {
+    const onDisconnect = () => {
       setIsConnected(false);
-    });
+    };
 
-    // Danh sách online
-    newSocket.on('users:online', (users) => {
-      setOnlineUsers(users);
-    });
+    const onUsersOnline = (users) => setOnlineUsers(users);
+    const onUsersLastSeen = (map) => {
+      setLastSeenUsers((prev) => ({ ...prev, ...map }));
+    };
 
-    // Lịch sử lastSeen
-    newSocket.on('users:lastSeen', (map) => {
-      setLastSeenUsers(prev => ({ ...prev, ...map }));
-    });
-
-    // Nhận tin nhắn real-time từ người khác
-    newSocket.on('message:receive', (data) => {
+    const onMessageReceive = (data) => {
       if (!isMessageFromSelf(data, sessionUser)) {
         playMessageSound();
       }
-      messageCallbacksRef.current.forEach(cb => cb(data));
-    });
-
-    // Nhận reaction real-time
-    newSocket.on('message:reaction', (data) => {
-      reactionCallbacksRef.current.forEach(cb => cb(data));
-    });
-
-    // Nhận sự kiện thu hồi tin nhắn
-    newSocket.on('message:recall', (data) => {
-      recallCallbacksRef.current.forEach(cb => cb(data));
-    });
-
-    newSocket.on('message:read_ack', (data) => {
-      readAckCallbackRef.current.forEach(cb => cb(data));
-    });
-
-    // Nhận sự kiện nhóm mới
-    newSocket.on('group:new', (data) => {
-      if (groupNewCallbackRef.current) {
-        groupNewCallbackRef.current(data);
-      }
-    });
-
-    // Gom nhiều sự kiện socket trong ~300ms → một lần gọi refresh (tránh bão API)
-    let refreshDebounceTimer = null;
-    const triggerRefresh = (data) => {
-      if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
-      refreshDebounceTimer = setTimeout(() => {
-        refreshDebounceTimer = null;
-        dataRefreshCallbacksRef.current.forEach((cb) => cb(data));
-      }, 320);
+      messageCallbacksRef.current.forEach((cb) => cb(data));
     };
 
-    newSocket.on('data:refresh', triggerRefresh);
-    newSocket.on('student:updated', triggerRefresh);
+    const onMessageSentEvt = (data) => {
+      messageSentCallbacksRef.current.forEach((cb) => cb(data));
+    };
 
-    /** Các route không luôn kèm data:refresh — vẫn cần kích hoạt đồng bộ DataContext */
-    const refreshEvents = [
-      'schedule:new', 'schedule:updated', 'schedule:completed', 'schedule:cancelled',
-      'assignment:new', 'assignment:graded', 'assignment:submitted', 'assignment:updated', 'assignment:deleted',
-      'teacher:updated', 'exam:unlocked',
-      'student:new', 'student:assigned', 'student:history_reset',
-      'submission:new', 'submission:graded',
-      'transactions:new', 'teacher:financeUpdated', 'tuition:paid', 'revenue:updated',
-      'teacher:scored', 'teacher:approved', 'teacher:practical_submitted', 'teacher:rejected', 'teacher:new',
-      'evaluation:admin_feedback', 'evaluation:teacher_rating',
-    ];
-    refreshEvents.forEach((ev) => newSocket.on(ev, triggerRefresh));
+    const onMessageReaction = (data) => {
+      reactionCallbacksRef.current.forEach((cb) => cb(data));
+    };
 
-    // Fallback toàn cục: nếu backend emit sự kiện mới chưa được whitelist phía trên,
-    // vẫn trigger refresh để UI không cần F5.
+    const onMessageRecall = (data) => {
+      recallCallbacksRef.current.forEach((cb) => cb(data));
+    };
+
+    const onMessageReadAck = (data) => {
+      readAckCallbackRef.current.forEach((cb) => cb(data));
+    };
+
+    const onGroupNewEvt = (data) => {
+      if (groupNewCallbackRef.current) groupNewCallbackRef.current(data);
+    };
+
     const ignoredAnyEvents = new Set([
       'connect',
       'disconnect',
       'users:online',
       'users:lastSeen',
       'message:read_ack',
+      'message:receive',
+      'message:sent',
+      'message:reaction',
+      'message:recall',
     ]);
     const onAnyEvent = (eventName, payload) => {
       if (ignoredAnyEvents.has(eventName)) return;
-      if (String(eventName || '').startsWith('message:')) return; // tránh bão refetch khi chat
+      if (String(eventName || '').startsWith('message:')) return;
       triggerRefresh({ type: 'socket:any', eventName, payload });
     };
-    newSocket.onAny(onAnyEvent);
 
-    // Centralized Notification Event
-    newSocket.on('RECEIVE_NOTIFICATION', (data) => {
+    const onReceiveNotification = (data) => {
       playNotifySound();
-      setNotifications(prev => [{ ...data, id: data._id || Date.now(), read: false }, ...prev]);
-    });
+      setNotifications((prev) => [{ ...data, id: data._id || Date.now(), read: false }, ...prev]);
+    };
 
-    newSocket.on('new-notification', () => {
+    const onNewNotification = () => {
       playNotifySound();
       triggerRefresh({ type: 'notifications' });
       apiFetch('/notifications/unread')
-        .then(res => res.json())
-        .then(data => {
-           if (data.success && data.data) {
-             setNotifications(data.data.map(n => ({ 
-               ...n, 
-               id: n._id, 
-               read: Array.isArray(n.read_by) && n.read_by.includes(String(userId)),
-               message: n.content || n.message,
-               time: n.createdAt || n.time 
-             })));
-           }
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.data) {
+            setNotifications(data.data.map((n) => ({
+              ...n,
+              id: n._id,
+              read: Array.isArray(n.read_by) && n.read_by.includes(String(userId)),
+              message: n.content || n.message,
+              time: n.createdAt || n.time,
+            })));
+          }
         })
-        .catch(err => void 0);
-    });
+        .catch(() => {});
+    };
 
-    // Nhắc lịch tự động
-    newSocket.on('class:reminder', (data) => {
+    const onClassReminder = (data) => {
       playNotifySound();
-      setNotifications(prev => [{
+      setNotifications((prev) => [{
         id: Date.now(), read: false, type: 'reminder',
         ...data,
       }, ...prev]);
-    });
+    };
 
-    // Bắt event dọn dẹp hệ thống
-    newSocket.on('SYSTEM_RESET', () => {
+    const onSystemReset = () => {
       localStorage.clear();
       sessionStorage.clear();
       window.location.href = '/login?msg=system_cleared';
-    });
+    };
 
-    // 📡 Danh bạ cần reload (sau khi xếp lớp real-time)
-    newSocket.on('CONTACT_LIST_UPDATED', (data) => {
+    const onContactListUpdated = (data) => {
       if (contactListUpdatedCallbackRef.current) {
         contactListUpdatedCallbackRef.current(data);
       }
-    });
+    };
 
-    // Thông báo chuyển tiền
-    newSocket.on('payment:confirmed', (data) => {
+    const onPaymentConfirmed = (data) => {
       playNotifySound();
-      setNotifications(prev => [{
+      setNotifications((prev) => [{
         id: Date.now(), read: false, type: 'payment',
         ...data,
       }, ...prev]);
       triggerRefresh({ type: 'payment' });
-    });
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('offline', onBrowserOffline);
+      window.addEventListener('online', onBrowserOnline);
+    }
+
+    newSocket.on('connect', onConnect);
+    newSocket.on('connect_error', onConnectError);
+    newSocket.on('disconnect', onDisconnect);
+    newSocket.on('users:online', onUsersOnline);
+    newSocket.on('users:lastSeen', onUsersLastSeen);
+    newSocket.on('message:receive', onMessageReceive);
+    newSocket.on('message:sent', onMessageSentEvt);
+    newSocket.on('message:reaction', onMessageReaction);
+    newSocket.on('message:recall', onMessageRecall);
+    newSocket.on('message:read_ack', onMessageReadAck);
+    newSocket.on('group:new', onGroupNewEvt);
+    newSocket.on('data:refresh', triggerRefresh);
+    newSocket.on('student:updated', triggerRefresh);
+    DATA_REFRESH_EVENTS.forEach((ev) => newSocket.on(ev, triggerRefresh));
+    newSocket.onAny(onAnyEvent);
+    newSocket.on('RECEIVE_NOTIFICATION', onReceiveNotification);
+    newSocket.on('new-notification', onNewNotification);
+    newSocket.on('class:reminder', onClassReminder);
+    newSocket.on('SYSTEM_RESET', onSystemReset);
+    newSocket.on('CONTACT_LIST_UPDATED', onContactListUpdated);
+    newSocket.on('payment:confirmed', onPaymentConfirmed);
+
+    if (userId) {
+      apiFetch('/notifications/unread')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.data) {
+            setNotifications(data.data.map((n) => ({
+              ...n,
+              id: n._id,
+              read: Array.isArray(n.read_by) && n.read_by.includes(String(userId)),
+              message: n.content || n.message,
+              time: n.createdAt || n.time,
+            })));
+          }
+        })
+        .catch(() => {});
+    }
 
     socketRef.current = newSocket;
     setSocket(newSocket);
@@ -324,41 +331,55 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
         window.removeEventListener('offline', onBrowserOffline);
         window.removeEventListener('online', onBrowserOnline);
       }
+
+      // Remove ONLY listeners owned by this effect (same function references).
+      newSocket.off('connect', onConnect);
+      newSocket.off('connect_error', onConnectError);
+      newSocket.off('disconnect', onDisconnect);
+      newSocket.off('users:online', onUsersOnline);
+      newSocket.off('users:lastSeen', onUsersLastSeen);
+      newSocket.off('message:receive', onMessageReceive);
+      newSocket.off('message:sent', onMessageSentEvt);
+      newSocket.off('message:reaction', onMessageReaction);
+      newSocket.off('message:recall', onMessageRecall);
+      newSocket.off('message:read_ack', onMessageReadAck);
+      newSocket.off('group:new', onGroupNewEvt);
+      newSocket.off('data:refresh', triggerRefresh);
+      newSocket.off('student:updated', triggerRefresh);
+      DATA_REFRESH_EVENTS.forEach((ev) => newSocket.off(ev, triggerRefresh));
       newSocket.offAny(onAnyEvent);
-      newSocket.removeAllListeners();
+      newSocket.off('RECEIVE_NOTIFICATION', onReceiveNotification);
+      newSocket.off('new-notification', onNewNotification);
+      newSocket.off('class:reminder', onClassReminder);
+      newSocket.off('SYSTEM_RESET', onSystemReset);
+      newSocket.off('CONTACT_LIST_UPDATED', onContactListUpdated);
+      newSocket.off('payment:confirmed', onPaymentConfirmed);
+
       if (socketRef.current === newSocket) socketRef.current = null;
-      // Tránh warning "closed before connection established" (React Strict Mode / remount nhanh)
-      newSocket.io.opts.reconnection = false;
-      if (newSocket.connected) {
-        newSocket.disconnect();
+      try { newSocket.io.opts.reconnection = false; } catch { /* ignore */ }
+      if (newSocket.connected) newSocket.disconnect();
+      else {
+        try { newSocket.close(); } catch { /* ignore */ }
       }
     };
   }, [userId, role, name, token, adminRole]);
 
-  // Gửi tin nhắn
   const sendMessage = useCallback((data) => {
-    if (socketRef.current) {
-      socketRef.current.emit('message:send', data);
-    }
+    if (socketRef.current) socketRef.current.emit('message:send', data);
   }, []);
 
-  // Đánh dấu đã đọc
   const markRead = useCallback((conversationId) => {
     if (socketRef.current) {
       socketRef.current.emit('message:read', { conversationId, readerId: userId });
     }
   }, [userId]);
 
-  // Xoá notification
   const clearNotification = useCallback((id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
-  // Tham gia nhóm
   const joinGroupChat = useCallback((groupId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('group:join', groupId);
-    }
+    if (socketRef.current) socketRef.current.emit('group:join', groupId);
   }, []);
 
   const value = {
@@ -372,6 +393,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     clearNotification,
     setNotifications,
     onMessageReceive,
+    onMessageSent,
     onReactionReceive,
     onRecallReceive,
     onGroupNew,
@@ -391,7 +413,6 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 export const useSocket = () => {
   const ctx = useContext(SocketContext);
   if (!ctx) {
-    // Return safe defaults when not wrapped in provider
     return {
       socket: null,
       isConnected: false,
@@ -401,9 +422,10 @@ export const useSocket = () => {
       markRead: () => {},
       clearNotification: () => {},
       setNotifications: () => {},
-      onMessageReceive: () => {},
-      onReactionReceive: () => {},
-      onDataRefresh: () => {},
+      onMessageReceive: () => () => {},
+      onMessageSent: () => () => {},
+      onReactionReceive: () => () => {},
+      onDataRefresh: () => () => {},
     };
   }
   return ctx;

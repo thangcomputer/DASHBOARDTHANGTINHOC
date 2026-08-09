@@ -304,6 +304,10 @@ function isSoakWindowActive(env = process.env) {
   return window === 'true' || window === '1' || window === 'yes' || window === 'on';
 }
 
+/** Phase 8.20C aliases — same implementation, no duplicate logic. */
+const snapshotRuntimeEvidence = snapshotSoakWindow;
+const deltaRuntimeEvidence = deltaSoakWindow;
+
 module.exports = {
   EVIDENCE_CHANNEL,
   resolveEvidenceChannel,
@@ -314,5 +318,7 @@ module.exports = {
   resetSoakEvidenceForTests,
   snapshotSoakWindow,
   deltaSoakWindow,
+  snapshotRuntimeEvidence,
+  deltaRuntimeEvidence,
   isSoakWindowActive,
 };
