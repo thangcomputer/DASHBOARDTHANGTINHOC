@@ -70,31 +70,31 @@ export function resolveAvatarUrl(userObj = {}) {
   const gRaw = String(gender || '').trim().toLowerCase();
   const isFemale = (gRaw === 'female' || gRaw === 'nữ');
 
-  // 1. Super Admin / Giám Đốc / Admin
-  if (uid === 'admin' || ar === 'SUPER_ADMIN' || ar === 'HIGH_ADMIN' || r === 'admin' || r === 'super_admin') {
-    if (isFemale) return DEFAULT_AVATARS.admin_female;
-    return DEFAULT_AVATARS.admin_male;
-  }
-
-  // 2. Hỗ trợ viên chuyên trách
+  // Phase 8.21: STAFF/SUPPORT by adminRole BEFORE generic role==="admin"
+  // (JWT staff often has role=admin — must NOT resolve SUPER avatar).
   if (ar === 'SUPPORT' || r === 'support') {
     if (isFemale) return DEFAULT_AVATARS.support_female;
     return DEFAULT_AVATARS.support_male;
   }
 
-  // 3. ADMIN-STAFF Chi nhánh
-  if (r === 'staff' || ar === 'STAFF') {
+  if (ar === 'STAFF' || r === 'staff') {
     if (isFemale) return DEFAULT_AVATARS.staff_female;
     return DEFAULT_AVATARS.staff_male;
   }
 
-  // 4. Admin chung
+  // Legacy root id OR explicit SUPER/HIGH adminRole — not role===admin alone for ObjectId users
+  if (uid === 'admin' || ar === 'SUPER_ADMIN' || ar === 'HIGH_ADMIN') {
+    if (isFemale) return DEFAULT_AVATARS.admin_female;
+    return DEFAULT_AVATARS.admin_male;
+  }
+
+  // JWT admin without adminRole (true root-style session)
   if (r === 'admin' || r === 'super_admin') {
     if (isFemale) return DEFAULT_AVATARS.admin_female;
     return DEFAULT_AVATARS.admin_male;
   }
 
-  // 5. Giảng viên
+  // Giảng viên
   if (r === 'teacher') {
     if (isFemale) return DEFAULT_AVATARS.teacher_female;
     return DEFAULT_AVATARS.teacher_male;

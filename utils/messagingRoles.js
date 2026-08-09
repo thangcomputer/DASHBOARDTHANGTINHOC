@@ -52,10 +52,42 @@ function canAccessDirectConversation(conversationId, user) {
   return false;
 }
 
+function isLegacyAdminMailboxToken(token) {
+  return Boolean(token)
+    && String(token.role) === 'admin'
+    && String(token.id) === 'admin';
+}
+
+/**
+ * Socket rooms for private typing/read toward a conversation peer token.
+ * Legacy admin_admin peer → root "admin" + ALL_ADMIN (SUPER/HIGH only).
+ * NEVER ALL_STAFF / ALL_SUPPORT / ALL_USERS.
+ */
+function resolveTypingReadPeerRooms(peerToken) {
+  if (!peerToken?.id) return [];
+  if (isLegacyAdminMailboxToken(peerToken)) {
+    return ['admin', 'ALL_ADMIN'];
+  }
+  return [String(peerToken.id)];
+}
+
+/**
+ * Peer tokens to notify for typing/read (excludes exact self id match).
+ * SUPER/HIGH on admin_admin are not token id "admin", so the admin token remains a delivery target for other admin-level sockets.
+ */
+function listTypingReadPeerTokens(conversationId, selfUserId) {
+  const tokens = parseDirectConversationTokens(conversationId) || [];
+  const selfId = String(selfUserId || '');
+  return tokens.filter((t) => t?.id && String(t.id) !== selfId);
+}
+
 module.exports = {
   getMessagingRole,
   parseDirectConversationTokens,
   isDirectConversationParticipant,
   isAdminLevelMessagingUser,
   canAccessDirectConversation,
+  isLegacyAdminMailboxToken,
+  resolveTypingReadPeerRooms,
+  listTypingReadPeerTokens,
 };

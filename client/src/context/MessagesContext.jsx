@@ -487,16 +487,16 @@ export function MessagesProvider({ user, children }) {
       });
     }
 
-    // Ai nhắn sau → lên đầu
-    return Object.values(convMap).sort((a, b) => {
-      const timeA = new Date(a.lastTime || 0).getTime();
-      const timeB = new Date(b.lastTime || 0).getTime();
+    // Ai nhắn sau → lên đầu (immutable)
+    return [...Object.values(convMap)].sort((a, b) => {
+      const timeA = new Date(a.lastTime || 0).getTime() || 0;
+      const timeB = new Date(b.lastTime || 0).getTime() || 0;
       return timeB - timeA;
     });
   }, [messages, students, teachers, groups]);
 
   const getMessages = useCallback((convId) =>
-    messages.filter((m) => m.convId === convId).sort((a, b) => a.time - b.time),
+    [...messages.filter((m) => m.convId === convId)].sort((a, b) => a.time - b.time),
   [messages]);
 
   const value = useMemo(() => ({

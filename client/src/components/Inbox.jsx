@@ -13,6 +13,8 @@ import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { displayFileName } from '../utils/validators';
 import { resolveAvatarUrl, DEFAULT_AVATARS } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
+import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE } from '../lib/messagingIdentity';
+import { mergeConversationsById } from '../lib/conversationList';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 const formatTime = (date) => {
@@ -159,7 +161,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const {
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, groups,
-    teachers, students, toggleMessageReaction: ctxToggleReaction,
+    teachers, students, staffs, toggleMessageReaction: ctxToggleReaction,
     softDeleteMessage: ctxDeleteMessage
   } = useData();
 
@@ -265,7 +267,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [pendingImage, setPendingImage] = useState(null);
 
   const conversations = useMemo(() => {
-    const list = [];
+    const entries = [];
 
     // Dedupe contacts từ API (tránh duplicate key + lọc trùng tên Super Admin)
     const seenContacts = new Set();
@@ -279,24 +281,52 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       return true;
     });
 
+    const activityById = new Map();
+    const activityByPeer = new Map();
+    (dataContextConvs || []).forEach((dc) => {
+      if (!dc?.id) return;
+      const id = String(dc.id);
+      activityById.set(id, dc);
+      if (!dc.isGroup && dc.user?.id != null) {
+        activityByPeer.set(String(dc.user.id), dc);
+      }
+    });
+
     const seenConvIds = new Set();
+    const pushEntry = (entry) => {
+      const id = String(entry?.id || '');
+      if (!id || seenConvIds.has(id)) return false;
+      seenConvIds.add(id);
+      entries.push(entry);
+      return true;
+    };
 
-    uniqueContacts.forEach(c => {
-      if (c.id === currentUserId) return;
-      const convId = buildConversationId(currentUserRole, currentUserId, c.role, c.id);
-      const existingConv = dataContextConvs.find(dc => String(dc.id) === String(convId));
+    uniqueContacts.forEach((c) => {
+      if (String(c.id) === String(currentUserId)) return;
+      const role = normalizeRole(c.role);
+      const builtId = String(buildConversationId(currentUserRole, currentUserId, role, c.id));
 
-      // Dedupe theo conversationId (phòng khi backend trả trùng contact)
-      if (seenConvIds.has(convId)) return;
-      seenConvIds.add(convId);
+      // Prefer exact conversationId; fallback peer id (role mismatch must not hide contact)
+      const existingConv = activityById.get(builtId) || activityByPeer.get(String(c.id));
+      const canonicalId = existingConv?.id ? String(existingConv.id) : builtId;
+      if (seenConvIds.has(canonicalId)) return;
 
-      list.push({
-        id: convId,
+      pushEntry({
+        id: canonicalId,
         isGroup: false,
-        isHidden: hiddenList.includes(convId),
-        user: { id: c.id, name: c.name, role: c.role, adminRole: c.adminRole || null, avatar: c.avatar, gender: c.gender, phone: c.phone || '', online: isUserOnline(c.id) },
+        isHidden: hiddenList.includes(canonicalId),
+        user: {
+          id: c.id,
+          name: c.name,
+          role,
+          adminRole: c.adminRole || existingConv?.user?.adminRole || null,
+          avatar: c.avatar || existingConv?.user?.avatar,
+          gender: c.gender,
+          phone: c.phone || '',
+          online: isUserOnline(c.id),
+        },
         lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
-        lastTime: existingConv?.lastTime || new Date('2000-01-01'),
+        lastTime: existingConv?.lastTime || new Date(0),
         unread: existingConv?.unread || 0,
       });
     });
@@ -304,12 +334,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     // Contact seed từ bảng tin / hỗ trợ online — chat không cần có sẵn trong danh bạ
     if (seedContact?.id && String(seedContact.id) !== String(currentUserId)) {
       const role = normalizeRole(seedContact.role);
-      const convId = buildConversationId(currentUserRole, currentUserId, role, seedContact.id);
-      if (!seenConvIds.has(convId)) {
-        seenConvIds.add(convId);
-        const existingConv = dataContextConvs.find((dc) => String(dc.id) === String(convId));
-        list.unshift({
-          id: convId,
+      const builtId = String(buildConversationId(currentUserRole, currentUserId, role, seedContact.id));
+      const existingConv = activityById.get(builtId) || activityByPeer.get(String(seedContact.id));
+      const canonicalId = existingConv?.id ? String(existingConv.id) : builtId;
+      if (!seenConvIds.has(canonicalId)) {
+        pushEntry({
+          id: canonicalId,
           isGroup: false,
           isHidden: false,
           user: {
@@ -329,50 +359,25 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       }
     }
 
-    const groupConvs = dataContextConvs.filter(dc => dc.isGroup).map(dc => ({
-      ...dc,
-      isHidden: hiddenList.includes(dc.id)
-    }));
-    list.push(...groupConvs);
-
-    // Hội thoại có tin (kể cả chưa đọc) nhưng không còn trong danh bạ API — vẫn hiện để đọc/xóa badge
-    dataContextConvs.forEach((dc) => {
-      if (!dc || dc.isGroup || seenConvIds.has(dc.id)) return;
-      const hasActivity = Number(dc.unread || 0) > 0
-        || (dc.lastMessage && dc.lastMessage !== 'Chưa có tin nhắn' && dc.lastMessage !== 'Bắt đầu cuộc trò chuyện');
-      if (!hasActivity) return;
-      seenConvIds.add(dc.id);
-      list.push({
+    // Phase 8.23B: include ALL dataContext DMs including seeds ("Chưa có tin nhắn").
+    // Do NOT require prior message activity for discovery.
+    (dataContextConvs || []).forEach((dc) => {
+      if (!dc?.id) return;
+      const id = String(dc.id);
+      if (seenConvIds.has(id)) return;
+      pushEntry({
         ...dc,
-        isHidden: hiddenList.includes(dc.id),
+        id,
+        isHidden: hiddenList.includes(id),
+        user: {
+          ...(dc.user || {}),
+          online: isUserOnline(dc.user?.id),
+        },
       });
     });
 
-    // Ai nhắn sau → lên đầu (theo thời gian tin gần nhất)
-    const sortedList = list.sort((a, b) => {
-      const timeA = new Date(a.lastTime || 0).getTime();
-      const timeB = new Date(b.lastTime || 0).getTime();
-      return timeB - timeA;
-    });
-
-    // Lọc trùng lặp tuyệt đối danh sách hội thoại theo user (không user nào bị trùng 2 dòng)
-    const finalSeenUserKeys = new Set();
-    const deduplicatedList = [];
-
-    sortedList.forEach((item) => {
-      if (item.isGroup) {
-        deduplicatedList.push(item);
-        return;
-      }
-      const role = normalizeRole(item.user?.role);
-      const userKey = `${String(item.user?.id)}:${role}`;
-
-      if (finalSeenUserKeys.has(userKey)) return;
-      finalSeenUserKeys.add(userKey);
-      deduplicatedList.push(item);
-    });
-
-    return deduplicatedList;
+    // Canonical id merge + newest lastTime first (immutable)
+    return mergeConversationsById(entries);
   }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact]);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef(null);
@@ -440,31 +445,65 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   }, [currentUserId, syncMessages]);
 
-  // ─── Helper tra cứu tên người gửi động chuẩn hệ thống ──────────────────────
+  // ─── Helper tra cứu tên người gửi — resolve by senderId, never role==="admin" alone ──
   const resolveSenderName = useCallback((msg) => {
-    if (!msg) return 'Người gửi';
-    if (String(msg.senderId) === String(currentUserId)) return currentUserName || 'Người gửi';
-    if (msg.senderId === 'admin') {
-      const superDoc = (teachers || []).find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin');
-      if (superDoc?.name) return superDoc.name;
-      if (currentUserRole === 'admin' && currentUserName) return currentUserName;
+    if (!msg) return 'Người dùng';
+    if (String(msg.senderId) === String(currentUserId)) return currentUserName || 'Người dùng';
+    if (msg.sender?.displayName) return msg.sender.displayName;
+    const actor = resolveMessagingActor(
+      {
+        id: msg.senderId,
+        role: msg.senderRole,
+        name: msg.senderName,
+        avatar: msg.senderAvatar || msg.sender?.avatar,
+        adminRole: msg.sender?.adminRole,
+      },
+      { teachers: teachers || [], students: students || [], staffs: staffs || [] },
+    );
+    return actor.displayName || 'Người dùng';
+  }, [currentUserId, currentUserName, teachers, students, staffs]);
+
+  const resolveSenderMeta = useCallback((msg) => {
+    if (!msg) {
+      return { displayName: 'Người dùng', displayRole: DISPLAY_ROLE.UNKNOWN, avatar: '', role: 'unknown', adminRole: null };
     }
-    const matchTeacher = (teachers || []).find(t => String(t.id || t._id) === String(msg.senderId));
-    if (matchTeacher?.name) return matchTeacher.name;
-    const matchStudent = (students || []).find(s => String(s.id || s._id) === String(msg.senderId));
-    if (matchStudent?.name) return matchStudent.name;
-    return msg.senderName || 'Người gửi';
-  }, [currentUserId, currentUserName, currentUserRole, teachers, students]);
+    if (msg.sender?.displayName && msg.sender?.id) {
+      return {
+        displayName: msg.sender.displayName,
+        displayRole: msg.sender.displayRole || DISPLAY_ROLE.UNKNOWN,
+        avatar: msg.sender.avatar || '',
+        role: msg.sender.role || msg.senderRole,
+        adminRole: msg.sender.adminRole || null,
+      };
+    }
+    return resolveMessagingActor(
+      {
+        id: msg.senderId,
+        role: msg.senderRole,
+        name: msg.senderName,
+        avatar: msg.senderAvatar,
+        adminRole: msg.sender?.adminRole,
+      },
+      { teachers: teachers || [], students: students || [], staffs: staffs || [] },
+    );
+  }, [teachers, students, staffs]);
 
   // ─── Load messages khi chọn conversation ─────────────────────────────────────
   useEffect(() => {
     if (activeConv) {
       const msgs = ctxGetMessages(activeConv.id);
-      setMessages(msgs.map(m => ({
+      setMessages(msgs.map(m => {
+        const meta = resolveSenderMeta(m);
+        return {
         id: m.id,
         senderId: m.senderId,
-        senderName: resolveSenderName(m),
-        senderRole: m.senderRole || (m.senderId === 'admin' ? 'admin' : activeConv.user.role),
+        senderName: String(m.senderId) === String(currentUserId)
+          ? (currentUserName || meta.displayName)
+          : meta.displayName,
+        senderRole: m.senderRole || meta.role || (m.senderId === 'admin' ? 'admin' : activeConv.user.role),
+        senderAdminRole: meta.adminRole,
+        senderDisplayRole: meta.displayRole,
+        senderAvatar: meta.avatar || m.senderAvatar || '',
         content: m.content,
         time: m.time,
         isRead: m.read,
@@ -474,10 +513,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         fileUrl: m.fileUrl,
         fileExpired: m.fileExpired || false,
         reactions: m.reactions || [],
-      })));
+      };
+      }));
       markMessagesRead(activeConv.id, currentUserId, (currentUserRole === 'admin') ? ['admin'] : []);
     }
-  }, [activeConv, ctxGetMessages, markMessagesRead, currentUserId, resolveSenderName]);
+  }, [activeConv, ctxGetMessages, markMessagesRead, currentUserId, currentUserName, currentUserRole, resolveSenderMeta]);
 
   // ─── Socket real-time listeners ──────────────────────────────────────────────
   useEffect(() => {
@@ -494,6 +534,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               senderId: data.senderId,
               senderName: resolveSenderName(data),
               senderRole: data.senderRole,
+              senderAdminRole: data.sender?.adminRole || resolveSenderMeta(data).adminRole,
+              senderDisplayRole: data.sender?.displayRole || resolveSenderMeta(data).displayRole,
+              senderAvatar: data.sender?.avatar || data.senderAvatar || resolveSenderMeta(data).avatar || '',
               content: data.content,
               time: new Date(data.createdAt || Date.now()),
               isRead: data.isRead || false,
@@ -534,7 +577,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (unsubRecall) unsubRecall();
       if (unsubReaction) unsubReaction();
     };
-  }, [activeConv, onMessageReceive, onRecallReceive, onReactionReceive, currentUserId, markMessagesRead]);
+  }, [activeConv, onMessageReceive, onRecallReceive, onReactionReceive, currentUserId, currentUserRole, markMessagesRead, resolveSenderName, resolveSenderMeta]);
 
   // ─── Thu hồi tin nhắn ────────────────────────────────────────────────────────
   const handleRecall = useCallback(async (msgId) => {
@@ -826,7 +869,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     if (contactTab === 'all') return true;
     if (contactTab === 'group') return c.isGroup;
-    return normalizeRole(c.user.role) === contactTab;
+    const r = normalizeRole(c.user?.role);
+    // "Admin" tab includes transport staff (ADMIN_STAFF / SUPPORT) — not SUPER only
+    if (contactTab === 'admin') return r === 'admin' || r === 'staff';
+    return r === contactTab;
   });
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
@@ -1193,10 +1239,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 {messages.map(msg => {
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
                   const role = normalizeRole(msg.senderRole);
+                  const badgeLabel = msg.senderDisplayRole
+                    ? displayRoleLabel(msg.senderDisplayRole)
+                    : (role === 'admin' ? 'Admin'
+                      : role === 'staff' ? 'Giáo vụ'
+                      : role === 'teacher' ? 'Giảng viên'
+                      : 'Học viên');
 
                   const bubbleRoleClass =
                     !isMine && role === 'admin'
                       ? 'cms-bubble-other-admin'
+                      : !isMine && role === 'staff'
+                        ? 'cms-bubble-other-admin'
                       : !isMine && role === 'teacher'
                         ? 'cms-bubble-other-teacher'
                         : !isMine && role === 'student'
@@ -1215,9 +1269,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                              <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
                                role === 'admin' ? 'bg-red-500 text-white' :
+                               role === 'staff' ? 'bg-amber-600 text-white' :
                                role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
                              }`}>
-                               {role === 'admin' ? 'Admin' : role === 'teacher' ? 'Giảng viên' : 'Học viên'}
+                               {badgeLabel}
                              </span>
                           </div>
                         )}

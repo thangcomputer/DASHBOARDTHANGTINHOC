@@ -23,6 +23,7 @@ const {
   canAccessDirectConversation,
 } = require('../utils/messagingRoles');
 const { sanitizeMessages, sanitizeMessageDoc } = require('../utils/messageFileRetention');
+const { enrichMessageIdentities } = require('../services/messagingIdentity');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
 const isStaffAccount = (u = {}) => u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';
 const isSuperAdminAccount = (u = {}) => u.id === 'admin' || u.adminRole === 'SUPER_ADMIN';
@@ -445,7 +446,9 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
       .sort({ createdAt: 1 })
       .limit(200);
 
-    res.json({ success: true, data: sanitizeMessages(messages) });
+    const sanitized = sanitizeMessages(messages);
+    const enriched = await enrichMessageIdentities(sanitized);
+    res.json({ success: true, data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -475,7 +478,9 @@ router.get('/sync/:userId', messagesGuard('sync'), async (req, res) => {
       hiddenFor: { $ne: userId }
     }).sort({ createdAt: -1 }).limit(500);
 
-    res.json({ success: true, data: sanitizeMessages(messages.reverse()) });
+    const sanitized = sanitizeMessages(messages.reverse());
+    const enriched = await enrichMessageIdentities(sanitized);
+    res.json({ success: true, data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

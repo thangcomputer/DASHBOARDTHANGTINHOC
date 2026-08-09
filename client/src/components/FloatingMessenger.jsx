@@ -26,9 +26,14 @@ import SupportMascot from './SupportMascot';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
-  staff: 'Hỗ trợ viên',
+  staff: 'Giáo vụ / Hỗ trợ',
   teacher: 'GV',
   student: 'HV',
+  SUPER_ADMIN: 'Super Admin',
+  HIGH_ADMIN: 'Admin cấp cao',
+  ADMIN_STAFF: 'Giáo vụ',
+  SUPPORT: 'Hỗ trợ',
+  LEGACY_ROOT: 'Super Admin',
 };
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i;
 const URL_RE = /(https?:\/\/[^\s<]+[^.,;:!?\s<])/gi;
@@ -484,9 +489,10 @@ export default function FloatingMessenger({ session, role }) {
 
       const peer = {
         id: String(data.senderId),
-        name: data.senderName || 'Người dùng',
+        name: data.sender?.displayName || data.senderName || 'Người dùng',
         role: normalizeChatRole(data.senderRole || 'student'),
-        avatar: data.senderAvatar || '',
+        adminRole: data.sender?.adminRole || null,
+        avatar: data.sender?.avatar || data.senderAvatar || '',
       };
 
       const current = tabsRef.current;

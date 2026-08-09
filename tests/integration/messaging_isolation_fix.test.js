@@ -126,9 +126,11 @@ describe('Messaging isolation + canonical IDs', { concurrency: false }, () => {
     const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
     assert.ok(src.includes("socket.on('typing:start'"));
     assert.ok(src.includes('canAccessDirectConversation'));
+    assert.ok(src.includes('resolveTypingReadPeerRooms'));
     const readStart = src.indexOf("socket.on('message:read'");
-    const readChunk = src.slice(readStart, readStart + 500);
+    const readChunk = src.slice(readStart, readStart + 900);
     assert.equal(/socketUserId\(socket\.user\) !== String\(readerId/.test(readChunk), false);
+    assert.ok(readChunk.includes('resolveTypingReadPeerRooms'));
   });
 
   it('13 FE mailbox: STAFF must not inherit admin mailbox filter', () => {
@@ -146,7 +148,7 @@ describe('Messaging isolation + canonical IDs', { concurrency: false }, () => {
 
   it('15 directMessageService exists and rejects client sender spoof path', () => {
     const src = fs.readFileSync(path.join(ROOT, 'services/directMessageService.js'), 'utf8');
-    assert.ok(src.includes('getMessagingRole(sender)'));
+    assert.ok(src.includes('resolveMessagingIdentity(sender)') || src.includes('getMessagingRole(sender)'));
     assert.ok(src.includes('assertCanDirectMessage'));
     assert.ok(src.includes('Message.create'));
     assert.equal(src.includes('req.body.senderId'), false);

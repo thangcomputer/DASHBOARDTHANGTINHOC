@@ -469,7 +469,11 @@ io.on('connection', (socket) => {
   socket.on('message:read', ({ conversationId }) => {
     if (!socket.user) return;
     const readerId = socketUserId(socket.user);
-    const { canAccessDirectConversation, parseDirectConversationTokens } = require('./utils/messagingRoles');
+    const {
+      canAccessDirectConversation,
+      listTypingReadPeerTokens,
+      resolveTypingReadPeerRooms,
+    } = require('./utils/messagingRoles');
     const cid = String(conversationId || '');
     if (cid.startsWith('group_')) {
       const gid = cid.slice('group_'.length);
@@ -478,11 +482,14 @@ io.on('connection', (socket) => {
       return;
     }
     if (!canAccessDirectConversation(cid, socket.user)) return;
-    const tokens = parseDirectConversationTokens(cid) || [];
-    for (const t of tokens) {
-      if (t?.id && String(t.id) !== readerId) {
-        io.to(String(t.id)).emit('message:read_ack', { conversationId: cid, readerId });
-      }
+    // Phase 8.22: legacy admin_admin → admin + ALL_ADMIN (SUPER/HIGH); never ALL_STAFF/SUPPORT.
+    // socket.to excludes sender (ObjectId SUPER in ALL_ADMIN must not echo self).
+    for (const t of listTypingReadPeerTokens(cid, readerId)) {
+      const rooms = resolveTypingReadPeerRooms(t);
+      if (!rooms.length) continue;
+      let chain = socket.to(rooms[0]);
+      for (let i = 1; i < rooms.length; i += 1) chain = chain.to(rooms[i]);
+      chain.emit('message:read_ack', { conversationId: cid, readerId });
     }
   });
 
@@ -490,32 +497,44 @@ io.on('connection', (socket) => {
   socket.on('typing:start', ({ conversationId, userName }) => {
     if (!socket.user) return;
     const userId = socketUserId(socket.user);
-    const { canAccessDirectConversation, parseDirectConversationTokens, getMessagingRole: gmr } = require('./utils/messagingRoles');
+    const {
+      canAccessDirectConversation,
+      listTypingReadPeerTokens,
+      resolveTypingReadPeerRooms,
+      getMessagingRole: gmr,
+    } = require('./utils/messagingRoles');
     const cid = String(conversationId || '');
     if (!canAccessDirectConversation(cid, socket.user)) return;
-    const tokens = parseDirectConversationTokens(cid) || [];
-    for (const t of tokens) {
-      if (t?.id && String(t.id) !== userId) {
-        io.to(String(t.id)).emit('typing:show', {
-          conversationId: cid,
-          userId,
-          userName: userName || socket.user.name || 'User',
-          userRole: gmr(socket.user),
-        });
-      }
+    const payload = {
+      conversationId: cid,
+      userId,
+      userName: userName || socket.user.name || 'User',
+      userRole: gmr(socket.user),
+    };
+    for (const t of listTypingReadPeerTokens(cid, userId)) {
+      const rooms = resolveTypingReadPeerRooms(t);
+      if (!rooms.length) continue;
+      let chain = socket.to(rooms[0]);
+      for (let i = 1; i < rooms.length; i += 1) chain = chain.to(rooms[i]);
+      chain.emit('typing:show', payload);
     }
   });
   socket.on('typing:stop', ({ conversationId }) => {
     if (!socket.user) return;
     const userId = socketUserId(socket.user);
-    const { canAccessDirectConversation, parseDirectConversationTokens } = require('./utils/messagingRoles');
+    const {
+      canAccessDirectConversation,
+      listTypingReadPeerTokens,
+      resolveTypingReadPeerRooms,
+    } = require('./utils/messagingRoles');
     const cid = String(conversationId || '');
     if (!canAccessDirectConversation(cid, socket.user)) return;
-    const tokens = parseDirectConversationTokens(cid) || [];
-    for (const t of tokens) {
-      if (t?.id && String(t.id) !== userId) {
-        io.to(String(t.id)).emit('typing:hide', { conversationId: cid, userId });
-      }
+    for (const t of listTypingReadPeerTokens(cid, userId)) {
+      const rooms = resolveTypingReadPeerRooms(t);
+      if (!rooms.length) continue;
+      let chain = socket.to(rooms[0]);
+      for (let i = 1; i < rooms.length; i += 1) chain = chain.to(rooms[i]);
+      chain.emit('typing:hide', { conversationId: cid, userId });
     }
   });
 

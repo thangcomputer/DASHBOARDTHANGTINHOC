@@ -10,6 +10,10 @@ const Student = require('../models/Student');
 const ConversationVisibility = require('../models/ConversationVisibility');
 const { buildConversationId } = require('../utils/chatConversationId');
 const { getMessagingRole } = require('../utils/messagingRoles');
+const {
+  resolveMessagingIdentity,
+  enrichMessageIdentities,
+} = require('./messagingIdentity');
 const { assertCanDirectMessage } = require('./chatAccessService');
 const { sanitizeMessageDoc } = require('../utils/messageFileRetention');
 
@@ -47,8 +51,9 @@ async function sendCanonicalMessage({
   if (!sender) return { ok: false, status: 401, message: 'Chua xac thuc' };
 
   const senderId = String(sender.id || sender._id || '');
-  const senderRole = getMessagingRole(sender);
-  const senderName = sender.name || 'User';
+  const senderIdentity = resolveMessagingIdentity(sender);
+  const senderRole = senderIdentity.role;
+  const senderName = senderIdentity.displayName || 'User';
 
   const rid = String(receiverId || '');
   const rRole = String(receiverRole || '').toLowerCase();
@@ -177,7 +182,8 @@ async function sendCanonicalMessage({
     );
   }
 
-  const clientMessage = toClientMessage(message);
+  // Phase 8.22: same enrichment path as history/sync (ID lookup, never role→SUPER).
+  const [clientMessage] = await enrichMessageIdentities([message]);
 
   if (io && typeof notifyUser === 'function') {
     if (isGroup && groupId) {
@@ -201,4 +207,6 @@ module.exports = {
   toClientMessage,
   isAdminLevelAccount,
   getMessagingRole,
+  resolveMessagingIdentity,
+  enrichMessageIdentities,
 };

@@ -4,6 +4,8 @@ import { buildConversationId } from '../utils/chatConversationId';
 import { useSocket } from './SocketContext';
 import { loadState } from './dataStorage';
 import { getMessagingRole } from '../lib/messagingRoles';
+import { resolveMessagingActor, normalizeMessage } from '../lib/messagingIdentity';
+import { sortConversationsByLastMessageAt } from '../lib/conversationList';
 
 /**
  * Messages / groups state, socket listeners, and messaging API for DataProvider.
@@ -38,26 +40,31 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           && String(m.fileUrl || '') === String(data.fileUrl || '')));
       }
 
+      const n = normalizeMessage(data);
       const mappedMsg = {
-        id: data._id || data.id,
-        convId: data.conversationId,
-        senderId: data.senderId,
-        senderName: data.senderName,
-        senderRole: data.senderRole,
-        receiverId: data.receiverId,
-        receiverName: data.receiverName,
-        receiverRole: data.receiverRole,
-        content: data.content,
-        time: new Date(data.createdAt || Date.now()),
-        read: Boolean(data.isRead),
-        isGroup: data.isGroup || false,
-        groupId: data.groupId,
-        isRecalled: data.isRecalled || false,
-        messageType: data.messageType || 'text',
-        fileName: data.fileName,
-        fileUrl: data.fileUrl,
-        fileExpired: data.fileExpired || false,
-        reactions: data.reactions || [],
+        id: n.id,
+        convId: n.conversationId,
+        senderId: n.senderId,
+        senderName: n.senderName,
+        senderRole: n.senderRole,
+        senderAvatar: n.senderAvatar,
+        sender: n.sender,
+        receiverId: n.receiverId,
+        receiverName: n.receiverName,
+        receiverRole: n.receiverRole,
+        receiverAvatar: n.receiverAvatar,
+        receiver: n.receiver,
+        content: n.content,
+        time: n.time instanceof Date ? n.time : new Date(n.time || Date.now()),
+        read: n.read,
+        isGroup: n.isGroup,
+        groupId: n.groupId,
+        isRecalled: n.isRecalled,
+        messageType: n.messageType,
+        fileName: n.fileName,
+        fileUrl: n.fileUrl,
+        fileExpired: n.fileExpired,
+        reactions: n.reactions,
       };
 
       const tempIdx = prev.findIndex(
@@ -188,6 +195,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       });
       if (res?.success && res?.data?._id) {
         const d = res.data;
+        const n = normalizeMessage(d);
         setMessages((prev) => {
           // Primary dedupe key: server _id (HTTP + socket race)
           if (prev.some((m) => String(m.id) === String(d._id))) {
@@ -197,20 +205,24 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             m.id === tempId
               ? {
                   ...m,
-                  id: d._id,
-                  convId: d.conversationId || m.convId,
-                  senderId: d.senderId,
-                  senderName: d.senderName,
-                  senderRole: d.senderRole,
-                  receiverId: d.receiverId,
-                  receiverName: d.receiverName,
-                  receiverRole: d.receiverRole,
-                  content: d.content,
-                  messageType: d.messageType || m.messageType,
-                  fileUrl: d.fileUrl || m.fileUrl,
-                  fileName: d.fileName || m.fileName,
-                  time: new Date(d.createdAt || m.time),
-                  read: d.isRead ?? m.read,
+                  id: n.id,
+                  convId: n.conversationId || m.convId,
+                  senderId: n.senderId,
+                  senderName: n.senderName,
+                  senderRole: n.senderRole,
+                  senderAvatar: n.senderAvatar,
+                  sender: n.sender,
+                  receiverId: n.receiverId,
+                  receiverName: n.receiverName,
+                  receiverRole: n.receiverRole,
+                  receiverAvatar: n.receiverAvatar,
+                  receiver: n.receiver,
+                  content: n.content,
+                  messageType: n.messageType || m.messageType,
+                  fileUrl: n.fileUrl || m.fileUrl,
+                  fileName: n.fileName || m.fileName,
+                  time: n.time instanceof Date ? n.time : new Date(n.time || m.time),
+                  read: n.read ?? m.read,
                 }
               : m
           );
@@ -234,30 +246,35 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     try {
       const json = await api.messages.syncByUser(userId);
       if (json.success) {
-        const syncedMsgs = (json.data || []).map(m => {
+        const syncedMsgs = (json.data || []).map((m) => {
+          const n = normalizeMessage(m);
           const convId = m.isGroup && m.groupId
             ? `group_${m.groupId}`
-            : m.conversationId;
+            : (n.conversationId || m.conversationId);
           return {
-            id: m._id,
+            id: n.id,
             convId,
-            groupId: m.groupId,
-            isGroup: m.isGroup || false,
-            senderId: m.senderId,
-            senderName: m.senderName,
-            senderRole: m.senderRole,
-            receiverId: m.receiverId,
-            receiverName: m.receiverName,
-            receiverRole: m.receiverRole,
-            content: m.content,
-            messageType: m.messageType || 'text',
-            fileUrl: m.fileUrl || '',
-            fileName: m.fileName || '',
-            fileExpired: m.fileExpired || false,
-            time: new Date(m.createdAt),
-            read: Boolean(m.isRead),
-            isRecalled: m.isRecalled || false,
-            reactions: m.reactions || [],
+            groupId: n.groupId,
+            isGroup: n.isGroup,
+            senderId: n.senderId,
+            senderName: n.senderName,
+            senderRole: n.senderRole,
+            senderAvatar: n.senderAvatar,
+            sender: n.sender,
+            receiverId: n.receiverId,
+            receiverName: n.receiverName,
+            receiverRole: n.receiverRole,
+            receiverAvatar: n.receiverAvatar,
+            receiver: n.receiver,
+            content: n.content,
+            messageType: n.messageType,
+            fileUrl: n.fileUrl,
+            fileName: n.fileName,
+            fileExpired: n.fileExpired,
+            time: n.time instanceof Date ? n.time : new Date(m.createdAt || Date.now()),
+            read: n.read,
+            isRecalled: n.isRecalled,
+            reactions: n.reactions,
           };
         });
 
@@ -408,46 +425,34 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         // Bỏ qua hội thoại tự chat với chính mình
         if (String(otherUserId) === String(sId)) return;
 
-        let finalName = isMeSender ? m.receiverName : m.senderName;
-        let finalRole = otherRole;
+        // Phase 8.21: resolve by participant ID. NEVER map otherRole==="admin" → SUPER profile.
+        const peerHintName = isMeSender ? m.receiverName : m.senderName;
+        const actor = resolveMessagingActor(
+          {
+            id: otherUserId,
+            role: otherRole,
+            name: peerHintName,
+            avatar: isMeSender
+              ? (m.receiverAvatar || m.receiver?.avatar)
+              : (m.senderAvatar || m.sender?.avatar),
+            adminRole: isMeSender ? m.receiver?.adminRole : m.sender?.adminRole,
+            displayRole: isMeSender ? m.receiver?.displayRole : m.sender?.displayRole,
+            displayName: isMeSender
+              ? (m.receiver?.displayName || m.receiverName)
+              : (m.sender?.displayName || m.senderName),
+          },
+          { teachers: safeTeachers, students: safeStudents, staffs: safeStaffs },
+        );
 
-        let finalAdminRole = null;
-        let finalGender = '';
-        let finalAvatar = '';
+        const matchedStudent = safeStudents.find(s => String(s.id || s._id) === String(otherUserId));
+        const matchedTeacher = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
+        const matchedStaff = safeStaffs.find(st => String(st.id || st._id) === String(otherUserId));
+        const finalGender = matchedStudent?.gender || matchedTeacher?.gender || matchedStaff?.gender || '';
 
-        // Tra cứu linh hoạt theo ID từ danh sách hệ thống local (Student / Teacher / Staff)
-        if (otherUserId === 'admin' || otherRole === 'admin') {
-          const superDoc = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')
-            || safeStaffs.find(st => st.adminRole === 'SUPER_ADMIN' || st.role === 'admin');
-          finalName = superDoc?.name || (isMeSender ? m.receiverName : m.senderName) || 'Ban Quản trị';
-          finalRole = 'admin';
-        } else {
-          const matchedStudent = safeStudents.find(s => String(s.id || s._id) === String(otherUserId));
-          const matchedTeacher = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
-          const matchedStaff   = safeStaffs.find(st => String(st.id || st._id) === String(otherUserId));
-
-          if (matchedStudent) {
-            finalName = matchedStudent.name;
-            finalRole = 'student';
-            finalGender = matchedStudent.gender;
-            finalAvatar = matchedStudent.avatar;
-          } else if (matchedTeacher) {
-            finalName = matchedTeacher.name;
-            finalRole = matchedTeacher.adminRole === 'SUPER_ADMIN' ? 'admin' : 'teacher';
-            finalAdminRole = matchedTeacher.adminRole;
-            finalGender = matchedTeacher.gender;
-            finalAvatar = matchedTeacher.avatar;
-          } else if (matchedStaff) {
-            finalName = matchedStaff.name;
-            finalRole = 'staff';
-            finalAdminRole = matchedStaff.adminRole;
-            finalGender = matchedStaff.gender;
-            finalAvatar = matchedStaff.avatar;
-          } else {
-            // Tài khoản đã bị xóa khỏi hệ thống -> Ẩn hoàn toàn, coi như chưa từng tồn tại
-            return;
-          }
-        }
+        const finalName = actor.displayName;
+        const finalRole = actor.role;
+        const finalAdminRole = actor.adminRole;
+        const finalAvatar = actor.avatar || String(finalName || 'H').substring(0, 2).toUpperCase();
 
         // Ưu tiên lấy branchCode trực tiếp từ tin nhắn (nếu có), nếu không mới tìm trong list local
         let branchCode = isMeSender ? m.receiverBranchCode : m.senderBranchCode;
@@ -499,24 +504,63 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
 
     const sysAdminName = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')?.name || currentUser?.name || 'Admin';
 
-    // 2. Add potential contacts
+    // 2. Add potential contacts (discovery seeds — no prior message required)
     if (userRole === 'student') {
       const student = safeStudents.find(s => String(s.id) === sId);
-      if (student && student.teacherId) {
-        const tid = String(student.teacherId || '');
-        const t = safeTeachers.find(t => String(t.id) === tid);
+      const teacherIds = new Set();
+      if (student?.teacherId) teacherIds.add(String(student.teacherId));
+      (student?.enrollments || []).forEach((e) => {
+        if (e?.teacherId) teacherIds.add(String(e.teacherId));
+      });
+      teacherIds.forEach((tid) => {
+        if (!tid || tid === sId) return;
+        const t = safeTeachers.find((te) => String(te.id || te._id) === tid);
         const convId = buildConversationId('student', sId, 'teacher', tid);
-        if (t && !convMap[convId]) {
+        if (!convMap[convId]) {
           convMap[convId] = {
             id: convId,
-            user: { id: t.id, name: t.name, role: 'teacher', avatar: String(t.name || 'GV').substring(0, 2).toUpperCase(), online: true, branchCode: t.branchCode || '' },
+            user: {
+              id: tid,
+              name: t?.name || 'Giảng viên',
+              role: 'teacher',
+              avatar: t?.avatar || String(t?.name || 'GV').substring(0, 2).toUpperCase(),
+              online: true,
+              branchCode: t?.branchCode || '',
+            },
             lastMessage: 'Chưa có tin nhắn',
             lastTime: new Date(0),
             unread: 0,
           };
         }
-      }
-      // Thêm Admin vào danh bạ của Học viên (Dùng ID 'admin' cho Super Admin)
+      });
+
+      // ADMIN_STAFF / SUPPORT — transport staff, per-user threads (never admin_admin)
+      safeStaffs.filter((st) => st && (st.id || st._id) && String(st.id || st._id) !== sId).forEach((st) => {
+        const stId = String(st.id || st._id);
+        const ar = String(st.adminRole || '').toUpperCase();
+        if (ar && ar !== 'STAFF' && ar !== 'SUPPORT') return;
+        if (!ar && st.role !== 'staff') return;
+        const convId = buildConversationId('student', sId, 'staff', stId);
+        if (!convMap[convId]) {
+          convMap[convId] = {
+            id: convId,
+            user: {
+              id: stId,
+              name: st.name || (ar === 'SUPPORT' ? 'Hỗ trợ' : 'Giáo vụ'),
+              role: 'staff',
+              adminRole: st.adminRole || 'STAFF',
+              avatar: st.avatar || String(st.name || 'AD').substring(0, 2).toUpperCase(),
+              online: true,
+              branchCode: st.branchCode || '',
+            },
+            lastMessage: 'Chưa có tin nhắn',
+            lastTime: new Date(0),
+            unread: 0,
+          };
+        }
+      });
+
+      // Legacy Super/High mailbox contact (id admin)
       const adminConvId = buildConversationId('student', sId, 'admin', 'admin');
       if (!convMap[adminConvId]) {
         convMap[adminConvId] = {
@@ -530,11 +574,38 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     } else if (userRole === 'teacher') {
       const myStudents = safeStudents.filter(s => s && String(s.teacherId) === sId);
       myStudents.forEach(s => {
-        const convId = buildConversationId('teacher', sId, 'student', s.id || s._id);
+        const sid = String(s.id || s._id);
+        const convId = buildConversationId('teacher', sId, 'student', sid);
         if (!convMap[convId]) {
           convMap[convId] = {
             id: convId,
-            user: { id: s.id, name: s.name, role: 'student', avatar: String(s.name || 'HV').substring(0, 2).toUpperCase(), online: true, branchCode: s.branchCode || '' },
+            user: { id: sid, name: s.name, role: 'student', avatar: String(s.name || 'HV').substring(0, 2).toUpperCase(), online: true, branchCode: s.branchCode || '' },
+            lastMessage: 'Chưa có tin nhắn',
+            lastTime: new Date(0),
+            unread: 0,
+          };
+        }
+      });
+
+      // ADMIN_STAFF / SUPPORT discovery seeds for teacher
+      safeStaffs.filter((st) => st && (st.id || st._id) && String(st.id || st._id) !== sId).forEach((st) => {
+        const stId = String(st.id || st._id);
+        const ar = String(st.adminRole || '').toUpperCase();
+        if (ar && ar !== 'STAFF' && ar !== 'SUPPORT') return;
+        if (!ar && st.role !== 'staff') return;
+        const convId = buildConversationId('teacher', sId, 'staff', stId);
+        if (!convMap[convId]) {
+          convMap[convId] = {
+            id: convId,
+            user: {
+              id: stId,
+              name: st.name || (ar === 'SUPPORT' ? 'Hỗ trợ' : 'Giáo vụ'),
+              role: 'staff',
+              adminRole: st.adminRole || 'STAFF',
+              avatar: st.avatar || String(st.name || 'AD').substring(0, 2).toUpperCase(),
+              online: true,
+              branchCode: st.branchCode || '',
+            },
             lastMessage: 'Chưa có tin nhắn',
             lastTime: new Date(0),
             unread: 0,
@@ -629,13 +700,9 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       });
     }
 
-    // Ai nhắn sau → lên đầu
-    return Object.values(convMap).sort((a, b) => {
-      const timeA = new Date(a.lastTime || 0).getTime();
-      const timeB = new Date(b.lastTime || 0).getTime();
-      return timeB - timeA;
-    });
-  }, [messages, students, teachers, staffs, groups]);
+    // Ai nhắn sau → lên đầu (immutable — không sort tại chỗ trên shared state)
+    return sortConversationsByLastMessageAt(Object.values(convMap));
+  }, [messages, students, teachers, staffs, groups, currentUser]);
 
   const getMessages = useCallback((convId) => {
     return messages.filter(m => m && m.convId === convId).sort((a, b) => a.time - b.time);
