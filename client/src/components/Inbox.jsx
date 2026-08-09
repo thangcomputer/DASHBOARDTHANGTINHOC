@@ -15,6 +15,7 @@ import { resolveAvatarUrl, DEFAULT_AVATARS } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
 import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE } from '../lib/messagingIdentity';
 import { mergeConversationsById } from '../lib/conversationList';
+import { getMessagingRole } from '../lib/messagingRoles';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 const formatTime = (date) => {
@@ -303,8 +304,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     uniqueContacts.forEach((c) => {
       if (String(c.id) === String(currentUserId)) return;
-      const role = normalizeRole(c.role);
-      const builtId = String(buildConversationId(currentUserRole, currentUserId, role, c.id));
+      // Phase 8.24: transport role from adminRole — never force STAFF→admin
+      const role = getMessagingRole({
+        id: c.id,
+        role: c.role,
+        adminRole: c.adminRole,
+      });
+      const myRole = getMessagingRole({
+        id: currentUserId,
+        role: currentUserRole,
+      }) || normalizeRole(currentUserRole);
+      const builtId = String(buildConversationId(myRole, currentUserId, role, c.id));
 
       // Prefer exact conversationId; fallback peer id (role mismatch must not hide contact)
       const existingConv = activityById.get(builtId) || activityByPeer.get(String(c.id));
@@ -333,8 +343,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     // Contact seed từ bảng tin / hỗ trợ online — chat không cần có sẵn trong danh bạ
     if (seedContact?.id && String(seedContact.id) !== String(currentUserId)) {
-      const role = normalizeRole(seedContact.role);
-      const builtId = String(buildConversationId(currentUserRole, currentUserId, role, seedContact.id));
+      const role = getMessagingRole({
+        id: seedContact.id,
+        role: seedContact.role,
+        adminRole: seedContact.adminRole,
+      }) || normalizeRole(seedContact.role);
+      const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
+      const builtId = String(buildConversationId(myRole, currentUserId, role, seedContact.id));
       const existingConv = activityById.get(builtId) || activityByPeer.get(String(seedContact.id));
       const canonicalId = existingConv?.id ? String(existingConv.id) : builtId;
       if (!seenConvIds.has(canonicalId)) {
@@ -641,7 +656,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const selectConversation = (conv) => {
     // Nếu conv truyền vào là object từ danh bạ (chưa có id hoặc id kiểu r_i__r_i)
     if (conv.user && !conv.lastMessage) {
-      const properId = buildConversationId(currentUserRole, currentUserId, conv.user.role, conv.user.id);
+      const peerRole = getMessagingRole({
+        id: conv.user.id,
+        role: conv.user.role,
+        adminRole: conv.user.adminRole,
+      }) || normalizeRole(conv.user.role);
+      const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
+      const properId = buildConversationId(myRole, currentUserId, peerRole, conv.user.id);
       
       // Kiểm tra xem đã có conv này trong dataContext chưa
       const existing = dataContextConvs.find(dc => dc.id === properId);
@@ -870,8 +891,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (contactTab === 'all') return true;
     if (contactTab === 'group') return c.isGroup;
     const r = normalizeRole(c.user?.role);
-    // "Admin" tab includes transport staff (ADMIN_STAFF / SUPPORT) — not SUPER only
-    if (contactTab === 'admin') return r === 'admin' || r === 'staff';
+    const ar = String(c.user?.adminRole || '').toUpperCase();
+    // Phase 8.24: Admin = SUPER/HIGH only; Staff vs Support tabs
+    if (contactTab === 'admin') {
+      return r === 'admin' && ar !== 'STAFF' && ar !== 'SUPPORT';
+    }
+    if (contactTab === 'staff') {
+      return r === 'staff' && ar !== 'SUPPORT';
+    }
+    if (contactTab === 'support') {
+      return ar === 'SUPPORT';
+    }
     return r === contactTab;
   });
 
@@ -902,8 +932,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     if (selectUser && String(selectUser.id) === String(selectId) && currentUserId) {
       hasAutoSelected.current = true;
-      const role = normalizeRole(selectUser.role || 'admin');
-      const convId = buildConversationId(currentUserRole, currentUserId, role, selectUser.id);
+      const role = getMessagingRole({
+        id: selectUser.id,
+        role: selectUser.role,
+        adminRole: selectUser.adminRole,
+      }) || normalizeRole(selectUser.role || 'admin');
+      const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
+      const convId = buildConversationId(myRole, currentUserId, role, selectUser.id);
       selectConversation({
         id: convId,
         isGroup: false,
@@ -966,6 +1001,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 { id: 'student', label: 'Học viên' },
                 { id: 'teacher', label: 'Giảng viên' },
                 { id: 'admin', label: 'Admin' },
+                { id: 'staff', label: 'Staff' },
+                { id: 'support', label: 'Support' },
                 { id: 'group', label: 'Nhóm' }
               ].filter(tab => !(currentUserRole === 'student' && tab.id === 'student')).map(tab => (
                 <button

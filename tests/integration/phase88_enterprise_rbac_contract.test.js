@@ -65,12 +65,21 @@ test('Phase8.8/8.10 mapping: manage_training != manage_student_training enterpri
   assert.notDeepEqual(t, st);
 });
 
-test('Phase8.8 mapping: legacy-only keys unmapped', () => {
-  for (const k of ['manage_schedule', 'manage_messages', 'view_logs', 'view_evaluations']) {
-    assert.deepEqual(map.resolve(k), []);
-    assert.equal(map.getMappingStatus(k), 'LEGACY_ONLY');
-    assert.equal(map.isLegacyOnly(k), true);
+test('Phase8.8 mapping: view_evaluations remains legacy-only', () => {
+  assert.deepEqual(map.resolve('view_evaluations'), []);
+  assert.equal(map.getMappingStatus('view_evaluations'), 'LEGACY_ONLY');
+  assert.equal(map.isLegacyOnly('view_evaluations'), true);
+});
+
+test('RBAC-S1 mapping: schedule/messages/logs are PARTIAL (shadow)', () => {
+  for (const k of ['manage_schedule', 'manage_messages', 'view_logs']) {
+    assert.equal(map.isLegacyOnly(k), false);
+    assert.equal(map.getMappingStatus(k), 'PARTIAL');
+    assert.ok(map.resolve(k).length > 0);
   }
+  assert.ok(map.resolve('manage_messages').includes('ticket:close'));
+  assert.ok(map.resolve('manage_messages').includes('message:view'));
+  assert.ok(!map.resolve('manage_messages').includes('ticket:delete'));
 });
 
 test('Phase8.8 roles: HIGH_ADMIN exists; STAFF/SUPPORT aliases', () => {

@@ -14,21 +14,24 @@ const ROOT = path.join(__dirname, '../..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () => {
-  it('1 contacts API: student branch includes STAFF+SUPPORT+assigned teachers', () => {
+  it('1 contacts API: student sees STAFF+SUPPORT+assigned teachers (no SUPER)', () => {
     const src = read('routes/messageRoutes.js');
     const idx = src.indexOf("else if (userRole === 'student')");
     assert.ok(idx > 0);
-    const chunk = src.slice(idx, idx + 2200);
-    assert.ok(chunk.includes("adminRole: { $in: ['STAFF', 'SUPPORT'] }"));
+    const chunk = src.slice(idx, idx + 2500);
+    assert.ok(chunk.includes("adminRole: 'STAFF'"));
+    assert.ok(chunk.includes("adminRole: 'SUPPORT'"));
     assert.ok(chunk.includes("role: 'teacher'"));
     assert.ok(chunk.includes('teacherIdList') || chunk.includes('myTeacherIds'));
+    assert.equal(chunk.includes('loadHighAdmins'), false);
   });
 
-  it('2 contacts API: teacher branch includes STAFF+SUPPORT+assigned students', () => {
+  it('2 contacts API: teacher sees HIGH+STAFF+SUPPORT+assigned students', () => {
     const src = read('routes/messageRoutes.js');
     const idx = src.indexOf("else if (userRole === 'teacher')");
     assert.ok(idx > 0);
-    const chunk = src.slice(idx, idx + 1800);
+    const chunk = src.slice(idx, idx + 2000);
+    assert.ok(chunk.includes('loadHighAdmins'));
     assert.ok(chunk.includes("adminRole: { $in: ['STAFF', 'SUPPORT'] }"));
     assert.ok(chunk.includes('Student.find'));
   });
@@ -40,10 +43,15 @@ describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () =
     assert.ok(inbox.includes('pushEntry'));
   });
 
-  it('4 Admin tab includes transport staff (ADMIN_STAFF/SUPPORT)', () => {
+  it('4 Admin/Staff/Support tabs are separated (Phase 8.24)', () => {
     const inbox = read('client/src/components/Inbox.jsx');
     assert.ok(inbox.includes("contactTab === 'admin'"));
-    assert.ok(inbox.includes("r === 'admin' || r === 'staff'"));
+    assert.ok(inbox.includes("contactTab === 'staff'"));
+    assert.ok(inbox.includes("contactTab === 'support'"));
+    assert.ok(inbox.includes("ar === 'SUPPORT'"));
+    assert.ok(inbox.includes("{ id: 'support', label: 'Support' }"));
+    // Admin filter must exclude STAFF/SUPPORT by adminRole
+    assert.ok(inbox.includes("ar !== 'STAFF'") || inbox.includes("ar !== 'SUPPORT'"));
   });
 
   it('5 student seeds teacher stub even without teachers[] cache', () => {

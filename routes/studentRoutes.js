@@ -8,6 +8,7 @@ const { PERMISSIONS } = require('../constants/permissions');
 const { assertStudentBranchAccess } = require('../middleware/studentBranchGuard');
 const { policyShadowStudentRead } = require('../middleware/policyShadowStudentRead');
 const { policyShadowStudentMutation } = require('../middleware/policyShadowStudentMutation');
+const { dataScopeObserve } = require('../middleware/dataScopeObserve');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
 function requireManageStudentsUnlessTeacher(req, res, next) {
@@ -127,7 +128,7 @@ async function createTuitionInvoice({ student, courseName, amount, note = '' }) 
 
 // ─── GET /api/students ─────────────────────────────────────────────────────────
 // Lấy danh sách học viên (Admin+MANAGE_STUDENTS / Teacher ownership) — pagination
-router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), requireManageStudentsUnlessTeacher], async (req, res) => {
+router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), dataScopeObserve('student'), requireManageStudentsUnlessTeacher], async (req, res) => {
   try {
     const { teacherId, paid, status, course, search, page, limit, branch_id } = req.query;
     const andConditions = [];
@@ -423,7 +424,7 @@ router.get('/stats', [authMiddleware, branchFilter, policyShadowStudentRead('sta
 
 // ─── GET /api/students/:id ─────────────────────────────────────────────────────────────────
 // Phase 7.35: policyShadowStudentRead('get_one') — evaluation-only; Legacy handler remains HTTP authority.
-router.get('/:id', [authMiddleware, branchFilter, policyShadowStudentRead('get_one')], async (req, res) => {
+router.get('/:id', [authMiddleware, branchFilter, policyShadowStudentRead('get_one'), dataScopeObserve('student', { listMode: false })], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
       .populate('teacherId', 'name phone specialty avatar');

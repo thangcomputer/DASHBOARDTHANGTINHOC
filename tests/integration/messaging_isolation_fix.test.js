@@ -149,7 +149,9 @@ describe('Messaging isolation + canonical IDs', { concurrency: false }, () => {
   it('15 directMessageService exists and rejects client sender spoof path', () => {
     const src = fs.readFileSync(path.join(ROOT, 'services/directMessageService.js'), 'utf8');
     assert.ok(src.includes('resolveMessagingIdentity(sender)') || src.includes('getMessagingRole(sender)'));
-    assert.ok(src.includes('assertCanDirectMessage'));
+    assert.ok(
+      src.includes('assertCanDirectMessage') || src.includes('assertMessagingPairAllowed'),
+    );
     assert.ok(src.includes('Message.create'));
     assert.equal(src.includes('req.body.senderId'), false);
   });

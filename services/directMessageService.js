@@ -1,6 +1,7 @@
 /**
  * Canonical direct/group message send — shared by HTTP + Socket.
  * LIVE messaging only. Does not touch Enterprise RBAC.
+ * Phase 8.24: conversationId from DB-resolved peer transport role (ignore wrong client role).
  */
 const mongoose = require('mongoose');
 const Message = require('../models/Message');
@@ -8,13 +9,15 @@ const Group = require('../models/Group');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const ConversationVisibility = require('../models/ConversationVisibility');
-const { buildConversationId } = require('../utils/chatConversationId');
 const { getMessagingRole } = require('../utils/messagingRoles');
 const {
   resolveMessagingIdentity,
   enrichMessageIdentities,
 } = require('./messagingIdentity');
-const { assertCanDirectMessage } = require('./chatAccessService');
+const {
+  assertMessagingPairAllowed,
+  buildCanonicalConversationId,
+} = require('./messagingPairing');
 const { sanitizeMessageDoc } = require('../utils/messageFileRetention');
 
 const isStaffAccount = (u = {}) =>
@@ -55,15 +58,16 @@ async function sendCanonicalMessage({
   const senderRole = senderIdentity.role;
   const senderName = senderIdentity.displayName || 'User';
 
-  const rid = String(receiverId || '');
-  const rRole = String(receiverRole || '').toLowerCase();
+  const ridHint = String(receiverId || '');
+  const rRoleHint = String(receiverRole || '').toLowerCase();
   const isBroadcast =
-    rid === 'ALL_USERS' || rid === 'ALL_STUDENTS' || rid === 'ALL_TEACHERS' || rid.startsWith('ALL_BRANCH_');
+    ridHint === 'ALL_USERS' || ridHint === 'ALL_STUDENTS' || ridHint === 'ALL_TEACHERS' || ridHint.startsWith('ALL_BRANCH_');
 
   if (isBroadcast) {
     return { ok: false, status: 400, message: 'Broadcast phai dung endpoint/socket broadcast rieng' };
   }
 
+  let pair = null;
   if (isGroup && groupId) {
     const group = await Group.findById(groupId).select('participants').lean();
     if (!group) return { ok: false, status: 404, message: 'Không tìm thấy nhóm chat' };
@@ -72,17 +76,21 @@ async function sendCanonicalMessage({
       return { ok: false, status: 403, message: 'Bạn không thuộc nhóm chat này' };
     }
   } else {
-    const access = await assertCanDirectMessage(sender, rid, rRole);
-    if (!access.ok) {
-      return { ok: false, status: 403, message: access.message || 'Không được nhắn tin đến người này' };
+    pair = await assertMessagingPairAllowed(sender, ridHint, rRoleHint);
+    if (!pair.ok) {
+      return { ok: false, status: 403, message: pair.message || 'Không được nhắn tin đến người này' };
     }
   }
+
+  const rid = pair ? String(pair.finalReceiverId || ridHint) : ridHint;
+  const rRole = pair ? String(pair.transportRole || rRoleHint) : rRoleHint;
+  const peerDoc = pair?.peer || null;
 
   let conversationId;
   if (isGroup && groupId) {
     conversationId = `group_${groupId}`;
   } else {
-    conversationId = buildConversationId(senderRole, senderId, rRole, rid);
+    conversationId = buildCanonicalConversationId(sender, rRole, rid);
   }
 
   let sBranch = '';
@@ -98,31 +106,32 @@ async function sendCanonicalMessage({
     }
   }
 
-  let rBranch = '';
-  let resolvedReceiverName = receiverName;
+  let rBranch = peerDoc?.branchCode || '';
+  let resolvedReceiverName = receiverName || peerDoc?.name || '';
   if (!isGroup) {
     if (rid === 'admin') {
       rBranch = 'HỆ THỐNG';
       if (!resolvedReceiverName) resolvedReceiverName = 'Admin';
-    } else if (mongoose.Types.ObjectId.isValid(rid)) {
-      if (rRole === 'teacher' || rRole === 'admin' || rRole === 'staff' || rRole === 'support') {
-        const t = await Teacher.findById(rid).select('branchCode name').lean();
-        rBranch = t?.branchCode || '';
-        if (!resolvedReceiverName) resolvedReceiverName = t?.name || 'Người nhận';
-      } else if (rRole === 'student') {
+    } else if (!rBranch && mongoose.Types.ObjectId.isValid(rid)) {
+      if (rRole === 'student') {
         const s = await Student.findById(rid).select('branchCode name').lean();
         rBranch = s?.branchCode || '';
         if (!resolvedReceiverName) resolvedReceiverName = s?.name || 'Học viên';
+      } else {
+        const t = await Teacher.findById(rid).select('branchCode name').lean();
+        rBranch = t?.branchCode || '';
+        if (!resolvedReceiverName) resolvedReceiverName = t?.name || 'Người nhận';
       }
     }
   }
   if (!resolvedReceiverName && !isGroup) resolvedReceiverName = 'Người nhận';
 
-  // Cross-branch: staff/admin (non-super) → student
+  // Defense-in-depth branch check (pairing already scoped STAFF)
   if (
     !isAdminLevelAccount(sender)
-    && (senderRole === 'admin' || senderRole === 'staff' || isStaffAccount(sender))
+    && (senderRole === 'staff' || isStaffAccount(sender))
     && rRole === 'student'
+    && sender.adminRole !== 'SUPPORT'
   ) {
     if (sBranch && rBranch && sBranch !== rBranch) {
       return { ok: false, status: 403, message: 'Bạn không được phép nhắn tin cho học viên chi nhánh khác' };
@@ -134,11 +143,10 @@ async function sendCanonicalMessage({
   let finalReceiverRole = isGroup ? 'admin' : rRole;
 
   // Student → generic admin contact: deliver to legacy root id "admin"
-  // but conversationId already canonical (admin_admin only when senderRole/receiverRole are admin).
   if (
     !isGroup
     && senderRole === 'student'
-    && (rRole === 'admin' || rRole === 'staff' || rRole === 'support')
+    && rRole === 'admin'
   ) {
     if (rid === 'admin' || !mongoose.Types.ObjectId.isValid(rid)) {
       finalReceiverId = 'admin';
@@ -182,7 +190,6 @@ async function sendCanonicalMessage({
     );
   }
 
-  // Phase 8.22: same enrichment path as history/sync (ID lookup, never role→SUPER).
   const [clientMessage] = await enrichMessageIdentities([message]);
 
   if (io && typeof notifyUser === 'function') {

@@ -502,8 +502,6 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       }
     });
 
-    const sysAdminName = safeTeachers.find(t => t.adminRole === 'SUPER_ADMIN' || t.role === 'admin')?.name || currentUser?.name || 'Admin';
-
     // 2. Add potential contacts (discovery seeds — no prior message required)
     if (userRole === 'student') {
       const student = safeStudents.find(s => String(s.id) === sId);
@@ -559,18 +557,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           };
         }
       });
-
-      // Legacy Super/High mailbox contact (id admin)
-      const adminConvId = buildConversationId('student', sId, 'admin', 'admin');
-      if (!convMap[adminConvId]) {
-        convMap[adminConvId] = {
-          id: adminConvId,
-          user: { id: 'admin', name: sysAdminName, role: 'admin', avatar: 'AD', online: true, branchCode: '' },
-          lastMessage: 'Chưa có tin nhắn',
-          lastTime: new Date(0),
-          unread: 0,
-        };
-      }
+      // Phase 8.24B: student contacts API no longer seeds SUPER/HIGH mailbox
     } else if (userRole === 'teacher') {
       const myStudents = safeStudents.filter(s => s && String(s.teacherId) === sId);
       myStudents.forEach(s => {
@@ -613,25 +600,69 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         }
       });
 
-      // Admin contact (Dùng ID 'admin' cho Super Admin)
-      const adminConvId = buildConversationId('admin', 'admin', 'teacher', sId);
-      if (!convMap[adminConvId]) {
-        convMap[adminConvId] = {
-          id: adminConvId,
-          user: { id: 'admin', name: sysAdminName, role: 'admin', avatar: 'AD', online: true, branchCode: '' },
-          lastMessage: 'Chưa có tin nhắn',
-          lastTime: new Date(0),
-          unread: 0,
-        };
-      }
+      // Phase 8.24B: teacher sees HIGH_ADMIN (not SUPER mailbox id=admin)
+      safeTeachers.filter((t) => t && String(t.adminRole || '').toUpperCase() === 'HIGH_ADMIN').forEach((h) => {
+        const hid = String(h.id || h._id);
+        if (!hid || hid === sId) return;
+        const convId = buildConversationId('teacher', sId, 'admin', hid);
+        if (!convMap[convId]) {
+          convMap[convId] = {
+            id: convId,
+            user: {
+              id: hid,
+              name: h.name || 'Admin cấp cao',
+              role: 'admin',
+              adminRole: 'HIGH_ADMIN',
+              avatar: String(h.name || 'AD').substring(0, 2).toUpperCase(),
+              online: true,
+              branchCode: h.branchCode || '',
+            },
+            lastMessage: 'Chưa có tin nhắn',
+            lastTime: new Date(0),
+            unread: 0,
+          };
+        }
+      });
     } else if (userRole === 'admin' || userRole === 'staff') {
-      const myRole = userRole;
-      // Dùng ID thật của Staff/Admin khác để tạo convId riêng tư
+      const myRole = getMessagingRole(currentUser || { id: sId, role: userRole, adminRole: currentUser?.adminRole });
+      const myAdminRole = String(currentUser?.adminRole || (sId === 'admin' ? 'SUPER_ADMIN' : '')).toUpperCase();
+
+      // SUPER: chỉ seed HIGH_ADMIN
+      if (myAdminRole === 'SUPER_ADMIN' || sId === 'admin') {
+        safeTeachers.filter((t) => t && String(t.adminRole || '').toUpperCase() === 'HIGH_ADMIN').forEach((h) => {
+          const hid = String(h.id || h._id);
+          if (!hid || hid === sId) return;
+          const convId = buildConversationId('admin', sId === 'admin' ? 'admin' : sId, 'admin', hid);
+          if (!convMap[convId]) {
+            convMap[convId] = {
+              id: convId,
+              user: {
+                id: hid,
+                name: h.name || 'Admin cấp cao',
+                role: 'admin',
+                adminRole: 'HIGH_ADMIN',
+                avatar: String(h.name || 'AD').substring(0, 2).toUpperCase(),
+                online: true,
+                branchCode: h.branchCode || '',
+              },
+              lastMessage: 'Chưa có tin nhắn',
+              lastTime: new Date(0),
+              unread: 0,
+            };
+          }
+        });
+      } else {
+      // HIGH / STAFF / SUPPORT: seed peers by matrix (contacts API remains authority)
       safeStaffs.filter(st => st && (st.id || st._id) && String(st.id || st._id) !== sId).forEach(st => {
         const stId = String(st.id || st._id);
-        const peerRole = (st.adminRole === 'SUPER_ADMIN' || st.adminRole === 'HIGH_ADMIN' || st.role === 'admin')
-          ? 'admin'
-          : 'staff';
+        const ar = String(st.adminRole || '').toUpperCase();
+        if (myAdminRole === 'STAFF' && ar !== 'SUPPORT' && ar !== 'HIGH_ADMIN') return;
+        if (myAdminRole === 'SUPPORT' && ar !== 'STAFF' && ar !== 'HIGH_ADMIN') return;
+        const peerRole = getMessagingRole({
+          id: stId,
+          role: st.role,
+          adminRole: st.adminRole,
+        });
         const convId = buildConversationId(myRole, sId, peerRole, stId);
         if (!convMap[convId]) {
           convMap[convId] = {
@@ -640,6 +671,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
               id: stId,
               name: st.name || 'Admin',
               role: peerRole,
+              adminRole: st.adminRole || null,
               avatar: String(st.name || 'AD').substring(0, 2).toUpperCase(),
               online: true,
               branchCode: st.branchCode || ''
@@ -651,7 +683,32 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         }
       });
 
-      teachers.filter(t => t && (t.status === 'Active' || t.status === 'active')).forEach(t => {
+      // HIGH peers from teachers collection
+      safeTeachers.filter((t) => t && String(t.adminRole || '').toUpperCase() === 'HIGH_ADMIN').forEach((h) => {
+        const hid = String(h.id || h._id);
+        if (!hid || hid === sId) return;
+        const convId = buildConversationId(myRole, sId, 'admin', hid);
+        if (!convMap[convId]) {
+          convMap[convId] = {
+            id: convId,
+            user: {
+              id: hid,
+              name: h.name || 'Admin cấp cao',
+              role: 'admin',
+              adminRole: 'HIGH_ADMIN',
+              avatar: String(h.name || 'AD').substring(0, 2).toUpperCase(),
+              online: true,
+              branchCode: h.branchCode || '',
+            },
+            lastMessage: 'Chưa có tin nhắn',
+            lastTime: new Date(0),
+            unread: 0,
+          };
+        }
+      });
+
+      if (myAdminRole === 'HIGH_ADMIN' || myAdminRole === 'SUPPORT' || myAdminRole === 'STAFF') {
+      teachers.filter(t => t && (t.status === 'Active' || t.status === 'active') && !t.adminRole).forEach(t => {
         const convId = buildConversationId(myRole, sId, 'teacher', t.id);
         if (!convMap[convId]) {
           convMap[convId] = {
@@ -665,7 +722,6 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       });
 
       safeStudents.filter(s => s && (s.id || s._id)).forEach(s => {
-        // STAFF → staff_<id>__student_*; SUPER/HIGH → admin_admin__student_*
         const convId = buildConversationId(myRole, sId, 'student', s.id || s._id);
         if (!convMap[convId]) {
           convMap[convId] = {
@@ -677,6 +733,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           };
         }
       });
+      }
+      }
     }
 
     // 3. Add Groups

@@ -227,9 +227,11 @@ describe('Phase 8.19 final readiness gate', { concurrency: false }, () => {
   });
 
   it('16 unsupported legacy remains unsupported', () => {
-    for (const k of ['manage_schedule', 'manage_messages', 'view_logs', 'view_evaluations']) {
-      assert.equal(map.isLegacyOnly(k), true);
-      assert.deepEqual(map.resolve(k), []);
+    assert.equal(map.isLegacyOnly('view_evaluations'), true);
+    assert.deepEqual(map.resolve('view_evaluations'), []);
+    for (const k of ['manage_schedule', 'manage_messages', 'view_logs']) {
+      assert.equal(map.isLegacyOnly(k), false);
+      assert.ok(map.resolve(k).length > 0);
     }
     assert.equal(evaluateCatalogContracts().unsupportedSilentMap, false);
   });

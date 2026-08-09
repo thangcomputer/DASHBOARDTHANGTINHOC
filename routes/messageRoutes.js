@@ -5,6 +5,7 @@ const Group   = require('../models/Group');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowMessage } = require('../middleware/policyShadowMessage');
 const { messagesCutoverGate } = require('../middleware/messagesCutoverGate');
+const { dataScopeObserve } = require('../middleware/dataScopeObserve');
 
 router.use(authMiddleware);
 
@@ -22,6 +23,7 @@ const {
   getMessagingRole,
   canAccessDirectConversation,
 } = require('../utils/messagingRoles');
+const { expandConversationIdAliases } = require('../services/messagingPairing');
 const { sanitizeMessages, sanitizeMessageDoc } = require('../utils/messageFileRetention');
 const { enrichMessageIdentities } = require('../services/messagingIdentity');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
@@ -52,26 +54,28 @@ function deptOutboundToStudent(reqUser) {
 }
 // AdminUser was wrong, they are stored in Teacher
 
-// ══ GET /api/chat/contacts  ──  RBAC/ABAC Matrix ══
-// ┌────────────────┼────────────────────────────────────────────┐
-// │ CALLER         │ CÓ THỂ THẤY                                         │
-// ├────────────────┼────────────────────────────────────────────┤
-// │ STUDENT        │ SuperAdmin + STAFF(cùng branch) + Teacher(teacherId + enrollments) │
-// │ TEACHER        │ SuperAdmin + STAFF(cùng branch) + Student(teacherId hoặc enrollments) │
-// │ STAFF          │ SuperAdmin + Teacher(cùng branch) + Student(cùng branch)   │
-// │ SUPER_ADMIN    │ Tất cả (có filter theo branch trên query)                  │
-// └────────────────┴────────────────────────────────────────────┘
-router.get('/contacts', messagesGuard('contacts'), async (req, res) => {
+// ══ GET /api/chat/contacts  ── Phase 8.24B contact visibility matrix ══
+// STUDENT     → STAFF(cùng CN) + SUPPORT + GV được phân công
+// TEACHER     → HIGH_ADMIN + STAFF + SUPPORT + HV được phân công
+// SUPPORT     → STAFF + HIGH_ADMIN + GV + HV
+// STAFF       → SUPPORT + GV(cùng CN) + HV(cùng CN) + HIGH_ADMIN
+// SUPER_ADMIN → chỉ HIGH_ADMIN
+// HIGH_ADMIN  → toàn bộ
+router.get('/contacts', messagesGuard('contacts'), dataScopeObserve('message'), async (req, res) => {
   try {
     const { role: userRole, id: userId, adminRole } = req.user;
-    const { branch_id: queryBranchId } = req.query; // SUPER_ADMIN có thể lọc theo CS
+    const { branch_id: queryBranchId } = req.query;
 
-    // Helper: định dạng contact trả về
     const mapContact = (doc, role) => ({
       id:     doc._id.toString(),
       name:   doc.name || 'Không rõ tên',
       role,
       adminRole: doc.adminRole || null,
+      productRole: doc.adminRole === 'SUPPORT' ? 'SUPPORT'
+        : doc.adminRole === 'STAFF' ? 'STAFF'
+        : doc.adminRole === 'SUPER_ADMIN' ? 'SUPER_ADMIN'
+        : doc.adminRole === 'HIGH_ADMIN' ? 'HIGH_ADMIN'
+        : (role === 'teacher' ? 'TEACHER' : role === 'student' ? 'STUDENT' : null),
       gender: doc.gender || '',
       phone:  doc.phone || '',
       avatar: doc.avatar || String(doc.name || 'U').substring(0, 2).toUpperCase(),
@@ -79,125 +83,145 @@ router.get('/contacts', messagesGuard('contacts'), async (req, res) => {
       branchCode: doc.branchCode || ''
     });
 
-    // ────── [1] SuperAdmin luôn được lấy trước (mọi role đều thấy) ──────
-    const SystemSettings = require('../models/SystemSettings');
-    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).lean();
-    const systemAdminName = (sysSettings?.adminName && sysSettings.adminName.trim()) ? sysSettings.adminName.trim() : null;
-
-    const superAdmins = await Teacher.find(
-      { $or: [{ adminRole: 'SUPER_ADMIN' }, { role: 'admin', adminRole: { $ne: 'STAFF' } }] },
-      'name adminRole gender phone branchId branchCode avatar'
-    ).lean();
-
-    const seenAdminNames = new Set();
-    const superAdminContacts = [];
-
-    for (const a of superAdmins) {
-      const actualName = (systemAdminName && a.phone === 'admin') ? systemAdminName : ((a.name && a.name.trim()) ? a.name.trim() : (systemAdminName || 'P ĐÀO TẠO (ADMIN)'));
-      const adminId = (a._id.toString() === 'admin' || a.phone === 'admin') ? 'admin' : a._id.toString();
-
-      const key = actualName.toLowerCase();
-      if (seenAdminNames.has(key)) continue;
-      seenAdminNames.add(key);
-
-      superAdminContacts.push({
+    const mapHighOrSuper = (a, forceRole) => {
+      const ar = forceRole || (a.adminRole === 'HIGH_ADMIN' ? 'HIGH_ADMIN' : 'SUPER_ADMIN');
+      const adminId = (String(a._id) === 'admin' || a.phone === 'admin') ? 'admin' : a._id.toString();
+      return {
         id: adminId,
-        name: actualName,
+        name: (a.name && a.name.trim()) ? a.name.trim() : (ar === 'HIGH_ADMIN' ? 'Admin cấp cao' : 'Super Admin'),
         role: 'admin',
+        adminRole: ar,
+        productRole: ar,
         phone: a.phone || '',
-        avatar: a.avatar || String(actualName || 'AD').substring(0, 2).toUpperCase(),
-        branchId: a.branchId || null,
-        branchCode: a.branchCode || ''
-      });
+        avatar: a.avatar || String(a.name || 'AD').substring(0, 2).toUpperCase(),
+        branchId: a.branchId ? a.branchId.toString() : null,
+        branchCode: a.branchCode || '',
+      };
+    };
+
+    const loadHighAdmins = async () => {
+      const docs = await Teacher.find(
+        { adminRole: 'HIGH_ADMIN' },
+        'name adminRole gender phone branchId branchCode avatar'
+      ).lean();
+      return docs.map((d) => mapHighOrSuper(d, 'HIGH_ADMIN'));
+    };
+
+    const loadSuperAdmins = async () => {
+      const docs = await Teacher.find(
+        {
+          $or: [
+            { adminRole: 'SUPER_ADMIN' },
+            { phone: 'admin', adminRole: { $nin: ['STAFF', 'SUPPORT', 'HIGH_ADMIN'] } },
+          ],
+        },
+        'name adminRole gender phone branchId branchCode avatar'
+      ).lean();
+      const out = [];
+      const seen = new Set();
+      for (const d of docs) {
+        const c = mapHighOrSuper(d, 'SUPER_ADMIN');
+        if (seen.has(c.id)) continue;
+        seen.add(c.id);
+        out.push(c);
+      }
+      return out;
+    };
+
+    const splitStaffSupport = (docs) => {
+      const staff = [];
+      const support = [];
+      for (const d of docs) {
+        const mapped = {
+          ...mapContact(d, 'staff'),
+          name: staffDisplayName(d.name, d.branchCode),
+        };
+        if (d.adminRole === 'SUPPORT') support.push(mapped);
+        else staff.push(mapped);
+      }
+      return { staff, support };
+    };
+
+    let elevatedContacts = [];
+    let staffContacts = [];
+    let supportContacts = [];
+    let teacherContacts = [];
+    let studentContacts = [];
+
+    // SUPER_ADMIN: chỉ HIGH_ADMIN
+    if (adminRole === 'SUPER_ADMIN' || String(userId) === 'admin') {
+      elevatedContacts = await loadHighAdmins();
     }
-
-    if (superAdminContacts.length === 0) {
-      const actualName = systemAdminName || 'Hệ Thống';
-      superAdminContacts.push({
-        id: 'admin',
-        name: actualName,
-        role: 'admin',
-        phone: '',
-        avatar: String(actualName).substring(0, 2).toUpperCase(),
-        branchId: null,
-        branchCode: 'HỆ THỐNG'
-      });
-    }
-
-    let staffContacts    = [];
-    let teacherContacts  = [];
-    let studentContacts  = [];
-
-    // ══ [2] SUPER_ADMIN: xem toàn hệ thống, có hỗ trợ filter branch ══
-    if (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') {
+    // HIGH_ADMIN: toàn bộ
+    else if (adminRole === 'HIGH_ADMIN') {
       const branchFilter = queryBranchId && queryBranchId !== 'all'
         ? { branchId: queryBranchId }
         : {};
-
-      const [staffDocs, teacherDocs, studentDocs] = await Promise.all([
+      const [supers, staffDocs, teacherDocs, studentDocs, highs] = await Promise.all([
+        loadSuperAdmins(),
         Teacher.find({ adminRole: { $in: ['STAFF', 'SUPPORT'] }, ...branchFilter },
-                     'name adminRole gender phone branchId branchCode avatar').lean(),
+          'name adminRole gender phone branchId branchCode avatar').lean(),
         Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] }, ...branchFilter },
-                     'name adminRole gender phone branchId branchCode avatar').lean(),
+          'name adminRole gender phone branchId branchCode avatar').lean(),
         Student.find({ ...branchFilter },
-                     'name adminRole gender phone branchId branchCode avatar').lean(),
+          'name adminRole gender phone branchId branchCode avatar').lean(),
+        loadHighAdmins(),
       ]);
-
-      staffContacts   = staffDocs.map(d => ({
+      elevatedContacts = [...supers, ...highs.filter((h) => h.id !== String(userId))];
+      ({ staff: staffContacts, support: supportContacts } = splitStaffSupport(staffDocs));
+      teacherContacts = teacherDocs.map((d) => mapContact(d, 'teacher'));
+      studentContacts = studentDocs.map((d) => mapContact(d, 'student'));
+    }
+    // SUPPORT: STAFF + HIGH + GV + HV (không SUPER)
+    else if (adminRole === 'SUPPORT') {
+      const [highs, staffDocs, teacherDocs, studentDocs] = await Promise.all([
+        loadHighAdmins(),
+        Teacher.find({ adminRole: 'STAFF' },
+          'name adminRole gender phone branchId branchCode avatar').lean(),
+        Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] } },
+          'name adminRole gender phone branchId branchCode avatar').lean(),
+        Student.find({},
+          'name adminRole gender phone branchId branchCode avatar').lean(),
+      ]);
+      elevatedContacts = highs;
+      staffContacts = staffDocs.map((d) => ({
         ...mapContact(d, 'staff'),
         name: staffDisplayName(d.name, d.branchCode),
       }));
-      teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
-      studentContacts = studentDocs.map(d => mapContact(d, 'student'));
+      teacherContacts = teacherDocs.map((d) => mapContact(d, 'teacher'));
+      studentContacts = studentDocs.map((d) => mapContact(d, 'student'));
     }
-
-    // ══ [3] STAFF ADMIN: chỉ thấy dữ liệu cùng branch ══
+    // STAFF: SUPPORT + GV + HV (cùng CN) + HIGH
     else if (adminRole === 'STAFF') {
-      // Lấy branchId của STAFF từ DB (máy chủ tin cậy hơn token)
       const staffUser = await Teacher.findById(userId).select('branchId').lean();
       const staffBranchId = staffUser?.branchId ? staffUser.branchId.toString() : null;
+      const teacherQ = staffBranchId
+        ? { role: 'teacher', status: { $in: ['Active', 'active'] }, branchId: staffBranchId }
+        : { role: 'teacher', status: { $in: ['Active', 'active'] } };
+      const studentQ = staffBranchId ? { branchId: staffBranchId } : {};
+      const supportQ = staffBranchId
+        ? { adminRole: 'SUPPORT', $or: [{ branchId: staffBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
+        : { adminRole: 'SUPPORT' };
 
-      if (!staffBranchId) {
-        // STAFF chưa gán branch riêng → Hỗ trợ viên quản lý toàn bộ học viên & giảng viên
-        const [staffDocs, teacherDocs, studentDocs] = await Promise.all([
-          Teacher.find({ adminRole: { $in: ['STAFF', 'SUPPORT'] }, _id: { $ne: userId } }, 'name adminRole gender phone branchId branchCode avatar').lean(),
-          Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] } }, 'name adminRole gender phone branchId branchCode avatar').lean(),
-          Student.find({}, 'name adminRole gender phone branchId branchCode avatar').lean(),
-        ]);
-        staffContacts = staffDocs.map(d => ({ ...mapContact(d, 'staff'), name: staffDisplayName(d.name, d.branchCode) }));
-        teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
-        studentContacts = studentDocs.map(d => mapContact(d, 'student'));
-      } else {
-        const [teacherDocs, studentDocs, otherStaffDocs] = await Promise.all([
-          Teacher.find(
-            { role: 'teacher', status: { $in: ['Active', 'active'] }, branchId: staffBranchId },
-            'name adminRole gender phone branchId branchCode avatar'
-          ).lean(),
-          Student.find(
-            { branchId: staffBranchId },
-            'name adminRole gender phone branchId branchCode avatar'
-          ).lean(),
-          Teacher.find(
-            { adminRole: { $in: ['STAFF', 'SUPPORT'] }, branchId: staffBranchId, _id: { $ne: userId } },
-            'name adminRole gender phone branchId branchCode avatar'
-          ).lean(),
-        ]);
-
-        staffContacts = otherStaffDocs.map(d => ({
-          ...mapContact(d, 'staff'),
-          name: staffDisplayName(d.name, d.branchCode),
-        }));
-        teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
-        studentContacts = studentDocs.map(d => mapContact(d, 'student'));
-      }
+      const [highs, supportDocs, teacherDocs, studentDocs] = await Promise.all([
+        loadHighAdmins(),
+        Teacher.find(supportQ, 'name adminRole gender phone branchId branchCode avatar').lean(),
+        Teacher.find(teacherQ, 'name adminRole gender phone branchId branchCode avatar').lean(),
+        Student.find(studentQ, 'name adminRole gender phone branchId branchCode avatar').lean(),
+      ]);
+      elevatedContacts = highs;
+      supportContacts = supportDocs.map((d) => ({
+        ...mapContact(d, 'staff'),
+        name: staffDisplayName(d.name, d.branchCode),
+      }));
+      teacherContacts = teacherDocs.map((d) => mapContact(d, 'teacher'));
+      studentContacts = studentDocs.map((d) => mapContact(d, 'student'));
     }
-
-    // ══ [4] TEACHER: chỉ thấy STAFF cùng branch + Student được phân công ══
+    // TEACHER: HIGH + STAFF + SUPPORT + HV phân công
     else if (userRole === 'teacher') {
       const teacher = await Teacher.findById(userId).select('branchId assignedStudents').lean();
       const teacherBranchId = teacher?.branchId ? teacher.branchId.toString() : null;
       const assignedIds = (teacher?.assignedStudents || []).filter(Boolean);
-
       const studentQuery = {
         $or: [
           { teacherId: userId },
@@ -205,32 +229,24 @@ router.get('/contacts', messagesGuard('contacts'), async (req, res) => {
           ...(assignedIds.length ? [{ _id: { $in: assignedIds } }] : []),
         ],
       };
-
       const staffQuery = teacherBranchId
         ? { adminRole: { $in: ['STAFF', 'SUPPORT'] }, $or: [{ branchId: teacherBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
         : { adminRole: { $in: ['STAFF', 'SUPPORT'] } };
 
-      const [staffDocs, studentDocs] = await Promise.all([
-        // STAFF (cả Hỗ trợ viên toàn hệ thống lẫn Staff cùng chi nhánh)
+      const [highs, staffDocs, studentDocs] = await Promise.all([
+        loadHighAdmins(),
         Teacher.find(staffQuery, 'name adminRole gender phone branchId branchCode avatar').lean(),
-        // HV: teacherId cấp hồ sơ HOẶC phân công theo enrollment (đa khóa)
         Student.find(studentQuery, 'name adminRole gender phone branchId branchCode avatar').lean(),
       ]);
-
-      staffContacts   = staffDocs.map(d => ({
-        ...mapContact(d, 'staff'),
-        name: staffDisplayName(d.name, d.branchCode),
-      }));
-      studentContacts = studentDocs.map(d => mapContact(d, 'student'));
-      // Không thêm GV khác vào danh bạ
+      elevatedContacts = highs;
+      ({ staff: staffContacts, support: supportContacts } = splitStaffSupport(staffDocs));
+      studentContacts = studentDocs.map((d) => mapContact(d, 'student'));
     }
-
-    // ══ [5] STUDENT: chỉ thấy STAFF cùng branch + Teacher đang dạy mình ══
+    // STUDENT: STAFF cùng CN + SUPPORT + GV đang dạy (không SUPER/HIGH)
     else if (userRole === 'student') {
       const student = await Student.findById(userId)
         .select('branchId teacherId enrollments.teacherId')
         .lean();
-
       const studentBranchId = student?.branchId ? student.branchId.toString() : null;
       const myTeacherIds = new Set();
       if (student?.teacherId) myTeacherIds.add(String(student.teacherId));
@@ -238,15 +254,16 @@ router.get('/contacts', messagesGuard('contacts'), async (req, res) => {
         if (e?.teacherId) myTeacherIds.add(String(e.teacherId));
       });
       const teacherIdList = [...myTeacherIds].filter(Boolean);
+      const staffOnlyQuery = studentBranchId
+        ? { adminRole: 'STAFF', branchId: studentBranchId }
+        : { adminRole: 'STAFF' };
+      const supportQuery = studentBranchId
+        ? { adminRole: 'SUPPORT', $or: [{ branchId: studentBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
+        : { adminRole: 'SUPPORT' };
 
-      const staffQuery = studentBranchId
-        ? { adminRole: { $in: ['STAFF', 'SUPPORT'] }, $or: [{ branchId: studentBranchId }, { branchId: null }, { branchId: { $exists: false } }] }
-        : { adminRole: { $in: ['STAFF', 'SUPPORT'] } };
-
-      const [staffDocs, teacherDocs] = await Promise.all([
-        // STAFF (cả Hỗ trợ viên toàn hệ thống lẫn Staff cùng chi nhánh)
-        Teacher.find(staffQuery, 'name adminRole gender phone branchId branchCode avatar').lean(),
-        // Mọi GV đang dạy (cấp hồ sơ + từng enrollment)
+      const [staffDocs, supportDocs, teacherDocs] = await Promise.all([
+        Teacher.find(staffOnlyQuery, 'name adminRole gender phone branchId branchCode avatar').lean(),
+        Teacher.find(supportQuery, 'name adminRole gender phone branchId branchCode avatar').lean(),
         teacherIdList.length
           ? Teacher.find(
               { _id: { $in: teacherIdList }, role: 'teacher' },
@@ -254,27 +271,26 @@ router.get('/contacts', messagesGuard('contacts'), async (req, res) => {
             ).lean()
           : Promise.resolve([]),
       ]);
-
-      staffContacts   = staffDocs.map(d => ({
+      staffContacts = staffDocs.map((d) => ({
         ...mapContact(d, 'staff'),
         name: staffDisplayName(d.name, d.branchCode),
       }));
-      teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
-      // Không thêm HV khác vào danh bạ
+      supportContacts = supportDocs.map((d) => ({
+        ...mapContact(d, 'staff'),
+        name: staffDisplayName(d.name, d.branchCode),
+      }));
+      teacherContacts = teacherDocs.map((d) => mapContact(d, 'teacher'));
     }
 
-    // ──── Hợp nhất ────
     const contacts = [
-      ...superAdminContacts,
+      ...elevatedContacts,
       ...staffContacts,
+      ...supportContacts,
       ...teacherContacts,
       ...studentContacts,
     ];
-
-    // Loại trừ chính mình khỏi danh bạ (nếu bị include)
     const selfId = userId?.toString();
-    const deduped = contacts.filter(c => c.id !== selfId);
-
+    const deduped = contacts.filter((c) => c.id !== selfId);
     res.json({ success: true, data: deduped });
   } catch (err) {
     logger.error('[CONTACTS]', err);
@@ -422,6 +438,7 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
     // Bảo vệ: participant canonical HOẶC legacy admin_admin chỉ SUPER/HIGH
     const isGroupConv = String(conversationId || '').startsWith('group_');
     let isParticipant = false;
+    let queryIds = [conversationId];
     if (isGroupConv) {
       const mongoose = require('mongoose');
       const groupId = String(conversationId).slice('group_'.length);
@@ -433,14 +450,20 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
         isParticipant = !!g || isAdminLevelAccount(req.user);
       }
     } else {
-      isParticipant = canAccessDirectConversation(conversationId, req.user);
+      const { canonical, ids } = expandConversationIdAliases(conversationId);
+      queryIds = ids;
+      isParticipant = ids.some((id) => canAccessDirectConversation(id, req.user));
+      // Prefer canonical for response continuity when aliased
+      if (canonical && canonical !== conversationId) {
+        // still query both ids; access already checked
+      }
     }
 
     if (!isParticipant) {
       return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
     }
-    const messages = await Message.find({ 
-      conversationId: req.params.conversationId,
+    const messages = await Message.find({
+      conversationId: { $in: queryIds },
       hiddenFor: { $ne: req.user.id }
     })
       .sort({ createdAt: 1 })
@@ -448,7 +471,11 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
 
     const sanitized = sanitizeMessages(messages);
     const enriched = await enrichMessageIdentities(sanitized);
-    res.json({ success: true, data: enriched });
+    res.json({
+      success: true,
+      data: enriched,
+      conversationId: expandConversationIdAliases(conversationId).canonical,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -660,7 +687,8 @@ router.put('/read/:conversationId', messagesGuard('read'), async (req, res) => {
         allowed = !!g;
       }
     } else {
-      allowed = canAccessDirectConversation(conversationId, req.user);
+      const { ids } = expandConversationIdAliases(conversationId);
+      allowed = ids.some((id) => canAccessDirectConversation(id, req.user));
     }
     if (!allowed) {
         return res.status(403).json({ success: false, message: 'Thao tác không hợp lệ' });
@@ -670,9 +698,13 @@ router.put('/read/:conversationId', messagesGuard('read'), async (req, res) => {
       ? ['admin', String(readerId)]
       : [String(readerId)];
 
+    const readIds = isGroupConv
+      ? [conversationId]
+      : expandConversationIdAliases(conversationId).ids;
+
     const filter = isGroupConv
       ? { conversationId, isRead: false, senderId: { $nin: receiverTargets } }
-      : { conversationId, receiverId: { $in: receiverTargets }, isRead: false };
+      : { conversationId: { $in: readIds }, receiverId: { $in: receiverTargets }, isRead: false };
 
     await Message.updateMany(
       filter,
