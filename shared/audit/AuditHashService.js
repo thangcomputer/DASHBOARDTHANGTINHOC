@@ -1,0 +1,1 @@
+'use strict'; class AuditHashService { hash() {} } module.exports = AuditHashService;

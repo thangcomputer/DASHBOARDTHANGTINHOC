@@ -23,7 +23,8 @@ function extractStudentCodeCandidates(content) {
 function amountsMatch(expected, actual, tolerance = 1) {
   const a = Number(expected);
   const b = Number(actual);
-  if (!(a > 0)) return true;
+  // Fail-closed: zero/unknown expected price must not auto-match arbitrary transfers
+  if (!(a > 0) || Number.isNaN(a) || Number.isNaN(b)) return false;
   return Math.abs(a - b) <= tolerance;
 }
 

@@ -1,0 +1,1 @@
+'use strict'; class DependencyPolicy { validate() {} } module.exports = DependencyPolicy;

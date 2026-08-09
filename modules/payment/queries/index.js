@@ -1,0 +1,14 @@
+'use strict';
+const { queryRegistry } = require('../../../shared/cqrs');
+const Get_payment_session_idQuery = require('./Get_payment_session_idQuery');
+const Get_payment_session_idHandler = require('./Get_payment_session_idHandler');
+queryRegistry.register('Get_payment_session_idQuery', new Get_payment_session_idHandler());
+module.exports.Get_payment_session_idQuery = Get_payment_session_idQuery;
+const Get_payment_statusQuery = require('./Get_payment_statusQuery');
+const Get_payment_statusHandler = require('./Get_payment_statusHandler');
+queryRegistry.register('Get_payment_statusQuery', new Get_payment_statusHandler());
+module.exports.Get_payment_statusQuery = Get_payment_statusQuery;
+const Get_payment_status_studentIdQuery = require('./Get_payment_status_studentIdQuery');
+const Get_payment_status_studentIdHandler = require('./Get_payment_status_studentIdHandler');
+queryRegistry.register('Get_payment_status_studentIdQuery', new Get_payment_status_studentIdHandler());
+module.exports.Get_payment_status_studentIdQuery = Get_payment_status_studentIdQuery;

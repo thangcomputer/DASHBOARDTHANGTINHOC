@@ -5,6 +5,7 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware, checkAnyPermission, checkPermission, branchFilter } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
+const { policyShadowFinance } = require('../middleware/policyShadowFinance');
 const {
   sumFinancialRevenue,
   listLedgerEntries,
@@ -14,21 +15,24 @@ const {
   rebuildDailySnapshots,
   syncStudentFinanceCache,
   postDiscount,
+  healOrphanEnrollmentPayments,
 } = require('../services/ledgerService');
 const Student = require('../models/Student');
 const logger = require('../config/logger');
 const { isLedgerSot } = require('../utils/financeFlags');
 
-const guard = [
+const readGuard = (action) => [
   authMiddleware,
-  checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE),
   branchFilter,
+  policyShadowFinance(action),
+  checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE),
 ];
 
-const manageGuard = [
+const manageGuard = (action) => [
   authMiddleware,
-  checkPermission(PERMISSIONS.MANAGE_FINANCE),
   branchFilter,
+  policyShadowFinance(action),
+  checkPermission(PERMISSIONS.MANAGE_FINANCE),
 ];
 
 function resolveBranchId(req) {
@@ -47,7 +51,7 @@ function actorOf(req) {
 }
 
 // GET /api/finance/summary
-router.get('/summary', guard, async (req, res) => {
+router.get('/summary', readGuard('summary'), async (req, res) => {
   try {
     const branchId = resolveBranchId(req);
     const from = req.query.from || null;
@@ -81,7 +85,7 @@ router.get('/summary', guard, async (req, res) => {
 });
 
 // GET /api/finance/ledger
-router.get('/ledger', guard, async (req, res) => {
+router.get('/ledger', readGuard('ledger_list'), async (req, res) => {
   try {
     const branchId = resolveBranchId(req);
     const data = await listLedgerEntries({
@@ -103,7 +107,7 @@ router.get('/ledger', guard, async (req, res) => {
 });
 
 // GET /api/finance/students/:id — card 5 chỉ tiêu TO-BE
-router.get('/students/:id', guard, async (req, res) => {
+router.get('/students/:id', readGuard('student_card'), async (req, res) => {
   try {
     const student = await Student.findById(req.params.id).select('branchId').lean();
     if (!student) {
@@ -124,8 +128,29 @@ router.get('/students/:id', guard, async (req, res) => {
   }
 });
 
+// POST /api/finance/students/:id/heal-orphans — admin reconcile only (not on GET card)
+router.post('/students/:id/heal-orphans', manageGuard('heal_orphans'), async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+    if (req.branchFilter?.branchId) {
+      const allowed = String(student.branchId || '') === String(req.branchFilter.branchId);
+      if (!allowed) {
+        return res.status(403).json({ success: false, message: 'Không có quyền heal HV chi nhánh khác' });
+      }
+    }
+    const result = await healOrphanEnrollmentPayments(student);
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
 // POST /api/finance/ledger/:id/void
-router.post('/ledger/:id/void', manageGuard, async (req, res) => {
+router.post('/ledger/:id/void', manageGuard('ledger_void'), async (req, res) => {
   try {
     const result = await voidLedgerEntry({
       entryId: req.params.id,
@@ -145,7 +170,7 @@ router.post('/ledger/:id/void', manageGuard, async (req, res) => {
 });
 
 // POST /api/finance/discount — ghi discount/coupon
-router.post('/discount', manageGuard, async (req, res) => {
+router.post('/discount', manageGuard('discount'), async (req, res) => {
   try {
     const { studentId, amount, kind, enrollmentId, courseName, note, sourceRef } = req.body || {};
     if (!studentId) {
@@ -173,7 +198,7 @@ router.post('/discount', manageGuard, async (req, res) => {
 });
 
 // GET /api/finance/reconcile
-router.get('/reconcile', manageGuard, async (req, res) => {
+router.get('/reconcile', manageGuard('reconcile'), async (req, res) => {
   try {
     const branchId = resolveBranchId(req);
     const report = await reconciliationReport({
@@ -188,7 +213,7 @@ router.get('/reconcile', manageGuard, async (req, res) => {
 });
 
 // POST /api/finance/snapshots/rebuild
-router.post('/snapshots/rebuild', manageGuard, async (req, res) => {
+router.post('/snapshots/rebuild', manageGuard('snapshots_rebuild'), async (req, res) => {
   try {
     const branchId = resolveBranchId(req);
     const result = await rebuildDailySnapshots({
@@ -204,7 +229,7 @@ router.post('/snapshots/rebuild', manageGuard, async (req, res) => {
 });
 
 // POST /api/finance/students/:id/sync-cache — recompute paidAmount từ Ledger
-router.post('/students/:id/sync-cache', manageGuard, async (req, res) => {
+router.post('/students/:id/sync-cache', manageGuard('sync_cache'), async (req, res) => {
   try {
     const data = await syncStudentFinanceCache(req.params.id);
     if (!data) {

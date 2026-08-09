@@ -1,0 +1,15 @@
+'use strict';
+const { commandRegistry } = require('../../../shared/cqrs');
+const Post_payment_sessionCommand = require('./Post_payment_sessionCommand');
+const Post_payment_sessionHandler = require('./Post_payment_sessionHandler');
+commandRegistry.register('Post_payment_sessionCommand', new Post_payment_sessionHandler());
+module.exports.Post_payment_sessionCommand = Post_payment_sessionCommand;
+const Post_create_sessionCommand = require('./Post_create_sessionCommand');
+const Post_create_sessionHandler = require('./Post_create_sessionHandler');
+commandRegistry.register('Post_create_sessionCommand', new Post_create_sessionHandler());
+module.exports.Post_create_sessionCommand = Post_create_sessionCommand;
+const Post_sepayCommand = require('./Post_sepayCommand');
+const Post_sepayHandler = require('./Post_sepayHandler');
+commandRegistry.register('Post_sepayCommand', new Post_sepayHandler());
+module.exports.Post_sepayCommand = Post_sepayCommand;
+require('../events');

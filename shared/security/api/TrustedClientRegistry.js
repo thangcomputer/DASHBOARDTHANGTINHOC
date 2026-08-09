@@ -1,0 +1,1 @@
+'use strict'; class TrustedClientRegistry { check() {} } module.exports = TrustedClientRegistry;

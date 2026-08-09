@@ -1,0 +1,1 @@
+'use strict'; class CourseProgressRepository { save() {} findByStudentAndCourse() {} } module.exports = CourseProgressRepository;

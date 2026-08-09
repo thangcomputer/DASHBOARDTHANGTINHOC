@@ -37,6 +37,8 @@ const auditLogSchema = new mongoose.Schema(
     ip: { type: String, default: '' },
     userAgent: { type: String, default: '', maxlength: 500 },
     device: { type: String, default: '' },
+    requestId: { type: String, default: '', index: true },
+    correlationId: { type: String, default: '', index: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
@@ -44,4 +46,4 @@ const auditLogSchema = new mongoose.Schema(
 auditLogSchema.index({ createdAt: -1 });
 auditLogSchema.index({ action: 1, createdAt: -1 });
 
-module.exports = mongoose.model('AuditLog', auditLogSchema);
+module.exports = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);

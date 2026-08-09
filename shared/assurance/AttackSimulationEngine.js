@@ -1,0 +1,1 @@
+'use strict'; class AttackSimulationEngine { simulate() {} } module.exports = AttackSimulationEngine;

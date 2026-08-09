@@ -1,0 +1,1 @@
+'use strict'; class DeviceService { register() {} check() {} } module.exports = DeviceService;

@@ -1,0 +1,1 @@
+'use strict'; class EncryptionPolicy { evaluate() {} } module.exports = EncryptionPolicy;

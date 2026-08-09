@@ -1,0 +1,1 @@
+'use strict'; class ResourceContext {} module.exports = ResourceContext;

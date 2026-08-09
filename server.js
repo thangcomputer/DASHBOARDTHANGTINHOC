@@ -168,9 +168,15 @@ if (isProd && process.env.MONGODB_URI) {
 app.use(session(sessionOptions));
 
 app.use(pinoHttp({ logger }));
+app.use(require('./shared/middleware/requestContext'));
 
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '1mb';
-app.use(express.json({ limit: JSON_BODY_LIMIT }));
+app.use(express.json({
+  limit: JSON_BODY_LIMIT,
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: JSON_BODY_LIMIT }));
 app.use((req, res, next) => {
   const origJson = res.json.bind(res);
@@ -217,6 +223,8 @@ const { apiRateLimitUnlessAuth } = require('./middleware/apiRateLimit');
 app.use('/api', apiRateLimitUnlessAuth);
 
 connectDB();
+const outboxWorker = require('./shared/outbox/OutboxWorker');
+outboxWorker.start();
 
 // ==========================================
 // SOCKET.IO - REAL-TIME
@@ -291,15 +299,16 @@ io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
 
   // Đăng ký user online — CHẶN SPOOFING: lấy ID/Role từ JWT thay vì tin client 100%
-  socket.on('register', async ({ branchId, branchCode }) => {
+  socket.on('register', async ({ branchId: _clientBranchId, branchCode: _clientBranchCode } = {}) => {
     if (!socket.user) return;
 
     const userId = socketUserId(socket.user);
     const messagingRole = getMessagingRole(socket.user);
     const name   = socket.user.name || 'User';
     const key    = `${messagingRole}_${userId}`;
-    const resolvedBranchId = socket.user.branchId || branchId;
-    const resolvedBranchCode = socket.user.branchCode || branchCode || '';
+    // Branch chỉ từ JWT — không tin client (chống spoof room)
+    const resolvedBranchId = socket.user.branchId || null;
+    const resolvedBranchCode = socket.user.branchCode || '';
 
     await presenceStore.upsertPresence(key, {
       socketId: socket.id,
@@ -315,9 +324,10 @@ io.on('connection', (socket) => {
 
     // Join rooms for Centralized Notification Service
     socket.join(userId);           // Unique user room
-    socket.join('GLOBAL');          // Global room
-    socket.join('feed_room');       // Bang tin hoi bai (realtime)
-    
+    socket.join('feed_room');       // Bang tin (realtime) — không join GLOBAL data bus
+    // Explicit deny: never honor client-requested GLOBAL
+    try { socket.leave('GLOBAL'); } catch { /* ignore */ }
+
     if (messagingRole) {
       const uRole = messagingRole.toUpperCase();
       socket.join(`ALL_${uRole}`);
@@ -336,6 +346,7 @@ io.on('connection', (socket) => {
         const bid = resolvedBranchId;
         socket.join(`ALL_${uRole}_${bid}`);
         socket.join(`presence_${bid}`);
+        socket.join(`branch_${bid}`);
       } else {
         socket.join('presence_none');
       }
@@ -608,6 +619,21 @@ io.on('connection', (socket) => {
     socket.join('feed_room');
   });
 
+  // Reject any attempt to join GLOBAL / spoof branch rooms from client
+  socket.on('join', (room) => {
+    if (!socket.user) return;
+    const r = String(room || '');
+    if (r === 'GLOBAL' || r === 'global') {
+      logger.warn({ socketId: socket.id, userId: socketUserId(socket.user) }, '[socket] denied join GLOBAL');
+      return;
+    }
+    // Branch rooms only via trusted register() — never via raw join
+    if (r.startsWith('branch_') || r.startsWith('presence_') || r.startsWith('ALL_')) {
+      logger.warn({ socketId: socket.id, room: r }, '[socket] denied raw join of privileged room');
+      return;
+    }
+  });
+
   socket.on('group:join', async (groupId) => {
     if (!socket.user || !groupId) return;
     try {
@@ -640,7 +666,9 @@ io.on('connection', (socket) => {
     socketRateMap.clear();
     clearInterval(rateCleanup);
     broadcastOnlinePresence();
-    io.emit('users:lastSeen', Object.fromEntries(lastSeenMap));
+    // Presence last-seen: role rooms only — không io.emit toàn cục
+    io.to('ALL_ADMIN').to('ALL_STAFF').to('ALL_SUPPORT').to('ALL_TEACHER').to('ALL_STUDENT')
+      .emit('users:lastSeen', Object.fromEntries(lastSeenMap));
     console.log(`❌ Socket disconnected: ${socket.id}`);
   });
 });
@@ -973,6 +1001,7 @@ const { initJobQueue, closeJobQueue } = require('./services/queue/jobQueue');
 async function shutdown(signal) {
   logger.info({ signal }, 'Shutting down');
   try {
+    try { outboxWorker.stop(); } catch (_) { /* ignore */ }
     await new Promise((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     });

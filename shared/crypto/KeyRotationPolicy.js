@@ -1,0 +1,1 @@
+'use strict'; class KeyRotationPolicy { evaluate() {} } module.exports = KeyRotationPolicy;

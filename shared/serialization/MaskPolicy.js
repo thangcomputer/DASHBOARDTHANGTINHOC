@@ -1,0 +1,1 @@
+'use strict'; class MaskPolicy { apply() {} } module.exports = MaskPolicy;

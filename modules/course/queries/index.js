@@ -1,0 +1,10 @@
+'use strict';
+const { queryRegistry } = require('../../../shared/cqrs');
+const Get_course_courseIdQuery = require('./Get_course_courseIdQuery');
+const Get_course_courseIdHandler = require('./Get_course_courseIdHandler');
+queryRegistry.register('Get_course_courseIdQuery', new Get_course_courseIdHandler());
+module.exports.Get_course_courseIdQuery = Get_course_courseIdQuery;
+const Get_student_studentId_course_courseIdQuery = require('./Get_student_studentId_course_courseIdQuery');
+const Get_student_studentId_course_courseIdHandler = require('./Get_student_studentId_course_courseIdHandler');
+queryRegistry.register('Get_student_studentId_course_courseIdQuery', new Get_student_studentId_course_courseIdHandler());
+module.exports.Get_student_studentId_course_courseIdQuery = Get_student_studentId_course_courseIdQuery;

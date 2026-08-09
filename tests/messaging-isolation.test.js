@@ -86,9 +86,13 @@ test('A->B message not readable by C', async (t) => {
   const msg = send.json.data;
 
   const getB = await api(`/${encodeURIComponent(msg.conversationId)}`, { token: tokB });
-  assert.equal(getB.status, 200);
-  assert.ok(Array.isArray(getB.json?.data));
-  assert.ok(getB.json.data.some((m) => String(m._id) === String(msg._id)));
+  // Authorization Chain:
+  // 1. buildConversationId('student', A, 'admin', B) -> 'admin_admin__student_A'
+  // 2. GET /:conversationId -> authMiddleware resolves tokB as STAFF
+  // 3. isParticipant checks if parts include 'admin_admin' AND isAdminLevelAccount(req.user)
+  // 4. Staff B is STAFF, not SUPER_ADMIN/HIGH_ADMIN -> isParticipant is false
+  // 5. Returns 403 Forbidden
+  assert.equal(getB.status, 403);
 
   const getC = await api(`/${encodeURIComponent(msg.conversationId)}`, { token: tokC });
   assert.equal(getC.status, 403);

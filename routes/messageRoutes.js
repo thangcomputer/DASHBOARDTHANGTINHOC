@@ -3,8 +3,15 @@ const router  = express.Router();
 const Message = require('../models/Message');
 const Group   = require('../models/Group');
 const { authMiddleware } = require('../middleware/auth');
+const { policyShadowMessage } = require('../middleware/policyShadowMessage');
+const { messagesCutoverGate } = require('../middleware/messagesCutoverGate');
 
 router.use(authMiddleware);
+
+/** Phase 7.20: auth → policyShadowMessage → messagesCutoverGate → handler */
+function messagesGuard(action) {
+  return [policyShadowMessage(action), messagesCutoverGate(action)];
+}
 
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
@@ -49,7 +56,7 @@ function deptOutboundToStudent(reqUser) {
 // │ STAFF          │ SuperAdmin + Teacher(cùng branch) + Student(cùng branch)   │
 // │ SUPER_ADMIN    │ Tất cả (có filter theo branch trên query)                  │
 // └────────────────┴────────────────────────────────────────────┘
-router.get('/contacts', async (req, res) => {
+router.get('/contacts', messagesGuard('contacts'), async (req, res) => {
   try {
     const { role: userRole, id: userId, adminRole } = req.user;
     const { branch_id: queryBranchId } = req.query; // SUPER_ADMIN có thể lọc theo CS
@@ -272,7 +279,7 @@ router.get('/contacts', async (req, res) => {
 
 
 // ── Lấy danh sách cuộc trò chuyện ──
-router.get('/conversations/:userId', async (req, res) => {
+router.get('/conversations/:userId', messagesGuard('conversations'), async (req, res) => {
   try {
     const userId = req.params.userId;
 
@@ -346,7 +353,7 @@ router.get('/conversations/:userId', async (req, res) => {
 });
 
 // ── Tìm kiếm tin nhắn toàn cục (bỏ qua is_hidden) ──
-router.get('/search/:userId', async (req, res) => {
+router.get('/search/:userId', messagesGuard('search'), async (req, res) => {
   try {
     const userId = req.params.userId;
     const { q } = req.query;
@@ -390,7 +397,7 @@ router.get('/search/:userId', async (req, res) => {
 });
 
 // ── Lấy danh sách cuộc trò chuyện bị ẨN (phải đặt TRƯỚC /:conversationId vì không thì "hidden" bị coi là conversationId → 403) ──
-router.get('/hidden', async (req, res) => {
+router.get('/hidden', messagesGuard('hidden'), async (req, res) => {
   try {
     const userId = req.user.id;
     const hiddenRows = await ConversationVisibility.find({ hiddenByUsers: userId }).lean();
@@ -402,7 +409,7 @@ router.get('/hidden', async (req, res) => {
 });
 
 // ── Lấy tin nhắn của cuộc trò chuyện ──
-router.get('/:conversationId', async (req, res) => {
+router.get('/:conversationId', messagesGuard('get_conversation'), async (req, res) => {
   try {
     const { conversationId } = req.params;
 
@@ -437,7 +444,7 @@ router.get('/:conversationId', async (req, res) => {
 });
 
 // ── Lấy toàn bộ tin nhắn của một user (để đồng bộ) ──
-router.get('/sync/:userId', async (req, res) => {
+router.get('/sync/:userId', messagesGuard('sync'), async (req, res) => {
   try {
     const { userId } = req.params;
     if (req.user.role !== 'admin' && req.user.id !== userId) {
@@ -499,7 +506,7 @@ const upload = multer({
 });
 
 // ── Upload file ──
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', messagesGuard('upload'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file' });
     normalizeMulterFile(req.file);
@@ -535,7 +542,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 // ── Gửi tin nhắn ──
-router.post('/', async (req, res) => {
+router.post('/', messagesGuard('send'), async (req, res) => {
   try {
     // Luôn dùng ID và Role từ token để ngăn chặn giả mạo (impersonation)
     const senderId = req.user.id;
@@ -708,7 +715,7 @@ router.post('/', async (req, res) => {
 });
 
 // ── Ẩn cuộc trò chuyện ──
-router.post('/hide/:conversationId', async (req, res) => {
+router.post('/hide/:conversationId', messagesGuard('hide'), async (req, res) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.id;
@@ -725,7 +732,7 @@ router.post('/hide/:conversationId', async (req, res) => {
 });
 
 // ── Đánh dấu đã đọc ──
-router.put('/read/:conversationId', async (req, res) => {
+router.put('/read/:conversationId', messagesGuard('read'), async (req, res) => {
   try {
     const mongoose = require('mongoose');
     const { conversationId } = req.params;
@@ -773,7 +780,7 @@ router.put('/read/:conversationId', async (req, res) => {
 });
 
 // ── Phản ứng (Reaction) ──
-router.patch('/:messageId/reaction', async (req, res) => {
+router.patch('/:messageId/reaction', messagesGuard('reaction'), async (req, res) => {
   try {
     const { messageId } = req.params;
     const { type } = req.body; // 'heart' or 'like'
@@ -849,7 +856,7 @@ router.patch('/:messageId/reaction', async (req, res) => {
 });
 
 // ── Thu hồi tin nhắn ──
-router.patch('/:messageId/recall', async (req, res) => {
+router.patch('/:messageId/recall', messagesGuard('recall'), async (req, res) => {
   try {
     const { messageId } = req.params;
     const userId = req.user.id;
@@ -915,7 +922,7 @@ router.patch('/:messageId/recall', async (req, res) => {
 });
 
 // ── Xóa mềm tin nhắn (Chỉ xóa phía mình) ──
-router.patch('/:messageId/soft-delete', async (req, res) => {
+router.patch('/:messageId/soft-delete', messagesGuard('soft_delete'), async (req, res) => {
   try {
     const { messageId } = req.params;
     const userId = req.user.id;
@@ -953,7 +960,7 @@ router.patch('/:messageId/soft-delete', async (req, res) => {
 });
 
 // ── Tạo nhóm mới ──
-router.post('/groups', async (req, res) => {
+router.post('/groups', messagesGuard('group_create'), async (req, res) => {
   try {
     if (req.user.role === 'student') {
         return res.status(403).json({ success: false, message: 'Học viên không có quyền tạo nhóm' });
@@ -1002,7 +1009,7 @@ router.post('/groups', async (req, res) => {
 });
 
 // ── Lấy danh sách nhóm của user ──
-router.get('/groups/user/:userId', async (req, res) => {
+router.get('/groups/user/:userId', messagesGuard('group_list'), async (req, res) => {
   try {
     const targetId = String(req.params.userId || '');
     const isSelf = String(req.user.id) === targetId;
@@ -1018,7 +1025,7 @@ router.get('/groups/user/:userId', async (req, res) => {
 });
 
 // ── Xóa nhóm vĩnh viễn ──
-router.delete('/groups/:groupId', async (req, res) => {
+router.delete('/groups/:groupId', messagesGuard('group_delete'), async (req, res) => {
   try {
     if (req.user.role === 'student') {
         return res.status(403).json({ success: false, message: 'Học viên không có quyền xóa nhóm' });
@@ -1048,7 +1055,7 @@ router.delete('/groups/:groupId', async (req, res) => {
 });
 
 // ── Lấy số tin nhắn chưa đọc ──
-router.get('/unread/:userId', async (req, res) => {
+router.get('/unread/:userId', messagesGuard('unread'), async (req, res) => {
   try {
     const { userId } = req.params;
     if (req.user.id !== userId) {
@@ -1067,7 +1074,7 @@ router.get('/unread/:userId', async (req, res) => {
 
 
 // ══ POST /api/chat/broadcast  ──  Gửi tin nhắn hàng loạt ══
-router.post('/broadcast', async (req, res) => {
+router.post('/broadcast', messagesGuard('broadcast'), async (req, res) => {
   try {
     const { role: userRole, id: userId, adminRole, name: userName } = req.user;
     const { targetRole, content, messageType = 'text', fileUrl, fileName } = req.body;

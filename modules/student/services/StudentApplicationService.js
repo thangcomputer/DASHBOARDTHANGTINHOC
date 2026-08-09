@@ -1,0 +1,1 @@
+class StudentApplicationService {}; module.exports = new StudentApplicationService();

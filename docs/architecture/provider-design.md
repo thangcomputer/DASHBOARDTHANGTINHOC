@@ -1,0 +1,1 @@
+# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nArchitecture design document for Sprint 5.3 Enterprise Workflow Automation & Integration Platform.\n\n## Overview\nDesign for DDD, CQRS, Event-Driven, Saga, and Multi-tenant requirements.

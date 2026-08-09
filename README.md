@@ -14,6 +14,12 @@ Full-stack CMS cho trung tâm đào tạo: **Express 5 + MongoDB + Socket.io**, 
 - `Dockerfile`, `docker-compose.yml` — chạy bằng container
 - `.github/workflows/node.yml` — CI (lint + test + build client)
 
+## Kiến trúc runtime (quan trọng)
+
+- **Production path:** `server.js` → `routes/*` → `models/` + `services/` (legacy live API).
+- **`modules/` + `shared/middleware/authorize` + Policy/RBAC v2:** scaffold / strangler — **chưa mount** trên Express app. Không coi là security boundary cho đến khi wire có chủ đích.
+- Permission catalog đang dùng: [`constants/permissions.js`](constants/permissions.js) (+ mirror FE).
+
 ## Yêu cầu
 
 - **Node.js 22 LTS** (khớp với `Dockerfile` / `.nvmrc`)
@@ -54,8 +60,18 @@ Bắt buộc — `validateEnv` sẽ chặn khởi động nếu thiếu/yếu.
 |------|-------|--------|
 | `JWT_SECRET` | Ký access token | dev ≥ 16 ký tự, prod ≥ 32 ký tự |
 | `JWT_REFRESH_SECRET` | Ký refresh token | **Phải khác** `JWT_SECRET` |
-| `MONGODB_URI` | Chuỗi kết nối MongoDB | |
+| `MONGODB_URI` | Chuỗi kết nối MongoDB | CQRS cần `?replicaSet=` hoặc `mongodb+srv` |
 | `CLIENT_URL` | URL frontend | **Bắt buộc** khi `NODE_ENV=production` |
+
+Tuỳ chọn CQRS / Outbox (mặc định **tắt** CQRS — xem [cqrs-phase-a-rollout.md](docs/architecture/cqrs-phase-a-rollout.md)):
+
+| Biến | Mặc định | Mô tả |
+|------|----------|--------|
+| `ENABLE_CQRS_STUDENT_CREATE` | tắt | Strangler `POST /api/students` |
+| `ENABLE_CQRS_INVOICE` | tắt | Strangler `POST /api/invoices` |
+| `ENABLE_CQRS_TEACHER` | tắt | Strangler `POST /api/teachers` |
+| `RUN_OUTBOX_WORKER` | `1` | `0` trên API khi có worker riêng |
+| `OUTBOX_LEASE_MS` | `60000` | Reclaim event `PROCESSING` kẹt |
 
 Tuỳ chọn:
 

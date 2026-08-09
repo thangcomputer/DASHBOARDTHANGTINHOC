@@ -1,0 +1,1 @@
+'use strict'; class StaticSecurityScanner { scan() {} } module.exports = StaticSecurityScanner;

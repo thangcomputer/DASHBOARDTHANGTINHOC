@@ -1,0 +1,14 @@
+'use strict';
+const { queryRegistry } = require('../../../shared/cqrs');
+const Get_rootQuery = require('./Get_rootQuery');
+const Get_rootHandler = require('./Get_rootHandler');
+queryRegistry.register('Get_rootQuery', new Get_rootHandler());
+module.exports.Get_rootQuery = Get_rootQuery;
+const Get_statsQuery = require('./Get_statsQuery');
+const Get_statsHandler = require('./Get_statsHandler');
+queryRegistry.register('Get_statsQuery', new Get_statsHandler());
+module.exports.Get_statsQuery = Get_statsQuery;
+const Get_id_payrollQuery = require('./Get_id_payrollQuery');
+const Get_id_payrollHandler = require('./Get_id_payrollHandler');
+queryRegistry.register('Get_id_payrollQuery', new Get_id_payrollHandler());
+module.exports.Get_id_payrollQuery = Get_id_payrollQuery;

@@ -6,6 +6,7 @@ const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const Transaction = require('../models/Transaction');
 const logger = require('../config/logger');
+const { emitTeacherEvent, emitDataRefresh, emitScheduleEvent } = require('../utils/realtimeEmit');
 
 const DEFINITIONS = {
   teacher_approval: {
@@ -172,12 +173,15 @@ async function applySideEffects(instance, action, io) {
     teacher.approvedAt = new Date();
     await teacher.save();
     if (io) {
-      io.emit('teacher:approved', {
+      emitTeacherEvent(io, teacher, 'teacher:approved', {
         teacherId: teacher._id.toString(),
         name: teacher.name,
         message: 'Tai khoan da duoc phe duyet qua Workflow.',
       });
-      io.emit('data:refresh', { type: 'teacher', id: teacher._id });
+      emitDataRefresh(io, { type: 'teacher', id: teacher._id }, {
+        branchId: teacher.branchId,
+        userIds: [teacher._id],
+      });
     }
     return { teacherId: teacher._id.toString(), status: teacher.status };
   }
@@ -188,7 +192,12 @@ async function applySideEffects(instance, action, io) {
       { status: 'suspended', rejectedAt: new Date() },
       { returnDocument: 'after' },
     );
-    if (io) io.emit('data:refresh', { type: 'teacher', id });
+    if (io) {
+      emitDataRefresh(io, { type: 'teacher', id }, {
+        branchId: teacher?.branchId,
+        userIds: [id],
+      });
+    }
     return { teacherId: id, status: teacher?.status || 'suspended' };
   }
 
@@ -212,8 +221,18 @@ async function applySideEffects(instance, action, io) {
       } catch (e) {
         logger.warn({ err: e.message }, '[Workflow] exam notify');
       }
-      io.emit('exam:unlocked', { studentId: student._id.toString(), studentName: student.name });
-      io.emit('data:refresh', { type: 'student', id: student._id });
+      emitScheduleEvent(io, {
+        branchId: student.branchId,
+        studentId: student._id,
+        teacherId: student.teacherId,
+      }, 'exam:unlocked', {
+        studentId: student._id.toString(),
+        studentName: student.name,
+      });
+      emitDataRefresh(io, { type: 'student', id: student._id }, {
+        branchId: student.branchId,
+        userIds: [student._id, student.teacherId].filter(Boolean),
+      });
     }
     return { studentId: student._id.toString(), unlocked: true };
   }
@@ -229,7 +248,12 @@ async function applySideEffects(instance, action, io) {
       { returnDocument: 'after' },
     );
     if (!tx) throw Object.assign(new Error('Khong tim thay giao dich'), { status: 404 });
-    if (io) io.emit('data:refresh', { type: 'transaction', id });
+    if (io) {
+      emitDataRefresh(io, { type: 'transaction', id }, {
+        branchId: tx.branchId,
+        userIds: tx.teacherId ? [tx.teacherId] : [],
+      });
+    }
     return { transactionId: id, status: 'confirmed' };
   }
 

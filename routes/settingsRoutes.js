@@ -6,8 +6,7 @@ const fs = require('fs');
 
 const SystemSettings = require('../models/SystemSettings');
 const { verifyAdminPassword } = require('../utils/adminPassword');
-const { authMiddleware, checkPermission, checkAnyPermission } = require('../middleware/auth');
-const { PERMISSIONS } = require('../constants/permissions');
+const { authMiddleware } = require('../middleware/auth');
 const logger = require('../config/logger');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
 const {
@@ -20,6 +19,19 @@ const {
 } = require('../services/examSubjectCatalog');
 const { getCachedSettings, invalidateSettingsCache } = require('../services/settingsCache');
 const Course = require('../models/Course');
+const { emitSystemWide } = require('../utils/realtimeEmit');
+const { policyShadowSettings } = require('../middleware/policyShadowSettings');
+const { settingsCutoverGate } = require('../middleware/settingsCutoverGate');
+
+/** Phase 7.19: policyShadowSettings → settingsCutoverGate (auth applied separately when required) */
+function settingsGuard(action) {
+  return [policyShadowSettings(action), settingsCutoverGate(action)];
+}
+
+/** Settings là TENANT/GLOBAL (SystemSettings _key=main) — ping refresh không kèm secret. */
+function emitSettingsRefresh(io) {
+  emitSystemWide(io, 'data:refresh', { type: 'settings', scope: 'system' });
+}
 
 /** Chuyển URL đầy đủ http(s)://.../uploads/... → /uploads/... (tránh mixed-content trên HTTPS) */
 function normalizeUploadFileUrl(url) {
@@ -81,7 +93,7 @@ async function updateMainSettings(update, options = {}) {
 
 // ── GET /api/settings/bank ─────────────────────────────────── (Public - chỉ bank info)
 // Chỉ trả thông tin ngân hàng để hiển thị QR - an toàn public
-router.get('/bank', async (req, res) => {
+router.get('/bank', ...settingsGuard('public_read'), async (req, res) => {
   try {
     const settings = await getSettings();
     return res.json({
@@ -99,7 +111,7 @@ router.get('/bank', async (req, res) => {
 });
 
 // ── GET /api/settings ─────────────────────────────────────────── (Admin only)
-router.get('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
+router.get('/', authMiddleware, ...settingsGuard('system_read'), async (req, res) => {
   try {
     const settings = await getSettings();
     return res.json({ success: true, data: settings });
@@ -109,7 +121,7 @@ router.get('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), as
 });
 
 // ── PUT /api/settings ─────────────────────────────────────────── (Admin only)
-router.put('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
+router.put('/', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
     const allowed = [
       'popupIsActive', 'popupTitle', 'popupContent', 'popupImageUrl', 'popupTargetRole',
@@ -129,7 +141,7 @@ router.put('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), as
 });
 
 // ── POST /api/settings/upload-popup-image ── Upload banner popup ─────────────
-router.post('/upload-popup-image', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), upload.single('image'), async (req, res) => {
+router.post('/upload-popup-image', authMiddleware, ...settingsGuard('system_write'), upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const imageUrl = `/uploads/popup/${req.file.filename}`;
@@ -162,7 +174,7 @@ const uploadSig = multer({
   },
 });
 
-router.post('/upload-invoice-signature', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), uploadSig.single('image'), async (req, res) => {
+router.post('/upload-invoice-signature', authMiddleware, ...settingsGuard('system_write'), uploadSig.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const signatureUrl = `/uploads/signature/${req.file.filename}`;
@@ -176,7 +188,7 @@ router.post('/upload-invoice-signature', authMiddleware, checkPermission(PERMISS
 });
 
 // ── GET /api/settings/popup ──── Public (Student & Teacher gọi khi login) ─────
-router.get('/popup', authMiddleware, async (req, res) => {
+router.get('/popup', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
     return res.json({
@@ -196,7 +208,7 @@ router.get('/popup', authMiddleware, async (req, res) => {
 
 // ── GET /api/settings/payment ── PUBLIC — Lấy thông tin ngân hàng trung tâm ──
 // Không cần auth: trang đăng ký học viên mới gọi endpoint này mà không có token
-router.get('/payment', async (req, res) => {
+router.get('/payment', ...settingsGuard('public_read'), async (req, res) => {
   try {
     const settings = await getSettings();
     return res.json({
@@ -215,7 +227,7 @@ router.get('/payment', async (req, res) => {
 
 // ── GET /api/settings/web ── PUBLIC — Logo, Loading style, Staff popup ────────
 // Frontend gọi ngay khi khởi tạo App để render loading screen + logo
-router.get('/web', async (req, res) => {
+router.get('/web', ...settingsGuard('public_read'), async (req, res) => {
   try {
     const settings = await getSettings();
     return res.json({
@@ -242,7 +254,7 @@ router.get('/web', async (req, res) => {
 });
 
 // ── PUT /api/settings/web ── Admin only — Cập nhật cài đặt web ───────────────
-router.put('/web', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
+router.put('/web', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
     const updates = {};
     const { logoUrl, faviconUrl, faviconAdminUrl, loadingStyle, staffPopup } = req.body;
@@ -268,7 +280,7 @@ router.put('/web', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS),
 });
 
 // ── GET /api/settings/training-data ── Lấy training data (Cho mọi user) ───────────
-router.get('/training-data', authMiddleware, async (req, res) => {
+router.get('/training-data', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
     const data = normalizeTrainingDataUrls(settings.trainingRawData || { videos: [], guides: [], files: [] });
@@ -279,12 +291,11 @@ router.get('/training-data', authMiddleware, async (req, res) => {
 });
 
 // ── PUT /api/settings/training-data ── Cập nhật training data (Admin) ─────────────
-router.put('/training-data', authMiddleware, checkPermission(PERMISSIONS.MANAGE_TRAINING), async (req, res) => {
+router.put('/training-data', authMiddleware, ...settingsGuard('training_write'), async (req, res) => {
   try {
     await updateMainSettings({ $set: { trainingRawData: req.body.trainingData } });
-    // Broadcast via socket that training data was updated
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh');
+    if (io) emitSettingsRefresh(io);
 
     return res.json({ success: true, message: 'Đã cập nhật training data' });
   } catch (err) {
@@ -293,7 +304,7 @@ router.put('/training-data', authMiddleware, checkPermission(PERMISSIONS.MANAGE_
 });
 
 // ── GET /api/settings/student-training-data ── Lấy student training data (Cho mọi user) ───────────
-router.get('/student-training-data', authMiddleware, async (req, res) => {
+router.get('/student-training-data', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
     const data = normalizeTrainingDataUrls(settings.studentTrainingRawData || { videos: [], guides: [], files: [] });
@@ -304,12 +315,11 @@ router.get('/student-training-data', authMiddleware, async (req, res) => {
 });
 
 // ── PUT /api/settings/student-training-data ── Cập nhật student training data (Admin) ─────────────
-router.put('/student-training-data', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING), async (req, res) => {
+router.put('/student-training-data', authMiddleware, ...settingsGuard('student_training_write'), async (req, res) => {
   try {
     await updateMainSettings({ $set: { studentTrainingRawData: req.body.studentTrainingData } });
-    // Broadcast via socket that data was updated
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh');
+    if (io) emitSettingsRefresh(io);
 
     return res.json({ success: true, message: 'Đã cập nhật dữ liệu học viên' });
   } catch (err) {
@@ -396,7 +406,7 @@ async function examCatalogPayload(settings) {
 }
 
 // ── GET /api/settings/student-exam-config ── Ngân hàng TN HV + phút làm bài (mọi role đăng nhập)
-router.get('/student-exam-config', authMiddleware, async (req, res) => {
+router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
     const bank = settings.studentExamBankRawData;
@@ -480,7 +490,7 @@ function sanitizeTeacherExamTimeLimitMinutes(raw) {
 }
 
 // ── GET /api/settings/teacher-exam-config ── Ngân hàng câu hỏi thi GV (mọi role đăng nhập — chỉ GV cần)
-router.get('/teacher-exam-config', authMiddleware, async (req, res) => {
+router.get('/teacher-exam-config', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
     const bank = settings.teacherExamBankRawData;
@@ -514,7 +524,7 @@ router.get('/teacher-exam-config', authMiddleware, async (req, res) => {
 });
 
 // ── PUT /api/settings/teacher-exam-config ── Admin/Staff lưu ngân hàng thi GV (+ phút làm bài tùy chọn)
-router.put('/teacher-exam-config', authMiddleware, checkPermission(PERMISSIONS.MANAGE_TRAINING), async (req, res) => {
+router.put('/teacher-exam-config', authMiddleware, ...settingsGuard('training_write'), async (req, res) => {
   try {
     const { questions, timeLimitMinutes, teacherExamMinutes, teacherEssayExamMinutes } = req.body || {};
     const settings = await getSettings();
@@ -573,7 +583,7 @@ router.put('/teacher-exam-config', authMiddleware, checkPermission(PERMISSIONS.M
     }
     await updateMainSettings({ $set });
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh');
+    if (io) emitSettingsRefresh(io);
     const fresh = await getSettings();
     const freshTn = fresh?.teacherExamMinutesRaw;
     const freshTl = fresh?.teacherEssayExamMinutesRaw;
@@ -593,7 +603,7 @@ router.put('/teacher-exam-config', authMiddleware, checkPermission(PERMISSIONS.M
 });
 
 // ── GET /api/settings/exam-subjects ── Danh muc mon thi (mac dinh + tuy chinh + sync Course)
-router.get('/exam-subjects', authMiddleware, async (req, res) => {
+router.get('/exam-subjects', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
     const catalog = await examCatalogPayload(settings);
@@ -604,7 +614,7 @@ router.get('/exam-subjects', authMiddleware, async (req, res) => {
 });
 
 // ── POST /api/settings/exam-subjects ── Admin them mon thi moi
-router.post('/exam-subjects', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
+router.post('/exam-subjects', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
     const entry = sanitizeCustomExamSubjectEntry(req.body || {});
     if (!entry) {
@@ -630,7 +640,7 @@ router.post('/exam-subjects', authMiddleware, checkPermission(PERMISSIONS.SYSTEM
       },
     });
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh');
+    if (io) emitSettingsRefresh(io);
     return res.status(201).json({
       success: true,
       message: `Da them mon thi "${entry.label}"`,
@@ -642,7 +652,7 @@ router.post('/exam-subjects', authMiddleware, checkPermission(PERMISSIONS.SYSTEM
 });
 
 // ── DELETE /api/settings/exam-subjects/:id ── Admin xoa mon tuy chinh
-router.delete('/exam-subjects/:id', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
+router.delete('/exam-subjects/:id', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!id || BUILTIN_EXAM_SUBJECT_IDS.includes(id)) {
@@ -652,7 +662,7 @@ router.delete('/exam-subjects/:id', authMiddleware, checkPermission(PERMISSIONS.
     const custom = normalizeCustomList(settings?.examSubjectsCustomRaw).filter((c) => c.id !== id);
     await updateMainSettings({ $set: { examSubjectsCustomRaw: custom } });
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh');
+    if (io) emitSettingsRefresh(io);
     return res.json({ success: true, message: 'Da xoa mon thi', data: { merged: getMergedExamCatalog(custom) } });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -660,7 +670,7 @@ router.delete('/exam-subjects/:id', authMiddleware, checkPermission(PERMISSIONS.
 });
 
 // ── PUT /api/settings/student-exam-config ── Admin/Staff lưu ngân hàng + thời gian thi HV
-router.put('/student-exam-config', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING), async (req, res) => {
+router.put('/student-exam-config', authMiddleware, ...settingsGuard('student_training_write'), async (req, res) => {
   try {
     const { studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles } = req.body || {};
     const updates = {};
@@ -684,7 +694,7 @@ router.put('/student-exam-config', authMiddleware, checkPermission(PERMISSIONS.M
     }
     await updateMainSettings({ $set: updates });
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh');
+    if (io) emitSettingsRefresh(io);
     return res.json({ success: true, message: 'Đã lưu cấu hình thi học viên' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -745,7 +755,7 @@ const uploadTraining = multer({
   },
 });
 
-router.post('/upload-training-file', authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.MANAGE_STUDENT_TRAINING), (req, res) => {
+router.post('/upload-training-file', authMiddleware, ...settingsGuard('training_upload'), (req, res) => {
   uploadTraining.single('file')(req, res, (err) => {
     if (err) {
       if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
@@ -787,7 +797,7 @@ const uploadLogo = multer({
   },
 });
 
-router.post('/upload-logo', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), uploadLogo.single('logo'), async (req, res) => {
+router.post('/upload-logo', authMiddleware, ...settingsGuard('system_write'), uploadLogo.single('logo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const logoUrl = `/uploads/logo/${req.file.filename}`;
@@ -820,7 +830,7 @@ const uploadFavicon = multer({
   },
 });
 
-router.post('/upload-favicon', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), uploadFavicon.single('favicon'), async (req, res) => {
+router.post('/upload-favicon', authMiddleware, ...settingsGuard('system_write'), uploadFavicon.single('favicon'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const kind = String(req.query?.kind || req.body?.kind || 'public').toLowerCase() === 'admin' ? 'admin' : 'public';
@@ -859,7 +869,7 @@ const uploadInvLogo = multer({
   },
 });
 
-router.post('/upload-invoice-logo', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), uploadInvLogo.single('logo'), async (req, res) => {
+router.post('/upload-invoice-logo', authMiddleware, ...settingsGuard('system_write'), uploadInvLogo.single('logo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
     const logoUrl = `/uploads/invoice_logo/${req.file.filename}`;
@@ -889,7 +899,7 @@ const PayrollLog = require('../models/PayrollLog');
 const Employee = require('../models/Employee');
 const mongoose = require('mongoose');
 
-router.post('/reset-data', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
+router.post('/reset-data', authMiddleware, ...settingsGuard('reset'), async (req, res) => {
   const { phrase, password, options = { all: true } } = req.body;
   const userId = req.user.id;
 
@@ -984,10 +994,11 @@ router.post('/reset-data', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SE
     // Auto-unlock tất cả giáo viên
     await Teacher.updateMany({}, { $set: { isLocked: false, loginAttempts: 0, lockReason: null } });
 
-    // 3. Thông báo cho Socket
+    // 3. SYSTEM_RESET — intentional system-wide to authenticated role rooms.
+    // Authz: SYSTEM_SETTINGS + Super Admin password. Payload: empty (clients clear local storage).
     const io = req.app.get('io');
     if (io) {
-       io.emit('SYSTEM_RESET');
+      emitSystemWide(io, 'SYSTEM_RESET', {});
     }
 
     return res.json({ success: true, message: 'Làm mới dữ liệu hệ thống thành công' });

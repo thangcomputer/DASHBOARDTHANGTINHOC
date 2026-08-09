@@ -11,10 +11,10 @@ test('buildReceiverMatch: admin gets ALL_ADMIN', () => {
   assert.ok(receivers.includes('ALL_ADMIN'));
 });
 
-test('buildReceiverMatch: staff gets ALL_ADMIN', () => {
+test('buildReceiverMatch: staff does not get ALL_ADMIN', () => {
   const { match } = buildReceiverMatch({ id: 's1', role: 'staff', adminRole: 'STAFF', branchId: 'b1' });
   const receivers = match.map((m) => m.receivers);
-  assert.ok(receivers.includes('ALL_ADMIN'));
+  assert.ok(!receivers.includes('ALL_ADMIN'));
   assert.ok(receivers.includes('ALL_ADMIN_b1'));
 });
 

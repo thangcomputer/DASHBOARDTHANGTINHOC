@@ -1,0 +1,1 @@
+# Blue-Green Deployment Review\nStateless API design allows immediate blue-green swap at load balancer.

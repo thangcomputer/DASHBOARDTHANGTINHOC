@@ -1,0 +1,1 @@
+'use strict'; class CompleteCourseHandler { handle() {} } module.exports = CompleteCourseHandler;

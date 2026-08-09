@@ -2,11 +2,19 @@ const express = require('express');
 const Evaluation = require('../models/Evaluation');
 const Teacher = require('../models/Teacher');
 const { authMiddleware } = require('../middleware/auth');
+const { policyShadowEvaluation } = require('../middleware/policyShadowEvaluation');
+const { evaluationsCutoverGate } = require('../middleware/evaluationsCutoverGate');
+const { emitDataRefresh } = require('../utils/realtimeEmit');
 
 const router = express.Router();
 
+/** Phase 7.25: policyShadowEvaluation → evaluationsCutoverGate */
+function evaluationsGuard(action) {
+  return [policyShadowEvaluation(action), evaluationsCutoverGate(action)];
+}
+
 // ─── ADMIN lấy danh sách phản hồi mật ──────────────────────────────────────
-router.get('/admin', authMiddleware, async (req, res) => {
+router.get('/admin', authMiddleware, ...evaluationsGuard('admin_list'), async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'staff') {
       return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
@@ -35,7 +43,7 @@ router.get('/admin', authMiddleware, async (req, res) => {
 });
 
 // ─── Lấy Review Công khai của Giáo viên ────────────────────────────────────
-router.get('/teacher/:teacherId', authMiddleware, async (req, res) => {
+router.get('/teacher/:teacherId', authMiddleware, ...evaluationsGuard('teacher_ratings'), async (req, res) => {
   try {
     const evals = await Evaluation.find({ type: 'teacher_rating', targetTeacherId: req.params.teacherId }).sort({ updatedAt: -1, createdAt: -1 });
     const seen = new Set();
@@ -60,7 +68,7 @@ router.get('/teacher/:teacherId', authMiddleware, async (req, res) => {
 });
 
 // ─── Học viên gửi hoặc cập nhật đánh giá ───────────────────────────────────
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, ...evaluationsGuard('create'), async (req, res) => {
   try {
     const { studentId, targetTeacherId, courseId, type, criteria, content, studentName, teacherName, courseName, milestone } = req.body;
     
@@ -139,8 +147,12 @@ router.post('/', authMiddleware, async (req, res) => {
              payload: { evaluationId: evalDoc._id },
              link: '/teacher'
            });
-           
-           io.emit('data:refresh', { type: 'evaluation', targetId: targetTeacherId });
+
+           const teacherDoc = await Teacher.findById(targetTeacherId).select('branchId').lean();
+           emitDataRefresh(io, { type: 'evaluation', targetId: targetTeacherId }, {
+             branchId: teacherDoc?.branchId || studentInfo?.branchId || null,
+             userIds: [targetTeacherId, studentId].filter(Boolean),
+           });
         }
       }
     }
@@ -151,7 +163,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // ─── Đánh dấu đã đọc đánh giá ───────────────────────────────────────────────
-router.post('/:id/read', authMiddleware, async (req, res) => {
+router.post('/:id/read', authMiddleware, ...evaluationsGuard('mark_read'), async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'staff' && req.user.role !== 'teacher') {
       return res.status(403).json({ success: false, message: 'Không có quyền' });
@@ -176,4 +188,3 @@ router.post('/:id/read', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
-

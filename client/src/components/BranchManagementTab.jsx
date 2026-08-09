@@ -11,8 +11,9 @@ import {
 } from 'lucide-react';
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
+import { csrfFetch } from '../services/api';
 
-const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
+const API = import.meta.env.VITE_API_URL || '';
 
 function getToken() {
   for (const role of ['admin','staff','teacher']) {
@@ -63,7 +64,7 @@ function BranchModal({ branch, onClose, onSaved }) {
     try {
       const url    = isEdit ? `${API}/api/branches/${branch._id}` : `${API}/api/branches`;
       const method = isEdit ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await csrfFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ ...form, code: form.code.toUpperCase() }),
@@ -165,7 +166,7 @@ export default function BranchManagementTab() {
       onConfirm: async () => {
         setDeleting(b._id);
         try {
-          const res = await fetch(`${API}/api/branches/${b._id}`, {
+          const res = await csrfFetch(`${API}/api/branches/${b._id}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${getToken()}` },
           }).then(r => r.json());

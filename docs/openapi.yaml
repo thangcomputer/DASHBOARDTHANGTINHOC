@@ -24,6 +24,7 @@ tags:
   - name: Workflows
   - name: Builder
   - name: Tenants
+  - name: Finance
 
 paths:
   /healthz:
@@ -155,6 +156,40 @@ paths:
       responses:
         "200":
           description: Count
+
+  /api/messages:
+    post:
+      tags: [Messages]
+      summary: Send a direct message or broadcast
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [receiverId, content]
+              properties:
+                receiverId: { type: string }
+                content: { type: string }
+      responses:
+        "201":
+          description: Message sent
+
+  /api/messages/{conversationId}:
+    get:
+      tags: [Messages]
+      summary: Get messages for a specific conversation
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: conversationId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of messages
 
   /api/files/upload:
     post:
@@ -381,3 +416,29 @@ components:
       required: false
       schema: { type: string }
       description: Super Admin tenant scope
+
+  /api/finance/students/{id}/sync-cache:
+    post:
+      tags: [Finance]
+      summary: Sync student finance cache from ledger
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Cache synced successfully
+          
+  /api/finance/snapshots/rebuild:
+    post:
+      tags: [Finance]
+      summary: Rebuild finance snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      responses:
+        "200":
+          description: Snapshots rebuilt

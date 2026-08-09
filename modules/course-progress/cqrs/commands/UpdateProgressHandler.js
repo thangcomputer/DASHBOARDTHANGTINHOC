@@ -1,0 +1,1 @@
+'use strict'; class UpdateProgressHandler { handle() {} } module.exports = UpdateProgressHandler;

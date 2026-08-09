@@ -1,14 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, isAdmin } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
+const { policyShadowBuilder } = require('../middleware/policyShadowBuilder');
+const { builderCutoverGate } = require('../middleware/builderCutoverGate');
 const formService = require('../services/formService');
 const reportService = require('../services/reportService');
-const logger = require('../config/logger');
 
-const adminGuard = [authMiddleware, isAdmin];
+/**
+ * Phase 7.10 — Controlled cutover for /api/builder ONLY.
+ *
+ * Admin routes:
+ *   auth → policyShadowBuilder → builderCutoverGate → (Legacy isAdmin when not Policy) → handler
+ *
+ * Public form_get / form_submit:
+ *   policyShadowBuilder → builderCutoverGate → handler
+ *   (no authMiddleware; draft hide remains 404; soft JWT stays in shadow only)
+ *
+ * form_submit_auth:
+ *   auth → policyShadowBuilder → builderCutoverGate → handler
+ *
+ * Handlers retain create/update/delete/submit/run. Mass-assignment behavior unchanged.
+ */
+const adminGuard = (action) => [
+  authMiddleware,
+  policyShadowBuilder(action),
+  builderCutoverGate(action),
+];
 
 // ── Forms ────────────────────────────────────────────────────────────────────
-router.get('/forms', adminGuard, async (req, res) => {
+router.get('/forms', adminGuard('form_list'), async (req, res) => {
   try {
     const result = await formService.listForms({ status: req.query.status });
     res.json({ success: true, ...result });
@@ -17,7 +37,7 @@ router.get('/forms', adminGuard, async (req, res) => {
   }
 });
 
-router.get('/forms/:idOrSlug', async (req, res) => {
+router.get('/forms/:idOrSlug', policyShadowBuilder('form_get'), builderCutoverGate('form_get'), async (req, res) => {
   try {
     // public neu published; admin xem moi trang thai
     let form;
@@ -46,7 +66,7 @@ router.get('/forms/:idOrSlug', async (req, res) => {
   }
 });
 
-router.post('/forms', adminGuard, async (req, res) => {
+router.post('/forms', adminGuard('form_create'), async (req, res) => {
   try {
     const form = await formService.createForm({ ...req.body, createdBy: req.user.id });
     res.status(201).json({ success: true, data: form });
@@ -55,7 +75,7 @@ router.post('/forms', adminGuard, async (req, res) => {
   }
 });
 
-router.put('/forms/:id', adminGuard, async (req, res) => {
+router.put('/forms/:id', adminGuard('form_update'), async (req, res) => {
   try {
     const form = await formService.updateForm(req.params.id, req.body || {});
     res.json({ success: true, data: form });
@@ -64,7 +84,7 @@ router.put('/forms/:id', adminGuard, async (req, res) => {
   }
 });
 
-router.delete('/forms/:id', adminGuard, async (req, res) => {
+router.delete('/forms/:id', adminGuard('form_delete'), async (req, res) => {
   try {
     const data = await formService.deleteForm(req.params.id);
     res.json({ success: true, data });
@@ -74,7 +94,7 @@ router.delete('/forms/:id', adminGuard, async (req, res) => {
 });
 
 // Public submit (published forms)
-router.post('/forms/:idOrSlug/submit', async (req, res) => {
+router.post('/forms/:idOrSlug/submit', policyShadowBuilder('form_submit'), builderCutoverGate('form_submit'), async (req, res) => {
   try {
     const user = req.user; // co the khong co
     const sub = await formService.submitForm(req.params.idOrSlug, {
@@ -90,7 +110,7 @@ router.post('/forms/:idOrSlug/submit', async (req, res) => {
 });
 
 // Optional auth for submit identity
-router.post('/forms/:idOrSlug/submit-auth', authMiddleware, async (req, res) => {
+router.post('/forms/:idOrSlug/submit-auth', authMiddleware, policyShadowBuilder('form_submit_auth'), builderCutoverGate('form_submit_auth'), async (req, res) => {
   try {
     const sub = await formService.submitForm(req.params.idOrSlug, {
       answers: req.body?.answers || req.body,
@@ -104,7 +124,7 @@ router.post('/forms/:idOrSlug/submit-auth', authMiddleware, async (req, res) => 
   }
 });
 
-router.get('/forms/:id/submissions', adminGuard, async (req, res) => {
+router.get('/forms/:id/submissions', adminGuard('form_submissions'), async (req, res) => {
   try {
     const form = await formService.getForm(req.params.id);
     const result = await formService.listSubmissions(form._id, {
@@ -117,7 +137,7 @@ router.get('/forms/:id/submissions', adminGuard, async (req, res) => {
   }
 });
 
-router.get('/forms/:id/submissions/export', adminGuard, async (req, res) => {
+router.get('/forms/:id/submissions/export', adminGuard('form_submissions_export'), async (req, res) => {
   try {
     const form = await formService.getForm(req.params.id);
     const result = await formService.listSubmissions(form._id, { page: 1, limit: 2000 });
@@ -131,11 +151,11 @@ router.get('/forms/:id/submissions/export', adminGuard, async (req, res) => {
 });
 
 // ── Reports ──────────────────────────────────────────────────────────────────
-router.get('/reports/sources', adminGuard, (req, res) => {
+router.get('/reports/sources', adminGuard('report_sources'), (req, res) => {
   res.json({ success: true, data: reportService.listSources() });
 });
 
-router.get('/reports', adminGuard, async (req, res) => {
+router.get('/reports', adminGuard('report_list'), async (req, res) => {
   try {
     const result = await reportService.listReports({ page: req.query.page });
     res.json({ success: true, ...result });
@@ -144,7 +164,7 @@ router.get('/reports', adminGuard, async (req, res) => {
   }
 });
 
-router.post('/reports', adminGuard, async (req, res) => {
+router.post('/reports', adminGuard('report_create'), async (req, res) => {
   try {
     const report = await reportService.createReport({ ...req.body, createdBy: req.user.id });
     res.status(201).json({ success: true, data: report });
@@ -153,7 +173,7 @@ router.post('/reports', adminGuard, async (req, res) => {
   }
 });
 
-router.put('/reports/:id', adminGuard, async (req, res) => {
+router.put('/reports/:id', adminGuard('report_update'), async (req, res) => {
   try {
     const report = await reportService.updateReport(req.params.id, req.body || {});
     res.json({ success: true, data: report });
@@ -162,7 +182,7 @@ router.put('/reports/:id', adminGuard, async (req, res) => {
   }
 });
 
-router.delete('/reports/:id', adminGuard, async (req, res) => {
+router.delete('/reports/:id', adminGuard('report_delete'), async (req, res) => {
   try {
     const data = await reportService.deleteReport(req.params.id);
     res.json({ success: true, data });
@@ -171,7 +191,7 @@ router.delete('/reports/:id', adminGuard, async (req, res) => {
   }
 });
 
-router.get('/reports/:id/run', adminGuard, async (req, res) => {
+router.get('/reports/:id/run', adminGuard('report_run'), async (req, res) => {
   try {
     const data = await reportService.runReport(req.params.id, { limit: req.query.limit });
     res.json({ success: true, data });
@@ -180,7 +200,7 @@ router.get('/reports/:id/run', adminGuard, async (req, res) => {
   }
 });
 
-router.get('/reports/:id/export', adminGuard, async (req, res) => {
+router.get('/reports/:id/export', adminGuard('report_export'), async (req, res) => {
   try {
     const data = await reportService.runReport(req.params.id, { limit: req.query.limit || 2000 });
     const csv = reportService.rowsToCsv(data.columns, data.rows);

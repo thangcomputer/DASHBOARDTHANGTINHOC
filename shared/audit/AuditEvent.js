@@ -1,0 +1,1 @@
+'use strict'; const DomainEvent = require('../events/DomainEvent'); class AuditEvent extends DomainEvent { constructor(data) { super(); Object.assign(this, data); } } module.exports = AuditEvent;

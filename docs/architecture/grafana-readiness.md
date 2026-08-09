@@ -1,0 +1,1 @@
+# Grafana Readiness\nDashboards structured and stored as config-as-code JSONs in `docs/architecture/dashboards/`.

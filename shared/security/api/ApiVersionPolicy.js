@@ -1,0 +1,1 @@
+'use strict'; class ApiVersionPolicy { evaluate() {} } module.exports = ApiVersionPolicy;

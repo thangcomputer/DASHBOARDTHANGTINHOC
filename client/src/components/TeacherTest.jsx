@@ -785,6 +785,8 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     if (!isMonitoredSession || banReason) return;
 
     const registerTabLeave = () => {
+      const inPractical = practicalMonitorActiveRef.current;
+      if (inPractical) return; // Bỏ qua giám sát chuyển tab khi làm phần tự luận
       if (Date.now() < tabGuardSuspendedUntilRef.current) return;
       const now = Date.now();
       if (now - lastTabViolationAtRef.current < 1200) return;

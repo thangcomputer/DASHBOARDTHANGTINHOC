@@ -13,6 +13,21 @@ let notifyQueue = null;
 let pdfQueue = null;
 const workers = [];
 const connections = [];
+/** Simple in-memory DLQ snapshot (last N failed jobs) for monitoring */
+const failedJobLog = [];
+const FAILED_JOB_LOG_MAX = 100;
+
+function recordFailedJob(job, err) {
+  failedJobLog.unshift({
+    at: new Date().toISOString(),
+    id: job?.id,
+    name: job?.name,
+    queue: job?.queueName,
+    attemptsMade: job?.attemptsMade,
+    err: err?.message || String(err),
+  });
+  if (failedJobLog.length > FAILED_JOB_LOG_MAX) failedJobLog.length = FAILED_JOB_LOG_MAX;
+}
 
 function parseRedisUrl(url) {
   try {
@@ -90,7 +105,8 @@ async function initJobQueue(opts = {}) {
 
       for (const w of [notifyWorker, pdfWorker]) {
         w.on('failed', (job, err) => {
-          logger.warn({ job: job?.name, id: job?.id, err: err.message }, '[Queue] job failed');
+          recordFailedJob(job, err);
+          logger.warn({ job: job?.name, id: job?.id, err: err.message }, '[Queue] job failed (DLQ log)');
         });
         workers.push(w);
       }
@@ -112,48 +128,61 @@ async function initJobQueue(opts = {}) {
 
 async function enqueue(kind, name, data, opts = {}) {
   const queue = kind === 'notify' ? notifyQueue : kind === 'pdf' ? pdfQueue : null;
+  const jobId = opts.jobId || data?.idempotencyKey || data?.jobId || null;
+  const jobOpts = { ...opts };
+  if (jobId) jobOpts.jobId = String(jobId);
 
   if (mode === 'bullmq' && queue) {
-    const job = await queue.add(name, data, defaultJobOpts(opts));
+    const job = await queue.add(name, data, defaultJobOpts(jobOpts));
     return { id: String(job.id), mode: 'bullmq', queue: kind, name };
   }
 
   // Inline: khong block request — chay o tick tiep theo
-  const inlineId = `inline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const inlineId = jobId ? String(jobId) : `inline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   setImmediate(() => {
     runInline(kind, name, data).catch((err) => {
+      recordFailedJob({ id: inlineId, name, queueName: kind }, err);
       logger.warn({ err: err.message, name, kind }, '[Queue] inline job failed');
     });
   });
   return { id: inlineId, mode: 'inline', queue: kind, name };
 }
 
-function enqueueOtp(data, opts) {
-  return enqueue('notify', 'otp', data, opts);
+function enqueueOtp(data, opts = {}) {
+  const jobId = opts.jobId || (data?.phone ? `otp:${data.phone}:${data?.purpose || 'default'}` : undefined);
+  return enqueue('notify', 'otp', data, { ...opts, ...(jobId ? { jobId } : {}) });
 }
 
-function enqueuePassword(data, opts) {
-  return enqueue('notify', 'password', data, opts);
+function enqueuePassword(data, opts = {}) {
+  const jobId = opts.jobId || (data?.userId ? `password:${data.userId}:${Date.now()}` : undefined);
+  return enqueue('notify', 'password', data, { ...opts, ...(jobId ? { jobId } : {}) });
 }
 
-function enqueueWelcome(data, opts) {
-  return enqueue('notify', 'welcome', data, opts);
+function enqueueWelcome(data, opts = {}) {
+  const jobId = opts.jobId || (data?.userId ? `welcome:${data.userId}` : undefined);
+  return enqueue('notify', 'welcome', data, { ...opts, ...(jobId ? { jobId } : {}) });
 }
 
-function enqueueInvoicePdf(data, opts) {
-  return enqueue('pdf', 'invoice', data, opts);
+function enqueueInvoicePdf(data, opts = {}) {
+  const jobId = opts.jobId || (data?.invoiceId ? `pdf:invoice:${data.invoiceId}` : undefined);
+  return enqueue('pdf', 'invoice', data, { ...opts, ...(jobId ? { jobId } : {}) });
 }
 
-function enqueueInvoiceEmail(data, opts) {
-  return enqueue('notify', 'invoice-email', data, opts);
+function enqueueInvoiceEmail(data, opts = {}) {
+  const jobId = opts.jobId || (data?.invoiceId ? `email:invoice:${data.invoiceId}` : undefined);
+  return enqueue('notify', 'invoice-email', data, { ...opts, ...(jobId ? { jobId } : {}) });
 }
 
-function enqueueBackup(data, opts) {
+function enqueueBackup(data, opts = {}) {
   return enqueue('notify', 'backup', data, { attempts: 1, ...opts });
 }
 
 function getQueueMode() {
   return mode;
+}
+
+function getFailedJobLog() {
+  return failedJobLog.slice();
 }
 
 async function closeJobQueue() {
@@ -183,4 +212,5 @@ module.exports = {
   enqueueInvoicePdf,
   enqueueInvoiceEmail,
   enqueueBackup,
+  getFailedJobLog,
 };

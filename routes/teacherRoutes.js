@@ -7,8 +7,11 @@ const fs       = require('fs');
 const Teacher  = require('../models/Teacher');
 const Schedule = require('../models/Schedule');
 const Transaction = require('../models/Transaction');
-const { authMiddleware, isAdmin, isTeacher, branchFilter, checkPermission } = require('../middleware/auth');
+const { authMiddleware, branchFilter } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
+const { policyShadowTeacherWrite } = require('../middleware/policyShadowTeacherWrite');
+const { policyShadowTeacherRoute } = require('../middleware/policyShadowTeacherRoute');
+const { teachersCutoverGate } = require('../middleware/teachersCutoverGate');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
@@ -17,8 +20,24 @@ const NotificationService = require('../services/NotificationService');
 const { generateTempPassword } = require('../utils/tempPassword');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
+const { emitTeacherEvent, emitDataRefresh, emitFinanceEvent, emitUser } = require('../utils/realtimeEmit');
 
 const router = express.Router();
+
+/**
+ * Phase 7.31 cutover:
+ * auth → [branchFilter if present] → policyShadow* → teachersCutoverGate → handler
+ * Legacy isAdmin/isTeacher/checkPermission/assertTeacherBranchAccess/superAdminOnly
+ * retained inside teachersCutoverGate.
+ */
+const teacherRouteGuard = (action) => [
+  policyShadowTeacherRoute(action),
+  teachersCutoverGate(action),
+];
+const teacherWriteGuard = (action) => [
+  policyShadowTeacherWrite(action),
+  teachersCutoverGate(action),
+];
 
 // Tự động tạo thư mục uploads/practical nếu chưa có
 const uploadDir = path.join(__dirname, '..', 'uploads', 'practical');
@@ -75,7 +94,7 @@ function handlePracticalUpload(req, res) {
 }
 
 // ─── POST /api/teachers/upload-practical ──────────────────────────────────────
-router.post('/upload-practical', authMiddleware, isTeacher, (req, res) => {
+router.post('/upload-practical', authMiddleware, ...teacherRouteGuard('upload_practical'), (req, res) => {
   upload.single('file')(req, res, (err) => {
     if (err) {
       const msg = err.message || 'Không thể tải file lên';
@@ -88,21 +107,19 @@ router.post('/upload-practical', authMiddleware, isTeacher, (req, res) => {
 
 // ⭐ RBAC Guard: Chặn STAFF thực hiện thao tác ghi trên teachers
 // STAFF chỉ được GET (xem), KHÔNG được POST/PUT/DELETE
-const superAdminOnlyTeacher = async (req, res, next) => {
-  if (!req.user) return res.status(401).json({ success: false, message: 'Chưa xác thực' });
-  if (req.user.id === 'admin') return next(); // Hardcoded admin
-  const user = await Teacher.findById(req.user.id).select('adminRole').lean();
-  if (user?.adminRole === 'SUPER_ADMIN') return next();
-  return res.status(403).json({
-    success: false,
-    message: '403 Forbidden — Bạn không có quyền thực hiện thao tác này. Chỉ Super Admin mới được thêm/sửa/xóa giảng viên.',
-  });
-};
+// superAdminOnlyTeacher retained inside teachersCutoverGate (Phase 7.31).
 
 // ─── POST /api/teachers ───────────────────────────────────────────────────────
 // Chỉ Super Admin được tạo giảng viên
-router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], async (req, res) => {
+// Strangler Facade: ENABLE_CQRS_TEACHER=true → CQRS (transaction + outbox)
+router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')], async (req, res, next) => {
   try {
+    if (process.env.ENABLE_CQRS_TEACHER === 'true' || process.env.ENABLE_CQRS_TEACHER === '1') {
+      require('../modules/teacher/commands');
+      const CQRSTeacherController = require('../modules/teacher/controllers/CQRSTeacherController');
+      return CQRSTeacherController.post_root(req, res, next);
+    }
+
     const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
@@ -165,10 +182,10 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
       baseSalaryPerSession: Math.max(0, Number(baseSalaryPerSession) || 0),
     });
 
-    // Emit socket cho Admin thấy real-time
+    // Emit socket scoped theo branch (không io.emit global)
     const io = req.app.get('io');
     if (io) {
-      io.emit('teacher:new', {
+      emitTeacherEvent(io, teacher, 'teacher:new', {
         teacherId: teacher._id,
         name: teacher.name,
         branchCode: teacher.branchCode,
@@ -218,7 +235,7 @@ router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter],
 
 // ─── GET /api/teachers ────────────────────────────────────────────────────────
 // Lấy danh sách giảng viên (Admin/Staff only — Teacher bị chặn)
-router.get('/', [authMiddleware, branchFilter], async (req, res) => {
+router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], async (req, res) => {
   try {
     // ⭐ Chỉ Admin/Staff được xem danh sách GV — Teacher chỉ được xem profile của mình
     if (req.user.role === 'teacher' || req.user.role === 'student') {
@@ -255,22 +272,50 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
     }
 
     const Evaluation = require('../models/Evaluation');
-    const evals = await Evaluation.find({ type: 'teacher_rating' }).lean();
+    const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 100));
+    const skip = (pageNum - 1) * limitNum;
 
-    let teachers = await Teacher.find(filter)
-      .select('-password -refreshToken')
-      .sort({ createdAt: -1 })
-      .lean();
+    const [teachersRaw, total, ratingAgg] = await Promise.all([
+      Teacher.find(filter)
+        .select('-password -refreshToken')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Teacher.countDocuments(filter),
+      Evaluation.aggregate([
+        { $match: { type: 'teacher_rating' } },
+        {
+          $group: {
+            _id: '$targetTeacherId',
+            ratings: { $push: '$$ROOT' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
 
-    teachers = teachers.map(t => {
-      const myRatings = evals.filter(e => String(e.targetTeacherId) === String(t._id));
+    const ratingMap = new Map(
+      (ratingAgg || []).map((r) => [String(r._id), r.ratings || []])
+    );
+
+    const teachers = teachersRaw.map((t) => {
+      const myRatings = ratingMap.get(String(t._id)) || [];
       const subjectIds = Array.isArray(t.subjectIds) && t.subjectIds.length
         ? t.subjectIds.filter(Boolean)
         : resolveTeacherSubjectIds(t);
       return { ...t, subjectIds, ratings: myRatings, id: t._id };
     });
 
-    return res.json({ success: true, count: teachers.length, data: teachers });
+    return res.json({
+      success: true,
+      count: teachers.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      data: teachers,
+    });
   } catch (error) {
     logger.error('[TEACHERS] Get all error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
@@ -278,7 +323,7 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
 });
 
 // ─── GET /api/teachers/stats/summary ──────────────────────────────────────────
-router.get('/stats/summary', [authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS), branchFilter], async (req, res) => {
+router.get('/stats/summary', [authMiddleware, branchFilter, ...teacherRouteGuard('stats_summary')], async (req, res) => {
   try {
     const bf = { ...req.branchFilter };
     const { branch_id } = req.query;
@@ -301,7 +346,7 @@ router.get('/stats/summary', [authMiddleware, checkPermission(PERMISSIONS.VIEW_T
 });
 
 // ─── GET /api/teachers/:id ────────────────────────────────────────────────────
-router.get('/:id', [authMiddleware, branchFilter], async (req, res) => {
+router.get('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('get_one')], async (req, res) => {
   try {
     // Teacher chỉ xem profile của chính mình
     if (req.user.role === 'teacher' && req.user.id !== req.params.id) {
@@ -348,7 +393,7 @@ router.get('/:id', [authMiddleware, branchFilter], async (req, res) => {
 
 // ─── PUT /api/teachers/:id ────────────────────────────────────────────────────
 // Cập nhật thông tin cơ bản giảng viên (STAFF bị chặn, teacher tự sửa được)
-router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
+router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_profile')], async (req, res) => {
   try {
     // Teacher sửa chính mình → cho phép
     const isSelfEdit = req.user.id === req.params.id && req.user.role === 'teacher';
@@ -360,22 +405,17 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
       if (req.user.id !== 'admin') {
         const me = await Teacher.findById(req.user.id).select('adminRole permissions').lean();
         const canTraining = Array.isArray(me?.permissions) && me.permissions.includes('manage_training');
-        if (me?.adminRole !== 'SUPER_ADMIN' && !canTraining) {
+        const canManageTeachers = Array.isArray(me?.permissions) && me.permissions.includes(PERMISSIONS.MANAGE_TEACHERS);
+        if (me?.adminRole !== 'SUPER_ADMIN' && !canTraining && !canManageTeachers) {
           return res.status(403).json({
             success: false,
-            message: '403 Forbidden — Chỉ Super Admin hoặc tài khoản có quyền Đào tạo (manage_training) mới được sửa thông tin giảng viên.',
+            message: '403 Forbidden — Chỉ Super Admin hoặc tài khoản có quyền Đào tạo / Quản lý Giảng viên mới được sửa thông tin giảng viên.',
           });
         }
       }
     }
 
-    // ⭐ STAFF cross-branch guard
-    if (req.userBranchId) {
-      const target = await Teacher.findById(req.params.id).select('branchId').lean();
-      if (target?.branchId && String(target.branchId) !== String(req.userBranchId)) {
-        return res.status(403).json({ success: false, message: 'Không có quyền chỉnh sửa giảng viên chi nhánh khác' });
-      }
-    }
+    // Branch isolation: assertTeacherBranchAccess (trusted req.userBranchId)
 
     const isAdminRole = (req.user.role === 'admin' || req.user.role === 'staff');
     // Self-edit: profile + kết quả thi onboarding (client-side grade rồi sync)
@@ -488,9 +528,12 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('data:refresh', { type: 'teacher', id: teacher._id });
+      emitDataRefresh(io, { type: 'teacher', id: teacher._id }, {
+        branchId: teacher.branchId,
+        userIds: [teacher._id],
+      });
       if (locking) {
-        io.emit('auth:forceLogout', {
+        emitUser(io, teacher._id, 'auth:forceLogout', {
           userId: String(teacher._id),
           role: 'teacher',
           reason: 'account_disabled',
@@ -544,7 +587,11 @@ router.put('/:id', [authMiddleware, branchFilter], async (req, res) => {
 
 // ─── PUT /api/teachers/:id/score ──────────────────────────────────────────────
 // Admin nhập điểm bài test Onboarding cho giảng viên
-router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS), async (req, res) => {
+router.put('/:id/score', [
+  authMiddleware,
+  branchFilter,
+  ...teacherWriteGuard('score'),
+], async (req, res) => {
   try {
     const { testScore, testNotes } = req.body;
 
@@ -609,10 +656,10 @@ router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHE
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
 
-    // Thông báo real-time cho giảng viên
+    // Thông báo real-time cho giảng viên + branch (không global)
     const io = req.app.get('io');
     if (io) {
-      io.emit('teacher:scored', {
+      emitTeacherEvent(io, teacher, 'teacher:scored', {
         teacherId:  teacher._id.toString(),
         testScore: scoreNum,
         passed:     scoreNum >= 80,
@@ -635,7 +682,11 @@ router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHE
 
 // ─── PUT /api/teachers/:id/approve ────────────────────────────────────────────
 // Admin duyệt giảng viên — STRICT: chỉ khi testScore >= 80
-router.put('/:id/approve', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS), async (req, res) => {
+router.put('/:id/approve', [
+  authMiddleware,
+  branchFilter,
+  ...teacherWriteGuard('approve'),
+], async (req, res) => {
   try {
     const teacherCheck = await Teacher.findById(req.params.id);
     if (!teacherCheck) {
@@ -656,10 +707,10 @@ router.put('/:id/approve', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEAC
       { returnDocument: 'after' }
     ).select('-password -refreshToken');
 
-    // Thông báo real-time
+    // Thông báo real-time (branch + teacher)
     const io = req.app.get('io');
     if (io) {
-      io.emit('teacher:approved', {
+      emitTeacherEvent(io, teacher, 'teacher:approved', {
         teacherId: teacher._id.toString(),
         name:      teacher.name,
         message:   '🎊 Tài khoản của bạn đã được Admin phê duyệt! Bạn có thể bắt đầu giảng dạy.',
@@ -690,7 +741,7 @@ router.put('/:id/approve', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEAC
 
 // ─── POST /api/teachers/:id/submit-practical ──────────────────────────────────
 // Giảng viên nộp file thực hành (Workflow 1 Phase 2)
-router.post('/:id/submit-practical', authMiddleware, isTeacher, async (req, res) => {
+router.post('/:id/submit-practical', authMiddleware, ...teacherRouteGuard('submit_practical'), async (req, res) => {
   try {
     if (req.user.id !== req.params.id) {
       return res.status(403).json({ success: false, message: 'Bạn không thể nộp giùm người khác' });
@@ -713,10 +764,10 @@ router.post('/:id/submit-practical', authMiddleware, isTeacher, async (req, res)
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
 
-    // Thông báo Admin có file mới
+    // Thông báo Admin có file mới (branch-scoped)
     const io = req.app.get('io');
     if (io) {
-      io.emit('teacher:practical_submitted', {
+      emitTeacherEvent(io, teacher, 'teacher:practical_submitted', {
         teacherId:   teacher._id.toString(),
         teacherName: teacher.name,
         fileUrl,
@@ -753,7 +804,11 @@ router.post('/:id/submit-practical', authMiddleware, isTeacher, async (req, res)
 
 // ─── PUT /api/teachers/:id/reject ─────────────────────────────────────────────
 // Admin từ chối / tạm dừng giảng viên
-router.put('/:id/reject', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS), async (req, res) => {
+router.put('/:id/reject', [
+  authMiddleware,
+  branchFilter,
+  ...teacherWriteGuard('reject'),
+], async (req, res) => {
   try {
     const { reason } = req.body;
 
@@ -784,7 +839,7 @@ router.put('/:id/reject', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACH
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('teacher:rejected', {
+      emitTeacherEvent(io, teacher, 'teacher:rejected', {
         teacherId: teacher._id.toString(),
         reason,
         message: `❌ Tài khoản bị từ chối. Lý do: ${reason || 'Không đáp ứng yêu cầu'}`,
@@ -804,7 +859,7 @@ router.put('/:id/reject', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACH
 
 // ─── DELETE /api/teachers/:id ─────────────────────────────────────────────────
 // Admin xóa giảng viên (STAFF bị chặn)
-router.delete('/:id', [authMiddleware, isAdmin, superAdminOnlyTeacher], async (req, res) => {
+router.delete('/:id', [authMiddleware, ...teacherRouteGuard('delete')], async (req, res) => {
   try {
     const teacher = await Teacher.findByIdAndDelete(req.params.id);
     if (!teacher) {
@@ -821,7 +876,7 @@ router.delete('/:id', [authMiddleware, isAdmin, superAdminOnlyTeacher], async (r
 });
 
 // ─── GET /api/teachers/:id/finance ──────────────────────────────────────────────
-router.get('/:id/finance', authMiddleware, async (req, res) => {
+router.get('/:id/finance', authMiddleware, ...teacherRouteGuard('finance_self'), async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền truy cập thông tin này' });
@@ -874,7 +929,7 @@ router.get('/:id/finance', authMiddleware, async (req, res) => {
 
 // ─── GET /api/teachers/:id/finance/pending ──────────────────────────────────────
 // Lấy số buổi còn nợ thanh toán + thưởng sao tích lũy (cho modal Step 1)
-router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.get('/:id/finance/pending', authMiddleware, ...teacherRouteGuard('finance_pending'), async (req, res) => {
   try {
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
@@ -913,7 +968,7 @@ router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.M
 // ─── PUT /api/teachers/:id/finance/pay-flexible ──────────────────────────────────
 // Thanh toán linh hoạt: Admin tự chọn số buổi và số tiền, FIFO (cũ nhất trước)
 // Có thể cộng thưởng sao tích lũy (includeStarBonus)
-router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
+router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('finance_pay_flexible')], async (req, res) => {
   try {
     const { sessionsCount, amount, note, includeStarBonus, starBonusMonths } = req.body;
     const idempotencyKey = String(
@@ -1107,15 +1162,16 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('teacher:financeUpdated', {
+      const financeScope = { branchId: teacher.branchId, userIds: [teacher._id] };
+      emitFinanceEvent(io, financeScope, 'teacher:financeUpdated', {
         teacherId: req.params.id,
         message: `Admin đã thanh toán ${Number(amount).toLocaleString('vi-VN')}đ`
           + (paidCount > 0 ? ` cho ${paidCount} buổi` : '')
           + (starBonusAmount > 0 ? ` (gồm thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ)` : '')
           + '.',
       });
-      io.emit('transactions:new', transaction);
-      io.emit('revenue:updated', { amount: Number(amount), type: 'salary' });
+      emitFinanceEvent(io, financeScope, 'transactions:new', transaction);
+      emitFinanceEvent(io, financeScope, 'revenue:updated', { amount: Number(amount), type: 'salary' });
     }
 
     return res.json({
@@ -1140,7 +1196,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISS
 });
 
 // ─── PUT /api/teachers/:id/finance/pay-all ──────────────────────────────────────
-router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), superAdminOnlyTeacher], async (req, res) => {
+router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('finance_pay_all')], async (req, res) => {
   try {
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
@@ -1255,12 +1311,13 @@ router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('teacher:financeUpdated', {
+      const financeScope = { branchId: teacher.branchId, userIds: [teacher._id] };
+      emitFinanceEvent(io, financeScope, 'teacher:financeUpdated', {
         teacherId: req.params.id,
         message: `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${paidCount} buổi dạy.`
       });
-      io.emit('transactions:new', transaction);
-      io.emit('revenue:updated', { amount: totalAmount, type: 'salary' });
+      emitFinanceEvent(io, financeScope, 'transactions:new', transaction);
+      emitFinanceEvent(io, financeScope, 'revenue:updated', { amount: totalAmount, type: 'salary' });
     }
 
     return res.json({

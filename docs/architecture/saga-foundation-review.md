@@ -1,0 +1,1 @@
+# Saga Foundation Review\nArchitecture scaffolded successfully. `SagaManager`, `CompensationManager`, `SagaRegistry`, `SagaDefinition`, `SagaContext` created.

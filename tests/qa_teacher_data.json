@@ -1,0 +1,34 @@
+{
+  "branch": {
+    "id": "6a72c8c1e63f88cc8bd0e35f",
+    "code": "QATT"
+  },
+  "adminStaff": {
+    "phone": "0888888003",
+    "password": "123456",
+    "id": "6a72c8c1e63f88cc8bd0e360"
+  },
+  "teacherA": {
+    "phone": "0888888001",
+    "password": "123456",
+    "id": "6a72c8c1e63f88cc8bd0e361"
+  },
+  "teacherB": {
+    "phone": "0888888002",
+    "password": "123456",
+    "id": "6a72c8c1e63f88cc8bd0e362"
+  },
+  "studentA": {
+    "phone": "0777777001",
+    "password": "123456",
+    "id": "6a72c8c1e63f88cc8bd0e364"
+  },
+  "studentB": {
+    "phone": "0777777002",
+    "password": "123456",
+    "id": "6a72c8c1e63f88cc8bd0e365"
+  },
+  "course": {
+    "id": "6a72c8c1e63f88cc8bd0e363"
+  }
+}

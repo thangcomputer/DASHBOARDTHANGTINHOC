@@ -1,0 +1,1 @@
+# Docker Compose Review\ndocker-compose.prod.yml created with resource limits and logging strategies.

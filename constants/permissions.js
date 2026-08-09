@@ -17,6 +17,7 @@ const PERMISSIONS = {
   VIEW_EVALUATIONS: 'view_evaluations',
   VIEW_BRANCH_REVENUE: 'view_branch_revenue',
   VIEW_TEACHERS: 'view_teachers',
+  MANAGE_TEACHERS: 'manage_teachers',
 };
 
 /** Enum các adminRole — dùng chung thay vì hard-code string */
@@ -29,7 +30,7 @@ const ADMIN_ROLES = {
 
 /** Quyền mặc định khi tạo HIGH_ADMIN — có thể điều chỉnh sau */
 const HIGH_ADMIN_DEFAULT_PERMISSIONS = [
-  'manage_students', 'view_teachers', 'manage_schedule',
+  'manage_students', 'view_teachers', 'manage_teachers', 'manage_schedule',
   'manage_messages', 'manage_finance', 'view_branch_revenue',
   'manage_training', 'manage_student_training',
   'manage_hr', 'manage_blog',

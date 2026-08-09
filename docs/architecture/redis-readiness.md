@@ -1,0 +1,1 @@
+# Redis Readiness\nRedisCacheProvider adapter exists but disabled by default per constraints.

@@ -1,0 +1,1 @@
+'use strict'; class SensitiveDataScanner { scan() {} } module.exports = SensitiveDataScanner;

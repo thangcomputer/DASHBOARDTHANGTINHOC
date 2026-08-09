@@ -1,0 +1,1 @@
+'use strict'; class LicenseScanner { scan() {} } module.exports = LicenseScanner;

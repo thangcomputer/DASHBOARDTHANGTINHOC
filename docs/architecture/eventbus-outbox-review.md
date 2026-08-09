@@ -1,0 +1,1 @@
+# EventBus Outbox Review\nEvents natively publish into `OutboxPublisher` before direct dispatching.

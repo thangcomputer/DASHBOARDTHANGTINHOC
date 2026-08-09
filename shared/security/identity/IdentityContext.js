@@ -1,0 +1,1 @@
+'use strict'; class IdentityContext {} module.exports = IdentityContext;

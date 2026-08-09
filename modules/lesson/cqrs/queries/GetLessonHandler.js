@@ -1,0 +1,1 @@
+'use strict'; class GetLessonHandler { handle() {} } module.exports = GetLessonHandler;

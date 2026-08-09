@@ -1,0 +1,1 @@
+'use strict'; class PolicyEvaluator { evaluate(context, policy) { return true; } } module.exports = PolicyEvaluator;

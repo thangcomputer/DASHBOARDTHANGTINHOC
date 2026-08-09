@@ -1,0 +1,1 @@
+'use strict'; class ForensicsGuide { execute() {} } module.exports = ForensicsGuide;

@@ -15,6 +15,7 @@
     "smoke": "node scripts/smoke-local.cjs",
     "smoke:api": "node scripts/smoke-api.cjs",
     "health:wait": "node scripts/wait-for-health.cjs",
+    "rbac:soak:production": "node scripts/rbac-soak-production.cjs",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down"
   },

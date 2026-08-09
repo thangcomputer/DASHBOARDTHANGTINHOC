@@ -1,0 +1,1 @@
+'use strict'; class LegalHoldService { applyHold() {} releaseHold() {} } module.exports = LegalHoldService;

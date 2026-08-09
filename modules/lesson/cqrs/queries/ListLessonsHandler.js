@@ -1,0 +1,1 @@
+'use strict'; class ListLessonsHandler { handle() {} } module.exports = ListLessonsHandler;

@@ -576,6 +576,15 @@ Tài khoản test (môi trường dev đã seed):
 | Super Admin | `admin` | `admin123` |
 | Staff / Teacher / Student | `0920000010` / `0910000010` / `0900000010` | `Test@123` |
 
+### 14.8 CQRS Phase A (strangler)
+
+Migration CQRS đang rollout từng endpoint qua feature flag. Checklist vận hành: [architecture/cqrs-phase-a-rollout.md](./architecture/cqrs-phase-a-rollout.md).
+
+- `ENABLE_CQRS_STUDENT_CREATE` → `POST /api/students`
+- `ENABLE_CQRS_INVOICE` → `POST /api/invoices`
+- `ENABLE_CQRS_TEACHER` → `POST /api/teachers`
+- MongoDB cần **replica set** khi bật flag; Outbox: `RUN_OUTBOX_WORKER` (API=0 / worker=1 khi multi-instance)
+
 ---
 
 ## Cập nhật tài liệu

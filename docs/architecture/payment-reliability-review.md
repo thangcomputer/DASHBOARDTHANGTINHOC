@@ -1,0 +1,1 @@
+# Payment Reliability Review\nExternal SePay integration wrapped with `ExternalCircuitBreaker` and protected by exponential backoff.

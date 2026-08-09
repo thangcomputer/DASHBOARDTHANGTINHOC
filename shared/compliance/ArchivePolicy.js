@@ -1,0 +1,1 @@
+'use strict'; class ArchivePolicy { apply() {} } module.exports = ArchivePolicy;

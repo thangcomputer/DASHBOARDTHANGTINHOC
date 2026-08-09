@@ -1,0 +1,1 @@
+'use strict'; class AssignCourseDto {} module.exports = AssignCourseDto;

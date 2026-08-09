@@ -1,0 +1,1 @@
+'use strict'; class CryptoCapabilityRegistry { register() {} } module.exports = CryptoCapabilityRegistry;

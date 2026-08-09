@@ -1,0 +1,44 @@
+[
+  {
+    "module": "Auth",
+    "func": "Login UI",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Đăng nhập UI thành công vào Student Portal"
+  },
+  {
+    "module": "Schedule",
+    "func": "Read UI",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Học viên xem được lịch học thành công"
+  },
+  {
+    "module": "Security",
+    "func": "Admin Access UI",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Student bị chặn khi cố truy cập trang Admin"
+  },
+  {
+    "module": "Security",
+    "func": "Teacher Access UI",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Student bị chặn khi cố truy cập trang Teacher"
+  },
+  {
+    "module": "Materials",
+    "func": "View UI",
+    "result": "Passed",
+    "severity": "Medium",
+    "description": "Truy cập tab Tài liệu thành công"
+  },
+  {
+    "module": "Profile",
+    "func": "View UI",
+    "result": "Passed",
+    "severity": "Medium",
+    "description": "Tải hồ sơ Student thành công"
+  }
+]

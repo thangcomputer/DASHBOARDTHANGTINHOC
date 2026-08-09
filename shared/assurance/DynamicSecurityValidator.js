@@ -1,0 +1,1 @@
+'use strict'; class DynamicSecurityValidator { validate() {} } module.exports = DynamicSecurityValidator;

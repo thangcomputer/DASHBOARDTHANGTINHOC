@@ -1,0 +1,1 @@
+'use strict'; class ApiKeyRepository { findByKey() {} } module.exports = ApiKeyRepository;

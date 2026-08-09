@@ -1,14 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, isSuperAdmin } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
+const { policyShadowBackup } = require('../middleware/policyShadowBackup');
+const { backupsCutoverGate } = require('../middleware/backupsCutoverGate');
 const logger = require('../config/logger');
 const backupService = require('../services/backupService');
 const { enqueue } = require('../services/queue/jobQueue');
 
-const guard = [authMiddleware, isSuperAdmin];
+/**
+ * Phase 7.3 — Controlled cutover for /api/backups ONLY.
+ *
+ * Default (POLICY_CUTOVER_ENABLED=false or backups not allowlisted):
+ *   auth → policyShadowBackup → Legacy isSuperAdmin (via backupsCutoverGate) → handler
+ *
+ * Opt-in Policy-primary:
+ *   POLICY_CUTOVER_ENABLED=true
+ *   POLICY_CUTOVER_ROUTES=backups
+ *
+ * Rollback: ENABLED=false OR remove backups from ROUTES.
+ * Legacy isSuperAdmin retained inside backupsCutoverGate (not deleted).
+ * Handlers retain all backup create/delete/queue/filesystem side effects.
+ */
+const guard = (action) => [
+  authMiddleware,
+  policyShadowBackup(action),
+  backupsCutoverGate(action),
+];
 
 // GET /api/backups/stats
-router.get('/stats', guard, async (req, res) => {
+router.get('/stats', guard('stats'), async (req, res) => {
   try {
     const data = await backupService.getStats();
     res.json({ success: true, data });
@@ -19,7 +39,7 @@ router.get('/stats', guard, async (req, res) => {
 });
 
 // GET /api/backups
-router.get('/', guard, async (req, res) => {
+router.get('/', guard('list'), async (req, res) => {
   try {
     const result = await backupService.listBackups({
       page: req.query.page,
@@ -33,7 +53,7 @@ router.get('/', guard, async (req, res) => {
 });
 
 // POST /api/backups — tao backup (async qua queue)
-router.post('/', guard, async (req, res) => {
+router.post('/', guard('create'), async (req, res) => {
   try {
     const job = await backupService.createBackupJob({
       type: 'manual',
@@ -56,7 +76,7 @@ router.post('/', guard, async (req, res) => {
 });
 
 // GET /api/backups/:id/download
-router.get('/:id/download', guard, async (req, res) => {
+router.get('/:id/download', guard('download'), async (req, res) => {
   try {
     const { job, fullPath } = await backupService.getBackupFile(req.params.id);
     res.setHeader('Content-Type', 'application/gzip');
@@ -68,7 +88,7 @@ router.get('/:id/download', guard, async (req, res) => {
 });
 
 // DELETE /api/backups/:id
-router.delete('/:id', guard, async (req, res) => {
+router.delete('/:id', guard('delete'), async (req, res) => {
   try {
     const data = await backupService.deleteBackup(req.params.id);
     res.json({ success: true, message: 'Da xoa backup', data });

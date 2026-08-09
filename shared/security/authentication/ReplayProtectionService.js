@@ -1,0 +1,1 @@
+'use strict'; class ReplayProtectionService { check(requestId, correlationId) { return false; } } module.exports = ReplayProtectionService;

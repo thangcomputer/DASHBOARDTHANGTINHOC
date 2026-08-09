@@ -1,0 +1,37 @@
+[
+  {
+    "module": "Auth",
+    "func": "Login API",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Student A đăng nhập API thành công"
+  },
+  {
+    "module": "Security",
+    "func": "Admin API Access",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Bị chặn quyền truy cập API tài chính (Admin) đúng như thiết kế"
+  },
+  {
+    "module": "Security",
+    "func": "List API Access",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Bị chặn quyền đọc danh sách học viên đúng như thiết kế"
+  },
+  {
+    "module": "Students",
+    "func": "Read Self",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Student lấy được thông tin của chính mình"
+  },
+  {
+    "module": "Students",
+    "func": "Data Isolation",
+    "result": "Passed",
+    "severity": "Critical",
+    "description": "Bị chặn truy cập hồ sơ của Student B (Data Isolation hoạt động)"
+  }
+]

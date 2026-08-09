@@ -1,26 +1,16 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const { authMiddleware, checkPermission, checkAnyPermission } = require('../middleware/auth');
-const { PERMISSIONS } = require('../constants/permissions');
+const { authMiddleware } = require('../middleware/auth');
+const { policyShadowFile } = require('../middleware/policyShadowFile');
+const { filesCutoverGate } = require('../middleware/filesCutoverGate');
 const logger = require('../config/logger');
 const fileService = require('../services/fileService');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
 
-/** Category mọi role đã đăng nhập được upload (chat / bài tập / avatar). */
-const OPEN_UPLOAD_CATEGORIES = new Set(['messages', 'assignments', 'avatars']);
-
-function requireUploadCategoryPermission(req, res, next) {
-  const category = String(req.query.category || req.body?.category || 'general').toLowerCase();
-  if (OPEN_UPLOAD_CATEGORIES.has(category)) return next();
-  if (category === 'training') {
-    return checkAnyPermission(
-      PERMISSIONS.MANAGE_TRAINING,
-      PERMISSIONS.MANAGE_STUDENT_TRAINING,
-      PERMISSIONS.SYSTEM_SETTINGS,
-    )(req, res, next);
-  }
-  return checkPermission(PERMISSIONS.SYSTEM_SETTINGS)(req, res, next);
+/** Phase 7.18: auth → policyShadowFile → filesCutoverGate → handler */
+function filesGuard(action) {
+  return [policyShadowFile(action), filesCutoverGate(action)];
 }
 
 function uploadMiddleware(req, res, next) {
@@ -46,66 +36,77 @@ function uploadMiddleware(req, res, next) {
 }
 
 // POST /api/files/upload?category=general
-router.post('/upload', authMiddleware, requireUploadCategoryPermission, uploadMiddleware, async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Chua chon file' });
+router.post(
+  '/upload',
+  authMiddleware,
+  ...filesGuard('upload'),
+  uploadMiddleware,
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'Chua chon file' });
+      }
+      normalizeMulterFile(req.file);
+      const asset = await fileService.registerUploadedFile(req.file, {
+        category: req.fileCategory,
+        uploadedBy: String(req.user.id || req.user._id || ''),
+        uploadedByRole: req.user.role || '',
+        relatedType: req.body?.relatedType || '',
+        relatedId: req.body?.relatedId || '',
+      });
+      return res.status(201).json({
+        success: true,
+        message: 'Upload thanh cong',
+        data: {
+          id: asset._id,
+          url: asset.url,
+          fileUrl: asset.url,
+          originalName: asset.originalName,
+          size: asset.size,
+          category: asset.category,
+          expiresAt: asset.expiresAt,
+        },
+      });
+    } catch (err) {
+      logger.error('[FILES] upload:', err);
+      return res.status(err.status || 500).json({ success: false, message: err.message || 'Loi server' });
     }
-    normalizeMulterFile(req.file);
-    const asset = await fileService.registerUploadedFile(req.file, {
-      category: req.fileCategory,
-      uploadedBy: String(req.user.id || req.user._id || ''),
-      uploadedByRole: req.user.role || '',
-      relatedType: req.body?.relatedType || '',
-      relatedId: req.body?.relatedId || '',
-    });
-    return res.status(201).json({
-      success: true,
-      message: 'Upload thanh cong',
-      data: {
-        id: asset._id,
-        url: asset.url,
-        fileUrl: asset.url,
-        originalName: asset.originalName,
-        size: asset.size,
-        category: asset.category,
-        expiresAt: asset.expiresAt,
-      },
-    });
-  } catch (err) {
-    logger.error('[FILES] upload:', err);
-    return res.status(err.status || 500).json({ success: false, message: err.message || 'Loi server' });
-  }
-});
+  },
+);
 
 // GET /api/files/stats
-router.get('/stats', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
-  try {
-    const stats = await fileService.getStats();
-    res.json({
-      success: true,
-      data: {
-        ...stats,
-        totals: {
-          ...stats.totals,
-          totalSizeLabel: fileService.formatBytes(stats.totals.totalSize),
+router.get(
+  '/stats',
+  authMiddleware,
+  ...filesGuard('stats'),
+  async (req, res) => {
+    try {
+      const stats = await fileService.getStats();
+      res.json({
+        success: true,
+        data: {
+          ...stats,
+          totals: {
+            ...stats.totals,
+            totalSizeLabel: fileService.formatBytes(stats.totals.totalSize),
+          },
+          byCategory: stats.byCategory.map((r) => ({
+            category: r._id,
+            count: r.count,
+            totalSize: r.totalSize,
+            totalSizeLabel: fileService.formatBytes(r.totalSize),
+          })),
         },
-        byCategory: stats.byCategory.map((r) => ({
-          category: r._id,
-          count: r.count,
-          totalSize: r.totalSize,
-          totalSizeLabel: fileService.formatBytes(r.totalSize),
-        })),
-      },
-    });
-  } catch (err) {
-    logger.error('[FILES] stats:', err);
-    res.status(500).json({ success: false, message: 'Loi server' });
-  }
-});
+      });
+    } catch (err) {
+      logger.error('[FILES] stats:', err);
+      res.status(500).json({ success: false, message: 'Loi server' });
+    }
+  },
+);
 
 // GET /api/files/categories
-router.get('/categories', authMiddleware, (req, res) => {
+router.get('/categories', authMiddleware, ...filesGuard('categories'), (req, res) => {
   const list = Object.entries(fileService.CATEGORIES).map(([key, cfg]) => ({
     key,
     maxBytes: cfg.maxBytes,
@@ -116,37 +117,47 @@ router.get('/categories', authMiddleware, (req, res) => {
 });
 
 // GET /api/files
-router.get('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
-  try {
-    const { page, limit, category, status, q, uploadedBy } = req.query;
-    const result = await fileService.listAssets({ page, limit, category, status, q, uploadedBy });
-    res.json({
-      success: true,
-      data: result.data.map((f) => ({
-        ...f,
-        sizeLabel: fileService.formatBytes(f.size),
-      })),
-      pagination: result.pagination,
-    });
-  } catch (err) {
-    logger.error('[FILES] list:', err);
-    res.status(500).json({ success: false, message: 'Loi server' });
-  }
-});
+router.get(
+  '/',
+  authMiddleware,
+  ...filesGuard('list'),
+  async (req, res) => {
+    try {
+      const { page, limit, category, status, q, uploadedBy } = req.query;
+      const result = await fileService.listAssets({ page, limit, category, status, q, uploadedBy });
+      res.json({
+        success: true,
+        data: result.data.map((f) => ({
+          ...f,
+          sizeLabel: fileService.formatBytes(f.size),
+        })),
+        pagination: result.pagination,
+      });
+    } catch (err) {
+      logger.error('[FILES] list:', err);
+      res.status(500).json({ success: false, message: 'Loi server' });
+    }
+  },
+);
 
 // POST /api/files/purge-expired
-router.post('/purge-expired', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS), async (req, res) => {
-  try {
-    const result = await fileService.purgeExpired();
-    res.json({ success: true, message: 'Da don ' + result.purged + ' file het han', data: result });
-  } catch (err) {
-    logger.error('[FILES] purge:', err);
-    res.status(500).json({ success: false, message: 'Loi server' });
-  }
-});
+router.post(
+  '/purge-expired',
+  authMiddleware,
+  ...filesGuard('purge_expired'),
+  async (req, res) => {
+    try {
+      const result = await fileService.purgeExpired();
+      res.json({ success: true, message: 'Da don ' + result.purged + ' file het han', data: result });
+    } catch (err) {
+      logger.error('[FILES] purge:', err);
+      res.status(500).json({ success: false, message: 'Loi server' });
+    }
+  },
+);
 
 // DELETE /api/files/:id
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, ...filesGuard('delete'), async (req, res) => {
   try {
     const asset = await fileService.deleteById(req.params.id, req.user);
     res.json({ success: true, message: 'Da xoa file', data: { id: asset._id, status: asset.status } });

@@ -1,0 +1,1 @@
+'use strict'; class OutputPolicy { filter() {} } module.exports = OutputPolicy;

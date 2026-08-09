@@ -1,18 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, branchFilter, checkAnyPermission } = require('../middleware/auth');
-const { PERMISSIONS } = require('../constants/permissions');
+const { authMiddleware, branchFilter } = require('../middleware/auth');
+const { policyShadowBI } = require('../middleware/policyShadowBI');
+const { biCutoverGate } = require('../middleware/biCutoverGate');
 const biService = require('../services/biService');
 const logger = require('../config/logger');
 
-// Cùng quyền với Báo cáo doanh thu / analytics
-const guard = [
+/**
+ * Phase 7.26 — Controlled cutover for LIVE /api/bi ONLY.
+ *
+ * Flow: auth → branchFilter (DATA SCOPE) → policyShadowBI → biCutoverGate → handler
+ * Legacy MANAGE_FINANCE|VIEW_BRANCH_REVENUE gate retained inside biCutoverGate.
+ * Aggregation / CSV remain handler-owned via overview service.
+ * modules/finance BiController is unmounted — not migrated.
+ */
+const guard = (action) => [
   authMiddleware,
-  checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE),
   branchFilter,
+  policyShadowBI(action),
+  biCutoverGate(action),
 ];
 
-router.get('/overview', guard, async (req, res) => {
+router.get('/overview', guard('overview'), async (req, res) => {
   try {
     const data = await biService.getOverview({
       period: req.query.period || '1m',
@@ -26,7 +35,7 @@ router.get('/overview', guard, async (req, res) => {
   }
 });
 
-router.get('/export', guard, async (req, res) => {
+router.get('/export', guard('export'), async (req, res) => {
   try {
     const data = await biService.getOverview({
       period: req.query.period || '1m',

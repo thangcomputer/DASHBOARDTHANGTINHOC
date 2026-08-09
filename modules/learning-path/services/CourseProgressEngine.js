@@ -1,0 +1,1 @@
+'use strict'; class CourseProgressEngine { calculateProgress() {} estimateRemainingTime() {} resumeLearning() {} } module.exports = CourseProgressEngine;

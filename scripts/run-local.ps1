@@ -72,7 +72,7 @@ for ($i = 0; $i -lt 30; $i++) {
     } catch { Start-Sleep -Seconds 1 }
 }
 if (-not $ready) {
-    Write-Host "Backend chua san sang — kiem tra cua so PowerShell backend (MongoDB, JWT_SECRET trong .env)." -ForegroundColor Red
+    Write-Host "Backend chua san sang - kiem tra cua so PowerShell backend (MongoDB, JWT_SECRET trong .env)." -ForegroundColor Red
 } else {
     Write-Host "Backend OK." -ForegroundColor Green
 }

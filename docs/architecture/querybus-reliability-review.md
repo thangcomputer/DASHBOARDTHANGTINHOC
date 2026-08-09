@@ -1,0 +1,1 @@
+# QueryBus Reliability Review\nRead-only queries wrapped in `RetryExecutor`.

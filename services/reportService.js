@@ -171,11 +171,13 @@ async function executeReport(report, { limit = 500 } = {}) {
   return { report, columns, rows, total: rows.length };
 }
 
+const { sanitizeCsvField } = require('../shared/utils/csv');
+
 function rowsToCsv(columns, rows) {
   const lines = [columns.join(',')];
   for (const row of rows) {
     lines.push(columns.map((c) => {
-      const str = row[c] == null ? '' : String(row[c]).replace(/"/g, '""');
+      const str = row[c] == null ? '' : sanitizeCsvField(String(row[c])).replace(/"/g, '""');
       return '"' + str + '"';
     }).join(','));
   }

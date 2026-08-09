@@ -1,0 +1,1 @@
+# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nGenerated artifact for Sprint 5.3 Batch 2 Enterprise Rule Engine, Scheduler & Automation Core.

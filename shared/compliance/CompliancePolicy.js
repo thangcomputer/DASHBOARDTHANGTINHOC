@@ -1,0 +1,1 @@
+'use strict'; class CompliancePolicy { evaluate() {} } module.exports = CompliancePolicy;

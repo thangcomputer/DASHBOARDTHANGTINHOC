@@ -1,0 +1,1 @@
+groups:\n  - name: high-error-rate\n    rules:\n      - alert: HighErrorRate\n        expr: up == 0\n        for: 1m\n        labels:\n          severity: critical\n

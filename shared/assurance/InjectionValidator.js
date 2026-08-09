@@ -1,0 +1,1 @@
+'use strict'; class InjectionValidator { validate() {} } module.exports = InjectionValidator;

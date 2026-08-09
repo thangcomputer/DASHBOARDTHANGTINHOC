@@ -1,6 +1,6 @@
 const express = require('express');
 const Course  = require('../models/Course');
-const { authMiddleware, checkPermission, requireInternalToken } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const cache = require('../utils/cache');
@@ -10,10 +10,30 @@ const {
   resolveExamSubjectsForCourse,
   inferExamSubjectsFromCourseName,
 } = require('../services/examSubjectCatalog');
+const { policyShadowCourse } = require('../middleware/policyShadowCourse');
+const { coursesCutoverGate } = require('../middleware/coursesCutoverGate');
 
 const router = express.Router();
 
-const courseWriteGuard = [authMiddleware, requireInternalToken, checkPermission('system_settings')];
+/**
+ * Phase 7.11 — Controlled cutover for /api/courses ONLY.
+ *
+ * Public reads: policyShadowCourse → coursesCutoverGate → handler
+ * Writes: auth → policyShadowCourse → coursesCutoverGate
+ *   → (Legacy requireInternalToken + checkPermission('system_settings') when not Policy)
+ *
+ * Legacy write gates retained inside coursesCutoverGate. Handlers retain all mutations,
+ * cache invalidation, audit, and soft-delete notifications.
+ */
+const courseWriteGuard = (action) => [
+  authMiddleware,
+  policyShadowCourse(action),
+  coursesCutoverGate(action),
+];
+const courseReadGuard = (action) => [
+  policyShadowCourse(action),
+  coursesCutoverGate(action),
+];
 const COURSE_TTL = 120;
 const COURSE_STATS_KEY = 'courses:stats';
 
@@ -30,7 +50,7 @@ function notDeletedFilter(includeDeleted = false) {
 }
 
 // ─── GET /api/courses/stats/summary — đặt trước /:id ───────────────────────────
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', courseReadGuard('stats'), async (req, res) => {
   try {
     const data = await cache.wrap(COURSE_STATS_KEY, COURSE_TTL, async () => {
       const alive = { deletedAt: null };
@@ -51,7 +71,7 @@ router.get('/stats/summary', async (req, res) => {
 });
 
 // ─── GET /api/courses ─────────────────────────────────────────────────────────
-router.get('/', async (req, res) => {
+router.get('/', courseReadGuard('list'), async (req, res) => {
   try {
     const { category, status, featured, search, includeDeleted } = req.query;
     const filter = {
@@ -91,7 +111,7 @@ router.get('/', async (req, res) => {
 });
 
 // ─── GET /api/courses/:id ─────────────────────────────────────────────────────
-router.get('/:id', async (req, res) => {
+router.get('/:id', courseReadGuard('get'), async (req, res) => {
   try {
     const course = await Course.findOne({
       $or: [
@@ -132,7 +152,7 @@ async function inferExamSubjects(body) {
 }
 
 // ─── POST /api/courses ────────────────────────────────────────────────────────
-router.post('/', courseWriteGuard, async (req, res) => {
+router.post('/', courseWriteGuard('create'), async (req, res) => {
   try {
     const body = { ...req.body };
     if (body.price !== undefined) {
@@ -160,7 +180,7 @@ router.post('/', courseWriteGuard, async (req, res) => {
 });
 
 // ─── PUT /api/courses/:id ─────────────────────────────────────────────────────
-router.put('/:id', courseWriteGuard, async (req, res) => {
+router.put('/:id', courseWriteGuard('update'), async (req, res) => {
   try {
     const body = { ...req.body };
     if (body.price !== undefined || body.discountPercent !== undefined) {
@@ -196,7 +216,7 @@ router.put('/:id', courseWriteGuard, async (req, res) => {
 });
 
 // ─── PATCH /api/courses/:id/price ─────────────────────────────────────────────
-router.patch('/:id/price', courseWriteGuard, async (req, res) => {
+router.patch('/:id/price', courseWriteGuard('price'), async (req, res) => {
   try {
     const { price, discountPercent = 0 } = req.body;
     if (price === undefined || isNaN(price) || Number(price) < 0) {
@@ -221,7 +241,7 @@ router.patch('/:id/price', courseWriteGuard, async (req, res) => {
 });
 
 // ─── DELETE /api/courses/:id — soft-delete (không đụng ledger / enrollment) ───
-router.delete('/:id', courseWriteGuard, async (req, res) => {
+router.delete('/:id', courseWriteGuard('delete'), async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
     if (!course || course.deletedAt) {
@@ -294,7 +314,7 @@ router.delete('/:id', courseWriteGuard, async (req, res) => {
 });
 
 // ─── POST /api/courses/:id/restore — khôi phục soft-delete ───────────────────
-router.post('/:id/restore', courseWriteGuard, async (req, res) => {
+router.post('/:id/restore', courseWriteGuard('restore'), async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
     if (!course) {
@@ -320,7 +340,7 @@ router.post('/:id/restore', courseWriteGuard, async (req, res) => {
 });
 
 // ─── POST /api/courses/seed — chỉ non-production ─────────────────────────────
-router.post('/seed', courseWriteGuard, async (req, res) => {
+router.post('/seed', courseWriteGuard('seed'), async (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ success: false, message: 'Seed không được phép trên production' });
   }

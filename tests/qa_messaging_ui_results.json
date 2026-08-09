@@ -1,0 +1,37 @@
+[
+  {
+    "module": "UI",
+    "func": "Teacher Login",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Teacher đăng nhập thành công"
+  },
+  {
+    "module": "UI",
+    "func": "Student Login",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Student đăng nhập thành công"
+  },
+  {
+    "module": "UI",
+    "func": "Inbox Page",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Mở trang Inbox thành công trên cả 2 user"
+  },
+  {
+    "module": "Realtime",
+    "func": "WebSocket Sync",
+    "result": "Passed",
+    "severity": "Critical",
+    "description": "Dữ liệu realtime đồng bộ qua lại mà không cần refresh"
+  },
+  {
+    "module": "Realtime",
+    "func": "Unread Badge",
+    "result": "Passed",
+    "severity": "Medium",
+    "description": "Badge số lượng tin nhắn chưa đọc hiển thị chuẩn xác"
+  }
+]

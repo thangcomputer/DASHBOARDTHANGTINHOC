@@ -1,0 +1,140 @@
+{
+  "phase": "8.13B",
+  "RUNTIME_ENVIRONMENT": "LOCAL",
+  "soakWindow": {
+    "start": "2026-08-09T07:07:24.507Z",
+    "end": "2026-08-09T07:07:24.545Z"
+  },
+  "SOAK_EVIDENCE": "AVAILABLE",
+  "soakStatus": {
+    "SOAK_EVIDENCE": "AVAILABLE",
+    "requests": 70,
+    "match": 67,
+    "mismatch": 1,
+    "unknown": 0,
+    "unsupported": 2,
+    "errors": 0
+  },
+  "static": {
+    "channel": "STATIC",
+    "match": 8,
+    "mismatch": 0,
+    "unknown": 0,
+    "unsupported": 4,
+    "gates": 8,
+    "legacyOnly": 4,
+    "mappedGateMatchTarget": 8,
+    "mappedGateMatch": 8
+  },
+  "channels": {
+    "STATIC": {
+      "requests": 12,
+      "match": 8,
+      "mismatch": 0,
+      "unknown": 0,
+      "unsupported": 4,
+      "errors": 0,
+      "mismatchReasons": {}
+    },
+    "SYNTHETIC": {
+      "requests": 0,
+      "match": 0,
+      "mismatch": 0,
+      "unknown": 0,
+      "unsupported": 0,
+      "errors": 0,
+      "mismatchReasons": {}
+    },
+    "RUNTIME": {
+      "requests": 70,
+      "match": 67,
+      "mismatch": 1,
+      "unknown": 0,
+      "unsupported": 2,
+      "errors": 0,
+      "mismatchReasons": {
+        "ROLE_MISMATCH": 1
+      }
+    }
+  },
+  "soakDelta": {
+    "requests": 70,
+    "match": 67,
+    "mismatch": 1,
+    "unknown": 0,
+    "unsupported": 2,
+    "observer_errors": 0,
+    "dualcheck_errors": 0,
+    "dualcheck_total": 35,
+    "mismatchReasons": {
+      "ROLE_MISMATCH": 1
+    },
+    "newRuntimeMismatchSamples": [
+      {
+        "permission": "manage_hr",
+        "family": null,
+        "role": "admin_staff_identity",
+        "liveDecision": "ALLOW",
+        "enterpriseDecision": "DENY",
+        "mismatchReason": "ROLE_MISMATCH",
+        "scope": "unspecified",
+        "requestId": "soak-1786259244544-r33lty",
+        "correlationId": "soak-1786259244544-r33lty"
+      }
+    ]
+  },
+  "httpCalls": 35,
+  "callSample": [
+    {
+      "actorKey": "STAFF_HR",
+      "method": "GET",
+      "url": "/soak/hr/list",
+      "status": 200,
+      "expectStatus": 200
+    },
+    {
+      "actorKey": "STAFF_HR",
+      "method": "GET",
+      "url": "/soak/hr/stats",
+      "status": 200,
+      "expectStatus": 200
+    },
+    {
+      "actorKey": "STAFF_HR",
+      "method": "POST",
+      "url": "/soak/hr/create",
+      "status": 200,
+      "expectStatus": 200
+    },
+    {
+      "actorKey": "STAFF_HR",
+      "method": "PUT",
+      "url": "/soak/hr/update",
+      "status": 200,
+      "expectStatus": 200
+    },
+    {
+      "actorKey": "STAFF_HR",
+      "method": "DELETE",
+      "url": "/soak/hr/delete",
+      "status": 200,
+      "expectStatus": 200
+    }
+  ],
+  "metrics": {
+    "rbac_parity_match_total": 67,
+    "rbac_parity_mismatch_total": 1,
+    "rbac_parity_unknown_total": 0,
+    "rbac_parity_unsupported_total": 2,
+    "rbac_parity_observer_error_total": 0,
+    "rbac_dualcheck_total": 35,
+    "rbac_dualcheck_mismatch_total": 1,
+    "rbac_dualcheck_error_total": 0
+  },
+  "ENTERPRISE_PRIMARY_READY": "NO",
+  "note": "LOCAL controlled HTTP through checkPermission; not production traffic",
+  "safety": {
+    "finalDecisionEqualsLiveDecision": true,
+    "enterpriseNotAuthoritative": true
+  }
+}

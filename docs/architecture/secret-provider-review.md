@@ -1,0 +1,1 @@
+# Secret Provider Review\nAWS/Azure/Vault adapters mocked. Default is EnvironmentProvider.

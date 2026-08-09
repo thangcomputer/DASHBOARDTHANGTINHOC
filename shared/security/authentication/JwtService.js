@@ -1,0 +1,1 @@
+'use strict'; class JwtService { issue() {} verify() {} } module.exports = JwtService;

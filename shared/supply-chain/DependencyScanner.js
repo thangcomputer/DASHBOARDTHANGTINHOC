@@ -1,0 +1,1 @@
+'use strict'; class DependencyScanner { scan() {} } module.exports = DependencyScanner;

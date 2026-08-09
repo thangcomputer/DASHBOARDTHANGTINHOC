@@ -1,0 +1,1 @@
+'use strict'; class LearningPathApplicationService { create() {} update() {} assignCourse() {} } module.exports = LearningPathApplicationService;

@@ -1,0 +1,1 @@
+# Auth Hardening Review\nFailed logins and suspicious replays emit observability metrics.

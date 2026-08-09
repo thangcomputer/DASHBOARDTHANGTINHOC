@@ -240,6 +240,37 @@ const checkPermission = (requiredPermission) => {
         res,
         (perms) => perms.includes(requiredPermission),
       );
+      // Phase 8.11/8.12 — shadow observe / dual-check ONLY (never changes ok / HTTP / next)
+      try {
+        const { observeLiveStaffGate } = require('../services/rbacParity/observe');
+        observeLiveStaffGate(req, {
+          liveDecision: ok ? 'ALLOW' : 'DENY',
+          livePermission: requiredPermission,
+          evidenceChannel: 'RUNTIME',
+          scopeOk: req.soakScopeOk !== false,
+          ownershipOk: req.soakOwnershipOk !== false,
+          branchClass: req.soakBranchClass || null,
+          ownerClass: req.soakOwnerClass || null,
+          action: req.soakAction || null,
+        });
+      } catch {
+        /* observer must never break LIVE auth */
+      }
+      try {
+        const { dualCheckLiveStaffGate } = require('../services/rbacParity/dualCheck');
+        dualCheckLiveStaffGate(req, {
+          liveDecision: ok ? 'ALLOW' : 'DENY',
+          livePermission: requiredPermission,
+          evidenceChannel: 'RUNTIME',
+          scopeOk: req.soakScopeOk !== false,
+          ownershipOk: req.soakOwnershipOk !== false,
+          branchClass: req.soakBranchClass || null,
+          ownerClass: req.soakOwnerClass || null,
+          action: req.soakAction || null,
+        });
+      } catch {
+        /* dual-check must never break LIVE auth */
+      }
       if (ok) next();
     } catch (err) {
       logger.error('[checkPermission] error:', err);
@@ -258,6 +289,36 @@ const checkAnyPermission = (...requiredPermissions) => {
         res,
         (perms) => list.some((p) => perms.includes(p)),
       );
+      try {
+        const { observeLiveStaffGate } = require('../services/rbacParity/observe');
+        observeLiveStaffGate(req, {
+          liveDecision: ok ? 'ALLOW' : 'DENY',
+          livePermissions: list,
+          evidenceChannel: 'RUNTIME',
+          scopeOk: req.soakScopeOk !== false,
+          ownershipOk: req.soakOwnershipOk !== false,
+          branchClass: req.soakBranchClass || null,
+          ownerClass: req.soakOwnerClass || null,
+          action: req.soakAction || null,
+        });
+      } catch {
+        /* observer must never break LIVE auth */
+      }
+      try {
+        const { dualCheckLiveStaffGate } = require('../services/rbacParity/dualCheck');
+        dualCheckLiveStaffGate(req, {
+          liveDecision: ok ? 'ALLOW' : 'DENY',
+          livePermissions: list,
+          evidenceChannel: 'RUNTIME',
+          scopeOk: req.soakScopeOk !== false,
+          ownershipOk: req.soakOwnershipOk !== false,
+          branchClass: req.soakBranchClass || null,
+          ownerClass: req.soakOwnerClass || null,
+          action: req.soakAction || null,
+        });
+      } catch {
+        /* dual-check must never break LIVE auth */
+      }
       if (ok) next();
     } catch (err) {
       logger.error('[checkAnyPermission] error:', err);
@@ -302,27 +363,41 @@ const branchFilter = async (req, res, next) => {
         return next();
       }
 
-      // 🛡️ SECURITY FIX: Chỉ thực sự là SUPER_ADMIN mới được xem toàn bộ.
-      // Nếu không có branchId mà cũng KHÔNG phải SUPER_ADMIN, ép về branchId=null (không thấy gì hoặc lỗi)
+      // SUPER_ADMIN: toàn hệ thống (có thể thu hẹp bằng ?branch_id)
+      // HIGH_ADMIN: bắt buộc chọn chi nhánh (?branch_id) hoặc dùng branch của tài khoản — không mặc định all-branch
+      // SUPPORT: scoped theo branch như STAFF (không mở student/finance toàn hệ)
       const isActuallySuper = user.adminRole === 'SUPER_ADMIN';
       const isHighAdmin = user.adminRole === 'HIGH_ADMIN';
       const isSupport = user.adminRole === 'SUPPORT';
+      const qBranch = req.query.branch_id;
 
-      if (isActuallySuper || isHighAdmin || isSupport || !user.branchId) {
-        const qBranch = req.query.branch_id;
-        if (qBranch && qBranch !== 'all' && qBranch !== '' && (isActuallySuper || isHighAdmin || isSupport)) {
+      if (isActuallySuper) {
+        if (qBranch && qBranch !== 'all' && qBranch !== '') {
           req.branchFilter = { branchId: qBranch };
-        } else if (isActuallySuper || isHighAdmin || isSupport) {
-          req.branchFilter = {};
         } else {
-          // Admin nhưng không có branchId và không phải Super/High/Support Admin? Giới hạn về null để an toàn
+          req.branchFilter = {};
+        }
+      } else if (isHighAdmin) {
+        if (qBranch && qBranch !== 'all' && qBranch !== '') {
+          req.branchFilter = { branchId: qBranch };
+        } else if (user.branchId) {
+          req.branchFilter = { branchId: user.branchId };
+          req.userBranchId = user.branchId;
+          req.userBranchCode = user.branchCode || '';
+        } else {
           req.branchFilter = { branchId: null };
         }
+      } else if (isSupport || user.branchId) {
+        if (!user.branchId) {
+          req.branchFilter = { branchId: null };
+        } else {
+          req.branchFilter = { branchId: user.branchId };
+          req.userBranchId = user.branchId;
+          req.userBranchCode = user.branchCode || '';
+        }
       } else {
-        // STAFF / Regular Admin with branch
-        req.branchFilter = { branchId: user.branchId };
-        req.userBranchId   = user.branchId;
-        req.userBranchCode = user.branchCode || '';
+        // Admin/staff không có branchId và không phải Super/High — an toàn: không thấy data
+        req.branchFilter = { branchId: null };
       }
     } else {
       req.branchFilter = {};

@@ -1,0 +1,1 @@
+# OpenTelemetry Foundation\nScaffolded native OpenTelemetry wrapper tracking `traceId` and `spanId` through `RequestContext`.

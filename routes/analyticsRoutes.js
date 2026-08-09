@@ -7,8 +7,9 @@ const router = express.Router();
 const Student = require('../models/Student');
 const Schedule = require('../models/Schedule');
 const Branch = require('../models/Branch');
-const { authMiddleware, checkAnyPermission, branchFilter } = require('../middleware/auth');
-const { PERMISSIONS } = require('../constants/permissions');
+const { authMiddleware, branchFilter } = require('../middleware/auth');
+const { policyShadowAnalytics } = require('../middleware/policyShadowAnalytics');
+const { analyticsCutoverGate } = require('../middleware/analyticsCutoverGate');
 const logger = require('../config/logger');
 const {
   listPaidItems,
@@ -17,7 +18,19 @@ const {
 } = require('../services/revenueAggregate');
 const { sumFinancialRevenue } = require('../services/ledgerService');
 
-const guard = [authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE), branchFilter];
+/**
+ * Phase 7.27 — Controlled cutover for LIVE /api/analytics ONLY.
+ *
+ * Flow: auth → branchFilter (DATA SCOPE) → policyShadowAnalytics → analyticsCutoverGate → handler
+ * Legacy MANAGE_FINANCE|VIEW_BRANCH_REVENUE gate retained inside analyticsCutoverGate.
+ * Aggregation remains handler-owned. modules/analytics twin is unmounted — not migrated.
+ */
+const guard = (action) => [
+  authMiddleware,
+  branchFilter,
+  policyShadowAnalytics(action),
+  analyticsCutoverGate(action),
+];
 
 function getPeriodRange(period) {
   const now = new Date();
@@ -76,7 +89,7 @@ function buildBaseFilter(req, queryBranch) {
 }
 
 // GET /api/analytics/revenue?period=1m&branchId=all
-router.get('/revenue', guard, async (req, res) => {
+router.get('/revenue', guard('revenue'), async (req, res) => {
   try {
     const { period = '1m', branchId: queryBranch } = req.query;
     const { start, end } = getPeriodRange(period);
@@ -137,7 +150,7 @@ router.get('/revenue', guard, async (req, res) => {
 });
 
 // GET /api/analytics/enrollment?period=1m&branchId=all
-router.get('/enrollment', guard, async (req, res) => {
+router.get('/enrollment', guard('enrollment'), async (req, res) => {
   try {
     const { period = '1m', branchId: queryBranch } = req.query;
     const { start, end } = getPeriodRange(period);
@@ -219,7 +232,7 @@ router.get('/enrollment', guard, async (req, res) => {
 });
 
 // GET /api/analytics/branches — Tổng quan từng chi nhánh (all-time)
-router.get('/branches', guard, async (req, res) => {
+router.get('/branches', guard('branches'), async (req, res) => {
   try {
     const branches = await Branch.find({ isActive: { $ne: false } }).lean();
 

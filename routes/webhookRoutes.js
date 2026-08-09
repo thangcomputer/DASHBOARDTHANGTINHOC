@@ -12,17 +12,25 @@ const router = express.Router();
 const crypto = require('crypto');
 const Student = require('../models/Student');
 const { authMiddleware } = require('../middleware/auth');
+const { policyShadowFinance } = require('../middleware/policyShadowFinance');
+const { policyShadowWebhook } = require('../middleware/policyShadowWebhook');
 
 const PaymentSession = require('../models/PaymentSession');
 const logger = require('../config/logger');
+const { emitFinanceEvent } = require('../utils/realtimeEmit');
+
+function timingSafeEqualString(a, b) {
+  const left = Buffer.from(String(a || ''), 'utf8');
+  const right = Buffer.from(String(b || ''), 'utf8');
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
 
 // ── SePay Webhook verification ────────────────────────────────────────────────
 // SePay hỗ trợ 2 kiểu chứng thực:
 // 1. API Key: Authorization: Apikey <KEY>
-// 2. HMAC: x-sepay-token = HMAC-SHA256(body, SECRET_KEY)
-// Nếu chưa cấu hình → cho qua (backward compat)
+// 2. HMAC: x-sepay-token = HMAC-SHA256(rawBody, SECRET_KEY)
 function verifySepaySignature(req, res, next) {
-  // Không log full Authorization / HMAC token (tránh leak secret vào log)
   logger.info('[SEPAY] Incoming webhook', {
     hasAuthorization: Boolean(req.headers['authorization']),
     hasSepayToken: Boolean(req.headers['x-sepay-token']),
@@ -32,50 +40,51 @@ function verifySepaySignature(req, res, next) {
   const apiKey = process.env.SEPAY_API_KEY;
   const hmacSecret = process.env.SEPAY_SECRET_KEY;
 
-  // Production: bắt buộc cấu hình xác thực webhook
   if (!apiKey && !hmacSecret) {
     if (process.env.NODE_ENV === 'production') {
       logger.error('[SEPAY] Webhook rejected — SEPAY_API_KEY / SEPAY_SECRET_KEY not configured');
       return res.status(503).json({ success: false, message: 'Webhook payment not configured' });
     }
     logger.warn('[SEPAY] Dev mode — webhook verification skipped (no SEPAY keys)');
+    req.sepayVerificationStatus = 'dev_skip';
     return next();
   }
 
-  // ── Kiểm tra API Key (SePay gửi: Authorization: Apikey <KEY>) ──
   if (apiKey) {
     const authHeader = req.headers['authorization'] || '';
     const incomingKey = authHeader.replace(/^Apikey\s+/i, '').trim();
-    if (incomingKey === apiKey) {
+    const headerKey = String(req.headers['x-api-key'] || '').trim();
+    if (timingSafeEqualString(incomingKey, apiKey) || timingSafeEqualString(headerKey, apiKey)) {
       logger.info('[SEPAY] ✅ API Key verified');
+      req.sepayVerificationStatus = 'verified';
       return next();
     }
-    // Cũng kiểm tra header x-api-key
-    if (req.headers['x-api-key'] === apiKey) {
-      logger.info('[SEPAY] ✅ API Key (x-api-key) verified');
-      return next();
+    // Fall through to HMAC if configured; otherwise reject
+    if (!hmacSecret) {
+      logger.warn('[SEPAY] ❌ API Key mismatch — rejected');
+      return res.status(401).json({ success: false, message: 'Invalid API Key' });
     }
-    logger.warn('[SEPAY] ❌ API Key mismatch — rejected');
-    return res.status(401).json({ success: false, message: 'Invalid API Key' });
   }
 
-  // ── Kiểm tra HMAC (legacy) ──
   if (hmacSecret) {
     const signature = req.headers['x-sepay-token'];
     if (!signature) {
       logger.warn('[SEPAY] Missing HMAC signature — rejected');
       return res.status(401).json({ success: false, message: 'Missing webhook signature' });
     }
-    const rawBody = JSON.stringify(req.body);
+    const rawBody = Buffer.isBuffer(req.rawBody)
+      ? req.rawBody
+      : Buffer.from(JSON.stringify(req.body || {}), 'utf8');
     const expected = crypto.createHmac('sha256', hmacSecret).update(rawBody).digest('hex');
-    if (signature !== expected) {
+    if (!timingSafeEqualString(signature, expected)) {
       logger.warn('[SEPAY] Invalid HMAC signature — rejected');
       return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
     }
+    req.sepayVerificationStatus = 'verified';
     return next();
   }
 
-  next();
+  return res.status(401).json({ success: false, message: 'Invalid webhook credentials' });
 }
 
 const SESSION_TTL_MS = 15 * 60 * 1000; // 15 phút
@@ -106,8 +115,8 @@ const handleCreateSession = async (req, res) => {
   }
 };
 
-router.post('/payment-session', authMiddleware, handleCreateSession);
-router.post('/create-session', authMiddleware, handleCreateSession);
+router.post('/payment-session', authMiddleware, policyShadowFinance('wh_payment_session'), handleCreateSession);
+router.post('/create-session', authMiddleware, policyShadowFinance('wh_payment_session'), handleCreateSession);
 
 // ── GET /api/webhooks/payment-session/:id & /api/webhooks/payment-status ── Polling
 const handleCheckSession = async (req, res) => {
@@ -148,20 +157,38 @@ const handleCheckSession = async (req, res) => {
   }
 };
 
-router.get('/payment-session/:id', authMiddleware, handleCheckSession);
-router.get('/payment-status', authMiddleware, handleCheckSession);
+router.get('/payment-session/:id', authMiddleware, policyShadowFinance('wh_payment_session'), handleCheckSession);
+router.get('/payment-status', authMiddleware, policyShadowFinance('wh_payment_session'), handleCheckSession);
 
 
 // ── POST /api/webhooks/sepay ── SePay Webhook (HMAC verified) ──────────────────
-router.post('/sepay', verifySepaySignature, async (req, res) => {
+// Policy SHADOW after Legacy verification — never re-verifies / never mutates finance
+router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async (req, res) => {
   try {
     const SepayWebhookEvent = require('../models/SepayWebhookEvent');
     const body = req.body;
     const content = (body.content || body.description || '').toLowerCase().trim();
     const amount  = Number(body.transferAmount || body.amount || 0);
-    const gatewayTxnId = String(
+    let gatewayTxnId = String(
       body.id || body.transactionID || body.transaction_id || body.referenceCode || body.transferId || ''
     ).trim();
+
+    // Stable fallback idempotency when gateway omits txn id
+    if (!gatewayTxnId) {
+      gatewayTxnId = crypto
+        .createHash('sha256')
+        .update([
+          String(amount),
+          content,
+          String(body.accountNumber || body.account || ''),
+          String(body.transactionDate || body.when || body.transferDate || ''),
+        ].join('|'))
+        .digest('hex')
+        .slice(0, 40);
+      if (process.env.NODE_ENV === 'production') {
+        logger.warn('[SEPAY] Missing gateway txn id — using content hash fallback');
+      }
+    }
 
     logger.info('[SEPAY WEBHOOK]', {
       amount,
@@ -252,7 +279,10 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
 
           const io = req.app.get('io');
           if (io) {
-            io.emit('tuition:paid', {
+            emitFinanceEvent(io, {
+              branchId: claimed.branchId || null,
+              userIds: claimed.studentId ? [claimed.studentId] : [],
+            }, 'tuition:paid', {
               sessionId: claimed.sessionId,
               amount,
               message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
@@ -282,7 +312,7 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
             paid: false,
             studentCode: { $in: variants },
           })
-            .select('studentCode name price paid')
+            .select('studentCode name price paid enrollments course branchId')
             .limit(50)
             .lean()
         : [];
@@ -293,17 +323,36 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
         if (!content.includes(code)) continue;
         if (!amountsMatch(s.price, amount)) continue;
 
+        const list = Array.isArray(s.enrollments) ? s.enrollments : [];
+        const unpaidEnr = list.find((e) => {
+          const st = String(e.status || 'active');
+          if (st === 'cancelled' || st === 'refunded') return false;
+          return e.paid !== true;
+        }) || list.find((e) => e.isPrimary) || list[0];
+        const enrId = unpaidEnr?._id ? String(unpaidEnr._id) : '';
+
+        const setFields = {
+          paid: true,
+          paidAmount: amount,
+          paidAt: new Date(),
+          paidNote: String(body.content || '').slice(0, 300),
+        };
+        if (enrId) {
+          setFields['enrollments.$[enr].paid'] = true;
+          setFields['enrollments.$[enr].paidAt'] = new Date();
+          setFields['enrollments.$[enr].learningAccess'] = true;
+          setFields['enrollments.$[enr].status'] = 'active';
+        }
+
+        const updateOpts = { returnDocument: 'after' };
+        if (enrId) {
+          updateOpts.arrayFilters = [{ 'enr._id': unpaidEnr._id }];
+        }
+
         const updated = await Student.findOneAndUpdate(
           { _id: s._id, paid: false },
-          {
-            $set: {
-              paid: true,
-              paidAmount: amount,
-              paidAt: new Date(),
-              paidNote: String(body.content || '').slice(0, 300),
-            },
-          },
-          { returnDocument: 'after' }
+          { $set: setFields },
+          updateOpts
         );
         if (!updated) continue;
 
@@ -319,7 +368,7 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
             maHoaDon: maHD,
             hocVien: updated._id,
             hoTen: updated.name || s.name,
-            khoaHoc: updated.course || 'Học phí',
+            khoaHoc: updated.course || unpaidEnr?.courseName || 'Học phí',
             hocPhi: amount,
             ghiChu: `SePay CK — ${String(body.content || '').slice(0, 120)}`,
           });
@@ -328,20 +377,21 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
         }
         try {
           const { settlePayment } = require('../services/ledgerService');
-          const list = updated.enrollments || [];
-          const primary = list.find((e) => e.isPrimary) || list[0];
-          const enrId = primary?._id ? String(primary._id) : '';
+          const primary = (updated.enrollments || []).find((e) => String(e._id) === enrId)
+            || (updated.enrollments || []).find((e) => e.isPrimary)
+            || (updated.enrollments || [])[0];
+          const settledEnrId = primary?._id ? String(primary._id) : enrId;
           await settlePayment({
             student: updated,
             amount,
             invoice: sepayInvoice,
-            enrollmentId: enrId,
-            courseName: updated.course || '',
+            enrollmentId: settledEnrId,
+            courseName: updated.course || primary?.courseName || '',
             source: 'sepay',
             sourceRef: sepayInvoice?.maHoaDon || gatewayTxnId || matchedRef,
-            // Khớp admin_pay theo enrollment — tránh key :primary nuốt lần thu khóa đăng ký lại
-            idempotencyKey: enrId
-              ? `payment:student:${updated._id}:enr:${enrId}`
+            // Unified with enrollment_pay — one PAYMENT per enrollment
+            idempotencyKey: settledEnrId
+              ? `payment:student:${updated._id}:enr:${settledEnrId}`
               : `payment:student:${updated._id}:primary`,
             actor: { id: 'sepay', role: 'system' },
             note: String(body.content || '').slice(0, 300),
@@ -350,10 +400,24 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
         } catch (ledgerErr) {
           logger.error('[SEPAY] ledger settle FAILED — rollback paid: %s', ledgerErr.message);
           try {
-            await Student.findByIdAndUpdate(updated._id, {
-              $set: { paid: false, paidAmount: 0, paidNote: '' },
-              $unset: { paidAt: 1 },
-            });
+            const rollbackSet = {
+              paid: false,
+              paidAmount: 0,
+              paidNote: '',
+            };
+            if (enrId) {
+              rollbackSet['enrollments.$[enr].paid'] = false;
+              rollbackSet['enrollments.$[enr].learningAccess'] = false;
+              rollbackSet['enrollments.$[enr].status'] = 'pending_payment';
+            }
+            const rbOpts = { $set: rollbackSet, $unset: { paidAt: 1 } };
+            if (enrId) {
+              await Student.findByIdAndUpdate(updated._id, rbOpts, {
+                arrayFilters: [{ 'enr._id': unpaidEnr._id }],
+              });
+            } else {
+              await Student.findByIdAndUpdate(updated._id, rbOpts);
+            }
             if (sepayInvoice?._id) {
               const Invoice = require('../models/Invoice');
               await Invoice.findByIdAndUpdate(sepayInvoice._id, { status: 'void' });
@@ -367,7 +431,10 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
         }
         const io = req.app.get('io');
         if (io) {
-          io.emit('tuition:paid', {
+          emitFinanceEvent(io, {
+            branchId: updated?.branchId || s.branchId || null,
+            userIds: [s._id],
+          }, 'tuition:paid', {
             studentId: String(s._id),
             amount,
             message: `✅ ${s.name} đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
@@ -398,7 +465,7 @@ router.post('/sepay', verifySepaySignature, async (req, res) => {
 });
 
 // ── GET /api/webhooks/payment-status/:studentId ── Polling HV đã có tài khoản ─
-router.get('/payment-status/:studentId', authMiddleware, async (req, res) => {
+router.get('/payment-status/:studentId', authMiddleware, policyShadowFinance('wh_payment_status_student'), async (req, res) => {
   try {
     const sid = String(req.params.studentId);
     const isSelf = req.user.role === 'student' && String(req.user.id) === sid;

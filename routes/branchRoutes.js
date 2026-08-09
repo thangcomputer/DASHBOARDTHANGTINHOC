@@ -2,17 +2,27 @@
  * branchRoutes.js — CRUD Chi nhánh
  *
  * GET    /api/branches          — Danh sách (public, để form đăng ký dùng)
- * POST   /api/branches          — Thêm chi nhánh (SUPER_ADMIN)
- * PUT    /api/branches/:id      — Sửa chi nhánh (SUPER_ADMIN)
- * DELETE /api/branches/:id      — Xóa chi nhánh (SUPER_ADMIN)
+ * POST   /api/branches          — Thêm chi nhánh (manage_staff)
+ * PUT    /api/branches/:id      — Sửa chi nhánh (manage_staff)
+ * DELETE /api/branches/:id      — Soft-disable chi nhánh (manage_staff)
+ *
+ * Phase 7.14 — Controlled cutover for /api/branches ONLY.
+ * Flow: (auth if admin) → policyShadowBranch → branchesCutoverGate → handler
  */
 const express = require('express');
 const Branch  = require('../models/Branch');
-const { authMiddleware, checkPermission } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
+const { policyShadowBranch } = require('../middleware/policyShadowBranch');
+const { branchesCutoverGate } = require('../middleware/branchesCutoverGate');
 const cache = require('../utils/cache');
 
 const router = express.Router();
-const adminGuard = [authMiddleware, checkPermission('manage_staff')];
+
+const adminGuard = (action) => [
+  authMiddleware,
+  policyShadowBranch(action),
+  branchesCutoverGate(action),
+];
 
 const BRANCH_ACTIVE_KEY = 'branches:active';
 const BRANCH_ALL_KEY = 'branches:all';
@@ -29,7 +39,10 @@ async function tenantBranchQuery(req) {
 }
 
 // ── GET /api/branches ─────────────────────────────────────────────────────────
-router.get('/', async (req, res) => {
+router.get('/', [
+  policyShadowBranch('list_public'),
+  branchesCutoverGate('list_public'),
+], async (req, res) => {
   try {
     const tq = await tenantBranchQuery(req);
     const cacheKey = BRANCH_ACTIVE_KEY + ':' + (tq.tenantId || 'all');
@@ -45,7 +58,7 @@ router.get('/', async (req, res) => {
 });
 
 // ── GET /api/branches/all — kể cả inactive (cho admin UI) ────────────────────
-router.get('/all', adminGuard, async (req, res) => {
+router.get('/all', adminGuard('list_all'), async (req, res) => {
   try {
     const tq = await tenantBranchQuery(req);
     const cacheKey = BRANCH_ALL_KEY + ':' + (tq.tenantId || 'all');
@@ -59,7 +72,7 @@ router.get('/all', adminGuard, async (req, res) => {
 });
 
 // ── POST /api/branches ────────────────────────────────────────────────────────
-router.post('/', adminGuard, async (req, res) => {
+router.post('/', adminGuard('create'), async (req, res) => {
   try {
     const { name, code, address, phone, tenantId } = req.body;
     if (!name || !code) {
@@ -93,7 +106,7 @@ router.post('/', adminGuard, async (req, res) => {
 });
 
 // ── PUT /api/branches/:id ─────────────────────────────────────────────────────
-router.put('/:id', adminGuard, async (req, res) => {
+router.put('/:id', adminGuard('update'), async (req, res) => {
   try {
     const updates = {};
     const allowed = ['name', 'code', 'address', 'phone', 'isActive'];
@@ -110,7 +123,7 @@ router.put('/:id', adminGuard, async (req, res) => {
 });
 
 // ── DELETE /api/branches/:id ──────────────────────────────────────────────────
-router.delete('/:id', adminGuard, async (req, res) => {
+router.delete('/:id', adminGuard('delete'), async (req, res) => {
   try {
     // Soft-delete: chỉ đặt isActive = false để không mất data lịch sử
     const deleted = await Branch.findByIdAndUpdate(req.params.id, { isActive: false }, { returnDocument: 'after' });

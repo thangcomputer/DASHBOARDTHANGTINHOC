@@ -1,0 +1,1 @@
+'use strict'; class EncryptionService { encrypt() {} } module.exports = EncryptionService;

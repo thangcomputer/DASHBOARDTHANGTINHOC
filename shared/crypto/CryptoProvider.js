@@ -1,0 +1,1 @@
+'use strict'; class CryptoProvider { encrypt() {} decrypt() {} } module.exports = CryptoProvider;

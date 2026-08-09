@@ -1,0 +1,1 @@
+'use strict'; class SupplyChainPolicy { evaluate() {} } module.exports = SupplyChainPolicy;

@@ -1,0 +1,1 @@
+# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nGenerated artifact for Sprint 5.0 Enterprise Feature Platform - Planning Phase.

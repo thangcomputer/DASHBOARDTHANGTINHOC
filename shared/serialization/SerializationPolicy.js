@@ -1,0 +1,1 @@
+'use strict'; class SerializationPolicy { evaluate() {} } module.exports = SerializationPolicy;

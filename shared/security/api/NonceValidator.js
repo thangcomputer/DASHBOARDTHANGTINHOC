@@ -1,0 +1,1 @@
+'use strict'; class NonceValidator { validate() {} } module.exports = NonceValidator;

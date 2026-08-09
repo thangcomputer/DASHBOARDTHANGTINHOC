@@ -1,11 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, isAdmin } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 const logger = require('../config/logger');
 const center = require('../services/notificationCenter');
+const { policyShadowNotification } = require('../middleware/policyShadowNotification');
+const { notificationsCutoverGate } = require('../middleware/notificationsCutoverGate');
+
+/**
+ * LIVE mount: server.js → app.use('/api/notifications', notificationRoutes)
+ *
+ * Phase 7.15 — Controlled cutover for /api/notifications ONLY.
+ * Flow: auth → policyShadowNotification(action) → notificationsCutoverGate(action) → handler
+ * Legacy fallback: auth-only pass-through; broadcast → isAdmin.
+ */
+
+function notifGuard(action) {
+  return [authMiddleware, policyShadowNotification(action), notificationsCutoverGate(action)];
+}
 
 // GET /api/notifications — danh sach phan trang (Notification Center)
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', notifGuard('list'), async (req, res) => {
   try {
     const { page, limit, type, unreadOnly } = req.query;
     const result = await center.listForUser(req.user, {
@@ -22,7 +36,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // GET /api/notifications/count — badge chua doc
-router.get('/count', authMiddleware, async (req, res) => {
+router.get('/count', notifGuard('count'), async (req, res) => {
   try {
     const count = await center.countUnread(req.user);
     res.json({ success: true, count });
@@ -33,7 +47,7 @@ router.get('/count', authMiddleware, async (req, res) => {
 });
 
 // GET /api/notifications/unread — tuong thich cu (50 gan day + count)
-router.get('/unread', authMiddleware, async (req, res) => {
+router.get('/unread', notifGuard('unread'), async (req, res) => {
   try {
     const result = await center.listForUser(req.user, { page: 1, limit: 50 });
     res.json({
@@ -48,7 +62,7 @@ router.get('/unread', authMiddleware, async (req, res) => {
 });
 
 // PUT /api/notifications/mark-read
-router.put('/mark-read', authMiddleware, async (req, res) => {
+router.put('/mark-read', notifGuard('mark_read'), async (req, res) => {
   try {
     const data = await center.markRead(req.user, req.body || {});
     res.json({ success: true, message: 'Da danh dau doc', data });
@@ -59,7 +73,7 @@ router.put('/mark-read', authMiddleware, async (req, res) => {
 });
 
 // DELETE /api/notifications/:id — dismiss cho user hien tai
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', notifGuard('dismiss'), async (req, res) => {
   try {
     const data = await center.dismiss(req.user, req.params.id);
     res.json({ success: true, message: 'Da an thong bao', data });
@@ -70,7 +84,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 });
 
 // POST /api/notifications — admin broadcast
-router.post('/', authMiddleware, isAdmin, async (req, res) => {
+router.post('/', notifGuard('broadcast'), async (req, res) => {
   try {
     const { title, content, type = 'SYSTEM', receivers = 'ALL_ADMIN', path = '', payload = {} } = req.body || {};
     if (!title || !content) {

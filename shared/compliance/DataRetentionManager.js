@@ -1,0 +1,1 @@
+'use strict'; class DataRetentionManager { manage() {} } module.exports = DataRetentionManager;

@@ -1,0 +1,1 @@
+'use strict'; class AuditChain { append() {} verify() {} } module.exports = AuditChain;

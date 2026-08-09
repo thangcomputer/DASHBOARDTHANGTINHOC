@@ -1,0 +1,1 @@
+'use strict'; class AuditIntegrityValidator { validate() {} } module.exports = AuditIntegrityValidator;

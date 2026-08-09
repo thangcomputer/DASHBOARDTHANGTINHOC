@@ -1,0 +1,94 @@
+{
+  "phase": "8.19",
+  "status": "BLOCKED",
+  "decision": "BLOCKED",
+  "environment": "LOCAL",
+  "evidenceEnvironment": "LOCAL",
+  "productionEvidence": "NOT_AVAILABLE",
+  "productionSoakEvidence": "NOT_AVAILABLE",
+  "runtimeCoverage": "NOT_AVAILABLE",
+  "parityReady": true,
+  "dualReadReady": true,
+  "dualCheckReady": true,
+  "productionSoakReady": true,
+  "observerErrors": 0,
+  "dualCheckErrors": 0,
+  "criticalMismatchCount": 0,
+  "privilegeWidening": false,
+  "financeSafety": "NOT_EVALUATED",
+  "hrSafety": "NOT_EVALUATED",
+  "teacherSafety": "NOT_EVALUATED",
+  "studentTrainingSafety": "NOT_EVALUATED",
+  "roleSafety": "PASS",
+  "legacyPrincipalSafety": "NOT_EVALUATED",
+  "domainSafety": {
+    "finance": "NOT_EVALUATED",
+    "hr": "NOT_EVALUATED",
+    "teacher": "NOT_EVALUATED",
+    "studentTraining": "NOT_EVALUATED",
+    "legacyPrincipal": "NOT_EVALUATED",
+    "note": "No STAGING/PRODUCTION RUNTIME evidence — domains NOT_EVALUATED (not FAIL)"
+  },
+  "finalDecisionInvariant": "PASS",
+  "unsupportedLegacy": [
+    {
+      "key": "manage_schedule",
+      "status": "LEGACY_ONLY",
+      "mapped": []
+    },
+    {
+      "key": "manage_messages",
+      "status": "LEGACY_ONLY",
+      "mapped": []
+    },
+    {
+      "key": "view_logs",
+      "status": "LEGACY_ONLY",
+      "mapped": []
+    },
+    {
+      "key": "view_evaluations",
+      "status": "LEGACY_ONLY",
+      "mapped": []
+    }
+  ],
+  "hardGates": {
+    "G1_Catalog": "PASS",
+    "G2_DualRead": "PASS",
+    "G3_DualCheck": "PASS",
+    "G4_ProductionSoak": "PASS",
+    "G5_ProductionEvidence": "NOT_AVAILABLE",
+    "G6_RuntimeErrors": "PASS",
+    "G7_CriticalMismatch": "PASS",
+    "G8_DecisionInvariant": "PASS",
+    "G9_PrivilegeWidening": "PASS",
+    "G10_DomainSafety": "NOT_EVALUATED",
+    "G11_RoleSafety": "PASS",
+    "G12_Coverage": "NOT_AVAILABLE"
+  },
+  "blockers": [
+    "hard_gate_G5_ProductionEvidence_NOT_AVAILABLE",
+    "hard_gate_G10_DomainSafety_NOT_EVALUATED",
+    "hard_gate_G12_Coverage_NOT_AVAILABLE",
+    "evidence_environment_not_staging_or_production",
+    "local_evidence_not_production",
+    "production_soak_evidence_not_available",
+    "runtime_coverage_not_available",
+    "no_runtime_events",
+    "domain_safety_not_evaluated"
+  ],
+  "recommendation": "NOT_READY",
+  "enterprisePrimaryReady": false,
+  "ENTERPRISE_PRIMARY_READY": "NO",
+  "safety": {
+    "liveRemainsPrimary": true,
+    "enterpriseIsShadowOnly": true,
+    "flagsNotAutoEnabled": true,
+    "authorizeNotMounted": true,
+    "evaluatorDoesNotMutateAuth": true,
+    "notEvaluatedIsNotFail": true,
+    "notEvaluatedStillBlocksPrimary": true
+  },
+  "note": "NOT_EVALUATED ≠ FAIL and ≠ PASS. NOT_EVALUATED still blocks ENTERPRISE_PRIMARY_READY. ENTERPRISE_PRIMARY_READY=YES means cutover review eligibility only — never auto-promote.",
+  "generatedAt": "2026-08-09T08:06:15.397Z"
+}

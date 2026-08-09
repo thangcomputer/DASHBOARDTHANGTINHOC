@@ -1,0 +1,1 @@
+'use strict'; class ${ModelName}Repository { save() {} } module.exports = ${ModelName}Repository;

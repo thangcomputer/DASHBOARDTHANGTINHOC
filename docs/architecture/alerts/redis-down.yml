@@ -1,0 +1,1 @@
+groups:\n  - name: redis-down\n    rules:\n      - alert: RedisCacheDown\n        expr: up == 0\n        for: 1m\n        labels:\n          severity: critical\n

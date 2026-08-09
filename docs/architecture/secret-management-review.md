@@ -1,0 +1,1 @@
+# Secret Management Review\nSecretManager abstracts direct process.env access.

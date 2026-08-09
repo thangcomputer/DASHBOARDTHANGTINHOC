@@ -1,0 +1,1 @@
+# Prometheus Exporter\nReplaced internal endpoint with `/metrics` exposing standard Prometheus text format based on `MetricsRegistry`.

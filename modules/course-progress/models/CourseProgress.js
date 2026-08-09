@@ -1,0 +1,1 @@
+'use strict'; const mongoose = require('mongoose'); const schema = new mongoose.Schema({ studentId: String }); module.exports = mongoose.model('CourseProgress', schema);

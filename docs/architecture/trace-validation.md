@@ -1,0 +1,1 @@
+# Distributed Trace Enhancement Review\n`RequestContext` firmly seeded in CQRS middleware. Trace propagating downwards seamlessly into Domain limits.

@@ -1,0 +1,1 @@
+# Security Headers Review\nHeaders safely emitted via config/security.js.

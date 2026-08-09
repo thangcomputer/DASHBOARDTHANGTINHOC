@@ -1,0 +1,560 @@
+[
+  {
+    "file": "aiRoutes.js",
+    "type": "guard_definition",
+    "value": "const guard = [authMiddleware, isAdmin, sensitiveFlowLimiter];",
+    "content": "authMiddleware, isAdmin, sensitiveFlowLimiter"
+  },
+  {
+    "file": "analyticsRoutes.js",
+    "type": "guard_definition",
+    "value": "const guard = [authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE), branchFilter];",
+    "content": "authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE), branchFilter"
+  },
+  {
+    "file": "assignmentRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "backupRoutes.js",
+    "type": "guard_definition",
+    "value": "const guard = [authMiddleware, isSuperAdmin];",
+    "content": "authMiddleware, isSuperAdmin"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG",
+    "content": "checkPermission(PERMISSIONS.MANAGE_BLOG"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG",
+    "content": "checkPermission(PERMISSIONS.MANAGE_BLOG"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG",
+    "content": "checkPermission(PERMISSIONS.MANAGE_BLOG"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG",
+    "content": "checkPermission(PERMISSIONS.MANAGE_BLOG"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/manage/posts/:id/publish', checkPermission(PERMISSIONS.MANAGE_BLOG",
+    "content": "checkPermission(PERMISSIONS.MANAGE_BLOG"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/manage/posts/:id/hide', checkPermission(PERMISSIONS.MANAGE_BLOG",
+    "content": "checkPermission(PERMISSIONS.MANAGE_BLOG"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG",
+    "content": "checkPermission(PERMISSIONS.MANAGE_BLOG"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/manage/upload', checkPermission(PERMISSIONS.MANAGE_BLOG",
+    "content": "checkPermission(PERMISSIONS.MANAGE_BLOG"
+  },
+  {
+    "file": "blogRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "branchRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "branchRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "branchRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "employeeRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/', [authMiddleware, isAdmin, branchFilter], ",
+    "content": "[authMiddleware, isAdmin, branchFilter], "
+  },
+  {
+    "file": "employeeRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/stats', [authMiddleware, isAdmin, branchFilter], ",
+    "content": "[authMiddleware, isAdmin, branchFilter], "
+  },
+  {
+    "file": "employeeRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/', [authMiddleware, isAdmin, branchFilter], ",
+    "content": "[authMiddleware, isAdmin, branchFilter], "
+  },
+  {
+    "file": "employeeRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id', [authMiddleware, isAdmin, branchFilter], ",
+    "content": "[authMiddleware, isAdmin, branchFilter], "
+  },
+  {
+    "file": "employeeRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/:id', [authMiddleware, isAdmin, branchFilter], ",
+    "content": "[authMiddleware, isAdmin, branchFilter], "
+  },
+  {
+    "file": "employeeRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/:id/pay', [authMiddleware, isAdmin, branchFilter], ",
+    "content": "[authMiddleware, isAdmin, branchFilter], "
+  },
+  {
+    "file": "employeeRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/payroll', [authMiddleware, isAdmin, branchFilter], ",
+    "content": "[authMiddleware, isAdmin, branchFilter], "
+  },
+  {
+    "file": "evaluationRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "fileRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/stats', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "fileRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "fileRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/purge-expired', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "invoiceRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "invoiceRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/stats', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "invoiceRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "invoiceRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/:id/pdf/queue', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "invoiceRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/:id/email', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "invoiceRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "messageRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "monitoringRoutes.js",
+    "type": "guard_definition",
+    "value": "const guard = [authMiddleware, isAdmin];",
+    "content": "authMiddleware, isAdmin"
+  },
+  {
+    "file": "notificationRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/', authMiddleware, isAdmin, ",
+    "content": "authMiddleware, isAdmin, "
+  },
+  {
+    "file": "proctorRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/events/:userId', authMiddleware, isAdmin, ",
+    "content": "authMiddleware, isAdmin, "
+  },
+  {
+    "file": "scheduleRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/upload-popup-image', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/upload-invoice-signature', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/web', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/training-data', authMiddleware, checkPermission(PERMISSIONS.MANAGE_TRAINING",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_TRAINING"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/student-training-data', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/teacher-exam-config', authMiddleware, checkPermission(PERMISSIONS.MANAGE_TRAINING",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_TRAINING"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/exam-subjects', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/exam-subjects/:id', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/student-exam-config', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/upload-training-file', authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.MANAGE_STUDENT_TRAINING",
+    "content": "authMiddleware, checkAnyPermission(PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.MANAGE_STUDENT_TRAINING"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/upload-logo', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/upload-favicon', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/upload-invoice-logo', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "settingsRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/reset-data', authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.SYSTEM_SETTINGS"
+  },
+  {
+    "file": "staffRoutes.js",
+    "type": "guard_definition",
+    "value": "const guard  = [authMiddleware, checkPermission('manage_staff')];",
+    "content": "authMiddleware, checkPermission('manage_staff')"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/import', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.patch('/:id/price', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/unlock-exam', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/:id/enrollments', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/assign-teacher', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/:id', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/:id/reset-history', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/pay-teacher', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "studentRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "systemLogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/', authMiddleware, isAdmin, ",
+    "content": "authMiddleware, isAdmin, "
+  },
+  {
+    "file": "systemLogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/', authMiddleware, isAdmin, ",
+    "content": "authMiddleware, isAdmin, "
+  },
+  {
+    "file": "systemLogRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/:id', authMiddleware, isAdmin, ",
+    "content": "authMiddleware, isAdmin, "
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/upload-practical', authMiddleware, isTeacher, ",
+    "content": "authMiddleware, isTeacher, "
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/', [authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], ",
+    "content": "[authMiddleware, isAdmin, superAdminOnlyTeacher, branchFilter], "
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/stats/summary', [authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS"
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/score', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS"
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/approve', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS"
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/:id/submit-practical', authMiddleware, isTeacher, ",
+    "content": "authMiddleware, isTeacher, "
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/reject', authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.VIEW_TEACHERS"
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/:id', [authMiddleware, isAdmin, superAdminOnlyTeacher], ",
+    "content": "[authMiddleware, isAdmin, superAdminOnlyTeacher], "
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/:id/finance/pending', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/finance/pay-flexible', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/finance/pay-all', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "teacherRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "tenantRoutes.js",
+    "type": "guard_definition",
+    "value": "const guard = [authMiddleware, isSuperAdmin];",
+    "content": "authMiddleware, isSuperAdmin"
+  },
+  {
+    "file": "trainingRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "transactionRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "transactionRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.get('/stats', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "[authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "transactionRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/calculate', authMiddleware, isTeacher, ",
+    "content": "authMiddleware, isTeacher, "
+  },
+  {
+    "file": "transactionRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "transactionRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/confirm', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "transactionRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.put('/:id/cancel', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "transactionRoutes.js",
+    "type": "inline_middleware",
+    "value": "router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE",
+    "content": "authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE"
+  },
+  {
+    "file": "webhookRoutes.js",
+    "type": "manual_role_check"
+  },
+  {
+    "file": "workflowRoutes.js",
+    "type": "guard_definition",
+    "value": "const guard = [authMiddleware, isAdmin];",
+    "content": "authMiddleware, isAdmin"
+  }
+]

@@ -1,0 +1,1 @@
+'use strict'; class AlgorithmRegistry { register() {} } module.exports = AlgorithmRegistry;

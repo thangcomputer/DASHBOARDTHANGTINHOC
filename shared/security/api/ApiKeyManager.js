@@ -1,0 +1,1 @@
+'use strict'; class ApiKeyManager { generate() {} revoke() {} } module.exports = ApiKeyManager;

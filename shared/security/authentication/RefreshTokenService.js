@@ -1,0 +1,1 @@
+'use strict'; class RefreshTokenService { issueFamily() {} rotate() {} revoke() {} } module.exports = RefreshTokenService;

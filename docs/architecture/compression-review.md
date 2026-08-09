@@ -1,0 +1,1 @@
+# Compression Review\nHTTP compression, ETags, Cache-Control headers centralized.

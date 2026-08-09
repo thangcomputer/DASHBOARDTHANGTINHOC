@@ -13,9 +13,10 @@ test('extractStudentCodeCandidates empty content → empty', () => {
   assert.deepEqual(extractStudentCodeCandidates(null), []);
 });
 
-test('amountsMatch allows 1đ tolerance and free when price 0', () => {
+test('amountsMatch allows 1đ tolerance and rejects non-positive expected', () => {
   assert.equal(amountsMatch(1500000, 1500000), true);
   assert.equal(amountsMatch(1500000, 1500001), true);
   assert.equal(amountsMatch(1500000, 1499998), false);
-  assert.equal(amountsMatch(0, 999), true);
+  assert.equal(amountsMatch(0, 999), false);
+  assert.equal(amountsMatch(-1, 999), false);
 });

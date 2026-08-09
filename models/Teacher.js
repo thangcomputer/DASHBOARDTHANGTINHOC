@@ -219,5 +219,5 @@ TeacherSchema.index({ role: 1 });
 TeacherSchema.index({ branchId: 1, status: 1 });
 TeacherSchema.index({ role: 1, status: 1 });
 
-const Teacher = mongoose.model('Teacher', TeacherSchema);
+const Teacher = mongoose.models.Teacher || mongoose.model('Teacher', TeacherSchema);
 module.exports = Teacher;

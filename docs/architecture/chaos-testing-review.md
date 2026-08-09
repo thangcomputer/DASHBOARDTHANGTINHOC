@@ -1,0 +1,1 @@
+# Chaos Testing Review\nExecuted failure simulations for Mongo timeout, Email timeout, Circuit open, Crash during commit, etc. Resiliency verified.

@@ -7,12 +7,18 @@ const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
 const BlogPost = require('../models/BlogPost');
-const { authMiddleware, checkPermission, userHasPermission } = require('../middleware/auth');
+const { authMiddleware, userHasPermission } = require('../middleware/auth');
+const { policyShadowBlog } = require('../middleware/policyShadowBlog');
+const { blogCutoverGate } = require('../middleware/blogCutoverGate');
 const { PERMISSIONS } = require('../constants/permissions');
 const NotificationService = require('../services/NotificationService');
 const logger = require('../config/logger');
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+function manageGuard(action) {
+  return [policyShadowBlog(action), blogCutoverGate(action)];
+}
 
 function slugify(raw) {
   const s = String(raw || '')
@@ -115,10 +121,15 @@ const upload = multer({
   },
 });
 
+/**
+ * Phase 7.16 — Controlled cutover for /api/blog ONLY.
+ * Flow: router.use(auth) → policyShadowBlog → blogCutoverGate → handler
+ * Legacy fallback: list/get pass-through; manage_* → checkPermission(MANAGE_BLOG).
+ */
 router.use(authMiddleware);
 
 // ─── GET /api/blog/posts — danh sách public (đã xuất bản) ───────────────────
-router.get('/posts', async (req, res) => {
+router.get('/posts', policyShadowBlog('list'), blogCutoverGate('list'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(40, Math.max(1, parseInt(req.query.limit, 10) || 12));
@@ -161,7 +172,7 @@ router.get('/posts', async (req, res) => {
 });
 
 // ─── GET /api/blog/posts/:slugOrId — chi tiết ────────────────────────────────
-router.get('/posts/:slugOrId', async (req, res) => {
+router.get('/posts/:slugOrId', policyShadowBlog('get'), blogCutoverGate('get'), async (req, res) => {
   try {
     const key = req.params.slugOrId;
     const manage = String(req.query.manage || '') === '1';
@@ -228,7 +239,7 @@ router.get('/posts/:slugOrId', async (req, res) => {
 });
 
 // ─── Manage ──────────────────────────────────────────────────────────────────
-router.get('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
+router.get('/manage/posts', manageGuard('manage_list'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
@@ -257,7 +268,7 @@ router.get('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req
 });
 
 /** Chi tiết bài cho editor (đủ contentHtml + attachments) */
-router.get('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
+router.get('/manage/posts/:id', manageGuard('manage_get'), async (req, res) => {
   try {
     const doc = await BlogPost.findOne({ _id: req.params.id, deletedAt: null });
     if (!doc) return res.status(404).json({ success: false, message: 'Không tìm thấy bài' });
@@ -267,7 +278,7 @@ router.get('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), async 
   }
 });
 
-router.post('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
+router.post('/manage/posts', manageGuard('manage_create'), async (req, res) => {
   try {
     const title = String(req.body.title || '').trim();
     if (!title) return res.status(400).json({ success: false, message: 'Thiếu tiêu đề' });
@@ -302,7 +313,7 @@ router.post('/manage/posts', checkPermission(PERMISSIONS.MANAGE_BLOG), async (re
   }
 });
 
-router.put('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
+router.put('/manage/posts/:id', manageGuard('manage_update'), async (req, res) => {
   try {
     const post = await BlogPost.findOne({ _id: req.params.id, deletedAt: null });
     if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài' });
@@ -340,7 +351,7 @@ router.put('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), async 
   }
 });
 
-router.post('/manage/posts/:id/publish', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
+router.post('/manage/posts/:id/publish', manageGuard('manage_publish'), async (req, res) => {
   try {
     const post = await BlogPost.findOne({ _id: req.params.id, deletedAt: null });
     if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài' });
@@ -355,7 +366,7 @@ router.post('/manage/posts/:id/publish', checkPermission(PERMISSIONS.MANAGE_BLOG
   }
 });
 
-router.post('/manage/posts/:id/hide', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
+router.post('/manage/posts/:id/hide', manageGuard('manage_hide'), async (req, res) => {
   try {
     const post = await BlogPost.findOneAndUpdate(
       { _id: req.params.id, deletedAt: null },
@@ -369,7 +380,7 @@ router.post('/manage/posts/:id/hide', checkPermission(PERMISSIONS.MANAGE_BLOG), 
   }
 });
 
-router.delete('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), async (req, res) => {
+router.delete('/manage/posts/:id', manageGuard('manage_delete'), async (req, res) => {
   try {
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -387,7 +398,7 @@ router.delete('/manage/posts/:id', checkPermission(PERMISSIONS.MANAGE_BLOG), asy
   }
 });
 
-router.post('/manage/upload', checkPermission(PERMISSIONS.MANAGE_BLOG), (req, res) => {
+router.post('/manage/upload', manageGuard('manage_upload'), (req, res) => {
   upload.array('files', 8)(req, res, (err) => {
     if (err) {
       const msg = err.code === 'LIMIT_FILE_SIZE'

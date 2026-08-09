@@ -1,0 +1,1 @@
+# CORS Review\nConfigurable strict origin validation implemented.

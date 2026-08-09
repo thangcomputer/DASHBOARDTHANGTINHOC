@@ -1,0 +1,1 @@
+'use strict'; class GetLearningPathQuery {} module.exports = GetLearningPathQuery;

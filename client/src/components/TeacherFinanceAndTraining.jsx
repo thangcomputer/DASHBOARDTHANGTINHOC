@@ -8,6 +8,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import { useModal } from '../utils/Modal.jsx';
 import api, { getRolePrefix } from '../services/api';
+import { sanitizeCsvField } from '../utils/csvSanitizer';
 
 const CircularProgress = ({ progress }) => {
   const radius = 35;
@@ -118,7 +119,7 @@ const TeacherFinanceAndTraining = () => {
       csvContent += "Tháng,Ngày chuyển,Số tiền (VNĐ),Số buổi,Trạng thái,Ghi chú\n";
       filteredPayments.forEach(p => {
           const th_status = (p.status === 'completed' || p.status === 'paid' || p.status === 'confirmed') ? 'Đã nhận' : 'Chưa nhận';
-          const row = `"${p.month}","${p.date || new Date(p.createdAt).toLocaleDateString('vi-VN')}","${p.amount}","${p.sessions || 0}","${th_status}","${p.note || ''}"`;
+          const row = `"${sanitizeCsvField(p.month)}","${p.date || new Date(p.createdAt).toLocaleDateString('vi-VN')}","${p.amount}","${p.sessions || 0}","${th_status}","${sanitizeCsvField(p.note || '').replace(/"/g, '""')}"`;
           csvContent += row + "\n";
       });
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

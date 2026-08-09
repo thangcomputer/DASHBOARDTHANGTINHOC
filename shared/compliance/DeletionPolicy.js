@@ -1,0 +1,1 @@
+'use strict'; class DeletionPolicy { apply() {} } module.exports = DeletionPolicy;

@@ -1,0 +1,1 @@
+'use strict'; class GDPRExportService { export() {} } module.exports = GDPRExportService;

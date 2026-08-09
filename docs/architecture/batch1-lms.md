@@ -1,0 +1,1 @@
+# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\nGenerated artifact for Sprint 5.0 Batch 1 (LMS Foundation).

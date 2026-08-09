@@ -1,0 +1,1 @@
+'use strict'; class RequestSigningService { sign() {} } module.exports = RequestSigningService;

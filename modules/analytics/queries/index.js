@@ -1,0 +1,14 @@
+'use strict';
+const { queryRegistry } = require('../../../shared/cqrs');
+const Get_revenueQuery = require('./Get_revenueQuery');
+const Get_revenueHandler = require('./Get_revenueHandler');
+queryRegistry.register('Get_revenueQuery', new Get_revenueHandler());
+module.exports.Get_revenueQuery = Get_revenueQuery;
+const Get_enrollmentQuery = require('./Get_enrollmentQuery');
+const Get_enrollmentHandler = require('./Get_enrollmentHandler');
+queryRegistry.register('Get_enrollmentQuery', new Get_enrollmentHandler());
+module.exports.Get_enrollmentQuery = Get_enrollmentQuery;
+const Get_branchesQuery = require('./Get_branchesQuery');
+const Get_branchesHandler = require('./Get_branchesHandler');
+queryRegistry.register('Get_branchesQuery', new Get_branchesHandler());
+module.exports.Get_branchesQuery = Get_branchesQuery;

@@ -1,0 +1,2138 @@
+'use strict';
+const { studentRepository } = require('./../repositories');
+const Invoice = require('./../../invoice/models/Invoice');
+const Schedule = require('./../../attendance/models/Schedule');
+const logger = require('./../../../config/logger');
+const { sendAccountWelcome } = require('./../../../services/accountWelcome');
+const { generateTempPassword } = require('./../../../utils/tempPassword');
+const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('./../../finance/services/ledgerService');
+const cache = require('./../../../utils/cache');
+
+const {
+  applyEnrollmentStats,
+  legacyEnrollmentFromStudent,
+  studentMatchesTeacher,
+  resolveEnrollmentExamSubjects,
+} = require('../../enrollment/services/enrollmentService');
+function financeActor(req) {
+  return {
+    id: String(req.currentUser?.id || req.currentUser?._id || ''),
+    role: String(req.currentUser?.role || ''),
+  };
+}
+function financeReqMeta(req, student) {
+  return {
+    ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      || req.ip
+      || '',
+    userAgent: req.headers['user-agent'] || '',
+    branchId: student?.branchId || req.currentUser?.branchId || null,
+  };
+}
+function bustFinanceCaches() {
+  try {
+    cache.delByPrefix('bi:overview');
+  } catch { /* ignore */ }
+}
+async function nextInvoiceCode() {
+  const now = new Date();
+  const yy = now.getFullYear().toString().slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const prefix = `HD${yy}${mm}-`;
+  // Lấy mã lớn nhất cùng tháng để tăng tuần tự (tránh trùng khi race nhẹ)
+  const latest = await Invoice.findOne({ maHoaDon: { $regex: `^${prefix}` } })
+    .sort({ maHoaDon: -1 })
+    .select('maHoaDon')
+    .lean();
+  let seq = 1;
+  if (latest?.maHoaDon) {
+    const m = String(latest.maHoaDon).match(/-(\d+)$/);
+    if (m) seq = Number(m[1]) + 1;
+  }
+  return `${prefix}${String(seq).padStart(4, '0')}`;
+}
+async function createTuitionInvoice({ student, courseName, amount, note = '' }) {
+  const hocPhi = Number(amount) || 0;
+  if (!student?._id || hocPhi <= 0) return null;
+  try {
+    let maHD = await nextInvoiceCode();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        return await Invoice.create({
+          maHoaDon: maHD,
+          hocVien: student._id,
+          hoTen: student.name,
+          khoaHoc: courseName || student.course || 'Học phí',
+          hocPhi,
+          ghiChu: note || `Thanh toán khóa ${courseName || student.course || ''}`.trim(),
+        });
+      } catch (err) {
+        if (err?.code === 11000) {
+          maHD = await nextInvoiceCode();
+          continue;
+        }
+        throw err;
+      }
+    }
+    return null;
+  } catch (err) {
+    logger.warn('[INVOICE] create skipped:', err.message);
+    return null;
+  }
+}
+// ─── GET /api/students ─────────────────────────────────────────────────────────
+// Lấy danh sách học viên (Admin / Teacher) — hỗ trợ Server-side Pagination
+
+class StudentApplicationService {
+  async get_root(data) {
+  try {
+    const { teacherId, paid, status, course, search, page, limit, branch_id } = data.query;
+    const andConditions = [];
+
+    if (data.branchFilter && Object.keys(data.branchFilter).length > 0) {
+      andConditions.push(data.branchFilter);
+    }
+    if (branch_id && branch_id !== 'all' && !data.userBranchId) {
+      andConditions.push({ branchId: branch_id });
+    }
+
+    if (data.currentUser.role === 'teacher') {
+      andConditions.push({
+        $or: [
+          { teacherId: data.currentUser.id },
+          { 'enrollments.teacherId': data.currentUser.id },
+        ],
+      });
+    } else if (data.currentUser.role === 'admin' || data.currentUser.role === 'staff') {
+      if (teacherId) andConditions.push({ teacherId });
+    } else {
+      return { _status: 403, _body: { success: false, message: 'Quyền truy cập bị từ chối' } };
+    }
+
+    if (paid && paid !== 'all') {
+      if (paid === 'paid' || paid === 'true') {
+        andConditions.push({
+          $or: [
+            { paid: true },
+            { 'enrollments.paid': true },
+            { 'enrollments.status': 'active' },
+            { 'enrollments.status': 'completed' },
+            { 'enrollments.status': 'pending_payment' },
+            { course: { $exists: true, $ne: '' } },
+          ],
+        });
+      } else if (paid === 'unpaid' || paid === 'refunded' || paid === 'false') {
+        andConditions.push({
+          $or: [
+            { 'enrollments.status': 'cancelled' },
+            { 'enrollments.status': 'refunded' },
+            { 'enrollments.refundedAmount': { $gt: 0 } },
+            { refundedAmount: { $gt: 0 } },
+            { status: 'cancelled' },
+            { status: 'refunded' },
+          ],
+        });
+      }
+    }
+
+    if (status) andConditions.push({ status });
+
+    if (course && course !== 'all') {
+      const cReg = { $regex: sanitizeRegex(course), $options: 'i' };
+      andConditions.push({
+        $or: [
+          { course: cReg },
+          { 'enrollments.courseName': cReg },
+          { 'enrollments.name': cReg },
+        ],
+      });
+    }
+
+    if (search) {
+      const s = sanitizeRegex(search);
+      const sReg = { $regex: s, $options: 'i' };
+      andConditions.push({
+        $or: [
+          { name: sReg },
+          { zalo: sReg },
+          { phone: sReg },
+          { course: sReg },
+          { 'enrollments.courseName': sReg },
+        ],
+      });
+    }
+
+    const filter = andConditions.length > 0 ? { $and: andConditions } : {};
+
+    // ── Pagination ──────────────────────────────────────────────────
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const totalRecords = await studentRepository.count(filter);
+    const totalPages = Math.ceil(totalRecords / limitNum);
+
+    const students = await studentRepository.findMany(filter)
+      .populate('teacherId', 'name phone specialty')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    // ⚡ FIX N+1: Thay vì chạy 3 query/học-viên, dùng 1 lần aggregate tổng hợp toàn bộ
+    const studentIds = students.map(s => s._id);
+
+    // 1. Đếm số buổi hoàn thành + số buổi chưa trả lương (gom theo học viên)
+    const sessionAgg = await Schedule.aggregate([
+      { $match: { studentId: { $in: studentIds }, status: 'completed' } },
+      {
+        $group: {
+          _id: '$studentId',
+          completed: { $sum: 1 },
+          pendingPayment: { $sum: { $cond: [{ $eq: ['$is_paid_to_teacher', false] }, 1, 0] } },
+        }
+      },
+    ]);
+    const sessionMap = Object.fromEntries(sessionAgg.map(r => [String(r._id), r]));
+
+    // 2. Kiểm tra Cooldown 12h bằng 1 query duy nhất
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    const cooldownAgg = await Schedule.aggregate([
+      { $match: { studentId: { $in: studentIds }, status: 'completed', createdAt: { $gte: twelveHoursAgo } } },
+      { $group: { _id: '$studentId', latestCreatedAt: { $max: '$createdAt' } } },
+    ]);
+    const cooldownMap = Object.fromEntries(cooldownAgg.map(r => [String(r._id), r.latestCreatedAt]));
+
+    const studentsWithRealSessions = students.map(st => {
+      const doc = st.toObject();
+      doc.requireWebcam = doc.requireWebcam !== false;
+      const sid = String(st._id);
+      const sess = sessionMap[sid];
+      const realCompleted = sess?.completed || 0;
+      doc.completedSessions = realCompleted;
+      doc.remainingSessions = Math.max(0, (st.totalSessions || 12) - realCompleted);
+      doc.pendingTeacherPaymentSessions = sess?.pendingPayment || 0;
+
+      const lastAt = cooldownMap[sid];
+      if (lastAt) {
+        const diffMs = Date.now() - new Date(lastAt).getTime();
+        const remainHrs = Math.max(0, 12 - diffMs / (1000 * 60 * 60));
+        doc.can_check_in = false;
+        doc.remaining_cooldown_hours = parseFloat(remainHrs.toFixed(1));
+        doc.last_attendance_at = lastAt;
+      } else {
+        doc.can_check_in = true;
+        doc.remaining_cooldown_hours = 0;
+        doc.last_attendance_at = null;
+      }
+
+      return doc;
+    });
+
+    const enrichedStudents = await Promise.all(
+      studentsWithRealSessions.map((doc) => applyEnrollmentStats(doc, doc._id, Schedule))
+    );
+
+    // Heal: khóa cancelled thiếu refundedAmount trên DTO → lấy từ ledger refund
+    try {
+      const needHealIds = [];
+      enrichedStudents.forEach((s) => {
+        const list = Array.isArray(s.courses) && s.courses.length
+          ? s.courses
+          : (Array.isArray(s.enrollments) ? s.enrollments : []);
+        const missing = list.some((e) => e?.status === 'cancelled' && !(Number(e.refundedAmount) > 0));
+        if (missing) needHealIds.push(s._id);
+      });
+      if (needHealIds.length) {
+        const LedgerEntry = require('../../finance/models/LedgerEntry');
+        const refundRows = await LedgerEntry.find({
+          studentId: { $in: needHealIds },
+          type: 'refund',
+          status: 'posted',
+        }).select('studentId courseName amount postedAt').lean();
+        
+        const byStudent = new Map();
+        refundRows.forEach((r) => {
+          const sid = String(r.studentId);
+          if (!byStudent.has(sid)) byStudent.set(sid, []);
+          byStudent.get(sid).push(r);
+        });
+        const norm = (n) => String(n || '').trim().toLowerCase();
+        enrichedStudents.forEach((s) => {
+          const sid = String(s._id);
+          const ledgers = byStudent.get(sid);
+          if (!ledgers?.length) return;
+          const patchList = (list) => {
+            if (!Array.isArray(list)) return;
+            list.forEach((e) => {
+              if (e?.status !== 'cancelled' || Number(e.refundedAmount) > 0) return;
+              const courseKey = norm(e.courseName || e.name);
+              const match = ledgers.find((r) => norm(r.courseName) === courseKey)
+                || ledgers.find((r) => courseKey && norm(r.courseName).includes(courseKey))
+                || ledgers[0];
+              if (match) e.refundedAmount = Math.abs(Number(match.amount) || 0);
+            });
+          };
+          patchList(s.courses);
+          patchList(s.enrollments);
+        });
+      }
+    } catch (healErr) {}
+
+    return { _status: 200, _body: {
+      success: true,
+      count: enrichedStudents.length,
+      totalRecords,
+      totalPages,
+      currentPage: pageNum,
+      data: enrichedStudents,
+    } };
+  } catch (error) {
+    return { _status: 500, _body: { success: false, message: error.message } };
+  }
+}
+
+  async get_stats(data) {
+  try {
+    // branchFilter đã gán data.branchFilter: {} cho SUPER_ADMIN, {branchId:...} cho STAFF
+    const bf = { ...data.branchFilter };
+    // Admin có thể override bằng ?branch_id query
+    const { branch_id } = data.query;
+    if (branch_id && branch_id !== 'all' && !data.userBranchId) {
+      bf.branchId = branch_id;
+    }
+
+    const total = await studentRepository.count(bf);
+    const paid = await studentRepository.count({ ...bf, paid: true });
+    const unpaid = await studentRepository.count({ ...bf, paid: false });
+    const unlocked = await studentRepository.count({ ...bf, studentExamUnlocked: true });
+
+    const { sumFinancialRevenue } = require('../../finance/services/ledgerService');
+    const branchId = bf.branchId || null;
+
+    // Doanh thu SoT = Ledger (PAYMENT − REFUND), không dùng enrollment.paid
+    const [revenueAll, pendingResult, todayRevenueRow] = await Promise.all([
+      sumFinancialRevenue({ branchId }),
+      studentRepository.aggregate([
+        { $match: { ...bf } },
+        {
+          $project: {
+            pending: {
+              $cond: [
+                { $gt: [{ $size: { $ifNull: ['$enrollments', []] } }, 0] },
+                {
+                  $sum: {
+                    $map: {
+                      input: {
+                        $filter: {
+                          input: '$enrollments',
+                          as: 'e',
+                          cond: {
+                            $and: [
+                              { $ne: ['$$e.paid', true] },
+                              { $ne: ['$$e.status', 'cancelled'] },
+                            ],
+                          },
+                        },
+                      },
+                      as: 'e',
+                      in: { $ifNull: ['$$e.price', 0] },
+                    },
+                  },
+                },
+                {
+                  $cond: [{ $eq: ['$paid', true] }, 0, { $ifNull: ['$price', 0] }],
+                },
+              ],
+            },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$pending' } } },
+      ]),
+      (async () => {
+        const nowVN = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
+        const startOfTodayVN = new Date(Date.UTC(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate()) - 7 * 60 * 60 * 1000);
+        return sumFinancialRevenue({ branchId, from: startOfTodayVN, to: new Date() });
+      })(),
+    ]);
+    const totalRevenue = revenueAll.net || 0;
+    const pendingRevenue = pendingResult[0]?.total || 0;
+    const todayRevenue = todayRevenueRow.net || 0;
+
+    // Số giảng viên active (branch-aware)
+    const Teacher = require('../../teacher/models/Teacher');
+    const teacherBranchFilter = data.userBranchId ? { branchId: data.userBranchId } : {};
+    if (branch_id && branch_id !== 'all' && !data.userBranchId) teacherBranchFilter.branchId = branch_id;
+    const activeTeachers = await Teacher.countDocuments({ ...teacherBranchFilter, status: { $in: ['Active', 'active'] }, role: 'teacher' });
+    const pendingTeachers = await Teacher.countDocuments({ role: 'teacher', status: 'Pending' });
+    const totalTeachers = await Teacher.countDocuments({ ...teacherBranchFilter, role: 'teacher' });
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async get_id(data) {
+  try {
+    const student = await studentRepository.findById(data.id)
+      .populate('teacherId', 'name phone specialty avatar');
+
+    if (!student) return { _status: 404, _body: {} };
+
+    // ⭐ 403 guard: STAFF chỉ được xem HV của chi nhánh mình
+    if (data.userBranchId) {
+      const studentBranch = student.branchId ? String(student.branchId) : null;
+      if (studentBranch && studentBranch !== String(data.userBranchId)) {
+        return { _status: 403, _body: {} };
+      }
+    }
+
+    const isSelf = data.currentUser.role === 'student' && String(data.currentUser.id) === String(student._id);
+    const isMyTeacher = data.currentUser.role === 'teacher' && studentMatchesTeacher(student, data.currentUser.id);
+    const isAdminOrStaff = data.currentUser.role === 'admin' || data.currentUser.role === 'staff';
+
+    if (!isAdminOrStaff && !isSelf && !isMyTeacher) {
+      return { _status: 403, _body: {} };
+    }
+
+    const doc = student.toObject();
+    doc.requireWebcam = doc.requireWebcam !== false;
+    await applyEnrollmentStats(doc, data.id, Schedule);
+
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async get_id_full_detail(data) {
+  try {
+    const student = await studentRepository.findById(data.id)
+      .populate('teacherId', 'name phone specialty avatar');
+
+    if (!student) return { _status: 404, _body: {} };
+
+    // 🛡️ 403 guard: STAFF chỉ được xem HV của chi nhánh mình
+    if (data.userBranchId && student.branchId && String(student.branchId) !== String(data.userBranchId)) {
+      return { _status: 403, _body: {} };
+    }
+
+    const isSelf = data.currentUser.role === 'student' && String(data.currentUser.id) === String(student._id);
+    const isMyTeacher = data.currentUser.role === 'teacher' && studentMatchesTeacher(student, data.currentUser.id);
+    const isAdminOrStaff = data.currentUser.role === 'admin' || data.currentUser.role === 'staff';
+    if (!isAdminOrStaff && !isSelf && !isMyTeacher) {
+      return { _status: 403, _body: {} };
+    }
+
+    // 1. Lịch sử điểm danh/học tập
+    const schedules = await Schedule.find({ studentId: data.id }).sort({ date: -1 });
+
+    // 2. Lịch sử hóa đơn học phí
+    const mongoose = require('mongoose');
+    const studentOid = mongoose.Types.ObjectId.isValid(data.id)
+      ? new mongoose.Types.ObjectId(data.id)
+      : data.id;
+    const invoicesRaw = await Invoice.find({ hocVien: studentOid }).sort({ createdAt: -1 });
+
+  async post_import(data) {
+  try {
+    const { students: rawStudents } = data.body;
+    if (!Array.isArray(rawStudents) || rawStudents.length === 0) {
+      return { _status: 400, _body: {} };
+    }
+
+    // Gán chi nhánh tự động: STAFF chỉ được nhập vào CS của mình
+    const branchId = data.userBranchId || null;
+
+    const studentsToInsert = rawStudents.map(s => {
+      const {
+        password: _omitPassword,
+        refreshToken: _omitRefresh,
+        tokenVersion: _omitTv,
+        ...safe
+      } = s || {};
+      return {
+        ...safe,
+        name: s.name?.toUpperCase()?.trim(),
+        branchId: branchId || s.branchId || null,
+        status: s.status || 'Chờ xếp lớp',
+        paid: s.paid === true || s.paid === 'Đã đóng phí',
+        learningMode: ['ONLINE', 'OFFLINE'].includes(s.learningMode?.toUpperCase())
+          ? s.learningMode.toUpperCase()
+          : 'OFFLINE',
+      };
+    }).filter(s => s.name && (s.phone || s.zalo));
+
+    if (studentsToInsert.length === 0) {
+      return { _status: 400, _body: {} };
+    }
+
+    const result = await studentRepository.insertMany(studentsToInsert, { ordered: false });
+
+    return { _status: 200, _body: {} };
+  } catch (err) {
+    if (err.name === 'BulkWriteError' || err.code === 11000) {
+      const inserted = err.result?.nInserted || 0;
+      return { _status: 200, _body: {} };
+    }
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async post_root(data) {
+  try {
+    // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) — random + isFirstLogin
+    const plainPassword = data.password != null && String(data.password).trim() !== ''
+      ? String(data.password).trim()
+      : generateTempPassword(8);
+    data.password = plainPassword;
+    data.isFirstLogin = true;
+
+    // Bảo mật: STAFF chỉ được tạo HV thuộc chi nhánh của mình
+    // SUPER_ADMIN tự đặt branchId hoặc để trống
+    if (data.userBranchId) {
+      data.branchId = data.userBranchId;
+      data.branchCode = data.userBranchCode || '';
+    }
+
+    // Đồng bộ số buổi / tên khóa từ catalog khi có courseId
+    if (data.courseId) {
+      const Course = require('../../course/models/Course');
+      const catalog = await Course.findById(data.courseId)
+        .select('name totalSessions price discountPercent')
+        .lean();
+      if (catalog) {
+        if (!data.course) data.course = catalog.name;
+        const catalogSessions = Number(catalog.totalSessions) > 0 ? Number(catalog.totalSessions) : 12;
+        if (!(Number(data.totalSessions) > 0)) {
+          data.totalSessions = catalogSessions;
+        }
+      }
+    }
+    const sessions = Number(data.totalSessions) > 0 ? Number(data.totalSessions) : 12;
+    data.totalSessions = sessions;
+    if (data.remainingSessions == null || data.remainingSessions === '') {
+      data.remainingSessions = sessions;
+    }
+
+    // Nếu lúc tạo có gán Giảng viên luôn thì chuyển trạng thái thành Đang học
+    if (data.teacherId && (!data.status || data.status === 'Chờ xếp lớp')) {
+      data.status = 'Đang học';
+    }
+
+    // 1 SĐT / 1 email duy nhất — không trùng HV khác hoặc GV
+    try {
+      const { assertUniqueContact } = require('../../../utils/uniqueContact');
+      await assertUniqueContact({
+        phone: data.phone,
+        zalo: data.zalo || data.phone,
+        email: data.email,
+      });
+    } catch (dupErr) {
+      if (dupErr.status === 409) {
+        return { _status: 409, _body: {} };
+      }
+      throw dupErr;
+    }
+
+    const student = studentRepository.createInstance(data.body);
+    if (!student.studentCode || !String(student.studentCode).trim()) {
+      const seq = String(Date.now()).slice(-8);
+      student.studentCode = `HV${seq}`;
+    }
+
+    // Luôn có enrollment primary (đồng bộ danh sách khóa + thu phí)
+    const isPaidOnCreate = student.paid === true || student.paid === 'true' || student.paid === 1;
+    const courseName = String(student.course || '').trim() || 'Khóa học';
+    const courseId = data.courseId || null;
+    const price = Number(student.price) || 0;
+    const enrollSessions = Number(student.totalSessions) > 0 ? Number(student.totalSessions) : sessions;
+    let teacherName = student.teacherName || '';
+    if (student.teacherId && !teacherName) {
+      try {
+        const Teacher = require('../../teacher/models/Teacher');
+        const t = await Teacher.findById(student.teacherId).select('name').lean();
+        teacherName = t?.name || '';
+        student.teacherName = teacherName;
+      } catch { /* ignore */ }
+    }
+    const examSubjects = await resolveEnrollmentExamSubjects({
+      courseName,
+      courseId,
+    });
+    if (!Array.isArray(student.enrollments) || student.enrollments.length === 0) {
+      student.enrollments = [{
+        courseName,
+        courseId: courseId || null,
+        examSubjects,
+        teacherId: student.teacherId || null,
+        teacherName,
+        price,
+        paid: !!isPaidOnCreate,
+        paidAt: isPaidOnCreate ? new Date() : undefined,
+        totalSessions: enrollSessions,
+        remainingSessions: enrollSessions,
+        completedSessions: 0,
+        grades: [],
+        status: isPaidOnCreate ? 'active' : 'pending_payment',
+        learningAccess: !!isPaidOnCreate,
+        isPrimary: true,
+        registeredAt: new Date(),
+        requireWebcam: true,
+        examUnlocked: false,
+      }];
+    } else if (isPaidOnCreate) {
+      student.enrollments.forEach((e, i) => {
+        if (i === 0 || e.isPrimary) {
+          e.paid = true;
+          e.paidAt = e.paidAt || new Date();
+          e.learningAccess = true;
+          if (!e.status || e.status === 'pending_payment') e.status = 'active';
+        }
+      });
+    }
+    if (isPaidOnCreate) {
+      student.paid = true;
+      if (!(Number(student.paidAmount) > 0)) student.paidAmount = price;
+      if (!student.paidAt) student.paidAt = new Date();
+      if (!student.paymentMethod) student.paymentMethod = 'cash';
+    }
+
+    await student.save();
+
+    // Tạo hóa đơn + ledger ngay khi thêm HV đã thanh toán (fail-closed: Ledger bắt buộc)
+    let createdInvoice = null;
+    if (isPaidOnCreate && price > 0) {
+      createdInvoice = await createTuitionInvoice({
+        student,
+        courseName,
+        amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
+        note: `Thanh toán khi thêm học viên — ${courseName}`,
+      });
+      try {
+        const primaryEnr = student.enrollments?.[0];
+        await settlePayment({
+          student,
+          amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
+          invoice: createdInvoice,
+          enrollmentId: primaryEnr?._id ? String(primaryEnr._id) : '',
+          courseName,
+          source: 'student_create_paid',
+          sourceRef: createdInvoice?.maHoaDon || `create:${student._id}`,
+          idempotencyKey: `payment:create:${student._id}:${primaryEnr?._id || createdInvoice?.maHoaDon || 'nohd'}`,
+          actor: financeActor(req),
+          note: 'Thanh toán khi thêm học viên',
+          reqMeta: financeReqMeta(req, student),
+        });
+        bustFinanceCaches();
+      } catch (ledgerErr) {
+        logger.error('[STUDENTS] ledger settle on create FAILED — rollback paid: %s', ledgerErr.message);
+        // Rollback cache + void invoice (không để paid không có Ledger)
+        if (Array.isArray(student.enrollments)) {
+          student.enrollments.forEach((e) => {
+            e.paid = false;
+            e.paidAt = undefined;
+            e.status = 'pending_payment';
+          });
+          student.markModified('enrollments');
+        }
+        student.paid = false;
+        student.paidAmount = 0;
+        student.paidAt = undefined;
+        await student.save();
+        if (createdInvoice?._id) {
+          try {
+            await Invoice.findByIdAndUpdate(createdInvoice._id, { status: 'void' });
+          } catch { /* ignore */ }
+        }
+        return { _status: 500, _body: {} };
+      }
+    }
+
+    const io = data.app.get('io');
+    if (io) {
+      const NotificationService = require('../../notification/services/NotificationService');
+      NotificationService.notifyBranchAdmins(io, {
+        branchId: student.branchId,
+        title: '🆕 Học viên mới đăng ký',
+        content: `Học viên ${student.name} đã đăng ký khóa học ${student.course}.`,
+        payload: { studentId: student._id },
+        link: '/admin/students',
+      });
+      
+      io.emit('student:new', {
+        studentId: student._id,
+        name: student.name,
+        course: student.course,
+      });
+      io.emit('data:refresh', { type: 'student', action: 'create' });
+      if (createdInvoice) {
+        io.emit('revenue:updated', { amount: price, studentName: student.name });
+      }
+    }
+
+    const welcome = await sendAccountWelcome(io, {
+      role: 'student',
+      userId: student._id,
+      name: student.name,
+      phone: student.phone,
+      zalo: student.zalo,
+      email: student.email,
+      password: plainPassword,
+    });
+
+    // Populate branch để logger và frontend có tên chi nhánh (không chỉ ObjectId)
+    const Branch = require('../../branch/models/Branch');
+    const branchDoc = student.branchId
+      ? await Branch.findById(student.branchId).select('name code').lean()
+      : null;
+    const studentObj = student.toObject();
+    delete studentObj.password;
+    delete studentObj.refreshToken;
+    delete studentObj.deviceFingerprint;
+    if (branchDoc) {
+      studentObj.branchName = branchDoc.name || branchDoc.code || '';
+      studentObj.branchCode = studentObj.branchCode || branchDoc.code || '';
+    }
+    studentObj.welcomeQueued = welcome.queued;
+    studentObj.welcomeNotified = welcome.notified;
+    studentObj.tempPassword = plainPassword;
+    if (createdInvoice) {
+      studentObj.invoice = {
+        _id: createdInvoice._id,
+        maHoaDon: createdInvoice.maHoaDon,
+        hocPhi: createdInvoice.hocPhi,
+      };
+    }
+
+    return { _status: 201, _body: {} };
+
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message);
+      return { _status: 400, _body: {} };
+    }
+    return { _status: 400, _body: {} };
+  }
+}
+
+  async put_id(data) {
+  try {
+    // STAFF/Admin thiếu manage_students → 403 (H7); teacher/student tự sửa vẫn theo allowlist bên dưới
+    if (data.currentUser.role === 'admin' || data.currentUser.role === 'staff') {
+      const allowed = await userHasPermission(data.currentUser, PERMISSIONS.MANAGE_STUDENTS);
+      if (!allowed) {
+        return { _status: 403, _body: {} };
+      }
+    }
+
+    const safeBody = { ...data.body };
+    // H12: cấm set paid/paidAmount/paymentMethod qua PUT generic — phải qua /pay hoặc /refund
+    delete safeBody.paid;
+    delete safeBody.paidAmount;
+    delete safeBody.paidAt;
+    delete safeBody.paymentMethod;
+    delete safeBody.paidNote;
+    const before = await studentRepository.findById(data.id)
+      .select('studentExamUnlocked examApproved name examProgress')
+      .lean();
+
+    // Nếu là Teacher, chỉ cho phép cập nhật thông tin điểm danh, thành tích
+    const enrollmentCourse = safeBody.courseName;
+    delete safeBody.courseName;
+
+    if (data.currentUser.role === 'teacher') {
+      const allowedKeys = ['completedSessions', 'remainingSessions', 'lastGrade', 'avgGrade', 'grades', 'status', 'notes', 'linkHoc', 'nextClass', 'nextClassTime'];
+      Object.keys(safeBody).forEach(key => {
+        if (!allowedKeys.includes(key)) {
+          delete safeBody[key];
+        }
+      });
+
+      if (enrollmentCourse) {
+        const doc = await studentRepository.findById(data.id);
+        if (doc?.enrollments?.length) {
+          const idx = doc.enrollments.findIndex((e) => e.courseName === enrollmentCourse);
+          if (idx >= 0) {
+            const patchKeys = ['completedSessions', 'remainingSessions', 'lastGrade', 'avgGrade', 'grades', 'status', 'notes', 'linkHoc', 'nextClass', 'nextClassTime'];
+            patchKeys.forEach((k) => {
+              if (safeBody[k] !== undefined) doc.enrollments[idx][k] = safeBody[k];
+            });
+            if (doc.enrollments[idx].isPrimary) {
+              patchKeys.forEach((k) => {
+                if (safeBody[k] !== undefined) doc[k] = safeBody[k];
+              });
+            }
+            await doc.save();
+            const populated = await studentRepository.findById(doc._id).populate('teacherId', 'name phone specialty');
+            const io = data.app.get('io');
+            if (io) io.emit('student:updated', populated._id);
+            return { _status: 200, _body: {} };
+          }
+        }
+      }
+    }
+
+    // Nếu Admin cập nhật thông tin và có gán Giảng viên, tự động chuyển sang Đang học
+    if (safeBody.teacherId) {
+      const currentSt = await studentRepository.findById(data.id);
+      if (currentSt && currentSt.status === 'Chờ xếp lớp') {
+        safeBody.status = 'Đang học';
+      }
+    }
+
+    // Nếu là Student, chỉ cho phép cập nhật hồ sơ cá nhân CỦA CHÍNH MÌNH
+    if (data.currentUser.role === 'student') {
+      if (String(data.currentUser.id) !== String(data.id)) {
+        return { _status: 403, _body: {} };
+      }
+      // examProgress: dùng PUT /:id/exam-progress (state machine server-side)
+      const allowedKeys = ['email', 'zalo', 'address', 'password', 'avatar'];
+      Object.keys(safeBody).forEach(key => {
+        if (!allowedKeys.includes(key)) {
+          delete safeBody[key];
+        }
+      });
+    }
+
+    // Một nguồn đúng cho link vào lớp: GV/Admin sửa linkHoc → đồng bộ online_meeting_url (tránh URL cũ chiếm ưu tiên ở client)
+    if (Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc')) {
+      safeBody.online_meeting_url = safeBody.linkHoc || '';
+    }
+
+    // Admin/staff đổi khóa học / số buổi → lấy từ catalog nếu thiếu
+    const isStaffOrAdmin = data.currentUser.role === 'admin' || data.currentUser.role === 'staff';
+    if (isStaffOrAdmin && safeBody.courseId && !(Number(safeBody.totalSessions) > 0)) {
+      const Course = require('../../course/models/Course');
+      const catalog = await Course.findById(safeBody.courseId).select('name totalSessions').lean();
+      if (catalog) {
+        safeBody.totalSessions = Number(catalog.totalSessions) > 0 ? Number(catalog.totalSessions) : 12;
+        if (!safeBody.course) safeBody.course = catalog.name;
+      }
+    }
+
+    // Hash mật khẩu nếu admin/staff đổi (findByIdAndUpdate không chạy pre('save'))
+    if (Object.prototype.hasOwnProperty.call(safeBody, 'password')) {
+      const plain = String(safeBody.password || '').trim();
+      if (plain) {
+        const bcrypt = require('bcryptjs');
+        safeBody.password = await bcrypt.hash(plain, 10);
+      } else {
+        delete safeBody.password;
+      }
+    }
+
+    // Đổi SĐT / Zalo / email → kiểm tra trùng toàn hệ thống (HV + GV)
+    if (
+      safeBody.phone !== undefined
+      || safeBody.zalo !== undefined
+      || safeBody.email !== undefined
+    ) {
+      const current = await studentRepository.findById(data.id).select('phone zalo email').lean();
+      if (!current) {
+        return { _status: 404, _body: {} };
+      }
+      try {
+        const { assertUniqueContact } = require('../../../utils/uniqueContact');
+        await assertUniqueContact({
+          phone: safeBody.phone !== undefined ? safeBody.phone : current.phone,
+          zalo: safeBody.zalo !== undefined ? safeBody.zalo : current.zalo,
+          email: safeBody.email !== undefined ? safeBody.email : current.email,
+          excludeRole: 'student',
+          excludeId: data.id,
+        });
+      } catch (dupErr) {
+        if (dupErr.status === 409) {
+          return { _status: 409, _body: {} };
+        }
+        throw dupErr;
+      }
+    }
+
+    const prevStatusDoc = await studentRepository.findById(data.id).select('status').lean();
+    const nextStatus = safeBody.status != null ? String(safeBody.status).toLowerCase() : null;
+    const prevStatus = String(prevStatusDoc?.status || '').toLowerCase();
+    const locking = nextStatus
+      && ['suspended', 'inactive'].includes(nextStatus)
+      && !['suspended', 'inactive'].includes(prevStatus);
+
+    const updateOps = locking
+      ? { $set: safeBody, $inc: { tokenVersion: 1 }, $unset: { refreshToken: '' } }
+      : safeBody;
+
+    const student = await studentRepository.updateById(data.id, updateOps, {
+      returnDocument: 'after',
+      runValidators: true,
+    }).populate('teacherId', 'name phone specialty');
+
+    if (!student) {
+      return { _status: 404, _body: {} };
+    }
+
+    if (locking) {
+      const ioLock = data.app.get('io');
+      if (ioLock) {
+        ioLock.emit('auth:forceLogout', {
+          userId: String(student._id),
+          role: 'student',
+          reason: 'account_disabled',
+        });
+      }
+    }
+
+    // Đồng bộ enrollment chính — applyEnrollmentStats lấy totalSessions từ đây
+    if (isStaffOrAdmin) {
+      const touchCourse =
+        safeBody.totalSessions != null
+        || safeBody.course != null
+        || safeBody.courseId != null
+        || safeBody.price != null
+        || safeBody.teacherId !== undefined;
+
+      if (touchCourse) {
+        const { legacyEnrollmentFromStudent } = require('../../enrollment/services/enrollmentService');
+        if (!student.enrollments?.length && (student.course || safeBody.course)) {
+          student.enrollments = [legacyEnrollmentFromStudent(student)];
+          student.enrollments[0].isPrimary = true;
+        }
+        if (student.enrollments?.length) {
+          let idx = student.enrollments.findIndex((e) => e.isPrimary);
+          if (idx < 0) idx = 0;
+          const enr = student.enrollments[idx];
+          if (safeBody.course != null) enr.courseName = safeBody.course;
+          if (safeBody.courseId != null) enr.courseId = safeBody.courseId;
+          if (safeBody.price != null) enr.price = Number(safeBody.price) || 0;
+          if (safeBody.teacherId !== undefined) {
+            enr.teacherId = safeBody.teacherId || null;
+          }
+          if (safeBody.totalSessions != null) {
+            const ts = Number(safeBody.totalSessions) > 0 ? Number(safeBody.totalSessions) : 12;
+            const completed = Number(enr.completedSessions) || Number(student.completedSessions) || 0;
+            enr.totalSessions = ts;
+            enr.remainingSessions = Math.max(0, ts - completed);
+            student.totalSessions = ts;
+            student.remainingSessions = Math.max(0, ts - completed);
+          }
+          student.markModified('enrollments');
+          await student.save();
+        }
+      }
+
+      // Đồng bộ quyền thi/camera xuống từng enrollment khi cập nhật flag root (list/edit modal)
+      if (safeBody.studentExamUnlocked !== undefined || safeBody.requireWebcam !== undefined) {
+        if (!student.enrollments?.length && student.course) {
+          const { legacyEnrollmentFromStudent: legacyEnr } = require('../../enrollment/services/enrollmentService');
+          student.enrollments = [legacyEnr(student)];
+          student.enrollments[0].isPrimary = true;
+        }
+        if (student.enrollments?.length) {
+          if (typeof safeBody.studentExamUnlocked === 'boolean') {
+            student.enrollments.forEach((e) => {
+              e.examUnlocked = !!safeBody.studentExamUnlocked;
+            });
+          }
+          if (typeof safeBody.requireWebcam === 'boolean') {
+            student.enrollments.forEach((e) => {
+              e.requireWebcam = !!safeBody.requireWebcam;
+            });
+          }
+          student.markModified('enrollments');
+          await student.save();
+        }
+      }
+    }
+
+    const io = data.app.get('io');
+    if (io) {
+      io.emit('student:updated', student._id);
+      io.emit('data:refresh', { type: 'student', id: student._id });
+
+      // ── Notification: duyệt/thu hồi quyền thi (khi admin/staff cập nhật qua PUT /students/:id)
+      // AdminDashboard hiện dùng endpoint này cho approve/revoke exam, nên cần bắn noti ở đây.
+      try {
+        const NotificationService = require('../../notification/services/NotificationService');
+        const beforeUnlocked = Boolean(before?.studentExamUnlocked);
+        const afterUnlocked = Boolean(student.studentExamUnlocked);
+        const beforeApproved = Boolean(before?.examApproved);
+        const afterApproved = Boolean(student.examApproved);
+
+        // Chỉ bắn noti nếu có thay đổi trạng thái (tránh spam khi update fields khác)
+        if ((beforeUnlocked !== afterUnlocked) || (beforeApproved !== afterApproved)) {
+          if (afterUnlocked || afterApproved) {
+            await NotificationService.send(io, {
+              type: 'EXAM',
+              title: '✅ Bạn đã được duyệt thi',
+              content: 'Admin đã cấp quyền cho bạn vào phòng thi. Bạn có thể vào thi ngay.',
+              receivers: student._id.toString(),
+              payload: { studentId: student._id.toString(), action: 'exam_approved' },
+              link: '/student/exam'
+            });
+            io.emit('exam:unlocked', { studentId: student._id.toString(), studentName: student.name });
+          } else {
+            await NotificationService.send(io, {
+              type: 'EXAM',
+              title: '🔒 Quyền thi đã bị thu hồi',
+              content: 'Quyền vào phòng thi của bạn vừa bị khóa. Vui lòng liên hệ trung tâm nếu cần hỗ trợ.',
+              receivers: student._id.toString(),
+              payload: { studentId: student._id.toString(), action: 'exam_revoked' },
+              link: '/student/exam'
+            });
+            io.emit('exam:locked', { studentId: student._id.toString(), reason: 'revoked', message: '🔒 Quyền thi đã bị thu hồi' });
+          }
+        }
+
+        // ── Notification: cấp lại bài thi (thi lại) theo từng môn (examProgress reset)
+        // AdminDashboard reset môn thi bằng cách update examProgress[].lockUntil=null, status='chua_thi', score/null...
+        const beforeProg = Array.isArray(before?.examProgress) ? before.examProgress : null;
+        const afterProg = Array.isArray(student.examProgress) ? student.examProgress : null;
+        const isAdminActor = ['admin', 'staff'].includes(String(data.currentUser?.role || '').toLowerCase());
+
+        if (isAdminActor && beforeProg && afterProg && Object.prototype.hasOwnProperty.call(safeBody, 'examProgress')) {
+          const beforeMap = new Map(beforeProg.map((p) => [String(p?.id || ''), p]));
+          const retakeSubjects = [];
+          for (const ap of afterProg) {
+            const sid = String(ap?.id || '');
+            if (!sid) continue;
+            const bp = beforeMap.get(sid);
+            if (!bp) continue;
+
+            const beforeLocked = bp.lockUntil != null;
+            const afterLocked = ap.lockUntil != null;
+            const becameUnlocked = beforeLocked && !afterLocked;
+            const statusReset = String(bp.status || '') === 'khong_dat' && String(ap.status || '') === 'chua_thi';
+
+            if (becameUnlocked || statusReset) retakeSubjects.push(sid);
+          }
+
+          if (retakeSubjects.length > 0) {
+            const uniq = Array.from(new Set(retakeSubjects));
+            const subjectText = uniq.length === 1 ? `môn "${uniq[0]}"` : `${uniq.length} môn thi`;
+            await NotificationService.send(io, {
+              type: 'EXAM',
+              title: '🔓 Đã cấp lại bài thi',
+              content: `Admin đã mở khóa để bạn thi lại ${subjectText}. Bạn có thể vào phòng thi để làm lại.`,
+              receivers: student._id.toString(),
+              payload: { studentId: student._id.toString(), action: 'exam_retake_granted', subjects: uniq },
+              link: '/student/exam'
+            });
+          }
+        }
+      } catch (notifErr) {
+        logger?.error?.('[STUDENTS] Exam approval notification error:', notifErr);
+      }
+    }
+
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message);
+      return { _status: 400, _body: {} };
+    }
+    return { _status: 400, _body: {} };
+  }
+}
+
+  async put_id_exam_progress(data) {
+  try {
+    const { applyStudentExamProgress } = require('../../exam/services/examProgressService');
+    const isSelf = data.currentUser.role === 'student' && String(data.currentUser.id) === String(data.id);
+    const isStaff = data.currentUser.role === 'admin' || data.currentUser.role === 'staff';
+    if (!isSelf && !isStaff) {
+      return { _status: 403, _body: {} };
+    }
+
+    const { subjectId, changes } = data.body || {};
+    const student = await studentRepository.findById(data.id);
+    if (!student) {
+      return { _status: 404, _body: {} };
+    }
+
+    if (isSelf) {
+      const unlocked = Boolean(student.studentExamUnlocked || student.examApproved);
+      const hasActive = (student.examProgress || []).some((e) => e && e.status === 'dang_thi');
+      if (!unlocked && !hasActive) {
+        return { _status: 403, _body: {} };
+      }
+    }
+
+    let progress;
+    let entry;
+    try {
+      ({ progress, entry } = applyStudentExamProgress(student, subjectId, changes || {}));
+    } catch (verr) {
+      return res.status(verr.status || 400).json({ success: false, message: verr.message });
+    }
+
+    student.examProgress = progress;
+    await student.save({ validateModifiedOnly: true });
+
+    const io = data.app.get('io');
+    if (io) {
+      io.emit('student:updated', student._id);
+      io.emit('data:refresh', { type: 'student', id: student._id });
+    }
+
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    logger.error('[STUDENTS] exam-progress error:', error);
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async patch_id_price(data) {
+  try {
+    const { newPrice, reason = '' } = data.body;
+    if (!newPrice || isNaN(newPrice) || Number(newPrice) < 0) {
+      return { _status: 400, _body: {} };
+    }
+
+    const student = await studentRepository.findById(data.id);
+    if (!student) {
+      return { _status: 404, _body: {} };
+    }
+
+    const oldPrice = student.price;
+    student.price = Number(newPrice);
+    student.priceHistory = student.priceHistory || [];
+    student.priceHistory.push({
+      oldPrice,
+      newPrice: Number(newPrice),
+      reason,
+      changedBy: data.currentUser.id,
+      changedAt: new Date(),
+    });
+    await student.save({ validateModifiedOnly: true });
+
+    const io = data.app.get('io');
+    if (io) io.emit('student:updated', student._id);
+
+    return { _status: 200, _body: {} };
+  } catch (err) {
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async put_id_pay(data) {
+  try {
+    const { paymentMethod = 'transfer', note = '' } = data.body;
+
+    const existing = await studentRepository.findById(data.id);
+    if (!existing) {
+      return { _status: 404, _body: {} };
+    }
+    if (existing.paid) {
+      return { _status: 409, _body: {} };
+    }
+
+    const paidAt = new Date();
+    const paidAmount = Number(existing.paidAmount) > 0
+      ? Number(existing.paidAmount)
+      : (Number(existing.price) || 0);
+
+    // Atomic claim — tránh race double-pay (admin×admin / admin×SePay)
+    const claimed = await studentRepository.updateOne(
+      { _id: data.id, paid: false },
+      {
+        $set: {
+          paid: true,
+          paidAt,
+          paymentMethod,
+          paidAmount,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+    if (!claimed) {
+      return { _status: 409, _body: {} };
+    }
+
+    // Mở quyền học enrollment primary / đã gắn khóa chính
+    if (claimed.enrollments?.length) {
+      claimed.enrollments.forEach((e) => {
+        if (e.isPrimary || claimed.enrollments.length === 1) {
+          e.paid = true;
+          e.paidAt = paidAt;
+          e.learningAccess = true;
+          if (e.status === 'pending_payment' || e.status === 'refunded') e.status = 'active';
+        }
+      });
+      claimed.markModified('enrollments');
+      await claimed.save({ validateModifiedOnly: true });
+    }
+
+    const student = claimed;
+    let invoice = null;
+    try {
+      invoice = await createTuitionInvoice({
+        student,
+        courseName: student.course,
+        amount: student.paidAmount || student.price,
+        note,
+      });
+    } catch (invErr) {
+      logger.warn('[STUDENTS] invoice on pay: %s', invErr.message);
+    }
+    const maHD = invoice?.maHoaDon || '';
+
+    try {
+      await settlePayment({
+        student,
+        amount: student.paidAmount || student.price,
+        invoice,
+        enrollmentId: (() => {
+          const list = student.enrollments || [];
+          const primary = list.find((e) => e.isPrimary) || list[0];
+          return primary?._id ? String(primary._id) : '';
+        })(),
+        courseName: student.course,
+        source: 'admin_pay',
+        sourceRef: maHD || `pay:${student._id}`,
+        // Key theo HV + enrollment primary — idempotent rematch cùng lần thu
+        idempotencyKey: (() => {
+          const list = student.enrollments || [];
+          const primary = list.find((e) => e.isPrimary) || list[0];
+          const enrId = primary?._id ? String(primary._id) : 'none';
+          return `payment:student:${student._id}:enr:${enrId}`;
+        })(),
+        actor: financeActor(req),
+        note,
+        reqMeta: financeReqMeta(req, student),
+      });
+      bustFinanceCaches();
+    } catch (ledgerErr) {
+      logger.error('[STUDENTS] ledger settle pay FAILED — rollback: %s', ledgerErr.message);
+      try {
+        if (student.enrollments?.length) {
+          student.enrollments.forEach((e) => {
+            if (e.isPrimary || student.enrollments.length === 1) {
+              e.paid = false;
+              e.paidAt = undefined;
+              e.learningAccess = false;
+              if (e.status === 'active') e.status = 'pending_payment';
+            }
+          });
+          student.markModified('enrollments');
+        }
+        student.paid = false;
+        student.paidAmount = 0;
+        student.paidAt = undefined;
+        student.paymentMethod = '';
+        await student.save({ validateModifiedOnly: true });
+        if (invoice?._id) {
+          await Invoice.findByIdAndUpdate(invoice._id, { status: 'void' });
+        }
+      } catch (rbErr) {
+        logger.error('[STUDENTS] pay rollback failed: %s', rbErr.message);
+      }
+      return { _status: 500, _body: {} };
+    }
+
+    // Thông báo real-time
+    const io = data.app.get('io');
+    if (io) {
+      const NotificationService = require('../../notification/services/NotificationService');
+      
+      // Notify Admin: doanh thu mới
+      NotificationService.notifyAdmins(io, '💰 Thu học phí', `Đã thu ${student.price.toLocaleString('vi-VN')}đ từ ${student.name}`, { studentId: student._id }, '/admin/invoices');
+      
+      // Notify học viên: xác nhận đã thanh toán
+      NotificationService.send(io, {
+        type: 'FINANCE',
+        title: '✅ Thanh toán thành công',
+        content: `Học phí của bạn đã được xác nhận. Mã HĐ: ${maHD}`,
+        receivers: student._id.toString(),
+        link: '/student#profile'
+      });
+
+      io.emit('revenue:updated', { amount: student.price, studentName: student.name });
+      io.emit('data:refresh', { type: 'student', id: student._id });
+    }
+
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    logger.error('[STUDENTS] Pay error:', error);
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async put_id_refund(data) {
+  try {
+    const note = String(data.body?.note || 'Hoàn tiền / hủy xác nhận thanh toán').slice(0, 300);
+    const student = await studentRepository.findById(data.id);
+    if (!student) {
+      return { _status: 404, _body: {} };
+    }
+    const prevPaidAmount = Number(student.paidAmount) || 0;
+    const fallbackPrice = Number(student.price) || 0;
+    const available = prevPaidAmount > 0 ? prevPaidAmount : (student.paid ? fallbackPrice : 0);
+
+    if (!student.paid || !(available > 0)) {
+      return { _status: 409, _body: {} };
+    }
+
+    const hasAmount = data.body?.amount !== undefined && data.body?.amount !== null && data.body?.amount !== '';
+    let refundAmt = available;
+    let partial = false;
+
+    if (hasAmount) {
+      refundAmt = Number(data.amount);
+      if (!(refundAmt > 0) || Number.isNaN(refundAmt)) {
+        return { _status: 400, _body: {} };
+      }
+      if (refundAmt > available) {
+        return { _status: 400, _body: {} };
+      }
+      partial = refundAmt < available;
+    }
+
+    const oldSnapshot = {
+      paid: student.paid,
+      paidAmount: available,
+    };
+
+    const remainingAfter = partial
+      ? Math.round((available - refundAmt) * 100) / 100
+      : 0;
+
+    // Ledger trước — fail-closed: không clear cache nếu sổ cái lỗi
+    let ledgerEntry = null;
+    try {
+      const posted = await postRefund({
+        student,
+        amount: refundAmt,
+        courseName: student.course,
+        sourceRef: `refund:student:${student._id}:${partial ? 'partial' : 'full'}:${refundAmt}:${oldSnapshot.paidAmount}`,
+        idempotencyKey: `refund:student:${student._id}:${partial ? 'partial' : 'full'}:${refundAmt}:${oldSnapshot.paidAmount}`,
+        actor: financeActor(req),
+        note,
+        metadata: { partial, remaining: remainingAfter },
+        reqMeta: financeReqMeta(req, student),
+      });
+      ledgerEntry = posted?.entry || null;
+    } catch (ledgerErr) {
+      logger.error('[STUDENTS] ledger refund FAILED: %s', ledgerErr.message);
+      return res.status(ledgerErr.status || 500).json({
+        success: false,
+        message: ledgerErr.message || 'Ghi sổ hoàn thất bại — chưa đổi trạng thái học viên',
+      });
+    }
+
+    if (partial) {
+      student.paidAmount = remainingAfter;
+      student.paid = true;
+      student.paidNote = note;
+    } else {
+      student.paid = false;
+      student.paidAmount = 0;
+      student.paidAt = null;
+      student.paidNote = note;
+      student.paymentMethod = '';
+      if (student.enrollments?.length) {
+        student.enrollments.forEach((e) => {
+          if (e.paid) {
+            e.paid = false;
+            e.paidAt = undefined;
+            e.learningAccess = false;
+            e.status = 'refunded';
+          }
+        });
+        student.markModified('enrollments');
+      }
+    }
+
+    await student.save({ validateModifiedOnly: true });
+    bustFinanceCaches();
+
+    const io = data.app.get('io');
+    if (io) {
+      const NotificationService = require('../../notification/services/NotificationService');
+      NotificationService.notifyAdmins(
+        io,
+        partial ? '↩️ Hoàn học phí (một phần)' : '↩️ Hoàn học phí',
+        `Đã hoàn ${refundAmt.toLocaleString('vi-VN')}đ của ${student.name}${partial ? ` (còn ${Number(student.paidAmount).toLocaleString('vi-VN')}đ)` : ''}`,
+        { studentId: student._id },
+        '/admin/students',
+      ).catch(() => {});
+      NotificationService.send(io, {
+        type: 'FINANCE',
+        title: partial ? 'Hoàn học phí một phần' : 'Hoàn học phí',
+        content: partial
+          ? `Đã hoàn ${refundAmt.toLocaleString('vi-VN')}đ. Số dư đã thanh toán còn ${Number(student.paidAmount).toLocaleString('vi-VN')}đ. ${note}`
+          : `Trạng thái thanh toán của bạn đã được cập nhật (hoàn/hủy). ${note}`,
+        receivers: String(student._id),
+        link: '/student#profile',
+      }).catch(() => {});
+      io.emit('data:refresh', { type: 'student', id: student._id });
+      io.emit('revenue:updated', { amount: -refundAmt, studentName: student.name });
+    }
+
+    const o = student.toObject();
+    delete o.password;
+    delete o.refreshToken;
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    logger.error('[STUDENTS] Refund error:', error);
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async put_id_unlock_exam(data) {
+  try {
+    const { enrollmentId } = data.body || {};
+    const student = await studentRepository.findById(data.id);
+    if (!student) {
+      return { _status: 404, _body: {} };
+    }
+
+    const ALLOWED_ENR_STATUS = new Set(['active', 'completed', 'paused', 'pending_payment', 'refunded']);
+
+    if (!student.enrollments?.length && student.course) {
+      student.enrollments = [legacyEnrollmentFromStudent(student)];
+      student.enrollments[0].isPrimary = true;
+    }
+
+    // Chuẩn hóa status lệch enum (seed/legacy) trước khi markModified — tránh ValidationError 500
+    (student.enrollments || []).forEach((e) => {
+      if (e.status && !ALLOWED_ENR_STATUS.has(String(e.status))) {
+        e.status = e.paid ? 'active' : 'pending_payment';
+      }
+    });
+
+    const hasEnrollmentId = enrollmentId
+      && enrollmentId !== 'main'
+      && require('mongoose').Types.ObjectId.isValid(String(enrollmentId));
+
+    if (hasEnrollmentId) {
+      const idx = (student.enrollments || []).findIndex((e) => String(e._id) === String(enrollmentId));
+      if (idx < 0) {
+        return { _status: 404, _body: {} };
+      }
+      student.enrollments[idx].examUnlocked = true;
+      // Root flag = true nếu có ít nhất 1 khóa được mở
+      student.studentExamUnlocked = (student.enrollments || []).some((e) => e.examUnlocked === true);
+      student.examApproved = student.studentExamUnlocked;
+    } else {
+      student.studentExamUnlocked = true;
+      student.examApproved = true;
+      (student.enrollments || []).forEach((e) => { e.examUnlocked = true; });
+    }
+
+    if (student.enrollments?.length) student.markModified('enrollments');
+    await student.save({ validateModifiedOnly: true });
+
+    // Thông báo — không để lỗi kênh làm fail API sau khi đã mở khóa trong DB
+    const io = data.app.get('io');
+    if (io) {
+      try {
+        const NotificationService = require('../../notification/services/NotificationService');
+        await NotificationService.send(io, {
+          type: 'EXAM',
+          title: '🔓 Phòng thi đã mở',
+          content: hasEnrollmentId
+            ? 'Admin đã cấp quyền thi cho một khóa học của bạn.'
+            : 'Giảng viên/Admin đã cấp quyền cho bạn vào thi.',
+          receivers: student._id.toString(),
+          link: '/student/exam',
+          payload: {
+            studentId: String(student._id),
+            enrollmentId: hasEnrollmentId ? String(enrollmentId) : null,
+          },
+        });
+        io.emit('exam:unlocked', {
+          studentId: student._id.toString(),
+          studentName: student.name,
+          enrollmentId: hasEnrollmentId ? String(enrollmentId) : null,
+        });
+        io.emit('data:refresh', { type: 'student', id: student._id });
+      } catch (notifErr) {
+        logger.warn('[STUDENTS] unlock-exam notify: %s', notifErr.message);
+      }
+    }
+
+    try {
+      const workflowService = require('../../cms/services/workflowService');
+      await workflowService.completeOpenForEntity('exam_unlock', student._id, {
+        action: 'approve',
+        user: data.currentUser,
+        note: 'Mở khóa từ API students/unlock-exam',
+      });
+    } catch (wfErr) {
+      logger.warn({ err: wfErr.message }, '[STUDENTS] workflow sync');
+    }
+
+    try {
+      const { writeAudit } = require('../../report/services/auditLogService');
+      await writeAudit({
+        action: 'exam.unlock',
+        actorUserId: String(data.currentUser?.id || ''),
+        actorRole: String(data.currentUser?.role || ''),
+        branchId: student.branchId || null,
+        entityType: 'student',
+        entityId: String(student._id),
+        studentId: student._id,
+        oldValue: { studentExamUnlocked: false },
+        newValue: {
+          studentExamUnlocked: true,
+          enrollmentId: hasEnrollmentId ? String(enrollmentId) : 'all',
+        },
+        ip: data.ip,
+        userAgent: data.headers['user-agent'] || '',
+      });
+    } catch (_) { /* non-blocking */ }
+
+    const o = student.toObject();
+    delete o.password;
+    delete o.refreshToken;
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    logger.error('[STUDENTS] unlock-exam error:', error);
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async put_id_lock_exam(data) {
+  try {
+    const role = String(data.currentUser?.role || '').toLowerCase();
+    const isAdminActor = role === 'admin' || role === 'staff';
+
+    if (isAdminActor) {
+      const allowed = await userHasPermission(data.currentUser, PERMISSIONS.MANAGE_STUDENTS);
+      if (!allowed) {
+        return { _status: 403, _body: {} };
+      }
+    }
+
+    const existing = await studentRepository.findById(data.id).select('teacherId name studentExamUnlocked enrollments.teacherId').lean();
+    if (!existing) {
+      return { _status: 404, _body: {} };
+    }
+
+    if (!existing.studentExamUnlocked) {
+      return { _status: 400, _body: {} };
+    }
+
+    if (!isAdminActor) {
+      if (role !== 'teacher') {
+        return { _status: 403, _body: {} };
+      }
+      const uid = String(data.currentUser.id);
+      const rootOk = String(existing.teacherId || '') === uid;
+      const enrOk = (existing.enrollments || []).some(
+        (e) => String(e?.teacherId || '') === uid,
+      );
+      if (!rootOk && !enrOk) {
+        return { _status: 403, _body: {} };
+      }
+    }
+
+    const { reason: rawReason = '' } = data.body || {};
+    const actorLabel = isAdminActor
+      ? (data.currentUser.name || 'Admin')
+      : (data.currentUser.name || 'Giảng viên');
+    const reason = String(rawReason || '').trim()
+      || `Vi phạm quy chế giám sát thi (${actorLabel} đã đánh trượt)`;
+
+    const student = await studentRepository.findById(data.id);
+    if (!student) {
+      return { _status: 404, _body: {} };
+    }
+    const ALLOWED_ENR_STATUS = new Set(['active', 'completed', 'paused', 'pending_payment', 'refunded']);
+    (student.enrollments || []).forEach((e) => {
+      if (e.status && !ALLOWED_ENR_STATUS.has(String(e.status))) {
+        e.status = e.paid ? 'active' : 'pending_payment';
+      }
+      e.examUnlocked = false;
+    });
+    student.studentExamUnlocked = false;
+    student.examApproved = false;
+    if (student.enrollments?.length) student.markModified('enrollments');
+    await student.save({ validateModifiedOnly: true });
+
+    const io = data.app.get('io');
+    if (io) {
+      try {
+        const NotificationService = require('../../notification/services/NotificationService');
+
+        await NotificationService.send(io, {
+          type: 'EXAM',
+          title: '🔒 Bài thi bị đánh trượt',
+          content: `Phòng thi của bạn đã bị khóa. Lý do: ${reason}`,
+          sender_id: data.currentUser.id,
+          receivers: student._id.toString(),
+          payload: {
+            studentId: student._id.toString(),
+            action: 'exam_failed',
+            reason,
+            by: role,
+            actorName: actorLabel,
+          },
+          link: '/student/exam',
+        });
+
+        const adminTitle = isAdminActor
+          ? '🔒 Admin đã khóa phòng thi học viên'
+          : '🚨 Giảng viên đánh trượt học viên';
+        const adminContent = isAdminActor
+          ? `${actorLabel} đã khóa phòng thi của học viên ${student.name}. Lý do: ${reason}`
+          : `${actorLabel} đã đánh trượt học viên ${student.name}. Lý do: ${reason}`;
+
+        await NotificationService.send(io, {
+          type: 'EXAM',
+          title: adminTitle,
+          content: adminContent,
+          sender_id: data.currentUser.id,
+          receivers: 'ALL_ADMIN',
+          payload: {
+            studentId: student._id.toString(),
+            studentName: student.name,
+            teacherId: student.teacherId?.toString?.() || student.teacherId,
+            action: 'exam_failed',
+            reason,
+            by: role,
+          },
+          link: '/admin#students',
+        });
+      } catch (notifErr) {
+        logger?.error?.('[LOCK_EXAM] Notification error:', notifErr);
+      }
+
+      const lockPayload = {
+        studentId: student._id.toString(),
+        reason,
+        message: `🔒 Phòng thi đã bị khóa. Lý do: ${reason}`,
+      };
+      io.to(`student_${student._id}`).emit('exam:locked', lockPayload);
+      io.emit('exam:locked', lockPayload);
+      io.emit('student:updated', student._id);
+      io.emit('data:refresh', { type: 'student', id: student._id });
+    }
+
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    return { _status: 500, _body: {} };
+  }
+  async put_id_assign_teacher(data) {
+  try {
+    const { teacherId, enrollmentId, reason = '' } = data.body;
+    const isUnassign = teacherId === null || teacherId === '' || teacherId === undefined;
+
+    const student = await studentRepository.findById(data.id);
+    if (!student) {
+      return { _status: 404, _body: {} };
+    }
+
+    if (!student.enrollments?.length && student.course) {
+      student.enrollments = [legacyEnrollmentFromStudent(student)];
+      student.enrollments[0].isPrimary = true;
+    }
+
+    let teacherName = '';
+    let teacherDoc = null;
+    let prevTeacherIdForReassign = null;
+    let activeEnrollmentId = '';
+    let activeEnrollmentIdx = -1;
+    // Validate ObjectId khi gán GV
+    if (!isUnassign && teacherId) {
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(teacherId)) {
+        return { _status: 400, _body: {} };
+      }
+      const Teacher = require('../../teacher/models/Teacher');
+      const t = await Teacher.findById(teacherId).select('name status role specialty subjectIds').lean();
+      if (!t || t.role !== 'teacher') {
+        return { _status: 404, _body: {} };
+      }
+      if (String(t.status || '').toLowerCase() !== 'active') {
+        return { _status: 400, _body: {} };
+      }
+      teacherDoc = t;
+      teacherName = t.name || 'Giảng viên';
+    }
+
+    // Khớp môn: khóa học HV ↔ chuyên môn GV — lệch môn thì từ chối phân công
+    let targetCourse = student.course;
+    let targetExamSubjects = [];
+    if (enrollmentId && student.enrollments?.length) {
+      const idxPreview = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
+      if (idxPreview >= 0) {
+        targetCourse = student.enrollments[idxPreview].courseName || targetCourse;
+        targetExamSubjects = student.enrollments[idxPreview].examSubjects || [];
+      }
+    } else if (student.enrollments?.length) {
+      const primaryIdx = student.enrollments.findIndex((e) => e.isPrimary);
+      const idx = primaryIdx >= 0 ? primaryIdx : 0;
+      targetCourse = student.enrollments[idx]?.courseName || targetCourse;
+      targetExamSubjects = student.enrollments[idx]?.examSubjects || [];
+    }
+
+    if (!isUnassign && teacherDoc && targetCourse) {
+      const courseName = String(targetCourse || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
+      const specialty = String(teacherDoc.specialty || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
+
+      const courseFocus = (() => {
+        if (courseName.includes('thvp') || courseName.includes('van phong') || courseName.includes('tin hoc van phong') || courseName.includes('microsoft office')) {
+          return ['thvp'];
+        }
+        if (courseName.includes('canva') && (courseName.includes('powerpoint') || courseName.includes('ppt'))) return ['powerpoint', 'canva'];
+        if (courseName.includes('canva')) return ['canva'];
+        if (courseName.includes('excel')) return ['excel'];
+        if (courseName.includes('word')) return ['word'];
+        if (courseName.includes('powerpoint') || courseName.includes('ppt')) return ['powerpoint'];
+        if (Array.isArray(targetExamSubjects) && targetExamSubjects.length) {
+          const office = ['coban', 'word', 'excel', 'powerpoint'];
+          const hits = targetExamSubjects.map(String).filter((id) => office.includes(id) && id !== 'coban');
+          if (hits.length >= 3) return ['thvp'];
+          return [...new Set(targetExamSubjects.map(String).filter((id) => id !== 'coban'))];
+        }
+        return [];
+      })();
+
+      const teacherFocus = (() => {
+        if (specialty.includes('thvp') || specialty.includes('van phong') || specialty.includes('tin hoc van phong') || specialty.includes('microsoft office')) {
+          return ['thvp'];
+        }
+        const focuses = new Set();
+        if (specialty.includes('excel')) focuses.add('excel');
+        if (specialty.includes('word')) focuses.add('word');
+        if (specialty.includes('powerpoint') || specialty.includes('ppt')) focuses.add('powerpoint');
+        if (specialty.includes('canva')) focuses.add('canva');
+        const { resolveTeacherSubjectIds } = require('../../../utils/trainingSubjectAccess');
+        const teacherSubs = resolveTeacherSubjectIds(teacherDoc).map(String);
+        const office = ['coban', 'word', 'excel', 'powerpoint'];
+        teacherSubs.forEach((id) => {
+          if (id === 'coban') return;
+          if (office.includes(id) || id === 'canva') focuses.add(id);
+        });
+        // Đủ Word+Excel+PowerPoint → focus THVP (khớp khóa Tin học văn phòng)
+        const hasCanva = focuses.has('canva') || teacherSubs.includes('canva');
+        const hasFullOffice = ['word', 'excel', 'powerpoint'].every((id) => focuses.has(id));
+        if (hasFullOffice && !hasCanva) {
+          focuses.delete('word');
+          focuses.delete('excel');
+          focuses.delete('powerpoint');
+          focuses.delete('coban');
+          focuses.add('thvp');
+        }
+        return [...focuses];
+      })();
+
+      let matched = false;
+      if (courseFocus.length && teacherFocus.length) {
+        const set = new Set(teacherFocus);
+        matched = courseFocus.some((f) => set.has(f));
+      }
+      if (!matched && specialty && courseName) {
+        matched = specialty.includes(courseName) || courseName.includes(specialty)
+          || specialty.split(/[,;|/]+/).some((p) => {
+            const part = p.trim();
+            return part.length >= 3 && (courseName.includes(part) || part.includes(courseName));
+          });
+      }
+      if (!matched) {
+        return { _status: 400, _body: {} };
+      }
+    }
+
+    const mongoose = require('mongoose');
+    const hasValidEnrollmentId = enrollmentId
+      && enrollmentId !== 'main'
+      && mongoose.Types.ObjectId.isValid(String(enrollmentId));
+
+    if (hasValidEnrollmentId && student.enrollments?.length) {
+      const idx = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
+      if (idx < 0) {
+        return { _status: 404, _body: {} };
+      }
+      activeEnrollmentIdx = idx;
+      activeEnrollmentId = String(student.enrollments[idx]._id);
+      const prevEnrTeacher = student.enrollments[idx].teacherId;
+      prevTeacherIdForReassign = prevEnrTeacher ? String(prevEnrTeacher) : null;
+      student.enrollments[idx].teacherId = isUnassign ? null : teacherId;
+      student.enrollments[idx].teacherName = teacherName;
+      targetCourse = student.enrollments[idx].courseName;
+      const isPrimary = !!student.enrollments[idx].isPrimary || student.enrollments.length === 1;
+      if (isUnassign) {
+        // Bỏ phân công: luôn xóa teacherId cấp HV nếu là khóa chính / khóa duy nhất
+        // hoặc teacherId cấp HV đang trùng GV của khóa này
+        const topTid = student.teacherId?._id || student.teacherId;
+        if (isPrimary || String(topTid || '') === String(prevEnrTeacher || '')) {
+          student.teacherId = null;
+          student.teacherName = '';
+        }
+      } else if (isPrimary) {
+        student.teacherId = teacherId;
+        student.teacherName = teacherName;
+      }
+    } else {
+      const primaryIdx = student.enrollments?.findIndex((e) => e.isPrimary);
+      const idx = primaryIdx >= 0 ? primaryIdx : 0;
+      if (student.enrollments?.[idx]) {
+        activeEnrollmentIdx = idx;
+        activeEnrollmentId = String(student.enrollments[idx]._id);
+        prevTeacherIdForReassign = student.enrollments[idx].teacherId
+          ? String(student.enrollments[idx].teacherId)
+          : (student.teacherId ? String(student.teacherId._id || student.teacherId) : null);
+        student.enrollments[idx].teacherId = isUnassign ? null : teacherId;
+        student.enrollments[idx].teacherName = teacherName;
+        targetCourse = student.enrollments[idx].courseName;
+      }
+      student.teacherId = isUnassign ? null : teacherId;
+      student.teacherName = isUnassign ? '' : teacherName;
+    }
+
+    // Mark enrollments modified for Mongoose subdocument arrays
+    if (student.enrollments?.length) {
+      student.markModified('enrollments');
+    }
+
+    if (student.status === 'Chờ xếp lớp' && !isUnassign) {
+      student.status = 'Đang học';
+    }
+
+    await student.save();
+    await student.populate('teacherId', 'name phone specialty');
+
+    const ScheduleModel = require('../../attendance/models/Schedule');
+    const schedFilter = {
+      studentId: student._id,
+      status: 'scheduled',
+      ...(targetCourse ? { course: targetCourse } : {}),
+    };
+    let futureSchedulesUpdated = 0;
+    if (isUnassign) {
+      const r = await ScheduleModel.updateMany(schedFilter, { $set: { teacherId: null, teacherName: '' } });
+      futureSchedulesUpdated = r.modifiedCount || 0;
+    } else {
+      const r = await ScheduleModel.updateMany(schedFilter, {
+        $set: { teacherId, teacherName },
+      });
+      futureSchedulesUpdated = r.modifiedCount || 0;
+    }
+
+    const completedAgg = await ScheduleModel.aggregate([
+      {
+        $match: {
+          studentId: student._id,
+          status: 'completed',
+          ...(targetCourse ? { course: targetCourse } : {}),
+        },
+      },
+      { $group: { _id: '$teacherId', count: { $sum: 1 } } },
+    ]);
+    const completedSplit = {};
+    completedAgg.forEach((row) => {
+      if (row._id) completedSplit[String(row._id)] = row.count;
+    });
+
+    const enrSnap = activeEnrollmentIdx >= 0 ? student.enrollments[activeEnrollmentIdx] : null;
+    const completedSessionsAtSwitch = Number(enrSnap?.completedSessions) || 0;
+    const remainingSessionsSnap = Number(enrSnap?.remainingSessions) || 0;
+    const progressPreserved = completedSessionsAtSwitch >= 0 && remainingSessionsSnap >= 0;
+
+    const newTeacherStr = !isUnassign && teacherId ? String(teacherId) : '';
+    const isReassign = !isUnassign && newTeacherStr
+      && prevTeacherIdForReassign
+      && prevTeacherIdForReassign !== newTeacherStr;
+
+    if (isReassign || (!isUnassign && newTeacherStr && !prevTeacherIdForReassign)) {
+      try {
+        const TeacherAssignmentSegment = require('../../teacher/models/TeacherAssignmentSegment');
+        const enrollKey = activeEnrollmentId || 'primary';
+        if (isReassign) {
+          await TeacherAssignmentSegment.updateMany(
+            {
+              studentId: student._id,
+              enrollmentId: enrollKey,
+              endedAt: null,
+            },
+            { $set: { endedAt: new Date() } },
+          );
+        }
+        await TeacherAssignmentSegment.create({
+          studentId: student._id,
+          enrollmentId: enrollKey,
+          courseName: targetCourse || student.course || '',
+          teacherId,
+          teacherName,
+          completedSessionsAtStart: completedSessionsAtSwitch,
+          actorId: String(data.currentUser?.id || ''),
+          actorRole: String(data.currentUser?.role || ''),
+          reason: String(reason || '').slice(0, 500) || (isReassign ? 'Đổi giảng viên' : 'Phân công giảng viên'),
+        });
+
+        const { writeAudit } = require('../../report/services/auditLogService');
+        await writeAudit({
+          action: isReassign ? 'teacher.reassign' : 'teacher.assign',
+          actorUserId: String(data.currentUser?.id || ''),
+          actorRole: String(data.currentUser?.role || ''),
+          branchId: student.branchId || null,
+          entityType: 'enrollment',
+          entityId: enrollKey,
+          studentId: student._id,
+          teacherId,
+          oldValue: {
+            teacherId: prevTeacherIdForReassign,
+            completedSessions: completedSessionsAtSwitch,
+          },
+          newValue: {
+            teacherId: newTeacherStr,
+            completedSessions: completedSessionsAtSwitch,
+            futureSchedulesUpdated,
+            completedSplit,
+          },
+          ip: data.ip,
+          userAgent: data.headers['user-agent'] || '',
+        });
+      } catch (segErr) {
+        logger.warn('[ASSIGN_TEACHER] segment/audit: %s', segErr.message);
+      }
+    }
+
+    const io = data.app.get('io');
+
+    try {
+      if (io && !isUnassign) {
+        const NotificationService = require('../../notification/services/NotificationService');
+        const isNewAssign = !isReassign;
+        await NotificationService.send(io, {
+          type: 'COURSE',
+          title: isNewAssign ? '📚 Học viên mới được giao' : '👨‍🏫 Đổi giảng viên phụ trách',
+          content: isNewAssign
+            ? `Học viên ${student.name} (${targetCourse || student.course}) đã được giao cho bạn.`
+            : `Bạn được phân công tiếp khóa "${targetCourse || student.course}" của ${student.name} (từ buổi ${completedSessionsAtSwitch + 1}).`,
+          receivers: teacherId.toString(),
+          payload: { studentId: student._id, type: 'student', reassign: isReassign },
+          link: `/teacher#students?studentId=${student._id}`,
+        });
+
+        if (isReassign) {
+          await NotificationService.send(io, {
+            type: 'COURSE',
+            title: '👨‍🏫 Giảng viên khóa học đã đổi',
+            content: `Khóa "${targetCourse || student.course}" chuyển sang GV ${teacherName}. Tiến độ đã học: ${completedSessionsAtSwitch} buổi (không mất lịch).`,
+            receivers: String(student._id),
+            link: '/student#profile',
+          });
+        } else {
+          await NotificationService.send(io, {
+            type: 'COURSE',
+            title: '👨‍🏫 Phân công giảng viên phụ trách',
+            content: `Bạn đã được phân công Giảng viên ${teacherName} phụ trách khóa "${targetCourse || student.course}".`,
+            receivers: String(student._id),
+            link: '/student#profile',
+          });
+        }
+
+
+        io.to(teacherId.toString()).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
+        io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId });
+        io.emit('student:assigned', { teacherId: teacherId.toString(), studentId: student._id.toString() });
+        io.emit('data:refresh', { type: 'student', id: student._id });
+      } else if (io && isUnassign) {
+        io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId: null });
+        io.emit('data:refresh', { type: 'student', id: student._id });
+      }
+    } catch (notifErr) {
+      logger.error('[ASSIGN_TEACHER] Notification error:', notifErr);
+    }
+
+    const doc = student.toObject();
+    await applyEnrollmentStats(doc, student._id, Schedule);
+
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async delete_id(data) {
+  try {
+    const student = await studentRepository.deleteById(data.id);
+    if (!student) {
+      return { _status: 404, _body: {} };
+    }
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async post_id_reset_today_attendance(data) {
+  try {
+    const student = await studentRepository.findById(data.id);
+    if (!student) return { _status: 404, _body: {} };
+
+    const todayVN = new Date().toLocaleDateString('vi-VN');
+    const oldGrades = student.grades || [];
+    const hadTodayRecord = oldGrades.some(g => g.date === todayVN);
+
+    if (!hadTodayRecord) {
+      return { _status: 200, _body: {} };
+    }
+
+    // ⏰ Kiểm tra thời gian 1 tiếng: Lấy schedule gần nhất hôm nay
+    const todayISO = new Date().toISOString().split('T')[0];
+    const latestSchedule = await Schedule.findOne({
+      studentId: data.id,
+      date: { $gte: new Date(todayISO), $lt: new Date(new Date(todayISO).getTime() + 86400000) },
+      status: 'completed',
+    }).sort({ createdAt: -1 }).lean();
+
+    if (latestSchedule) {
+      const diffMs = Date.now() - new Date(latestSchedule.createdAt).getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins >= 60) {
+        return { _status: 403, _body: {} };
+      }
+    }
+
+    // Xóa record hôm nay khỏi grades
+    const newGrades = oldGrades.filter(g => g.date !== todayVN);
+
+    // Khôi phục số buổi (tính toán toán học tuyệt đối để tránh sai số)
+    const newCompleted = newGrades.length;
+    const newRemaining = Math.max(0, (student.totalSessions || 12) - newCompleted);
+
+    await studentRepository.updateById(data.id, {
+      grades: newGrades,
+      completedSessions: newCompleted,
+      remainingSessions: newRemaining,
+      status: 'Đang học'
+    });
+
+    // Xóa schedule hôm nay nếu có
+    await Schedule.deleteMany({
+      studentId: data.id,
+      date: { $gte: new Date(todayISO), $lt: new Date(new Date(todayISO).getTime() + 86400000) },
+      status: 'completed'
+    });
+
+    const io = data.app.get('io');
+    if (io) {
+      io.emit('data:refresh', { type: 'student', id: data.id });
+    }
+
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async post_id_reset_history(data) {
+  try {
+    const student = await studentRepository.findById(data.id);
+    if (!student) return { _status: 404, _body: {} };
+
+    // Xóa tất cả lịch học liên quan đến học viên này
+    const deletedSchedules = await Schedule.deleteMany({ studentId: data.id });
+
+    // Reset các field lịch sử trên Student document, giữ nguyên: name, phone, zalo, course, paid, price...
+    await studentRepository.updateById(data.id, {
+      $set: {
+        remainingSessions: student.totalSessions || 12, // reset về đủ buổi
+        studentExamUnlocked: false,
+        grade: null,
+        status: 'active',
+        // Xóa lịch sử điểm danh nếu có field này
+        attendanceHistory: [],
+        examScore: null,
+        practicalStatus: 'pending',
+      },
+    });
+
+    // Log hệ thống
+    const io = data.app.get('io');
+    if (io) io.emit('student:history_reset', { studentId: data.id, name: student.name });
+
+    return { _status: 200, _body: {} };
+  } catch (error) {
+    return { _status: 500, _body: {} };
+  }
+}
+
+  async put_id_pay_teacher(data) {
+  try {
+    const { action } = data.body; // 'PARTIAL' (thanh toán cộng dồn) hoặc 'PAID_IN_ADVANCE' (trả trước trọn gói)
+    const studentId = data.id;
+
+    const student = await studentRepository.findById(studentId);
+    if (!student) return { _status: 404, _body: {} };
+
+    const io = data.app.get('io');
+    const teacherId = student.teacherId ? String(student.teacherId) : '';
+    const notifyTeacher = async (content, payload = {}) => {
+      if (!io || !teacherId) return;
+      const NotificationService = require('../../notification/services/NotificationService');
+      await NotificationService.send(io, {
+        type: 'FINANCE',
+        title: '💵 Đã thanh toán lương (theo học viên)',
+        content,
+        receivers: teacherId,
+        payload: { studentId: String(student._id), ...payload },
+        link: '/teacher/finance',
+      });
+    };
+
+    if (action === 'PAID_IN_ADVANCE') {
+      // 1. Chuyển trạng thái của học viên thành TRẢ TRƯỚC Toàn bộ
+      student.teacher_payment_status = 'PAID_IN_ADVANCE';
+      await student.save();
+
+      // 2. Chuyển tất cả buổi "đã học/chưa học" đang pending thành PAID
+      const updated = await Schedule.updateMany(
+        { studentId, status: 'completed', is_paid_to_teacher: false },
+        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+      );
+
+      await notifyTeacher(
+        `Admin đã thiết lập TRẢ TRƯỚC cho học viên ${student.name}. Đã xác nhận thanh toán ${updated.modifiedCount || 0} buổi đã hoàn thành (các buổi sau sẽ tự động tick đã thanh toán).`,
+        { action: 'PAID_IN_ADVANCE', paidSessions: updated.modifiedCount || 0 }
+      );
+
+      if (io) {
+        io.emit('student:updated', student._id.toString());
+        io.emit('data:refresh', { type: 'student', id: student._id.toString(), action: 'pay_teacher' });
+      }
+
+      return { _status: 200, _body: {} };
+    } else {
+      // PARTIAL (Thanh toán cộng dồn các buổi dang dở hiện tại)
+      const updated = await Schedule.updateMany(
+        { studentId, status: 'completed', is_paid_to_teacher: false },
+        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
+      );
+
+      if (student.teacher_payment_status === 'UNPAID') {
+        student.teacher_payment_status = 'PARTIAL';
+        await student.save();
+      }
+
+      await notifyTeacher(
+        `Admin đã thanh toán ${updated.modifiedCount || 0} buổi dạy của học viên ${student.name}.`,
+        { action: 'PARTIAL', paidSessions: updated.modifiedCount || 0 }
+      );
+
+      if (io) {
+        io.emit('student:updated', student._id.toString());
+        io.emit('data:refresh', { type: 'student', id: student._id.toString(), action: 'pay_teacher' });
+      }
+
+      return { _status: 200, _body: {} };
+    }
+  } catch (error) {
+    logger.error('[STUDENTS] Pay Teacher error:', error);
+    return { _status: 500, _body: {} };
+  }
+}
+
+}
+
+module.exports = new StudentApplicationService();
+
+
+
+}
+
+}
+

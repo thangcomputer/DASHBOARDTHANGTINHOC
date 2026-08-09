@@ -1,0 +1,1 @@
+'use strict'; class SessionService { create() {} revoke() {} expire() {} } module.exports = SessionService;

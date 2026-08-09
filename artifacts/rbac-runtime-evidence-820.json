@@ -1,0 +1,53 @@
+{
+  "phase": "8.20",
+  "environment": "UNKNOWN",
+  "soakWindow": null,
+  "productionEvidence": "NOT_AVAILABLE",
+  "evidenceChannel": "NONE",
+  "hookEvents": 0,
+  "uniqueRuntimeRequests": "UNKNOWN",
+  "match": 0,
+  "mismatch": 0,
+  "unknown": 0,
+  "unsupported": 0,
+  "observerErrors": 0,
+  "dualCheckErrors": 0,
+  "criticalMismatchCount": 0,
+  "runtimeCoverage": "NOT_AVAILABLE",
+  "domainSafety": {
+    "finance": "NOT_EVALUATED",
+    "hr": "NOT_EVALUATED",
+    "teacher": "NOT_EVALUATED",
+    "studentTraining": "NOT_EVALUATED",
+    "legacyPrincipal": "NOT_EVALUATED"
+  },
+  "roleSafety": "PASS",
+  "legacyPrincipalSafety": "NOT_EVALUATED",
+  "privilegeWidening": "NOT_EVALUATED",
+  "finalDecisionInvariant": "PASS",
+  "blockers": [
+    "environment_rejected_UNKNOWN",
+    "observe_flag_off",
+    "dual_check_flag_off",
+    "soak_window_flag_off",
+    "zero_runtime_events"
+  ],
+  "enterprisePrimaryReady": false,
+  "ENTERPRISE_PRIMARY_READY": "NO",
+  "flags": {
+    "observe": false,
+    "dualCheck": false,
+    "soakWindow": false
+  },
+  "safety": {
+    "liveRemainsPrimary": true,
+    "enterpriseIsShadowOnly": true,
+    "flagsNotAutoEnabled": true,
+    "authorizeNotMounted": true,
+    "noDbMutation": true,
+    "noPermissionMutation": true,
+    "hookEventsNotUniqueRequests": true
+  },
+  "note": "hookEvents may count observe+dual-check hooks per HTTP call. uniqueRuntimeRequests uses correlation/request IDs only — never invented. ENTERPRISE_PRIMARY_READY remains NO in Phase 8.20.",
+  "timestamp": "2026-08-09T08:06:15.490Z"
+}

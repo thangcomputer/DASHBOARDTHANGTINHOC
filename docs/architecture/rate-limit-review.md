@@ -1,0 +1,1 @@
+# Rate Limit Review\nGlobal sliding window IP-based rate limiting implemented and hooked to MetricsRegistry.

@@ -1,0 +1,1 @@
+# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nArchitecture design document for Sprint 5.4 Enterprise Platform Hardening & Production Readiness.\n\n## Overview\nFocus on API standardization, DB hardening, observability, security, Devops, AI governance, and preparing LMS/CRM/ERP for production.

@@ -1,0 +1,11 @@
+'use strict';
+const { commandRegistry } = require('../../../shared/cqrs');
+const Post_rootCommand = require('./Post_rootCommand');
+const Post_rootHandler = require('./Post_rootHandler');
+commandRegistry.register('Post_rootCommand', new Post_rootHandler());
+module.exports.Post_rootCommand = Post_rootCommand;
+const Delete_idCommand = require('./Delete_idCommand');
+const Delete_idHandler = require('./Delete_idHandler');
+commandRegistry.register('Delete_idCommand', new Delete_idHandler());
+module.exports.Delete_idCommand = Delete_idCommand;
+require('../events');

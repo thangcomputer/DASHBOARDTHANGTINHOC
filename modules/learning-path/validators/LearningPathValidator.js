@@ -1,0 +1,1 @@
+'use strict'; class LearningPathValidator { validate() {} } module.exports = LearningPathValidator;

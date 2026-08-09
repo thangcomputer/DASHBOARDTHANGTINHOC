@@ -1,0 +1,1 @@
+'use strict'; class ComplianceRegistry { register() {} } module.exports = ComplianceRegistry;

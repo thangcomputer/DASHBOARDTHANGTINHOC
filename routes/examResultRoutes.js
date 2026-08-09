@@ -1,19 +1,180 @@
-const express    = require('express');
-const router     = express.Router();
+const express = require('express');
+const router = express.Router();
 const ExamResult = require('../models/ExamResult');
-const { authMiddleware } = require('../middleware/auth');
+const Student = require('../models/Student');
+const Teacher = require('../models/Teacher');
+const {
+  authMiddleware,
+  branchFilter,
+  userHasPermission,
+} = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const NotificationService = require('../services/NotificationService');
 const logger = require('../config/logger');
+const { emitDataRefresh } = require('../utils/realtimeEmit');
+const { pickExamResultCreate, pickExamResultUpdate } = require('../utils/examResultDto');
+const { studentMatchesTeacher } = require('../services/enrollmentService');
+const { policyShadowExamResult } = require('../middleware/policyShadowExamResult');
+const { examResultsCutoverGate } = require('../middleware/examResultsCutoverGate');
 
-// GET /api/exam-results — lấy tất cả (hoặc lọc theo type)
-router.get('/', authMiddleware, async (req, res) => {
+/**
+ * Phase 7.30 — Controlled cutover for LIVE /api/exam-results ONLY.
+ *
+ * Flow: auth → branchFilter → policyShadowExamResult → examResultsCutoverGate → handler
+ * Legacy: list/create/update authz remains handler-owned (authorizeExamMutation / list gates);
+ *         delete MANAGE_* permission retained inside examResultsCutoverGate + handler branchAllows.
+ * Notifications / emit / audit remain handler-owned.
+ */
+const examGuard = (action) => [
+  authMiddleware,
+  branchFilter,
+  policyShadowExamResult(action),
+  examResultsCutoverGate(action),
+];
+
+async function resolveExamRefreshScope(result) {
+  if (result?.type === 'student' && result.studentId) {
+    const student = await Student.findById(result.studentId).select('branchId teacherId').lean();
+    return {
+      branchId: student?.branchId || null,
+      userIds: [result.studentId, student?.teacherId].filter(Boolean),
+    };
+  }
+  if (result?.type === 'teacher' && result.teacherId) {
+    const teacher = await Teacher.findById(result.teacherId).select('branchId').lean();
+    return {
+      branchId: teacher?.branchId || null,
+      userIds: [result.teacherId],
+    };
+  }
+  return { branchId: null, userIds: [] };
+}
+
+/** Trusted branch of the subject (student or teacher). Client branchId ignored. */
+async function resolveSubjectBranch(doc) {
+  if (doc?.type === 'student' && doc.studentId) {
+    const student = await Student.findById(doc.studentId)
+      .select('branchId teacherId enrollments')
+      .lean();
+    return {
+      branchId: student?.branchId || null,
+      student,
+      teacher: null,
+    };
+  }
+  if (doc?.type === 'teacher' && doc.teacherId) {
+    const teacher = await Teacher.findById(doc.teacherId).select('branchId').lean();
+    return {
+      branchId: teacher?.branchId || null,
+      student: null,
+      teacher,
+    };
+  }
+  return { branchId: null, student: null, teacher: null };
+}
+
+/**
+ * Branch-bound actors: DENY when subject branch differs or cannot be proven.
+ * Super (no userBranchId): ALLOW.
+ */
+function branchAllows(req, subjectBranchId) {
+  if (!req.userBranchId) return { ok: true };
+  if (!subjectBranchId) {
+    return { ok: false, status: 403, message: 'Không xác định được chi nhánh của kết quả thi' };
+  }
+  if (String(subjectBranchId) !== String(req.userBranchId)) {
+    return { ok: false, status: 403, message: 'Không có quyền thao tác kết quả thi chi nhánh khác' };
+  }
+  return { ok: true };
+}
+
+async function staffCanManageExam(req, type) {
+  if (req.user?.id === 'admin') return true;
+  if (type === 'teacher') {
+    return userHasPermission(req.user, PERMISSIONS.MANAGE_TRAINING);
+  }
+  const a = await userHasPermission(req.user, PERMISSIONS.MANAGE_STUDENTS);
+  const b = await userHasPermission(req.user, PERMISSIONS.MANAGE_STUDENT_TRAINING);
+  return a || b;
+}
+
+async function authorizeExamMutation(req, doc) {
+  const role = String(req.user?.role || '').toLowerCase();
+  const { branchId, student } = await resolveSubjectBranch(doc);
+  const br = branchAllows(req, branchId);
+  if (!br.ok) return br;
+
+  if (role === 'student') {
+    return { ok: false, status: 403, message: 'Học viên không được tạo/sửa kết quả thi' };
+  }
+
+  if (role === 'teacher') {
+    if (doc.type === 'teacher') {
+      if (String(doc.teacherId) !== String(req.user.id)) {
+        return { ok: false, status: 403, message: 'Chỉ ghi nhận kết quả thi của chính bạn' };
+      }
+      return { ok: true, branchId };
+    }
+    if (!student || !studentMatchesTeacher(student, req.user.id)) {
+      return { ok: false, status: 403, message: 'Chỉ thao tác kết quả thi học viên mình phụ trách' };
+    }
+    return { ok: true, branchId };
+  }
+
+  if (role === 'admin' || role === 'staff') {
+    const allowed = await staffCanManageExam(req, doc.type);
+    if (!allowed) {
+      return { ok: false, status: 403, message: 'Thiếu quyền quản lý kết quả thi' };
+    }
+    return { ok: true, branchId };
+  }
+
+  return { ok: false, status: 403, message: 'Không có quyền' };
+}
+
+// GET /api/exam-results
+router.get('/', examGuard('list'), async (req, res) => {
   try {
+    const role = String(req.user.role || '').toLowerCase();
     const filter = {};
     if (req.query.type) filter.type = req.query.type;
-    
-    // Authorization: Admin/Staff/Teacher có thể xem tất cả, Student chỉ xem của mình
-    if (req.user.role === 'student') {
-      filter.studentId = req.user.id;
+
+    if (role === 'student') {
+      filter.studentId = String(req.user.id);
+    } else if (role === 'teacher') {
+      const myStudents = await Student.find({
+        $or: [
+          { teacherId: req.user.id },
+          { 'enrollments.teacherId': req.user.id },
+        ],
+      }).select('_id').lean();
+      const sids = myStudents.map((s) => String(s._id));
+      filter.$or = [
+        { type: 'teacher', teacherId: String(req.user.id) },
+        { type: 'student', studentId: { $in: sids } },
+      ];
+    } else if (role === 'admin' || role === 'staff') {
+      const can =
+        (await userHasPermission(req.user, PERMISSIONS.MANAGE_STUDENTS))
+        || (await userHasPermission(req.user, PERMISSIONS.MANAGE_STUDENT_TRAINING))
+        || (await userHasPermission(req.user, PERMISSIONS.MANAGE_TRAINING));
+      if (!can) {
+        return res.status(403).json({ success: false, message: 'Thiếu quyền xem kết quả thi' });
+      }
+      if (req.userBranchId) {
+        const [branchTeachers, branchStudents] = await Promise.all([
+          Teacher.find({ branchId: req.userBranchId }).select('_id').lean(),
+          Student.find({ branchId: req.userBranchId }).select('_id').lean(),
+        ]);
+        const tids = branchTeachers.map((t) => String(t._id));
+        const sids = branchStudents.map((s) => String(s._id));
+        filter.$or = [
+          { type: 'teacher', teacherId: { $in: tids } },
+          { type: 'student', studentId: { $in: sids } },
+        ];
+      }
+    } else {
+      return res.status(403).json({ success: false, message: 'Không có quyền' });
     }
 
     const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -36,18 +197,29 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/exam-results — thêm kết quả thi mới
-router.post('/', authMiddleware, async (req, res) => {
+// POST /api/exam-results
+router.post('/', examGuard('create'), async (req, res) => {
   try {
-    // Only Admin, Staff, or Teacher can create exam results
-    if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Không có quyền tạo kết quả thi' });
+    const data = pickExamResultCreate(req.body);
+    // Ignore client spoof of branch/tenant/system fields (not in allowlist)
+    if (!['student', 'teacher'].includes(data.type)) {
+      return res.status(400).json({ success: false, message: 'type không hợp lệ' });
+    }
+    if (data.type === 'student' && !data.studentId) {
+      return res.status(400).json({ success: false, message: 'Thiếu studentId' });
+    }
+    if (data.type === 'teacher' && !data.teacherId) {
+      return res.status(400).json({ success: false, message: 'Thiếu teacherId' });
     }
 
-    const result = new ExamResult(req.body);
+    const authz = await authorizeExamMutation(req, data);
+    if (!authz.ok) {
+      return res.status(authz.status).json({ success: false, message: authz.message });
+    }
+
+    const result = new ExamResult(data);
     await result.save();
 
-    // Notify student when an exam result is created/recorded
     const io = req.app.get('io');
     if (io && result.type === 'student' && result.studentId) {
       const subject = result.subject || 'bài thi';
@@ -57,9 +229,10 @@ router.post('/', authMiddleware, async (req, res) => {
         content: `Kết quả ${subject} của bạn đã được cập nhật. Vào mục Phòng Thi để xem chi tiết.`,
         receivers: String(result.studentId),
         payload: { examResultId: String(result._id), studentId: String(result.studentId), subject },
-        link: '/student/exam'
+        link: '/student/exam',
       });
-      io.emit('data:refresh', { type: 'examResult', id: result._id });
+      const scope = await resolveExamRefreshScope(result);
+      emitDataRefresh(io, { type: 'examResult', id: result._id }, scope);
     }
 
     if (io && result.type === 'teacher' && result.teacherId) {
@@ -82,10 +255,15 @@ router.post('/', authMiddleware, async (req, res) => {
         title: result.passed ? '🎉 Bạn đã thi đạt' : '📊 Kết quả thi đã ghi nhận',
         content: `${subject}: ${outcome}.`,
         receivers: String(result.teacherId),
-        payload: { examResultId: String(result._id), teacherId: String(result.teacherId), passed: Boolean(result.passed) },
+        payload: {
+          examResultId: String(result._id),
+          teacherId: String(result.teacherId),
+          passed: Boolean(result.passed),
+        },
         link: '/teacher/test',
       });
-      io.emit('data:refresh', { type: 'examResult', id: result._id });
+      const scope = await resolveExamRefreshScope(result);
+      emitDataRefresh(io, { type: 'examResult', id: result._id }, scope);
     }
 
     res.status(201).json({ success: true, data: result });
@@ -94,15 +272,16 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/exam-results/:id — cập nhật (chấm điểm)
-router.put('/:id', authMiddleware, async (req, res) => {
+// PUT /api/exam-results/:id
+router.put('/:id', examGuard('update'), async (req, res) => {
   try {
-    if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Không có quyền cập nhật kết quả thi' });
-    }
-
     const existing = await ExamResult.findById(req.params.id);
     if (!existing) return res.status(404).json({ success: false, message: 'Không tìm thấy kết quả thi' });
+
+    const authz = await authorizeExamMutation(req, existing);
+    if (!authz.ok) {
+      return res.status(authz.status).json({ success: false, message: authz.message });
+    }
 
     const resolveScore = (doc) => {
       if (typeof doc.essayScore === 'number' && !Number.isNaN(doc.essayScore)) return doc.essayScore;
@@ -113,12 +292,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
     };
 
     const oldScore = resolveScore(existing);
-    const patch = { ...req.body };
-    delete patch.scoreHistory;
+    const patch = pickExamResultUpdate(req.body);
 
     const result = await ExamResult.findByIdAndUpdate(
       req.params.id,
-      patch,
+      { $set: patch },
       { returnDocument: 'after', runValidators: true },
     );
 
@@ -161,7 +339,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const refreshed = await ExamResult.findById(req.params.id);
     const notifyDoc = refreshed || result;
 
-    // Notify student when result is graded/updated (pass/fail, score)
     const io = req.app.get('io');
     if (io && notifyDoc.type === 'student' && notifyDoc.studentId) {
       const subject = notifyDoc.subject || 'bài thi';
@@ -178,10 +355,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
         title: `📊 Kết quả thi: ${outcome}`,
         content: parts ? `${subject} — ${outcome}. ${parts}.` : `${subject} — ${outcome}.`,
         receivers: String(notifyDoc.studentId),
-        payload: { examResultId: String(notifyDoc._id), studentId: String(notifyDoc.studentId), subject, passed: Boolean(notifyDoc.passed) },
-        link: '/student/exam'
+        payload: {
+          examResultId: String(notifyDoc._id),
+          studentId: String(notifyDoc.studentId),
+          subject,
+          passed: Boolean(notifyDoc.passed),
+        },
+        link: '/student/exam',
       });
-      io.emit('data:refresh', { type: 'examResult', id: notifyDoc._id });
+      const scope = await resolveExamRefreshScope(notifyDoc);
+      emitDataRefresh(io, { type: 'examResult', id: notifyDoc._id }, scope);
     }
 
     if (io && notifyDoc.type === 'teacher' && notifyDoc.teacherId) {
@@ -204,10 +387,15 @@ router.put('/:id', authMiddleware, async (req, res) => {
         title: `📊 Kết quả thi: ${notifyDoc.passed ? '✅ ĐẠT' : '❌ CHƯA ĐẠT'}`,
         content: `${subject} — ${outcome}.`,
         receivers: String(notifyDoc.teacherId),
-        payload: { examResultId: String(notifyDoc._id), teacherId: String(notifyDoc.teacherId), passed: Boolean(notifyDoc.passed) },
+        payload: {
+          examResultId: String(notifyDoc._id),
+          teacherId: String(notifyDoc.teacherId),
+          passed: Boolean(notifyDoc.passed),
+        },
         link: '/teacher/test',
       });
-      io.emit('data:refresh', { type: 'examResult', id: notifyDoc._id });
+      const scope = await resolveExamRefreshScope(notifyDoc);
+      emitDataRefresh(io, { type: 'examResult', id: notifyDoc._id }, scope);
     }
 
     res.json({ success: true, data: refreshed || result });
@@ -216,19 +404,34 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/exam-results/:id — xóa
-router.delete('/:id', authMiddleware, async (req, res) => {
-  try {
-    if (!['admin', 'staff'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Không có quyền xóa kết quả thi' });
-    }
+// DELETE /api/exam-results/:id
+router.delete(
+  '/:id',
+  examGuard('delete'),
+  async (req, res) => {
+    try {
+      const existing = await ExamResult.findById(req.params.id);
+      if (!existing) return res.status(404).json({ success: false, message: 'Không tìm thấy kết quả thi' });
 
-    const result = await ExamResult.findByIdAndDelete(req.params.id);
-    if (!result) return res.status(404).json({ success: false, message: 'Không tìm thấy kết quả thi' });
-    res.json({ success: true, message: 'Đã xóa kết quả thi' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+      const { branchId } = await resolveSubjectBranch(existing);
+      const br = branchAllows(req, branchId);
+      if (!br.ok) {
+        return res.status(br.status).json({ success: false, message: br.message });
+      }
+
+      await ExamResult.findByIdAndDelete(req.params.id);
+      res.json({ success: true, message: 'Đã xóa kết quả thi' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+);
 
 module.exports = router;
+module.exports._test = {
+  pickExamResultCreate,
+  pickExamResultUpdate,
+  branchAllows,
+  authorizeExamMutation,
+  resolveSubjectBranch,
+};

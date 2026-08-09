@@ -1,0 +1,1 @@
+'use strict'; class ApiScopeResolver { resolve() {} } module.exports = ApiScopeResolver;

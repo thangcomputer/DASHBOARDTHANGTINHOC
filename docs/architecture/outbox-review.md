@@ -1,0 +1,1 @@
+# Outbox Infrastructure\nProvides the atomic guarantees missing when EventBus publishes out-of-band.

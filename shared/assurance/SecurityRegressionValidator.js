@@ -1,0 +1,1 @@
+'use strict'; class SecurityRegressionValidator { validate() {} } module.exports = SecurityRegressionValidator;

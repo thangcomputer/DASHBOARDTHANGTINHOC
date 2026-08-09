@@ -1,0 +1,1 @@
+'use strict'; class TimestampValidator { validate() {} } module.exports = TimestampValidator;

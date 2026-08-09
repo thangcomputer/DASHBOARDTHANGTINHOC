@@ -1,0 +1,1 @@
+'use strict'; class IncidentResponseGuide { execute() {} } module.exports = IncidentResponseGuide;

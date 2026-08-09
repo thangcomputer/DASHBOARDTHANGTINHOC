@@ -1,0 +1,1 @@
+'use strict'; class EvidenceCollector { collect() {} } module.exports = EvidenceCollector;

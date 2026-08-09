@@ -1,14 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const SystemLog = require('../models/SystemLog');
-const { authMiddleware, isAdmin } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
+const { policyShadowSystemLog } = require('../middleware/policyShadowSystemLog');
+const { systemLogsCutoverGate } = require('../middleware/systemLogsCutoverGate');
 const {
   SYSTEM_LOG_VISIBLE_ACTIONS,
   isVisibleSystemLogAction,
 } = require('../constants/systemLogActions');
 
+/**
+ * Phase 7.7 — Controlled cutover for /api/system-logs ONLY.
+ *
+ * Default / not allowlisted:
+ *   auth → policyShadowSystemLog → Legacy isAdmin (via systemLogsCutoverGate) → handler
+ *
+ * Opt-in Policy-primary:
+ *   POLICY_CUTOVER_ENABLED=true
+ *   POLICY_CUTOVER_ROUTES=…,system-logs
+ *
+ * Rollback: remove system-logs from ROUTES (keep backups,monitoring,tenants) or ENABLED=false.
+ * Legacy isAdmin retained inside systemLogsCutoverGate. Handlers retain all mutations.
+ * Permission taxonomy view-logs keys are NOT HTTP gates on these routes (parity with Legacy).
+ */
+const guard = (action) => [
+  authMiddleware,
+  policyShadowSystemLog(action),
+  systemLogsCutoverGate(action),
+];
+
 // GET /api/system-logs — chỉ các hành động trong allowlist
-router.get('/', authMiddleware, isAdmin, async (req, res) => {
+router.get('/', guard('list'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
@@ -40,7 +62,7 @@ router.get('/', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // POST /api/system-logs — ghi tay (xuất báo cáo client-side, …)
-router.post('/', authMiddleware, isAdmin, async (req, res) => {
+router.post('/', guard('create'), async (req, res) => {
   try {
     const action = String(req.body?.action || '').trim();
     if (!isVisibleSystemLogAction(action)) {
@@ -77,7 +99,7 @@ router.post('/', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // DELETE /api/system-logs/:id
-router.delete('/:id', authMiddleware, isAdmin, async (req, res) => {
+router.delete('/:id', guard('delete'), async (req, res) => {
   try {
     const deleted = await SystemLog.findByIdAndDelete(req.params.id);
     if (!deleted) {

@@ -1,0 +1,1 @@
+'use strict'; class SecurityChecklist { verify() {} } module.exports = SecurityChecklist;

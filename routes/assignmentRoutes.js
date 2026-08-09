@@ -8,12 +8,22 @@ const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, branchFilter, userHasPermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
+const { emitDataRefresh } = require('../utils/realtimeEmit');
+const { pickAssignmentCreate, pickAssignmentUpdate } = require('../utils/assignmentDto');
+const { studentMatchesTeacher } = require('../services/enrollmentService');
+const { policyShadowAssignment } = require('../middleware/policyShadowAssignment');
+const { assignmentsCutoverGate } = require('../middleware/assignmentsCutoverGate');
 
 const router = express.Router();
 
+/** Phase 7.23: policyShadowAssignment → assignmentsCutoverGate */
+function assignmentsGuard(action) {
+  return [policyShadowAssignment(action), assignmentsCutoverGate(action)];
+}
 async function assignmentHasGradedSubmission(assignmentId) {
   const n = await Submission.countDocuments({ assignmentId, status: 'graded' });
   return n > 0;
@@ -83,7 +93,7 @@ const upload = multer({
 });
 
 // ─── Tải file đính kèm/nộp bài chung ─────────────────────────────────────────
-router.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
+router.post('/upload', [authMiddleware, ...assignmentsGuard('upload')], upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Chưa chọn file để tải lên' });
@@ -120,7 +130,7 @@ router.use((err, req, res, next) => {
 });
 
 // ─── Lấy danh sách giao bài (Theo Course) ──────────────────────────────────
-router.get('/course/:courseId', authMiddleware, async (req, res) => {
+router.get('/course/:courseId', [authMiddleware, ...assignmentsGuard('get_course')], async (req, res) => {
   try {
     const assignments = await Assignment.find({ courseId: req.params.courseId }).sort({ createdAt: -1 });
     
@@ -137,7 +147,7 @@ router.get('/course/:courseId', authMiddleware, async (req, res) => {
 });
 
 // ─── Lấy Bài tập cho Học viên (Kèm Submission cá nhân) ─────────────────────
-router.get('/student/:studentId/course/:courseId', authMiddleware, async (req, res) => {
+router.get('/student/:studentId/course/:courseId', [authMiddleware, ...assignmentsGuard('get_student')], async (req, res) => {
   try {
     // Authorization: Học viên chỉ xem bài của mình
     if (req.user.role === 'student' && String(req.user.id || req.user._id) !== String(req.params.studentId)) {
@@ -190,7 +200,7 @@ router.get('/student/:studentId/course/:courseId', authMiddleware, async (req, r
 });
 
 // ─── Giáo viên tạo bài tập ─────────────────────────────────────────────────
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', [authMiddleware, branchFilter, ...assignmentsGuard('create')], async (req, res) => {
   try {
     if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Không có quyền tạo bài tập' });
@@ -200,7 +210,14 @@ router.post('/', authMiddleware, async (req, res) => {
     const userId = String(req.user.id || req.user._id || '');
     const userName = String(req.user.name || req.user.fullName || req.user.username || '').trim();
 
-    const payload = { ...req.body };
+    if (role === 'admin' || role === 'staff') {
+      const allowed = await userHasPermission(req.user, PERMISSIONS.MANAGE_STUDENTS);
+      if (!allowed) {
+        return res.status(403).json({ success: false, message: 'Thiếu quyền quản lý học viên để giao bài' });
+      }
+    }
+
+    const payload = pickAssignmentCreate(req.body);
     if (payload.studentId != null && String(payload.studentId).trim() !== '') {
       const rawSid = String(payload.studentId).trim();
       if (mongoose.Types.ObjectId.isValid(rawSid)) {
@@ -211,13 +228,41 @@ router.post('/', authMiddleware, async (req, res) => {
     } else {
       payload.studentId = null;
     }
-    // Teacher tạo bài → tự gán teacherId nếu thiếu
-    if (role === 'teacher' && !payload.teacherId) payload.teacherId = userId;
-    // Admin/Staff tạo bài → teacherId optional (null)
-    if ((role === 'admin' || role === 'staff') && (payload.teacherId === 'admin' || payload.teacherId === '')) {
+
+    // Teacher luôn gán chính mình — không tin teacherId client
+    if (role === 'teacher') {
+      payload.teacherId = userId;
+    } else if (payload.teacherId === 'admin' || payload.teacherId === '') {
       payload.teacherId = null;
     }
 
+    if (payload.status != null && !['active', 'closed'].includes(String(payload.status))) {
+      return res.status(400).json({ success: false, message: 'status không hợp lệ' });
+    }
+
+    if (payload.studentId) {
+      const targetStudent = await Student.findById(payload.studentId)
+        .select('branchId teacherId enrollments')
+        .lean();
+      if (!targetStudent) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+      }
+      if (req.userBranchId && targetStudent.branchId
+          && String(targetStudent.branchId) !== String(req.userBranchId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Không có quyền giao bài cho học viên chi nhánh khác',
+        });
+      }
+      if (role === 'teacher' && !studentMatchesTeacher(targetStudent, userId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Chỉ giao bài cho học viên mình phụ trách',
+        });
+      }
+    }
+
+    // Server-owned attribution — never from client
     payload.assignedById = userId;
     payload.assignedByRole = role;
     payload.assignedByName = userName || (role === 'teacher' ? 'Giảng viên' : 'Admin');
@@ -230,7 +275,7 @@ router.post('/', authMiddleware, async (req, res) => {
       if (newAssignment.studentId) {
         io.to(`student_${String(newAssignment.studentId)}`).emit('assignment:new', newAssignment);
       } else {
-        io.to(`course_${req.body.courseId}`).emit('assignment:new', newAssignment);
+        io.to(`course_${newAssignment.courseId}`).emit('assignment:new', newAssignment);
       }
 
       try {
@@ -241,10 +286,13 @@ router.post('/', authMiddleware, async (req, res) => {
         if (newAssignment.studentId) {
           studentIds = [newAssignment.studentId.toString()];
           studentDoc = await Student.findById(newAssignment.studentId)
-            .select('name teacherId enrollments course')
+            .select('name teacherId enrollments course branchId')
             .lean();
         } else {
-          const students = await Student.find({ course: req.body.courseId }, '_id name teacherId enrollments').lean();
+          const students = await Student.find(
+            { course: newAssignment.courseId },
+            '_id name teacherId enrollments branchId',
+          ).lean();
           studentIds = students.map((s) => s._id.toString());
           studentDoc = students[0] || null;
         }
@@ -296,7 +344,14 @@ router.post('/', authMiddleware, async (req, res) => {
           }
         }
 
-        io.emit('data:refresh', { type: 'assignment', action: 'create' });
+        const refreshUsers = [
+          ...(studentIds || []),
+          newAssignment.teacherId,
+        ].filter(Boolean);
+        emitDataRefresh(io, { type: 'assignment', action: 'create' }, {
+          branchId: studentDoc?.branchId || null,
+          userIds: refreshUsers,
+        });
       } catch (e) {
         logger.error('Error sending notif for new assignment:', e);
       }
@@ -308,10 +363,40 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // ─── Giáo viên cập nhật bài tập ────────────────────────────────────────────
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', [authMiddleware, branchFilter, ...assignmentsGuard('update')], async (req, res) => {
   try {
     if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Không có quyền chỉnh sửa bài tập' });
+    }
+
+    const role = String(req.user.role || '').toLowerCase();
+    const userId = String(req.user.id || req.user._id || '');
+
+    if (role === 'admin' || role === 'staff') {
+      const allowed = await userHasPermission(req.user, PERMISSIONS.MANAGE_STUDENTS);
+      if (!allowed) {
+        return res.status(403).json({ success: false, message: 'Thiếu quyền quản lý học viên' });
+      }
+    }
+
+    const existing = await Assignment.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Không tìm thấy bài tập' });
+
+    if (role === 'teacher' && existing.teacherId && String(existing.teacherId) !== userId) {
+      return res.status(403).json({ success: false, message: 'Chỉ sửa bài tập của chính bạn' });
+    }
+
+    if (existing.studentId) {
+      const stu = await Student.findById(existing.studentId).select('branchId teacherId enrollments').lean();
+      if (req.userBranchId && stu?.branchId && String(stu.branchId) !== String(req.userBranchId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Không có quyền sửa bài tập học viên chi nhánh khác',
+        });
+      }
+      if (role === 'teacher' && stu && !studentMatchesTeacher(stu, userId)) {
+        return res.status(403).json({ success: false, message: 'Không có quyền sửa bài tập học viên này' });
+      }
     }
 
     if (await assignmentHasGradedSubmission(req.params.id)) {
@@ -321,12 +406,42 @@ router.put('/:id', authMiddleware, async (req, res) => {
       });
     }
 
-    const updated = await Assignment.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
+    const updates = pickAssignmentUpdate(req.body);
+    if (role === 'teacher') {
+      updates.teacherId = userId;
+    }
+    if (updates.status != null && !['active', 'closed'].includes(String(updates.status))) {
+      return res.status(400).json({ success: false, message: 'status không hợp lệ' });
+    }
+    // Never allow client to rewrite attribution
+    delete updates.assignedById;
+    delete updates.assignedByRole;
+    delete updates.assignedByName;
+
+    if (updates.studentId) {
+      const targetStudent = await Student.findById(updates.studentId).select('branchId teacherId enrollments').lean();
+      if (!targetStudent) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+      }
+      if (req.userBranchId && targetStudent.branchId
+          && String(targetStudent.branchId) !== String(req.userBranchId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Không có quyền gán học viên chi nhánh khác',
+        });
+      }
+    }
+
+    const updated = await Assignment.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { returnDocument: 'after' },
+    );
     if (!updated) return res.status(404).json({ success: false, message: 'Không tìm thấy bài tập' });
-    
+
     const io = req.app.get('io');
     if (io) io.to(`course_${updated.courseId}`).emit('assignment:updated', updated);
-    
+
     return res.json({ success: true, data: updated });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server' });
@@ -334,7 +449,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 });
 
 // ─── Giáo viên xóa bài tập ─────────────────────────────────────────────────
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', [authMiddleware, ...assignmentsGuard('delete')], async (req, res) => {
   try {
     if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Không có quyền xóa bài tập' });
@@ -362,7 +477,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 });
 
 // ─── Học viên nộp bài ──────────────────────────────────────────────────────
-router.post('/:id/submit', authMiddleware, async (req, res) => {
+router.post('/:id/submit', [authMiddleware, ...assignmentsGuard('submit')], async (req, res) => {
   try {
     const { studentId, teacherId, submittedFileUrl } = req.body;
 
@@ -445,7 +560,10 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
           link: `/teacher#assignments?courseId=${assignment?.courseId || ''}&assignmentId=${req.params.id}&studentId=${studentId}`
         });
 
-        io.emit('data:refresh', { type: 'submission', action: 'create' });
+        emitDataRefresh(io, { type: 'submission', action: 'create' }, {
+          branchId: student?.branchId || null,
+          userIds: [studentId, resolvedTeacherId].filter(Boolean),
+        });
       }
     }
     return res.json({ success: true, data: submission });
@@ -455,7 +573,7 @@ router.post('/:id/submit', authMiddleware, async (req, res) => {
 });
 
 // ─── Giáo viên chấm điểm ───────────────────────────────────────────────────
-router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) => {
+router.put('/submissions/:submissionId/grade', [authMiddleware, ...assignmentsGuard('grade')], async (req, res) => {
   try {
     if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Không có quyền chấm điểm' });
@@ -566,8 +684,16 @@ router.put('/submissions/:submissionId/grade', authMiddleware, async (req, res) 
           receivers: submission.studentId.toString(),
           link: '/student#materials'
         });
-        
-        io.emit('data:refresh', { type: 'submission', id: submission._id });
+
+        let branchId = null;
+        try {
+          const stu = await Student.findById(submission.studentId).select('branchId').lean();
+          branchId = stu?.branchId || null;
+        } catch { /* ignore */ }
+        emitDataRefresh(io, { type: 'submission', id: submission._id }, {
+          branchId,
+          userIds: [submission.studentId, submission.teacherId, assignment?.teacherId].filter(Boolean),
+        });
       } catch (e) {
         logger.error('Error sending notif for grading:', e);
       }

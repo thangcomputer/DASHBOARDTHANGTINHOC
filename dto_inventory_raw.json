@@ -1,0 +1,1411 @@
+{
+  "AiApplicationService": {},
+  "AnalyticsApplicationService": {},
+  "AttendanceApplicationService": {
+    "get_teacher_teacherId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "teacherId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_student_studentId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "studentId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_scheduleId": {
+      "body": [
+        "hasUnreadStudentNote",
+        "studentNote"
+      ],
+      "query": [],
+      "params": [
+        "scheduleId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_scheduleId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "scheduleId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "patch_scheduleId_cancel": {
+      "body": [],
+      "query": [],
+      "params": [
+        "scheduleId"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "BlogApplicationService": {
+    "get_posts": {
+      "body": [],
+      "query": [
+        "limit",
+        "page",
+        "q",
+        "target"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_posts_slugOrId": {
+      "body": [],
+      "query": [
+        "manage"
+      ],
+      "params": [
+        "slugOrId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_manage_posts": {
+      "body": [],
+      "query": [
+        "limit",
+        "page",
+        "q",
+        "status"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_manage_posts_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_manage_posts": {
+      "body": [
+        "attachments",
+        "content",
+        "contentHtml",
+        "excerpt",
+        "slug",
+        "status",
+        "targetAudience",
+        "thumbnailUrl",
+        "title"
+      ],
+      "query": [],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "put_manage_posts_id": {
+      "body": [
+        "attachments",
+        "content",
+        "contentHtml",
+        "excerpt",
+        "slug",
+        "status",
+        "targetAudience",
+        "thumbnailUrl",
+        "title"
+      ],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_manage_posts_id_publish": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_manage_posts_id_hide": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_manage_posts_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "BranchApplicationService": {},
+  "ChatApplicationService": {
+    "get_conversations_userId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "userId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_search_userId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "userId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_conversationId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "conversationId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_upload": {
+      "body": [],
+      "query": [],
+      "params": [],
+      "file": true,
+      "files": false
+    },
+    "post_root": {
+      "body": [
+        "conversationId"
+      ],
+      "query": [],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_groups_user_userId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "userId"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "CmsApplicationService": {
+    "get_forms": {
+      "body": [],
+      "query": [
+        "status"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_forms_idOrSlug": {
+      "body": [],
+      "query": [],
+      "params": [
+        "idOrSlug"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_forms_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_forms_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_forms_idOrSlug_submit": {
+      "body": [],
+      "query": [],
+      "params": [
+        "idOrSlug"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_forms_idOrSlug_submit_auth": {
+      "body": [],
+      "query": [],
+      "params": [
+        "idOrSlug"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_forms_id_submissions": {
+      "body": [],
+      "query": [
+        "limit",
+        "page"
+      ],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_forms_id_submissions_export": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_reports": {
+      "body": [],
+      "query": [
+        "page"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "put_reports_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_reports_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_reports_id_run": {
+      "body": [],
+      "query": [
+        "limit"
+      ],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_reports_id_export": {
+      "body": [],
+      "query": [
+        "limit"
+      ],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_root": {
+      "body": [],
+      "query": [
+        "definitionKey",
+        "limit",
+        "page",
+        "status",
+        "sync"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_advance": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "AssignmentApplicationService": {
+    "post_upload": {
+      "body": [],
+      "query": [],
+      "params": [],
+      "file": true,
+      "files": false
+    },
+    "get_course_courseId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "courseId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_student_studentId_course_courseId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "courseId",
+        "studentId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_root": {
+      "body": [
+        "courseId"
+      ],
+      "query": [],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "put_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_submit": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_submissions_submissionId_grade": {
+      "body": [],
+      "query": [],
+      "params": [
+        "submissionId"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "CourseApplicationService": {
+    "get_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "patch_id_price": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_restore": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "TeachingGuideApplicationService": {
+    "get_root": {
+      "body": [],
+      "query": [
+        "category"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    }
+  },
+  "TrainingApplicationService": {
+    "get_courses_id_lessons": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "EnrollmentApplicationService": {
+    "post_id_enrollments": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_enrollments_enrollmentId_settings": {
+      "body": [],
+      "query": [],
+      "params": [
+        "enrollmentId",
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_enrollments_enrollmentId_pay": {
+      "body": [],
+      "query": [],
+      "params": [
+        "enrollmentId",
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id_enrollments_enrollmentId": {
+      "body": [
+        "refundAmount"
+      ],
+      "query": [],
+      "params": [
+        "enrollmentId",
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "EvaluationApplicationService": {
+    "get_teacher_teacherId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "teacherId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_read": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "ExamResultApplicationService": {
+    "get_root": {
+      "body": [],
+      "query": [
+        "limit",
+        "page",
+        "type"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "put_id": {
+      "body": [
+        "essayNote"
+      ],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "ProctorApplicationService": {
+    "get_events_me": {
+      "body": [],
+      "query": [
+        "limit"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_events_userId": {
+      "body": [],
+      "query": [
+        "limit"
+      ],
+      "params": [
+        "userId"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "QuizApplicationService": {
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_submit": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "FeedApplicationService": {
+    "get_root": {
+      "body": [],
+      "query": [
+        "limit",
+        "page"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "post_root": {
+      "body": [
+        "images"
+      ],
+      "query": [],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_comments": {
+      "body": [
+        "images",
+        "parentId"
+      ],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id_comments_commentId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "commentId",
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "FileApplicationService": {
+    "post_upload": {
+      "body": [],
+      "query": [],
+      "params": [],
+      "file": true,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "BiApplicationService": {
+    "get_overview": {
+      "body": [],
+      "query": [
+        "branchId",
+        "period"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_export": {
+      "body": [],
+      "query": [
+        "branchId",
+        "period"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    }
+  },
+  "FinanceApplicationService": {
+    "get_summary": {
+      "body": [],
+      "query": [
+        "from",
+        "studentId",
+        "to"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_ledger": {
+      "body": [],
+      "query": [
+        "from",
+        "limit",
+        "page",
+        "status",
+        "studentId",
+        "teacherId",
+        "to",
+        "type"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_students_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_ledger_id_void": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_reconcile": {
+      "body": [],
+      "query": [
+        "from",
+        "to"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "post_snapshots_rebuild": {
+      "body": [],
+      "query": [
+        "from",
+        "to"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "post_students_id_sync_cache": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "InvoiceApplicationService": {
+    "get_stats": {
+      "body": [],
+      "query": [
+        "branch_id"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_id_pdf": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_pdf_queue": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_email": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "NotificationApplicationService": {},
+  "PaymentApplicationService": {
+    "get_payment_status_studentId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "studentId"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "BackupApplicationService": {
+    "get_root": {
+      "body": [],
+      "query": [
+        "limit",
+        "page"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_id_download": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "MonitoringApplicationService": {},
+  "SystemLogApplicationService": {
+    "get_root": {
+      "body": [],
+      "query": [
+        "limit",
+        "page"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "AuthApplicationService": {
+    "get_zalo_callback3": {
+      "body": [],
+      "query": [
+        "state"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    }
+  },
+  "SupportApplicationService": {},
+  "SystemApplicationService": {
+    "post_upload_popup_image4": {
+      "body": [],
+      "query": [],
+      "params": [],
+      "file": true,
+      "files": false
+    },
+    "post_upload_invoice_signature5": {
+      "body": [],
+      "query": [],
+      "params": [],
+      "file": true,
+      "files": false
+    },
+    "put_training_data11": {
+      "body": [
+        "trainingData"
+      ],
+      "query": [],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "put_student_training_data13": {
+      "body": [
+        "studentTrainingData"
+      ],
+      "query": [],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "delete_exam_subjects_id19": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_upload_logo21": {
+      "body": [],
+      "query": [],
+      "params": [],
+      "file": true,
+      "files": false
+    },
+    "post_upload_favicon22": {
+      "body": [],
+      "query": [],
+      "params": [],
+      "file": true,
+      "files": false
+    },
+    "post_upload_invoice_logo23": {
+      "body": [],
+      "query": [],
+      "params": [],
+      "file": true,
+      "files": false
+    }
+  },
+  "StudentApplicationService": {
+    "get_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_id_full_detail": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_root": {
+      "body": [
+        "branchCode",
+        "branchId",
+        "course",
+        "courseId",
+        "email",
+        "isFirstLogin",
+        "password",
+        "phone",
+        "remainingSessions",
+        "status",
+        "teacherId",
+        "totalSessions",
+        "zalo"
+      ],
+      "query": [],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "put_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_exam_progress": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "patch_id_price": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_pay": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_refund": {
+      "body": [
+        "amount"
+      ],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_unlock_exam": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_lock_exam": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_assign_teacher": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_reset_today_attendance": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_reset_history": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_pay_teacher": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "EmployeeApplicationService": {
+    "get_root": {
+      "body": [],
+      "query": [
+        "position",
+        "search",
+        "status"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "post_root": {
+      "body": [
+        "gender"
+      ],
+      "query": [],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "put_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_pay": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_id_payroll": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "StaffApplicationService": {
+    "put_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "TeacherApplicationService": {
+    "get_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id": {
+      "body": [
+        "specialty",
+        "subjectIds"
+      ],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_score": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_approve": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "post_id_submit_practical": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_reject": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_id_finance": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "get_id_finance_pending": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_finance_pay_flexible": {
+      "body": [
+        "idempotencyKey"
+      ],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_finance_pay_all": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  },
+  "TenantApplicationService": {},
+  "TransactionApplicationService": {
+    "get_stats": {
+      "body": [],
+      "query": [
+        "branch_id"
+      ],
+      "params": [],
+      "file": false,
+      "files": false
+    },
+    "get_teacher_teacherId": {
+      "body": [],
+      "query": [],
+      "params": [
+        "teacherId"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_confirm": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "put_id_cancel": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    },
+    "delete_id": {
+      "body": [],
+      "query": [],
+      "params": [
+        "id"
+      ],
+      "file": false,
+      "files": false
+    }
+  }
+}

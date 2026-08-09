@@ -1,0 +1,1 @@
+'use strict'; class KeyRotationManager { rotate() {} } module.exports = KeyRotationManager;

@@ -7,6 +7,14 @@ const ScheduleHistory = require('../models/ScheduleHistory');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const logger = require('../config/logger');
 const { studentMatchesTeacher } = require('../services/enrollmentService');
+const { emitScheduleEvent, emitDataRefresh } = require('../utils/realtimeEmit');
+const { policyShadowSchedule } = require('../middleware/policyShadowSchedule');
+const { schedulesCutoverGate } = require('../middleware/schedulesCutoverGate');
+
+/** Phase 7.21: policyShadowSchedule → schedulesCutoverGate */
+function schedulesGuard(action) {
+  return [policyShadowSchedule(action), schedulesCutoverGate(action)];
+}
 
 function isAdminOrStaff(user) {
   const role = String(user?.role || '').toLowerCase();
@@ -231,7 +239,11 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
             receivers: student._id.toString(),
             link: '/student/exam',
           });
-          io.emit('exam:unlocked', {
+          emitScheduleEvent(io, {
+            branchId: student.branchId,
+            studentId: student._id,
+            teacherId: student.teacherId,
+          }, 'exam:unlocked', {
             studentId: student._id.toString(),
             studentName: student.name,
           });
@@ -245,7 +257,10 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
             totalRequired,
           });
         }
-        io.emit('data:refresh', { type: 'student', id: student._id });
+        emitDataRefresh(io, { type: 'student', id: student._id }, {
+          branchId: student.branchId,
+          userIds: [student._id, student.teacherId].filter(Boolean),
+        });
       }
       logger.info(`✅ [SCHEDULE] Unlock thi cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
       return;
@@ -306,7 +321,11 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
           receivers: student._id.toString(),
           link: '/student/exam',
         });
-        io.emit('exam:unlocked', {
+        emitScheduleEvent(io, {
+          branchId: student.branchId,
+          studentId: student._id,
+          teacherId: student.teacherId,
+        }, 'exam:unlocked', {
           studentId: student._id.toString(),
           studentName: student.name,
         });
@@ -320,7 +339,10 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
           totalRequired: c.totalRequired,
         });
       }
-      io.emit('data:refresh', { type: 'student', id: student._id });
+      emitDataRefresh(io, { type: 'student', id: student._id }, {
+        branchId: student.branchId,
+        userIds: [student._id, student.teacherId].filter(Boolean),
+      });
     }
   } catch (err) {
     logger.error('[SCHEDULE] checkAndUnlockExam error:', err.message);
@@ -329,7 +351,7 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
 
 // ─── GET /api/schedules ────────────────────────────────────────────────────────
 // Admin/Staff: Lấy lịch học (STAFF chỉ thấy chi nhánh của mình)
-router.get('/', [authMiddleware, branchFilter], async (req, res) => {
+router.get('/', [authMiddleware, branchFilter, ...schedulesGuard('list')], async (req, res) => {
   try {
     const { status, date, teacherId, studentId, page, limit } = req.query;
     const filter = { ...req.branchFilter }; // {} for admin, {branchId:...} for staff
@@ -356,7 +378,7 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
     }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(2000, Math.max(1, parseInt(limit, 10) || 500));
+    const limitNum = Math.min(500, Math.max(1, parseInt(limit, 10) || 200));
     const skip = (pageNum - 1) * limitNum;
 
     const [schedules, total] = await Promise.all([
@@ -383,7 +405,7 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
 });
 
 // ─── GET /api/schedules/stats (branch-aware, secured) ────────────────────────
-router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
+router.get('/stats', [authMiddleware, branchFilter, ...schedulesGuard('stats')], async (req, res) => {
   try {
     const role = String(req.user.role || '').toLowerCase();
     let bf = { ...req.branchFilter };
@@ -413,7 +435,7 @@ router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
 
 // ─── GET /api/schedules/teacher/:teacherId ─────────────────────────────────────
 // Giảng viên xem lịch dạy của mình
-router.get('/teacher/:teacherId', authMiddleware, async (req, res) => {
+router.get('/teacher/:teacherId', [authMiddleware, ...schedulesGuard('get_teacher')], async (req, res) => {
   try {
     const { status, month } = req.query;
     const filter = { teacherId: req.params.teacherId };
@@ -446,7 +468,7 @@ router.get('/teacher/:teacherId', authMiddleware, async (req, res) => {
 
 // ─── GET /api/schedules/student/:studentId ─────────────────────────────────────
 // Học viên xem lịch học của mình
-router.get('/student/:studentId', authMiddleware, async (req, res) => {
+router.get('/student/:studentId', [authMiddleware, ...schedulesGuard('get_student')], async (req, res) => {
   try {
     const role = String(req.user.role || '').toLowerCase();
     // Authorization: HV chỉ xem mình; Admin/Staff xem; Teacher chỉ HV được gán
@@ -482,7 +504,7 @@ router.get('/student/:studentId', authMiddleware, async (req, res) => {
 
 // ─── POST /api/schedules ───────────────────────────────────────────────────────
 // Giảng viên / Admin tạo lịch học mới
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res) => {
   try {
     // Authorization: Chỉ Admin, Staff, hoặc Teacher mới được tạo lịch
     if (!['admin', 'staff', 'teacher'].includes(req.user.role)) {
@@ -614,6 +636,7 @@ router.post('/', authMiddleware, async (req, res) => {
       status: status || 'scheduled',
       is_paid_to_teacher: finalPaidToTeacher,
       paymentStatus: paymentStatus,
+      branchId: studentDoc?.branchId || null,
     });
 
     // Ghi bản ghi ScheduleHistory kèm tên học viên
@@ -673,15 +696,23 @@ router.post('/', authMiddleware, async (req, res) => {
         }
       }
 
-      io.emit('schedule:new', {
+      const scheduleScope = {
+        branchId: schedule.branchId || studentDoc?.branchId || null,
+        teacherId: schedule.teacherId,
+        studentId: studentId,
+      };
+      emitScheduleEvent(io, scheduleScope, 'schedule:new', {
         studentId: studentId.toString(),
         schedule,
       });
-      io.emit('data:refresh', { type: 'schedule', action: 'create' });
+      emitDataRefresh(io, { type: 'schedule', action: 'create' }, {
+        branchId: schedule.branchId,
+        userIds: [schedule.teacherId, studentId].filter(Boolean),
+      });
 
-      // 🔐 Nếu là điểm danh (status=completed), broadcast lock cho toàn hệ thống
+      // Điểm danh: lock attendance scoped (không broadcast toàn hệ thống)
       if (schedule.status === 'completed') {
-        io.emit('attendance:locked', {
+        emitScheduleEvent(io, scheduleScope, 'attendance:locked', {
           studentId: studentId.toString(),
           course: courseFinal,
           lockedUntil: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
@@ -717,7 +748,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // ─── PUT /api/schedules/:scheduleId ───────────────────────────────────────────
 // Cập nhật lịch học (hoàn thành, huỷ, điểm danh...)
-router.put('/:scheduleId', authMiddleware, async (req, res) => {
+router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async (req, res) => {
   try {
     // Authorization:
     // - Admin/Staff/Teacher: sửa lịch đầy đủ
@@ -832,7 +863,11 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
          });
 
          // Emit cancelled event so clients refetch / update UI immediately
-         io.emit('schedule:cancelled', { scheduleId: schedule._id.toString(), reason: cancelReason });
+         emitScheduleEvent(io, {
+           branchId: schedule.branchId,
+           teacherId: schedule.teacherId,
+           studentId: schedule.studentId,
+         }, 'schedule:cancelled', { scheduleId: schedule._id.toString(), reason: cancelReason });
       }
       else if ((startTime && startTime !== schedule.startTime) || (date && new Date(date).getTime() !== schedule.date.getTime())) {
          NotificationService.send(io, {
@@ -902,8 +937,12 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
            userId: schedule.teacherId.toString()
          });
 
-         // Báo cập nhật calendar
-         io.emit('schedule:updated', schedule._id);
+         // Báo cập nhật calendar (scoped)
+         emitScheduleEvent(io, {
+           branchId: schedule.branchId,
+           teacherId: schedule.teacherId,
+           studentId: schedule.studentId,
+         }, 'schedule:updated', schedule._id);
       } catch (e) {
          logger.error('[SCHEDULE] Notify error:', e);
       }
@@ -917,7 +956,7 @@ router.put('/:scheduleId', authMiddleware, async (req, res) => {
 });
 
 // ─── DELETE /api/schedules/:scheduleId ────────────────────────────────────────
-router.delete('/:scheduleId', authMiddleware, async (req, res) => {
+router.delete('/:scheduleId', [authMiddleware, ...schedulesGuard('delete')], async (req, res) => {
   try {
     // Authorization: Chỉ Admin/Staff mới được xóa vĩnh viễn lịch
     if (!['admin', 'staff'].includes(req.user.role)) {
@@ -934,7 +973,7 @@ router.delete('/:scheduleId', authMiddleware, async (req, res) => {
 });
 
 // ─── PATCH /api/schedules/:scheduleId/cancel ─────────────────────────────────
-router.patch('/:scheduleId/cancel', authMiddleware, async (req, res) => {
+router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')], async (req, res) => {
   try {
     const { reason = '' } = req.body;
     const schedule = await Schedule.findById(req.params.scheduleId);
@@ -988,7 +1027,11 @@ router.patch('/:scheduleId/cancel', authMiddleware, async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('schedule:cancelled', { scheduleId: schedule._id.toString(), reason });
+      emitScheduleEvent(io, {
+        branchId: schedule.branchId,
+        teacherId: schedule.teacherId,
+        studentId: schedule.studentId,
+      }, 'schedule:cancelled', { scheduleId: schedule._id.toString(), reason });
 
       // Notify student with reason (if any)
       if (schedule.studentId) {
@@ -1020,7 +1063,7 @@ router.patch('/:scheduleId/cancel', authMiddleware, async (req, res) => {
 
 // ─── GET /api/schedules/history/:teacherId ───────────────────────────────
 // Trả về lịch sử sắp lịch của 1 giảng viên (cho Admin xem)
-router.get('/history/:teacherId', authMiddleware, async (req, res) => {
+router.get('/history/:teacherId', [authMiddleware, ...schedulesGuard('history')], async (req, res) => {
   try {
     const { teacherId } = req.params;
     if (!isAdminOrStaff(req.user) && String(req.user.id) !== String(teacherId)) {

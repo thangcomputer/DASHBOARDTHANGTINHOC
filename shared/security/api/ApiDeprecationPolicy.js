@@ -1,0 +1,1 @@
+'use strict'; class ApiDeprecationPolicy { check() {} } module.exports = ApiDeprecationPolicy;

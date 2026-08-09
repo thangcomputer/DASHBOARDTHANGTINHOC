@@ -68,7 +68,7 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       branches,
       byCourse,
       dayRevenueRows,
-      newStudents,
+      newStudentsByDay,
     ] = await Promise.all([
       Student.countDocuments(bf),
       Student.countDocuments({ ...bf, paid: true }),
@@ -87,10 +87,15 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       Branch.find({ isActive: { $ne: false } }).select('name code').lean(),
       revenueByCourseFromLedger({ branchId, from: start, to: end, limit: 8 }),
       listNetRevenueByDay({ branchId, from: start, to: end }),
-      Student.find({
-        ...bf,
-        createdAt: { $gte: start, $lte: end },
-      }).select('createdAt').lean(),
+      Student.aggregate([
+        { $match: { ...bf, createdAt: { $gte: start, $lte: end } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     const refundAmount = ledgerNow.refunds || 0;
@@ -115,10 +120,10 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
       };
       cur.setDate(cur.getDate() + 1);
     }
-    newStudents.forEach((s) => {
-      const key = new Date(s.createdAt).toISOString().slice(0, 10);
+    (newStudentsByDay || []).forEach((row) => {
+      const key = row._id;
       if (!dayMap[key]) return;
-      dayMap[key].students += 1;
+      dayMap[key].students += Number(row.count) || 0;
     });
     (dayRevenueRows || []).forEach((row) => {
       const key = row.dateKey;
@@ -171,6 +176,8 @@ async function getOverview({ period = '1m', branchFilter = {}, queryBranch = 'al
   });
 }
 
+const { sanitizeCsvField } = require('../shared/utils/csv');
+
 function overviewToCsv(data) {
   const k = data.kpis || {};
   const lines = [
@@ -199,7 +206,7 @@ function overviewToCsv(data) {
   lines.push('');
   lines.push('course,count,revenue');
   (data.byCourse || []).forEach((c) => {
-    const name = String(c.course || '').replace(/,/g, ' ');
+    const name = sanitizeCsvField(c.course);
     lines.push(name + ',' + c.count + ',' + c.revenue);
   });
   return lines.join('\n');

@@ -1,0 +1,1 @@
+'use strict'; class CreateLearningPathCommand {} module.exports = CreateLearningPathCommand;

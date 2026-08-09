@@ -1,0 +1,1 @@
+'use strict'; const DomainEvent = require('../../shared/events/DomainEvent'); class ${ModelName}Event extends DomainEvent {} module.exports = { ${ModelName}Event };

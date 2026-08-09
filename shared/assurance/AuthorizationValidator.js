@@ -1,0 +1,1 @@
+'use strict'; class AuthorizationValidator { validate() {} } module.exports = AuthorizationValidator;

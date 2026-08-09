@@ -209,20 +209,22 @@ export async function downloadTeacherQuestionsExcelTemplate(sectionId = 'excel',
   XLSX.writeFile(wb, `Mau_GV_${suffix}_${safe}.xlsx`);
 }
 
+import { sanitizeCsvField } from './csvSanitizer';
+
 function questionRowToExcel(q, subjectLabel) {
   const isEssay = String(q.type).toLowerCase() === 'essay';
   const opts = q.options || ['', '', '', ''];
   return {
     Loại: isEssay ? 'Tự luận' : 'Trắc nghiệm',
-    'Phần thi': subjectLabel || q.section || '',
+    'Phần thi': sanitizeCsvField(subjectLabel || q.section || ''),
     'Độ khó': q.difficulty === 'easy' ? 'Cơ bản' : q.difficulty === 'hard' ? 'Nâng cao' : 'Trung bình',
-    'Câu hỏi': q.q || '',
-    'Đáp án A': opts[0] || '',
-    'Đáp án B': opts[1] || '',
-    'Đáp án C': opts[2] || '',
-    'Đáp án D': opts[3] || '',
+    'Câu hỏi': sanitizeCsvField(q.q || ''),
+    'Đáp án A': sanitizeCsvField(opts[0] || ''),
+    'Đáp án B': sanitizeCsvField(opts[1] || ''),
+    'Đáp án C': sanitizeCsvField(opts[2] || ''),
+    'Đáp án D': sanitizeCsvField(opts[3] || ''),
     'Đáp án đúng': isEssay ? '' : ['A', 'B', 'C', 'D'][q.correct] || 'A',
-    'Gợi ý trả lời (tự luận)': q.sampleAnswer || '',
+    'Gợi ý trả lời (tự luận)': sanitizeCsvField(q.sampleAnswer || ''),
   };
 }
 

@@ -1,0 +1,23 @@
+[
+  {
+    "module": "Auth",
+    "func": "Login API",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Teacher A đăng nhập API thành công"
+  },
+  {
+    "module": "Security",
+    "func": "Admin API Access",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Bị chặn quyền truy cập API tài chính đúng như thiết kế"
+  },
+  {
+    "module": "Students",
+    "func": "Read API",
+    "result": "Passed",
+    "severity": "Critical",
+    "description": "Teacher chỉ lấy được học viên của mình"
+  }
+]

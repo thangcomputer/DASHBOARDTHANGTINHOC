@@ -1,0 +1,101 @@
+{
+  "phase": "8.18",
+  "status": "BLOCKED",
+  "environment": "LOCAL",
+  "startTime": "2026-08-09T08:06:15.317Z",
+  "endTime": "2026-08-09T08:06:15.317Z",
+  "duration": 0,
+  "runtimeHookEvents": 0,
+  "uniqueCorrelationIds": 0,
+  "match": 0,
+  "mismatch": 0,
+  "unknown": 0,
+  "unsupported": 0,
+  "observerErrors": 0,
+  "dualCheckErrors": 0,
+  "criticalMismatchCount": 0,
+  "mismatchReasons": {},
+  "coverage": {
+    "runtimeCoverage": "NOT_AVAILABLE",
+    "observedRoles": [],
+    "observedPermissions": [],
+    "observedScopes": [],
+    "missingRoles": [
+      "SUPER_ADMIN",
+      "HIGH_ADMIN",
+      "ADMIN_STAFF",
+      "SUPPORT_AGENT",
+      "TEACHER",
+      "STUDENT",
+      "LEGACY_PRINCIPAL",
+      "LEGACY_ROOT",
+      "legacy_root"
+    ],
+    "missingPermissions": [
+      "manage_hr",
+      "view_teachers",
+      "manage_teachers",
+      "view_branch_revenue",
+      "manage_finance",
+      "manage_student_training",
+      "manage_training",
+      "manage_staff"
+    ],
+    "note": "No RUNTIME observations",
+    "channels": {
+      "STATIC": {
+        "countedAsProductionEvidence": false,
+        "requests": 0
+      },
+      "SYNTHETIC": {
+        "countedAsProductionEvidence": false,
+        "requests": 0
+      },
+      "RUNTIME": {
+        "countedAsProductionEvidence": true,
+        "hookEvents": 0,
+        "note": "hook events may be observe+dual-check; not unique HTTP"
+      }
+    }
+  },
+  "financeSafety": {
+    "status": "NOT_EVALUATED",
+    "critical": 0
+  },
+  "hrSafety": {
+    "status": "NOT_EVALUATED",
+    "critical": 0
+  },
+  "teacherSafety": {
+    "status": "NOT_EVALUATED",
+    "critical": 0
+  },
+  "studentTrainingSafety": {
+    "status": "NOT_EVALUATED",
+    "critical": 0
+  },
+  "legacyPrincipalSafety": {
+    "status": "NOT_EVALUATED",
+    "critical": 0
+  },
+  "finalDecisionInvariant": "PASS",
+  "productionSoakEvidence": "NOT_AVAILABLE",
+  "productionRuntimeExecuted": false,
+  "enterprisePrimaryReady": false,
+  "ENTERPRISE_PRIMARY_READY": "NO",
+  "blockers": [
+    "environment_not_staging_or_production",
+    "production_runtime_not_executed",
+    "observe_flag_off",
+    "dual_check_flag_off",
+    "soak_window_flag_off",
+    "insufficient_runtime_events_0_lt_10",
+    "runtime_coverage_not_available"
+  ],
+  "flags": {
+    "observe": false,
+    "dualCheck": false,
+    "soakWindow": false
+  },
+  "note": "Phase 8.18: LOCAL/SYNTHETIC/STATIC are never production evidence. AVAILABLE requires explicit STAGING/PRODUCTION runtime soak."
+}

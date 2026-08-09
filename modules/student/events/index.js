@@ -1,0 +1,16 @@
+'use strict';
+const { eventBus } = require('../../../shared/cqrs');
+eventBus.subscribe('StudentPost_importCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPost_rootCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPut_idCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPut_id_exam_progressCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPatch_id_priceCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPut_id_payCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPut_id_refundCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPut_id_unlock_examCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPut_id_lock_examCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPut_id_assign_teacherCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentDelete_idCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPost_id_reset_today_attendanceCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPost_id_reset_historyCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });
+eventBus.subscribe('StudentPut_id_pay_teacherCompleted', { handle: async (event) => console.log('[Event Handler]', event.eventName, 'processed successfully.') });

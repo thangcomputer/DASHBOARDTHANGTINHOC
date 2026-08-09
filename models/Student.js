@@ -294,5 +294,5 @@ StudentSchema.index({ paid: 1, updatedAt: -1 });     // SePay webhook — HV ch�
 StudentSchema.index({ studentCode: 1 }, { sparse: true }); // Match mã HV trong nội dung CK
 StudentSchema.index({ branchId: 1, status: 1 });
 
-const Student = mongoose.model('Student', StudentSchema);
+const Student = mongoose.models.Student || mongoose.model('Student', StudentSchema);
 module.exports = Student;

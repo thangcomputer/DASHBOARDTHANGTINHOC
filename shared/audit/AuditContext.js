@@ -1,0 +1,1 @@
+'use strict'; class AuditContext { constructor() { this.context = {}; } } module.exports = AuditContext;

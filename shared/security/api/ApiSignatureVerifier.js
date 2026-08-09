@@ -1,0 +1,1 @@
+'use strict'; class ApiSignatureVerifier { verify() {} } module.exports = ApiSignatureVerifier;

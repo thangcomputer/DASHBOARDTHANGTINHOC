@@ -1,0 +1,1 @@
+'use strict'; class KeyCompromiseProcedure { execute() {} } module.exports = KeyCompromiseProcedure;

@@ -1,0 +1,26 @@
+[
+  {
+    "module": "Đăng nhập",
+    "func": "Authentication",
+    "result": "Passed",
+    "severity": "Low",
+    "description": "Đăng nhập thành công cả 2 roles",
+    "steps": "Support & Student Login"
+  },
+  {
+    "module": "Chat (Support -> Student)",
+    "func": "Send Message",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn có Emoji từ Support",
+    "steps": "Gõ tin nhắn -> Enter"
+  },
+  {
+    "module": "Chat (Support -> Student)",
+    "func": "Realtime Receive",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Học viên nhận được tin nhắn tức thì không cần F5",
+    "steps": "Check DOM Student"
+  }
+]

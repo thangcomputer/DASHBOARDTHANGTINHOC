@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import useSWR, { mutate } from 'swr';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useModal } from '../../../utils/Modal.jsx';
@@ -34,6 +34,7 @@ const TAB_PERMISSION = {
  * Composes useAdminStudents and useAdminTeachers with shared finance/logs/training state.
  */
 export function useAdminDashboardState() {
+  const outlet = useOutletContext() || {};
   const {
     teachers: globalTeachers,
     addTeacher: ctxAddTeacher,
@@ -87,7 +88,8 @@ export function useAdminDashboardState() {
   const { selectedBranchId, branches } = useBranch();
   const safeBranches = (branches || []).filter(Boolean);
 
-  const _sess = JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
+  const _sess = outlet.session
+    || JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
   const isSuperAdmin = _sess?.id === 'admin' || _sess?.adminRole === 'SUPER_ADMIN';
   const isHighAdmin = _sess?.adminRole === 'HIGH_ADMIN';
 
@@ -125,7 +127,7 @@ export function useAdminDashboardState() {
       navigate('/admin#dashboard', { replace: true });
     }
     return undefined;
-  }, [activeTab, isSuperAdmin, navigate, location.pathname]);
+  }, [activeTab, isSuperAdmin, isHighAdmin, navigate, location.pathname, _sess]);
 
   const [deleteModal, setDeleteModal] = useState(null);
   const [resetPwModal, setResetPwModal] = useState(null);

@@ -1,0 +1,1 @@
+'use strict'; class SecureSerializer { serialize() {} } module.exports = SecureSerializer;

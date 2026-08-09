@@ -1,0 +1,1 @@
+'use strict'; class SensitiveFieldDetector { detect() {} } module.exports = SensitiveFieldDetector;

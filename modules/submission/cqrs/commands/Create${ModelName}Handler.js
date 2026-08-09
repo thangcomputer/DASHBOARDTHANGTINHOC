@@ -1,0 +1,1 @@
+'use strict'; class Create${ModelName}Handler { handle() {} } module.exports = Create${ModelName}Handler;

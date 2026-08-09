@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   VIEW_EVALUATIONS:   'view_evaluations',     // Đánh giá nội bộ
   VIEW_BRANCH_REVENUE:'view_branch_revenue',  // ⭐ Xem báo cáo doanh thu (chỉ chi nhánh)
   VIEW_TEACHERS:      'view_teachers',        // ⭐ Xem danh sách giảng viên (read-only)
+  MANAGE_TEACHERS:    'manage_teachers',      // Duyệt / chấm / từ chối giảng viên
 };
 
 /** Enum các adminRole — dùng chung thay vì hard-code string */
@@ -30,7 +31,7 @@ export const ADMIN_ROLES = {
 
 /** Quyền mặc định khi tạo HIGH_ADMIN — có thể điều chỉnh sau */
 export const HIGH_ADMIN_DEFAULT_PERMISSIONS = [
-  'manage_students', 'view_teachers', 'manage_schedule',
+  'manage_students', 'view_teachers', 'manage_teachers', 'manage_schedule',
   'manage_messages', 'manage_finance', 'view_branch_revenue',
   'manage_training', 'manage_student_training',
   'manage_hr', 'manage_blog',
@@ -44,6 +45,7 @@ export const SUPPORT_DEFAULT_PERMISSIONS = ['manage_messages'];
 export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.MANAGE_STUDENTS,     label: 'Quản lý Học viên',           desc: 'Xem, thêm, sửa, xóa học viên' },
   { key: PERMISSIONS.VIEW_TEACHERS,       label: '👁️ Xem Giảng viên',         desc: 'Chỉ xem danh sách GV chi nhánh (không thêm/sửa/xóa)' },
+  { key: PERMISSIONS.MANAGE_TEACHERS,     label: 'Quản lý Giảng viên',         desc: 'Duyệt, chấm điểm, từ chối hồ sơ giảng viên' },
   { key: PERMISSIONS.MANAGE_SCHEDULE,     label: 'Lịch dạy',                   desc: 'Quản lý lịch giảng dạy' },
   { key: PERMISSIONS.MANAGE_MESSAGES,     label: '💬 Hộp thư & Support',       desc: 'Chat, tư vấn, xem và gửi tin nhắn hỗ trợ học viên / giảng viên' },
   { key: PERMISSIONS.MANAGE_FINANCE,      label: 'Tài chính (toàn quyền)',     desc: 'Thu chi, thanh toán lương, quản lý tài chính' },

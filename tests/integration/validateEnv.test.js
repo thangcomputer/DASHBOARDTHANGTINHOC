@@ -45,6 +45,10 @@ test('validateEnv: passes with strong distinct secrets and CLIENT_URL', () => {
   process.env.CLIENT_URL = 'https://example.com';
   process.env.SEPAY_API_KEY = 'test-sepay-key';
   process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'user';
+  process.env.SMTP_PASS = 'pass';
   assert.doesNotThrow(() => freshValidateEnv()());
 });
 
@@ -54,6 +58,10 @@ test('validateEnv: requires REDIS_URL in production', () => {
   process.env.JWT_REFRESH_SECRET = STRONG2;
   process.env.CLIENT_URL = 'https://example.com';
   process.env.SEPAY_API_KEY = 'test-sepay-key';
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'user';
+  process.env.SMTP_PASS = 'pass';
   delete process.env.REDIS_URL;
   assert.throws(() => freshValidateEnv()(), /REDIS_URL is required/);
 });
@@ -75,4 +83,115 @@ test('validateEnv: production requires longer (>=32) secrets', () => {
   process.env.JWT_REFRESH_SECRET = 'b'.repeat(20);
   process.env.CLIENT_URL = 'https://example.com';
   assert.throws(() => freshValidateEnv()(), /at least 32 characters/);
+});
+
+test('validateEnv: CQRS in production requires ALLOW_CQRS_IN_PRODUCTION (fail-closed)', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.JWT_SECRET = STRONG;
+  process.env.JWT_REFRESH_SECRET = STRONG2;
+  process.env.CLIENT_URL = 'https://example.com';
+  process.env.SEPAY_API_KEY = 'test-sepay-key';
+  process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'user';
+  process.env.SMTP_PASS = 'pass';
+  process.env.ENABLE_CQRS_STUDENT_CREATE = 'true';
+  process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/db?replicaSet=rs0';
+  delete process.env.ALLOW_CQRS_IN_PRODUCTION;
+  assert.throws(() => freshValidateEnv()(), /ALLOW_CQRS_IN_PRODUCTION/);
+  delete process.env.ENABLE_CQRS_STUDENT_CREATE;
+});
+
+test('validateEnv: CQRS in production without opt-in rejects even before replica check', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.JWT_SECRET = STRONG;
+  process.env.JWT_REFRESH_SECRET = STRONG2;
+  process.env.CLIENT_URL = 'https://example.com';
+  process.env.SEPAY_API_KEY = 'test-sepay-key';
+  process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'user';
+  process.env.SMTP_PASS = 'pass';
+  process.env.ENABLE_CQRS_STUDENT_CREATE = 'true';
+  process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/dashboardthangtinhoc';
+  delete process.env.ALLOW_CQRS_IN_PRODUCTION;
+  assert.throws(() => freshValidateEnv()(), /ALLOW_CQRS_IN_PRODUCTION|CQRS flags are enabled/);
+  delete process.env.ENABLE_CQRS_STUDENT_CREATE;
+});
+
+test('validateEnv: CQRS with ALLOW_CQRS_IN_PRODUCTION still requires replicaSet', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.JWT_SECRET = STRONG;
+  process.env.JWT_REFRESH_SECRET = STRONG2;
+  process.env.CLIENT_URL = 'https://example.com';
+  process.env.SEPAY_API_KEY = 'test-sepay-key';
+  process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'user';
+  process.env.SMTP_PASS = 'pass';
+  process.env.ALLOW_CQRS_IN_PRODUCTION = 'true';
+  process.env.ENABLE_CQRS_STUDENT_CREATE = 'true';
+  process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/dashboardthangtinhoc';
+  assert.throws(() => freshValidateEnv()(), /replica set/i);
+  delete process.env.ENABLE_CQRS_STUDENT_CREATE;
+  delete process.env.ALLOW_CQRS_IN_PRODUCTION;
+});
+
+test('validateEnv: CQRS accepts replicaSet URI in production only with ALLOW opt-in', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.JWT_SECRET = STRONG;
+  process.env.JWT_REFRESH_SECRET = STRONG2;
+  process.env.CLIENT_URL = 'https://example.com';
+  process.env.SEPAY_API_KEY = 'test-sepay-key';
+  process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'user';
+  process.env.SMTP_PASS = 'pass';
+  process.env.ALLOW_CQRS_IN_PRODUCTION = 'true';
+  process.env.ENABLE_CQRS_STUDENT_CREATE = 'true';
+  process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/db?replicaSet=rs0';
+  assert.doesNotThrow(() => freshValidateEnv()());
+  delete process.env.ENABLE_CQRS_STUDENT_CREATE;
+  delete process.env.ALLOW_CQRS_IN_PRODUCTION;
+});
+
+test('validateEnv: CQRS accepts mongodb+srv with ALLOW opt-in', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.JWT_SECRET = STRONG;
+  process.env.JWT_REFRESH_SECRET = STRONG2;
+  process.env.CLIENT_URL = 'https://example.com';
+  process.env.SEPAY_API_KEY = 'test-sepay-key';
+  process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'user';
+  process.env.SMTP_PASS = 'pass';
+  process.env.ALLOW_CQRS_IN_PRODUCTION = 'true';
+  process.env.ENABLE_CQRS_INVOICE = 'true';
+  process.env.MONGODB_URI = 'mongodb+srv://user:pass@cluster.mongodb.net/db';
+  assert.doesNotThrow(() => freshValidateEnv()());
+  delete process.env.ENABLE_CQRS_INVOICE;
+  delete process.env.ALLOW_CQRS_IN_PRODUCTION;
+});
+
+test('validateEnv: production with all CQRS flags OFF passes without ALLOW opt-in', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.JWT_SECRET = STRONG;
+  process.env.JWT_REFRESH_SECRET = STRONG2;
+  process.env.CLIENT_URL = 'https://example.com';
+  process.env.SEPAY_API_KEY = 'test-sepay-key';
+  process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'user';
+  process.env.SMTP_PASS = 'pass';
+  process.env.ENABLE_CQRS_TEACHER = 'false';
+  process.env.ENABLE_CQRS_STUDENT_CREATE = 'false';
+  process.env.ENABLE_CQRS_INVOICE = 'false';
+  delete process.env.ALLOW_CQRS_IN_PRODUCTION;
+  assert.doesNotThrow(() => freshValidateEnv()());
 });

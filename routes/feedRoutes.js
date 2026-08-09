@@ -6,7 +6,14 @@ const router = express.Router();
 const FeedPost = require('../models/FeedPost');
 const { REACTION_TYPES } = require('../models/FeedPost');
 const { authMiddleware } = require('../middleware/auth');
+const { policyShadowFeed } = require('../middleware/policyShadowFeed');
+const { feedCutoverGate } = require('../middleware/feedCutoverGate');
 const logger = require('../config/logger');
+
+/** Phase 7.17: auth → policyShadowFeed → feedCutoverGate → handler */
+function feedGuard(action) {
+  return [policyShadowFeed(action), feedCutoverGate(action)];
+}
 
 function normalizeRole(role) {
   const r = String(role || '').toLowerCase();
@@ -130,7 +137,7 @@ const uploadFeed = multer({
   },
 });
 
-router.post('/upload', authMiddleware, (req, res) => {
+router.post('/upload', authMiddleware, ...feedGuard('upload'), (req, res) => {
   uploadFeed.array('images', 6)(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       return res.status(400).json({ success: false, message: err.code === 'LIMIT_FILE_SIZE' ? 'Anh qua lon (toi da 5MB)' : err.message });
@@ -148,7 +155,7 @@ router.post('/upload', authMiddleware, (req, res) => {
   });
 });
 
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, ...feedGuard('list'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
@@ -168,7 +175,7 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, ...feedGuard('create'), async (req, res) => {
   try {
     const content = String(req.body?.content || '').trim();
     const images = Array.isArray(req.body?.images)
@@ -202,7 +209,7 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, ...feedGuard('delete_post'), async (req, res) => {
   try {
     const post = await FeedPost.findById(req.params.id);
     if (!post) return res.status(404).json({ success: false, message: 'Khong tim thay bai viet' });
@@ -260,7 +267,7 @@ async function applyReaction(req, res, typeIn) {
   return res.json({ success: true, data });
 }
 
-router.post('/:id/like', authMiddleware, async (req, res) => {
+router.post('/:id/like', authMiddleware, ...feedGuard('like'), async (req, res) => {
   try {
     return await applyReaction(req, res, req.body?.type || 'heart');
   } catch (err) {
@@ -269,7 +276,7 @@ router.post('/:id/like', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/:id/react', authMiddleware, async (req, res) => {
+router.post('/:id/react', authMiddleware, ...feedGuard('react'), async (req, res) => {
   try {
     return await applyReaction(req, res, req.body?.type || 'heart');
   } catch (err) {
@@ -278,7 +285,7 @@ router.post('/:id/react', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/:id/comments', authMiddleware, async (req, res) => {
+router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req, res) => {
   try {
     if (!feedRateOk(req.user.id, 'comment', 20, 60 * 1000)) {
       return res.status(429).json({ success: false, message: 'Binh luan qua nhanh, thu lai sau' });
@@ -347,7 +354,7 @@ router.post('/:id/comments', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/:id/comments/:commentId', authMiddleware, async (req, res) => {
+router.delete('/:id/comments/:commentId', authMiddleware, ...feedGuard('delete_comment'), async (req, res) => {
   try {
     const post = await FeedPost.findById(req.params.id);
     if (!post) return res.status(404).json({ success: false, message: 'Khong tim thay bai viet' });

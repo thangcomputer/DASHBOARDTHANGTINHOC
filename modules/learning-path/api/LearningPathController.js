@@ -1,0 +1,1 @@
+'use strict'; class LearningPathController { async create(req, res) { return res.json({}); } } module.exports = LearningPathController;

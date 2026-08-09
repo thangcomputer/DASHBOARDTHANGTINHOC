@@ -1,0 +1,44 @@
+[
+  {
+    "module": "Auth",
+    "func": "Login Internal",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Đăng nhập thành công dưới quyền Admin Staff A"
+  },
+  {
+    "module": "Students",
+    "func": "Read List",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Staff A CHỈ thấy học viên Branch A"
+  },
+  {
+    "module": "Students",
+    "func": "Update Branch B",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Bị chặn thành công khi cố sửa học viên Branch B (Status 403)"
+  },
+  {
+    "module": "Employees",
+    "func": "Read List",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Staff A CHỈ thấy nhân viên Branch A"
+  },
+  {
+    "module": "Finance",
+    "func": "Global Stats",
+    "result": "Passed",
+    "severity": "Medium",
+    "description": "Staff A xem được thống kê (cần chắc chắn đây chỉ là của Branch A)"
+  },
+  {
+    "module": "Teachers",
+    "func": "Create for Branch B",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Bị từ chối vì thiếu quyền (RBAC chặn STAFF tạo teacher, chỉ có SuperAdmin) (Status 403)"
+  }
+]

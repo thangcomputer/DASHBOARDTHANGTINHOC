@@ -1,0 +1,1 @@
+'use strict'; class LearningPathRepository { save() {} } module.exports = LearningPathRepository;

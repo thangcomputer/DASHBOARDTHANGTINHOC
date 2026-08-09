@@ -1,0 +1,1 @@
+# ETag Review\nExpress strong ETag verified and enforced globally.

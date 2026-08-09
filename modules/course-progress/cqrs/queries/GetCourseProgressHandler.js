@@ -1,0 +1,1 @@
+'use strict'; class GetCourseProgressHandler { handle() {} } module.exports = GetCourseProgressHandler;

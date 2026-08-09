@@ -1,0 +1,1 @@
+'use strict'; class ClassificationRegistry { register() {} getMetadata() {} } module.exports = ClassificationRegistry;

@@ -103,6 +103,8 @@ export const downloadInvoicePDF = async (invoiceId, invoiceCode = 'HD') => {
 const getTodayStr = () =>
   new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
 
+import { sanitizeCsvField } from './csvSanitizer';
+
 /**
  * Tạo file Excel đơn giản từ dữ liệu JSON (phía frontend, không cần backend)
  * Dùng khi không có endpoint export riêng
@@ -117,7 +119,7 @@ export const exportToCSV = (data, filename = 'export.csv') => {
       headers.map(h => {
         const val = row[h] ?? '';
         // Escape dấu phẩy và ngoặc kép
-        const str = String(val).replace(/"/g, '""');
+        const str = sanitizeCsvField(val).replace(/"/g, '""');
         return str.includes(',') || str.includes('"') || str.includes('\n')
           ? `"${str}"`
           : str;

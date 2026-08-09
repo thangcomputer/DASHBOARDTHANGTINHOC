@@ -1,0 +1,1 @@
+'use strict'; class CourseProgressController { async get(req, res) { return res.json({}); } } module.exports = CourseProgressController;

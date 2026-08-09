@@ -1,0 +1,1 @@
+'use strict'; class CompletionPolicy { evaluate() {} } module.exports = CompletionPolicy;

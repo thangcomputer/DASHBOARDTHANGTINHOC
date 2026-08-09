@@ -6,10 +6,24 @@ const express = require('express');
 const bcrypt  = require('bcryptjs');
 const Teacher = require('../models/Teacher');
 const Branch  = require('../models/Branch');
-const { authMiddleware, checkPermission } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
+const { policyShadowStaff } = require('../middleware/policyShadowStaff');
+const { staffCutoverGate } = require('../middleware/staffCutoverGate');
 
 const router = express.Router();
-const guard  = [authMiddleware, checkPermission('manage_staff')];
+/**
+ * Phase 7.28 — Controlled cutover for LIVE /api/staff ONLY.
+ *
+ * Flow: auth → policyShadowStaff → staffCutoverGate → handler
+ * Legacy manage_staff permission gate retained inside staffCutoverGate.
+ * SUPER/HIGH create/update/delete messages remain handler-owned on Legacy;
+ * Policy mirrors those gates when primary. Mutations stay handler-owned.
+ */
+const guard = (action) => [
+  authMiddleware,
+  policyShadowStaff(action),
+  staffCutoverGate(action),
+];
 
 function actorIsRootSuperAdmin(req) {
   return req.user?.id === 'admin';
@@ -32,7 +46,7 @@ async function sanitizeAssignedPermissions(req, permissions) {
 }
 
 // ── GET /api/staff ─────────────────────────────────────────────────────────────
-router.get('/', guard, async (req, res) => {
+router.get('/', guard('list'), async (req, res) => {
   try {
     const staff = await Teacher.find({ role: { $in: ['admin', 'staff'] } })
       .select('-password -refreshToken').sort({ createdAt: -1 });
@@ -43,7 +57,7 @@ router.get('/', guard, async (req, res) => {
 });
 
 // ── POST /api/staff ────────────────────────────────────────────────────────────
-router.post('/', guard, async (req, res) => {
+router.post('/', guard('create'), async (req, res) => {
   try {
     const { name, phone, password, adminRole = 'STAFF', permissions = [], branchId, gender } = req.body;
 
@@ -112,7 +126,7 @@ router.post('/', guard, async (req, res) => {
 });
 
 // ── PUT /api/staff/:id ─────────────────────────────────────────────────────────
-router.put('/:id', guard, async (req, res) => {
+router.put('/:id', guard('update'), async (req, res) => {
   try {
     const target = await Teacher.findById(req.params.id).select('adminRole').lean();
     if (!target) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
@@ -206,7 +220,7 @@ router.put('/:id', guard, async (req, res) => {
 });
 
 // ── DELETE /api/staff/:id ──────────────────────────────────────────────────────
-router.delete('/:id', guard, async (req, res) => {
+router.delete('/:id', guard('delete'), async (req, res) => {
   try {
     if (req.params.id === req.user.id)
       return res.status(400).json({ success: false, message: 'Không thể tự xóa chính mình' });

@@ -1,0 +1,1 @@
+'use strict'; class SecretScanner { scan() {} } module.exports = SecretScanner;

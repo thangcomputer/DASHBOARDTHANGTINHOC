@@ -1,0 +1,1 @@
+'use strict'; class PasswordService { verify() {} hash() {} rehashIfNeeded() {} algorithmVersion() { return 'argon2id-v1'; } } module.exports = PasswordService;

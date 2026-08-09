@@ -1,0 +1,156 @@
+[
+  {
+    "module": "Auth",
+    "func": "Login All",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Đăng nhập thành công 5 roles"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Super Admin -> Branch Admin",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Branch Admin -> Super Admin",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Super Admin -> Support",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Support -> Super Admin",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Super Admin -> Teacher Msg",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Teacher Msg -> Super Admin",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Super Admin -> Student Msg",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Student Msg -> Super Admin",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Branch Admin -> Support",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Support -> Branch Admin",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Branch Admin -> Teacher Msg",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Teacher Msg -> Branch Admin",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Branch Admin -> Student Msg",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Student Msg -> Branch Admin",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Support -> Teacher Msg",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Teacher Msg -> Support",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Support -> Student Msg",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Student Msg -> Support",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Teacher Msg -> Student Msg",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Message Flow",
+    "func": "Student Msg -> Teacher Msg",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Gửi tin nhắn thành công"
+  },
+  {
+    "module": "Security",
+    "func": "Unauthorized Read",
+    "result": "Passed",
+    "severity": "Critical",
+    "description": "Student bị chặn xem đoạn chat của Admin"
+  }
+]

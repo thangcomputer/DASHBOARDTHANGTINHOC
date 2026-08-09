@@ -1,0 +1,1 @@
+# Environment Validation Review\nConfig/schema ensures fail-fast on missing critical vars.

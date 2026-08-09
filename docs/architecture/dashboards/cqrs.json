@@ -1,0 +1,9 @@
+{
+  "title": "CQRS Commands and Queries Dashboard",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Total CQRS Commands and Queries"
+    }
+  ]
+}

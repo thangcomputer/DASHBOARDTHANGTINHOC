@@ -1,0 +1,1 @@
+# Security Observability\nAll RBAC, Policy Denials, and Login failures trigger `Metrics.inc` and structured logs with Trace Context.

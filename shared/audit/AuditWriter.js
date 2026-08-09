@@ -1,0 +1,1 @@
+'use strict'; class AuditWriter { write() {} } module.exports = AuditWriter;

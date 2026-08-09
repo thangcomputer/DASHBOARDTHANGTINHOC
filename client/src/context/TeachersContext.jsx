@@ -16,7 +16,7 @@ function teachersKey(user) {
 async function fetchTeachers(key) {
   const [, scope, teacherId] = key;
   if (scope === 'admin') {
-    const res = await api.teachers.getAll();
+    const res = await api.teachers.getAll({ page: 1, limit: 200 });
     return res?.success ? res.data.map(mapTeacher) : [];
   }
   const res = await api.teachers.getById(teacherId);

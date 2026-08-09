@@ -1,0 +1,1 @@
+'use strict'; class AuditProof { generate() {} } module.exports = AuditProof;

@@ -1,0 +1,1 @@
+# Docker Review\nDockerfile optimized with multi-stage builds and non-root execution.

@@ -6,18 +6,40 @@ const express    = require('express');
 const router     = express.Router();
 const Employee   = require('../models/Employee');
 const PayrollLog = require('../models/PayrollLog');
-const { authMiddleware, isAdmin, branchFilter } = require('../middleware/auth');
+const { authMiddleware, branchFilter } = require('../middleware/auth');
+const { policyShadowEmployee } = require('../middleware/policyShadowEmployee');
+const { employeesCutoverGate } = require('../middleware/employeesCutoverGate');
+
+/**
+ * Phase 7.29 — Controlled cutover for LIVE /api/employees ONLY.
+ *
+ * Flow: auth → branchFilter (DATA SCOPE + trusted userBranchId)
+ *   → policyShadowEmployee → employeesCutoverGate → handler
+ * Legacy MANAGE_HR permission gate retained inside employeesCutoverGate.
+ * Cross-branch mutation messages remain handler-owned on Legacy;
+ * Policy mirrors those gates when primary.
+ * Employee/PayrollLog mutations + emitEmployeesChanged remain handler-owned.
+ */
+const hrGuard = (action) => [
+  authMiddleware,
+  branchFilter,
+  policyShadowEmployee(action),
+  employeesCutoverGate(action),
+];
 
 function emitEmployeesChanged(req, action = 'update') {
   const io = req.app.get('io');
   if (!io) return;
-  io.emit('employees:updated', { action });
-  io.emit('data:refresh', { type: 'employees', action });
+  const { emitBranch, emitDataRefresh } = require('../utils/realtimeEmit');
+  // Trusted scope from auth branchFilter — không tin body.branchId
+  const branchId = req.userBranchId || null;
+  emitBranch(io, branchId, 'employees:updated', { action });
+  emitDataRefresh(io, { type: 'employees', action }, { branchId });
 }
 
 // ─── GET /api/employees ─────────────────────────────────────────────────────────
 // Danh sách nhân sự (branch-aware)
-router.get('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.get('/', hrGuard('list'), async (req, res) => {
   try {
     const filter = { ...req.branchFilter };
     if (req.query.position && req.query.position !== 'all') filter.position = req.query.position;
@@ -38,7 +60,7 @@ router.get('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
 });
 
 // ─── GET /api/employees/stats ────────────────────────────────────────────────────
-router.get('/stats', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.get('/stats', hrGuard('stats'), async (req, res) => {
   try {
     const bf = { ...req.branchFilter };
     const total  = await Employee.countDocuments({ ...bf, status: 'active' });
@@ -72,7 +94,7 @@ router.get('/stats', [authMiddleware, isAdmin, branchFilter], async (req, res) =
 });
 
 // ─── POST /api/employees ────────────────────────────────────────────────────────
-router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.post('/', hrGuard('create'), async (req, res) => {
   try {
     const { name, phone, position, baseSalary, startDate, note, branchId, branchCode, linkedTeacherId, bankAccount } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Tên nhân viên là bắt buộc' });
@@ -101,7 +123,7 @@ router.post('/', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
 });
 
 // ─── PUT /api/employees/:id ─────────────────────────────────────────────────────
-router.put('/:id', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.put('/:id', hrGuard('update'), async (req, res) => {
   try {
     // Branch guard
     if (req.userBranchId) {
@@ -124,7 +146,7 @@ router.put('/:id', [authMiddleware, isAdmin, branchFilter], async (req, res) => 
 });
 
 // ─── DELETE /api/employees/:id ──────────────────────────────────────────────────
-router.delete('/:id', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.delete('/:id', hrGuard('delete'), async (req, res) => {
   try {
     if (req.userBranchId) {
       const emp = await Employee.findById(req.params.id).select('branchId').lean();
@@ -143,7 +165,7 @@ router.delete('/:id', [authMiddleware, isAdmin, branchFilter], async (req, res) 
 
 // ─── POST /api/employees/:id/pay ────────────────────────────────────────────────
 // Trả lương cho nhân viên → ghi vào PayrollLog
-router.post('/:id/pay', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.post('/:id/pay', hrGuard('pay'), async (req, res) => {
   try {
     const employee = await Employee.findById(req.params.id);
     if (!employee) return res.status(404).json({ success: false, message: 'Không tìm thấy nhân viên' });
@@ -181,7 +203,7 @@ router.post('/:id/pay', [authMiddleware, isAdmin, branchFilter], async (req, res
 
 // ─── GET /api/employees/payroll ─────────────────────────────────────────────────
 // Lịch sử trả lương (branch-aware)
-router.get('/payroll', [authMiddleware, isAdmin, branchFilter], async (req, res) => {
+router.get('/payroll', hrGuard('payroll'), async (req, res) => {
   try {
     const filter = { ...req.branchFilter };
     if (req.query.employeeId) filter.employeeId = req.query.employeeId;

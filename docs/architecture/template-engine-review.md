@@ -1,0 +1,1 @@
+# ${report.replace(/-/g, ' ').replace('.md', '').toUpperCase()}\n\nGenerated artifact for Sprint 5.3 Batch 3 Enterprise Integration, Notification, Document & Global Search Platform.

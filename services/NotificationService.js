@@ -45,8 +45,12 @@ class NotificationService {
         };
 
         if (receiversArr.includes('GLOBAL')) {
-          io.emit('RECEIVE_NOTIFICATION', socketData);
-          io.emit('data:refresh', { type: 'global' });
+          // Deprecate GLOBAL fan-out — route to admin/staff/support role rooms
+          io.to('ALL_ADMIN').emit('RECEIVE_NOTIFICATION', socketData);
+          io.to('ALL_STAFF').emit('RECEIVE_NOTIFICATION', socketData);
+          io.to('ALL_SUPPORT').emit('RECEIVE_NOTIFICATION', socketData);
+          io.to('ALL_TEACHER').emit('RECEIVE_NOTIFICATION', socketData);
+          io.to('ALL_ADMIN').emit('data:refresh', { type: 'global' });
         } else {
           receiversArr.forEach((receiver) => {
             // Emit to specific user room OR role room (e.g., 'ALL_ADMIN')
@@ -55,8 +59,15 @@ class NotificationService {
           });
         }
 
-        // Legacy refresh cho client poll /notifications/unread
-        io.emit('new-notification');
+        // Legacy refresh — scoped to role rooms (không io.emit toàn cục)
+        io.to('ALL_ADMIN').emit('new-notification');
+        io.to('ALL_STAFF').emit('new-notification');
+        io.to('ALL_SUPPORT').emit('new-notification');
+        receiversArr.forEach((receiver) => {
+          if (receiver && receiver !== 'GLOBAL' && !String(receiver).startsWith('ALL_')) {
+            io.to(String(receiver)).emit('new-notification');
+          }
+        });
       }
 
       return newNotification;

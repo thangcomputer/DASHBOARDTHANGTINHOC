@@ -1,0 +1,1 @@
+'use strict'; class PermissionResolver { resolve(user) {} } module.exports = PermissionResolver;

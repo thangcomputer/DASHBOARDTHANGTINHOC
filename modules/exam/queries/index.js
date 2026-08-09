@@ -1,0 +1,10 @@
+'use strict';
+const { queryRegistry } = require('../../../shared/cqrs');
+const Get_adminQuery = require('./Get_adminQuery');
+const Get_adminHandler = require('./Get_adminHandler');
+queryRegistry.register('Get_adminQuery', new Get_adminHandler());
+module.exports.Get_adminQuery = Get_adminQuery;
+const Get_teacher_teacherIdQuery = require('./Get_teacher_teacherIdQuery');
+const Get_teacher_teacherIdHandler = require('./Get_teacher_teacherIdHandler');
+queryRegistry.register('Get_teacher_teacherIdQuery', new Get_teacher_teacherIdHandler());
+module.exports.Get_teacher_teacherIdQuery = Get_teacher_teacherIdQuery;

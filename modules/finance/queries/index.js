@@ -1,0 +1,10 @@
+'use strict';
+const { queryRegistry } = require('../../../shared/cqrs');
+const Get_overviewQuery = require('./Get_overviewQuery');
+const Get_overviewHandler = require('./Get_overviewHandler');
+queryRegistry.register('Get_overviewQuery', new Get_overviewHandler());
+module.exports.Get_overviewQuery = Get_overviewQuery;
+const Get_exportQuery = require('./Get_exportQuery');
+const Get_exportHandler = require('./Get_exportHandler');
+queryRegistry.register('Get_exportQuery', new Get_exportHandler());
+module.exports.Get_exportQuery = Get_exportQuery;

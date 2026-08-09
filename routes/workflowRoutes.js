@@ -1,16 +1,36 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, isAdmin } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
+const { policyShadowWorkflow } = require('../middleware/policyShadowWorkflow');
+const { workflowsCutoverGate } = require('../middleware/workflowsCutoverGate');
 const workflowService = require('../services/workflowService');
 const logger = require('../config/logger');
 
-const guard = [authMiddleware, isAdmin];
+/**
+ * Phase 7.9 — Controlled cutover for /api/workflows ONLY.
+ *
+ * Default / not allowlisted:
+ *   auth → policyShadowWorkflow → Legacy isAdmin (via workflowsCutoverGate) → handler
+ *
+ * Opt-in Policy-primary:
+ *   POLICY_CUTOVER_ENABLED=true
+ *   POLICY_CUTOVER_ROUTES=…,workflows
+ *
+ * Rollback: remove workflows from ROUTES (keep prior families) or ENABLED=false.
+ * Legacy isAdmin retained inside workflowsCutoverGate.
+ * Handlers/service retain advance, sync, DB writes, emitTeacherEvent / emitDataRefresh.
+ */
+const guard = (action) => [
+  authMiddleware,
+  policyShadowWorkflow(action),
+  workflowsCutoverGate(action),
+];
 
-router.get('/definitions', guard, (req, res) => {
+router.get('/definitions', guard('definitions'), (req, res) => {
   res.json({ success: true, data: workflowService.listDefinitions() });
 });
 
-router.get('/', guard, async (req, res) => {
+router.get('/', guard('list'), async (req, res) => {
   try {
     if (req.query.sync === '1' || req.query.sync === 'true') {
       await workflowService.syncFromDomain();
@@ -28,7 +48,7 @@ router.get('/', guard, async (req, res) => {
   }
 });
 
-router.post('/sync', guard, async (req, res) => {
+router.post('/sync', guard('sync'), async (req, res) => {
   try {
     const data = await workflowService.syncFromDomain();
     res.json({ success: true, message: 'Da dong bo ' + data.created + ' workflow', data });
@@ -37,7 +57,7 @@ router.post('/sync', guard, async (req, res) => {
   }
 });
 
-router.get('/:id', guard, async (req, res) => {
+router.get('/:id', guard('get'), async (req, res) => {
   try {
     const data = await workflowService.getInstance(req.params.id);
     res.json({ success: true, data });
@@ -46,7 +66,7 @@ router.get('/:id', guard, async (req, res) => {
   }
 });
 
-router.post('/', guard, async (req, res) => {
+router.post('/', guard('create'), async (req, res) => {
   try {
     const { definitionKey, entityId, entityLabel, title, payload } = req.body || {};
     const instance = await workflowService.start({
@@ -63,7 +83,7 @@ router.post('/', guard, async (req, res) => {
   }
 });
 
-router.post('/:id/advance', guard, async (req, res) => {
+router.post('/:id/advance', guard('advance'), async (req, res) => {
   try {
     const { action, note } = req.body || {};
     if (!action) {

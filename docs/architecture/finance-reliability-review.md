@@ -1,0 +1,1 @@
+# Finance Reliability Review\nFinance aggregates are now protected by global Idempotency and outbox publishing. Duplicate payroll or revenue mutations are safely rejected.

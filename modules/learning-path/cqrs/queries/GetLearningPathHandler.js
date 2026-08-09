@@ -1,0 +1,1 @@
+'use strict'; class GetLearningPathHandler { handle() {} } module.exports = GetLearningPathHandler;

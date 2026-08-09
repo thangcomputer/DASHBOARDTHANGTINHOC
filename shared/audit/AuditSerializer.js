@@ -1,0 +1,1 @@
+'use strict'; class AuditSerializer { serialize() {} } module.exports = AuditSerializer;

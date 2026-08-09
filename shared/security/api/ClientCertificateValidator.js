@@ -1,0 +1,1 @@
+'use strict'; class ClientCertificateValidator { validate() {} } module.exports = ClientCertificateValidator;

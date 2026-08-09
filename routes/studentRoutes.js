@@ -6,6 +6,14 @@ const Schedule = require('../models/Schedule');
 const { authMiddleware, checkPermission, isTeacher, branchFilter, userHasPermission } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const { assertStudentBranchAccess } = require('../middleware/studentBranchGuard');
+const { policyShadowStudentRead } = require('../middleware/policyShadowStudentRead');
+const { policyShadowStudentMutation } = require('../middleware/policyShadowStudentMutation');
+
+/** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
+function requireManageStudentsUnlessTeacher(req, res, next) {
+  if (req.user?.role === 'teacher') return next();
+  return checkPermission(PERMISSIONS.MANAGE_STUDENTS)(req, res, next);
+}
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const {
@@ -17,7 +25,9 @@ const {
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const { generateTempPassword } = require('../utils/tempPassword');
 const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../services/ledgerService');
+const { refundStudentTuition, payTeacherForStudent } = require('../services/studentFinanceService');
 const cache = require('../utils/cache');
+const { emitDataRefresh, emitBranch } = require('../utils/realtimeEmit');
 
 function financeActor(req) {
   return {
@@ -40,6 +50,31 @@ function bustFinanceCaches() {
   try {
     cache.delByPrefix('bi:overview');
   } catch { /* ignore */ }
+}
+
+function studentRealtime(io, studentLike, event, payload) {
+  if (!io) return;
+  const branchId = studentLike?.branchId || null;
+  const userIds = [
+    studentLike?._id,
+    studentLike?.id,
+    studentLike?.teacherId,
+  ].filter(Boolean).map(String);
+  emitBranch(io, branchId, event, payload);
+  for (const uid of userIds) {
+    io.to(uid).emit(event, payload);
+  }
+}
+
+function studentDataRefresh(io, studentLike, payload) {
+  if (!io) return;
+  const branchId = studentLike?.branchId || null;
+  const userIds = [
+    studentLike?._id,
+    studentLike?.id,
+    studentLike?.teacherId,
+  ].filter(Boolean).map(String);
+  emitDataRefresh(io, payload, { branchId, userIds });
 }
 
 async function nextInvoiceCode() {
@@ -91,8 +126,8 @@ async function createTuitionInvoice({ student, courseName, amount, note = '' }) 
 }
 
 // ─── GET /api/students ─────────────────────────────────────────────────────────
-// Lấy danh sách học viên (Admin / Teacher) — hỗ trợ Server-side Pagination
-router.get('/', [authMiddleware, branchFilter], async (req, res) => {
+// Lấy danh sách học viên (Admin+MANAGE_STUDENTS / Teacher ownership) — pagination
+router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), requireManageStudentsUnlessTeacher], async (req, res) => {
   try {
     const { teacherId, paid, status, course, search, page, limit, branch_id } = req.query;
     const andConditions = [];
@@ -303,7 +338,7 @@ router.get('/', [authMiddleware, branchFilter], async (req, res) => {
 // ─── GET /api/students/stats ───────────────────────────────────────────────────
 // Thống kê tổng quan (Admin dashboard)
 // ─── GET /api/students/stats (branch-aware, timezone-safe) ────────────────────
-router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
+router.get('/stats', [authMiddleware, branchFilter, policyShadowStudentRead('stats'), requireManageStudentsUnlessTeacher], async (req, res) => {
   try {
     // branchFilter đã gán req.branchFilter: {} cho SUPER_ADMIN, {branchId:...} cho STAFF
     const bf = { ...req.branchFilter };
@@ -387,7 +422,8 @@ router.get('/stats', [authMiddleware, branchFilter], async (req, res) => {
 });
 
 // ─── GET /api/students/:id ─────────────────────────────────────────────────────────────────
-router.get('/:id', [authMiddleware, branchFilter], async (req, res) => {
+// Phase 7.35: policyShadowStudentRead('get_one') — evaluation-only; Legacy handler remains HTTP authority.
+router.get('/:id', [authMiddleware, branchFilter, policyShadowStudentRead('get_one')], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
       .populate('teacherId', 'name phone specialty avatar');
@@ -425,7 +461,8 @@ router.get('/:id', [authMiddleware, branchFilter], async (req, res) => {
 
 // ─── GET /api/students/:id/full-detail (MEGA ENDPOINT) ───────────────────────
 // Tổng hợp toàn bộ hồ sơ học viên: Thông tin cá nhân, Lịch sử điểm danh, Hóa đơn, Điểm thi
-router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) => {
+// Phase 7.35: policyShadowStudentRead('full_detail') — evaluation-only; Legacy handler remains HTTP authority.
+router.get('/:id/full-detail', [authMiddleware, branchFilter, policyShadowStudentRead('full_detail')], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
       .populate('teacherId', 'name phone specialty avatar');
@@ -506,7 +543,7 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter], async (req, res) 
 
 // ─── POST /api/students/import (BẢN GHI HÀNG LOẠT) ──────────────────────────
 // Nhập danh sách học viên từ file Excel (Array of Objects)
-router.post('/import', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter], async (req, res) => {
+router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutation('create_import'), checkPermission(PERMISSIONS.MANAGE_STUDENTS)], async (req, res) => {
   try {
     const { students: rawStudents } = req.body;
     if (!Array.isArray(rawStudents) || rawStudents.length === 0) {
@@ -562,8 +599,14 @@ router.post('/import', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDE
 // ─── POST /api/students ────────────────────────────────────────────────────────
 // Admin thêm học viên mới
 // ─── POST /api/students ──────────────────────────────────────────────────────────────────
-router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter], async (req, res) => {
+router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('create'), checkPermission(PERMISSIONS.MANAGE_STUDENTS)], async (req, res, next) => {
   try {
+    // Strangler Facade for CQRS Migration
+    if (process.env.ENABLE_CQRS_STUDENT_CREATE === 'true') {
+      const CQRSStudentController = require('../modules/student/controllers/CQRSStudentController');
+      return await CQRSStudentController.create(req, res, next);
+    }
+
     // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) — random + isFirstLogin
     const plainPassword = req.body.password != null && String(req.body.password).trim() !== ''
       ? String(req.body.password).trim()
@@ -747,14 +790,14 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
         link: '/admin/students',
       });
       
-      io.emit('student:new', {
+      studentRealtime(io, student, 'student:new', {
         studentId: student._id,
         name: student.name,
         course: student.course,
       });
-      io.emit('data:refresh', { type: 'student', action: 'create' });
+      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', action: 'create' });
       if (createdInvoice) {
-        io.emit('revenue:updated', { amount: price, studentName: student.name });
+        studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: price, studentName: student.name });
       }
     }
 
@@ -805,7 +848,7 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
 
 // ─── PUT /api/students/:id ─────────────────────────────────────────────────────
 // Cập nhật thông tin học viên (Admin, Teacher, Student tự cập nhật)
-router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('update'), assertStudentBranchAccess], async (req, res) => {
   try {
     // STAFF/Admin thiếu manage_students → 403 (H7); teacher/student tự sửa vẫn theo allowlist bên dưới
     if (req.user.role === 'admin' || req.user.role === 'staff') {
@@ -858,7 +901,7 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
             await doc.save();
             const populated = await Student.findById(doc._id).populate('teacherId', 'name phone specialty');
             const io = req.app.get('io');
-            if (io) io.emit('student:updated', populated._id);
+            if (io) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', populated._id);
             return res.json({ success: true, data: populated });
           }
         }
@@ -1036,8 +1079,8 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('student:updated', student._id);
-      io.emit('data:refresh', { type: 'student', id: student._id });
+      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
+      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
 
       // ── Notification: duyệt/thu hồi quyền thi (khi admin/staff cập nhật qua PUT /students/:id)
       // AdminDashboard hiện dùng endpoint này cho approve/revoke exam, nên cần bắn noti ở đây.
@@ -1059,7 +1102,7 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
               payload: { studentId: student._id.toString(), action: 'exam_approved' },
               link: '/student/exam'
             });
-            io.emit('exam:unlocked', { studentId: student._id.toString(), studentName: student.name });
+            studentRealtime(io, student, 'exam:unlocked', { studentId: student._id.toString(), studentName: student.name });
           } else {
             await NotificationService.send(io, {
               type: 'EXAM',
@@ -1069,7 +1112,7 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
               payload: { studentId: student._id.toString(), action: 'exam_revoked' },
               link: '/student/exam'
             });
-            io.emit('exam:locked', { studentId: student._id.toString(), reason: 'revoked', message: '🔒 Quyền thi đã bị thu hồi' });
+            studentRealtime(io, student, 'exam:locked', { studentId: student._id.toString(), reason: 'revoked', message: '🔒 Quyền thi đã bị thu hồi' });
           }
         }
 
@@ -1126,7 +1169,7 @@ router.put('/:id', [authMiddleware, branchFilter, assertStudentBranchAccess], as
 
 // ─── PUT /api/students/:id/exam-progress ───────────────────────────────────────
 // Học viên cập nhật tiến độ thi 1 môn (server merge + validate)
-router.put('/:id/exam-progress', [authMiddleware, branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/exam-progress', [authMiddleware, branchFilter, policyShadowStudentMutation('exam_progress'), assertStudentBranchAccess], async (req, res) => {
   try {
     const { applyStudentExamProgress } = require('../services/examProgressService');
     const isSelf = req.user.role === 'student' && String(req.user.id) === String(req.params.id);
@@ -1162,8 +1205,8 @@ router.put('/:id/exam-progress', [authMiddleware, branchFilter, assertStudentBra
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('student:updated', student._id);
-      io.emit('data:refresh', { type: 'student', id: student._id });
+      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
+      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
     }
 
     return res.json({
@@ -1179,7 +1222,7 @@ router.put('/:id/exam-progress', [authMiddleware, branchFilter, assertStudentBra
 // ─── PATCH /api/students/:id/price ────────────────────────────────────────────
 // Admin điều chỉnh học phí riêng cho 1 học viên cụ thể (ghi đè price snapshot)
 // Dùng khi: học viên xin giảm học phí, có mã giảm giá, hoặc Admin muốn áp giá mới
-router.patch('/:id/price', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.patch('/:id/price', [authMiddleware, branchFilter, policyShadowStudentMutation('finance_price'), checkPermission(PERMISSIONS.MANAGE_FINANCE), assertStudentBranchAccess], async (req, res) => {
   try {
     const { newPrice, reason = '' } = req.body;
     if (!newPrice || isNaN(newPrice) || Number(newPrice) < 0) {
@@ -1204,7 +1247,7 @@ router.patch('/:id/price', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_F
     await student.save({ validateModifiedOnly: true });
 
     const io = req.app.get('io');
-    if (io) io.emit('student:updated', student._id);
+    if (io) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
 
     res.json({
       success: true,
@@ -1220,7 +1263,7 @@ router.patch('/:id/price', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_F
 
 // ─── PUT /api/students/:id/pay ─────────────────────────────────────────────────
 // Workflow 4: Admin xác nhận thu học phí → tạo hóa đơn tự động + ledger payment
-router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutation('finance_pay'), checkPermission(PERMISSIONS.MANAGE_FINANCE), assertStudentBranchAccess], async (req, res) => {
   try {
     const { paymentMethod = 'transfer', note = '' } = req.body;
 
@@ -1355,8 +1398,8 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
         link: '/student#profile'
       });
 
-      io.emit('revenue:updated', { amount: student.price, studentName: student.name });
-      io.emit('data:refresh', { type: 'student', id: student._id });
+      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: student.price, studentName: student.name });
+      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
     }
 
     res.json({
@@ -1379,101 +1422,25 @@ router.put('/:id/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINAN
 });
 
 // ─── PUT /api/students/:id/refund ─────────────────────────────────────────────
-// Hoàn tiền: partial (amount) hoặc full. Không xóa Invoice; ghi LedgerEntry refund.
-router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+// Hoàn tiền: partial (amount) hoặc full. Atomic claim paidAmount trước ledger.
+router.put('/:id/refund', [authMiddleware, branchFilter, policyShadowStudentMutation('finance_refund'), checkPermission(PERMISSIONS.MANAGE_FINANCE), assertStudentBranchAccess], async (req, res) => {
   try {
     const note = String(req.body?.note || 'Hoàn tiền / hủy xác nhận thanh toán').slice(0, 300);
-    const student = await Student.findById(req.params.id);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
-    }
-    const prevPaidAmount = Number(student.paidAmount) || 0;
-    const fallbackPrice = Number(student.price) || 0;
-    const available = prevPaidAmount > 0 ? prevPaidAmount : (student.paid ? fallbackPrice : 0);
-
-    if (!student.paid || !(available > 0)) {
-      return res.status(409).json({ success: false, message: 'Học viên chưa thanh toán — không thể hoàn' });
-    }
-
-    const hasAmount = req.body?.amount !== undefined && req.body?.amount !== null && req.body?.amount !== '';
-    let refundAmt = available;
-    let partial = false;
-
-    if (hasAmount) {
-      refundAmt = Number(req.body.amount);
-      if (!(refundAmt > 0) || Number.isNaN(refundAmt)) {
-        return res.status(400).json({ success: false, message: 'Số tiền hoàn không hợp lệ' });
-      }
-      if (refundAmt > available) {
-        return res.status(400).json({
-          success: false,
-          message: `Số tiền hoàn (${refundAmt.toLocaleString('vi-VN')}đ) vượt quá đã thanh toán (${available.toLocaleString('vi-VN')}đ)`,
-        });
-      }
-      partial = refundAmt < available;
-    }
-
-    const oldSnapshot = {
-      paid: student.paid,
-      paidAmount: available,
-    };
-
-    const remainingAfter = partial
-      ? Math.round((available - refundAmt) * 100) / 100
-      : 0;
-
-    // Ledger trước — fail-closed: không clear cache nếu sổ cái lỗi
-    let ledgerEntry = null;
-    try {
-      const posted = await postRefund({
-        student,
-        amount: refundAmt,
-        courseName: student.course,
-        sourceRef: `refund:student:${student._id}:${partial ? 'partial' : 'full'}:${refundAmt}:${oldSnapshot.paidAmount}`,
-        idempotencyKey: `refund:student:${student._id}:${partial ? 'partial' : 'full'}:${refundAmt}:${oldSnapshot.paidAmount}`,
-        actor: financeActor(req),
-        note,
-        metadata: { partial, remaining: remainingAfter },
-        reqMeta: financeReqMeta(req, student),
-      });
-      ledgerEntry = posted?.entry || null;
-    } catch (ledgerErr) {
-      logger.error('[STUDENTS] ledger refund FAILED: %s', ledgerErr.message);
-      return res.status(ledgerErr.status || 500).json({
-        success: false,
-        message: ledgerErr.message || 'Ghi sổ hoàn thất bại — chưa đổi trạng thái học viên',
-      });
-    }
-
-    if (partial) {
-      student.paidAmount = remainingAfter;
-      student.paid = true;
-      student.paidNote = note;
-    } else {
-      student.paid = false;
-      student.paidAmount = 0;
-      student.paidAt = null;
-      student.paidNote = note;
-      student.paymentMethod = '';
-      if (student.enrollments?.length) {
-        student.enrollments.forEach((e) => {
-          if (e.paid) {
-            e.paid = false;
-            e.paidAt = undefined;
-            e.learningAccess = false;
-            e.status = 'refunded';
-          }
-        });
-        student.markModified('enrollments');
-      }
-    }
-
-    await student.save({ validateModifiedOnly: true });
+    const result = await refundStudentTuition({
+      studentId: req.params.id,
+      amount: req.body?.amount,
+      note,
+      refundId: String(req.body?.refundId || req.headers['idempotency-key'] || '').trim(),
+      actor: financeActor(req),
+      reqMeta: financeReqMeta(req, null),
+    });
     bustFinanceCaches();
-
+    const student = result.student;
     const io = req.app.get('io');
-    if (io) {
+    if (io && !result.idempotent) {
       const NotificationService = require('../services/NotificationService');
+      const refundAmt = result.refundedAmount;
+      const partial = result.partial;
       NotificationService.notifyAdmins(
         io,
         partial ? '↩️ Hoàn học phí (một phần)' : '↩️ Hoàn học phí',
@@ -1490,37 +1457,39 @@ router.put('/:id/refund', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FI
         receivers: String(student._id),
         link: '/student#profile',
       }).catch(() => {});
-      io.emit('data:refresh', { type: 'student', id: student._id });
-      io.emit('revenue:updated', { amount: -refundAmt, studentName: student.name });
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
+      studentRealtime(io, student, 'revenue:updated', { amount: -refundAmt, studentName: student.name });
     }
-
-    const o = student.toObject();
+    const o = student.toObject ? student.toObject() : student;
     delete o.password;
     delete o.refreshToken;
     return res.json({
       success: true,
-      message: partial
-        ? `Đã hoàn một phần ${refundAmt.toLocaleString('vi-VN')}đ (còn ${Number(student.paidAmount).toLocaleString('vi-VN')}đ)`
-        : `Đã hoàn/hủy thanh toán ${refundAmt.toLocaleString('vi-VN')}đ`,
+      message: result.idempotent
+        ? 'Hoàn tiền đã được ghi nhận trước đó (idempotent)'
+        : (result.partial
+          ? `Đã hoàn một phần ${result.refundedAmount.toLocaleString('vi-VN')}đ (còn ${Number(result.remainingPaidAmount).toLocaleString('vi-VN')}đ)`
+          : `Đã hoàn/hủy thanh toán ${result.refundedAmount.toLocaleString('vi-VN')}đ`),
       data: {
         student: o,
-        refundedAmount: refundAmt,
-        partial,
-        remainingPaidAmount: Number(student.paidAmount) || 0,
-        oldValue: oldSnapshot,
-        ledgerEntryId: ledgerEntry?._id || null,
+        refundedAmount: result.refundedAmount,
+        partial: result.partial,
+        remainingPaidAmount: result.remainingPaidAmount,
+        oldValue: result.oldSnapshot,
+        ledgerEntryId: result.ledgerEntryId,
+        idempotent: result.idempotent,
       },
     });
   } catch (error) {
     logger.error('[STUDENTS] Refund error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 });
 
 // ─── PUT /api/students/:id/unlock-exam ────────────────────────────────────────
 // Workflow 2: Admin mở khóa phòng thi thủ công
 // Body optional: { enrollmentId } — chỉ mở 1 khóa; không có = mở tất cả enrollment
-router.put('/:id/unlock-exam', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/unlock-exam', [authMiddleware, branchFilter, policyShadowStudentMutation('unlock_exam'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
     const { enrollmentId } = req.body || {};
     const student = await Student.findById(req.params.id);
@@ -1582,12 +1551,12 @@ router.put('/:id/unlock-exam', [authMiddleware, checkPermission(PERMISSIONS.MANA
             enrollmentId: hasEnrollmentId ? String(enrollmentId) : null,
           },
         });
-        io.emit('exam:unlocked', {
+        studentRealtime(io, student, 'exam:unlocked', {
           studentId: student._id.toString(),
           studentName: student.name,
           enrollmentId: hasEnrollmentId ? String(enrollmentId) : null,
         });
-        io.emit('data:refresh', { type: 'student', id: student._id });
+        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
       } catch (notifErr) {
         logger.warn('[STUDENTS] unlock-exam notify: %s', notifErr.message);
       }
@@ -1640,7 +1609,7 @@ router.put('/:id/unlock-exam', [authMiddleware, checkPermission(PERMISSIONS.MANA
 
 // ─── PUT /api/students/:id/lock-exam ──────────────────────────────────────────
 // Admin/Staff hoặc GV phụ trách: đánh trượt / khóa phòng thi
-router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/lock-exam', [authMiddleware, branchFilter, policyShadowStudentMutation('lock_exam'), assertStudentBranchAccess], async (req, res) => {
   try {
     const role = String(req.user?.role || '').toLowerCase();
     const isAdminActor = role === 'admin' || role === 'staff';
@@ -1761,9 +1730,9 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
         message: `🔒 Phòng thi đã bị khóa. Lý do: ${reason}`,
       };
       io.to(`student_${student._id}`).emit('exam:locked', lockPayload);
-      io.emit('exam:locked', lockPayload);
-      io.emit('student:updated', student._id);
-      io.emit('data:refresh', { type: 'student', id: student._id });
+      studentRealtime(io, student, 'exam:locked', lockPayload);
+      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
+      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
     }
 
     res.json({
@@ -1778,7 +1747,7 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, assertStudentBranchA
 
 // ─── POST /api/students/:id/enrollments ───────────────────────────────────────
 // Admin thêm khóa học mới cho học viên (cùng tài khoản, khác môn / thầy)
-router.post('/:id/enrollments', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStudentMutation('enrollment_create'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
     const { courseName, courseId, teacherId, price, totalSessions, paid } = req.body;
     if (!courseName?.trim() && !courseId) {
@@ -1921,7 +1890,7 @@ router.post('/:id/enrollments', [authMiddleware, checkPermission(PERMISSIONS.MAN
     await applyEnrollmentStats(doc, student._id, Schedule);
 
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh', { type: 'student', id: student._id });
+    if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
 
     res.status(201).json({
       success: true,
@@ -1965,7 +1934,13 @@ function syncStudentFromPrimaryEnrollment(student) {
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/settings ─────────────────
 // Cập nhật quyền theo khóa: requireWebcam, examUnlocked
-router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.put('/:id/enrollments/:enrollmentId/settings', [
+  authMiddleware,
+  branchFilter,
+  policyShadowStudentMutation('enrollment_settings'),
+  checkPermission(PERMISSIONS.MANAGE_STUDENTS),
+  assertStudentBranchAccess,
+], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) {
@@ -2001,7 +1976,7 @@ router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermi
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh', { type: 'student', id: student._id });
+    if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
 
     return res.json({
       success: true,
@@ -2015,7 +1990,7 @@ router.put('/:id/enrollments/:enrollmentId/settings', authMiddleware, checkPermi
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/pay ──────────────────────
 // Xác nhận thanh toán học phí cho 1 khóa (enrollment)
-router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, policyShadowStudentMutation('enrollment_pay'), checkPermission(PERMISSIONS.MANAGE_FINANCE), assertStudentBranchAccess], async (req, res) => {
   try {
     const { paymentMethod = 'cash', note = '' } = req.body || {};
     const student = await Student.findById(req.params.id);
@@ -2096,7 +2071,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermissio
           courseName: claimedEnr.courseName,
           source: 'enrollment_pay',
           sourceRef: invoice?.maHoaDon || `enr:${claimedEnr._id}`,
-          idempotencyKey: `payment:enrollment_pay:${fresh._id}:${claimedEnr._id}`,
+          idempotencyKey: `payment:student:${fresh._id}:enr:${claimedEnr._id}`,
           actor: financeActor(req),
           note: note || '',
           reqMeta: financeReqMeta(req, fresh),
@@ -2123,7 +2098,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermissio
     }
 
     const io = req.app.get('io');
-    if (io) io.emit('data:refresh', { type: 'student', id: fresh._id });
+    if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: fresh._id });
 
     const doc = fresh.toObject();
     await applyEnrollmentStats(doc, fresh._id, Schedule);
@@ -2140,7 +2115,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, checkPermissio
 // ─── DELETE /api/students/:id/enrollments/:enrollmentId ───────────────────────
 // Hủy (soft-cancel) 1 khóa học — không xóa cứng; hoàn tiền chỉ khi có quyền finance + refundAmount > 0
 // Body (optional): { cancelReason: string, refundAmount: number }
-router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, policyShadowStudentMutation('enrollment_delete'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) {
@@ -2260,8 +2235,8 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('data:refresh', { type: 'student', id: student._id });
-      if (refundAmt > 0) io.emit('revenue:updated', { amount: -refundAmt, studentName: student.name });
+      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+      if (refundAmt > 0) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: -refundAmt, studentName: student.name });
     }
 
     const doc = student.toObject();
@@ -2279,7 +2254,7 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, checkPermission
 
 // ─── PUT /api/students/:id/assign-teacher ─────────────────────────────────────
 // Admin/Staff gán (hoặc bỏ gán) giảng viên — theo khóa (enrollmentId) hoặc khóa chính
-router.put('/:id/assign-teacher', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStudentMutation('assign_teacher'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
     const { teacherId, enrollmentId, reason = '' } = req.body;
     const isUnassign = teacherId === null || teacherId === '' || teacherId === undefined;
@@ -2602,11 +2577,11 @@ router.put('/:id/assign-teacher', [authMiddleware, checkPermission(PERMISSIONS.M
 
         io.to(teacherId.toString()).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId });
-        io.emit('student:assigned', { teacherId: teacherId.toString(), studentId: student._id.toString() });
-        io.emit('data:refresh', { type: 'student', id: student._id });
+        studentRealtime(io, student, 'student:assigned', { teacherId: teacherId.toString(), studentId: student._id.toString() });
+        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
       } else if (io && isUnassign) {
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId: null });
-        io.emit('data:refresh', { type: 'student', id: student._id });
+        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
       }
     } catch (notifErr) {
       logger.error('[ASSIGN_TEACHER] Notification error:', notifErr);
@@ -2634,7 +2609,7 @@ router.put('/:id/assign-teacher', [authMiddleware, checkPermission(PERMISSIONS.M
 
 
 // ─── DELETE /api/students/:id ──────────────────────────────────────────────────
-router.delete('/:id', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), branchFilter, assertStudentBranchAccess], async (req, res) => {
+router.delete('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('delete'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
     if (!student) {
@@ -2648,7 +2623,13 @@ router.delete('/:id', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDEN
 
 // ─── POST /api/students/:id/reset-today-attendance ─────────────────────────────
 // Xóa điểm danh HÔM NAY của học viên — CHỈ CHO PHÉP TRONG VÒNG 1 TIẾNG
-router.post('/:id/reset-today-attendance', authMiddleware, async (req, res) => {
+router.post('/:id/reset-today-attendance', [
+  authMiddleware,
+  branchFilter,
+  policyShadowStudentMutation('reset_today_attendance'),
+  checkPermission(PERMISSIONS.MANAGE_STUDENTS),
+  assertStudentBranchAccess,
+], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
@@ -2704,7 +2685,7 @@ router.post('/:id/reset-today-attendance', authMiddleware, async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('data:refresh', { type: 'student', id: req.params.id });
+      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: req.params.id });
     }
 
     res.json({ success: true, message: `✅ Đã hủy điểm danh hôm nay cho "${student.name}"` });
@@ -2715,7 +2696,13 @@ router.post('/:id/reset-today-attendance', authMiddleware, async (req, res) => {
 
 // ─── POST /api/students/:id/reset-history ──────────────────────────────────────
 // Reset lịch sử học (xóa buổi học, điểm danh, điểm số) — giữ thông tin cá nhân & học phí
-router.post('/:id/reset-history', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), async (req, res) => {
+router.post('/:id/reset-history', [
+  authMiddleware,
+  branchFilter,
+  policyShadowStudentMutation('reset_history'),
+  checkPermission(PERMISSIONS.MANAGE_STUDENTS),
+  assertStudentBranchAccess,
+], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
@@ -2739,7 +2726,7 @@ router.post('/:id/reset-history', authMiddleware, checkPermission(PERMISSIONS.MA
 
     // Log hệ thống
     const io = req.app.get('io');
-    if (io) io.emit('student:history_reset', { studentId: req.params.id, name: student.name });
+    if (io) studentRealtime(io, student, 'student:history_reset', { studentId: req.params.id, name: student.name });
 
     res.json({
       success: true,
@@ -2752,78 +2739,44 @@ router.post('/:id/reset-history', authMiddleware, checkPermission(PERMISSIONS.MA
 });
 
 // ─── PUT /api/students/:id/pay-teacher (THANH TOÁN LƯƠNG TRÊN TỪNG HỌC VIÊN) ───
-router.put('/:id/pay-teacher', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter, assertStudentBranchAccess], async (req, res) => {
+// Ghi Transaction + Ledger salary; Schedule flags chỉ là projection.
+router.put('/:id/pay-teacher', [authMiddleware, branchFilter, policyShadowStudentMutation('finance_pay_teacher'), checkPermission(PERMISSIONS.MANAGE_FINANCE), assertStudentBranchAccess], async (req, res) => {
   try {
-    const { action } = req.body; // 'PARTIAL' (thanh toán cộng dồn) hoặc 'PAID_IN_ADVANCE' (trả trước trọn gói)
-    const studentId = req.params.id;
-
-    const student = await Student.findById(studentId);
-    if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
-
+    const result = await payTeacherForStudent({
+      studentId: req.params.id,
+      action: req.body?.action || 'PARTIAL',
+      idempotencyKey: String(req.headers['idempotency-key'] || req.body?.idempotencyKey || '').trim(),
+      actor: { ...financeActor(req), name: req.user?.name || 'Admin' },
+    });
+    const { student, teacher, paidSessions, amount, transaction, action, defaultDesc } = result;
     const io = req.app.get('io');
-    const teacherId = student.teacherId ? String(student.teacherId) : '';
-    const notifyTeacher = async (content, payload = {}) => {
-      if (!io || !teacherId) return;
+    if (io && !result.idempotent) {
       const NotificationService = require('../services/NotificationService');
       await NotificationService.send(io, {
         type: 'FINANCE',
         title: '💵 Đã thanh toán lương (theo học viên)',
-        content,
-        receivers: teacherId,
-        payload: { studentId: String(student._id), ...payload },
+        content: action === 'PAID_IN_ADVANCE'
+          ? `Admin đã thiết lập TRẢ TRƯỚC cho học viên ${student.name}. Đã xác nhận ${paidSessions} buổi (${amount.toLocaleString('vi-VN')}đ).`
+          : `Admin đã thanh toán ${paidSessions} buổi dạy của học viên ${student.name} (${amount.toLocaleString('vi-VN')}đ).`,
+        receivers: String(teacher._id),
+        payload: { studentId: String(student._id), action, paidSessions },
         link: '/teacher/finance',
       });
-    };
-
-    if (action === 'PAID_IN_ADVANCE') {
-      // 1. Chuyển trạng thái của học viên thành TRẢ TRƯỚC Toàn bộ
-      student.teacher_payment_status = 'PAID_IN_ADVANCE';
-      await student.save();
-
-      // 2. Chuyển tất cả buổi "đã học/chưa học" đang pending thành PAID
-      const updated = await Schedule.updateMany(
-        { studentId, status: 'completed', is_paid_to_teacher: false },
-        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-      );
-
-      await notifyTeacher(
-        `Admin đã thiết lập TRẢ TRƯỚC cho học viên ${student.name}. Đã xác nhận thanh toán ${updated.modifiedCount || 0} buổi đã hoàn thành (các buổi sau sẽ tự động tick đã thanh toán).`,
-        { action: 'PAID_IN_ADVANCE', paidSessions: updated.modifiedCount || 0 }
-      );
-
-      if (io) {
-        io.emit('student:updated', student._id.toString());
-        io.emit('data:refresh', { type: 'student', id: student._id.toString(), action: 'pay_teacher' });
-      }
-
-      return res.json({ success: true, message: 'Đã thiết lập thanh toán TRỌN GÓI. Mọi buổi điểm danh tiếp theo sẽ tự động tick Đã thanh toán.' });
-    } else {
-      // PARTIAL (Thanh toán cộng dồn các buổi dang dở hiện tại)
-      const updated = await Schedule.updateMany(
-        { studentId, status: 'completed', is_paid_to_teacher: false },
-        { $set: { is_paid_to_teacher: true, paymentStatus: 'paid' } }
-      );
-
-      if (student.teacher_payment_status === 'UNPAID') {
-        student.teacher_payment_status = 'PARTIAL';
-        await student.save();
-      }
-
-      await notifyTeacher(
-        `Admin đã thanh toán ${updated.modifiedCount || 0} buổi dạy của học viên ${student.name}.`,
-        { action: 'PARTIAL', paidSessions: updated.modifiedCount || 0 }
-      );
-
-      if (io) {
-        io.emit('student:updated', student._id.toString());
-        io.emit('data:refresh', { type: 'student', id: student._id.toString(), action: 'pay_teacher' });
-      }
-
-      return res.json({ success: true, message: `Thanh toán thành công ${updated.modifiedCount} buổi dạy của HV ${student.name}.` });
+      studentRealtime(io, student, 'student:updated', student._id.toString());
+      studentDataRefresh(io, student, { type: 'student', id: student._id.toString(), action: 'pay_teacher' });
     }
+    return res.json({
+      success: true,
+      message: result.idempotent
+        ? 'Giao dịch đã tồn tại (idempotent)'
+        : (action === 'PAID_IN_ADVANCE'
+          ? 'Đã thiết lập thanh toán TRỌN GÓI và ghi sổ các buổi đã hoàn thành.'
+          : `Thanh toán thành công ${paidSessions} buổi dạy của HV ${student.name}.`),
+      data: { paidSessions, amount, transaction, idempotent: result.idempotent, note: defaultDesc },
+    });
   } catch (error) {
     logger.error('[STUDENTS] Pay Teacher error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 });
 

@@ -1,0 +1,1 @@
+'use strict'; class AuditRetentionPolicy { evaluate() {} } module.exports = AuditRetentionPolicy;

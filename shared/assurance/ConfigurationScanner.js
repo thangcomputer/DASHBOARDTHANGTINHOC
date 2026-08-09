@@ -1,0 +1,1 @@
+'use strict'; class ConfigurationScanner { scan() {} } module.exports = ConfigurationScanner;

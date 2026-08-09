@@ -1,0 +1,1 @@
+'use strict'; class ArchitectureComplianceEngine { evaluate() {} } module.exports = ArchitectureComplianceEngine;

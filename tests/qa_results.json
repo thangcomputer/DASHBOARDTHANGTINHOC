@@ -1,0 +1,164 @@
+[
+  {
+    "module": "Đăng Nhập",
+    "func": "Login",
+    "result": "Passed",
+    "severity": "Low",
+    "description": "Đăng nhập thành công",
+    "steps": "Nhập admin/admin123 và click Login",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Tổng quan",
+    "func": "Render UI",
+    "result": "Passed",
+    "severity": "Low",
+    "description": "Giao diện render bình thường",
+    "steps": "Truy cập module Tổng quan",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Bảng tin",
+    "func": "Render UI",
+    "result": "Passed",
+    "severity": "Low",
+    "description": "Giao diện render bình thường",
+    "steps": "Truy cập module Bảng tin",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Học viên",
+    "func": "Render UI",
+    "result": "Passed",
+    "severity": "Low",
+    "description": "Giao diện render bình thường",
+    "steps": "Truy cập module Học viên",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Giảng viên",
+    "func": "Render UI",
+    "result": "Passed",
+    "severity": "Low",
+    "description": "Giao diện render bình thường",
+    "steps": "Truy cập module Giảng viên",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Phân quyền nhân viên",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Phân quyền nhân viên\"), div:has-text(\"Phân quyền nhân viên\")')\u001b[22m\n",
+    "steps": "Thao tác tại Phân quyền nhân viên",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Đào tạo GV",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Đào tạo GV\"), div:has-text(\"Đào tạo GV\")')\u001b[22m\n",
+    "steps": "Thao tác tại Đào tạo GV",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Đào tạo HV",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Đào tạo HV\"), div:has-text(\"Đào tạo HV\")')\u001b[22m\n",
+    "steps": "Thao tác tại Đào tạo HV",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Đánh giá nội bộ",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Đánh giá\"), div:has-text(\"Đánh giá\")')\u001b[22m\n",
+    "steps": "Thao tác tại Đánh giá nội bộ",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Tài chính",
+    "func": "Render UI",
+    "result": "Passed",
+    "severity": "Low",
+    "description": "Giao diện render bình thường",
+    "steps": "Truy cập module Tài chính",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Báo cáo doanh thu",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Báo cáo doanh thu\"), div:has-text(\"Báo cáo doanh thu\")')\u001b[22m\n",
+    "steps": "Thao tác tại Báo cáo doanh thu",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "BI Dashboard",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"BI Dashboard\"), div:has-text(\"BI Dashboard\")')\u001b[22m\n",
+    "steps": "Thao tác tại BI Dashboard",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Cài đặt hệ thống",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Cài đặt hệ thống\"), div:has-text(\"Cài đặt hệ thống\")')\u001b[22m\n",
+    "steps": "Thao tác tại Cài đặt hệ thống",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Nhật ký hệ thống",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Nhật ký\"), div:has-text(\"Nhật ký\")')\u001b[22m\n",
+    "steps": "Thao tác tại Nhật ký hệ thống",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Quản lý File",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Quản lý File\"), div:has-text(\"Quản lý File\")')\u001b[22m\n",
+    "steps": "Thao tác tại Quản lý File",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Sao lưu dữ liệu",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Sao lưu\"), div:has-text(\"Sao lưu\")')\u001b[22m\n",
+    "steps": "Thao tác tại Sao lưu dữ liệu",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "Monitoring",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"Monitoring\"), div:has-text(\"Monitoring\")')\u001b[22m\n",
+    "steps": "Thao tác tại Monitoring",
+    "proposal": "Kiểm tra lại logic/UI"
+  },
+  {
+    "module": "AI Center",
+    "func": "Render UI",
+    "result": "Failed",
+    "severity": "High",
+    "description": "Lỗi Timeout/Click: page.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('a:has-text(\"AI Center\"), div:has-text(\"AI Center\")')\u001b[22m\n",
+    "steps": "Thao tác tại AI Center",
+    "proposal": "Kiểm tra lại logic/UI"
+  }
+]

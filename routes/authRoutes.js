@@ -9,6 +9,7 @@ const Teacher  = require('../models/Teacher');
 const Student  = require('../models/Student');
 const blacklist = require('../middleware/tokenBlacklist');
 const { authMiddleware } = require('../middleware/auth');
+const { policyShadowAuth } = require('../middleware/policyShadowAuth');
 const {
   loginLimiter,
   captchaLimiter,
@@ -282,13 +283,14 @@ async function issueAdminTokens(sysSettings, audience = 'public') {
 }
 
 // ─── GET /api/auth/csrf-token ────────────────────────────────────────────────
-router.get('/csrf-token', (req, res) => {
+// Legacy remains PRIMARY; Policy is SHADOW ONLY (observational).
+router.get('/csrf-token', policyShadowAuth('csrf_token'), (req, res) => {
   const token = issueCsrfToken(res);
   res.json({ success: true, csrfToken: token });
 });
 
 // ─── GET /api/auth/captcha  — Sinh CAPTCHA mới ────────────────────────────────
-router.get('/captcha', captchaLimiter, (req, res) => {
+router.get('/captcha', captchaLimiter, policyShadowAuth('captcha'), (req, res) => {
   const captcha = svgCaptcha.create({
     size:        5,
     ignoreChars: '0oOlI1',
@@ -320,7 +322,7 @@ function verifyCaptcha(cid, input) {
 }
 
 // ─── POST /api/auth/refresh — xoay refresh token + blacklist bản cũ ───────────
-router.post('/refresh', refreshTokenLimiter, async (req, res) => {
+router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) return res.status(400).json({ success: false, message: 'Thiếu refreshToken' });
@@ -417,7 +419,7 @@ router.post('/refresh', refreshTokenLimiter, async (req, res) => {
 
 // ─── POST /api/auth/check-role ────────────────────────────────────────────────
 // Nhận identifier (phone/email), trả về role để hiện badge UI
-router.post('/check-role', checkRoleLimiter, async (req, res) => {
+router.post('/check-role', checkRoleLimiter, policyShadowAuth('check_role'), async (req, res) => {
   try {
     const { identifier } = req.body;
     if (!identifier) return res.json({ success: true, data: null });
@@ -453,11 +455,13 @@ router.post('/check-role', checkRoleLimiter, async (req, res) => {
 
 // ─── GET /api/auth/google ─────────────────────────────────────────────────────
 router.get('/google',
+  policyShadowAuth('google'),
   passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
 // ─── GET /api/auth/google/callback ───────────────────────────────────────────
 router.get('/google/callback',
+  policyShadowAuth('google_callback'),
   passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || ''}/login?error=google_failed` }),
   async (req, res) => {
     const clientUrl = process.env.CLIENT_URL || '';
@@ -494,7 +498,7 @@ router.get('/google/callback',
 
 // ─── GET /api/auth/zalo ───────────────────────────────────────────────────────
 // Redirect về Zalo OAuth dialog
-router.get('/zalo', (req, res) => {
+router.get('/zalo', policyShadowAuth('zalo'), (req, res) => {
   const appId    = process.env.ZALO_APP_ID || '';
   const callback = encodeURIComponent(process.env.ZALO_CALLBACK_URL || '');
   if (!appId) return res.redirect(`${process.env.CLIENT_URL || ''}/login?error=zalo_not_configured`);
@@ -504,7 +508,7 @@ router.get('/zalo', (req, res) => {
 });
 
 // ─── GET /api/auth/zalo/callback ──────────────────────────────────────────────
-router.get('/zalo/callback', async (req, res) => {
+router.get('/zalo/callback', policyShadowAuth('zalo_callback'), async (req, res) => {
   const clientUrl = process.env.CLIENT_URL || '';
   try {
     if (!req.signedCookies.oauth_z || req.signedCookies.oauth_z !== req.query.state) {
@@ -567,7 +571,7 @@ router.get('/zalo/callback', async (req, res) => {
  *
  * Body: { phone: "0935758462", password: "123456", role: "teacher"|"admin"|"student" }
  */
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) => {
   try {
     // Hỗ trợ cả 'identifier' (mới) lẫn 'phone' (cũ) để tương thích ngược
     const { identifier, phone: legacyPhone, password, role = 'teacher' } = req.body;
@@ -752,7 +756,7 @@ async function lookupUser(rawId, requestedRole = null) {
 
 // ─── POST /api/auth/login/public ─────────────────────────────────────────────
 // Cổng đăng nhập dành cho HỌC VIÊN & GIẢNG VIÊN (Social Login hợp lệ với route này)
-router.post('/login/public', loginLimiter, async (req, res) => {
+router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), async (req, res) => {
   try {
     const { identifier, password, role } = req.body;
     const rawId = (identifier || '').trim();
@@ -844,7 +848,7 @@ router.post('/login/public', loginLimiter, async (req, res) => {
 
 // ─── POST /api/auth/login/internal ───────────────────────────────────────────
 // Cổng đăng nhập nội bộ — CHỈ ADMIN & STAFF — yêu cầu CAPTCHA
-router.post('/login/internal', loginLimiter, async (req, res) => {
+router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'), async (req, res) => {
   try {
     const { identifier, password, captchaId, captchaAnswer, forceTicket } = req.body;
     const rawId = (identifier || '').trim();
@@ -952,7 +956,7 @@ router.post('/login/internal', loginLimiter, async (req, res) => {
 // ─── MFA (Super Admin TOTP) ───────────────────────────────────────────────────
 
 /** Xác thực mã MFA sau bước mật khẩu */
-router.post('/mfa/verify', loginLimiter, async (req, res) => {
+router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (req, res) => {
   try {
     const { mfaToken, code } = req.body || {};
     if (!mfaToken || !code) {
@@ -1021,7 +1025,7 @@ async function loadInternalMfaUser(req, extraSelect = '') {
 }
 
 /** Bắt đầu setup MFA — trả secret + QR (chưa bật) */
-router.post('/mfa/setup', authMiddleware, async (req, res) => {
+router.post('/mfa/setup', authMiddleware, policyShadowAuth('mfa_setup'), async (req, res) => {
   try {
     if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
       return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
@@ -1058,7 +1062,7 @@ router.post('/mfa/setup', authMiddleware, async (req, res) => {
 });
 
 /** Xác nhận enable MFA bằng mã OTP từ app authenticator */
-router.post('/mfa/enable', authMiddleware, async (req, res) => {
+router.post('/mfa/enable', authMiddleware, policyShadowAuth('mfa_enable'), async (req, res) => {
   try {
     if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
       return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
@@ -1101,7 +1105,7 @@ router.post('/mfa/enable', authMiddleware, async (req, res) => {
 });
 
 /** Tắt MFA — cần mật khẩu + OTP hiện tại */
-router.post('/mfa/disable', authMiddleware, async (req, res) => {
+router.post('/mfa/disable', authMiddleware, policyShadowAuth('mfa_disable'), async (req, res) => {
   try {
     if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
       return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
@@ -1142,7 +1146,7 @@ router.post('/mfa/disable', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/mfa/status', authMiddleware, async (req, res) => {
+router.get('/mfa/status', authMiddleware, policyShadowAuth('mfa_status'), async (req, res) => {
   if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
     return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
   }
@@ -1161,7 +1165,7 @@ router.get('/mfa/status', authMiddleware, async (req, res) => {
  *          Không bắt buộc access token còn hạn (tránh phiên “ma” khi bị kick / token hết hạn).
  * @access  Public (cần access hoặc refresh token trong body/header)
  */
-router.post('/logout', async (req, res) => {
+router.post('/logout', policyShadowAuth('logout'), async (req, res) => {
   try {
     let userId = null;
     let role = null;
@@ -1193,7 +1197,7 @@ router.post('/logout', async (req, res) => {
     const bodyRefresh = req.body?.refreshToken;
     if (bodyRefresh) {
       try {
-        const dec = jwt.verify(bodyRefresh, process.env.JWT_SECRET);
+        const dec = jwt.verify(bodyRefresh, process.env.JWT_REFRESH_SECRET);
         if (dec?.id) {
           userId = String(dec.id);
           role = dec.role || role;
@@ -1244,7 +1248,7 @@ router.post('/logout', async (req, res) => {
  * @desc    Đăng ký tài khoản giảng viên (chờ Admin duyệt)
  * @access  Public
  */
-router.post('/register-teacher', sensitiveFlowLimiter, async (req, res) => {
+router.post('/register-teacher', sensitiveFlowLimiter, policyShadowAuth('register_teacher'), async (req, res) => {
   try {
     const { name, phone, password, password2, specialty } = req.body;
 
@@ -1304,7 +1308,7 @@ router.post('/register-teacher', sensitiveFlowLimiter, async (req, res) => {
  * @desc    Đổi mật khẩu
  * @access  Protected (cần accessToken)
  */
-router.post('/change-password', authMiddleware, async (req, res) => {
+router.post('/change-password', authMiddleware, policyShadowAuth('change_password'), async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
     const { id: userId, role } = req.user;
@@ -1350,7 +1354,7 @@ router.post('/change-password', authMiddleware, async (req, res) => {
  * @desc    Xác minh token + trả về thông tin user hiện tại (dùng khi reload trang)
  * @access  Protected
  */
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
   try {
     const decoded = req.user; // Đã được verify bởi authMiddleware
 
@@ -1428,7 +1432,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /api/auth/avatar ── Đổi avatar cá nhân cho mọi role ─────────────────
-router.post('/avatar', authMiddleware, async (req, res) => {
+router.post('/avatar', authMiddleware, policyShadowAuth('avatar'), async (req, res) => {
   try {
     const { avatar } = req.body || {};
     if (!avatar) return res.status(400).json({ success: false, message: 'Thiếu đường dẫn avatar' });
@@ -1458,7 +1462,7 @@ const otpStore = new Map(); // "phone:role" → { otp, expiresAt, userId, userNa
  * @desc    Bước 1: Gửi OTP về Zalo để cấp lại mật khẩu
  * @access  Public
  */
-router.post('/forgot-password/request', sensitiveFlowLimiter, async (req, res) => {
+router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('forgot_password_request'), async (req, res) => {
   try {
     const { phone, role } = req.body;
     if (!phone) return res.status(400).json({ success: false, message: 'Vui lòng nhập số điện thoại' });
@@ -1486,7 +1490,7 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, async (req, res) =
       });
       // Phát sự kiện socket nếu cần (tùy thuộc vào implement socket hiện tại, thường frontend sẽ poll hoặc dùng socket io global)
       if (global.io) {
-        global.io.emit('new-notification');
+        global.io.to('ALL_ADMIN').emit('new-notification');
       }
     } catch (err) {
       logger.warn('[AUTH] Cannot create notification:', err.message);
@@ -1512,7 +1516,7 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, async (req, res) =
  * @desc    Bước 2: Xác minh OTP và cấp mật khẩu mới
  * @access  Public
  */
-router.post('/forgot-password/verify', sensitiveFlowLimiter, async (req, res) => {
+router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('forgot_password_verify'), async (req, res) => {
   try {
     const { phone, otp, role } = req.body;
     if (!phone || !otp) return res.status(400).json({ success: false, message: 'Thiếu thông tin' });
@@ -1584,7 +1588,7 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, async (req, res) =>
  * @desc    Admin sinh OTP 120s cho học viên/giảng viên. Admin tự gửi qua Zalo.
  * @access  Admin only
  */
-router.post('/admin/generate-otp', authMiddleware, async (req, res) => {
+router.post('/admin/generate-otp', authMiddleware, policyShadowAuth('admin_generate_otp'), async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'staff') {
       return res.status(403).json({ success: false, message: 'Không có quyền' });
@@ -1649,7 +1653,7 @@ router.post('/admin/generate-otp', authMiddleware, async (req, res) => {
 
 
 // ─── POST /api/auth/reset-password-request (backward compat - DISABLED FOR SECURITY) ─────────────────
-router.post('/reset-password-request', sensitiveFlowLimiter, async (req, res) => {
+router.post('/reset-password-request', sensitiveFlowLimiter, policyShadowAuth('reset_password_request'), async (req, res) => {
   return res.status(410).json({ success: false, message: 'Phương thức này đã bị gỡ bỏ vì lý do bảo mật. Vui lòng dùng luồng Quên mật khẩu chính thức.' });
 });
 
@@ -1660,7 +1664,7 @@ router.post('/reset-password-request', sensitiveFlowLimiter, async (req, res) =>
  * @desc    Admin cấp lại mật khẩu cho giảng viên/học viên
  * @access  Admin only
  */
-router.post('/admin/reset-password', authMiddleware, async (req, res) => {
+router.post('/admin/reset-password', authMiddleware, policyShadowAuth('admin_reset_password'), async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'staff') {
       return res.status(403).json({ success: false, message: 'Không có quyền thực hiện' });
@@ -1708,7 +1712,7 @@ router.post('/admin/reset-password', authMiddleware, async (req, res) => {
  * @desc    Admin đổi tên hiển thị và/hoặc mật khẩu
  * @access  Admin only
  */
-router.put('/admin/profile', authMiddleware, async (req, res) => {
+router.put('/admin/profile', authMiddleware, policyShadowAuth('admin_profile'), async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'staff') {
       return res.status(403).json({ success: false, message: 'Chỉ Admin/Nhân viên mới được thay đổi' });

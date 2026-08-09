@@ -1,13 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, isAdmin } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
+const { policyShadowAi } = require('../middleware/policyShadowAi');
+const { aiCutoverGate } = require('../middleware/aiCutoverGate');
 const aiService = require('../services/aiService');
 const logger = require('../config/logger');
 const { sensitiveFlowLimiter } = require('../middleware/authRateLimit');
 
-const guard = [authMiddleware, isAdmin, sensitiveFlowLimiter];
+/**
+ * Phase 7.8 — Controlled cutover for /api/ai ONLY.
+ *
+ * Default / not allowlisted:
+ *   auth → policyShadowAi → Legacy isAdmin (via aiCutoverGate) → sensitiveFlowLimiter → handler
+ *
+ * Opt-in Policy-primary:
+ *   POLICY_CUTOVER_ENABLED=true
+ *   POLICY_CUTOVER_ROUTES=…,ai
+ *
+ * Rollback: remove ai from ROUTES (keep prior families) or ENABLED=false.
+ * Legacy isAdmin retained inside aiCutoverGate. Limiter order preserved (after authz).
+ * Handlers retain all AI provider calls. No invented AI manage-permission taxonomy.
+ */
+const guard = (action) => [
+  authMiddleware,
+  policyShadowAi(action),
+  aiCutoverGate(action),
+  sensitiveFlowLimiter,
+];
 
-router.get('/status', guard, async (req, res) => {
+router.get('/status', guard('status'), async (req, res) => {
   try {
     const data = await aiService.probeHealth();
     res.json({ success: true, data });
@@ -16,7 +37,7 @@ router.get('/status', guard, async (req, res) => {
   }
 });
 
-router.post('/quiz', guard, async (req, res) => {
+router.post('/quiz', guard('quiz'), async (req, res) => {
   try {
     const { topic, count, subject } = req.body || {};
     const data = await aiService.generateQuiz({ topic, count, subject });
@@ -28,7 +49,7 @@ router.post('/quiz', guard, async (req, res) => {
   }
 });
 
-router.post('/notification-draft', guard, async (req, res) => {
+router.post('/notification-draft', guard('notification_draft'), async (req, res) => {
   try {
     const { purpose, audience, tone } = req.body || {};
     const data = await aiService.draftNotification({ purpose, audience, tone });
@@ -39,7 +60,7 @@ router.post('/notification-draft', guard, async (req, res) => {
   }
 });
 
-router.post('/summarize', guard, async (req, res) => {
+router.post('/summarize', guard('summarize'), async (req, res) => {
   try {
     const { text, maxWords } = req.body || {};
     const data = await aiService.summarizeText({ text, maxWords });
@@ -50,7 +71,7 @@ router.post('/summarize', guard, async (req, res) => {
   }
 });
 
-router.post('/complete', guard, async (req, res) => {
+router.post('/complete', guard('complete'), async (req, res) => {
   try {
     const { prompt, system } = req.body || {};
     const data = await aiService.complete({ prompt, system });

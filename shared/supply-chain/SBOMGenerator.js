@@ -1,0 +1,1 @@
+'use strict'; class SBOMGenerator { generate() {} } module.exports = SBOMGenerator;

@@ -523,12 +523,8 @@ async function getStudentFinanceCard(studentId) {
     throw err;
   }
 
-  // Tự heal trước khi cộng KPI — đóng lệch "HĐ có / enrollment paid / Ledger thiếu"
-  try {
-    await healOrphanEnrollmentPayments(student);
-  } catch (err) {
-    logger.warn('[ledger] heal on finance card: %s', err.message);
-  }
+  // Heal orphans chỉ qua admin reconcile endpoint — không mint revenue trên GET card
+  // (tránh silent PAYMENT từ UI flags / SePay half-state)
 
   const enrollments = Array.isArray(student.enrollments) ? student.enrollments : [];
   const registeredFee = enrollments.reduce((s, e) => s + (Number(e.price) || 0), 0)

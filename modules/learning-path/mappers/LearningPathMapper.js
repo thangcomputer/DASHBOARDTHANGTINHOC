@@ -1,0 +1,1 @@
+'use strict'; class LearningPathMapper { toDomain() {} toDto() {} } module.exports = LearningPathMapper;

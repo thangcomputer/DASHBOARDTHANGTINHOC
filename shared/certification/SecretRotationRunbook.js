@@ -1,0 +1,1 @@
+'use strict'; class SecretRotationRunbook { execute() {} } module.exports = SecretRotationRunbook;

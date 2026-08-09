@@ -1,0 +1,37 @@
+[
+  {
+    "module": "Auth",
+    "func": "Login UI",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Đăng nhập UI thành công vào Teacher Portal"
+  },
+  {
+    "module": "Students",
+    "func": "Read UI",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Teacher chỉ nhìn thấy Học viên của mình trên UI"
+  },
+  {
+    "module": "Security",
+    "func": "Admin Access UI",
+    "result": "Passed",
+    "severity": "High",
+    "description": "Teacher bị chặn khi cố truy cập trang Admin"
+  },
+  {
+    "module": "Schedule",
+    "func": "View UI",
+    "result": "Passed",
+    "severity": "Medium",
+    "description": "Truy cập tab Lịch dạy thành công"
+  },
+  {
+    "module": "Profile",
+    "func": "View UI",
+    "result": "Passed",
+    "severity": "Medium",
+    "description": "Tải hồ sơ Teacher thành công"
+  }
+]

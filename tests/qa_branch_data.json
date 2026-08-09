@@ -1,0 +1,24 @@
+{
+  "branchA": {
+    "id": "6a72ab63ac1a1516697ffd53",
+    "code": "QAT_A"
+  },
+  "branchB": {
+    "id": "6a72ab63ac1a1516697ffd54",
+    "code": "QAT_B"
+  },
+  "adminStaffA": {
+    "phone": "0999999001",
+    "password": "123456",
+    "id": "6a72ab63ac1a1516697ffd55"
+  },
+  "teacherB": {
+    "id": "6a72ab63ac1a1516697ffd57"
+  },
+  "studentB": {
+    "id": "6a72ab63ac1a1516697ffd5b"
+  },
+  "empB": {
+    "id": "6a72ab63ac1a1516697ffd5d"
+  }
+}

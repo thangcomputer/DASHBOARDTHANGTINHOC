@@ -5,13 +5,20 @@ const Student = require('../models/Student');
 const { generateInvoicePDF } = require('../modules/pdfInvoice');
 const { authMiddleware, checkPermission, branchFilter } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
+const { policyShadowFinance } = require('../middleware/policyShadowFinance');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const { enqueueInvoicePdf, enqueueInvoiceEmail } = require('../services/queue/jobQueue');
 const logger = require('../config/logger');
 
+// ─── CQRS Strangler: import modular CQRS controller ─────────────────────────
+// Activated via ENABLE_CQRS_INVOICE=true env flag
+const cqrsInvoiceController = require('../modules/invoice/controllers/InvoiceController');
+const NEW_PERMISSIONS = require('../shared/constants/permissions');
+const { authorize } = require('../shared/middleware/authorize');
+
 // ─── GET /api/invoices ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy hóa đơn (STAFF bị giới hạn theo chi nhánh)
-router.get('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter], async (req, res) => {
+router.get('/', [authMiddleware, branchFilter, policyShadowFinance('inv_list'), checkPermission(PERMISSIONS.MANAGE_FINANCE)], async (req, res) => {
   try {
     const { studentId, search, branchId: queryBranch, paymentMethod, from, to } = req.query;
     const filter = { ...req.branchFilter }; // {} for admin, {branchId:...} for staff
@@ -36,18 +43,34 @@ router.get('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), br
       ];
     }
 
-    const invoices = await Invoice.find(filter)
-      .populate('hocVien', 'name course phone zalo paid paidAt branchId branchCode')
-      .sort({ createdAt: -1 });
+    const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const skip = (pageNum - 1) * limitNum;
 
-    res.json({ success: true, count: invoices.length, data: invoices });
+    const [invoices, total] = await Promise.all([
+      Invoice.find(filter)
+        .populate('hocVien', 'name course phone sbd paid paidAt branchId branchCode')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum),
+      Invoice.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      count: invoices.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      data: invoices,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // ─── GET /api/invoices/stats (branch-aware, timezone-safe) ────────────────────
-router.get('/stats', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), branchFilter], async (req, res) => {
+router.get('/stats', [authMiddleware, branchFilter, policyShadowFinance('inv_stats'), checkPermission(PERMISSIONS.MANAGE_FINANCE)], async (req, res) => {
   try {
     // ⭐ Fix: branch-aware filter
     const bf = { ...req.branchFilter };
@@ -79,7 +102,7 @@ router.get('/stats', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE
 });
 
 // ─── GET /api/invoices/:id ─────────────────────────────────────────────────────
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware, policyShadowFinance('inv_get'), async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id)
       .populate('hocVien', 'name course phone zalo address');
@@ -100,7 +123,13 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // ─── POST /api/invoices ────────────────────────────────────────────────────────
 // Tạo hóa đơn thủ công (Admin) — dùng field names từ Student schema mới
-router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+// Strangler Facade: route to CQRS controller when ENABLE_CQRS_INVOICE=true
+router.post('/', authMiddleware, policyShadowFinance('inv_create'), checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res, next) => {
+  // CQRS path: InvoiceController -> CommandBus -> Post_rootHandler -> Repository -> Outbox
+  if (process.env.ENABLE_CQRS_INVOICE === 'true') {
+    return cqrsInvoiceController.post_root(req, res, next);
+  }
+  // Legacy path
   try {
     const { hocVienId, ghiChu } = req.body;
 
@@ -142,7 +171,7 @@ router.post('/', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), as
 
 // ─── GET /api/invoices/:id/pdf ─────────────────────────────────────────────────
 // Xuất hóa đơn PDF (đồng bộ — tải ngay)
-router.get('/:id/pdf', authMiddleware, async (req, res) => {
+router.get('/:id/pdf', authMiddleware, policyShadowFinance('inv_pdf'), async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id)
       .populate('hocVien', 'name course phone address');
@@ -173,7 +202,7 @@ router.get('/:id/pdf', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /api/invoices/:id/pdf/queue ── Sinh PDF nền (lưu uploads/invoices) ──
-router.post('/:id/pdf/queue', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.post('/:id/pdf/queue', authMiddleware, policyShadowFinance('inv_pdf_queue'), checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id).select('_id maHoaDon');
     if (!invoice) {
@@ -192,7 +221,7 @@ router.post('/:id/pdf/queue', authMiddleware, checkPermission(PERMISSIONS.MANAGE
 });
 
 // ─── POST /api/invoices/:id/email ── Gửi PDF hóa đơn qua email (queue) ───────
-router.post('/:id/email', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.post('/:id/email', authMiddleware, policyShadowFinance('inv_email'), checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id)
       .populate('hocVien', 'email name');
@@ -226,7 +255,7 @@ router.post('/:id/email', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FIN
 
 // ─── DELETE /api/invoices/:id ──────────────────────────────────────────────────
 // P3: cấm hard-delete HĐ — chỉ void (status=void) trừ khi FINANCE_ALLOW_HARD_DELETE=true
-router.delete('/:id', authMiddleware, checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.delete('/:id', authMiddleware, policyShadowFinance('inv_delete'), checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const { allowHardDeleteFinance } = require('../utils/financeFlags');
     const invoice = await Invoice.findById(req.params.id);

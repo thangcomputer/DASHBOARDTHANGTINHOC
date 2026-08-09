@@ -1,0 +1,1 @@
+'use strict'; const DomainEvent = require('../../shared/events/DomainEvent'); class LearningStarted extends DomainEvent {} class ProgressUpdated extends DomainEvent {} class CourseCompleted extends DomainEvent {} module.exports = { LearningStarted, ProgressUpdated, CourseCompleted };

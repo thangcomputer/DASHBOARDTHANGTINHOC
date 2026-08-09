@@ -1,0 +1,1 @@
+'use strict'; class LeaderboardController {} module.exports = LeaderboardController;

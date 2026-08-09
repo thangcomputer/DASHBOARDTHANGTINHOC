@@ -4,9 +4,23 @@ const TrainingCourse = require('../models/TrainingCourse');
 const TrainingLesson = require('../models/TrainingLesson');
 const TrainingProgress = require('../models/TrainingProgress');
 const { authMiddleware } = require('../middleware/auth');
+const { policyShadowTrainingLms } = require('../middleware/policyShadowTrainingLms');
+const { trainingLmsCutoverGate } = require('../middleware/trainingLmsCutoverGate');
+
+/**
+ * LIVE mount: server.js → app.use('/api/training-lms', trainingRoutes)
+ *
+ * Phase 7.13 — Controlled cutover for /api/training-lms ONLY (not /api/training).
+ * Flow: auth → policyShadowTrainingLms(action) → trainingLmsCutoverGate(action) → handler
+ * Legacy fallback: auth-only pass-through; lms_admin_progress → checkPermission(MANAGE_TRAINING).
+ */
+
+function lmsGuard(action) {
+  return [authMiddleware, policyShadowTrainingLms(action), trainingLmsCutoverGate(action)];
+}
 
 // Lấy danh sách khóa đào tạo
-router.get('/courses', authMiddleware, async (req, res) => {
+router.get('/courses', lmsGuard('lms_courses'), async (req, res) => {
   try {
     const courses = await TrainingCourse.find({ isActive: true });
     res.json({ success: true, data: courses });
@@ -27,7 +41,7 @@ function findCourseInSettings(settings, courseId) {
 }
 
 // Lấy danh sách bài học của 1 khóa (Kèm trạng thái khóa/mở)
-router.get('/courses/:id/lessons', authMiddleware, async (req, res) => {
+router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const courseId = req.params.id;
@@ -102,7 +116,7 @@ router.get('/courses/:id/lessons', authMiddleware, async (req, res) => {
 });
 
 // Hoàn thành bài học
-router.post('/complete-lesson', authMiddleware, async (req, res) => {
+router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const { lessonId, courseId, watchedSeconds } = req.body;
@@ -173,7 +187,7 @@ function mapFileForTeacherUi(file) {
 }
 
 // Lấy tổng quan phần trăm hoàn thành của TẤT CẢ khóa học của người dùng hiện tại
-router.get('/progress/me', authMiddleware, async (req, res) => {
+router.get('/progress/me', lmsGuard('lms_progress_me'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const progress = await TrainingProgress.find({ userId, status: 'completed' });
@@ -207,7 +221,7 @@ router.get('/progress/me', authMiddleware, async (req, res) => {
 });
 
 // Tổng quan đào tạo GV: khóa học + tiến độ + quy trình + tài liệu (1 request)
-router.get('/teacher/overview', authMiddleware, async (req, res) => {
+router.get('/teacher/overview', lmsGuard('lms_teacher_overview'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const SystemSettings = require('../models/SystemSettings');
@@ -270,7 +284,7 @@ router.get('/teacher/overview', authMiddleware, async (req, res) => {
 });
 
 // ⏱ Lưu tiến độ xem tạm thời (auto-save mỗi 30s — chống F5 reset bộ đếm)
-router.post('/save-watch-progress', authMiddleware, async (req, res) => {
+router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const { lessonId, courseId, watchedSeconds } = req.body;
@@ -293,7 +307,7 @@ router.post('/save-watch-progress', authMiddleware, async (req, res) => {
 });
 
 // [ADMIN] Theo dõi tiến độ đào tạo của tất cả giảng viên
-router.get('/admin/progress/:courseId', authMiddleware, async (req, res) => {
+router.get('/admin/progress/:courseId', lmsGuard('lms_admin_progress'), async (req, res) => {
   try {
     const { courseId } = req.params;
 
@@ -320,7 +334,7 @@ router.get('/admin/progress/:courseId', authMiddleware, async (req, res) => {
     });
 
     const Teacher = require('../models/Teacher');
-    const teachers = await Teacher.find({}).select('name phone status').lean();
+    const teachers = await Teacher.find({}).select('name status').lean();
 
     const result = teachers.map(t => {
       const uid = String(t._id);
@@ -329,7 +343,6 @@ router.get('/admin/progress/:courseId', authMiddleware, async (req, res) => {
       return {
         teacherId: uid,
         teacherName: t.name,
-        teacherPhone: t.phone,
         status: t.status,
         completedLessons: prog.completedCount,
         totalLessons,

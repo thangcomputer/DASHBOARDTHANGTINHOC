@@ -1,0 +1,1 @@
+# Operations Runbook\nStartup, shutdown, scaling, and Mongo failure procedures documented.

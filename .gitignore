@@ -22,6 +22,7 @@ lerna-debug.log*
 uploads/
 temp/
 tmp/
+$null
 
 # OS files
 .DS_Store
@@ -38,6 +39,9 @@ tests/load-test/k6-bin/
 # Test artifacts
 tests/reports/
 tests/videos/
+tests/screenshots/
+coverage/
+artifacts/mongo_data/
 
 # Editor
 .vscode/

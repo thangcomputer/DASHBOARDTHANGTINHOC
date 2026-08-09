@@ -1,0 +1,14 @@
+'use strict';
+const { queryRegistry } = require('../../../shared/cqrs');
+const Get_statsQuery = require('./Get_statsQuery');
+const Get_statsHandler = require('./Get_statsHandler');
+queryRegistry.register('Get_statsQuery', new Get_statsHandler());
+module.exports.Get_statsQuery = Get_statsQuery;
+const Get_rootQuery = require('./Get_rootQuery');
+const Get_rootHandler = require('./Get_rootHandler');
+queryRegistry.register('Get_rootQuery', new Get_rootHandler());
+module.exports.Get_rootQuery = Get_rootQuery;
+const Get_id_downloadQuery = require('./Get_id_downloadQuery');
+const Get_id_downloadHandler = require('./Get_id_downloadHandler');
+queryRegistry.register('Get_id_downloadQuery', new Get_id_downloadHandler());
+module.exports.Get_id_downloadQuery = Get_id_downloadQuery;

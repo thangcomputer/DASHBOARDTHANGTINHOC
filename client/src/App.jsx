@@ -320,23 +320,31 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
           </PermissionGuard>
         } />
         <Route path="/admin/inbox" element={
-          <ErrorBoundary inline>
-            <Inbox 
-              currentUserId={session?.id} 
-              currentUserName={session?.name} 
-              currentUserRole={getMessagingRole(session)} 
-              onNavigate={go} 
-            />
-          </ErrorBoundary>
+          <PermissionGuard session={session} permission={PERMISSIONS.MANAGE_MESSAGES}>
+            <ErrorBoundary inline>
+              <Inbox 
+                currentUserId={session?.id} 
+                currentUserName={session?.name} 
+                currentUserRole={getMessagingRole(session)} 
+                onNavigate={go} 
+              />
+            </ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/feed" element={
-          <ErrorBoundary inline><FeedBoard session={session} role="admin" /></ErrorBoundary>
+          <PermissionGuard session={session} anyOf={[PERMISSIONS.MANAGE_MESSAGES, PERMISSIONS.MANAGE_STUDENTS, PERMISSIONS.VIEW_TEACHERS]}>
+            <ErrorBoundary inline><FeedBoard session={session} role="admin" /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/news" element={
-          <ErrorBoundary inline><NewsPage session={session} role="admin" /></ErrorBoundary>
+          <PermissionGuard session={session} anyOf={[PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES, PERMISSIONS.VIEW_TEACHERS]}>
+            <ErrorBoundary inline><NewsPage session={session} role="admin" /></ErrorBoundary>
+          </PermissionGuard>
         } />
         <Route path="/admin/news/:slug" element={
-          <ErrorBoundary inline><NewsPage session={session} role="admin" /></ErrorBoundary>
+          <PermissionGuard session={session} anyOf={[PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES, PERMISSIONS.VIEW_TEACHERS]}>
+            <ErrorBoundary inline><NewsPage session={session} role="admin" /></ErrorBoundary>
+          </PermissionGuard>
         } />
       </Route>
 

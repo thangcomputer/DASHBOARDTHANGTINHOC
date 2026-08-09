@@ -1,0 +1,1 @@
+'use strict'; class SourceCodePolicy { validate() {} } module.exports = SourceCodePolicy;

@@ -1,0 +1,9 @@
+{
+  "title": "Security and RBAC Dashboard",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Total Security and RBAC"
+    }
+  ]
+}

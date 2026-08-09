@@ -535,7 +535,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   : 'cms-page min-w-0 w-full max-w-full'
             }
           >
-            <Outlet />
+            <Outlet context={{ session, role }} />
           </div>
         </div>
       </main>

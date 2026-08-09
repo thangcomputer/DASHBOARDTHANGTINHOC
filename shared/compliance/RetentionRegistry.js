@@ -1,0 +1,1 @@
+'use strict'; class RetentionRegistry { register() {} } module.exports = RetentionRegistry;

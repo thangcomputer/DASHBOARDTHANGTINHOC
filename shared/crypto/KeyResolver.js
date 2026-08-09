@@ -1,0 +1,1 @@
+'use strict'; class KeyResolver { resolve() {} } module.exports = KeyResolver;

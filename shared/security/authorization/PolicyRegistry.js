@@ -1,0 +1,1 @@
+'use strict'; class PolicyRegistry { register() {} get() {} } module.exports = PolicyRegistry;

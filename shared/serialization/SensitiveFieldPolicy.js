@@ -1,0 +1,1 @@
+'use strict'; class SensitiveFieldPolicy { check() {} } module.exports = SensitiveFieldPolicy;

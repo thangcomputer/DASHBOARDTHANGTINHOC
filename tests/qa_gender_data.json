@@ -1,0 +1,31 @@
+{
+  "branchAdmin": {
+    "id": "6a72d16550954e200b0d55b1",
+    "phone": "0888888001",
+    "password": "123456"
+  },
+  "employee": {
+    "id": "6a72d16550954e200b0d55b2",
+    "phone": "0888888002",
+    "password": "123456"
+  },
+  "support": {
+    "id": "6a72d16550954e200b0d55b3",
+    "phone": "0888888003",
+    "password": "123456"
+  },
+  "teacher": {
+    "id": "6a72d16550954e200b0d55b4",
+    "phone": "0888888004",
+    "password": "123456"
+  },
+  "student": {
+    "id": "6a72d16550954e200b0d55b5",
+    "phone": "0888888101",
+    "password": "123456"
+  },
+  "admin": {
+    "phone": "admin",
+    "password": "admin123"
+  }
+}

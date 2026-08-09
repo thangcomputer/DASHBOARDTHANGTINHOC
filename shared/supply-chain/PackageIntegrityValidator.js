@@ -1,0 +1,1 @@
+'use strict'; class PackageIntegrityValidator { validate() {} } module.exports = PackageIntegrityValidator;

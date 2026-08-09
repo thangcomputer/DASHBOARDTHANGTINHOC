@@ -1,0 +1,1 @@
+'use strict'; class ApiSecurityMiddleware { static enforce() { return (req, res, next) => next(); } } module.exports = ApiSecurityMiddleware;

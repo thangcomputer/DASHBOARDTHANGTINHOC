@@ -1,0 +1,31 @@
+{
+  "superAdmin": {
+    "id": "admin",
+    "phone": "admin",
+    "password": "admin123"
+  },
+  "branchAdmin": {
+    "id": "6a72cdf9f27872e065309a1c",
+    "phone": "0999999001",
+    "password": "123456"
+  },
+  "supportAgent": {
+    "id": "6a72cdf9f27872e065309a1d",
+    "phone": "0999999002",
+    "password": "123456"
+  },
+  "teacher": {
+    "id": "6a72cdf9f27872e065309a1e",
+    "phone": "0999999003",
+    "password": "123456"
+  },
+  "student": {
+    "id": "6a72cdf9f27872e065309a1f",
+    "phone": "0999999101",
+    "password": "123456"
+  },
+  "branch": {
+    "id": "6a72cdf9f27872e065309a1b",
+    "code": "QAMSG"
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "phase": "8.14",
+  "RUNTIME_ENVIRONMENT": "LOCAL",
+  "soakWindow": {
+    "start": "2026-08-09T07:11:29.495Z",
+    "end": "2026-08-09T07:11:29.540Z"
+  },
+  "SOAK_EVIDENCE": "AVAILABLE",
+  "static": {
+    "channel": "STATIC",
+    "match": 8,
+    "mismatch": 0,
+    "unknown": 0,
+    "unsupported": 4,
+    "gates": 8,
+    "legacyOnly": 4,
+    "mappedGateMatchTarget": 8,
+    "mappedGateMatch": 8
+  },
+  "channels": {
+    "STATIC": {
+      "requests": 12,
+      "match": 8,
+      "mismatch": 0,
+      "unknown": 0,
+      "unsupported": 4,
+      "errors": 0,
+      "mismatchReasons": {}
+    },
+    "SYNTHETIC": {
+      "requests": 0,
+      "match": 0,
+      "mismatch": 0,
+      "unknown": 0,
+      "unsupported": 0,
+      "errors": 0,
+      "mismatchReasons": {}
+    },
+    "RUNTIME": {
+      "requests": 88,
+      "match": 85,
+      "mismatch": 1,
+      "unknown": 0,
+      "unsupported": 2,
+      "errors": 0,
+      "mismatchReasons": {
+        "KNOWN_LEGACY_MISMATCH": 1
+      }
+    }
+  },
+  "soakDelta": {
+    "requests": 88,
+    "match": 85,
+    "mismatch": 1,
+    "unknown": 0,
+    "unsupported": 2,
+    "observer_errors": 0,
+    "dualcheck_errors": 0,
+    "dualcheck_total": 44,
+    "mismatchReasons": {
+      "KNOWN_LEGACY_MISMATCH": 1
+    },
+    "newRuntimeMismatchSamples": [
+      {
+        "permission": "manage_hr",
+        "family": null,
+        "role": "admin_staff_identity",
+        "liveDecision": "ALLOW",
+        "enterpriseDecision": "DENY",
+        "mismatchReason": "KNOWN_LEGACY_MISMATCH",
+        "scope": "same",
+        "requestId": "soak-1786259489539-r6hri4",
+        "correlationId": "soak-1786259489539-r6hri4"
+      }
+    ]
+  },
+  "httpCalls": 44,
+  "mismatchInventory": [
+    {
+      "permission": "manage_hr",
+      "family": null,
+      "role": "admin_staff_identity",
+      "liveDecision": "ALLOW",
+      "enterpriseDecision": "DENY",
+      "mismatchReason": "KNOWN_LEGACY_MISMATCH",
+      "scope": "same",
+      "requestId": "soak-1786259489539-r6hri4",
+      "correlationId": "soak-1786259489539-r6hri4"
+    }
+  ],
+  "roleMismatchAudit": {
+    "classification": "LEGACY_COMPATIBILITY",
+    "knownAs": "KNOWN_LEGACY_MISMATCH",
+    "live": "JWT admin|staff + permissions without adminRole → ALLOW (assertStaffPermissions fallthrough)",
+    "enterprise": "CONDITIONAL DENY (role_unresolved_adminRole) — no admin→SUPER/STAFF flatten",
+    "action": "Keep MISMATCH; do not promote; future architectural approval required"
+  },
+  "ENTERPRISE_PRIMARY_READY": "NO",
+  "safety": {
+    "finalDecisionEqualsLiveDecision": true,
+    "liveSemanticsUnchanged": true,
+    "enterpriseNotPromoted": true
+  },
+  "metrics": {
+    "rbac_parity_match_total": 85,
+    "rbac_parity_mismatch_total": 1,
+    "rbac_parity_unknown_total": 0,
+    "rbac_parity_unsupported_total": 2,
+    "rbac_parity_observer_error_total": 0,
+    "rbac_dualcheck_total": 44,
+    "rbac_dualcheck_mismatch_total": 1,
+    "rbac_dualcheck_error_total": 0
+  }
+}
