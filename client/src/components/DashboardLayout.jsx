@@ -284,8 +284,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     : role;
 
   return (
-import { getMessagingRole } from '../lib/messagingRoles';
-...
     <FloatingMessengerProvider
       currentUserId={myId}
       currentUserRole={getMessagingRole(session) || role}
