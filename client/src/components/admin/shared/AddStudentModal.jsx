@@ -2,11 +2,29 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import {
   X, CheckCircle2, CreditCard, AlertCircle, MapPin, Loader2,
-  Plus, Share2, DollarSign,
+  Plus, Share2, DollarSign, UserPlus,
 } from 'lucide-react';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useSocket } from '../../../context/SocketContext';
+import { getAccessToken } from '../../../services/api';
+
+function readPortalAccessToken() {
+  return (
+    getAccessToken('admin')
+    || getAccessToken('staff')
+    || (() => {
+      try {
+        for (const key of ['admin_user', 'staff_user']) {
+          const u = JSON.parse(localStorage.getItem(key) || 'null');
+          const t = u?.token || u?.accessToken;
+          if (t) return t;
+        }
+      } catch { /* ignore */ }
+      return '';
+    })()
+  );
+}
 
 export default function AddStudentModal({ onAdd, onClose, teachers }) {
   const toast    = useToast();
@@ -18,6 +36,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
 
   // ── Step: 'form' | 'qr' | 'success' ─────────────────────────────────────
   const [step, setStep] = useState('form');
+  const [submitting, setSubmitting] = useState(false);
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [dbCourses, setDbCourses] = useState([]);
@@ -111,14 +130,15 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       .then(res => { if (res.success) setBankInfo(res.data); })
       .catch(() => {});
 
-    // 2) Create payment session
-    const token = (() => { try { return JSON.parse(localStorage.getItem('admin_user') || '{}').token || ''; } catch { return ''; } })();
+    // 2) Create payment session — STAFF lưu staff_user, không chỉ admin_user
+    const token = readPortalAccessToken();
     const selectedBranch = branches.find(b => String(b._id) === String(form.branchId || (selectedBranchId !== 'all' ? selectedBranchId : '')));
     const branchCode = selectedBranch?.code || '';
 
     fetch(`${API}/api/webhooks/create-session`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      credentials: 'include',
       body: JSON.stringify({ 
         amount: form.price, 
         content: ckContent,
@@ -126,7 +146,12 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
         courseName: form.course,
         branchCode: branchCode
       }),
-    }).then(r => r.json()).then(res => { if (res.sessionId) setSessionId(res.sessionId); }).catch(() => {});
+    }).then(r => r.json()).then(res => {
+      if (res.sessionId) setSessionId(res.sessionId);
+      else if (res.message) toast.error(res.message || 'Không tạo được phiên QR thanh toán');
+    }).catch(() => {
+      toast.error('Không tạo được phiên QR — thử "Lưu chưa thanh toán" hoặc tích tiền mặt');
+    });
 
     // Countdown
     timerRef.current = setInterval(() => {
@@ -152,8 +177,15 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
         
         // Wait 2 seconds before closing and adding student
         setTimeout(() => {
-          onAdd({ ...form, age: Number(form.age), id: Date.now(), paid: true, studentCode });
-          onClose();
+          Promise.resolve(onAdd({
+            ...form,
+            age: form.age === '' || form.age == null ? undefined : Number(form.age),
+            id: Date.now(),
+            paid: true,
+            studentCode,
+          }))
+            .then(() => onClose())
+            .catch((err) => toast.error(err?.message || 'Lỗi thêm học viên sau thanh toán'));
         }, 2500);
       }
     };
@@ -177,8 +209,15 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
           setStep('success'); // Show success screen
           
           setTimeout(() => {
-            onAdd({ ...form, age: Number(form.age), id: Date.now(), paid: true, studentCode });
-            onClose(); 
+            Promise.resolve(onAdd({
+              ...form,
+              age: form.age === '' || form.age == null ? undefined : Number(form.age),
+              id: Date.now(),
+              paid: true,
+              studentCode,
+            }))
+              .then(() => onClose())
+              .catch((err) => toast.error(err?.message || 'Lỗi thêm học viên sau thanh toán'));
           }, 2500);
         }
       } catch {}
@@ -186,14 +225,48 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
     return () => clearInterval(pollRef.current);
   }, [step, sessionId, pollStatus, ckContent]);
 
-  const handleSubmitForm = () => {
+  const buildPayload = (paid) => ({
+    ...form,
+    age: form.age === '' || form.age == null ? undefined : Number(form.age),
+    id: Date.now(),
+    paid: !!paid,
+    zalo: form.zalo || form.phone,
+  });
+
+  const submitStudent = async (paid) => {
+    if (!form.name.trim() || !form.phone.trim()) {
+      toast.error('Vui lòng nhập họ tên và số điện thoại!');
+      return false;
+    }
+    if (!form.course?.trim() && !form.courseId) {
+      toast.error('Vui lòng chọn khóa học!');
+      return false;
+    }
+    setSubmitting(true);
+    try {
+      await Promise.resolve(onAdd(buildPayload(paid)));
+      onClose();
+      return true;
+    } catch (err) {
+      // useAdminStudents đã toast — giữ modal mở để sửa form
+      if (!err?.message) toast.error('Lỗi thêm học viên');
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitForm = async () => {
     if (!form.name.trim() || !form.phone.trim()) { toast.error('Vui lòng nhập họ tên và số điện thoại!'); return; }
     if (form.paid) {
-      // Paid manually marked — add directly
-      onAdd({ ...form, age: Number(form.age), id: Date.now(), paid: true });
-      onClose(); return;
+      await submitStudent(true);
+      return;
     }
     setStep('qr');
+  };
+
+  const handleSaveUnpaid = async () => {
+    await submitStudent(false);
   };
 
   const formatTime = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
@@ -447,7 +520,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                 <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 shrink-0" />
                 <span className="min-w-0">
                   <span className="block text-[13px] font-semibold text-slate-800 leading-tight">Thanh toán tiền mặt</span>
-                  <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp</span>
+                  <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp — hoặc dùng &quot;Lưu chưa thanh toán&quot; nếu thu sau</span>
                 </span>
               </label>
             </section>
@@ -536,14 +609,29 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
           </div>
         </div>
 
-        <div className="cms-sheet-footer">
-          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">
+        <div className="cms-sheet-footer flex-wrap gap-2">
+          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline" disabled={submitting}>
             Hủy bỏ
           </button>
-          <button type="button" onClick={handleSubmitForm} className="cms-btn cms-btn-primary">
-            {form.paid
-              ? <><CheckCircle2 size={16} /> Hoàn tất đăng ký</>
-              : <><CreditCard size={16} /> Quét QR &amp; đăng ký</>}
+          {!form.paid && (
+            <button
+              type="button"
+              onClick={handleSaveUnpaid}
+              className="cms-btn cms-btn-outline"
+              disabled={submitting}
+              title="Tạo học viên ngay, thu học phí sau"
+            >
+              {submitting
+                ? <><Loader2 size={16} className="animate-spin" /> Đang lưu…</>
+                : <><UserPlus size={16} /> Lưu chưa thanh toán</>}
+            </button>
+          )}
+          <button type="button" onClick={handleSubmitForm} className="cms-btn cms-btn-primary" disabled={submitting}>
+            {submitting
+              ? <><Loader2 size={16} className="animate-spin" /> Đang lưu…</>
+              : form.paid
+                ? <><CheckCircle2 size={16} /> Hoàn tất đăng ký</>
+                : <><CreditCard size={16} /> Quét QR &amp; đăng ký</>}
           </button>
         </div>
       </div>

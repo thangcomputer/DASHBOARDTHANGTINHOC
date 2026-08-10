@@ -323,7 +323,11 @@ const AppSidebar = ({
 
   const getBadgeCount = (itemKey) => {
     if (itemKey === 'inbox' && session?.id) {
-      return getConversations(session.id).reduce((sum, c) => sum + (c.unread || 0), 0);
+      try {
+        return (getConversations(session.id) || []).reduce((sum, c) => sum + (c.unread || 0), 0);
+      } catch {
+        return 0;
+      }
     }
     if (role === 'admin') {
       if (itemKey === 'students') {

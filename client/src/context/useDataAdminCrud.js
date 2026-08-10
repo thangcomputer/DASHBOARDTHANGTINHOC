@@ -19,10 +19,11 @@ export function useDataAdminCrud({
   }, [examResults]);
 
   const addStudent = useCallback(async (student) => {
+    const ageNum = Number(student.age);
     const payload = {
       name:          student.name,
       gender:        student.gender || 'male',
-      age:           student.age || undefined,
+      age:           Number.isFinite(ageNum) && ageNum >= 10 ? ageNum : undefined,
       phone:         student.phone || '',
       zalo:          student.zalo || student.phone || '',
       address:       student.address || '',

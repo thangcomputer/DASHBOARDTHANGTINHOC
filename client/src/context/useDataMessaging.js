@@ -384,10 +384,10 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
 
   const getConversations = useCallback((userId) => {
     const sId = String(userId);
-    const safeStudents = students.filter(Boolean);
-    const safeTeachers = teachers.filter(Boolean);
-    const safeStaffs = staffs.filter(Boolean);
-    const safeMessages = messages.filter(Boolean);
+    const safeStudents = Array.isArray(students) ? students.filter(Boolean) : [];
+    const safeTeachers = Array.isArray(teachers) ? teachers.filter(Boolean) : [];
+    const safeStaffs = Array.isArray(staffs) ? staffs.filter(Boolean) : [];
+    const safeMessages = Array.isArray(messages) ? messages.filter(Boolean) : [];
     const isSupportStaff = currentUser?.role === 'staff'
       || currentUser?.adminRole === 'STAFF'
       || currentUser?.adminRole === 'SUPPORT'
@@ -708,7 +708,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       });
 
       if (myAdminRole === 'HIGH_ADMIN' || myAdminRole === 'SUPPORT' || myAdminRole === 'STAFF') {
-      teachers.filter(t => t && (t.status === 'Active' || t.status === 'active') && !t.adminRole).forEach(t => {
+      safeTeachers.filter(t => t && (t.status === 'Active' || t.status === 'active') && !t.adminRole).forEach(t => {
         const convId = buildConversationId(myRole, sId, 'teacher', t.id);
         if (!convMap[convId]) {
           convMap[convId] = {

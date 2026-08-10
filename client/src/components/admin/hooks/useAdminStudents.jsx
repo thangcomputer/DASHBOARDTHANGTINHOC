@@ -190,6 +190,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
       setCurrentPage(1);
     } catch (err) {
       toast.error('Lỗi thêm học viên: ' + (err.message || 'Không xác định'));
+      throw err;
     }
   };
 
