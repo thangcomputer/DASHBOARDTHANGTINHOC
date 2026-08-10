@@ -104,13 +104,24 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
   };
 
   const isLocked = subject.status === 'dang_khoa';
+  const awaitingGrade =
+    subject.thucHanh === 'da_nop' &&
+    (subject.essayScore === null || subject.essayScore === undefined);
   const canStart  = allowStartExam && isApproved && !isLocked && !isLockedCountDown && (subject.status === 'chua_thi' || !subject.status);
-  const isOngoing = allowStartExam && isApproved && !isLocked && !isLockedCountDown && subject.status === 'dang_thi';
+  // Chỉ "Tiếp tục thi" khi còn dang dở — không khi đã nộp thực hành đang chờ chấm
+  const isOngoing =
+    allowStartExam &&
+    isApproved &&
+    !isLocked &&
+    !isLockedCountDown &&
+    subject.status === 'dang_thi' &&
+    !awaitingGrade;
   const canRetry  = allowStartExam && isApproved && !isLocked && !isLockedCountDown && subject.status === 'khong_dat';
   const isPassed  = subject.status === 'dat';
+  const isAwaitingGrade = awaitingGrade && !isPassed && subject.status !== 'khong_dat';
   const wouldBeAbleToStart =
     isApproved && !isLocked && !isLockedCountDown &&
-    (subject.status === 'chua_thi' || !subject.status || subject.status === 'dang_thi' || subject.status === 'khong_dat');
+    (subject.status === 'chua_thi' || !subject.status || (subject.status === 'dang_thi' && !awaitingGrade) || subject.status === 'khong_dat');
 
   return (
     <div className={`bg-white rounded-2xl border shadow-sm transition-all duration-200 overflow-hidden ${
@@ -166,6 +177,14 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
             className="w-full py-2.5 bg-gray-100 border border-gray-200 text-gray-400 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed uppercase tracking-wide"
           >
             <Clock size={15} /> Mở khóa sau: {countdown}
+          </button>
+        ) : isAwaitingGrade ? (
+          <button
+            type="button"
+            disabled
+            className="w-full py-2.5 bg-amber-50 border border-amber-200 text-amber-700 font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-not-allowed"
+          >
+            <Clock size={15} /> Đang chờ chấm
           </button>
         ) : !allowStartExam && wouldBeAbleToStart ? (
           <div className="w-full py-2.5 px-3 bg-amber-50 border border-amber-200 text-amber-800 font-semibold rounded-xl text-xs flex items-start justify-center gap-2 text-center leading-snug">
