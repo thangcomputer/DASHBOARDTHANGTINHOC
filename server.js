@@ -992,8 +992,8 @@ const { initJobQueue, closeJobQueue } = require('./services/queue/jobQueue');
 (async () => {
   await attachSocketIoAdapter(io);
   await presenceStore.initPresenceBus();
-  server.listen(PORT, () => {
-    logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'dashboardthangtinhoc server listening');
+  server.listen(PORT, '::', () => {
+    logger.info({ port: PORT, env: process.env.NODE_ENV || 'development', host: '::' }, 'dashboardthangtinhoc server listening');
     initJobQueue().catch((err) => logger.warn({ err: err.message }, 'initJobQueue failed'));
   });
 })().catch((err) => {

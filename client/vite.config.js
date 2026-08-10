@@ -1,6 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// Dev proxy MUST use IPv6 loopback on Windows when another process
+// (e.g. Challenge.exe) steals 127.0.0.1:5000 — Node often listens on [::]:5000 only.
+const DEV_API = process.env.VITE_DEV_API_PROXY || 'http://[::1]:5000'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -8,15 +12,15 @@ export default defineConfig({
     proxy: {
       // Không cần VITE_API_URL khi dev: /api → backend (tránh lỗi fetch HTML 404)
       '/api': {
-        target: process.env.VITE_DEV_API_PROXY || 'http://localhost:5000',
+        target: DEV_API,
         changeOrigin: true,
       },
       '/uploads': {
-        target: process.env.VITE_DEV_API_PROXY || 'http://localhost:5000',
+        target: DEV_API,
         changeOrigin: true,
       },
       '/socket.io': {
-        target: process.env.VITE_DEV_API_PROXY || 'http://localhost:5000',
+        target: DEV_API,
         ws: true,
       },
     },
