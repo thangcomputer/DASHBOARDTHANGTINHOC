@@ -13,9 +13,13 @@ function getRedis() {
   try {
     const Redis = require('ioredis');
     client = new Redis(process.env.REDIS_URL, {
-      maxRetriesPerRequest: 2,
+      maxRetriesPerRequest: 1,
       enableReadyCheck: true,
       lazyConnect: false,
+      // Khi Redis down: KHÔNG xếp hàng lệnh (tránh treo request 10–20s)
+      enableOfflineQueue: false,
+      connectTimeout: 2000,
+      commandTimeout: 500,
       // Blip Redis không được crash Node — tự reconnect với backoff
       retryStrategy(times) {
         if (times > 30) return Math.min(times * 200, 10000);

@@ -122,11 +122,14 @@ describe('Messaging isolation + canonical IDs', { concurrency: false }, () => {
     assert.equal(/io\.to\(rid\)\.emit\('message:receive'/.test(chunk), false);
   });
 
-  it('12 typing/read use socket.user + canAccessDirectConversation', () => {
+  it('12 typing/read use socket.user + MessagingPolicy (wraps canAccessDirectConversation)', () => {
     const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
     assert.ok(src.includes("socket.on('typing:start'"));
-    assert.ok(src.includes('canAccessDirectConversation'));
+    assert.ok(src.includes("require('./services/messagingPolicy')"));
+    assert.ok(src.includes('canViewConversation') || src.includes('canMarkRead'));
     assert.ok(src.includes('resolveTypingReadPeerRooms'));
+    const policy = fs.readFileSync(path.join(ROOT, 'services/messagingPolicy.js'), 'utf8');
+    assert.ok(policy.includes('canAccessDirectConversation'));
     const readStart = src.indexOf("socket.on('message:read'");
     const readChunk = src.slice(readStart, readStart + 900);
     assert.equal(/socketUserId\(socket\.user\) !== String\(readerId/.test(readChunk), false);

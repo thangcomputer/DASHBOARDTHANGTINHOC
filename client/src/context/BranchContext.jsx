@@ -1,8 +1,9 @@
 /**
- * BranchContext.jsx — Global Branch Filter Context cho SUPER_ADMIN
- * 
- * Cung cấp selectedBranch state dùng chung toàn ứng dụng.
- * STAFF không cần — backend tự lock theo branchId của họ.
+ * BranchContext.jsx — Global Branch Filter Context
+ *
+ * SUPER_ADMIN: có thể chọn "Tất cả" hoặc một chi nhánh.
+ * HIGH_ADMIN: bắt buộc một chi nhánh cụ thể (không "all").
+ * STAFF: khóa theo branchId tài khoản.
  */
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
@@ -38,6 +39,7 @@ export function BranchProvider({ session, children }) {
   const [tenants, setTenants] = useState([]);
 
   const isSuperAdmin = session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN';
+  const isHighAdmin  = session?.adminRole === 'HIGH_ADMIN';
   const isStaff      = session?.adminRole === 'STAFF';
   const staffBranchId = session?.branchId;
 
@@ -50,6 +52,19 @@ export function BranchProvider({ session, children }) {
       if (br) setSelectedBranchName(br.name);
     }
   }, [isStaff, staffBranchId, branches]);
+
+  // HIGH_ADMIN: không dùng "Tất cả" (backend fail-closed). Gắn chi nhánh đầu tiên / account branch.
+  useEffect(() => {
+    if (!isHighAdmin || !branches.length) return;
+    if (selectedBranchId && selectedBranchId !== 'all') return;
+    const home = session?.branchId
+      ? branches.find((b) => String(b._id) === String(session.branchId))
+      : null;
+    const pick = home || branches[0];
+    if (!pick?._id) return;
+    setSelectedBranchId(pick._id);
+    setSelectedBranchName(pick.name || 'Chi nhánh');
+  }, [isHighAdmin, branches, selectedBranchId, session?.branchId]);
 
   const setSelectedTenant = useCallback((id) => {
     const next = id || 'all';
@@ -111,9 +126,11 @@ export function BranchProvider({ session, children }) {
 
   const setSelectedBranch = useCallback((id, name) => {
     if (isStaff) return;
+    // HIGH_ADMIN: bắt buộc một chi nhánh cụ thể (không cho "all")
+    if (isHighAdmin && (!id || id === 'all')) return;
     setSelectedBranchId(id || 'all');
     setSelectedBranchName(name || 'Tất cả chi nhánh');
-  }, [isStaff]);
+  }, [isStaff, isHighAdmin]);
 
   const branchQueryParam = selectedBranchId && selectedBranchId !== 'all'
     ? `branch_id=${selectedBranchId}`
@@ -128,6 +145,7 @@ export function BranchProvider({ session, children }) {
       branchQueryParam,
       isLoadingBranches,
       isSuperAdmin,
+      isHighAdmin,
       isStaff,
       selectedTenantId,
       setSelectedTenant,

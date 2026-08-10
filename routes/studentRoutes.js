@@ -624,9 +624,18 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
 
     // Bảo mật: STAFF chỉ được tạo HV thuộc chi nhánh của mình
     // SUPER_ADMIN tự đặt branchId hoặc để trống
+    // HIGH_ADMIN: bắt buộc có branch (account hoặc body) — không tạo HV "lạc" rồi list không thấy
     if (req.userBranchId) {
       req.body.branchId = req.userBranchId;
       req.body.branchCode = req.userBranchCode || '';
+    } else if (req.user?.adminRole === 'HIGH_ADMIN') {
+      const bid = req.body.branchId;
+      if (!bid || bid === 'all') {
+        return res.status(400).json({
+          success: false,
+          message: 'Admin cấp cao phải chọn chi nhánh khi thêm học viên',
+        });
+      }
     }
 
     // Đồng bộ số buổi / tên khóa từ catalog khi có courseId

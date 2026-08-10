@@ -11,11 +11,15 @@ import { useLocation } from 'react-router-dom';
 import { useToast } from '../utils/toast';
 import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { displayFileName } from '../utils/validators';
-import { resolveAvatarUrl, DEFAULT_AVATARS } from '../utils/defaultAvatars';
+import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
 import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE } from '../lib/messagingIdentity';
 import { mergeConversationsById } from '../lib/conversationList';
 import { getMessagingRole } from '../lib/messagingRoles';
+import {
+  resolveMessagingDeepLink,
+  existingPeerIdsFromConversations,
+} from '../utils/messagingDeepLink';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 const formatTime = (date) => {
@@ -168,7 +172,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const dataContextConvs = getConversations(currentUserId);
   const [contacts, setContacts] = useState([]);
-  const [seedContact, setSeedContact] = useState(null);
+  const [contactsLoaded, setContactsLoaded] = useState(false);
+  const [seedContact, setSeedContact] = useState(null); // navigation intent — gated by resolveMessagingDeepLink
   const [hiddenList, setHiddenList] = useState([]);
   const [contactTab, setContactTab] = useState('all'); // 'all', 'student', 'teacher', 'admin', 'group'
 
@@ -215,9 +220,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           messagesAPI.getContacts(),
           messagesAPI.getHiddenConversations()
         ]);
-        if (res?.success) setContacts(res.data);
+        if (res?.success) setContacts(Array.isArray(res.data) ? res.data : []);
+        else setContacts([]);
         if (hiddenRes?.success) setHiddenList(hiddenRes.data);
-      } catch (err) {}
+      } catch (err) {
+        setContacts([]);
+      } finally {
+        setContactsLoaded(true);
+      }
     })();
   }, []);
 
@@ -232,8 +242,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const refreshContacts = useCallback(async () => {
     try {
       const res = await messagesAPI.getContacts();
-      if (res?.success) setContacts(res.data);
-    } catch (err) {}
+      if (res?.success) setContacts(Array.isArray(res.data) ? res.data : []);
+      else setContacts([]);
+    } catch (err) {
+      setContacts([]);
+    } finally {
+      setContactsLoaded(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -304,8 +319,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     uniqueContacts.forEach((c) => {
       if (String(c.id) === String(currentUserId)) return;
-      // Phase 8.24: transport role from adminRole — never force STAFF→admin
-      const role = getMessagingRole({
+      // Transport role for conversation IDs; product/adminRole for tab presentation (Phase 6).
+      const role = c.transportRole || getMessagingRole({
         id: c.id,
         role: c.role,
         adminRole: c.adminRole,
@@ -330,6 +345,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           name: c.name,
           role,
           adminRole: c.adminRole || existingConv?.user?.adminRole || null,
+          productRole: c.productRole || null,
           avatar: c.avatar || existingConv?.user?.avatar,
           gender: c.gender,
           phone: c.phone || '',
@@ -341,51 +357,71 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       });
     });
 
-    // Contact seed từ bảng tin / hỗ trợ online — chat không cần có sẵn trong danh bạ
+    // Phase 7: deep-link seedContact may open ONLY if peer is already in the list
+    // (authorized contact or existing conversation activity). Never invent a new peer.
     if (seedContact?.id && String(seedContact.id) !== String(currentUserId)) {
-      const role = getMessagingRole({
-        id: seedContact.id,
-        role: seedContact.role,
-        adminRole: seedContact.adminRole,
-      }) || normalizeRole(seedContact.role);
-      const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
-      const builtId = String(buildConversationId(myRole, currentUserId, role, seedContact.id));
-      const existingConv = activityById.get(builtId) || activityByPeer.get(String(seedContact.id));
-      const canonicalId = existingConv?.id ? String(existingConv.id) : builtId;
-      if (!seenConvIds.has(canonicalId)) {
-        pushEntry({
-          id: canonicalId,
-          isGroup: false,
-          isHidden: false,
-          user: {
-            id: seedContact.id,
-            name: seedContact.name,
-            role,
-            adminRole: seedContact.adminRole || null,
-            avatar: seedContact.avatar,
-            gender: seedContact.gender,
-            phone: seedContact.phone || '',
-            online: isUserOnline(seedContact.id),
-          },
-          lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
-          lastTime: existingConv?.lastTime || new Date(),
-          unread: existingConv?.unread || 0,
-        });
+      const activityPeerIds = existingPeerIdsFromConversations(dataContextConvs);
+      const gate = resolveMessagingDeepLink({
+        peerId: seedContact.id,
+        contacts: uniqueContacts,
+        existingPeerIds: activityPeerIds,
+      });
+      if (gate.allowed) {
+        const role = getMessagingRole({
+          id: seedContact.id,
+          role: seedContact.role,
+          adminRole: seedContact.adminRole,
+        }) || normalizeRole(seedContact.role);
+        const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
+        const builtId = String(buildConversationId(myRole, currentUserId, role, seedContact.id));
+        const existingConv = activityById.get(builtId) || activityByPeer.get(String(seedContact.id));
+        const canonicalId = existingConv?.id ? String(existingConv.id) : builtId;
+        if (!seenConvIds.has(canonicalId)) {
+          // Prefer contact row metadata when peer is discoverable
+          const fromContact = uniqueContacts.find((c) => String(c.id) === String(seedContact.id));
+          pushEntry({
+            id: canonicalId,
+            isGroup: false,
+            isHidden: false,
+            user: {
+              id: seedContact.id,
+              name: fromContact?.name || seedContact.name,
+              role: fromContact?.transportRole || role,
+              adminRole: fromContact?.adminRole || seedContact.adminRole || null,
+              productRole: fromContact?.productRole || null,
+              avatar: fromContact?.avatar || seedContact.avatar,
+              gender: fromContact?.gender || seedContact.gender,
+              phone: fromContact?.phone || seedContact.phone || '',
+              online: isUserOnline(seedContact.id),
+            },
+            lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
+            lastTime: existingConv?.lastTime || (gate.mode === 'AUTHORIZED_CONTACT' ? new Date(0) : new Date()),
+            unread: existingConv?.unread || 0,
+          });
+        }
       }
     }
 
-    // Phase 8.23B: include ALL dataContext DMs including seeds ("Chưa có tin nhắn").
-    // Do NOT require prior message activity for discovery.
+    // Phase 6: include message-activity DMs from dataContext (not discovery seeds).
+    // Discovery contacts come only from GET /api/messages/contacts above.
     (dataContextConvs || []).forEach((dc) => {
       if (!dc?.id) return;
       const id = String(dc.id);
       if (seenConvIds.has(id)) return;
+      const peerId = dc.user?.id != null ? String(dc.user.id) : '';
+      const fromContact = peerId
+        ? uniqueContacts.find((c) => String(c.id) === peerId)
+        : null;
       pushEntry({
         ...dc,
         id,
         isHidden: hiddenList.includes(id),
         user: {
           ...(dc.user || {}),
+          adminRole: fromContact?.adminRole || dc.user?.adminRole || null,
+          productRole: fromContact?.productRole || dc.user?.productRole || null,
+          gender: fromContact?.gender || dc.user?.gender,
+          avatar: fromContact?.avatar || dc.user?.avatar,
           online: isUserOnline(dc.user?.id),
         },
       });
@@ -740,7 +776,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         isGroup: activeConv.isGroup || false,
         groupId: activeConv.isGroup ? activeConv.user.id : null,
       };
-      await ctxSendMessage(msgData);
+      const sentImg = await ctxSendMessage(msgData);
+      if (sentImg?.failed) {
+        toast.error(sentImg.failReason || 'Không gửi được tin nhắn');
+      }
       setPendingImage(null);
       setNewMsg('');
     } else if (contentText) {
@@ -757,7 +796,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         isGroup: activeConv.isGroup || false,
         groupId: activeConv.isGroup ? activeConv.user.id : null,
       };
-      await ctxSendMessage(msgData);
+      const sent = await ctxSendMessage(msgData);
+      if (sent?.failed) {
+        toast.error(sent.failReason || 'Không gửi được tin nhắn');
+      }
       setNewMsg('');
     }
 
@@ -907,7 +949,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
 
-  // Auto-select conversation từ navigation state (kể cả chưa có trong danh bạ)
+  // Auto-select from navigation — Phase 7: never invent unauthorized peers
   const hasAutoSelected = useRef(false);
   useEffect(() => {
     const selectId = location.state?.selectUserId;
@@ -917,11 +959,21 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         id: String(selectUser.id),
         name: selectUser.name || 'Người dùng',
         role: normalizeRole(selectUser.role || 'admin'),
+        adminRole: selectUser.adminRole || null,
         avatar: selectUser.avatar,
         phone: selectUser.phone || '',
       });
+    } else if (selectId) {
+      setSeedContact({
+        id: String(selectId),
+        name: 'Người dùng',
+        role: 'student',
+      });
     }
+
     if (!selectId || hasAutoSelected.current) return;
+    // Wait for contacts so we can distinguish Case A (existing) vs Case B (unauthorized new)
+    if (!contactsLoaded) return;
 
     const found = conversations.find((c) => String(c.user?.id) === String(selectId));
     if (found) {
@@ -930,33 +982,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       return;
     }
 
-    if (selectUser && String(selectUser.id) === String(selectId) && currentUserId) {
-      hasAutoSelected.current = true;
-      const role = getMessagingRole({
-        id: selectUser.id,
-        role: selectUser.role,
-        adminRole: selectUser.adminRole,
-      }) || normalizeRole(selectUser.role || 'admin');
-      const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
-      const convId = buildConversationId(myRole, currentUserId, role, selectUser.id);
-      selectConversation({
-        id: convId,
-        isGroup: false,
-        isHidden: false,
-        user: {
-          id: String(selectUser.id),
-          name: selectUser.name || 'Người dùng',
-          role,
-          avatar: selectUser.avatar,
-          phone: selectUser.phone || '',
-          online: true,
-        },
-        lastMessage: 'Bắt đầu cuộc trò chuyện',
-        lastTime: new Date(),
-        unread: 0,
-      });
-    }
-  }, [location.state?.selectUserId, location.state?.selectUser, conversations, currentUserId, currentUserRole]);
+    // Not in merged list (contacts + activity) → do not create a synthetic conversation
+    hasAutoSelected.current = true;
+  }, [location.state?.selectUserId, location.state?.selectUser, conversations, currentUserId, currentUserRole, contactsLoaded]);
 
   return (
     <div className="cms-chat-shell">
@@ -1041,8 +1069,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       isGroup ? 'bg-red-500' : 'bg-white ring-2 ' + (
                         conv.user.role === 'teacher' ? 'ring-amber-400/80'
                           : conv.user.role === 'student' ? 'ring-sky-400/80'
-                            : conv.user.role === 'admin' ? 'ring-rose-400/80'
-                              : 'ring-slate-300'
+                            : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'ring-blue-400/80'
+                              : conv.user.role === 'admin' ? 'ring-rose-400/80'
+                                : 'ring-slate-300'
                       )
                     }`}>
                       {isGroup ? (
@@ -1056,8 +1085,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             const el = e.currentTarget;
                             if (el.dataset.fallback === '1') return;
                             el.dataset.fallback = '1';
-                            const role = String(conv.user.role || '').toLowerCase();
-                            el.src = DEFAULT_AVATARS[role] || DEFAULT_AVATARS.staff;
+                            el.src = resolveAvatarUrl({ ...conv.user, avatar: '' });
                           }}
                         />
                       )}
@@ -1067,18 +1095,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         className={`absolute -bottom-0.5 -right-0.5 z-20 text-[8px] px-1 min-w-[18px] h-4 rounded-md font-black leading-none flex items-center justify-center shadow-sm border border-white ${
                           conv.user.role === 'teacher' ? 'bg-amber-500 text-white'
                             : conv.user.role === 'student' ? 'bg-sky-500 text-white'
-                              : conv.user.role === 'admin' ? (
-                                Array.isArray(conv.user.permissions) && conv.user.permissions.length === 1 && conv.user.permissions.includes('manage_messages')
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-rose-600 text-white'
-                              )
-                                : 'bg-slate-600 text-white'
+                              : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'bg-blue-600 text-white'
+                                : String(conv.user.adminRole || '').toUpperCase() === 'STAFF' || conv.user.role === 'staff' ? 'bg-slate-600 text-white'
+                                  : conv.user.role === 'admin' ? 'bg-rose-600 text-white'
+                                    : 'bg-slate-600 text-white'
                         }`}
                       >
                         {conv.user.role === 'teacher' ? 'GV' : conv.user.role === 'student' ? 'HV' : (
-                          Array.isArray(conv.user.permissions) && conv.user.permissions.length === 1 && conv.user.permissions.includes('manage_messages')
+                          String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT'
                             ? 'HT'
-                            : 'AD'
+                            : String(conv.user.adminRole || '').toUpperCase() === 'STAFF' || conv.user.role === 'staff'
+                              ? 'NV'
+                              : 'AD'
                         )}
                       </span>
                     )}
@@ -1222,8 +1250,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             const el = e.currentTarget;
                             if (el.dataset.fallback === '1') return;
                             el.dataset.fallback = '1';
-                            const role = String(activeConv.user.role || '').toLowerCase();
-                            el.src = DEFAULT_AVATARS[role] || DEFAULT_AVATARS.staff;
+                            el.src = resolveAvatarUrl({ ...activeConv.user, avatar: '' });
                           }}
                         />
                       )}
@@ -1278,13 +1305,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   const role = normalizeRole(msg.senderRole);
                   const badgeLabel = msg.senderDisplayRole
                     ? displayRoleLabel(msg.senderDisplayRole)
-                    : (role === 'admin' ? 'Admin'
+                    : (String(msg.senderAdminRole || '').toUpperCase() === 'SUPPORT' ? 'Hỗ trợ'
+                      : role === 'admin' ? 'Admin'
                       : role === 'staff' ? 'Giáo vụ'
                       : role === 'teacher' ? 'Giảng viên'
                       : 'Học viên');
 
                   const bubbleRoleClass =
-                    !isMine && role === 'admin'
+                    !isMine && (role === 'admin' || String(msg.senderAdminRole || '').toUpperCase() === 'SUPPORT')
                       ? 'cms-bubble-other-admin'
                       : !isMine && role === 'staff'
                         ? 'cms-bubble-other-admin'

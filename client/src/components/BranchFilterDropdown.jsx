@@ -1,6 +1,7 @@
 /**
  * BranchFilterDropdown.jsx — Dropdown chọn Chi nhánh (Topbar)
- * Chỉ hiện khi SUPER_ADMIN / STAFF ở module có phân vùng chi nhánh.
+ * SUPER_ADMIN / HIGH_ADMIN: chọn chi nhánh (HIGH không có "Tất cả").
+ * STAFF: chỉ hiện nhãn chi nhánh đã khóa.
  */
 import { Building2, ChevronDown, Check } from 'lucide-react';
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
@@ -21,7 +22,16 @@ const BRANCH_VISIBLE_HASHES = [
 ];
 
 export default function BranchFilterDropdown({ className = '', fullWidth = false }) {
-  const { selectedBranchId, selectedBranchName, branches, setSelectedBranch, isSuperAdmin, isStaff, isLoadingBranches } = useBranch();
+  const {
+    selectedBranchId,
+    selectedBranchName,
+    branches,
+    setSelectedBranch,
+    isSuperAdmin,
+    isHighAdmin,
+    isStaff,
+    isLoadingBranches,
+  } = useBranch();
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 240 });
   const ref = useRef(null);
@@ -36,6 +46,7 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
     BRANCH_VISIBLE_HASHES.includes(currentHash) ||
     location.pathname.startsWith('/admin/bi')
   );
+  const canPickBranch = isSuperAdmin || isHighAdmin;
 
   // Đóng khi mở sidebar mobile (tránh dropdown đè menu)
   useEffect(() => {
@@ -103,7 +114,7 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
     );
   }
 
-  if (!isSuperAdmin || !showDropdown) return null;
+  if (!canPickBranch || !showDropdown) return null;
 
   const handleSelect = (id, name) => {
     setSelectedBranch(id, name);
@@ -112,6 +123,7 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
 
   const activeBranches = branches.filter((b) => b && b.isActive !== false);
   const isFiltered = selectedBranchId && selectedBranchId !== 'all';
+  const allowAllBranches = isSuperAdmin && !isHighAdmin;
 
   const menu = open
     ? createPortal(
@@ -126,25 +138,27 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
           Chi nhánh
         </p>
 
-        <button
-          type="button"
-          role="option"
-          aria-selected={!isFiltered}
-          onClick={() => handleSelect('all', 'Tất cả chi nhánh')}
-          className={`w-full flex items-center justify-between gap-2 px-3.5 min-h-11 text-left text-[13px] transition-colors ${
-            !isFiltered ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50'
-          }`}
-        >
-          <span>Tất cả chi nhánh</span>
-          {!isFiltered && <Check size={13} className="text-slate-700" aria-hidden="true" />}
-        </button>
+        {allowAllBranches && (
+          <button
+            type="button"
+            role="option"
+            aria-selected={!isFiltered}
+            onClick={() => handleSelect('all', 'Tất cả chi nhánh')}
+            className={`w-full flex items-center justify-between gap-2 px-3.5 min-h-11 text-left text-[13px] transition-colors ${
+              !isFiltered ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50'
+            }`}
+          >
+            <span>Tất cả chi nhánh</span>
+            {!isFiltered && <Check size={13} className="text-slate-700" aria-hidden="true" />}
+          </button>
+        )}
 
         {activeBranches.length === 0 && (
           <div className="px-3.5 py-2.5 text-xs text-slate-400 text-center">Chưa có chi nhánh</div>
         )}
 
         {activeBranches.map((b) => {
-          const isSelected = selectedBranchId === b._id;
+          const isSelected = String(selectedBranchId) === String(b._id);
           return (
             <button
               key={b._id}
@@ -169,7 +183,7 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
           );
         })}
 
-        {isFiltered && (
+        {allowAllBranches && isFiltered && (
           <div className="border-t border-slate-100 p-2 sticky bottom-0 bg-white">
             <button
               type="button"

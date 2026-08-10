@@ -16,7 +16,7 @@ import {
   ShieldCheck, Briefcase,
 } from 'lucide-react';
 import { BankSelect } from './BankSelect';
-import api from '../services/api';
+import api, { resolveMediaUrl } from '../services/api';
 import { useToast } from '../utils/toast';
 import CoursePricingTab from './CoursePricingTab';
 import BranchManagementTab from './BranchManagementTab';
@@ -633,9 +633,7 @@ export default function SystemSettingsTab() {
             {settings.popupImageUrl && (
               <div className="relative mt-1.5 inline-block max-w-full">
                 <img
-                  src={settings.popupImageUrl.startsWith('http')
-                    ? settings.popupImageUrl
-                    : `${import.meta.env.VITE_API_URL || ""}${settings.popupImageUrl}`}
+                  src={resolveMediaUrl(settings.popupImageUrl) || settings.popupImageUrl}
                   alt="Banner preview"
                   className="rounded-lg border max-h-28 object-cover"
                 />
@@ -679,7 +677,7 @@ export default function SystemSettingsTab() {
               <div className="flex items-center gap-2">
                 {settings.invoiceLogoUrl ? (
                   <img
-                    src={settings.invoiceLogoUrl.startsWith('http') ? settings.invoiceLogoUrl : `${import.meta.env.VITE_API_URL || ""}${settings.invoiceLogoUrl}`}
+                    src={resolveMediaUrl(settings.invoiceLogoUrl) || settings.invoiceLogoUrl}
                     className="h-11 w-11 object-contain border rounded-md bg-white flex-shrink-0"
                     alt="Logo Invoice"
                   />
@@ -709,7 +707,7 @@ export default function SystemSettingsTab() {
               <div className="flex items-center gap-2">
                 {settings.invoiceSignatureUrl ? (
                   <img
-                    src={settings.invoiceSignatureUrl.startsWith('http') ? settings.invoiceSignatureUrl : `${import.meta.env.VITE_API_URL || ""}${settings.invoiceSignatureUrl}`}
+                    src={resolveMediaUrl(settings.invoiceSignatureUrl) || settings.invoiceSignatureUrl}
                     className="h-11 w-20 object-contain border rounded-md bg-white flex-shrink-0"
                     alt="Chữ ký"
                   />

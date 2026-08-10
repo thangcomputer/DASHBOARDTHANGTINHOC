@@ -953,7 +953,15 @@ export const messagesAPI = {
       method: 'POST',
       body: JSON.stringify(data)
     });
-    return res.json();
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.success === false) {
+      const err = new Error(body?.message || `Gửi tin nhắn thất bại (HTTP ${res.status})`);
+      err.status = res.status;
+      err.data = body;
+      err.code = body?.code;
+      throw err;
+    }
+    return body;
   },
   uploadMessageFile: async (file) => {
     const formData = new FormData();

@@ -133,8 +133,17 @@ async function enqueue(kind, name, data, opts = {}) {
   if (jobId) jobOpts.jobId = String(jobId);
 
   if (mode === 'bullmq' && queue) {
-    const job = await queue.add(name, data, defaultJobOpts(jobOpts));
-    return { id: String(job.id), mode: 'bullmq', queue: kind, name };
+    try {
+      const job = await Promise.race([
+        queue.add(name, data, defaultJobOpts(jobOpts)),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('bullmq add timeout')), 1500);
+        }),
+      ]);
+      return { id: String(job.id), mode: 'bullmq', queue: kind, name };
+    } catch (err) {
+      logger.warn({ err: err.message, name, kind }, '[Queue] bullmq add failed, fallback inline');
+    }
   }
 
   // Inline: khong block request — chay o tick tiep theo

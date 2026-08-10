@@ -32,21 +32,6 @@
   "finalDecisionInvariant": "PASS",
   "unsupportedLegacy": [
     {
-      "key": "manage_schedule",
-      "status": "LEGACY_ONLY",
-      "mapped": []
-    },
-    {
-      "key": "manage_messages",
-      "status": "LEGACY_ONLY",
-      "mapped": []
-    },
-    {
-      "key": "view_logs",
-      "status": "LEGACY_ONLY",
-      "mapped": []
-    },
-    {
       "key": "view_evaluations",
       "status": "LEGACY_ONLY",
       "mapped": []
@@ -90,5 +75,5 @@
     "notEvaluatedStillBlocksPrimary": true
   },
   "note": "NOT_EVALUATED ≠ FAIL and ≠ PASS. NOT_EVALUATED still blocks ENTERPRISE_PRIMARY_READY. ENTERPRISE_PRIMARY_READY=YES means cutover review eligibility only — never auto-promote.",
-  "generatedAt": "2026-08-09T09:24:57.311Z"
+  "generatedAt": "2026-08-10T11:39:28.835Z"
 }

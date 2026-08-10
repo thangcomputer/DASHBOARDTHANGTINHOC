@@ -155,7 +155,13 @@ async function evaluateSend(subject, ctx) {
     ? ctx.dmAccess
     : await assertCanDirectMessage(subject, receiverId, ctx.receiverRole);
   if (!access.ok) {
-    return { decision: 'DENY', reason: 'dm_denied', statusHint: 403 };
+    return {
+      decision: 'DENY',
+      reason: 'dm_denied',
+      statusHint: 403,
+      message: access.message || 'Không được nhắn tin đến người này',
+      denyCode: access.code || access.reason || null,
+    };
   }
   return { decision: 'ALLOW', reason: 'dm_ok', statusHint: 200 };
 }

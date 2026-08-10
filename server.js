@@ -209,6 +209,51 @@ app.get('/healthz', (req, res) => {
   });
 });
 
+// Phase 10 load-test probe — loopback only, gated by PHASE10_LOADTEST=1
+if (process.env.PHASE10_LOADTEST === '1') {
+  const { monitorEventLoopDelay } = require('perf_hooks');
+  const elHistogram = monitorEventLoopDelay({ resolution: 20 });
+  elHistogram.enable();
+  let lastCpu = process.cpuUsage();
+  let lastCpuAt = Date.now();
+  app.get('/__phase10/stats', (req, res) => {
+    const ra = req.socket.remoteAddress || '';
+    const loopback =
+      ra === '127.0.0.1' ||
+      ra === '::1' ||
+      ra === '::ffff:127.0.0.1';
+    if (!loopback) return res.status(403).json({ ok: false });
+    const now = Date.now();
+    const cpu = process.cpuUsage(lastCpu);
+    const elapsedMs = Math.max(1, now - lastCpuAt);
+    lastCpu = process.cpuUsage();
+    lastCpuAt = now;
+    const cpuPct = Math.min(100, ((cpu.user + cpu.system) / 1000 / elapsedMs) * 100);
+    const mem = process.memoryUsage();
+    const nsToMs = (ns) => Math.round((Number(ns) / 1e6) * 1000) / 1000;
+    res.json({
+      ok: true,
+      uptimeSec: Math.round(process.uptime()),
+      sockets: typeof io?.engine?.clientsCount === 'number' ? io.engine.clientsCount : null,
+      memory: {
+        rssMb: Math.round((mem.rss / 1048576) * 10) / 10,
+        heapUsedMb: Math.round((mem.heapUsed / 1048576) * 10) / 10,
+        heapTotalMb: Math.round((mem.heapTotal / 1048576) * 10) / 10,
+        externalMb: Math.round((mem.external / 1048576) * 10) / 10,
+      },
+      cpuPct: Math.round(cpuPct * 10) / 10,
+      eventLoopMs: {
+        mean: nsToMs(elHistogram.mean),
+        max: nsToMs(elHistogram.max),
+        p50: nsToMs(elHistogram.percentile(50)),
+        p95: nsToMs(elHistogram.percentile(95)),
+        p99: nsToMs(elHistogram.percentile(99)),
+      },
+    });
+    elHistogram.reset();
+  });
+}
+
 // Phase 8.20C — loopback-only RUNTIME evidence export (NOT under /api public proxy)
 app.use('/internal/rbac', require('./routes/internalRbacRoutes'));
 
@@ -263,7 +308,9 @@ function mapOnlineUser(u) {
   };
 }
 
-/** Presence theo chi nhánh — Super Admin & Staff nhận full list qua ALL_ADMIN & ALL_STAFF */
+/** Presence theo chi nhánh — Super/High/Staff/Support nhận full list qua ALL_*.
+ *  Teacher/Student nhận list scoped theo presence_<branchId> / presence_none.
+ *  Ops roles must not join presence_* (see register) or the second emit overwrites. */
 function broadcastOnlinePresence() {
   const all = presenceStore.listPresence();
   const full = all.map(mapOnlineUser);
@@ -345,12 +392,27 @@ io.on('connection', (socket) => {
         socket.join('ALL_ADMIN');
       }
 
+      // STAFF / SUPPORT / SUPER / HIGH already get the full presence list via ALL_*.
+      // Do NOT also join presence_* — the branch emit would overwrite FE state and drop
+      // branchless / cross-branch peers (e.g. Staff cannot see online Teacher with no branchId).
+      const getsFullPresence = (
+        userId === 'admin'
+        || socket.user?.adminRole === 'SUPER_ADMIN'
+        || socket.user?.adminRole === 'HIGH_ADMIN'
+        || socket.user?.adminRole === 'STAFF'
+        || socket.user?.adminRole === 'SUPPORT'
+        || messagingRole === 'staff'
+        || messagingRole === 'admin'
+      );
+
       if (resolvedBranchId) {
         const bid = resolvedBranchId;
         socket.join(`ALL_${uRole}_${bid}`);
-        socket.join(`presence_${bid}`);
         socket.join(`branch_${bid}`);
-      } else {
+        if (!getsFullPresence) {
+          socket.join(`presence_${bid}`);
+        }
+      } else if (!getsFullPresence) {
         socket.join('presence_none');
       }
       
@@ -408,6 +470,16 @@ io.on('connection', (socket) => {
     if (!isFileMsg && !isBroadcast && !rawContent) return;
     if (rawContent.length > 2000) return;
 
+    const {
+      runWithMessagingCorrelation,
+      newCorrelationId,
+      logMessagingEvent,
+    } = require('./services/messagingObservability');
+
+    await runWithMessagingCorrelation({
+      correlationId: newCorrelationId('sock'),
+      channel: 'socket',
+    }, async () => {
     // Broadcast stays on role/global rooms (admin/staff only) — not private DM path
     if (isBroadcast) {
       if (!isAdminSocketUser(u)) return;
@@ -458,11 +530,27 @@ io.on('connection', (socket) => {
         notifyUser: app.notifyUser,
         io,
       });
-      if (!result.ok) return;
+      if (!result.ok) {
+        logMessagingEvent('warn', 'messaging.socket.send_denied', {
+          senderId,
+          receiverId: data.receiverId ? String(data.receiverId) : null,
+          code: result.code || null,
+          policy: result.policy || null,
+          reason: result.message || null,
+          socketId: socket.id,
+        });
+        return;
+      }
       socket.emit('message:sent', result.clientMessage);
-    } catch {
+    } catch (err) {
+      logMessagingEvent('error', 'messaging.socket.send_error', {
+        senderId,
+        socketId: socket.id,
+        err: err?.message || 'unknown',
+      });
       return;
     }
+    });
   });
 
   // ── Đánh dấu đã đọc ──
@@ -470,10 +558,10 @@ io.on('connection', (socket) => {
     if (!socket.user) return;
     const readerId = socketUserId(socket.user);
     const {
-      canAccessDirectConversation,
       listTypingReadPeerTokens,
       resolveTypingReadPeerRooms,
     } = require('./utils/messagingRoles');
+    const { canMarkRead } = require('./services/messagingPolicy');
     const cid = String(conversationId || '');
     if (cid.startsWith('group_')) {
       const gid = cid.slice('group_'.length);
@@ -481,7 +569,8 @@ io.on('connection', (socket) => {
       socket.to(`group_${gid}`).emit('message:read_ack', { conversationId: cid, readerId });
       return;
     }
-    if (!canAccessDirectConversation(cid, socket.user)) return;
+    // Phase 4: conversation access via MessagingPolicy (wraps canAccessDirectConversation)
+    if (!canMarkRead(socket.user, cid).allowed) return;
     // Phase 8.22: legacy admin_admin → admin + ALL_ADMIN (SUPER/HIGH); never ALL_STAFF/SUPPORT.
     // socket.to excludes sender (ObjectId SUPER in ALL_ADMIN must not echo self).
     for (const t of listTypingReadPeerTokens(cid, readerId)) {
@@ -498,13 +587,13 @@ io.on('connection', (socket) => {
     if (!socket.user) return;
     const userId = socketUserId(socket.user);
     const {
-      canAccessDirectConversation,
       listTypingReadPeerTokens,
       resolveTypingReadPeerRooms,
       getMessagingRole: gmr,
     } = require('./utils/messagingRoles');
+    const { canViewConversation } = require('./services/messagingPolicy');
     const cid = String(conversationId || '');
-    if (!canAccessDirectConversation(cid, socket.user)) return;
+    if (!canViewConversation(socket.user, cid).allowed) return;
     const payload = {
       conversationId: cid,
       userId,
@@ -523,12 +612,12 @@ io.on('connection', (socket) => {
     if (!socket.user) return;
     const userId = socketUserId(socket.user);
     const {
-      canAccessDirectConversation,
       listTypingReadPeerTokens,
       resolveTypingReadPeerRooms,
     } = require('./utils/messagingRoles');
+    const { canViewConversation } = require('./services/messagingPolicy');
     const cid = String(conversationId || '');
-    if (!canAccessDirectConversation(cid, socket.user)) return;
+    if (!canViewConversation(socket.user, cid).allowed) return;
     for (const t of listTypingReadPeerTokens(cid, userId)) {
       const rooms = resolveTypingReadPeerRooms(t);
       if (!rooms.length) continue;
@@ -676,11 +765,31 @@ io.on('connection', (socket) => {
 // ── Hàm gửi notification real-time ──
 app.notifyUser = (role, userId, eventName, data) => {
   const strUserId = String(userId);
+  const {
+    logDelivery,
+  } = require('./services/messagingObservability');
+  const messageId = data?._id || data?.id || null;
+  const conversationId = data?.conversationId || null;
+  const productRole = data?.sender?.adminRole || data?.receiver?.adminRole || null;
 
   // Legacy root "admin": target root admin room + SUPER/HIGH (ALL_ADMIN).
   // NEVER fan-out private messages to ALL_STAFF / ALL_SUPPORT.
   if (strUserId === 'admin') {
     io.to('admin').to('ALL_ADMIN').emit(eventName, data);
+    logDelivery({
+      eventName,
+      targetRole: role,
+      targetUserId: 'admin',
+      presenceKey: null,
+      selectedSocketId: null,
+      room: 'admin+ALL_ADMIN',
+      mode: 'legacy_admin_mailbox',
+      messageId,
+      conversationId,
+      productRole,
+      transportRole: 'admin',
+      ok: true,
+    });
     return true;
   }
 
@@ -692,15 +801,44 @@ app.notifyUser = (role, userId, eventName, data) => {
 
   for (const r of tryRoles) {
     if (!r) continue;
-    const user = onlineUsers.get(`${r}_${strUserId}`);
+    const presenceKey = `${r}_${strUserId}`;
+    const user = onlineUsers.get(presenceKey);
     if (user?.socketId) {
       io.to(user.socketId).emit(eventName, data);
+      logDelivery({
+        eventName,
+        targetRole: r,
+        targetUserId: strUserId,
+        presenceKey,
+        selectedSocketId: user.socketId,
+        room: user.socketId,
+        mode: 'presence_socketId',
+        messageId,
+        conversationId,
+        productRole,
+        transportRole: r,
+        ok: true,
+      });
       return true;
     }
   }
 
   // Canonical private delivery: userId room joined at connect
   io.to(strUserId).emit(eventName, data);
+  logDelivery({
+    eventName,
+    targetRole: role,
+    targetUserId: strUserId,
+    presenceKey: null,
+    selectedSocketId: null,
+    room: strUserId,
+    mode: 'userId_room',
+    messageId,
+    conversationId,
+    productRole,
+    transportRole: role,
+    ok: true,
+  });
   return true;
 };
 

@@ -124,6 +124,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
     try {
       await ctxAddStudent({
         name: student.name,
+        gender: student.gender || 'male',
         age: student.age,
         phone: student.phone,
         zalo: student.zalo,

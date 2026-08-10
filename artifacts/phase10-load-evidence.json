@@ -1,0 +1,512 @@
+{
+  "startedAt": "2026-08-10T16:51:58.136Z",
+  "node": "v24.18.0",
+  "port": 5020,
+  "dbName": "dashboardthangtinhoc_p10load",
+  "mongoUriHost": "127.0.0.1:27018",
+  "redis": "NOT USED",
+  "topology": "single-node",
+  "tiers": {
+    "100": {
+      "tier": 100,
+      "classification": "PASS",
+      "stoppedReason": null,
+      "roleMix": {
+        "student": 0.7,
+        "teacher": 0.1,
+        "staff": 0.1,
+        "support": 0.08,
+        "admin": 0.02
+      },
+      "connection": {
+        "attempted": 100,
+        "connected": 100,
+        "newConnections": 100,
+        "failures": [],
+        "latency": {
+          "count": 100,
+          "p50": 50,
+          "p95": 128,
+          "p99": 134,
+          "max": 134,
+          "mean": 63.09
+        },
+        "successRate": 1
+      },
+      "dm": {
+        "pairsAvailable": 70,
+        "pairsActive": 10,
+        "ratePerSec": 5,
+        "sendOk": 19,
+        "sendFail": 0,
+        "deliveryOk": 19,
+        "deliveryFail": 0,
+        "wrongRecipient": 0,
+        "crossTenant": 0,
+        "persistedOk": 19,
+        "duplicatePersist": 0,
+        "sendLatency": {
+          "count": 19,
+          "p50": 737,
+          "p95": 2419,
+          "p99": 2419,
+          "max": 2419,
+          "mean": 890.37
+        },
+        "deliveryLatency": {
+          "count": 19,
+          "p50": 737,
+          "p95": 2419,
+          "p99": 2419,
+          "max": 2419,
+          "mean": 890.11
+        },
+        "messagesAttempted": 19,
+        "messageSuccessRate": 1,
+        "deliverySuccessRate": 1
+      },
+      "highProbe": {
+        "sendOk": 26,
+        "sendFail": 0,
+        "deliveryOk": 26,
+        "deliveryFail": 0,
+        "wrongRecipient": 0,
+        "crossTenant": 0,
+        "persistedOk": 26,
+        "duplicatePersist": 0,
+        "sendLatency": {
+          "count": 26,
+          "p50": 126,
+          "p95": 842,
+          "p99": 898,
+          "max": 898,
+          "mean": 280.85
+        },
+        "deliveryLatency": {
+          "count": 26,
+          "p50": 126,
+          "p95": 842,
+          "p99": 898,
+          "max": 898,
+          "mean": 280.85
+        },
+        "messagesAttempted": 26
+      },
+      "reconnect": null,
+      "resources": {
+        "peakCpuPct": 6.2,
+        "peakRssMb": 133.6,
+        "peakHeapUsedMb": 58.3,
+        "eventLoop": {
+          "p50": 30.835,
+          "p95": 31.441,
+          "p99": 35.127,
+          "max": 35.127
+        },
+        "peakSockets": 100
+      }
+    },
+    "250": {
+      "tier": 250,
+      "classification": "PASS",
+      "stoppedReason": null,
+      "roleMix": {
+        "student": 0.7,
+        "teacher": 0.1,
+        "staff": 0.1,
+        "support": 0.08,
+        "admin": 0.02
+      },
+      "connection": {
+        "attempted": 250,
+        "connected": 250,
+        "newConnections": 150,
+        "failures": [],
+        "latency": {
+          "count": 150,
+          "p50": 487,
+          "p95": 854,
+          "p99": 858,
+          "max": 860,
+          "mean": 498.3
+        },
+        "successRate": 1
+      },
+      "dm": {
+        "pairsAvailable": 175,
+        "pairsActive": 26,
+        "ratePerSec": 5,
+        "sendOk": 70,
+        "sendFail": 0,
+        "deliveryOk": 70,
+        "deliveryFail": 0,
+        "wrongRecipient": 0,
+        "crossTenant": 0,
+        "persistedOk": 70,
+        "duplicatePersist": 0,
+        "sendLatency": {
+          "count": 70,
+          "p50": 74,
+          "p95": 98,
+          "p99": 241,
+          "max": 241,
+          "mean": 80.93
+        },
+        "deliveryLatency": {
+          "count": 70,
+          "p50": 74,
+          "p95": 98,
+          "p99": 241,
+          "max": 241,
+          "mean": 80.76
+        },
+        "messagesAttempted": 70,
+        "messageSuccessRate": 1,
+        "deliverySuccessRate": 1
+      },
+      "highProbe": {
+        "sendOk": 48,
+        "sendFail": 0,
+        "deliveryOk": 48,
+        "deliveryFail": 0,
+        "wrongRecipient": 0,
+        "crossTenant": 0,
+        "persistedOk": 48,
+        "duplicatePersist": 0,
+        "sendLatency": {
+          "count": 48,
+          "p50": 74,
+          "p95": 276,
+          "p99": 435,
+          "max": 435,
+          "mean": 105.35
+        },
+        "deliveryLatency": {
+          "count": 48,
+          "p50": 74,
+          "p95": 276,
+          "p99": 435,
+          "max": 435,
+          "mean": 105.27
+        },
+        "messagesAttempted": 48
+      },
+      "reconnect": null,
+      "resources": {
+        "peakCpuPct": 9.4,
+        "peakRssMb": 188.7,
+        "peakHeapUsedMb": 81.4,
+        "eventLoop": {
+          "p50": 30.933,
+          "p95": 31.588,
+          "p99": 33.751,
+          "max": 33.751
+        },
+        "peakSockets": 250
+      }
+    },
+    "500": {
+      "tier": 500,
+      "classification": "PASS",
+      "stoppedReason": null,
+      "roleMix": {
+        "student": 0.7,
+        "teacher": 0.1,
+        "staff": 0.1,
+        "support": 0.08,
+        "admin": 0.02
+      },
+      "connection": {
+        "attempted": 500,
+        "connected": 500,
+        "newConnections": 250,
+        "failures": [],
+        "latency": {
+          "count": 250,
+          "p50": 1164,
+          "p95": 1652,
+          "p99": 1730,
+          "max": 1858,
+          "mean": 1170.24
+        },
+        "successRate": 1
+      },
+      "dm": {
+        "pairsAvailable": 350,
+        "pairsActive": 52,
+        "ratePerSec": 5,
+        "sendOk": 90,
+        "sendFail": 0,
+        "deliveryOk": 90,
+        "deliveryFail": 0,
+        "wrongRecipient": 0,
+        "crossTenant": 0,
+        "persistedOk": 90,
+        "duplicatePersist": 0,
+        "sendLatency": {
+          "count": 90,
+          "p50": 72,
+          "p95": 76,
+          "p99": 136,
+          "max": 136,
+          "mean": 71.73
+        },
+        "deliveryLatency": {
+          "count": 90,
+          "p50": 71,
+          "p95": 76,
+          "p99": 136,
+          "max": 136,
+          "mean": 71.61
+        },
+        "messagesAttempted": 90,
+        "messageSuccessRate": 1,
+        "deliverySuccessRate": 1
+      },
+      "highProbe": {
+        "sendOk": 0,
+        "sendFail": 1,
+        "deliveryOk": 0,
+        "deliveryFail": 0,
+        "wrongRecipient": 0,
+        "crossTenant": 0,
+        "persistedOk": 0,
+        "duplicatePersist": 0,
+        "sendLatency": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "deliveryLatency": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "messagesAttempted": 1
+      },
+      "reconnect": {
+        "attempted": 50,
+        "success": 50,
+        "failures": 0,
+        "latency": {
+          "count": 50,
+          "p50": 1137,
+          "p95": 5233,
+          "p99": 5241,
+          "max": 5241,
+          "mean": 1909.76
+        },
+        "durationMs": 9741
+      },
+      "resources": {
+        "peakCpuPct": 10.8,
+        "peakRssMb": 268.8,
+        "peakHeapUsedMb": 107.1,
+        "eventLoop": {
+          "p50": 30.949,
+          "p95": 33.423,
+          "p99": 35.226,
+          "max": 35.226
+        },
+        "peakSockets": 500
+      }
+    },
+    "1000": {
+      "tier": 1000,
+      "classification": "PASS",
+      "stoppedReason": null,
+      "roleMix": {
+        "student": 0.7,
+        "teacher": 0.1,
+        "staff": 0.1,
+        "support": 0.08,
+        "admin": 0.02
+      },
+      "connection": {
+        "attempted": 1000,
+        "connected": 1000,
+        "newConnections": 550,
+        "failures": [],
+        "latency": {
+          "count": 550,
+          "p50": 3129,
+          "p95": 6368,
+          "p99": 8508,
+          "max": 8509,
+          "mean": 3590.19
+        },
+        "successRate": 1
+      },
+      "dm": {
+        "pairsAvailable": 700,
+        "pairsActive": 105,
+        "ratePerSec": 4,
+        "sendOk": 75,
+        "sendFail": 0,
+        "deliveryOk": 75,
+        "deliveryFail": 0,
+        "wrongRecipient": 0,
+        "crossTenant": 0,
+        "persistedOk": 75,
+        "duplicatePersist": 0,
+        "sendLatency": {
+          "count": 75,
+          "p50": 69,
+          "p95": 135,
+          "p99": 421,
+          "max": 421,
+          "mean": 77.87
+        },
+        "deliveryLatency": {
+          "count": 75,
+          "p50": 68,
+          "p95": 135,
+          "p99": 421,
+          "max": 421,
+          "mean": 77.8
+        },
+        "messagesAttempted": 75,
+        "messageSuccessRate": 1,
+        "deliverySuccessRate": 1
+      },
+      "highProbe": null,
+      "reconnect": {
+        "attempted": 100,
+        "success": 90,
+        "failures": 10,
+        "latency": {
+          "count": 90,
+          "p50": 41,
+          "p95": 40253,
+          "p99": 40254,
+          "max": 40254,
+          "mean": 4752.67
+        },
+        "durationMs": 74609
+      },
+      "resources": {
+        "peakCpuPct": 6.2,
+        "peakRssMb": 303.1,
+        "peakHeapUsedMb": 124.2,
+        "eventLoop": {
+          "p50": 30.949,
+          "p95": 31.654,
+          "p99": 33.407,
+          "max": 34.144
+        },
+        "peakSockets": 1050
+      }
+    }
+  },
+  "contacts": {
+    "student": {
+      "status": 200,
+      "ms": 14,
+      "bytes": 13253,
+      "count": 46
+    },
+    "support": {
+      "status": 200,
+      "ms": 14,
+      "bytes": 133541,
+      "count": 460
+    },
+    "high_admin": {
+      "status": 200,
+      "ms": 12,
+      "bytes": 144877,
+      "count": 499
+    }
+  },
+  "broadcast": {
+    "status": 200,
+    "ms": 352,
+    "count": 175,
+    "message": "Đã gửi tin nhắn tới 175 người dùng."
+  },
+  "multiTab": {
+    "status": "ok",
+    "sockets": [
+      "Lp-A2no6n2hXExn-AAAB",
+      "PkkKs1jHAg9APrtcAAAD"
+    ],
+    "note": "latest presence socketId wins (Phase 8/9 designed behavior); not redesigned"
+  },
+  "env": {
+    "hasJwt": true,
+    "isolatedDb": true
+  },
+  "dataset": {
+    "totalUsers": 1000,
+    "counts": {
+      "student": 700,
+      "teacher": 100,
+      "staff": 100,
+      "support": 80,
+      "admin": 20
+    },
+    "tenants": {
+      "A": "6a7a01aea994adb678325e35",
+      "B": "6a7a01aea994adb678325e36"
+    },
+    "branches": {
+      "A1": "6a7a01aea994adb678325e37",
+      "A2": "6a7a01aea994adb678325e38",
+      "B1": "6a7a01afa994adb678325e39",
+      "B2": "6a7a01afa994adb678325e3a"
+    }
+  },
+  "finishedAt": "2026-08-10T16:58:48.654Z",
+  "summary": {
+    "classifications": {
+      "100": "PASS",
+      "250": "PASS",
+      "500": "PASS",
+      "1000": "PASS"
+    },
+    "privateDmCorrectness": "PASS",
+    "wrongRecipient": 0,
+    "crossTenant": 0,
+    "duplicatePersist": 0,
+    "deliveryFail": 0,
+    "p95": 135,
+    "p99": 421,
+    "peakCpu": 10.8,
+    "peakRam": 303.1,
+    "peakEventLoopP99": 35.226,
+    "redis": "NOT USED",
+    "thousandUserVerdict": "PROVEN",
+    "contacts": {
+      "student": {
+        "status": 200,
+        "ms": 14,
+        "bytes": 13253,
+        "count": 46
+      },
+      "support": {
+        "status": 200,
+        "ms": 14,
+        "bytes": 133541,
+        "count": 460
+      },
+      "high_admin": {
+        "status": 200,
+        "ms": 12,
+        "bytes": 144877,
+        "count": 499
+      }
+    },
+    "broadcast": {
+      "status": 200,
+      "ms": 352,
+      "count": 175,
+      "message": "Đã gửi tin nhắn tới 175 người dùng."
+    }
+  }
+}

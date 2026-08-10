@@ -237,6 +237,20 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         return { ...newMsg, id: res.data._id };
       }
     } catch (err) {
+      const failMsg = err?.message || 'Gửi tin nhắn thất bại';
+      setMessages((prev) => prev.map((m) => (
+        m.id === tempId
+          ? { ...m, failed: true, failReason: failMsg, code: err?.code || err?.data?.code }
+          : m
+      )));
+      if (typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(new CustomEvent('cms:toast', {
+            detail: { type: 'error', message: failMsg },
+          }));
+        } catch { /* ignore */ }
+      }
+      return { ...newMsg, failed: true, failReason: failMsg };
     }
     return newMsg;
   }, []);
@@ -502,240 +516,9 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       }
     });
 
-    // 2. Add potential contacts (discovery seeds — no prior message required)
-    if (userRole === 'student') {
-      const student = safeStudents.find(s => String(s.id) === sId);
-      const teacherIds = new Set();
-      if (student?.teacherId) teacherIds.add(String(student.teacherId));
-      (student?.enrollments || []).forEach((e) => {
-        if (e?.teacherId) teacherIds.add(String(e.teacherId));
-      });
-      teacherIds.forEach((tid) => {
-        if (!tid || tid === sId) return;
-        const t = safeTeachers.find((te) => String(te.id || te._id) === tid);
-        const convId = buildConversationId('student', sId, 'teacher', tid);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: {
-              id: tid,
-              name: t?.name || 'Giảng viên',
-              role: 'teacher',
-              avatar: t?.avatar || String(t?.name || 'GV').substring(0, 2).toUpperCase(),
-              online: true,
-              branchCode: t?.branchCode || '',
-            },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-
-      // ADMIN_STAFF / SUPPORT — transport staff, per-user threads (never admin_admin)
-      safeStaffs.filter((st) => st && (st.id || st._id) && String(st.id || st._id) !== sId).forEach((st) => {
-        const stId = String(st.id || st._id);
-        const ar = String(st.adminRole || '').toUpperCase();
-        if (ar && ar !== 'STAFF' && ar !== 'SUPPORT') return;
-        if (!ar && st.role !== 'staff') return;
-        const convId = buildConversationId('student', sId, 'staff', stId);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: {
-              id: stId,
-              name: st.name || (ar === 'SUPPORT' ? 'Hỗ trợ' : 'Giáo vụ'),
-              role: 'staff',
-              adminRole: st.adminRole || 'STAFF',
-              avatar: st.avatar || String(st.name || 'AD').substring(0, 2).toUpperCase(),
-              online: true,
-              branchCode: st.branchCode || '',
-            },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-      // Phase 8.24B: student contacts API no longer seeds SUPER/HIGH mailbox
-    } else if (userRole === 'teacher') {
-      const myStudents = safeStudents.filter(s => s && String(s.teacherId) === sId);
-      myStudents.forEach(s => {
-        const sid = String(s.id || s._id);
-        const convId = buildConversationId('teacher', sId, 'student', sid);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: { id: sid, name: s.name, role: 'student', avatar: String(s.name || 'HV').substring(0, 2).toUpperCase(), online: true, branchCode: s.branchCode || '' },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-
-      // ADMIN_STAFF / SUPPORT discovery seeds for teacher
-      safeStaffs.filter((st) => st && (st.id || st._id) && String(st.id || st._id) !== sId).forEach((st) => {
-        const stId = String(st.id || st._id);
-        const ar = String(st.adminRole || '').toUpperCase();
-        if (ar && ar !== 'STAFF' && ar !== 'SUPPORT') return;
-        if (!ar && st.role !== 'staff') return;
-        const convId = buildConversationId('teacher', sId, 'staff', stId);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: {
-              id: stId,
-              name: st.name || (ar === 'SUPPORT' ? 'Hỗ trợ' : 'Giáo vụ'),
-              role: 'staff',
-              adminRole: st.adminRole || 'STAFF',
-              avatar: st.avatar || String(st.name || 'AD').substring(0, 2).toUpperCase(),
-              online: true,
-              branchCode: st.branchCode || '',
-            },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-
-      // Phase 8.24B: teacher sees HIGH_ADMIN (not SUPER mailbox id=admin)
-      safeTeachers.filter((t) => t && String(t.adminRole || '').toUpperCase() === 'HIGH_ADMIN').forEach((h) => {
-        const hid = String(h.id || h._id);
-        if (!hid || hid === sId) return;
-        const convId = buildConversationId('teacher', sId, 'admin', hid);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: {
-              id: hid,
-              name: h.name || 'Admin cấp cao',
-              role: 'admin',
-              adminRole: 'HIGH_ADMIN',
-              avatar: String(h.name || 'AD').substring(0, 2).toUpperCase(),
-              online: true,
-              branchCode: h.branchCode || '',
-            },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-    } else if (userRole === 'admin' || userRole === 'staff') {
-      const myRole = getMessagingRole(currentUser || { id: sId, role: userRole, adminRole: currentUser?.adminRole });
-      const myAdminRole = String(currentUser?.adminRole || (sId === 'admin' ? 'SUPER_ADMIN' : '')).toUpperCase();
-
-      // SUPER: chỉ seed HIGH_ADMIN
-      if (myAdminRole === 'SUPER_ADMIN' || sId === 'admin') {
-        safeTeachers.filter((t) => t && String(t.adminRole || '').toUpperCase() === 'HIGH_ADMIN').forEach((h) => {
-          const hid = String(h.id || h._id);
-          if (!hid || hid === sId) return;
-          const convId = buildConversationId('admin', sId === 'admin' ? 'admin' : sId, 'admin', hid);
-          if (!convMap[convId]) {
-            convMap[convId] = {
-              id: convId,
-              user: {
-                id: hid,
-                name: h.name || 'Admin cấp cao',
-                role: 'admin',
-                adminRole: 'HIGH_ADMIN',
-                avatar: String(h.name || 'AD').substring(0, 2).toUpperCase(),
-                online: true,
-                branchCode: h.branchCode || '',
-              },
-              lastMessage: 'Chưa có tin nhắn',
-              lastTime: new Date(0),
-              unread: 0,
-            };
-          }
-        });
-      } else {
-      // HIGH / STAFF / SUPPORT: seed peers by matrix (contacts API remains authority)
-      safeStaffs.filter(st => st && (st.id || st._id) && String(st.id || st._id) !== sId).forEach(st => {
-        const stId = String(st.id || st._id);
-        const ar = String(st.adminRole || '').toUpperCase();
-        if (myAdminRole === 'STAFF' && ar !== 'SUPPORT' && ar !== 'HIGH_ADMIN') return;
-        if (myAdminRole === 'SUPPORT' && ar !== 'STAFF' && ar !== 'HIGH_ADMIN') return;
-        const peerRole = getMessagingRole({
-          id: stId,
-          role: st.role,
-          adminRole: st.adminRole,
-        });
-        const convId = buildConversationId(myRole, sId, peerRole, stId);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: {
-              id: stId,
-              name: st.name || 'Admin',
-              role: peerRole,
-              adminRole: st.adminRole || null,
-              avatar: String(st.name || 'AD').substring(0, 2).toUpperCase(),
-              online: true,
-              branchCode: st.branchCode || ''
-            },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-
-      // HIGH peers from teachers collection
-      safeTeachers.filter((t) => t && String(t.adminRole || '').toUpperCase() === 'HIGH_ADMIN').forEach((h) => {
-        const hid = String(h.id || h._id);
-        if (!hid || hid === sId) return;
-        const convId = buildConversationId(myRole, sId, 'admin', hid);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: {
-              id: hid,
-              name: h.name || 'Admin cấp cao',
-              role: 'admin',
-              adminRole: 'HIGH_ADMIN',
-              avatar: String(h.name || 'AD').substring(0, 2).toUpperCase(),
-              online: true,
-              branchCode: h.branchCode || '',
-            },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-
-      if (myAdminRole === 'HIGH_ADMIN' || myAdminRole === 'SUPPORT' || myAdminRole === 'STAFF') {
-      safeTeachers.filter(t => t && (t.status === 'Active' || t.status === 'active') && !t.adminRole).forEach(t => {
-        const convId = buildConversationId(myRole, sId, 'teacher', t.id);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: { id: t.id, name: t.name, role: 'teacher', avatar: String(t.name || 'GV').substring(0, 2).toUpperCase(), online: true, branchCode: t.branchCode || '' },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-
-      safeStudents.filter(s => s && (s.id || s._id)).forEach(s => {
-        const convId = buildConversationId(myRole, sId, 'student', s.id || s._id);
-        if (!convMap[convId]) {
-          convMap[convId] = {
-            id: convId,
-            user: { id: s.id, name: s.name, role: 'student', avatar: String(s.name || 'HV').substring(0, 2).toUpperCase(), online: true, branchCode: s.branchCode || '' },
-            lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
-            unread: 0,
-          };
-        }
-      });
-      }
-      }
-    }
+    // Phase 6: contact discovery is server-authoritative via GET /api/messages/contacts.
+    // Do NOT seed unauthorized peers from local students/teachers/staffs arrays.
+    // Conversation list here = message activity (+ groups below) only.
 
     // 3. Add Groups
     if (groups && Array.isArray(groups)) {

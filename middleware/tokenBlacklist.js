@@ -4,7 +4,13 @@
  */
 
 const crypto = require('crypto');
-const { getRedis } = require('../config/redis');
+const { getRedis, isRedisReady } = require('../config/redis');
+
+function readyRedis() {
+  const redis = getRedis();
+  if (!redis || !isRedisReady()) return null;
+  return redis;
+}
 
 function hashToken(token) {
   return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
@@ -30,7 +36,7 @@ class TokenBlacklist {
     if (!token) return;
     const ttlMs = Math.max(1, ttlSeconds) * 1000;
     const key = `jwtbl:${hashToken(token)}`;
-    const redis = getRedis();
+    const redis = readyRedis();
 
     if (redis) {
       try {
@@ -50,7 +56,7 @@ class TokenBlacklist {
   async isBlacklisted(token) {
     if (!token) return false;
     const key = `jwtbl:${hashToken(token)}`;
-    const redis = getRedis();
+    const redis = readyRedis();
 
     if (redis) {
       try {

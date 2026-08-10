@@ -2,7 +2,14 @@
  * Cache-aside: Redis khi co REDIS_URL, khong thi in-memory Map (TTL).
  * Khong throw — loi Redis luon fallback memory / miss.
  */
-const { getRedis } = require('../config/redis');
+const { getRedis, isRedisReady } = require('../config/redis');
+
+/** Chỉ gọi Redis khi client ready — tránh treo khi REDIS_URL set nhưng Redis down. */
+function readyRedis() {
+  const redis = getRedis();
+  if (!redis || !isRedisReady()) return null;
+  return redis;
+}
 
 const PREFIX = 'cms:';
 const memory = new Map(); // key -> { value, expiresAt }
@@ -54,7 +61,7 @@ function memoryDelByPrefix(prefix) {
 
 async function get(key) {
   const k = fullKey(key);
-  const redis = getRedis();
+  const redis = readyRedis();
   if (redis) {
     try {
       const raw = await redis.get(k);
@@ -69,7 +76,7 @@ async function get(key) {
 async function set(key, value, ttlSeconds = 60) {
   const k = fullKey(key);
   const ttl = Math.max(1, Number(ttlSeconds) || 60);
-  const redis = getRedis();
+  const redis = readyRedis();
   if (redis) {
     try {
       await redis.set(k, JSON.stringify(value), 'EX', ttl);
@@ -84,7 +91,7 @@ async function set(key, value, ttlSeconds = 60) {
 async function del(key) {
   const k = fullKey(key);
   memoryDel(k);
-  const redis = getRedis();
+  const redis = readyRedis();
   if (redis) {
     try {
       await redis.del(k);
@@ -98,7 +105,7 @@ async function del(key) {
 async function delByPrefix(prefix) {
   const p = fullKey(prefix);
   memoryDelByPrefix(p);
-  const redis = getRedis();
+  const redis = readyRedis();
   if (!redis) return;
 
   try {

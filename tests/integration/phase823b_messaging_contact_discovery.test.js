@@ -1,6 +1,7 @@
 /**
- * Phase 8.23B — Messaging contact/conversation discovery.
- * FE list only — does not change assertCanDirectMessage / RBAC / Enterprise.
+ * Phase 8.23B — Messaging contact/conversation discovery (updated Phase 6).
+ * Contacts authority moved to MessagingPolicy + messagingContactsService.
+ * FE must not seed unauthorized peers; conversation ID rules unchanged.
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
@@ -14,8 +15,8 @@ const ROOT = path.join(__dirname, '../..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () => {
-  it('1 contacts API: student sees STAFF+SUPPORT+assigned teachers (no SUPER)', () => {
-    const src = read('routes/messageRoutes.js');
+  it('1 contacts API: student candidates load STAFF+SUPPORT+assigned teachers (no SUPER)', () => {
+    const src = read('services/messagingContactsService.js');
     const idx = src.indexOf("else if (userRole === 'student')");
     assert.ok(idx > 0);
     const chunk = src.slice(idx, idx + 2500);
@@ -23,23 +24,23 @@ describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () =
     assert.ok(chunk.includes("adminRole: 'SUPPORT'"));
     assert.ok(chunk.includes("role: 'teacher'"));
     assert.ok(chunk.includes('teacherIdList') || chunk.includes('myTeacherIds'));
-    assert.equal(chunk.includes('loadHighAdmins'), false);
+    assert.equal(chunk.includes('loadHighAdminDocs'), false);
   });
 
-  it('2 contacts API: teacher sees HIGH+STAFF+SUPPORT+assigned students', () => {
-    const src = read('routes/messageRoutes.js');
+  it('2 contacts API: teacher candidates load HIGH+STAFF+SUPPORT+assigned students', () => {
+    const src = read('services/messagingContactsService.js');
     const idx = src.indexOf("else if (userRole === 'teacher')");
     assert.ok(idx > 0);
     const chunk = src.slice(idx, idx + 2000);
-    assert.ok(chunk.includes('loadHighAdmins'));
+    assert.ok(chunk.includes('loadHighAdminDocs'));
     assert.ok(chunk.includes("adminRole: { $in: ['STAFF', 'SUPPORT'] }"));
     assert.ok(chunk.includes('Student.find'));
   });
 
-  it('3 Inbox no longer requires hasActivity to show seed contacts', () => {
+  it('3 Inbox discovers contacts from API; message-activity DMs from dataContext', () => {
     const inbox = read('client/src/components/Inbox.jsx');
     assert.equal(inbox.includes("!== 'Chưa có tin nhắn'"), false);
-    assert.ok(inbox.includes('include ALL dataContext DMs') || inbox.includes('Phase 8.23B'));
+    assert.ok(inbox.includes('Discovery contacts come only') || inbox.includes('Phase 6'));
     assert.ok(inbox.includes('pushEntry'));
   });
 
@@ -50,17 +51,17 @@ describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () =
     assert.ok(inbox.includes("contactTab === 'support'"));
     assert.ok(inbox.includes("ar === 'SUPPORT'"));
     assert.ok(inbox.includes("{ id: 'support', label: 'Support' }"));
-    // Admin filter must exclude STAFF/SUPPORT by adminRole
     assert.ok(inbox.includes("ar !== 'STAFF'") || inbox.includes("ar !== 'SUPPORT'"));
   });
 
-  it('5 student seeds teacher stub even without teachers[] cache', () => {
+  it('5 useDataMessaging does not seed discovery contacts (Phase 6)', () => {
     const src = read('client/src/context/useDataMessaging.js');
-    assert.ok(src.includes("name: t?.name || 'Giảng viên'"));
-    assert.ok(src.includes('teacherIds.forEach'));
+    assert.ok(src.includes('server-authoritative'));
+    assert.equal(src.includes("name: t?.name || 'Giảng viên'"), false);
+    assert.equal(src.includes('teacherIds.forEach'), false);
   });
 
-  it('6 student/teacher seed ADMIN_STAFF/SUPPORT as staff_* not admin_admin', () => {
+  it('6 student/teacher STAFF/SUPPORT threads use staff_* not admin_admin', () => {
     const studentId = '333333333333333333333333';
     const staffId = 'aaaaaaaaaaaaaaaaaaaaaaaa';
     const supportId = 'bbbbbbbbbbbbbbbbbbbbbbbb';
@@ -97,16 +98,21 @@ describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () =
     assert.equal(getMessagingRole({ id: 's', role: 'student' }), 'student');
   });
 
-  it('9 useDataMessaging seeds staff for student and teacher', () => {
+  it('9 useDataMessaging no longer seeds staff contacts', () => {
     const src = read('client/src/context/useDataMessaging.js');
-    assert.ok(src.includes("buildConversationId('student', sId, 'staff', stId)"));
-    assert.ok(src.includes("buildConversationId('teacher', sId, 'staff', stId)"));
+    assert.equal(src.includes("buildConversationId('student', sId, 'staff', stId)"), false);
+    assert.equal(src.includes("buildConversationId('teacher', sId, 'staff', stId)"), false);
   });
 
   it('10 Inbox does not poison seenConvIds before push', () => {
     const inbox = read('client/src/components/Inbox.jsx');
-    // Old bug: seenConvIds.add(convId) before canonical check then return
     assert.equal(/seenConvIds\.add\(convId\);\s*\n\s*\/\/ Prefer exact/.test(inbox), false);
     assert.ok(inbox.includes('if (seenConvIds.has(canonicalId)) return'));
+  });
+
+  it('11 route delegates to messagingContactsService (Phase 6)', () => {
+    const routes = read('routes/messageRoutes.js');
+    assert.ok(routes.includes('listDiscoverableContacts'));
+    assert.ok(routes.includes('messagingContactsService'));
   });
 });

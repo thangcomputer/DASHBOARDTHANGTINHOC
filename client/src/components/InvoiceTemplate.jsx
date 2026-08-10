@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveMediaUrl } from '../services/api';
 
 /**
  * Đọc số tiền thành chữ tiếng Việt
@@ -85,7 +86,6 @@ const InvoiceTemplate = ({ data = {} }) => {
     isPaid = true
   } = data;
 
-  const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const [invoiceSettings, setInvoiceSettings] = React.useState({
     logo: '',
     signature: '',
@@ -93,15 +93,15 @@ const InvoiceTemplate = ({ data = {} }) => {
   });
 
   React.useEffect(() => {
-    fetch(`${API}/api/settings/web`)
+    fetch('/api/settings/web')
       .then(r => r.json())
       .then(res => {
         if (res.success && res.data) {
           const { invoiceLogoUrl, invoiceSignatureUrl, invoiceStampText, logoUrl } = res.data;
           const logo = invoiceLogoUrl || logoUrl || '';
           setInvoiceSettings({
-            logo: logo.startsWith('http') ? logo : (logo ? `${API}${logo}` : ''),
-            signature: invoiceSignatureUrl ? (invoiceSignatureUrl.startsWith('http') ? invoiceSignatureUrl : `${API}${invoiceSignatureUrl}`) : '',
+            logo: resolveMediaUrl(logo) || logo,
+            signature: resolveMediaUrl(invoiceSignatureUrl) || invoiceSignatureUrl || '',
             stamp: invoiceStampText || 'ĐÃ THU PHÍ'
           });
         }

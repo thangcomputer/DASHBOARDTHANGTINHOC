@@ -101,7 +101,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const location = useLocation();
   const toast = useToast();
   const { socket } = useSocket() || {};
-  const { students, teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead } = useData();
+  const { students, teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead, getConversations } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const myId = String(session?.id || session?._id || '');
 
@@ -287,6 +287,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     <FloatingMessengerProvider
       currentUserId={myId}
       currentUserRole={getMessagingRole(session) || role}
+      getConversations={getConversations}
     >
     <div className="flex h-[100dvh] max-h-[100dvh] bg-[#f8fafc] relative font-sans overflow-hidden">
       {isRefetching ? (

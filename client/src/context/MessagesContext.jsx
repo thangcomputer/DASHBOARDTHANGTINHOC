@@ -1,3 +1,9 @@
+/**
+ * LEGACY / UNMOUNTED / NO LIVE EXECUTION PATH — Phase 7.
+ * Not imported or mounted from App.jsx / DataProvider.
+ * Contains outdated contact-seed / discovery policy. Do not wire back without migration.
+ * Live messaging: useDataMessaging + GET /api/messages/contacts + MessagingPolicy.
+ */
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 import api from '../services/api';

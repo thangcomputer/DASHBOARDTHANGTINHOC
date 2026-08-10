@@ -15,7 +15,7 @@ const {
   getAuthorizationAuthority,
 } = require('../services/policyShadow/cutoverAuthority');
 
-function denyMessages(res, statusHint, reason, action) {
+function denyMessages(res, statusHint, reason, action, detail = {}) {
   const r = String(reason || '');
   const a = String(action || '');
   if (
@@ -84,10 +84,13 @@ function denyMessages(res, statusHint, reason, action) {
     });
   }
   if (r === 'dm_denied' || r === 'policy_dm_denied') {
-    return res.status(403).json({
+    const body = {
       success: false,
-      message: 'Không được nhắn tin đến người này',
-    });
+      message: (detail.message && String(detail.message).trim())
+        || 'Không được nhắn tin đến người này',
+    };
+    if (detail.code) body.code = detail.code;
+    return res.status(403).json(body);
   }
   if (r === 'not_sender' || r === 'policy_not_sender') {
     return res.status(403).json({
@@ -246,7 +249,10 @@ function messagesCutoverGate(action) {
       },
       '[POLICY_CUTOVER] messages Policy DENY',
     );
-    return denyMessages(res, statusHint, reason, action);
+    return denyMessages(res, statusHint, reason, action, {
+      message: shadow.policyMessage || null,
+      code: shadow.policyDenyCode || null,
+    });
   };
 }
 

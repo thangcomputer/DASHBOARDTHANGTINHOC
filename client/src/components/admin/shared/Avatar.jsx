@@ -6,6 +6,7 @@ const ROLE_BADGE = {
   student: { label: 'HV', className: 'bg-sky-500 text-white' },
   admin: { label: 'AD', className: 'bg-rose-600 text-white' },
   staff: { label: 'NV', className: 'bg-slate-600 text-white' },
+  support: { label: 'HT', className: 'bg-blue-600 text-white' },
 };
 
 const ROLE_RING = {
@@ -13,6 +14,7 @@ const ROLE_RING = {
   student: 'ring-2 ring-sky-400/80',
   admin: 'ring-2 ring-rose-400/80',
   staff: 'ring-2 ring-slate-400/80',
+  support: 'ring-2 ring-blue-400/80',
 };
 
 /**
@@ -34,8 +36,9 @@ export default function Avatar({
   const normalized =
     adminRole === 'SUPER_ADMIN' ? 'admin'
       : adminRole === 'HIGH_ADMIN' ? 'admin'
-        : adminRole === 'STAFF' ? 'staff'
-          : String(role || 'student').toLowerCase();
+        : adminRole === 'SUPPORT' ? 'support'
+          : adminRole === 'STAFF' ? 'staff'
+            : String(role || 'student').toLowerCase();
 
   const url = resolveAvatarUrl({ avatar: src, role, adminRole, name, gender });
   const sizeClass =

@@ -144,6 +144,8 @@ function policyShadowMessage(action) {
         policyReason: policy.reason,
         policyStatusHint: policy.statusHint,
         legacyStatusHint: legacy.statusHint,
+        policyMessage: policy.message || null,
+        policyDenyCode: policy.denyCode || null,
       };
 
       if (comparison === 'MISMATCH') {

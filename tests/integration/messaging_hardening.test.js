@@ -101,11 +101,14 @@ describe('Messaging hardening', { concurrency: false }, () => {
     assert.ok(dmChunk.includes('sendCanonicalMessage'));
   });
 
-  it('9 typing/read refuse non-participant (canAccessDirectConversation)', () => {
+  it('9 typing/read refuse non-participant (MessagingPolicy wraps canAccessDirectConversation)', () => {
     const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
     assert.ok(src.includes("socket.on('typing:start'"));
     assert.ok(src.includes("socket.on('message:read'"));
-    assert.ok(src.includes('canAccessDirectConversation'));
+    assert.ok(src.includes('canMarkRead') || src.includes('canViewConversation'));
+    assert.ok(src.includes("require('./services/messagingPolicy')"));
+    const policy = fs.readFileSync(path.join(ROOT, 'services/messagingPolicy.js'), 'utf8');
+    assert.ok(policy.includes('canAccessDirectConversation'));
   });
 
   it('10 Staff A vs Staff B distinct threads for same student', () => {
@@ -114,10 +117,18 @@ describe('Messaging hardening', { concurrency: false }, () => {
     assert.notEqual(a, b);
   });
 
-  it('11 FE staff seed conversations use staff role not admin_admin', () => {
+  it('11 FE staff threads use staff role not admin_admin (Phase 6: contacts API)', () => {
     const src = fs.readFileSync(path.join(ROOT, 'client/src/context/useDataMessaging.js'), 'utf8');
-    assert.ok(src.includes("userRole === 'admin' || userRole === 'staff'"));
-    assert.ok(src.includes('buildConversationId(myRole, sId, \'student\''));
+    assert.ok(src.includes('server-authoritative') || src.includes('GET /api/messages/contacts'));
+    assert.equal(src.includes("buildConversationId('student', sId, 'staff', stId)"), false);
+    const inbox = fs.readFileSync(path.join(ROOT, 'client/src/components/Inbox.jsx'), 'utf8');
+    assert.ok(inbox.includes('buildConversationId(myRole, currentUserId, role, c.id)'));
+    assert.ok(inbox.includes('transportRole') || inbox.includes('getMessagingRole'));
+    const studentId = '333333333333333333333333';
+    const staffId = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+    const id = buildConversationId('student', studentId, 'staff', staffId);
+    assert.ok(id.includes(`staff_${staffId}`));
+    assert.equal(id.includes('admin_admin'), false);
   });
 });
 

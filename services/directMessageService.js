@@ -14,11 +14,16 @@ const {
   resolveMessagingIdentity,
   enrichMessageIdentities,
 } = require('./messagingIdentity');
-const {
-  assertMessagingPairAllowed,
-  buildCanonicalConversationId,
-} = require('./messagingPairing');
+const { buildCanonicalConversationId } = require('./messagingPairing');
+const { assertCanDirectMessage } = require('./chatAccessService');
 const { sanitizeMessageDoc } = require('../utils/messageFileRetention');
+const {
+  runWithMessagingCorrelation,
+  logPolicyDecision,
+  logPersisted,
+  getCorrelation,
+  newCorrelationId,
+} = require('./messagingObservability');
 
 const isStaffAccount = (u = {}) =>
   u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';
@@ -31,13 +36,23 @@ function toClientMessage(doc) {
   return sanitizeMessageDoc(plain);
 }
 
+async function sendCanonicalMessage(args = {}) {
+  const corr = getCorrelation();
+  const meta = {
+    correlationId: corr.correlationId || newCorrelationId('msg'),
+    requestId: corr.requestId || null,
+    channel: corr.channel || (args.io ? 'socket' : 'http'),
+  };
+  return runWithMessagingCorrelation(meta, () => sendCanonicalMessageInner(args));
+}
+
 /**
  * Persist + emit a private/group message.
  * Sender identity always from `sender` (JWT user), never from client body fields.
  *
- * @returns {Promise<{ ok: true, message, clientMessage, conversationId } | { ok: false, status: number, message: string }>}
+ * @returns {Promise<{ ok: true, message, clientMessage, conversationId } | { ok: false, status: number, message: string, code?: string, policy?: string }>}
  */
-async function sendCanonicalMessage({
+async function sendCanonicalMessageInner({
   sender,
   receiverId,
   receiverName,
@@ -51,7 +66,7 @@ async function sendCanonicalMessage({
   notifyUser,
   io,
 } = {}) {
-  if (!sender) return { ok: false, status: 401, message: 'Chua xac thuc' };
+  if (!sender) return { ok: false, status: 401, message: 'Chua xac thuc', code: 'MESSAGING_AUTH_REQUIRED' };
 
   const senderId = String(sender.id || sender._id || '');
   const senderIdentity = resolveMessagingIdentity(sender);
@@ -76,10 +91,47 @@ async function sendCanonicalMessage({
       return { ok: false, status: 403, message: 'Bạn không thuộc nhóm chat này' };
     }
   } else {
-    pair = await assertMessagingPairAllowed(sender, ridHint, rRoleHint);
+    // Phase 4: REST + Socket share MessagingPolicy via assertCanDirectMessage
+    pair = await assertCanDirectMessage(sender, ridHint, rRoleHint);
     if (!pair.ok) {
-      return { ok: false, status: 403, message: pair.message || 'Không được nhắn tin đến người này' };
+      logPolicyDecision({
+        allowed: false,
+        code: pair.code,
+        reason: pair.message,
+        policy: pair.policy,
+        scope: pair.scope,
+        senderId,
+        receiverId: ridHint,
+        senderProductRole: sender.adminRole || senderRole,
+        receiverProductRole: null,
+        senderTransportRole: senderRole,
+        receiverTransportRole: rRoleHint || null,
+        tenantId: sender.tenantId || null,
+        branchId: sender.branchId || null,
+      });
+      return {
+        ok: false,
+        status: 403,
+        message: pair.message || 'Không được nhắn tin đến người này',
+        code: pair.code,
+        policy: pair.policy,
+      };
     }
+    logPolicyDecision({
+      allowed: true,
+      code: pair.code,
+      reason: 'PAIR_ALLOWED',
+      policy: pair.policy || 'PAIRING_824',
+      scope: pair.scope,
+      senderId,
+      receiverId: pair.finalReceiverId || ridHint,
+      senderProductRole: pair.senderProduct || sender.adminRole || null,
+      receiverProductRole: pair.productRole || null,
+      senderTransportRole: senderRole,
+      receiverTransportRole: pair.transportRole || null,
+      tenantId: sender.tenantId || null,
+      branchId: sender.branchId || null,
+    });
   }
 
   const rid = pair ? String(pair.finalReceiverId || ridHint) : ridHint;
@@ -171,6 +223,15 @@ async function sendCanonicalMessage({
     fileName: fileName || '',
     isGroup: Boolean(isGroup),
     groupId: isGroup ? groupId : null,
+  });
+
+  logPersisted({
+    messageId: message._id,
+    conversationId,
+    senderId,
+    receiverId: finalReceiverId,
+    senderRole,
+    receiverRole: finalReceiverRole,
   });
 
   if (isGroup && groupId) {

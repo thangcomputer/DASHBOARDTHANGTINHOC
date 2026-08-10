@@ -1,7 +1,12 @@
 import React, {
-  createContext, useCallback, useContext, useEffect, useMemo, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { buildConversationId, normalizeChatRole } from '../utils/chatConversationId';
+import { messagesAPI } from '../services/api';
+import {
+  resolveMessagingDeepLink,
+  existingPeerIdsFromConversations,
+} from '../utils/messagingDeepLink';
 
 const FloatingMessengerContext = createContext(null);
 
@@ -42,11 +47,13 @@ function loadPersisted() {
   }
 }
 
-export function FloatingMessengerProvider({ children, currentUserId, currentUserRole }) {
+export function FloatingMessengerProvider({ children, currentUserId, currentUserRole, getConversations }) {
   const initial = loadPersisted();
   const [supportOpen, setSupportOpen] = useState(initial.supportOpen);
   const [tabs, setTabs] = useState(initial.tabs);
   const [activeTabId, setActiveTabId] = useState(initial.activeTabId);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
 
   useEffect(() => {
     try {
@@ -141,13 +148,40 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
   }, []);
 
   useEffect(() => {
-    const onOpen = (e) => {
+    const onOpen = async (e) => {
       const d = e?.detail;
-      if (d?.id) openChat(d, { expand: true });
+      if (!d?.id || !currentUserId) return;
+      const peerId = String(d.id);
+
+      // Reopen existing floating tab always OK
+      if (tabsRef.current.some((t) => String(t.user?.id) === peerId)) {
+        openChat(d, { expand: true });
+        return;
+      }
+
+      // Existing conversation activity (Case A) — not discovery
+      const convs = typeof getConversations === 'function'
+        ? (getConversations(currentUserId) || [])
+        : [];
+      const existingPeerIds = existingPeerIdsFromConversations(convs);
+      if (existingPeerIds.includes(peerId)) {
+        openChat(d, { expand: true });
+        return;
+      }
+
+      // New conversation UX requires server-authorized contact (Case B)
+      try {
+        const res = await messagesAPI.getContacts();
+        const contacts = res?.success && Array.isArray(res.data) ? res.data : [];
+        const gate = resolveMessagingDeepLink({ peerId, contacts, existingPeerIds });
+        if (gate.allowed) openChat(d, { expand: true });
+      } catch {
+        /* blocked — empty contacts / network */
+      }
     };
     window.addEventListener('cms:open-chat', onOpen);
     return () => window.removeEventListener('cms:open-chat', onOpen);
-  }, [openChat]);
+  }, [openChat, currentUserId, getConversations]);
 
   const value = useMemo(() => ({
     supportOpen,

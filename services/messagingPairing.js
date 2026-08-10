@@ -44,17 +44,33 @@ function isElevatedProduct(pr) {
   return pr === PRODUCT_ROLES.SUPER_ADMIN || pr === PRODUCT_ROLES.HIGH_ADMIN;
 }
 
+function normalizeBranchId(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'object' && v._id != null) return String(v._id);
+  return String(v);
+}
+
 function branchKey(doc = {}) {
-  if (doc.branchId) return `id:${String(doc.branchId)}`;
-  if (doc.branchCode) return `code:${String(doc.branchCode)}`;
+  const bid = normalizeBranchId(doc.branchId);
+  if (bid) return `id:${bid}`;
+  if (doc.branchCode) return `code:${String(doc.branchCode).trim().toUpperCase()}`;
   return '';
 }
 
+/**
+ * Same branch if branchId matches OR branchCode matches.
+ * Avoids false DENY when one side only has code and the other only has id
+ * (legacy branchKey string compare could never match id:* vs code:*).
+ */
 function sameBranch(a = {}, b = {}) {
-  const ak = branchKey(a);
-  const bk = branchKey(b);
-  if (!ak || !bk) return false;
-  return ak === bk;
+  const aId = normalizeBranchId(a?.branchId);
+  const bId = normalizeBranchId(b?.branchId);
+  if (aId && bId && aId === bId) return true;
+  if (a?.branchCode && b?.branchCode
+    && String(a.branchCode).trim().toUpperCase() === String(b.branchCode).trim().toUpperCase()) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -129,9 +145,12 @@ async function resolveCanonicalPeer(receiverId, clientReceiverRoleHint = '') {
   }
 
   let peer = null;
+  const teacherSelect = 'name role adminRole branchId branchCode gender avatar phone status tenantId';
+  const studentSelect = 'name role adminRole branchId branchCode teacherId enrollments gender avatar phone tenantId';
+
   if (hint === 'student') {
     peer = await Student.findById(rid)
-      .select('name role adminRole branchId branchCode teacherId enrollments gender avatar phone')
+      .select(studentSelect)
       .lean();
     if (peer) {
       return {
@@ -145,7 +164,7 @@ async function resolveCanonicalPeer(receiverId, clientReceiverRoleHint = '') {
   }
 
   peer = await Teacher.findById(rid)
-    .select('name role adminRole branchId branchCode gender avatar phone status')
+    .select(teacherSelect)
     .lean();
   if (peer) {
     const productRole = resolveProductRole({
@@ -168,7 +187,7 @@ async function resolveCanonicalPeer(receiverId, clientReceiverRoleHint = '') {
   }
 
   peer = await Student.findById(rid)
-    .select('name role adminRole branchId branchCode teacherId enrollments gender avatar phone')
+    .select(studentSelect)
     .lean();
   if (peer) {
     return {
@@ -196,8 +215,9 @@ async function assertPairScope(sender, senderProduct, peer, peerProduct) {
       if (!me || me.adminRole === 'SUPER_ADMIN' || me.adminRole === 'HIGH_ADMIN') {
         return { ok: true };
       }
-      if (!branchKey(me)) return { ok: true };
-      if (sameBranch(me, peer)) return { ok: true };
+      // Bidirectional soft-allow with TEACHER→STAFF / STUDENT→STAFF:
+      // empty branch on either side → allow; otherwise require same branch.
+      if (!branchKey(me) || !branchKey(peer) || sameBranch(me, peer)) return { ok: true };
       return {
         ok: false,
         message: peerProduct === PRODUCT_ROLES.STUDENT
@@ -220,7 +240,6 @@ async function assertPairScope(sender, senderProduct, peer, peerProduct) {
     if (peerProduct === PRODUCT_ROLES.STAFF) {
       const me = await Teacher.findById(sender.id).select('branchId branchCode').lean();
       if (!branchKey(me) || !branchKey(peer) || sameBranch(me, peer)) return { ok: true };
-      if (!branchKey(peer)) return { ok: true };
       return { ok: false, message: 'Chi nhan tin giao vu cung chi nhanh' };
     }
     if (peerProduct === PRODUCT_ROLES.SUPPORT || isElevatedProduct(peerProduct)) {
@@ -249,13 +268,17 @@ async function assertPairScope(sender, senderProduct, peer, peerProduct) {
   return { ok: true };
 }
 
-async function assertMessagingPairAllowed(sender, receiverId, clientReceiverRoleHint = '') {
+/**
+ * @param {object} [options]
+ * @param {object} [options.resolved] pre-resolved peer from resolveCanonicalPeer (avoid duplicate DB lookup)
+ */
+async function assertMessagingPairAllowed(sender, receiverId, clientReceiverRoleHint = '', options = {}) {
   if (!sender) return { ok: false, message: 'Chua xac thuc' };
 
   const senderProduct = resolveProductRole(sender);
   if (!senderProduct) return { ok: false, message: 'Khong xac dinh role nguoi gui' };
 
-  const resolved = await resolveCanonicalPeer(receiverId, clientReceiverRoleHint);
+  const resolved = options.resolved || await resolveCanonicalPeer(receiverId, clientReceiverRoleHint);
   if (!resolved.ok) return resolved;
   if (resolved.isBroadcast) return { ok: true, ...resolved };
 

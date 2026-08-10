@@ -20,6 +20,7 @@ import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { useToast } from '../utils/toast';
 import {
   isSuperAdminViewer,
+  isElevatedPresenceDirectoryViewer,
   buildSupportDirectory,
 } from '../utils/supportPresence';
 import SupportMascot from './SupportMascot';
@@ -417,7 +418,10 @@ export default function FloatingMessenger({ session, role }) {
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';
   const meRole = normalizeChatRole(getMessagingRole(session) || role || session?.role || 'student');
+  // UI: staff/admin hide student quick-support chrome
   const isSuper = isSuperAdminViewer(session);
+  // Directory: only SUPER/HIGH may browse presence; others use GET /contacts
+  const usePresenceDirectory = isElevatedPresenceDirectoryViewer(session);
 
   const conversations = useMemo(
     () => (meId ? (getConversations(meId) || []) : []),
@@ -438,22 +442,27 @@ export default function FloatingMessenger({ session, role }) {
     return map;
   }, [conversations]);
 
+  // Phase 7: non-elevated floating directory uses GET /contacts only — never fall back to local staffs[].
   const [fmContacts, setFmContacts] = useState([]);
   useEffect(() => {
-    if (isSuper) return;
+    if (usePresenceDirectory) return undefined;
     const fetchContacts = () => {
       messagesAPI.getContacts().then((res) => {
-        if (res?.success) setFmContacts(res.data);
-      }).catch(() => {});
+        if (res?.success) setFmContacts(Array.isArray(res.data) ? res.data : []);
+        else setFmContacts([]);
+      }).catch(() => {
+        setFmContacts([]);
+      });
     };
     fetchContacts();
     if (onContactListUpdated) {
       const unsub = onContactListUpdated(() => fetchContacts());
       return unsub;
     }
-  }, [isSuper, onContactListUpdated]);
+    return undefined;
+  }, [usePresenceDirectory, onContactListUpdated]);
 
-  const effectiveStaffs = isSuper ? staffs : (fmContacts.length > 0 ? fmContacts : staffs);
+  const effectiveStaffs = usePresenceDirectory ? staffs : fmContacts;
 
   const directory = useMemo(
     () => buildSupportDirectory({ session, onlineUsers, meId, staffs: effectiveStaffs }),
@@ -462,14 +471,14 @@ export default function FloatingMessenger({ session, role }) {
 
   const unreadConversations = useMemo(() => {
     const list = conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup);
-    if (isSuper) return list.slice(0, 8);
-    // Non-super: nhận tin từ Hỗ trợ viên (staff)
+    if (usePresenceDirectory) return list.slice(0, 8);
+    // Non-elevated: nhận tin từ Hỗ trợ viên (staff transport / SUPPORT product)
     return list.filter((c) => {
       const r = String(c.user?.role || '').toLowerCase();
       const ar = String(c.user?.adminRole || '').toUpperCase();
       return r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT';
     }).slice(0, 8);
-  }, [conversations, isSuper]);
+  }, [conversations, usePresenceDirectory]);
 
   const openWindow = tabs.find((t) => !t.minimized) || null;
   const heads = tabs.filter((t) => t.minimized);
@@ -613,13 +622,13 @@ export default function FloatingMessenger({ session, role }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-slate-800 flex items-center gap-2">
                   <Headphones size={15} className="text-emerald-600 shrink-0" />
-                  {isSuper ? 'Đang hoạt động' : 'Hỗ trợ viên'}
+                  {usePresenceDirectory ? 'Đang hoạt động' : 'Hỗ trợ viên'}
                   {unreadTotal > 0 && (
                     <span className="cms-fm-unread-pill">{badgeLabel} mới</span>
                   )}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                  {isSuper
+                  {usePresenceDirectory
                     ? 'Học viên, giảng viên, admin chi nhánh đang online'
                     : 'Gửi tin nhắn trực tiếp tới bộ phận Hỗ trợ viên'}
                 </p>

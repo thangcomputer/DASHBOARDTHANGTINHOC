@@ -2,8 +2,14 @@
  * Presence store: Redis Hash khi co REDIS_URL, fallback Map in-process.
  * Multi-instance: moi node publish/subscribe channel cms:presence
  */
-const { getRedis } = require('./redis');
+const { getRedis, isRedisReady } = require('./redis');
 const logger = require('./logger');
+
+function readyRedis() {
+  const redis = getRedis();
+  if (!redis || !isRedisReady()) return null;
+  return redis;
+}
 
 const HASH_KEY = 'cms:presence';
 const CHANNEL = 'cms:presence';
@@ -42,7 +48,7 @@ async function upsertPresence(key, user) {
   };
   local.set(key, row);
 
-  const redis = getRedis();
+  const redis = readyRedis();
   if (redis) {
     try {
       await redis.hset(HASH_KEY, key, JSON.stringify(row));
@@ -58,7 +64,7 @@ async function upsertPresence(key, user) {
 
 async function removePresence(key) {
   local.delete(key);
-  const redis = getRedis();
+  const redis = readyRedis();
   if (redis) {
     try {
       await redis.hdel(HASH_KEY, key);
@@ -82,7 +88,7 @@ function findPresenceBySocketId(socketId) {
 }
 
 async function hydrateFromRedis() {
-  const redis = getRedis();
+  const redis = readyRedis();
   if (!redis) return;
   try {
     const all = await redis.hgetall(HASH_KEY);
@@ -99,7 +105,7 @@ async function hydrateFromRedis() {
 
 async function initPresenceBus() {
   const redis = getRedis();
-  if (!redis) {
+  if (!redis || !isRedisReady()) {
     logger.info('Presence: in-memory only');
     return { mode: 'memory' };
   }
@@ -109,6 +115,9 @@ async function initPresenceBus() {
     subClient = new Redis(process.env.REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
+      enableOfflineQueue: false,
+      connectTimeout: 2000,
+      commandTimeout: 500,
     });
     await subClient.subscribe(CHANNEL);
     subClient.on('message', (_ch, message) => {

@@ -125,17 +125,23 @@ describe('Phase 8.24 messaging pairing lock', { concurrency: false }, () => {
 
   it('wiring: pairing module + send path + docs exist', () => {
     assert.ok(fs.existsSync(path.join(ROOT, 'services/messagingPairing.js')));
+    assert.ok(fs.existsSync(path.join(ROOT, 'services/messagingPolicy.js')));
     assert.ok(fs.existsSync(path.join(ROOT, 'docs/messaging/pairing-matrix-824.md')));
     assert.ok(fs.existsSync(path.join(ROOT, 'docs/messaging/contact-visibility-824b.md')));
     const send = fs.readFileSync(path.join(ROOT, 'services/directMessageService.js'), 'utf8');
     assert.ok(send.includes('buildCanonicalConversationId'));
-    assert.ok(send.includes('assertMessagingPairAllowed'));
+    // Phase 4: DMS → assertCanDirectMessage → MessagingPolicy → pairing
+    assert.ok(send.includes('assertCanDirectMessage'));
     assert.ok(!send.includes("buildConversationId(senderRole, senderId, rRole, rid)"));
     const access = fs.readFileSync(path.join(ROOT, 'services/chatAccessService.js'), 'utf8');
-    assert.ok(access.includes('assertMessagingPairAllowed'));
+    assert.ok(access.includes('messagingPolicy'));
+    const policy = fs.readFileSync(path.join(ROOT, 'services/messagingPolicy.js'), 'utf8');
+    assert.ok(policy.includes('assertMessagingPairAllowed'));
     const routes = fs.readFileSync(path.join(ROOT, 'routes/messageRoutes.js'), 'utf8');
     assert.ok(routes.includes('expandConversationIdAliases'));
-    assert.ok(routes.includes('Phase 8.24B') || routes.includes('loadHighAdmins'));
-    assert.ok(routes.includes("SUPER_ADMIN: chỉ HIGH_ADMIN") || routes.includes('chỉ HIGH_ADMIN'));
+    assert.ok(routes.includes('listDiscoverableContacts') || routes.includes('messagingContactsService'));
+    const contactsSvc = fs.readFileSync(path.join(ROOT, 'services/messagingContactsService.js'), 'utf8');
+    assert.ok(contactsSvc.includes('loadHighAdminDocs') || contactsSvc.includes('HIGH_ADMIN'));
+    assert.ok(contactsSvc.includes('SUPER_ADMIN') && contactsSvc.includes('HIGH_ADMIN'));
   });
 });

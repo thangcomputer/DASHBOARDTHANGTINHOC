@@ -35,9 +35,9 @@ const authMiddleware = async (req, res, next) => {
     if (decoded.id && decoded.id !== 'admin') {
       let dbUser = null;
       if (decoded.role === 'student') {
-        dbUser = await Student.findById(decoded.id).select('tokenVersion status').lean();
+        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode').lean();
       } else {
-        dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role permissions adminRole createdAt branchId').lean();
+        dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role permissions adminRole createdAt branchId branchCode').lean();
       }
 
       if (dbUser) {
@@ -45,6 +45,7 @@ const authMiddleware = async (req, res, next) => {
         req.user.adminRole = dbUser.adminRole || decoded.adminRole;
         if (dbUser.createdAt) req.user.createdAt = dbUser.createdAt;
         if (dbUser.branchId) req.user.branchId = dbUser.branchId;
+        if (dbUser.branchCode) req.user.branchCode = dbUser.branchCode;
       }
 
       if (!dbUser) {
@@ -385,7 +386,10 @@ const branchFilter = async (req, res, next) => {
           req.userBranchId = user.branchId;
           req.userBranchCode = user.branchCode || '';
         } else {
-          req.branchFilter = { branchId: null };
+          // HIGH must pick ?branch_id or have account branch (SECURITY_CONTRACT).
+          // Do NOT use { branchId: null } — that only matches unscoped students and
+          // hides HV vừa tạo có branchId thật khi FE gửi branch_id=all.
+          req.branchFilter = { _id: { $in: [] } };
         }
       } else if (isSupport || user.branchId) {
         if (!user.branchId) {

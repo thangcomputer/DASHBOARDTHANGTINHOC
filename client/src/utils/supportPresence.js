@@ -1,10 +1,26 @@
 /**
  * Danh bạ chat nổi theo vai trò:
- * - Super Admin: mọi người đang online (HV / GV / Admin chi nhánh)
- * - Staff / GV / HV / admin chi nhánh: chỉ Admin Super hỗ trợ
+ * - SUPER / HIGH: mọi người đang online (presence directory)
+ * - Student / Teacher / Staff / Support: chỉ peer từ GET /contacts (Phase 6/7)
  */
 import { normalizeChatRole } from './chatConversationId';
 
+/**
+ * Elevated admins who may browse online presence as a directory.
+ * STAFF/SUPPORT must NOT inherit this — they use server contacts.
+ */
+export function isElevatedPresenceDirectoryViewer(session) {
+  if (!session) return false;
+  const id = String(session?.id || session?._id || '');
+  if (id === 'admin') return true;
+  const ar = String(session?.adminRole || '').toUpperCase();
+  return ar === 'SUPER_ADMIN' || ar === 'HIGH_ADMIN';
+}
+
+/**
+ * @deprecated Prefer isElevatedPresenceDirectoryViewer for messaging directory mode.
+ * Kept for FeedBoard UI (hide student quick-support for staff/admin accounts).
+ */
 export function isSuperAdminViewer(session) {
   if (!session) return false;
   const id = String(session?.id || session?._id || '');
@@ -47,65 +63,54 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
   const me = String(meId || session?.id || session?._id || '');
   const users = Array.isArray(onlineUsers) ? onlineUsers : [];
 
-  if (!isSuperAdminViewer(session)) {
-    const onlineStaffMap = new Map();
+  // Phase 7: only SUPER/HIGH use presence directory. Everyone else = server contacts.
+  if (!isElevatedPresenceDirectoryViewer(session)) {
+    // Phase 6: directory people come ONLY from server contacts (staffs arg).
+    // Presence may mark online — must NOT invent unauthorized peers.
+    const onlineIds = new Set();
     users.forEach((u) => {
       const r = String(u.role || '').toLowerCase();
       const ar = String(u.adminRole || '').toUpperCase();
       if (r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT') {
         const uid = String(u.userId || u.id || '');
-        if (uid) {
-          onlineStaffMap.set(uid, {
-            id: uid,
-            name: u.name || 'Hỗ trợ viên',
-            role: 'staff',
-            displayRole: 'staff',
-            adminRole: u.adminRole || 'STAFF',
-            gender: u.gender || '',
-            permissions: ['manage_messages'],
-            avatar: u.avatar || '',
-            online: true,
-          });
-        }
+        if (uid) onlineIds.add(uid);
       }
     });
 
     const peopleList = [];
     const seenIds = new Set();
-
-    // 1. Ưu tiên Hỗ trợ viên đang online
-    onlineStaffMap.forEach((person, uid) => {
-      seenIds.add(uid);
-      peopleList.push(person);
-    });
-
-    // 2. Thêm các Hỗ trợ viên offline từ danh sách hệ thống (staffs)
     if (Array.isArray(staffs)) {
       staffs.forEach((st) => {
         if (!st || st.status === 'Deleted' || st.status === 'inactive' || st.isDeleted) return;
         const r = String(st.role || '').toLowerCase();
         const ar = String(st.adminRole || '').toUpperCase();
-        if (r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT' || st.permissions?.includes?.('manage_messages')) {
-          const stId = String(st.id || st._id || '');
-          if (stId && stId !== me && !seenIds.has(stId)) {
-            seenIds.add(stId);
-            peopleList.push({
-              id: stId,
-              name: st.name || 'Hỗ trợ viên',
-              role: 'staff',
-              displayRole: 'staff',
-              adminRole: st.adminRole || 'STAFF',
-              gender: st.gender || '',
-              permissions: st.permissions || ['manage_messages'],
-              avatar: st.avatar || '',
-              online: false,
-            });
-          }
+        // Presentation filter on already-authorized contacts (from /contacts).
+        // Prefer productRole when present — never map transport staff → product STAFF.
+        const product = String(st.productRole || '').toUpperCase();
+        const isOps = product === 'SUPPORT' || product === 'STAFF'
+          || r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT'
+          || st.permissions?.includes?.('manage_messages');
+        if (!isOps) return;
+        const stId = String(st.id || st._id || '');
+        if (stId && stId !== me && !seenIds.has(stId)) {
+          seenIds.add(stId);
+          const adminRole = st.adminRole
+            || (product === 'SUPPORT' ? 'SUPPORT' : product === 'STAFF' ? 'STAFF' : 'STAFF');
+          peopleList.push({
+            id: stId,
+            name: st.name || 'Hỗ trợ viên',
+            role: 'staff',
+            displayRole: 'staff',
+            adminRole,
+            productRole: st.productRole || (adminRole === 'SUPPORT' ? 'SUPPORT' : 'STAFF'),
+            gender: st.gender || '',
+            permissions: st.permissions || ['manage_messages'],
+            avatar: st.avatar || '',
+            online: onlineIds.has(stId),
+          });
         }
       });
     }
-
-
 
     return {
       mode: 'support_only',

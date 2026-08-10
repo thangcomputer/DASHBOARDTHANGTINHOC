@@ -126,6 +126,8 @@ router.put('/', authMiddleware, ...settingsGuard('system_write'), async (req, re
     const allowed = [
       'popupIsActive', 'popupTitle', 'popupContent', 'popupImageUrl', 'popupTargetRole',
       'invoiceLogoUrl', 'invoiceSignatureUrl', 'invoiceStampText',
+      // Tài khoản thu học phí (VietQR trung tâm)
+      'centerBankCode', 'centerBankName', 'centerBankAccountNumber', 'centerBankAccountName',
     ];
     const updates = {};
     for (const key of allowed) {

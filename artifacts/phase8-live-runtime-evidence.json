@@ -1,0 +1,190 @@
+{
+  "generatedAt": "2026-08-10T13:02:09.964Z",
+  "origin": "http://127.0.0.1:5018",
+  "live": true,
+  "envFailure": null,
+  "cases": [
+    {
+      "name": "infra",
+      "status": "PASS",
+      "detail": {
+        "clients": [
+          "studentA",
+          "studentB",
+          "supportA",
+          "supportB",
+          "staffA",
+          "staffB",
+          "teacherA"
+        ],
+        "origin": "http://127.0.0.1:5018",
+        "studentA": "6a79cbb8ee530fa0f98b3d20",
+        "supportA": "6a79cbb8ee530fa0f98b3d1e",
+        "supportB": "6a79cbb8ee530fa0f98b3d1f"
+      }
+    },
+    {
+      "name": "student_to_supportA",
+      "status": "PASS",
+      "detail": {
+        "sender": "6a79cbb8ee530fa0f98b3d20",
+        "recipient": "6a79cbb8ee530fa0f98b3d1e",
+        "event": "message:receive",
+        "unexpectedRecipients": 0,
+        "dbCountDelta": 1,
+        "conversationId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20"
+      }
+    },
+    {
+      "name": "staff_support_collision",
+      "status": "PASS",
+      "detail": {
+        "note": "transportRole staff shared; private DM user-room only",
+        "supportA": 1,
+        "staffA": 0,
+        "supportB": 0
+      }
+    },
+    {
+      "name": "support_to_student",
+      "status": "PASS",
+      "detail": {
+        "recipient": "studentA",
+        "leaks": 0
+      }
+    },
+    {
+      "name": "staff_to_support",
+      "status": "PASS",
+      "detail": {
+        "supportA": 1,
+        "supportB": 0,
+        "staffB": 0
+      }
+    },
+    {
+      "name": "support_to_staff",
+      "status": "PASS",
+      "detail": {
+        "staffA": 1,
+        "supportB": 0,
+        "staffB": 0
+      }
+    },
+    {
+      "name": "teacher_to_student",
+      "status": "PASS",
+      "detail": {
+        "studentA": 1,
+        "others": 0
+      }
+    },
+    {
+      "name": "branch_student_staffB_deny",
+      "status": "PASS",
+      "detail": {
+        "note": "approved pairing: STAFF cross-branch DENY",
+        "dbDelta": 0
+      }
+    },
+    {
+      "name": "branch_student_supportB_allow_global",
+      "status": "PASS",
+      "detail": {
+        "note": "CURRENT DESIGNED BEHAVIOR — SUPPORT send global; private room still isolated",
+        "supportB": 1,
+        "supportA": 0
+      }
+    },
+    {
+      "name": "tenant_deny",
+      "status": "PASS",
+      "detail": {
+        "dbDelta": 0,
+        "localLeaks": 0
+      }
+    },
+    {
+      "name": "wrong_role_hint",
+      "status": "PASS",
+      "detail": {
+        "hint": "teacher",
+        "actualReceiver": "6a79cbb8ee530fa0f98b3d1e",
+        "receiverRole": "staff"
+      }
+    },
+    {
+      "name": "typing_isolation",
+      "status": "PASS",
+      "detail": {
+        "convId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20",
+        "supportA": 1,
+        "supportB": 0,
+        "events": "typing:show/hide"
+      }
+    },
+    {
+      "name": "read_isolation",
+      "status": "PASS",
+      "detail": {
+        "note": "Message.isRead remains global boolean — only verify no Support B socket event",
+        "convId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20"
+      }
+    },
+    {
+      "name": "concurrent",
+      "status": "PASS",
+      "detail": {
+        "messages": [
+          "[P8:conc:S→SupA] 1786366926428",
+          "[P8:conc:S→SupB] 1786366926428",
+          "[P8:conc:Staff→S] 1786366926428",
+          "[P8:conc:T→S] 1786366926428"
+        ]
+      }
+    },
+    {
+      "name": "persistence",
+      "status": "PASS",
+      "detail": {
+        "conversationId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20",
+        "senderRole": "student",
+        "receiverRole": "staff",
+        "senderBranchCode": "P8A",
+        "receiverBranchCode": "P8A",
+        "note": "Message schema has no tenantId field — unchanged",
+        "clientConversationId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20"
+      }
+    },
+    {
+      "name": "reconnect",
+      "status": "PASS",
+      "detail": {
+        "supportA": "6a79cbb8ee530fa0f98b3d1e"
+      }
+    },
+    {
+      "name": "multitab",
+      "status": "PASS",
+      "detail": {
+        "note": "CURRENT DESIGNED BEHAVIOR — latest presence socketId receives; not both tabs. Not classified as duplicate-user leak."
+      }
+    },
+    {
+      "name": "http_contacts",
+      "status": "PASS",
+      "detail": {
+        "count": 3,
+        "hasSupportA": true,
+        "hasCrossTenantSupport": false
+      }
+    },
+    {
+      "name": "messaging_isolation_suite",
+      "status": "DOCUMENTED",
+      "detail": {
+        "note": "If 401: ENVIRONMENT FAILURE — API/auth seed, not DM authorization"
+      }
+    }
+  ]
+}

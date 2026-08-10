@@ -78,6 +78,27 @@ const prometheusExporter = {
     lines.push('# TYPE http_request_duration_seconds_max gauge');
     lines.push(`http_request_duration_seconds_max ${snapshot.latency.maxMs / 1000}`);
 
+    // Messaging counters (Phase 9) — identifiers only, no message bodies
+    try {
+      const { snapshotCounters } = require('../../services/messagingObservability');
+      const m = snapshotCounters();
+      lines.push('# HELP messaging_messages_sent_total Policy-allowed private DM attempts');
+      lines.push('# TYPE messaging_messages_sent_total counter');
+      lines.push(`messaging_messages_sent_total ${m.messages_sent_total}`);
+      lines.push('# HELP messaging_messages_denied_total Policy-denied private DM attempts');
+      lines.push('# TYPE messaging_messages_denied_total counter');
+      lines.push(`messaging_messages_denied_total ${m.messages_denied_total}`);
+      lines.push('# HELP messaging_messages_persisted_total Messages written to MongoDB');
+      lines.push('# TYPE messaging_messages_persisted_total counter');
+      lines.push(`messaging_messages_persisted_total ${m.messages_persisted_total}`);
+      lines.push('# HELP messaging_messages_delivery_success_total notifyUser emit attempts marked success');
+      lines.push('# TYPE messaging_messages_delivery_success_total counter');
+      lines.push(`messaging_messages_delivery_success_total ${m.messages_delivery_success_total}`);
+      lines.push('# HELP messaging_messages_delivery_failed_total notifyUser emit failures');
+      lines.push('# TYPE messaging_messages_delivery_failed_total counter');
+      lines.push(`messaging_messages_delivery_failed_total ${m.messages_delivery_failed_total}`);
+    } catch { /* optional */ }
+
     lines.push('# HELP http_request_errors_4xx_total Total 4xx client errors');
     lines.push('# TYPE http_request_errors_4xx_total counter');
     lines.push(`http_request_errors_4xx_total ${snapshot.errors4xx}`);

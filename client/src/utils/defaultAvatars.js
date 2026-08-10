@@ -72,8 +72,9 @@ export function resolveAvatarUrl(userObj = {}) {
 
   // Phase 8.21: STAFF/SUPPORT by adminRole BEFORE generic role==="admin"
   // (JWT staff often has role=admin — must NOT resolve SUPER avatar).
+  // SUPPORT is a branded helpdesk identity — ignore Teacher.gender so sidebar /
+  // inbox / list never diverge (mailbox gender is often leftover staff data).
   if (ar === 'SUPPORT' || r === 'support') {
-    if (isFemale) return DEFAULT_AVATARS.support_female;
     return DEFAULT_AVATARS.support_male;
   }
 
