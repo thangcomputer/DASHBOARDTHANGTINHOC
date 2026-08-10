@@ -85,7 +85,7 @@ test('validateEnv: production requires longer (>=32) secrets', () => {
   assert.throws(() => freshValidateEnv()(), /at least 32 characters/);
 });
 
-test('validateEnv: CQRS in production requires ALLOW_CQRS_IN_PRODUCTION (fail-closed)', () => {
+test('validateEnv: CQRS in production without ALLOW forces legacy (no crash)', () => {
   process.env.NODE_ENV = 'production';
   process.env.JWT_SECRET = STRONG;
   process.env.JWT_REFRESH_SECRET = STRONG2;
@@ -99,11 +99,14 @@ test('validateEnv: CQRS in production requires ALLOW_CQRS_IN_PRODUCTION (fail-cl
   process.env.ENABLE_CQRS_STUDENT_CREATE = 'true';
   process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/db?replicaSet=rs0';
   delete process.env.ALLOW_CQRS_IN_PRODUCTION;
-  assert.throws(() => freshValidateEnv()(), /ALLOW_CQRS_IN_PRODUCTION/);
+  assert.doesNotThrow(() => freshValidateEnv()());
+  assert.equal(process.env.ENABLE_CQRS_STUDENT_CREATE, 'false');
+  assert.equal(process.env.ENABLE_CQRS, 'false');
   delete process.env.ENABLE_CQRS_STUDENT_CREATE;
+  delete process.env.ENABLE_CQRS;
 });
 
-test('validateEnv: CQRS in production without opt-in rejects even before replica check', () => {
+test('validateEnv: CQRS without opt-in / without RS forces legacy (no crash)', () => {
   process.env.NODE_ENV = 'production';
   process.env.JWT_SECRET = STRONG;
   process.env.JWT_REFRESH_SECRET = STRONG2;
@@ -117,11 +120,13 @@ test('validateEnv: CQRS in production without opt-in rejects even before replica
   process.env.ENABLE_CQRS_STUDENT_CREATE = 'true';
   process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/dashboardthangtinhoc';
   delete process.env.ALLOW_CQRS_IN_PRODUCTION;
-  assert.throws(() => freshValidateEnv()(), /ALLOW_CQRS_IN_PRODUCTION|CQRS flags are enabled/);
+  assert.doesNotThrow(() => freshValidateEnv()());
+  assert.equal(process.env.ENABLE_CQRS_STUDENT_CREATE, 'false');
   delete process.env.ENABLE_CQRS_STUDENT_CREATE;
+  delete process.env.ENABLE_CQRS;
 });
 
-test('validateEnv: CQRS with ALLOW_CQRS_IN_PRODUCTION still requires replicaSet', () => {
+test('validateEnv: CQRS with ALLOW but no replicaSet forces legacy (no crash)', () => {
   process.env.NODE_ENV = 'production';
   process.env.JWT_SECRET = STRONG;
   process.env.JWT_REFRESH_SECRET = STRONG2;
@@ -135,11 +140,12 @@ test('validateEnv: CQRS with ALLOW_CQRS_IN_PRODUCTION still requires replicaSet'
   process.env.ALLOW_CQRS_IN_PRODUCTION = 'true';
   process.env.ENABLE_CQRS_STUDENT_CREATE = 'true';
   process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/dashboardthangtinhoc';
-  assert.throws(() => freshValidateEnv()(), /replica set/i);
+  assert.doesNotThrow(() => freshValidateEnv()());
+  assert.equal(process.env.ENABLE_CQRS_STUDENT_CREATE, 'false');
   delete process.env.ENABLE_CQRS_STUDENT_CREATE;
   delete process.env.ALLOW_CQRS_IN_PRODUCTION;
+  delete process.env.ENABLE_CQRS;
 });
-
 test('validateEnv: CQRS accepts replicaSet URI in production only with ALLOW opt-in', () => {
   process.env.NODE_ENV = 'production';
   process.env.JWT_SECRET = STRONG;
