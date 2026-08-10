@@ -602,8 +602,15 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
 // ─── POST /api/students ──────────────────────────────────────────────────────────────────
 router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('create'), checkPermission(PERMISSIONS.MANAGE_STUDENTS)], async (req, res, next) => {
   try {
-    // Strangler Facade for CQRS Migration
-    if (process.env.ENABLE_CQRS_STUDENT_CREATE === 'true') {
+    // Strangler: CQRS when flag/replica resolves on; otherwise LIVE legacy (never hard-503).
+    let useCqrs = false;
+    try {
+      const { isStudentCreateCqrs } = require('../shared/cqrs/flags');
+      useCqrs = isStudentCreateCqrs();
+    } catch {
+      useCqrs = process.env.ENABLE_CQRS_STUDENT_CREATE === 'true';
+    }
+    if (useCqrs) {
       const CQRSStudentController = require('../modules/student/controllers/CQRSStudentController');
       return await CQRSStudentController.create(req, res, next);
     }
