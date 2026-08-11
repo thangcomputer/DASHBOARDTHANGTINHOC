@@ -26,28 +26,30 @@ function timeAgo(ts) {
 export function LmsTabBar({ courseTab, setCourseTab, className = '' }) {
   return (
     <div
-      className={`flex items-stretch gap-0 overflow-x-auto overscroll-x-contain border-b border-white/[0.08] bg-[#0d1117] ${className}`}
+      className={`overflow-x-auto overscroll-x-contain border-b border-white/[0.08] bg-[#0d1117] ${className}`}
       role="tablist"
       aria-label="Tab nội dung bài học"
     >
-      {LMS_PLAYER_TABS.map((t) => (
-        <button
-          key={t.key}
-          type="button"
-          role="tab"
-          aria-selected={courseTab === t.key}
-          onClick={() => setCourseTab(t.key)}
-          className={`shrink-0 px-3.5 sm:px-4 py-3 text-xs sm:text-sm font-bold tracking-wide border-b-2 transition-colors whitespace-nowrap ${
-            t.mobileOnly ? 'lg:hidden' : ''
-          } ${
-            courseTab === t.key
-              ? 'text-white border-emerald-500 bg-white/[0.03]'
-              : 'text-slate-500 border-transparent hover:text-slate-300'
-          }`}
-        >
-          {t.label}
-        </button>
-      ))}
+      <div className="flex items-stretch gap-0 max-w-3xl mx-auto w-full px-2 sm:px-0">
+        {LMS_PLAYER_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={courseTab === t.key}
+            onClick={() => setCourseTab(t.key)}
+            className={`shrink-0 px-3.5 sm:px-4 py-3 text-xs sm:text-sm font-bold tracking-wide border-b-2 transition-colors whitespace-nowrap ${
+              t.mobileOnly ? 'lg:hidden' : ''
+            } ${
+              courseTab === t.key
+                ? 'text-white border-emerald-500 bg-white/[0.03]'
+                : 'text-slate-500 border-transparent hover:text-slate-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -67,7 +69,7 @@ function OverviewPanel({
   const courseDesc = selectedCourse?.description || selectedCourse?.desc || '';
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-3xl mx-auto w-full">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="inline-block text-[9px] font-black text-emerald-400/80 uppercase tracking-[0.15em] mb-2">
@@ -183,7 +185,7 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
   const removeNote = (id) => setNotes((prev) => (prev || []).filter((n) => n.id !== id));
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4 max-w-3xl mx-auto w-full">
       <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
         <input
           value={draft}
@@ -308,7 +310,7 @@ function QaPanel({ storageKey, lessonId, lessonTitle, userName }) {
   };
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4 max-w-3xl mx-auto w-full">
       <div className="flex gap-2">
         <div className="flex-1 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
           <Search size={14} className="text-slate-500 shrink-0" />
@@ -384,14 +386,14 @@ function AnnouncementsPanel({ notices }) {
 
   if (!list.length) {
     return (
-      <div className="py-12 text-center text-slate-500 max-w-3xl">
+      <div className="py-12 text-center text-slate-500 max-w-3xl mx-auto w-full">
         <p className="text-sm font-semibold">Chưa có thông báo nào cho khóa học này.</p>
       </div>
     );
   }
 
   return (
-    <ul className="space-y-4 max-w-3xl">
+    <ul className="space-y-4 max-w-3xl mx-auto w-full">
       {list.map((n, i) => {
         const text = typeof n === 'string' ? n : n?.text || n?.title || n?.message || '';
         const title = typeof n === 'object' && n?.title ? n.title : `Thông báo ${i + 1}`;
@@ -441,7 +443,7 @@ function ReviewsPanel({ storageKey, userName }) {
   const list = [...(Array.isArray(items) ? items : [])].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-3xl mx-auto w-full">
       <div className="flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
         <div>
           <p className="text-3xl font-extrabold text-white tabular-nums">{avg ? avg.toFixed(1) : '—'}</p>
@@ -522,7 +524,7 @@ function ResourcesPanel({ files }) {
   const list = Array.isArray(files) ? files : [];
   if (!list.length) {
     return (
-      <div className="py-12 text-center text-slate-500 max-w-3xl">
+      <div className="py-12 text-center text-slate-500 max-w-3xl mx-auto w-full">
         <FileBox size={36} className="mx-auto mb-3 opacity-40" />
         <p className="text-sm font-semibold">Chưa có tài liệu đính kèm</p>
       </div>
@@ -530,7 +532,7 @@ function ResourcesPanel({ files }) {
   }
 
   return (
-    <ul className="space-y-3 max-w-3xl">
+    <ul className="space-y-3 max-w-3xl mx-auto w-full">
       {list.map((file, idx) => {
         const href = (file.fileUrl || file.url)
           ? buildMediaDownloadUrl(file.fileUrl || file.url, file.fileOriginalName || file.title)
@@ -571,7 +573,7 @@ function ListPanel({
   onSelectLesson,
 }) {
   return (
-    <div className="max-w-3xl space-y-3 lg:hidden">
+    <div className="max-w-3xl mx-auto w-full space-y-3 lg:hidden">
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-300">Nội dung khóa học</h3>

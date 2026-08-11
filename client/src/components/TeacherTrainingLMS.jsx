@@ -1137,7 +1137,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           className="flex-1 basis-0 min-w-0 min-h-0 w-full overflow-y-scroll overscroll-y-contain custom-scrollbar-dark"
         >
 
-          <div className="sticky top-0 z-20 bg-[#0b1018] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          <div className="bg-[#0b1018]">
             <div className="px-0 sm:px-4 pt-0 sm:pt-3 pb-0 sm:pb-2 flex justify-center w-full bg-black/40">
               <div className="relative w-full rounded-none sm:rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80 h-[44dvh] sm:h-[50dvh] lg:h-[min(56dvh,560px)]">
                 <YouTubePlayerSecure
