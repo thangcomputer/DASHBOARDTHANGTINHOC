@@ -17,7 +17,7 @@ import {
   formatTeacherDisplay,
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
-import { normalizeScheduleDate } from '../utils/scheduleTime';
+import { getScheduleDisplayKind } from '../utils/scheduleTime';
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
 import { StudentNoteModal } from './student/StudentNoteModal';
 import {
@@ -311,12 +311,10 @@ const StudentDashboard = ({ onNavigate }) => {
   );
 
   const upcomingScheduleCount = useMemo(() => {
-    // Tổng quan: đếm mọi khóa của HV (không lọc theo course switcher)
-    const todayStr = normalizeScheduleDate(new Date());
+    // Tổng quan: đếm buổi còn sắp tới / đang diễn ra (không tính buổi đã qua giờ)
     return (mySchedulesAll || []).filter((s) => {
-      if (String(s.status || '') !== 'scheduled') return false;
-      const d = normalizeScheduleDate(s.date);
-      return d >= todayStr;
+      const kind = getScheduleDisplayKind(s);
+      return kind === 'upcoming' || kind === 'ongoing';
     }).length;
   }, [mySchedulesAll]);
   const myMaterials = useMemo(() =>
@@ -458,17 +456,19 @@ const StudentDashboard = ({ onNavigate }) => {
        }
     });
 
-    // 3. Tất cả lịch sắp diễn ra & đã xếp của Giảng viên (status === 'scheduled' / 'upcoming')
+    // 3. Lịch GV xếp — nhãn theo thời gian thực (không đổi status DB)
     (mySchedules || []).forEach((s, sIdx) => {
        const dateStr = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
        const ts = parseDateToMs(s.date) || Date.now();
+       const kind = getScheduleDisplayKind(s);
 
-       if (s.status === 'scheduled' || s.status === 'upcoming') {
+       if (kind === 'upcoming' || kind === 'ongoing') {
          const key = `sched_${dateStr}_${s.startTime || sIdx}`;
          if (!seenKeys.has(key)) {
            seenKeys.add(key);
            logs.push({
               type: 'scheduled',
+              displayKind: kind,
               date: dateStr,
               time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
               note: s.title || s.subject || `Lịch học giảng viên xếp (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`,
@@ -477,12 +477,28 @@ const StudentDashboard = ({ onNavigate }) => {
               timestamp: ts
            });
          }
-       } else if (s.status === 'cancelled') {
+       } else if (kind === 'past_pending') {
+         const key = `past_${dateStr}_${s.startTime || sIdx}`;
+         if (!seenKeys.has(key)) {
+           seenKeys.add(key);
+           logs.push({
+              type: 'past_pending',
+              displayKind: kind,
+              date: dateStr,
+              time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
+              note: s.title || s.subject || `Lịch đã qua — chờ giảng viên điểm danh (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`,
+              grade: null,
+              index: null,
+              timestamp: ts
+           });
+         }
+       } else if (kind === 'cancelled') {
          const key = `cancel_${dateStr}_${s.startTime || sIdx}`;
          if (!seenKeys.has(key)) {
            seenKeys.add(key);
            logs.push({
               type: 'cancelled',
+              displayKind: kind,
               date: dateStr,
               time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
               note: s.note || 'Lịch học đã bị hủy',
@@ -492,6 +508,7 @@ const StudentDashboard = ({ onNavigate }) => {
            });
          }
        }
+       // completed: đã hiện qua attendanceHistory/grades ở bước 1 — không nhân đôi
     });
 
     return logs.sort((a, b) => b.timestamp - a.timestamp);

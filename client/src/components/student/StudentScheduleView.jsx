@@ -3,7 +3,7 @@ import {
   Calendar, Video, Clock, CheckCircle, XCircle, AlertCircle, FileText,
   ChevronLeft, ChevronRight, User, BookOpen, Sparkles, MessageSquare, ExternalLink, Award, ClipboardList
 } from 'lucide-react';
-import { isScheduleOngoingNow } from '../../utils/scheduleTime';
+import { getScheduleDisplayKind, getScheduleDisplayMeta, isScheduleUpcomingDisplay } from '../../utils/scheduleTime';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
 
 export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displayGrades = [] }) => {
@@ -67,11 +67,11 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
   }, [schedules, month, year]);
 
   const upcomingCount = useMemo(() => {
-    return monthSchedules.filter(s => s.status === 'scheduled').length;
+    return monthSchedules.filter((s) => isScheduleUpcomingDisplay(s)).length;
   }, [monthSchedules]);
 
   const completedCount = useMemo(() => {
-    return monthSchedules.filter(s => s.status === 'completed').length;
+    return monthSchedules.filter((s) => getScheduleDisplayKind(s) === 'completed').length;
   }, [monthSchedules]);
 
   return (
@@ -187,14 +187,17 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
 
                     {hasSchedule && (
                       <div className="flex gap-0.5 mt-0.5 justify-center">
-                        {daySchedules.filter(s => s.status === 'scheduled').slice(0, 2).map((s, sidx) => (
-                          <div key={'s-' + s.id + sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
+                        {daySchedules.filter((s) => isScheduleUpcomingDisplay(s)).slice(0, 2).map((s, sidx) => (
+                          <div key={'s-' + (s.id || s._id) + sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
                         ))}
-                        {daySchedules.filter(s => s.status === 'completed').slice(0, 2).map((s, sidx) => (
-                          <div key={'c-' + s.id + sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-emerald-200' : 'bg-emerald-500'} shadow-sm`} />
+                        {daySchedules.filter((s) => getScheduleDisplayKind(s) === 'past_pending').slice(0, 2).map((s, sidx) => (
+                          <div key={'p-' + (s.id || s._id) + sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-slate-300' : 'bg-slate-400'} shadow-sm`} />
                         ))}
-                        {daySchedules.filter(s => s.status === 'cancelled').slice(0, 2).map((s, sidx) => (
-                          <div key={'x-' + s.id + sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-red-200' : 'bg-red-500'} shadow-sm`} />
+                        {daySchedules.filter((s) => getScheduleDisplayKind(s) === 'completed').slice(0, 2).map((s, sidx) => (
+                          <div key={'c-' + (s.id || s._id) + sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-emerald-200' : 'bg-emerald-500'} shadow-sm`} />
+                        ))}
+                        {daySchedules.filter((s) => getScheduleDisplayKind(s) === 'cancelled').slice(0, 2).map((s, sidx) => (
+                          <div key={'x-' + (s.id || s._id) + sidx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-red-200' : 'bg-red-500'} shadow-sm`} />
                         ))}
                       </div>
                     )}
@@ -208,6 +211,7 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
           <div className="px-2 pt-2.5 mt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] sm:text-xs font-semibold text-slate-500 shrink-0">
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" /> Đã hoàn thành</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" /> Sắp diễn ra</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" /> Đã qua</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0" /> Đã hủy</span>
           </div>
         </div>
@@ -236,7 +240,8 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
               {selectedSchedules.length > 0 ? (
                 <div className="space-y-2.5 max-h-[190px] overflow-y-auto pr-1">
                   {selectedSchedules.map((s) => {
-                    const isOngoing = isScheduleOngoingNow(s);
+                    const kind = getScheduleDisplayKind(s);
+                    const meta = getScheduleDisplayMeta(s);
                     return (
                       <div
                         key={s._id || s.id}
@@ -248,22 +253,18 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                           </h4>
                           <span
                             className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase shrink-0 border ${
-                              s.status === 'completed'
+                              kind === 'completed'
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                                : s.status === 'cancelled'
+                                : kind === 'cancelled'
                                 ? 'bg-red-500/20 text-red-300 border-red-500/30'
-                                : isOngoing
+                                : kind === 'ongoing'
                                 ? 'bg-green-500/30 text-green-200 border-green-400/40 animate-pulse'
+                                : kind === 'past_pending'
+                                ? 'bg-slate-500/25 text-slate-200 border-slate-400/30'
                                 : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                             }`}
                           >
-                            {s.status === 'completed'
-                              ? 'ĐÃ HỌC'
-                              : s.status === 'cancelled'
-                              ? 'ĐÃ HỦY'
-                              : isOngoing
-                              ? 'ĐANG DIỄN RA'
-                              : 'SẮP HỌC'}
+                            {meta.label}
                           </span>
                         </div>
 

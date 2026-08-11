@@ -106,3 +106,66 @@ export function isScheduleOngoingNow(schedule, now = new Date()) {
   if (end == null) return current >= start;
   return current >= start && current <= end;
 }
+
+/**
+ * Buổi scheduled đã qua giờ kết thúc (chưa điểm danh / chưa hủy).
+ * Chỉ dùng cho nhãn UI — không đổi status DB / không trừ buổi.
+ */
+export function isSchedulePastEnd(schedule, now = new Date()) {
+  if (!schedule) return false;
+  const status = String(schedule.status || 'scheduled');
+  if (status === 'completed' || status === 'cancelled' || status === 'no_show') return false;
+
+  const dateStr = normalizeScheduleDate(schedule.date);
+  const parts = dateStr.split('-').map((n) => parseInt(n, 10));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return false;
+  const [y, m, d] = parts;
+
+  const startMins = parseTimeToMinutes(schedule.startTime);
+  let endMins = parseTimeToMinutes(schedule.endTime);
+  if (endMins == null) {
+    endMins = startMins == null ? null : Math.min(startMins + SESSION_DURATION_MINS, 23 * 60 + 59);
+  }
+  if (endMins == null) {
+    // Không có giờ → coi hết ngày là "đã qua"
+    const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
+    return now.getTime() > endOfDay.getTime();
+  }
+
+  const endAt = new Date(y, m - 1, d, Math.floor(endMins / 60), endMins % 60, 0, 0);
+  return now.getTime() > endAt.getTime();
+}
+
+/** Nhãn hiển thị lịch (không ghi DB) */
+export const SCHEDULE_DISPLAY = {
+  completed: { kind: 'completed', label: 'ĐÃ HỌC', shortLabel: 'Hoàn thành' },
+  cancelled: { kind: 'cancelled', label: 'ĐÃ HỦY', shortLabel: 'Hủy' },
+  ongoing: { kind: 'ongoing', label: 'ĐANG DIỄN RA', shortLabel: 'Đang học' },
+  upcoming: { kind: 'upcoming', label: 'SẮP TỚI', shortLabel: 'Sắp tới' },
+  past_pending: { kind: 'past_pending', label: 'ĐÃ QUA', shortLabel: 'Đã qua' },
+};
+
+/**
+ * Phân loại hiển thị lịch theo status + thời gian thực.
+ * completed / cancelled giữ nguyên; scheduled quá giờ → past_pending.
+ */
+export function getScheduleDisplayKind(schedule, now = new Date()) {
+  if (!schedule) return 'upcoming';
+  const status = String(schedule.status || 'scheduled');
+  if (status === 'completed') return 'completed';
+  if (status === 'cancelled' || status === 'no_show') return 'cancelled';
+  if (isScheduleOngoingNow(schedule, now)) return 'ongoing';
+  if (isSchedulePastEnd(schedule, now)) return 'past_pending';
+  return 'upcoming';
+}
+
+export function getScheduleDisplayMeta(schedule, now = new Date()) {
+  const kind = getScheduleDisplayKind(schedule, now);
+  return SCHEDULE_DISPLAY[kind] || SCHEDULE_DISPLAY.upcoming;
+}
+
+/** Còn là buổi sắp tới / đang diễn ra (đếm "sắp tới") */
+export function isScheduleUpcomingDisplay(schedule, now = new Date()) {
+  const kind = getScheduleDisplayKind(schedule, now);
+  return kind === 'upcoming' || kind === 'ongoing';
+}

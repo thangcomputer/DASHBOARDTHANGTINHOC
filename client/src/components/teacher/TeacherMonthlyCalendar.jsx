@@ -4,7 +4,7 @@ import {
   CheckCircle, Video, MessageSquare, Edit3, Trash2, User, Sparkles
 } from 'lucide-react';
 import { csrfFetch } from '../../services/api';
-import { isScheduleOngoingNow } from '../../utils/scheduleTime';
+import { isScheduleOngoingNow, getScheduleDisplayKind, isScheduleUpcomingDisplay } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
 
 const STATUS_COLORS = {
@@ -20,11 +20,23 @@ const STATUS_COLORS = {
     dot: 'bg-amber-400',
     label: '● Sắp tới',
   },
+  upcoming: {
+    cell: 'bg-amber-50 border-amber-200 text-amber-700',
+    badge: 'bg-amber-100 text-amber-700 border-amber-200',
+    dot: 'bg-amber-400',
+    label: '● Sắp tới',
+  },
   ongoing: {
     cell: 'bg-green-50 border-green-200 text-green-700',
     badge: 'bg-green-100 text-green-700 border-green-300',
     dot: 'bg-green-500',
     label: '● Đang diễn ra',
+  },
+  past_pending: {
+    cell: 'bg-slate-50 border-slate-200 text-slate-600',
+    badge: 'bg-slate-200 text-slate-700 border-slate-300',
+    dot: 'bg-slate-400',
+    label: '● Đã qua',
   },
   cancelled: {
     cell: 'bg-red-50 border-red-200 text-red-400',
@@ -47,9 +59,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
     return () => clearInterval(timer);
   }, []);
 
-  const getDisplayStatus = (schedule) => (
-    isScheduleOngoingNow(schedule) ? 'ongoing' : schedule.status
-  );
+  const getDisplayStatus = (schedule) => getScheduleDisplayKind(schedule);
 
   const year  = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -219,14 +229,17 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                   {/* Status dots */}
                   {hasData && (
                     <div className="flex gap-0.5 mt-0.5 justify-center px-0.5">
-                      {daySchs.filter(s => s.status === 'scheduled').slice(0,2).map(s => (
-                        <div key={'s-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : selected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
+                      {daySchs.filter((s) => isScheduleUpcomingDisplay(s)).slice(0, 2).map((s) => (
+                        <div key={'s-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : selected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
                       ))}
-                      {daySchs.filter(s => s.status === 'completed').slice(0,2).map(s => (
-                        <div key={'c-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-emerald-200' : 'bg-emerald-500'} shadow-sm`} />
+                      {daySchs.filter((s) => getScheduleDisplayKind(s) === 'past_pending').slice(0, 2).map((s) => (
+                        <div key={'p-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-slate-300' : 'bg-slate-400'} shadow-sm`} />
                       ))}
-                      {daySchs.filter(s => s.status === 'cancelled').slice(0,2).map(s => (
-                        <div key={'x-'+s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-rose-200' : 'bg-red-400'} shadow-sm`} />
+                      {daySchs.filter((s) => getScheduleDisplayKind(s) === 'completed').slice(0, 2).map((s) => (
+                        <div key={'c-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-emerald-200' : 'bg-emerald-500'} shadow-sm`} />
+                      ))}
+                      {daySchs.filter((s) => getScheduleDisplayKind(s) === 'cancelled').slice(0, 2).map((s) => (
+                        <div key={'x-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-rose-200' : 'bg-red-400'} shadow-sm`} />
                       ))}
                     </div>
                   )}
@@ -248,6 +261,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" /> Đã dạy</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" /> Sắp tới</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" /> Đang diễn ra</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" /> Đã qua</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0" /> Đã hủy</span>
         </div>
       </div>
@@ -387,18 +401,18 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
               </h4>
             </div>
             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-              {schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length} buổi
+              {schedules.filter((s) => isScheduleUpcomingDisplay(s) && new Date(s.date).getMonth() === month && new Date(s.date).getFullYear() === year).length} buổi
             </span>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-1 divide-y divide-slate-100 space-y-0.5">
             {schedules
-              .filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month)
+              .filter((s) => isScheduleUpcomingDisplay(s) && new Date(s.date).getMonth() === month && new Date(s.date).getFullYear() === year)
               .sort((a, b) => new Date(a.date) - new Date(b.date))
               .map(s => {
                 const d = new Date(s.date);
                 const displayStatus = getDisplayStatus(s);
-                const cfg = STATUS_COLORS[displayStatus] || STATUS_COLORS.scheduled;
+                const cfg = STATUS_COLORS[displayStatus] || STATUS_COLORS.upcoming;
 
                 return (
                   <div key={s._id || s.id} className={`py-2 px-1 flex items-center justify-between gap-2 transition group ${displayStatus === 'ongoing' ? 'bg-green-50/50 rounded-lg' : 'hover:bg-amber-50/30'}`}>
@@ -431,7 +445,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                 );
               })}
 
-            {schedules.filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === month).length === 0 && (
+            {schedules.filter((s) => isScheduleUpcomingDisplay(s) && new Date(s.date).getMonth() === month && new Date(s.date).getFullYear() === year).length === 0 && (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 text-xs font-medium py-4">
                 Không có buổi nào sắp tới.
               </div>

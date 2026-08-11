@@ -221,6 +221,7 @@ export default function StudentOverviewTab({
                 {studyLogs.map((item, idx) => {
                   const isCancelled = item.type === 'cancelled';
                   const isScheduled = item.type === 'scheduled';
+                  const isPastPending = item.type === 'past_pending';
                   const isHomework = item.type === 'homework';
                   const isQuiz = item.type === 'quiz';
                   const isAttendance = item.type === 'attendance';
@@ -229,7 +230,7 @@ export default function StudentOverviewTab({
                     <div
                       key={idx}
                       className={`px-3.5 py-3 flex flex-col justify-between gap-1.5 ${
-                        isCancelled ? 'bg-red-50/30' : isScheduled ? 'bg-blue-50/30' : isQuiz ? 'bg-amber-50/20' : 'hover:bg-slate-50'
+                        isCancelled ? 'bg-red-50/30' : isPastPending ? 'bg-slate-50/80' : isScheduled ? 'bg-blue-50/30' : isQuiz ? 'bg-amber-50/20' : 'hover:bg-slate-50'
                       } transition-colors duration-200`}
                     >
                       <div className="flex items-start gap-2.5 min-w-0">
@@ -237,6 +238,8 @@ export default function StudentOverviewTab({
                           className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
                             isCancelled
                               ? 'bg-red-100 text-red-600'
+                              : isPastPending
+                              ? 'bg-slate-200 text-slate-600'
                               : isScheduled
                               ? 'bg-blue-100 text-blue-600'
                               : isHomework
@@ -248,7 +251,7 @@ export default function StudentOverviewTab({
                         >
                           {isCancelled ? (
                             <XCircle size={15} aria-hidden="true" />
-                          ) : isScheduled ? (
+                          ) : isPastPending || isScheduled ? (
                             <Calendar size={15} aria-hidden="true" />
                           ) : isHomework ? (
                             <ClipboardList size={15} aria-hidden="true" />
@@ -260,12 +263,22 @@ export default function StudentOverviewTab({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-1">
-                            <p className={`text-xs font-bold truncate ${isCancelled ? 'text-red-700' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
+                            <p className={`text-xs font-bold truncate ${isCancelled ? 'text-red-700' : isPastPending ? 'text-slate-700' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
                               {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
                             </p>
                             {isScheduled && (
                               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide shrink-0">
-                                SẮP TỚI
+                                {item.displayKind === 'ongoing' ? 'ĐANG DIỄN RA' : 'SẮP TỚI'}
+                              </span>
+                            )}
+                            {isPastPending && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 uppercase tracking-wide shrink-0">
+                                ĐÃ QUA
+                              </span>
+                            )}
+                            {isCancelled && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-red-100 text-red-700 uppercase tracking-wide shrink-0">
+                                HỦY
                               </span>
                             )}
                           </div>
