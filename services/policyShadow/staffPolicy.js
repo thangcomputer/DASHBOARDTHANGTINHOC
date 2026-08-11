@@ -55,8 +55,8 @@ function evaluateCreate(subject, ctx) {
   const base = requireManageStaff(subject);
   if (base.decision === 'DENY') return base;
   const requested = String(ctx.requestedAdminRole || 'STAFF');
-  if (requested === 'SUPER_ADMIN' && !isRootSuperAdmin(subject)) {
-    return { decision: 'DENY', reason: 'only_root_creates_super', statusHint: 403 };
+  if (requested === 'SUPER_ADMIN') {
+    return { decision: 'DENY', reason: 'super_create_disabled', statusHint: 403 };
   }
   if (requested === 'HIGH_ADMIN' && !isSuperAdmin(subject)) {
     return { decision: 'DENY', reason: 'only_super_creates_high', statusHint: 403 };
@@ -75,6 +75,9 @@ function evaluateUpdate(subject, ctx) {
   }
   if (ctx.target.adminRole === 'HIGH_ADMIN' && !isSuperAdmin(subject)) {
     return { decision: 'DENY', reason: 'only_super_edits_high', statusHint: 403 };
+  }
+  if (String(ctx.requestedAdminRole || '') === 'SUPER_ADMIN') {
+    return { decision: 'DENY', reason: 'super_create_disabled', statusHint: 403 };
   }
   if (ctx.roleChanging && !isRootSuperAdmin(subject)) {
     return { decision: 'DENY', reason: 'only_root_changes_role', statusHint: 403 };

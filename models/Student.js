@@ -108,7 +108,29 @@ const StudentSchema = new mongoose.Schema(
     paidAt: { type: Date },
     paidAmount: { type: Number, default: 0 },  // Số tiền thực nhận qua SePay
     paidNote: { type: String, default: '' },    // Nội dung CK ghi nhận
-    studentCode: { type: String, default: '' }, // Mã HV dùng trong nội dung QR
+    studentCode: { type: String, default: '' }, // Canonical HV###### (server-generated)
+    /** Historical codes for payment/search compatibility — never rewrite finance history */
+    legacyStudentCodes: {
+      type: [String],
+      default: undefined,
+      validate: {
+        validator(arr) {
+          if (arr == null) return true;
+          if (!Array.isArray(arr)) return false;
+          const seen = new Set();
+          for (const c of arr) {
+            if (typeof c !== 'string') return false;
+            const t = c.trim();
+            if (!t) return false;
+            const key = t.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+          }
+          return true;
+        },
+        message: 'legacyStudentCodes must be unique non-empty strings',
+      },
+    },
     // Chi nhánh học viên đăng ký
     branchId: {
       type: mongoose.Schema.Types.ObjectId,

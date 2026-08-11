@@ -25,6 +25,10 @@ const {
 } = require('../services/enrollmentService');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const { generateTempPassword } = require('../utils/tempPassword');
+const {
+  generateStudentCode,
+  isCanonical,
+} = require('../services/businessCodeService');
 const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../services/ledgerService');
 const { refundStudentTuition, payTeacherForStudent } = require('../services/studentFinanceService');
 const cache = require('../utils/cache');
@@ -202,6 +206,8 @@ router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), 
           { phone: sReg },
           { course: sReg },
           { 'enrollments.courseName': sReg },
+          { studentCode: sReg },
+          { legacyStudentCodes: sReg },
         ],
       });
     }
@@ -551,27 +557,118 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
       return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ hoặc rỗng.' });
     }
 
-    // Gán chi nhánh tự động: STAFF chỉ được nhập vào CS của mình
-    const branchId = req.userBranchId || null;
+    const Branch = require('../models/Branch');
+    const Teacher = require('../models/Teacher');
+    const bcrypt = require('bcryptjs');
+    const forcedBranchId = req.userBranchId || null;
+    const forcedBranchCode = req.userBranchCode || '';
 
-    const studentsToInsert = rawStudents.map(s => {
+    const branchCache = new Map();
+    const resolveBranch = async (hint) => {
+      const key = String(hint || '').trim();
+      if (!key) return { branchId: null, branchCode: '' };
+      if (branchCache.has(key.toLowerCase())) return branchCache.get(key.toLowerCase());
+      let branch = null;
+      if (/^[a-f\d]{24}$/i.test(key)) {
+        branch = await Branch.findById(key).select('_id code name').lean();
+      }
+      if (!branch) {
+        branch = await Branch.findOne({
+          $or: [
+            { code: new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            { name: new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          ],
+        }).select('_id code name').lean();
+      }
+      const resolved = branch
+        ? { branchId: branch._id, branchCode: branch.code || '' }
+        : { branchId: null, branchCode: key };
+      branchCache.set(key.toLowerCase(), resolved);
+      return resolved;
+    };
+
+    const resolveTeacherId = async (hint) => {
+      const key = String(hint || '').trim();
+      if (!key) return null;
+      if (/^[a-f\d]{24}$/i.test(key)) {
+        const byId = await Teacher.findById(key).select('_id').lean();
+        return byId?._id || null;
+      }
+      const phoneDigits = key.replace(/\D/g, '');
+      const doc = await Teacher.findOne({
+        role: 'teacher',
+        $or: [
+          ...(phoneDigits.length >= 8 ? [{ phone: phoneDigits }, { phone: key }] : []),
+          { name: new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        ],
+      }).select('_id').lean();
+      return doc?._id || null;
+    };
+
+    const studentsToInsert = [];
+    for (const s of rawStudents) {
+      if (!s) continue;
       const {
         password: _omitPassword,
         refreshToken: _omitRefresh,
         tokenVersion: _omitTv,
+        studentCode: _omitClientCode,
+        legacyStudentCodes: _omitLegacy,
+        reservedStudentCode: _omitReserved,
+        branchHint,
+        teacherHint,
         ...safe
-      } = s || {};
-      return {
+      } = s;
+
+      const name = s.name?.toUpperCase()?.trim();
+      const phone = String(s.phone || '').trim();
+      const zalo = String(s.zalo || phone || '').trim();
+      if (!name || (!phone && !zalo)) continue;
+
+      let branchId = forcedBranchId;
+      let branchCode = forcedBranchCode;
+      if (!branchId) {
+        const resolved = await resolveBranch(branchHint || s.branchCode || s.branchId || '');
+        branchId = resolved.branchId;
+        branchCode = resolved.branchCode || '';
+      }
+
+      const teacherId = await resolveTeacherId(teacherHint || s.teacherId || s.teacherName || '');
+      const genderRaw = String(s.gender || 'male').toLowerCase();
+      const gender = (genderRaw === 'female' || genderRaw === 'nữ' || genderRaw === 'nu') ? 'female' : 'male';
+      const learningMode = ['ONLINE', 'OFFLINE'].includes(String(s.learningMode || '').toUpperCase())
+        ? String(s.learningMode).toUpperCase()
+        : 'OFFLINE';
+      const paid = s.paid === true || s.paid === 'Đã đóng phí' || s.paid === 'x' || s.paid === 'v';
+      const totalSessions = Number(s.totalSessions) > 0 ? Number(s.totalSessions) : 12;
+      const price = Number(s.price) || 0;
+      const ageNum = Number(s.age);
+      const plainPassword = generateTempPassword(8);
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+      const studentCode = await generateStudentCode();
+
+      studentsToInsert.push({
         ...safe,
-        name: s.name?.toUpperCase()?.trim(),
-        branchId: branchId || s.branchId || null,
+        name,
+        phone: phone || zalo,
+        zalo: zalo || phone,
+        gender,
+        ...(Number.isFinite(ageNum) && ageNum >= 10 && ageNum <= 80 ? { age: ageNum } : {}),
+        course: String(s.course || '').trim() || 'CHƯA XÁC ĐỊNH',
+        price,
+        totalSessions,
+        remainingSessions: totalSessions,
+        paid,
+        learningMode,
+        branchId: branchId || null,
+        branchCode: branchCode || '',
+        ...(teacherId ? { teacherId } : {}),
         status: s.status || 'Chờ xếp lớp',
-        paid: s.paid === true || s.paid === 'Đã đóng phí',
-        learningMode: ['ONLINE', 'OFFLINE'].includes(s.learningMode?.toUpperCase())
-          ? s.learningMode.toUpperCase()
-          : 'OFFLINE',
-      };
-    }).filter(s => s.name && (s.phone || s.zalo));
+        password: hashedPassword,
+        isFirstLogin: true,
+        studentCode,
+      });
+    }
 
     if (studentsToInsert.length === 0) {
       return res.status(400).json({ success: false, message: 'Không có bản ghi nào hợp lệ để nhập (Thiếu Tên hoặc SĐT/Zalo).' });
@@ -596,6 +693,26 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// ─── POST /api/students/reserve-code ───────────────────────────────────────────
+// Allocate canonical HV###### before QR (server-only). Client must not invent TTH/Date.now.
+router.post(
+  '/reserve-code',
+  [authMiddleware, branchFilter, checkPermission(PERMISSIONS.MANAGE_STUDENTS)],
+  async (req, res) => {
+    try {
+      const studentCode = await generateStudentCode();
+      return res.status(201).json({ success: true, data: { studentCode } });
+    } catch (err) {
+      const status = err.status || 500;
+      return res.status(status).json({
+        success: false,
+        message: err.message || 'Không cấp được mã học viên',
+        code: err.code || 'BUSINESS_CODE_ERROR',
+      });
+    }
+  },
+);
 
 // ─── POST /api/students ────────────────────────────────────────────────────────
 // Admin thêm học viên mới
@@ -679,9 +796,20 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
     }
 
     const student = new Student(req.body);
-    if (!student.studentCode || !String(student.studentCode).trim()) {
-      const seq = String(Date.now()).slice(-8);
-      student.studentCode = `HV${seq}`;
+    // Server is sole authority for business codes — ignore client studentCode / legacy arrays
+    delete student.legacyStudentCodes;
+    const reserved = String(req.body.reservedStudentCode || '').trim().toUpperCase();
+    if (isCanonical('student', reserved)) {
+      const taken = await Student.exists({
+        $or: [{ studentCode: reserved }, { legacyStudentCodes: reserved }],
+      });
+      if (!taken) {
+        student.studentCode = reserved;
+      } else {
+        student.studentCode = await generateStudentCode();
+      }
+    } else {
+      student.studentCode = await generateStudentCode();
     }
 
     // Luôn có enrollment primary (đồng bộ danh sách khóa + thu phí)

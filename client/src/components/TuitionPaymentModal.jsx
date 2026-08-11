@@ -29,11 +29,13 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
   const { socket } = useSocket() || {};
   const toast = useToast();
 
-  // Tạo nội dung chuyển khoản chuẩn
-  const studentCode = student?.studentCode || String(student?._id || student?.id || '').slice(-6).toUpperCase() || 'HV001';
+  // Canonical studentCode from server only — never invent TTH / _id slice
+  const studentCode = String(student?.studentCode || '').trim();
   const courseName  = student?.course || 'KHOA HOC';
   const amount      = student?.price || 0;
-  const description = `${studentCode} Nop hoc phi ${courseName}`;
+  const description = studentCode
+    ? `${studentCode} Nop hoc phi ${courseName}`
+    : '';
 
   // Lấy thông tin ngân hàng trung tâm từ SystemSettings
   useEffect(() => {
@@ -124,7 +126,7 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
     return () => socket.off('tuition:paid', handler);
   }, [socket, student]);
 
-  const qrUrl = centerBank
+  const qrUrl = centerBank && description
     ? generateVietQRUrl(
         centerBank.bankCode,
         centerBank.accountNumber,
@@ -135,9 +137,33 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
     : null;
 
   const handleCopyDesc = () => {
+    if (!description) {
+      toast.error('Chưa có mã học viên từ server');
+      return;
+    }
     navigator.clipboard.writeText(description);
     toast.success('Đã copy nội dung chuyển khoản!');
   };
+
+  if (!studentCode) {
+    return (
+      <div
+        className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
+      >
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
+          <AlertCircle className="mx-auto text-amber-500 mb-3" size={36} />
+          <h3 className="font-bold text-lg mb-2">Chưa có mã học viên</h3>
+          <p className="text-slate-600 text-sm mb-4">
+            Hệ thống chưa cấp mã HV cho học viên này. Không tự tạo mã trên thiết bị.
+          </p>
+          <button type="button" onClick={onClose} className="cms-btn cms-btn--primary w-full">
+            Đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

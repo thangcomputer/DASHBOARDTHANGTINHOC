@@ -12,6 +12,7 @@ const {
 } = require('../services/examSubjectCatalog');
 const { policyShadowCourse } = require('../middleware/policyShadowCourse');
 const { coursesCutoverGate } = require('../middleware/coursesCutoverGate');
+const { generateCourseCode } = require('../services/businessCodeService');
 
 const router = express.Router();
 
@@ -86,6 +87,8 @@ router.get('/', courseReadGuard('list'), async (req, res) => {
       filter.$or = [
         { name: { $regex: safe, $options: 'i' } },
         { description: { $regex: safe, $options: 'i' } },
+        { courseCode: { $regex: safe, $options: 'i' } },
+        { slug: { $regex: safe, $options: 'i' } },
       ];
     }
 
@@ -155,6 +158,7 @@ async function inferExamSubjects(body) {
 router.post('/', courseWriteGuard('create'), async (req, res) => {
   try {
     const body = { ...req.body };
+    delete body.courseCode; // server-only
     if (body.price !== undefined) {
       body.discountPrice = calcEffectivePrice(Number(body.price), Number(body.discountPercent || 0));
     }
@@ -163,6 +167,7 @@ router.post('/', courseWriteGuard('create'), async (req, res) => {
     } else {
       body.examSubjects = await inferExamSubjects(body);
     }
+    body.courseCode = await generateCourseCode();
     const course = await Course.create(body);
     await invalidateCourseCache();
     return res.status(201).json({

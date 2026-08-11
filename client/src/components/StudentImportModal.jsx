@@ -6,6 +6,10 @@ import {
 import api from '../services/api';
 import { useToast } from '../utils/toast.jsx';
 import { mutate } from 'swr';
+import {
+  STUDENT_EXCEL_TEMPLATE_ROWS,
+  excelRowToStudentPayload,
+} from '../utils/studentImportExportColumns';
 
 export default function StudentImportModal({ onClose, branchId }) {
   const [step, setStep] = useState('upload'); // 'upload' | 'preview' | 'importing' | 'success'
@@ -34,17 +38,9 @@ export default function StudentImportModal({ onClose, branchId }) {
           return;
         }
 
-        // Mapping and validation
-        const mapped = raw.map(item => ({
-          name: item['Họ tên'] || item['Name'] || item['Tên'],
-          phone: String(item['Số điện thoại'] || item['SĐT'] || item['Phone'] || '').trim(),
-          zalo: String(item['Zalo'] || item['Zalo Number'] || '').trim() || String(item['Số điện thoại'] || item['SĐT'] || item['Phone'] || '').trim(),
-          course: item['Khóa học'] || item['Course'] || '',
-          price: Number(item['Học phí'] || item['Price'] || 0),
-          paid: (item['Đã đóng'] || item['Paid']) === 'x' || (item['Đã đóng'] || item['Paid']) === 'v' || !!item['Paid'],
-          learningMode: item['Hình thức'] || item['Mode'] || 'OFFLINE',
-          address: item['Địa chỉ'] || item['Address'] || '',
-        })).filter(s => s.name);
+        const mapped = raw
+          .map((item) => excelRowToStudentPayload(item))
+          .filter((s) => s.name);
 
         setData(mapped);
         setStep('preview');
@@ -77,14 +73,10 @@ export default function StudentImportModal({ onClose, branchId }) {
 
   const downloadTemplate = async () => {
     const XLSX = await import('xlsx');
-    const template = [
-      { 'Họ tên': 'NGUYỄN VĂN A', 'Số điện thoại': '0912345678', 'Zalo': '0912345678', 'Khóa học': 'THVP NÂNG CAO', 'Học phí': 1500000, 'Đã đóng': 'x', 'Hình thức': 'OFFLINE', 'Địa chỉ': 'Hà Nội' },
-      { 'Họ tên': 'TRẦN THỊ B', 'Số điện thoại': '0987654321', 'Zalo': '0987654321', 'Khóa học': 'MOS EXCEL', 'Học phí': 1200000, 'Đã đóng': '', 'Hình thức': 'ONLINE', 'Địa chỉ': 'Hồ Chí Minh' },
-    ];
-    const ws = XLSX.utils.json_to_sheet(template);
+    const ws = XLSX.utils.json_to_sheet(STUDENT_EXCEL_TEMPLATE_ROWS);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "Mau_Nhap_Hoc_Vien.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, 'Mau_Nhap_Hoc_Vien.xlsx');
   };
 
   return (
@@ -122,7 +114,7 @@ export default function StudentImportModal({ onClose, branchId }) {
                   </div>
                   <div>
                     <p className="text-sm font-black text-slate-700">Kéo thả file hoặc Click để tải lên</p>
-                    <p className="text-xs text-slate-400 font-bold">Hỗ trợ định dạng .xlsx, .xls</p>
+                    <p className="text-xs text-slate-400 font-bold">Hỗ trợ .xlsx / .xls — cột giống form Thêm học viên</p>
                   </div>
                   <input ref={fileInputRef} type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} />
                </div>

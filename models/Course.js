@@ -11,6 +11,11 @@ const courseSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
   },
+  /** Canonical KH###### — business reference; slug/_id unchanged for routing/FK */
+  courseCode: {
+    type: String,
+    default: '',
+  },
   category: {
     type: String,
     enum: ['van-phong', 'do-hoa', 'lap-trinh', 'ai', 'chung-chi', 'khac'],

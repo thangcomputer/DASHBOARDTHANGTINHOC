@@ -110,50 +110,73 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
   const [timeLeft, setTimeLeft]     = useState(TOTAL_PAYMENT_SECS);
   const [pollStatus, setPollStatus] = useState('pending'); // 'pending' | 'paid'
   const [sessionId, setSessionId]   = useState(null);
+  const [reservedStudentCode, setReservedStudentCode] = useState('');
+  const [codeReady, setCodeReady] = useState(false);
   const pollRef                     = React.useRef(null);
   const timerRef                    = React.useRef(null);
 
-  const [studentCode] = useState(() => `TTH${Date.now().toString().slice(-5)}`);
   const ckContent = useMemo(() => {
-    return `${form.name.replace(/\s+/g,'').slice(0,8) || 'HV'} ${studentCode} Nop hoc phi`.trim();
-  }, [form.name, studentCode]);
+    if (!reservedStudentCode) return '';
+    const namePart = form.name.replace(/\s+/g, '').slice(0, 8) || 'HV';
+    return `${namePart} ${reservedStudentCode} Nop hoc phi`.trim();
+  }, [form.name, reservedStudentCode]);
 
-  // Fetch bank + create session khi vào step qr
+  // Fetch bank + reserve server studentCode + create session khi vào step qr
   useEffect(() => {
     if (step !== 'qr') return;
+    let cancelled = false;
     setTimeLeft(TOTAL_PAYMENT_SECS);
     setPollStatus('pending');
+    setCodeReady(false);
+    setReservedStudentCode('');
 
-    // 1) Fetch bank settings (public endpoint)
     fetch(`${API}/api/settings/bank`)
       .then(r => r.json())
-      .then(res => { if (res.success) setBankInfo(res.data); })
+      .then(res => { if (!cancelled && res.success) setBankInfo(res.data); })
       .catch(() => {});
 
-    // 2) Create payment session — STAFF lưu staff_user, không chỉ admin_user
     const token = readPortalAccessToken();
     const selectedBranch = branches.find(b => String(b._id) === String(form.branchId || (selectedBranchId !== 'all' ? selectedBranchId : '')));
     const branchCode = selectedBranch?.code || '';
 
-    fetch(`${API}/api/webhooks/create-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      credentials: 'include',
-      body: JSON.stringify({ 
-        amount: form.price, 
-        content: ckContent,
-        studentName: form.name,
-        courseName: form.course,
-        branchCode: branchCode
-      }),
-    }).then(r => r.json()).then(res => {
-      if (res.sessionId) setSessionId(res.sessionId);
-      else if (res.message) toast.error(res.message || 'Không tạo được phiên QR thanh toán');
-    }).catch(() => {
-      toast.error('Không tạo được phiên QR — thử "Lưu chưa thanh toán" hoặc tích tiền mặt');
-    });
+    (async () => {
+      try {
+        const codeRes = await fetch(`${API}/api/students/reserve-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          credentials: 'include',
+          body: '{}',
+        }).then((r) => r.json());
+        if (cancelled) return;
+        const code = codeRes?.data?.studentCode || codeRes?.studentCode;
+        if (!code) {
+          toast.error(codeRes?.message || 'Không cấp được mã học viên từ server');
+          return;
+        }
+        setReservedStudentCode(code);
+        setCodeReady(true);
+        const namePart = form.name.replace(/\s+/g, '').slice(0, 8) || 'HV';
+        const content = `${namePart} ${code} Nop hoc phi`.trim();
+        const sess = await fetch(`${API}/api/webhooks/create-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          credentials: 'include',
+          body: JSON.stringify({
+            amount: form.price,
+            content,
+            studentName: form.name,
+            courseName: form.course,
+            branchCode: branchCode,
+          }),
+        }).then((r) => r.json());
+        if (cancelled) return;
+        if (sess.sessionId) setSessionId(sess.sessionId);
+        else if (sess.message) toast.error(sess.message || 'Không tạo được phiên QR thanh toán');
+      } catch {
+        if (!cancelled) toast.error('Không tạo được phiên QR — thử "Lưu chưa thanh toán" hoặc tích tiền mặt');
+      }
+    })();
 
-    // Countdown
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) { clearInterval(timerRef.current); return 0; }
@@ -161,7 +184,11 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       });
     }, 1000);
 
-    return () => { clearInterval(timerRef.current); clearInterval(pollRef.current); };
+    return () => {
+      cancelled = true;
+      clearInterval(timerRef.current);
+      clearInterval(pollRef.current);
+    };
   }, [step]);
 
   // Real-time Socket.io listener
@@ -182,7 +209,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
             age: form.age === '' || form.age == null ? undefined : Number(form.age),
             id: Date.now(),
             paid: true,
-            studentCode,
+            reservedStudentCode,
           }))
             .then(() => onClose())
             .catch((err) => toast.error(err?.message || 'Lỗi thêm học viên sau thanh toán'));
@@ -192,7 +219,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
 
     socket.on('tuition:paid', handlePaid);
     return () => socket.off('tuition:paid', handlePaid);
-  }, [step, sessionId, pollStatus, socket, ckContent]);
+  }, [step, sessionId, pollStatus, socket, ckContent, reservedStudentCode]);
 
   // Polling mỗi 3s (Fallback)
   useEffect(() => {
@@ -214,7 +241,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
               age: form.age === '' || form.age == null ? undefined : Number(form.age),
               id: Date.now(),
               paid: true,
-              studentCode,
+              reservedStudentCode,
             }))
               .then(() => onClose())
               .catch((err) => toast.error(err?.message || 'Lỗi thêm học viên sau thanh toán'));
@@ -223,7 +250,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       } catch {}
     }, 3000);
     return () => clearInterval(pollRef.current);
-  }, [step, sessionId, pollStatus, ckContent]);
+  }, [step, sessionId, pollStatus, ckContent, reservedStudentCode]);
 
   const buildPayload = (paid) => ({
     ...form,

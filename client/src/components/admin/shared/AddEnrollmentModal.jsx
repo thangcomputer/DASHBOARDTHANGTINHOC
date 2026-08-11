@@ -52,11 +52,9 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
   const timerRef = React.useRef(null);
   const submittedRef = React.useRef(false);
 
-  const payCode = useMemo(
-    () => `TTH${String(student?.id || student?._id || Date.now()).slice(-5)}`,
-    [student],
-  );
+  const payCode = String(student?.studentCode || '').trim();
   const ckContent = useMemo(() => {
+    if (!payCode) return '';
     const namePart = String(student?.name || 'HV').replace(/\s+/g, '').slice(0, 8);
     return `${namePart} ${payCode} Nop hoc phi`.trim();
   }, [student?.name, payCode]);
@@ -139,21 +137,25 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
       catch { return ''; }
     })();
 
-    fetch(`${API}/api/webhooks/create-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        amount: Number(form.price) || 0,
-        content: ckContent,
-        studentName: student?.name || '',
-        courseName: form.courseName,
-        branchCode: student?.branchCode || '',
-        studentId: student?.id || student?._id,
-      }),
-    })
-      .then((r) => r.json())
-      .then((res) => { if (res.sessionId) setSessionId(res.sessionId); })
-      .catch(() => {});
+    if (!ckContent) {
+      toast.error('Học viên chưa có mã HV từ server — không thể tạo QR');
+    } else {
+      fetch(`${API}/api/webhooks/create-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          amount: Number(form.price) || 0,
+          content: ckContent,
+          studentName: student?.name || '',
+          courseName: form.courseName,
+          branchCode: student?.branchCode || '',
+          studentId: student?.id || student?._id,
+        }),
+      })
+        .then((r) => r.json())
+        .then((res) => { if (res.sessionId) setSessionId(res.sessionId); })
+        .catch(() => {});
+    }
 
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {

@@ -24,6 +24,7 @@ const { generateSecret, verifyTotp, otpauthUrl } = require('../utils/totp');
 const { invalidateSettingsCache } = require('../services/settingsCache');
 const { enqueueOtp, enqueuePassword } = require('../services/queue/jobQueue');
 const QRCode = require('qrcode');
+const { generateStudentCode, generateTeacherCode } = require('../services/businessCodeService');
 
 const router = express.Router();
 
@@ -53,6 +54,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         name, email, googleId, avatar,
         phone: 'Chưa cập nhật', zalo: 'Chưa cập nhật', course: 'Chưa xếp lớp', price: 0, paid: false, status: 'Chờ xếp lớp',
         password: Math.random().toString(36).slice(-10),
+        studentCode: await generateStudentCode(),
       });
       return done(null, { ...newStudent.toObject(), role: 'student' });
     } catch (err) { return done(err, null); }
@@ -545,6 +547,7 @@ router.get('/zalo/callback', policyShadowAuth('zalo_callback'), async (req, res)
         name: zName, zaloId, avatar: zAvatar,
         phone: 'Chưa cập nhật', zalo: 'Chưa cập nhật', course: 'Chưa xếp lớp', price: 0, paid: false, status: 'Chờ xếp lớp',
         password: Math.random().toString(36).slice(-10),
+        studentCode: await generateStudentCode(),
       });
     }
 
@@ -1280,6 +1283,7 @@ router.post('/register-teacher', sensitiveFlowLimiter, policyShadowAuth('registe
       specialty: specialty || '',
       status: 'pending',
       role: 'teacher',
+      teacherCode: await generateTeacherCode(),
     });
 
     return res.status(201).json({

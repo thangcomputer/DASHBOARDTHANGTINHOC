@@ -18,6 +18,7 @@ const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const NotificationService = require('../services/NotificationService');
 const { generateTempPassword } = require('../utils/tempPassword');
+const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
 const { emitTeacherEvent, emitDataRefresh, emitFinanceEvent, emitUser } = require('../utils/realtimeEmit');
@@ -164,6 +165,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
     const plainPassword = password && String(password).trim()
       ? String(password).trim()
       : generateTempPassword(8);
+    const teacherCode = await generateTeacherCode();
     const teacher = await Teacher.create({
       name,
       phone,
@@ -180,6 +182,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       branchId:   finalBranchId,
       branchCode: finalBranchCode,
       baseSalaryPerSession: Math.max(0, Number(baseSalaryPerSession) || 0),
+      teacherCode,
     });
 
     // Emit socket scoped theo branch (không io.emit global)
@@ -268,6 +271,7 @@ router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], as
         { name:      { $regex: s, $options: 'i' } },
         { phone:     { $regex: s, $options: 'i' } },
         { specialty: { $regex: s, $options: 'i' } },
+        { teacherCode: { $regex: s, $options: 'i' } },
       ];
     }
 

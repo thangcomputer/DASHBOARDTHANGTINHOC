@@ -30,6 +30,8 @@ const POSITION_LABELS = {
 
 const employeeSchema = new mongoose.Schema({
   name:       { type: String, required: true, trim: true },
+  /** Canonical NV###### — display/HR reference; payroll uses employeeId */
+  employeeCode: { type: String, default: '' },
   phone:      { type: String, trim: true, default: '' },
   position:   { type: String, enum: POSITIONS, default: 'KHAC' },
   branchId:   { type: String, default: '' },

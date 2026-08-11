@@ -705,6 +705,10 @@ export const studentsAPI = {
     });
     return res.json();
   },
+  reserveCode: async () => {
+    const res = await apiFetch('/students/reserve-code', { method: 'POST', body: '{}' });
+    return res.json();
+  },
   importBulk: async (students) => {
     const res = await apiFetch('/students/import', {
       method: 'POST',

@@ -8,8 +8,8 @@ import { useBranch } from '../../../context/BranchContext';
 import { useModal } from '../../../utils/Modal.jsx';
 import InvoicePreviewFrame from '../../InvoicePreviewFrame';
 import exportPDF, { printInvoice } from '../../../utils/exportPDF';
-import { exportToCSV } from '../../../utils/exportExcel';
 import { parseQuestionBankExcel } from '../../../utils/studentQuestionsExcel';
+import { studentToExcelRow } from '../../../utils/studentImportExportColumns';
 import api from '../../../services/api';
 import { EXAM_RESULTS_STUDENTS_FETCH_CAP } from './adminConstants';
 
@@ -272,18 +272,15 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true);
-    const tid = toast.loading('Đang xuất dữ liệu học viên sang Excel(CSV)...');
+    const tid = toast.loading('Đang xuất dữ liệu học viên sang Excel...');
     try {
-      const dataToExport = filteredStudents.map((s) => ({
-        'Họ Tên': s.name,
-        'Khóa học': s.course,
-        'Tuổi': s.age || '',
-        'SĐT': s.phone || '',
-        'Zalo': s.zalo || '',
-        'Học phí': s.price,
-        'Trạng thái': s.paid ? 'Đã thanh toán' : 'Chưa thanh toán',
-      }));
-      exportToCSV(dataToExport, `DanhSachHocVien_${Date.now()}.csv`);
+      const dataToExport = filteredStudents.map((s) => studentToExcelRow(s));
+      if (!dataToExport.length) throw new Error('Không có học viên để xuất');
+      const XLSX = await import('xlsx');
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'HocVien');
+      XLSX.writeFile(wb, `DanhSachHocVien_${Date.now()}.xlsx`);
       toast.dismiss(tid);
       toast.success('Xuất Excel thành công!');
     } catch (e) {

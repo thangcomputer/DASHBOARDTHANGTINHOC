@@ -82,7 +82,7 @@ function StatusBadge({ status }) {
 }
 
 // ── Modal Thêm/Sửa ────────────────────────────────────────────────────────────
-function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
+function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin }) {
   const toast  = useToast();
   const isEdit = !!staff?._id;
 
@@ -94,7 +94,13 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
     phone:       staff?.phone || '',
     password:    '',
     adminRole:   staff?.adminRole || 'STAFF',
-    permissions: staff?.permissions || (isEdit ? [] : DEFAULT_STAFF_PERMISSIONS),
+    permissions: staff?.permissions?.length
+      ? staff.permissions
+      : (staff?.adminRole === 'HIGH_ADMIN'
+        ? HIGH_ADMIN_DEFAULT_PERMISSIONS
+        : staff?.adminRole === 'SUPPORT'
+          ? SUPPORT_DEFAULT_PERMISSIONS
+          : (isEdit ? [] : DEFAULT_STAFF_PERMISSIONS)),
     branchId:    staff?.branchId || '',
     status:      staff?.status || 'active',
     gender:      staff?.gender || 'male',
@@ -133,11 +139,26 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
       toast.error('Nhân viên (STAFF) phải được gán vào một chi nhánh!'); return;
     }
 
+    let permissions = Array.isArray(form.permissions) ? [...form.permissions] : [];
+    if (form.adminRole === 'HIGH_ADMIN' && permissions.length === 0) {
+      permissions = [...HIGH_ADMIN_DEFAULT_PERMISSIONS];
+    }
+    if (form.adminRole === 'SUPPORT' && permissions.length === 0) {
+      permissions = [...SUPPORT_DEFAULT_PERMISSIONS];
+    }
+    if (form.adminRole === 'SUPER_ADMIN') {
+      permissions = [];
+    }
+
     setSaving(true);
     try {
       const payload = {
         ...form,
-        branchId: (form.adminRole === 'SUPER_ADMIN' || form.adminRole === 'HIGH_ADMIN' || form.adminRole === 'SUPPORT') ? null : (form.branchId || null),
+        password: form.password?.trim() || '',
+        permissions,
+        branchId: (form.adminRole === 'SUPER_ADMIN' || form.adminRole === 'HIGH_ADMIN' || form.adminRole === 'SUPPORT')
+          ? null
+          : (form.branchId || null),
       };
       const res = isEdit
         ? await staffAPI.update(staff._id, payload)
@@ -158,6 +179,11 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
   };
 
   const isStaff = form.adminRole === 'STAFF';
+  const isHighAdmin = form.adminRole === 'HIGH_ADMIN';
+  const isSupport = form.adminRole === 'SUPPORT';
+  const isSuperRole = form.adminRole === 'SUPER_ADMIN';
+  const showPermEditor = isStaff || isHighAdmin || isSupport;
+  const canPickElevatedRoles = !!isSuperAdmin;
   const q = permQuery.trim().toLowerCase();
 
   const groupedPerms = useMemo(() => {
@@ -302,41 +328,63 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
 
             <div>
               <label className="cms-rbac-label" id="rbac-role-label">Vai trò</label>
-              <div
-                className="cms-rbac-segment"
-                role="radiogroup"
-                aria-labelledby="rbac-role-label"
-              >
-                {[
-                  ...(isRootSuperAdmin ? [{ val: 'SUPER_ADMIN', label: 'Super Admin', icon: Crown }] : []),
-                  ...(isRootSuperAdmin ? [{ val: 'HIGH_ADMIN', label: 'Admin cấp cao', icon: ShieldCheck }] : []),
-                  { val: 'SUPPORT', label: 'Chuyên viên Hỗ trợ', icon: Headset },
-                  { val: 'STAFF', label: 'Hỗ trợ viên / Admin-Staff', icon: UserCog },
-                ].map(({ val, label, icon: Icon }) => (
-                  <button
-                    key={val}
-                    type="button"
-                    role="radio"
-                    aria-checked={form.adminRole === val}
-                    onClick={() => setForm((f) => ({
-                      ...f,
-                      adminRole: val,
-                      permissions: val === 'SUPER_ADMIN' ? [] : val === 'HIGH_ADMIN' ? (f.permissions.length ? f.permissions : HIGH_ADMIN_DEFAULT_PERMISSIONS) : val === 'SUPPORT' ? SUPPORT_DEFAULT_PERMISSIONS : (f.permissions.length ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
-                      branchId: (val === 'SUPER_ADMIN' || val === 'HIGH_ADMIN' || val === 'SUPPORT') ? '' : f.branchId,
-                    }))}
-                    className={`cms-rbac-segment-item ${form.adminRole === val ? 'is-active' : ''}`}
-                  >
-                    <Icon size={14} aria-hidden="true" />
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {isSuperRole ? (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[13px] text-amber-900 flex items-center gap-2">
+                  <Crown size={14} className="text-amber-600 flex-shrink-0" aria-hidden="true" />
+                  <span><strong>Super Admin</strong> — tài khoản hệ thống, không đổi vai trò / không tạo thêm từ form này.</span>
+                </div>
+              ) : (
+                <div
+                  className="cms-rbac-segment"
+                  role="radiogroup"
+                  aria-labelledby="rbac-role-label"
+                >
+                  {[
+                    ...(canPickElevatedRoles ? [{ val: 'HIGH_ADMIN', label: 'Admin cấp cao', icon: ShieldCheck }] : []),
+                    { val: 'SUPPORT', label: 'Chuyên viên Hỗ trợ', icon: Headset },
+                    { val: 'STAFF', label: 'Hỗ trợ viên / Admin-Staff', icon: UserCog },
+                  ].map(({ val, label, icon: Icon }) => (
+                    <button
+                      key={val}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.adminRole === val}
+                      onClick={() => setForm((f) => ({
+                        ...f,
+                        adminRole: val,
+                        permissions: val === 'HIGH_ADMIN'
+                          ? (f.adminRole === 'HIGH_ADMIN' && f.permissions.length ? f.permissions : HIGH_ADMIN_DEFAULT_PERMISSIONS)
+                          : val === 'SUPPORT'
+                            ? SUPPORT_DEFAULT_PERMISSIONS
+                            : (f.permissions.length && f.adminRole === 'STAFF' ? f.permissions : DEFAULT_STAFF_PERMISSIONS),
+                        branchId: (val === 'HIGH_ADMIN' || val === 'SUPPORT') ? '' : f.branchId,
+                      }))}
+                      className={`cms-rbac-segment-item ${form.adminRole === val ? 'is-active' : ''}`}
+                    >
+                      <Icon size={14} aria-hidden="true" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {!isStaff && (
+            {isSuperRole && (
               <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-[13px] text-amber-800 flex items-start gap-2">
                 <Crown size={14} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <span>Quản trị viên quản lý <strong>toàn bộ hệ thống</strong>, không bị giới hạn theo chi nhánh.</span>
+                <span>Super Admin — <strong>toàn quyền hệ thống</strong>, không cần gán chi nhánh / tick quyền module.</span>
+              </div>
+            )}
+            {isHighAdmin && (
+              <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-[13px] text-amber-800 flex items-start gap-2">
+                <ShieldCheck size={14} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <span>Admin cấp cao — không gán chi nhánh cố định; <strong>quyền theo danh sách bên dưới</strong> (không bypass toàn hệ thống).</span>
+              </div>
+            )}
+            {isSupport && (
+              <div className="rounded-xl bg-sky-50 border border-sky-100 p-3 text-[13px] text-sky-800 flex items-start gap-2">
+                <Headset size={14} className="text-sky-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <span>Chuyên viên Hỗ trợ — phạm vi org-wide; mặc định quyền hộp thư (có thể chỉnh bên dưới).</span>
               </div>
             )}
 
@@ -353,7 +401,7 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
           <section className="space-y-3">
             <h4 className="cms-rbac-section-title">
               <span className="cms-rbac-section-num cms-rbac-section-num-info">2</span>
-              {isStaff ? 'Chi nhánh & Phân quyền' : 'Phạm vi quản lý'}
+              {isStaff ? 'Chi nhánh & Phân quyền' : showPermEditor ? 'Phân quyền module' : 'Phạm vi quản lý'}
             </h4>
 
             {isStaff && (
@@ -408,7 +456,7 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
               </div>
             )}
 
-            {isStaff && (
+            {showPermEditor && (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="cms-rbac-label !mb-0">
@@ -416,28 +464,50 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
                   </label>
 
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, permissions: DEFAULT_STAFF_PERMISSIONS }))}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
-                        !isOnlyMessages && form.permissions.length > 1
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      🛡️ Mặc định: Admin-Staff
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, permissions: ['manage_messages'] }))}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
-                        isOnlyMessages
-                          ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      💬 Chỉ Hỗ trợ viên
-                    </button>
+                    {isHighAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, permissions: [...HIGH_ADMIN_DEFAULT_PERMISSIONS] }))}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all border bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                      >
+                        Mặc định Admin cấp cao
+                      </button>
+                    )}
+                    {isSupport && (
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, permissions: [...SUPPORT_DEFAULT_PERMISSIONS] }))}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all border bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100"
+                      >
+                        Mặc định Hỗ trợ
+                      </button>
+                    )}
+                    {isStaff && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, permissions: DEFAULT_STAFF_PERMISSIONS }))}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+                            !isOnlyMessages && form.permissions.length > 1
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          🛡️ Mặc định: Admin-Staff
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, permissions: ['manage_messages'] }))}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+                            isOnlyMessages
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          💬 Chỉ Hỗ trợ viên
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -498,15 +568,15 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin }) {
 
                 {form.permissions.length === 0 && (
                   <p className="text-[12px] text-amber-700 flex items-center gap-1 font-medium">
-                    <AlertTriangle size={12} /> Nhân viên chưa có quyền nào — sẽ không thấy menu sau khi đăng nhập
+                    <AlertTriangle size={12} /> Chưa có quyền nào — tài khoản sẽ không thấy menu sau khi đăng nhập
                   </p>
                 )}
               </div>
             )}
 
-            {!isStaff && (
+            {isSuperRole && (
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-[13px] text-slate-500 leading-relaxed">
-                Tài khoản quản trị viên không cần gán chi nhánh hay tick quyền module — mặc định toàn quyền.
+                Super Admin không cần gán chi nhánh hay tick quyền module — mặc định toàn quyền.
               </div>
             )}
           </section>
@@ -591,7 +661,7 @@ function ResetPasswordModal({ staff, onClose, onSaved }) {
   );
 }
 
-function StaffCard({ s, deleting, isRootSuperAdmin, onEdit, onResetPw, onDelete }) {
+function StaffCard({ s, deleting, isRootSuperAdmin, isSuperAdmin, onEdit, onResetPw, onDelete }) {
   const perms = s.permissions || [];
   const visible = perms.slice(0, 3);
   const rest = perms.slice(3);
@@ -599,8 +669,17 @@ function StaffCard({ s, deleting, isRootSuperAdmin, onEdit, onResetPw, onDelete 
 
   const isTargetSuper = s.adminRole === 'SUPER_ADMIN';
   const isTargetHighAdmin = s.adminRole === 'HIGH_ADMIN';
-  const canManage = isTargetSuper ? isRootSuperAdmin : true;
-  const disabledReason = !canManage ? 'Chỉ Admin Super mới được thao tác với Admin Cấp Cao' : '';
+  // SUPER chỉ Root sửa; HIGH chỉ Super trở lên; còn lại (STAFF/SUPPORT) theo manage_staff
+  const canManage = isTargetSuper
+    ? !!isRootSuperAdmin
+    : isTargetHighAdmin
+      ? !!isSuperAdmin
+      : true;
+  const disabledReason = !canManage
+    ? (isTargetSuper
+      ? 'Chỉ Admin Super (hệ thống) mới thao tác Super Admin'
+      : 'Chỉ Super Admin mới thao tác Admin cấp cao')
+    : '';
 
   return (
     <article className="cms-rbac-card">
@@ -778,14 +857,17 @@ export default function StaffManagementTab() {
   const [resetPwStaff, setResetPwStaff] = useState(null);
   const [deleting, setDeleting]   = useState(null);
 
-  const isRootSuperAdmin = useMemo(() => {
+  const sessionMeta = useMemo(() => {
     try {
       const sess = JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
-      return sess?.id === 'admin';
+      const isRootSuperAdmin = sess?.id === 'admin';
+      const isSuperAdmin = isRootSuperAdmin || sess?.adminRole === 'SUPER_ADMIN';
+      return { isRootSuperAdmin, isSuperAdmin };
     } catch {
-      return false;
+      return { isRootSuperAdmin: false, isSuperAdmin: false };
     }
   }, []);
+  const { isRootSuperAdmin, isSuperAdmin } = sessionMeta;
 
   const fetchStaff = useCallback(() => {
     setLoading(true);
@@ -798,8 +880,12 @@ export default function StaffManagementTab() {
   useEffect(() => { fetchStaff(); }, [fetchStaff]);
 
   const handleDelete = async (s) => {
-    if ((s.adminRole === 'SUPER_ADMIN' || s.adminRole === 'HIGH_ADMIN') && !isRootSuperAdmin) {
-      toast.error('Chỉ Admin Super (Hệ thống) mới có quyền xóa tài khoản Admin Cấp Cao.');
+    if (s.adminRole === 'SUPER_ADMIN' && !isRootSuperAdmin) {
+      toast.error('Chỉ Admin Super (Hệ thống) mới có quyền xóa Super Admin.');
+      return;
+    }
+    if (s.adminRole === 'HIGH_ADMIN' && !isSuperAdmin) {
+      toast.error('Chỉ Super Admin mới có quyền xóa tài khoản Admin Cấp Cao.');
       return;
     }
     showModal({
@@ -837,7 +923,13 @@ export default function StaffManagementTab() {
   return (
     <div className="cms-rbac cms-viewport-fill">
       {modal !== undefined && (
-        <StaffModal staff={modal} onClose={() => setModal(undefined)} onSaved={handleSaved} isRootSuperAdmin={isRootSuperAdmin} />
+        <StaffModal
+          staff={modal}
+          onClose={() => setModal(undefined)}
+          onSaved={handleSaved}
+          isRootSuperAdmin={isRootSuperAdmin}
+          isSuperAdmin={isSuperAdmin}
+        />
       )}
 
       {resetPwStaff && (
@@ -855,7 +947,9 @@ export default function StaffManagementTab() {
           <p className="text-[12px] text-slate-500 mt-1 pl-11">
             {isRootSuperAdmin
               ? 'Admin Super — Toàn quyền quản lý toàn bộ hệ thống'
-              : 'Admin Cấp Cao — Toàn quyền quản lý Nhân viên (Không sửa/xóa/reset pass Admin Cấp Cao)'}
+              : isSuperAdmin
+                ? 'Super Admin — Quản lý nhân viên (có thể sửa Admin cấp cao)'
+                : 'Admin Cấp Cao — Quản lý nhân viên theo quyền được cấp (không sửa/xóa Admin cấp cao)'}
           </p>
         </div>
         <button
@@ -899,6 +993,7 @@ export default function StaffManagementTab() {
               s={s}
               deleting={deleting === s._id}
               isRootSuperAdmin={isRootSuperAdmin}
+              isSuperAdmin={isSuperAdmin}
               onEdit={() => setModal(s)}
               onResetPw={() => setResetPwStaff(s)}
               onDelete={() => handleDelete(s)}

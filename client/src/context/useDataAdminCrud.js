@@ -39,6 +39,9 @@ export function useDataAdminCrud({
       learningMode:  student.learningMode || 'OFFLINE',
       branchId:      student.branchId || undefined,
       branchCode:    student.branchCode || '',
+      ...(student.reservedStudentCode
+        ? { reservedStudentCode: String(student.reservedStudentCode).trim() }
+        : {}),
     };
 
     try {

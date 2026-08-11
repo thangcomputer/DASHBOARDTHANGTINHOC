@@ -223,27 +223,35 @@ const SepayWebhookEvent = require('../models/SepayWebhookEvent'); // Temp for ne
       }
     }
 
-    // ── 2. Học viên hiện có: extract mã từ nội dung CK → query theo studentCode ─
+    // ── 2. Học viên hiện có: studentCode OR legacy — FAIL CLOSED nếu >1 ─
     if (!matched) {
-      const { extractStudentCodeCandidates, amountsMatch } = require('../../../utils/sepayMatch');
+      const {
+        extractStudentCodeCandidates,
+        selectUnpaidStudentCandidates,
+      } = require('../../../utils/sepayMatch');
       const variants = extractStudentCodeCandidates(content);
 
       const unpaid = variants.length
         ? await Student.find({
             paid: false,
-            studentCode: { $in: variants },
+            $or: [
+              { studentCode: { $in: variants } },
+              { legacyStudentCodes: { $in: variants } },
+            ],
           })
-            .select('studentCode name price paid')
+            .select('studentCode legacyStudentCodes name price paid enrollments course branchId')
             .limit(50)
             .lean()
         : [];
 
-      for (const s of unpaid) {
-        const code = String(s.studentCode || '').toLowerCase().trim();
-        if (!code || code.length < 4) continue;
-        if (!content.includes(code)) continue;
-        if (!amountsMatch(s.price, amount)) continue;
-
+      const selection = selectUnpaidStudentCandidates(unpaid, content, amount);
+      if (selection.status === 'ambiguous') {
+        logger.error(
+          '[SEPAY] FAIL CLOSED multi-match (CQRS path) — ids=%j',
+          selection.candidates.map((c) => String(c.student._id)),
+        );
+      } else if (selection.status === 'one') {
+        const { student: s, matchedIdentity } = selection.candidates[0];
         const updated = await Student.findOneAndUpdate(
           { _id: s._id, paid: false },
           {
@@ -256,76 +264,75 @@ const SepayWebhookEvent = require('../models/SepayWebhookEvent'); // Temp for ne
           },
           { returnDocument: 'after' }
         );
-        if (!updated) continue;
-
-        matched = true;
-        matchedRef = code;
-        let sepayInvoice = null;
-        try {
-          const Invoice = require('../../invoice/models/Invoice');
-          const count = await Invoice.countDocuments();
-          const now = new Date();
-          const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
-          sepayInvoice = await Invoice.create({
-            maHoaDon: maHD,
-            hocVien: updated._id,
-            hoTen: updated.name || s.name,
-            khoaHoc: updated.course || 'Học phí',
-            hocPhi: amount,
-            ghiChu: `SePay CK — ${String(body.content || '').slice(0, 120)}`,
-          });
-        } catch (invErr) {
-          logger.warn('[SEPAY] Invoice create skipped:', invErr.message);
-        }
-        try {
-          const { settlePayment } = require('../../finance/services/ledgerService');
-          const list = updated.enrollments || [];
-          const primary = list.find((e) => e.isPrimary) || list[0];
-          const enrId = primary?._id ? String(primary._id) : '';
-          await settlePayment({
-            student: updated,
-            amount,
-            invoice: sepayInvoice,
-            enrollmentId: enrId,
-            courseName: updated.course || '',
-            source: 'sepay',
-            sourceRef: sepayInvoice?.maHoaDon || gatewayTxnId || matchedRef,
-            // Khớp admin_pay theo enrollment — tránh key :primary nuốt lần thu khóa đăng ký lại
-            idempotencyKey: enrId
-              ? `payment:student:${updated._id}:enr:${enrId}`
-              : `payment:student:${updated._id}:primary`,
-            actor: { id: 'sepay', role: 'system' },
-            note: String(body.content || '').slice(0, 300),
-            reqMeta: { ip: data.ip, userAgent: 'sepay-webhook', branchId: updated.branchId },
-          });
-        } catch (ledgerErr) {
-          logger.error('[SEPAY] ledger settle FAILED — rollback paid: %s', ledgerErr.message);
+        if (updated) {
+          matched = true;
+          matchedRef = matchedIdentity;
+          let sepayInvoice = null;
           try {
-            await Student.findByIdAndUpdate(updated._id, {
-              $set: { paid: false, paidAmount: 0, paidNote: '' },
-              $unset: { paidAt: 1 },
+            const Invoice = require('../../invoice/models/Invoice');
+            const count = await Invoice.countDocuments();
+            const now = new Date();
+            const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
+            sepayInvoice = await Invoice.create({
+              maHoaDon: maHD,
+              hocVien: updated._id,
+              hoTen: updated.name || s.name,
+              khoaHoc: updated.course || 'Học phí',
+              hocPhi: amount,
+              ghiChu: `SePay CK — ${String(body.content || '').slice(0, 120)}`,
             });
-            if (sepayInvoice?._id) {
-              const Invoice = require('../../invoice/models/Invoice');
-              await Invoice.findByIdAndUpdate(sepayInvoice._id, { status: 'void' });
-            }
-          } catch (rbErr) {
-            logger.error('[SEPAY] student paid rollback failed: %s', rbErr.message);
+          } catch (invErr) {
+            logger.warn('[SEPAY] Invoice create skipped:', invErr.message);
           }
-          matched = false;
-          matchedRef = '';
-          continue;
+          try {
+            const { settlePayment } = require('../../finance/services/ledgerService');
+            const list = updated.enrollments || [];
+            const primary = list.find((e) => e.isPrimary) || list[0];
+            const enrId = primary?._id ? String(primary._id) : '';
+            await settlePayment({
+              student: updated,
+              amount,
+              invoice: sepayInvoice,
+              enrollmentId: enrId,
+              courseName: updated.course || '',
+              source: 'sepay',
+              sourceRef: sepayInvoice?.maHoaDon || gatewayTxnId || matchedRef,
+              idempotencyKey: enrId
+                ? `payment:student:${updated._id}:enr:${enrId}`
+                : `payment:student:${updated._id}:primary`,
+              actor: { id: 'sepay', role: 'system' },
+              note: String(body.content || '').slice(0, 300),
+              reqMeta: { ip: data.ip, userAgent: 'sepay-webhook', branchId: updated.branchId },
+            });
+          } catch (ledgerErr) {
+            logger.error('[SEPAY] ledger settle FAILED — rollback paid: %s', ledgerErr.message);
+            try {
+              await Student.findByIdAndUpdate(updated._id, {
+                $set: { paid: false, paidAmount: 0, paidNote: '' },
+                $unset: { paidAt: 1 },
+              });
+              if (sepayInvoice?._id) {
+                const Invoice = require('../../invoice/models/Invoice');
+                await Invoice.findByIdAndUpdate(sepayInvoice._id, { status: 'void' });
+              }
+            } catch (rbErr) {
+              logger.error('[SEPAY] student paid rollback failed: %s', rbErr.message);
+            }
+            matched = false;
+            matchedRef = '';
+          }
+          if (matched) {
+            const io = data.app.get('io');
+            if (io) {
+              io.emit('tuition:paid', {
+                studentId: String(s._id),
+                amount,
+                message: `✅ ${s.name} đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
+              });
+            }
+            logger.info(`[SEPAY] Học viên ${s.name} đã thanh toán ${amount}đ`);
+          }
         }
-        const io = data.app.get('io');
-        if (io) {
-          io.emit('tuition:paid', {
-            studentId: String(s._id),
-            amount,
-            message: `✅ ${s.name} đã thanh toán ${amount.toLocaleString('vi-VN')}đ`,
-          });
-        }
-        logger.info(`[SEPAY] Học viên ${s.name} đã thanh toán ${amount}đ`);
-        break;
       }
     }
 

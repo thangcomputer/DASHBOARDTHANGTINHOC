@@ -9,6 +9,7 @@ const PayrollLog = require('../models/PayrollLog');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const { policyShadowEmployee } = require('../middleware/policyShadowEmployee');
 const { employeesCutoverGate } = require('../middleware/employeesCutoverGate');
+const { generateEmployeeCode } = require('../services/businessCodeService');
 
 /**
  * Phase 7.29 — Controlled cutover for LIVE /api/employees ONLY.
@@ -50,6 +51,7 @@ router.get('/', hrGuard('list'), async (req, res) => {
       filter.$or = [
         { name:  { $regex: safeSearch, $options: 'i' } },
         { phone: { $regex: safeSearch, $options: 'i' } },
+        { employeeCode: { $regex: safeSearch, $options: 'i' } },
       ];
     }
     const employees = await Employee.find(filter).sort({ createdAt: -1 }).lean();
@@ -112,7 +114,8 @@ router.post('/', hrGuard('create'), async (req, res) => {
       branchId: finalBranchId,
       branchCode: finalBranchCode,
       linkedTeacherId: linkedTeacherId || null,
-      bankAccount: bankAccount || { bankCode: '', accountNumber: '', accountName: '' }
+      bankAccount: bankAccount || { bankCode: '', accountNumber: '', accountName: '' },
+      employeeCode: await generateEmployeeCode(),
     });
 
     emitEmployeesChanged(req, 'create');

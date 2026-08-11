@@ -9,6 +9,8 @@ const Branch  = require('../models/Branch');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowStaff } = require('../middleware/policyShadowStaff');
 const { staffCutoverGate } = require('../middleware/staffCutoverGate');
+const { HIGH_ADMIN_DEFAULT_PERMISSIONS, SUPPORT_DEFAULT_PERMISSIONS } = require('../constants/permissions');
+const { generateTeacherCode } = require('../services/businessCodeService');
 
 const router = express.Router();
 /**
@@ -64,11 +66,11 @@ router.post('/', guard('create'), async (req, res) => {
     if (!name || !phone || !password)
       return res.status(400).json({ success: false, message: 'Thiếu tên, số điện thoại hoặc mật khẩu' });
 
-    // Tạo tài khoản SUPER_ADMIN chỉ dành cho Admin Super (Hệ thống)
-    if (adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(req)) {
+    // Không cho tạo thêm Super Admin qua API (chỉ tài khoản hệ thống id=admin)
+    if (adminRole === 'SUPER_ADMIN') {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ Admin Super (Hệ thống) mới được phép tạo thêm tài khoản Super Admin.',
+        message: 'Không được tạo thêm tài khoản Super Admin. Hãy tạo Admin cấp cao.',
       });
     }
 
@@ -95,9 +97,15 @@ router.post('/', guard('create'), async (req, res) => {
     if (exists)
       return res.status(409).json({ success: false, message: 'Số điện thoại đã được sử dụng' });
 
-    const safePermissions = (adminRole === 'SUPER_ADMIN')
+    let safePermissions = (adminRole === 'SUPER_ADMIN')
       ? []
       : await sanitizeAssignedPermissions(req, permissions);
+    if (adminRole === 'HIGH_ADMIN' && !safePermissions.length) {
+      safePermissions = [...HIGH_ADMIN_DEFAULT_PERMISSIONS];
+    }
+    if (adminRole === 'SUPPORT' && !safePermissions.length) {
+      safePermissions = [...SUPPORT_DEFAULT_PERMISSIONS];
+    }
 
     const resolvedRole = (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') ? 'admin' : 'staff';
 
@@ -112,6 +120,7 @@ router.post('/', guard('create'), async (req, res) => {
       gender:    gender || 'male',
       approvedBy: req.user?.name || 'Admin',
       approvedAt: new Date(),
+      teacherCode: await generateTeacherCode(),
     });
 
     return res.status(201).json({
@@ -157,6 +166,12 @@ router.put('/:id', guard('update'), async (req, res) => {
     if (adminRole) {
       // Đổi vai trò sang SUPER_ADMIN hoặc từ SUPER_ADMIN xuống STAFF: chỉ dành cho Root Admin
       const isRoleChanging = target.adminRole !== adminRole;
+      if (adminRole === 'SUPER_ADMIN') {
+        return res.status(403).json({
+          success: false,
+          message: 'Không được gán vai trò Super Admin. Hãy dùng Admin cấp cao.',
+        });
+      }
       if (isRoleChanging && !actorIsRootSuperAdmin(req)) {
         return res.status(403).json({
           success: false,
@@ -172,12 +187,14 @@ router.put('/:id', guard('update'), async (req, res) => {
         updates.branchCode  = '';
       } else if (adminRole === 'HIGH_ADMIN') {
         updates.role        = 'admin';
-        updates.permissions = await sanitizeAssignedPermissions(req, permissions);
+        const perms = await sanitizeAssignedPermissions(req, permissions);
+        updates.permissions = perms.length ? perms : [...HIGH_ADMIN_DEFAULT_PERMISSIONS];
         updates.branchId    = null;
         updates.branchCode  = '';
       } else if (adminRole === 'SUPPORT') {
         updates.role        = 'staff';
-        updates.permissions = await sanitizeAssignedPermissions(req, permissions);
+        const perms = await sanitizeAssignedPermissions(req, permissions);
+        updates.permissions = perms.length ? perms : [...SUPPORT_DEFAULT_PERMISSIONS];
         updates.branchId    = null;
         updates.branchCode  = '';
       } else {
