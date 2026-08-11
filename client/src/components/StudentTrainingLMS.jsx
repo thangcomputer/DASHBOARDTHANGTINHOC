@@ -17,8 +17,9 @@ import StudentExamRoom from './StudentExamRoom';
 import api, { buildMediaDownloadUrl, resolveMediaUrl, csrfFetch } from '../services/api';
 import { useToast } from '../utils/toast';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
-import { formatLessonDisplayTitle, LMS_PLAYER_TABS } from '../utils/lmsLessonUi';
+import { formatLessonDisplayTitle } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
+import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
 
 const MOCK_COURSES = [
   {
@@ -154,6 +155,7 @@ const StudentVideoPlayer = ({
   onSaveProgress,
   onVideoEnded,
   onEligibilityReached,
+  playerApiRef = null,
 }) => {
   const yId = extractYouTubeId(videoId);
   const [isReady, setIsReady] = useState(false);
@@ -314,6 +316,22 @@ const StudentVideoPlayer = ({
     return () => clearInterval(autoSaveTimerRef.current);
   }, [isReady, lessonId, courseId, onSaveProgress]);
 
+  useEffect(() => {
+    if (!playerApiRef) return undefined;
+    playerApiRef.current = {
+      getCurrentTime: () => {
+        try {
+          return Number(playerRef.current?.getCurrentTime?.()) || 0;
+        } catch {
+          return 0;
+        }
+      },
+    };
+    return () => {
+      playerApiRef.current = null;
+    };
+  }, [playerApiRef, isReady, lessonId]);
+
   const handleStateChange = useCallback((event) => {
     const state = event.data;
     if (state === window.YT.PlayerState.PLAYING) {
@@ -352,7 +370,7 @@ const StudentVideoPlayer = ({
 
   return (
     <div className="flex flex-col w-full h-full min-h-0">
-      <div ref={containerRef} className="relative w-full h-full min-h-0 aspect-video lg:rounded-2xl overflow-hidden bg-black shadow-lg group">
+      <div ref={containerRef} className="relative w-full h-full min-h-0 lg:rounded-2xl overflow-hidden bg-black shadow-lg group">
         <div id={`student-yt-player-${lessonId}`} className="absolute inset-0 w-full h-full" />
 
         {/* ▶️ PREMIUM OVERLAY — chỉ lúc chưa phát / xem lại */}
@@ -545,7 +563,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [courseProgressMap, setCourseProgressMap] = useState({});
   const [expandedChapters, setExpandedChapters] = useState({});
-  const [courseTab, setCourseTab] = useState('video'); // video | list | data | notice
+  const [courseTab, setCourseTab] = useState('overview');
+  const playerApiRef = useRef(null);
   const [mainTab, setMainTab] = useState('courses'); // courses | guides | files
   const [localSubmissions, setLocalSubmissions] = useState({});
   const [uploadingAssignId, setUploadingAssignId] = useState(null);
@@ -908,7 +927,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                 return (
                   <div onClick={() => {
                     setSelectedCourse(course);
-                    setCourseTab('video');
+                    setCourseTab('overview');
                     fetchLessons(course.id || course._id);
                   }} key={course.id || course._id} className="bg-white rounded-2xl border border-slate-100 shadow-md transition-all duration-200 cursor-pointer group flex flex-col overflow-hidden hover:shadow-xl lg:hover:-translate-y-1 lg:hover:shadow-xl">
 
@@ -1341,214 +1360,67 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         </div>
       </div>
 
-      {/* ─── BODY: RESPONSIVE LAYOUT (Mobile: 1 cột; Desktop: 2 cột) ──────────────── */}
+      {/* ─── BODY: Udemy-style — cột trái scroll; video+tabs sticky; sidebar độc lập ─── */}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden" style={{ background: '#0b1018' }}>
 
-        {/* ══ LEFT COLUMN: Video & Details ══ */}
+        {/* ══ LEFT COLUMN ══ */}
         <div className="flex flex-col flex-1 min-w-0 w-full min-h-0 overflow-y-auto overscroll-contain custom-scrollbar-dark">
 
-          {/* VIDEO WRAPPER — full-bleed mobile, padded desktop */}
-          <div className="flex-shrink-0 px-0 sm:px-4 pt-0 sm:pt-4 pb-0 sm:pb-2 flex justify-center w-full">
-            <div
-              className="relative overflow-hidden shadow-2xl shadow-black/80 w-full rounded-none sm:rounded-2xl"
-              style={{
-                aspectRatio: '16 / 9',
-              }}
-            >
-              <StudentVideoPlayer
-                key={currentLesson?._id}
-                videoId={currentLesson?.videoUrl}
-                lessonId={currentLesson?._id}
-                courseId={selectedCourse?._id || selectedCourse?.id}
-                initialWatchedSeconds={currentLesson?.watchedSeconds || 0}
-                antiSeekEnabled={currentLesson?.antiSeek !== false}
-                onSaveProgress={handleSaveProgress}
-                onVideoEnded={handleVideoEnded}
-                onEligibilityReached={handleEligibilityReached}
-              />
+          <div className="sticky top-0 z-20 bg-[#0b1018] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <div className="px-0 sm:px-4 pt-0 sm:pt-3 pb-0 sm:pb-2 flex justify-center w-full bg-black/40">
+              <div
+                className="relative overflow-hidden shadow-2xl shadow-black/80 w-full rounded-none sm:rounded-2xl bg-black h-[36dvh] sm:h-[40dvh] lg:h-[min(46dvh,480px)] max-h-[420px]"
+              >
+                <StudentVideoPlayer
+                  key={currentLesson?._id}
+                  videoId={currentLesson?.videoUrl}
+                  lessonId={currentLesson?._id}
+                  courseId={selectedCourse?._id || selectedCourse?.id}
+                  initialWatchedSeconds={currentLesson?.watchedSeconds || 0}
+                  antiSeekEnabled={
+                    currentLesson?.antiSeek !== false
+                    && localStorage.getItem('student_anti_seek_disabled') !== 'true'
+                    && localStorage.getItem('admin_anti_seek_disabled') !== 'true'
+                  }
+                  onSaveProgress={handleSaveProgress}
+                  onVideoEnded={handleVideoEnded}
+                  onEligibilityReached={handleEligibilityReached}
+                  playerApiRef={playerApiRef}
+                />
+              </div>
             </div>
+            <LmsTabBar courseTab={courseTab} setCourseTab={setCourseTab} />
           </div>
 
-          {/* INFO PANEL BELOW VIDEO */}
-          <div className="flex flex-col flex-1 min-h-0 w-full">
-
-            {/* TAB BAR — Chỉ hiện trên Mobile/Tablet (lg:hidden) vì Desktop đã có Sidebar bên phải */}
-            <div className="lg:hidden grid grid-cols-2 flex-shrink-0 border-b border-white/[0.06]" style={{ background: '#0d1117' }}>
-              {LMS_PLAYER_TABS.map(t => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setCourseTab(t.key)}
-                  className={`px-3 py-3 text-xs sm:text-sm font-bold tracking-wide border-b-2 transition-all text-center truncate ${
-                    courseTab === t.key
-                      ? 'text-white border-emerald-500 bg-white/[0.03]'
-                      : 'text-slate-500 border-transparent hover:text-slate-300'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* TAB CONTENT */}
-            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 custom-scrollbar-dark w-full" style={{ background: '#0d1117' }}>
-
-              {/* THÔNG TIN BÀI GIẢNG — Luôn hiện trên Desktop, trên Mobile thì hiện khi chọn tab video */}
-              {currentLesson && (
-                <div className={`w-full space-y-4 sm:space-y-5 ${courseTab === 'video' ? 'block' : 'hidden lg:block'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className="inline-block text-[9px] font-black text-emerald-400/80 uppercase tracking-[0.15em] mb-2">
-                        {currentLesson.chapterTitle || 'Mục lục'}
-                      </span>
-                      <h1 className="text-lg sm:text-xl font-bold text-white leading-snug">
-                        {formatLessonDisplayTitle(
-                          currentLesson.title,
-                          Math.max(0, lessons.findIndex(l => String(l._id) === String(currentLesson._id)))
-                        )}
-                      </h1>
-                      {Number(currentLesson.duration) > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 mt-2 text-slate-400 text-[11px] font-semibold">
-                          <Clock size={12} />
-                          {Math.floor(currentLesson.duration / 60)} phút {String(currentLesson.duration % 60).padStart(2, '0')}s
-                        </span>
-                      ) : null}
-                    </div>
-                    {currentLesson.isCompleted && (
-                      <div className="flex-shrink-0 flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-bold border border-emerald-500/20">
-                        <CheckCircle size={13} /> Đã xong
-                      </div>
-                    )}
-                  </div>
-
-                  {(currentLesson?.antiSeek === false || localStorage.getItem('student_anti_seek_disabled') === 'true' || localStorage.getItem('admin_anti_seek_disabled') === 'true') ? (
-                    <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-3">
-                      <CheckCircle size={14} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-emerald-200/80 text-[11px] leading-relaxed">
-                        <strong className="text-emerald-400">Hệ thống chống tua:</strong> ĐÃ TẮT (Tự do tua video & xem các bài giảng).
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
-                      <AlertCircle size={14} className="text-amber-400/80 flex-shrink-0 mt-0.5" />
-                      <p className="text-amber-200/60 text-[11px] leading-relaxed">
-                        <strong className="text-amber-400/80">Lưu ý:</strong> Hệ thống chống tua video đã bật.
-                        Bạn phải xem hết thời lượng video để được ghi nhận tiến độ hoàn thành.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="pt-3 border-t border-white/[0.06] space-y-2">
-                    <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Mô tả bài giảng</p>
-                    {currentLesson.description && /<[a-z][\s\S]*>/i.test(currentLesson.description) ? (
-                      <div
-                        className="text-slate-400 leading-relaxed text-[13px] max-h-[45vh] overflow-y-auto break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-emerald-400 [&_a]:underline"
-                        dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(currentLesson.description) }}
-                      />
-                    ) : (
-                      <p className="text-slate-400 leading-relaxed text-[13px] whitespace-pre-wrap">
-                        {htmlToPlainText(currentLesson.description) ||
-                          'Vui lòng theo dõi video để nắm vững kiến thức. Hệ thống sẽ tự động ghi nhận tiến độ học tập khi bạn xem hết thời lượng yêu cầu của bài giảng này.'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {courseTab === 'list' && (
-                <div className="max-w-3xl space-y-3 lg:hidden">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-300">Nội dung khóa học</h3>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
-                        {lessons.filter(l => l.isCompleted).length}/{lessons.length} bài · {overallProgress}%
-                      </p>
-                    </div>
-                  </div>
-                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${overallProgress}%` }} />
-                  </div>
-                  {Object.entries(groupedLessons).map(([chapter, chapterLessons]) => {
-                    const isExpanded = expandedChapters[chapter] !== false;
-                    const chapterCompleted = chapterLessons.filter(l => l.isCompleted).length;
-                    return (
-                      <div key={chapter} className="rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.02]">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedChapters(prev => ({ ...prev, [chapter]: !prev[chapter] }))}
-                          className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-white/5"
-                        >
-                          <div>
-                            <p className="text-[11px] font-bold text-slate-300">{chapter}</p>
-                            <p className="text-[9px] text-slate-600 mt-0.5 font-semibold">{chapterCompleted}/{chapterLessons.length} hoàn thành</p>
-                          </div>
-                          {isExpanded ? <ChevronUp size={13} className="text-slate-600" /> : <ChevronDown size={13} className="text-slate-600" />}
-                        </button>
-                        {isExpanded && chapterLessons.map((lesson) => {
-                          const globalIdx = lessons.findIndex(l => String(l._id) === String(lesson._id));
-                          const isCurrent = currentLesson?._id === lesson._id;
-                          return (
-                            <div
-                              key={lesson._id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => {
-                                if (!lesson.isUnlocked) return;
-                                setCurrentLesson(lesson);
-                                setCourseTab('video');
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && lesson.isUnlocked) {
-                                  setCurrentLesson(lesson);
-                                  setCourseTab('video');
-                                }
-                              }}
-                              className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-all ${
-                                !lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
-                              } ${
-                                isCurrent
-                                  ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
-                                  : 'border-l-4 border-transparent hover:bg-white/[0.04]'
-                              }`}
-                            >
-                              <div className="mt-0.5 flex-shrink-0">
-                                {lesson.isCompleted ? (
-                                  <div className="w-[18px] h-[18px] rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                    <CheckCircle size={12} className="text-emerald-400" />
-                                  </div>
-                                ) : !lesson.isUnlocked ? (
-                                  <Lock size={14} className="text-slate-600" />
-                                ) : isCurrent ? (
-                                  <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center" title="Đang phát">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                                  </div>
-                                ) : (
-                                  <PlayCircle size={16} className="text-slate-600" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className={`text-[12px] leading-snug line-clamp-2 ${
-                                  isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
-                                }`}>
-                                  {formatLessonDisplayTitle(lesson.title, globalIdx)}
-                                </h4>
-                                {lesson.duration ? (
-                                  <span className="text-[10px] text-slate-600 flex items-center gap-1 mt-1">
-                                    <Clock size={9} />
-                                    {Math.floor(lesson.duration / 60)}:{String(lesson.duration % 60).padStart(2, '0')}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-            </div>
+          <div className="px-4 sm:px-6 py-4 sm:py-5 w-full" style={{ background: '#0d1117' }}>
+            <LmsPlayerPanels
+              courseTab={courseTab}
+              userId={session?.id || student?.id || 'student'}
+              userName={student?.name || session?.name || 'Học viên'}
+              selectedCourse={selectedCourse}
+              currentLesson={currentLesson}
+              lessons={lessons}
+              groupedLessons={groupedLessons}
+              overallProgress={overallProgress}
+              expandedChapters={expandedChapters}
+              setExpandedChapters={setExpandedChapters}
+              onSelectLesson={(lesson) => {
+                setCurrentLesson(lesson);
+                setCourseTab('overview');
+              }}
+              getCurrentTime={() => {
+                try {
+                  return Number(playerApiRef.current?.getCurrentTime?.()) || 0;
+                } catch {
+                  return 0;
+                }
+              }}
+              antiSeekEnabled={
+                currentLesson?.antiSeek !== false
+                && localStorage.getItem('student_anti_seek_disabled') !== 'true'
+                && localStorage.getItem('admin_anti_seek_disabled') !== 'true'
+              }
+            />
           </div>
         </div>
 

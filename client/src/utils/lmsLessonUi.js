@@ -23,7 +23,20 @@ export function formatLessonDisplayTitle(title, index = 0) {
   return `Bài ${index + 1}: ${nice}`;
 }
 
+export function formatLmsTimestamp(secs = 0) {
+  const s = Math.max(0, Math.floor(Number(secs) || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+/** Desktop + mobile tabs (list chỉ hiện trên <lg qua CSS trong TabBar) */
 export const LMS_PLAYER_TABS = [
-  { key: 'video', label: 'Bài giảng', shortLabel: 'Bài giảng' },
-  { key: 'list', label: 'Danh sách bài', shortLabel: 'Danh sách bài' },
+  { key: 'overview', label: 'Tổng quan', shortLabel: 'Tổng quan' },
+  { key: 'qa', label: 'Hỏi đáp', shortLabel: 'Hỏi đáp' },
+  { key: 'notes', label: 'Ghi chú', shortLabel: 'Ghi chú' },
+  { key: 'announcements', label: 'Thông báo', shortLabel: 'Thông báo' },
+  { key: 'reviews', label: 'Đánh giá', shortLabel: 'Đánh giá' },
+  { key: 'resources', label: 'Tài liệu', shortLabel: 'Tài liệu' },
+  { key: 'list', label: 'Mục lục', shortLabel: 'Mục lục', mobileOnly: true },
 ];
