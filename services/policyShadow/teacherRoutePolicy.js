@@ -65,7 +65,7 @@ function evaluateCheckPermission(subject, livePermission) {
   return { decision: 'ALLOW', reason: `has_${livePermission}`, statusHint: 200 };
 }
 
-/** superAdminOnlyTeacher middleware */
+/** superAdminOnlyTeacher middleware — Super hoặc HIGH_ADMIN */
 function evaluateSuperAdminOnly(subject) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };
@@ -75,6 +75,9 @@ function evaluateSuperAdminOnly(subject) {
   }
   if (subject.adminRole === 'SUPER_ADMIN') {
     return { decision: 'ALLOW', reason: 'super_admin', statusHint: 200 };
+  }
+  if (subject.adminRole === 'HIGH_ADMIN') {
+    return { decision: 'ALLOW', reason: 'high_admin', statusHint: 200 };
   }
   return { decision: 'DENY', reason: 'super_admin_only', statusHint: 403 };
 }

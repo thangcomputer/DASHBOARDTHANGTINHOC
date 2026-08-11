@@ -34,7 +34,7 @@ function TeacherActionMenu({
   t,
   openId,
   setOpenId,
-  isSuperAdmin,
+  canManageTeacherActions,
   align = 'right',
   setReviewModal,
   setGrantModal,
@@ -63,14 +63,14 @@ function TeacherActionMenu({
       onClick={(e) => e.stopPropagation()}
       role="menu"
     >
-      {isSuperAdmin && active && (
+      {canManageTeacherActions && active && (
         <button type="button" role="menuitem" onClick={() => { handlePayTeacher(t); close(); }}
           className={`${itemCls} text-emerald-700 hover:bg-emerald-50`}>
           <DollarSign size={15} className="shrink-0" />
           <span>Thanh toán lương</span>
         </button>
       )}
-      {isSuperAdmin && inactive && (
+      {canManageTeacherActions && inactive && (
         <button type="button" role="menuitem"
           onClick={() => { setGrantModal({ id: t.id, name: t.name || t.email || t.phone, type: locked ? 'retry' : 'first' }); close(); }}
           className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
@@ -78,7 +78,7 @@ function TeacherActionMenu({
           <span>{locked ? 'Cấp quyền thi lại' : 'Cấp truy cập thi'}</span>
         </button>
       )}
-      {isSuperAdmin && pending && (
+      {canManageTeacherActions && pending && (
         <button type="button" role="menuitem" disabled={!canApprove}
           onClick={() => { if (canApprove) { setApproveModal(t); close(); } }}
           className={`${itemCls} ${canApprove ? 'text-emerald-700 hover:bg-emerald-50' : 'text-slate-300 cursor-not-allowed'}`}>
@@ -86,21 +86,21 @@ function TeacherActionMenu({
           <span>Cấp quyền giảng dạy</span>
         </button>
       )}
-      {isSuperAdmin && t.practicalFile && t.practicalStatus !== 'reviewed' && (
+      {canManageTeacherActions && t.practicalFile && t.practicalStatus !== 'reviewed' && (
         <button type="button" role="menuitem" onClick={() => { setReviewModal(t); close(); }}
           className={`${itemCls} text-sky-700 hover:bg-sky-50`}>
           <FileSpreadsheet size={15} className="shrink-0" />
           <span>Kiểm tra bài thực hành</span>
         </button>
       )}
-      {isSuperAdmin && (
+      {canManageTeacherActions && (
         <button type="button" role="menuitem" onClick={() => { setEditTeacher(t); close(); }}
           className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
           <Edit3 size={15} className="shrink-0 text-slate-500" />
           <span>Chỉnh sửa / lương</span>
         </button>
       )}
-      {isSuperAdmin && (
+      {canManageTeacherActions && (
         <>
           <div className="border-t border-slate-100 my-1" />
           <button type="button" role="menuitem" onClick={() => { removeTeacher(t.id); close(); }}
@@ -110,8 +110,8 @@ function TeacherActionMenu({
           </button>
         </>
       )}
-      {!isSuperAdmin && (
-        <p className="px-3.5 py-2 text-[12px] text-slate-400">Chỉ Super Admin thao tác được</p>
+      {!canManageTeacherActions && (
+        <p className="px-3.5 py-2 text-[12px] text-slate-400">Chỉ Super / High Admin thao tác được</p>
       )}
     </div>
   );
@@ -119,10 +119,12 @@ function TeacherActionMenu({
 
 export default function AdminTeachersTab() {
   const {
-    teachers, safeTeachers, filteredTeachers, teacherSearch, setTeacherSearch, isSuperAdmin, setShowTeacherModal,
+    teachers, safeTeachers, filteredTeachers, teacherSearch, setTeacherSearch, isSuperAdmin, isHighAdmin, setShowTeacherModal,
     getTeacherRating, setReviewModal, setGrantModal, setApproveModal, setEditTeacher, handlePayTeacher,
     removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed, toast,
   } = useAdminTab();
+
+  const canManageTeacherActions = !!(isSuperAdmin || isHighAdmin);
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [menuId, setMenuId] = useState(null);
@@ -160,7 +162,7 @@ export default function AdminTeachersTab() {
   const menuProps = {
     openId: menuId,
     setOpenId: setMenuId,
-    isSuperAdmin,
+    canManageTeacherActions,
     setReviewModal,
     setGrantModal,
     setApproveModal,
@@ -223,7 +225,7 @@ export default function AdminTeachersTab() {
               />
             </div>
 
-            {isSuperAdmin && (
+            {canManageTeacherActions && (
               <button
                 type="button"
                 onClick={() => setShowTeacherModal(true)}
@@ -266,6 +268,7 @@ export default function AdminTeachersTab() {
                     name={t.name}
                     role="teacher"
                     src={t.avatar}
+                    gender={t.gender}
                     color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-slate-400'}
                   />
                   <div className="flex-1 min-w-0">
@@ -390,6 +393,7 @@ export default function AdminTeachersTab() {
                           name={t.name}
                           role="teacher"
                           src={t.avatar}
+                          gender={t.gender}
                           color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-slate-400'}
                         />
                         <div className="min-w-0">
@@ -556,7 +560,7 @@ export default function AdminTeachersTab() {
             </div>
             <div className="cms-sheet-body space-y-4">
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 flex items-center gap-3">
-                <Avatar initials={approveModal.name?.substring(0, 2).toUpperCase() || 'GV'} name={approveModal.name} role="teacher" src={approveModal.avatar} color="bg-emerald-500" size="card" />
+                <Avatar initials={approveModal.name?.substring(0, 2).toUpperCase() || 'GV'} name={approveModal.name} role="teacher" src={approveModal.avatar} gender={approveModal.gender} color="bg-emerald-500" size="card" />
                 <div className="min-w-0">
                   <p className="font-semibold text-slate-900 truncate">{approveModal.name}</p>
                   <p className="text-[13px] text-slate-500 mt-0.5">Điểm test: <span className="text-emerald-700 font-semibold">{approveModal.testScore}/100</span></p>

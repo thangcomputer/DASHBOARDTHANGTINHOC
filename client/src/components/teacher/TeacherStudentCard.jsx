@@ -54,7 +54,7 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
         title={hint}
         aria-label="Đánh trượt"
         onClick={openConfirm}
-        className={`inline-flex justify-center items-center w-8 h-8 rounded-lg transition-all shrink-0 ${
+        className={`inline-flex justify-center items-center w-9 h-9 sm:w-8 sm:h-8 rounded-lg transition-all shrink-0 ${
           canFail
             ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
             : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
@@ -377,22 +377,26 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
 
   if (isDetailed) {
     return (
-      <div className="bg-white rounded-2xl sm:rounded-[40px] shadow-lg sm:shadow-2xl shadow-blue-900/5 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500">
+      <div className="bg-white rounded-2xl sm:rounded-[40px] shadow-lg sm:shadow-2xl shadow-blue-900/5 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 min-w-0 w-full max-w-full">
         {/* Header */}
-        <div className="bg-slate-50/80 px-4 py-4 sm:px-8 sm:py-6 md:px-10 md:py-8 border-b border-slate-100">
-          <div className="bg-white border border-slate-100 shadow-sm rounded-2xl sm:rounded-[28px] p-4 sm:p-6">
+        <div className="bg-slate-50/80 px-3 py-3 sm:px-8 sm:py-6 md:px-10 md:py-8 border-b border-slate-100">
+          <div className="bg-white border border-slate-100 shadow-sm rounded-2xl sm:rounded-[28px] p-3 sm:p-6 min-w-0">
             <div className="flex items-start gap-3 sm:gap-6 min-w-0">
-            <div className="w-10 h-10 sm:w-20 sm:h-20 rounded-full sm:rounded-[28px] overflow-hidden shadow-sm border border-slate-200 bg-white shrink-0">
+            <div className="w-11 h-11 sm:w-20 sm:h-20 rounded-xl sm:rounded-[28px] overflow-hidden shadow-sm border border-slate-200 bg-white shrink-0">
               <img
-                src={resolveAvatarUrl({ avatar: student.avatarUrl || student.photo, role: 'student' })}
+                src={resolveAvatarUrl({
+                  avatar: student.avatarUrl || student.avatar || student.photo,
+                  role: 'student',
+                  gender: student.gender,
+                })}
                 alt={getDisplayName(student)}
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-sm sm:text-2xl font-bold tracking-tight text-slate-800 break-words line-clamp-2 leading-snug">
+              <div className="flex items-start gap-2 min-w-0">
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <h2 className="text-base sm:text-2xl font-bold tracking-tight text-slate-800 break-words line-clamp-2 leading-snug">
                     {getDisplayName(student)}
                   </h2>
                   <p className="text-slate-500 text-[11px] sm:text-sm font-semibold mt-0.5 break-words line-clamp-2 leading-snug">
@@ -400,7 +404,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`hidden min-[380px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
+                  <span className={`hidden min-[420px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${
                     isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
                   }`}>
                     {isCompleted ? 'Hoàn thành' : 'Đang học'}
@@ -413,7 +417,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                       role: 'student',
                       avatar: student.avatar,
                     })}
-                    className="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition-all border border-blue-100"
+                    className="w-9 h-9 sm:w-8 sm:h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition-all border border-blue-100 shrink-0"
                     title="Nhắn tin nội bộ"
                     aria-label="Nhắn tin nội bộ"
                   >
@@ -425,12 +429,12 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <span className={`min-[380px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase ${
+                <span className={`min-[420px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase whitespace-nowrap ${
                   isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
                 }`}>
                   {isCompleted ? 'Hoàn thành' : 'Đang học'}
                 </span>
-                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-slate-100 text-slate-500 border border-slate-200 uppercase">
+                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-slate-100 text-slate-500 border border-slate-200 uppercase whitespace-nowrap">
                   {student.learningMode || 'OFFLINE'}
                 </span>
               </div>
@@ -453,7 +457,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
         </div>
 
         {/* Tabs — 5 cột: Tiến độ, Bài tập, Link học, Đánh giá, Nhật ký */}
-        <div className="grid grid-cols-5 w-full bg-white border-b border-slate-100">
+        <div className="grid grid-cols-5 w-full bg-white border-b border-slate-100 min-w-0">
           {panels.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -462,12 +466,12 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               title={label}
               aria-label={label}
               aria-current={activePanel === key ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 px-0.5 sm:px-1 py-2 sm:py-3.5 text-[10px] sm:text-xs font-bold tracking-wide transition-all min-w-0 ${
+              className={`relative flex flex-col items-center justify-center gap-0.5 px-0.5 sm:px-1 min-h-11 sm:min-h-0 py-2 sm:py-3.5 text-[10px] sm:text-xs font-bold tracking-wide transition-all min-w-0 ${
                 activePanel === key ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               <Icon size={16} className="shrink-0" aria-hidden="true" />
-              <span className="truncate max-w-full leading-tight">{label}</span>
+              <span className="hidden min-[400px]:block truncate max-w-full leading-tight px-0.5">{label}</span>
               {activePanel === key && (
                 <div className="absolute bottom-0 left-1 right-1 h-0.5 bg-blue-600 rounded-t-full" />
               )}
@@ -480,31 +484,31 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
            {activePanel === 'progress' && (
               <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-500">
                  {/* Stat Boxes — 3 cột trên mobile */}
-                 <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
-                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
-                       <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-1">Đã học</p>
-                       <h4 className="text-xl sm:text-4xl font-extrabold text-blue-600 leading-none tabular-nums">{done}</h4>
-                       <p className="text-xs font-bold text-blue-400 mt-1 uppercase">buổi</p>
+                 <div className="grid grid-cols-3 gap-1.5 sm:gap-4 md:gap-6 min-w-0">
+                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
+                       <p className="text-[10px] sm:text-xs font-bold text-blue-600 uppercase tracking-wide mb-1 truncate max-w-full">Đã học</p>
+                       <h4 className="text-lg sm:text-4xl font-extrabold text-blue-600 leading-none tabular-nums">{done}</h4>
+                       <p className="text-[10px] sm:text-xs font-bold text-blue-400 mt-1 uppercase">buổi</p>
                     </div>
-                    <div className="bg-amber-50/60 border border-amber-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
-                       <p className="text-xs font-bold uppercase tracking-wide mb-1 text-amber-600">Còn lại</p>
-                       <h4 className="text-xl sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{student.remainingSessions}</h4>
-                       <p className="text-xs font-bold mt-1 uppercase text-amber-400">buổi</p>
+                    <div className="bg-amber-50/60 border border-amber-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
+                       <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wide mb-1 text-amber-600 truncate max-w-full">Còn lại</p>
+                       <h4 className="text-lg sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{student.remainingSessions}</h4>
+                       <p className="text-[10px] sm:text-xs font-bold mt-1 uppercase text-amber-400">buổi</p>
                     </div>
-                    <div className="bg-purple-50/60 border border-purple-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-3 sm:p-6">
-                       <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-1">Điểm TB</p>
-                       <div className="flex items-baseline justify-center gap-0.5">
-                          <h4 className="text-xl sm:text-4xl font-extrabold text-purple-600 leading-none tabular-nums">{student.lastGrade || 0}</h4>
-                          <span className="text-xs sm:text-lg font-bold text-purple-400">/10</span>
+                    <div className="bg-purple-50/60 border border-purple-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
+                       <p className="text-[10px] sm:text-xs font-bold text-purple-600 uppercase tracking-wide mb-1 truncate max-w-full">Điểm TB</p>
+                       <div className="flex items-baseline justify-center gap-0.5 min-w-0">
+                          <h4 className="text-lg sm:text-4xl font-extrabold text-purple-600 leading-none tabular-nums">{student.lastGrade || 0}</h4>
+                          <span className="text-[10px] sm:text-lg font-bold text-purple-400">/10</span>
                        </div>
                        <p className="text-xs font-bold text-purple-400 mt-1 uppercase hidden sm:block">Đánh giá chung</p>
                     </div>
                  </div>
 
                  {/* Actions outlined gọn */}
-                 <div className="grid grid-cols-2 gap-2 mt-4 sm:gap-4">
+                 <div className="grid grid-cols-2 gap-2 mt-4 sm:gap-4 min-w-0">
                    {attendanceGate?.status === 'not_yet' ? (
-                     <div className="flex items-center justify-center h-9 sm:h-auto sm:py-5 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide border border-dashed border-slate-300 rounded-xl bg-slate-50">
+                     <div className="flex items-center justify-center min-h-10 sm:min-h-[3.25rem] px-2 py-2 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide text-center leading-tight border border-dashed border-slate-300 rounded-xl bg-slate-50">
                         Chưa đến giờ dạy
                      </div>
                    ) : (
@@ -523,7 +527,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                          !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                          'Bấm để điểm danh buổi học hôm nay'
                        }
-                       className={`h-10 sm:h-auto sm:py-5 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all ${
+                       className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
                          isCompleted 
                            ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
                          : attendanceGate?.status === 'no_schedule'
@@ -534,7 +538,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        }`}
                      >
                        <CheckCircle size={14} className="shrink-0" aria-hidden="true" />
-                       <span className="truncate">
+                       <span className="min-w-0 text-center leading-tight whitespace-normal">
                          {isCompleted 
                            ? 'Hoàn thành'
                            : attendanceGate?.status === 'no_schedule'
@@ -555,14 +559,14 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        : !canCancelAttendance ? `Đã quá 1 tiếng, không thể hủy (${minsElapsedSinceAttend} phút trước)`
                        : `Còn ${cancelTimeLeft} phút để hủy. Nhấn để hủy điểm danh hôm nay`
                      }
-                     className={`h-10 sm:h-auto sm:py-5 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all ${
+                     className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
                        canCancelAttendance && !isCompleted
                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
                          : 'bg-slate-100 text-slate-500 cursor-not-allowed'
                      }`}
                    >
                      <X size={14} className="shrink-0" aria-hidden="true" />
-                     <span className="truncate">
+                     <span className="min-w-0 text-center leading-tight whitespace-normal">
                        {canCancelAttendance && cancelTimeLeft > 0
                          ? `Hủy (${cancelTimeLeft}p)`
                          : 'Hủy điểm danh'}
@@ -591,29 +595,30 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
 
            {activePanel === 'link' && (
               <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
-                 <div className="bg-indigo-50 border border-indigo-100 rounded-[40px] p-10 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-200/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-                    <div className="flex items-center gap-4 mb-6">
-                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
-                          <Video size={24} />
+                 <div className="bg-indigo-50 border border-indigo-100 rounded-2xl sm:rounded-[40px] p-4 sm:p-6 md:p-10 relative overflow-hidden min-w-0">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-200/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
+                    <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 min-w-0">
+                       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                          <Video size={22} />
                        </div>
-                       <div>
-                          <h3 className="text-xl font-black text-indigo-900">Link học trực tuyến</h3>
-                          <p className="text-xs font-bold text-indigo-400">Tự động đồng bộ hóa với Dashboard của học viên</p>
+                       <div className="min-w-0">
+                          <h3 className="text-base sm:text-xl font-black text-indigo-900 truncate">Link học trực tuyến</h3>
+                          <p className="text-xs font-bold text-indigo-400 leading-snug">Tự động đồng bộ hóa với Dashboard của học viên</p>
                        </div>
                     </div>
                     
-                    <div className="flex flex-col sm:flex-row gap-3">
-                       <div className="flex-1 relative">
+                    <div className="flex flex-col sm:flex-row gap-3 min-w-0">
+                       <div className="flex-1 relative min-w-0">
                           <input 
                             type="text" value={linkInput} onChange={e => setLinkInput(e.target.value)}
-                            className="w-full bg-white border-2 border-indigo-100 rounded-2xl px-6 py-4 text-sm font-bold text-indigo-700 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                            className="w-full bg-white border-2 border-indigo-100 rounded-2xl px-4 sm:px-6 py-3 sm:py-4 text-sm font-bold text-indigo-700 focus:border-indigo-500 outline-none transition-all shadow-sm min-w-0"
                             placeholder="Nhập link Google Meet / Zoom..."
                           />
                        </div>
                        <button 
+                         type="button"
                          onClick={handleLinkSave}
-                         className={`px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg ${
+                         className={`shrink-0 w-full sm:w-auto min-h-11 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg whitespace-nowrap ${
                             linkSaved ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-100'
                          }`}
                        >
@@ -633,7 +638,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   <button
                     type="button"
                     onClick={() => setShowAddAssign(!showAddAssign)}
-                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1"
+                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 min-h-9 rounded-lg font-medium transition-all inline-flex items-center gap-1 whitespace-nowrap"
                   >
                     {showAddAssign ? <X size={14} /> : <Plus size={14} />}
                     {showAddAssign ? 'Hủy' : 'Giao bài'}
@@ -655,10 +660,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                       </div>
                       <div className="md:col-span-2">
                         <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
                           <input type="text" value={newAssign.fileUrl} onChange={e => setNewAssign({...newAssign, fileUrl: e.target.value})}
-                            className="flex-1 bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="Dán link Drive/File..." />
-                          <label className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-4 py-3 rounded-2xl cursor-pointer transition flex items-center justify-center" title="Tải file lên (Tối đa 3MB)">
+                            className="flex-1 min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="Dán link Drive/File..." />
+                          <label className="shrink-0 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 w-11 h-11 rounded-2xl cursor-pointer transition inline-flex items-center justify-center" title="Tải file lên (Tối đa 3MB)">
                             <Upload size={18} />
                             <input type="file" className="hidden" onChange={(e) => handleAssignmentUpload(e, 'new')} accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" />
                           </label>
@@ -875,22 +880,22 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
 
            {activePanel === 'logs' && (
               <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-10 duration-500">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <div className="flex items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 min-w-0">
+                  <div className="flex items-start sm:items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
                       <History size={18} />
                     </div>
-                    <div>
-                      <h3 className="text-sm sm:text-base font-black text-slate-800">
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-black text-slate-800 leading-snug">
                         Nhật ký Hoạt động &amp; Lịch sử Học viên
                       </h3>
-                      <p className="text-[11px] text-slate-400 font-medium">
+                      <p className="text-[11px] text-slate-400 font-medium leading-snug">
                         Điểm danh, lịch sử nộp bài tập và quá trình cập nhật điểm số
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
-                    {(student.grades || []).length} lượt ghi nhận
+                  <span className="text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600 shrink-0 whitespace-nowrap">
+                    {(student.grades || []).length} lượt
                   </span>
                 </div>
 
@@ -1029,19 +1034,21 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                    />
                 </div>
 
-                <div className="flex gap-4 pt-4">
+                <div className="flex flex-col-reverse min-[380px]:flex-row gap-2 sm:gap-4 pt-4 min-w-0">
                   <button 
+                    type="button"
                     onClick={() => setShowAttendanceModal(false)}
-                    className="flex-1 py-4 text-slate-400 font-black text-xs uppercase tracking-widest bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all"
+                    className="flex-1 min-h-11 py-3 sm:py-4 text-slate-400 font-black text-xs uppercase tracking-widest bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all whitespace-nowrap"
                   >
                     Hủy
                   </button>
                   <button 
+                    type="button"
                     onClick={() => {
                       onAttendance((student._id || student.id), attForm.note, Number(attForm.grade));
                       setShowAttendanceModal(false);
                     }}
-                    className="flex-[2] py-4 text-white font-black text-xs uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg shadow-green-100 hover:shadow-green-200 transition-all active:scale-95"
+                    className="flex-[2] min-h-11 py-3 sm:py-4 px-2 text-white font-black text-xs uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg shadow-green-100 hover:shadow-green-200 transition-all active:scale-95 text-center leading-tight"
                   >
                     Xác nhận Điểm danh
                   </button>
@@ -1063,7 +1070,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
         <div className="flex flex-col gap-4 min-[440px]:flex-row min-[440px]:items-start min-[440px]:justify-between min-w-0">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shrink-0 bg-white">
-              <img src={resolveAvatarUrl({ role: 'student' })} alt="" className="w-full h-full object-cover" />
+              <img src={resolveAvatarUrl({ avatar: student.avatarUrl || student.avatar || student.photo, role: 'student', gender: student.gender })} alt="" className="w-full h-full object-cover" />
             </div>
             <div className="min-w-0">
               <p className="text-white font-bold text-lg tracking-wide truncate">{getDisplayName(student)}</p>
@@ -1102,13 +1109,20 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-100">
+      <div className="flex border-b border-gray-100 min-w-0 overflow-hidden">
         {panels.map(({ key, icon: Icon, label }) => (
-          <button key={key} onClick={() => setActivePanel(key)}
-            className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-all ${
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActivePanel(key)}
+            title={label}
+            aria-label={label}
+            className={`flex-1 min-w-0 min-h-11 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-0.5 py-2 sm:py-3.5 text-[10px] sm:text-sm font-semibold transition-all ${
               activePanel === key ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            <Icon size={15} /> {label}
+            }`}
+          >
+            <Icon size={15} className="shrink-0" aria-hidden="true" />
+            <span className="hidden min-[400px]:inline truncate max-w-full leading-tight">{label}</span>
           </button>
         ))}
       </div>

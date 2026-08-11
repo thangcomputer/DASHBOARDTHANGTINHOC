@@ -24,14 +24,15 @@ const legacyViewTeachers = checkPermission(PERMISSIONS.VIEW_TEACHERS);
 const legacyManageTeachers = checkPermission(PERMISSIONS.MANAGE_TEACHERS);
 const legacyManageFinance = checkPermission(PERMISSIONS.MANAGE_FINANCE);
 
+/** Super Admin hoặc HIGH_ADMIN — create/delete/pay giảng viên (STAFF/SUPPORT không). */
 const superAdminOnlyTeacher = async (req, res, next) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Chưa xác thực' });
   if (req.user.id === 'admin') return next();
   const user = await Teacher.findById(req.user.id).select('adminRole').lean();
-  if (user?.adminRole === 'SUPER_ADMIN') return next();
+  if (user?.adminRole === 'SUPER_ADMIN' || user?.adminRole === 'HIGH_ADMIN') return next();
   return res.status(403).json({
     success: false,
-    message: '403 Forbidden — Bạn không có quyền thực hiện thao tác này. Chỉ Super Admin mới được thêm/sửa/xóa giảng viên.',
+    message: '403 Forbidden — Bạn không có quyền thực hiện thao tác này. Chỉ Super Admin hoặc High Admin mới được thêm/sửa/xóa / trả lương giảng viên.',
   });
 };
 
@@ -80,7 +81,7 @@ function denyTeachers(res, statusHint, reason, action) {
   if (r === 'super_admin_only') {
     return res.status(403).json({
       success: false,
-      message: '403 Forbidden — Bạn không có quyền thực hiện thao tác này. Chỉ Super Admin mới được thêm/sửa/xóa giảng viên.',
+      message: '403 Forbidden — Bạn không có quyền thực hiện thao tác này. Chỉ Super Admin hoặc High Admin mới được thêm/sửa/xóa / trả lương giảng viên.',
     });
   }
   if (r === 'not_admin_role') {

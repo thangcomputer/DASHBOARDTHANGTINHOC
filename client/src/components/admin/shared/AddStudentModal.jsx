@@ -26,6 +26,10 @@ function readPortalAccessToken() {
   );
 }
 
+function isOnlineBranch(branch) {
+  return String(branch?.name || '').toLowerCase().includes('online');
+}
+
 export default function AddStudentModal({ onAdd, onClose, teachers }) {
   const toast    = useToast();
   const API      = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
@@ -65,7 +69,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
           let mode = 'OFFLINE';
           if (defaultBranchId) {
              const checkBranch = branches.find(b => String(b._id) === String(defaultBranchId));
-             if (checkBranch && checkBranch.name.toLowerCase().includes('online')) {
+             if (checkBranch && isOnlineBranch(checkBranch)) {
                 mode = 'ONLINE';
              }
           }
@@ -78,17 +82,45 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
       .catch(() => {});
   }, [API, isSuperAdmin, selectedBranchId, branches]);
 
+  const locationBranches = useMemo(() => {
+    const list = Array.isArray(branches) ? branches : [];
+    if (form.learningMode === 'ONLINE') {
+      return list.filter(isOnlineBranch);
+    }
+    return list.filter((b) => !isOnlineBranch(b));
+  }, [branches, form.learningMode]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === 'name') { setForm(f => ({ ...f, name: value.toUpperCase() })); return; }
+
+    if (name === 'learningMode') {
+      const mode = value === 'ONLINE' ? 'ONLINE' : 'OFFLINE';
+      const list = Array.isArray(branches) ? branches : [];
+      const filtered = mode === 'ONLINE'
+        ? list.filter(isOnlineBranch)
+        : list.filter((b) => !isOnlineBranch(b));
+      const stillOk = filtered.some((b) => String(b._id) === String(form.branchId));
+      const nextBranch = stillOk
+        ? list.find((b) => String(b._id) === String(form.branchId))
+        : filtered[0];
+      setForm((f) => ({
+        ...f,
+        learningMode: mode,
+        branchId: nextBranch?._id || '',
+        branchCode: nextBranch?.code || '',
+      }));
+      return;
+    }
     
     if (name === 'branchId') {
       const selectedB = branches.find(b => String(b._id) === String(value));
-      let mode = form.learningMode;
-      if (selectedB && selectedB.name.toLowerCase().includes('online')) {
-        mode = 'ONLINE';
-      }
-      setForm(f => ({ ...f, branchId: value, branchCode: selectedB?.code || '', learningMode: mode }));
+      setForm(f => ({
+        ...f,
+        branchId: value,
+        branchCode: selectedB?.code || '',
+        learningMode: selectedB && isOnlineBranch(selectedB) ? 'ONLINE' : f.learningMode,
+      }));
       return;
     }
 
@@ -558,29 +590,12 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                 <span className="cms-step__label">Đăng ký khóa học</span>
               </div>
 
-              {isSuperAdmin && (
-                <div>
-                  <label className="cms-label">Cơ sở (chi nhánh)</label>
-                  <CmsSelect
-                    name="branchId"
-                    value={form.branchId || ''}
-                    onChange={handleChange}
-                    className="cms-input"
-                  >
-                    <option value="">-- Chọn cơ sở đào tạo --</option>
-                    {branches.map((b) => (
-                      <option key={b._id} value={b._id}>{b.name}</option>
-                    ))}
-                  </CmsSelect>
-                </div>
-              )}
-
               <div>
                 <label className="cms-label">Hình thức học</label>
                 <div className="cms-chip-grid">
                   <label className={`cms-chip-option ${form.learningMode === 'OFFLINE' ? 'is-on' : ''}`}>
                     <input type="radio" name="learningMode" value="OFFLINE" checked={form.learningMode === 'OFFLINE'} onChange={handleChange} className="sr-only" />
-                    Tại cơ sở
+                    Trực tiếp
                   </label>
                   <label className={`cms-chip-option ${form.learningMode === 'ONLINE' ? 'is-on' : ''}`}>
                     <input type="radio" name="learningMode" value="ONLINE" checked={form.learningMode === 'ONLINE'} onChange={handleChange} className="sr-only" />
@@ -588,6 +603,33 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                   </label>
                 </div>
               </div>
+
+              {isSuperAdmin && (
+                <div>
+                  <label className="cms-label">Địa điểm (chi nhánh)</label>
+                  <p className="text-[11px] text-slate-500 mb-1.5">
+                    {form.learningMode === 'ONLINE'
+                      ? 'Cơ sở / khu online'
+                      : 'Cơ sở đào tạo trực tiếp'}
+                  </p>
+                  <CmsSelect
+                    name="branchId"
+                    value={form.branchId || ''}
+                    onChange={handleChange}
+                    className="cms-input"
+                  >
+                    <option value="">-- Chọn địa điểm --</option>
+                    {locationBranches.map((b) => (
+                      <option key={b._id} value={b._id}>{b.name}</option>
+                    ))}
+                  </CmsSelect>
+                  {locationBranches.length === 0 && (
+                    <p className="text-[11px] text-amber-600 mt-1">
+                      Chưa có chi nhánh phù hợp hình thức này.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="cms-label">Khóa học &amp; học phí</label>

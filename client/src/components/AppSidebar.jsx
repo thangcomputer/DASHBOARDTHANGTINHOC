@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, BookOpen, Calendar, MessageSquare,
   Trophy, FileText, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown,
@@ -11,7 +11,9 @@ import { useData } from '../context/DataContext';
 import { isSoundMuted, setSoundMuted } from '../utils/sound';
 import { PERMISSIONS } from '../constants/permissions';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
+import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../utils/enrollments';
 import EditableAvatar from './EditableAvatar';
+import api from '../services/api';
 
 const formatTime = (date) => {
   if (!date) return '';
@@ -29,14 +31,14 @@ const MENU_CONFIG = {
   student: {
     brand: { label: 'HỌC VIÊN', color: 'from-slate-900 to-indigo-950' },
     items: [
-      { key: 'dashboard',  icon: LayoutDashboard, label: 'Tổng quan',      path: '/student' },
+      { key: 'dashboard',  icon: LayoutDashboard, label: 'Tổng quan',      path: '/student', requiresLearningAccess: true },
       { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',       path: '/student/feed' },
       { key: 'news',       icon: FileText,         label: 'Tin tức',        path: '/student/news' },
-      { key: 'exam',       icon: Trophy,           label: 'Phòng Thi',      path: '/student/exam' },
-      { key: 'schedule',   icon: Calendar,         label: 'Lịch học',       path: '/student', hash: 'schedule' },
-      { key: 'materials',  icon: BookOpen,          label: 'Tài liệu',      path: '/student', hash: 'materials' },
+      { key: 'exam',       icon: Trophy,           label: 'Phòng Thi',      path: '/student/exam', requiresLearningAccess: true },
+      { key: 'schedule',   icon: Calendar,         label: 'Lịch học',       path: '/student', hash: 'schedule', requiresLearningAccess: true },
+      { key: 'materials',  icon: BookOpen,          label: 'Tài liệu',      path: '/student', hash: 'materials', requiresLearningAccess: true },
       { key: 'inbox',      icon: MessageSquare,     label: 'Hộp thư',       path: '/student/inbox' },
-      { key: 'evaluation', icon: Star,              label: 'Đánh giá',      path: '/student', hash: 'evaluation' },
+      { key: 'evaluation', icon: Star,              label: 'Đánh giá',      path: '/student', hash: 'evaluation', requiresLearningAccess: true },
     ],
     bottomItems: [
       { key: 'help', icon: HelpCircle, label: 'Trợ giúp', isHelp: true },
@@ -235,9 +237,116 @@ const AppSidebar = ({
     }
   });
   const { 
-    students, teachers, getPrivateEvaluationsForAdmin, getConversations, triggerBackgroundSync,
+    students, teachers, staffs, getPrivateEvaluationsForAdmin, getConversations, triggerBackgroundSync,
     notifications: allNotifications, markNotificationRead
   } = useData();
+
+  // Session login/me có thể thiếu gender → bổ sung từ hồ sơ self (mọi role)
+  const selfProfile = useMemo(() => {
+    if (!session) return null;
+    const sid = String(session.id || session._id || '');
+    if (!sid || sid === 'admin') return null;
+    const pools = [
+      ...(Array.isArray(students) ? students : []),
+      ...(Array.isArray(teachers) ? teachers : []),
+      ...(Array.isArray(staffs) ? staffs : []),
+    ];
+    return pools.find((p) => String(p?.id || p?._id) === sid) || null;
+  }, [session, students, teachers, staffs]);
+
+  const effectiveGender = session?.gender || selfProfile?.gender || '';
+  const effectiveAvatar = session?.avatar || selfProfile?.avatar || userAvatar || '';
+
+  const sessionStorageKey = (() => {
+    if (!session) return null;
+    if (session.adminRole === 'STAFF' || session.role === 'staff') return 'staff_user';
+    return `${session.role || 'admin'}_user`;
+  })();
+
+  // Persist: giữ gender session nếu đã có; chỉ bổ sung từ self khi session thiếu
+  useEffect(() => {
+    if (!session || !sessionStorageKey) return;
+    const nextGender = session.gender || selfProfile?.gender || '';
+    const nextAvatar = session.avatar || selfProfile?.avatar || '';
+    if (!nextGender && !nextAvatar) return;
+    if ((session.gender || '') === (nextGender || '') && (session.avatar || '') === (nextAvatar || '')) return;
+    const patched = {
+      ...session,
+      gender: nextGender || '',
+      avatar: nextAvatar || session.avatar || '',
+    };
+    try {
+      localStorage.setItem(sessionStorageKey, JSON.stringify(patched));
+      window.dispatchEvent(new CustomEvent('cms:session-patched', { detail: patched }));
+    } catch { /* ignore */ }
+  }, [session, selfProfile, sessionStorageKey]);
+
+  // Fallback: /me + teachers/staff profile khi thiếu gender (SUPPORT/HIGH/GV)
+  useEffect(() => {
+    if (!session || session.gender || !sessionStorageKey) return;
+    const sid = session.id || session._id;
+    if (!sid || sid === 'admin') return;
+    let cancelled = false;
+    const snap = session;
+    (async () => {
+      try {
+        let g = '';
+        let a = '';
+        let res = null;
+
+        try {
+          res = await api.auth.me();
+        } catch { /* ignore */ }
+        if (res?.success && res.data) {
+          if (Object.prototype.hasOwnProperty.call(res.data, 'gender') && res.data.gender) {
+            g = res.data.gender;
+          }
+          if (res.data.avatar) a = res.data.avatar;
+        }
+
+        if (!g && role !== 'student') {
+          try {
+            const tRes = await api.teachers.getById(sid);
+            if (tRes?.success && tRes.data) {
+              if (tRes.data.gender) g = tRes.data.gender;
+              if (!a && tRes.data.avatar) a = tRes.data.avatar;
+            }
+          } catch { /* ignore */ }
+        }
+
+        if (!g && role !== 'student') {
+          try {
+            const sRes = await api.staff.getAll();
+            const list = Array.isArray(sRes?.data) ? sRes.data : [];
+            const self = list.find((x) => String(x.id || x._id) === String(sid));
+            if (self?.gender) g = self.gender;
+            if (!a && self?.avatar) a = self.avatar;
+          } catch { /* ignore */ }
+        }
+
+        if (!g && role === 'student') {
+          try {
+            const st = await api.students.getById(sid);
+            if (st?.success && st.data?.gender) g = st.data.gender;
+            if (!a && st?.data?.avatar) a = st.data.avatar;
+          } catch { /* ignore */ }
+        }
+
+        if (cancelled || (!g && !a)) return;
+        const patched = {
+          ...snap,
+          ...(res?.data || {}),
+          gender: g || snap.gender || '',
+          avatar: a || snap.avatar || '',
+        };
+        localStorage.setItem(sessionStorageKey, JSON.stringify(patched));
+        window.dispatchEvent(new CustomEvent('cms:session-patched', { detail: patched }));
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when identity/gender key changes
+  }, [session?.id, session?.gender, sessionStorageKey, role]);
+
   const [muted, setMutedState] = useState(() => isSoundMuted());
   const [dynamicLogo, setDynamicLogo] = useState('');
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
@@ -279,7 +388,16 @@ const AppSidebar = ({
 
   const config = MENU_CONFIG[role] || MENU_CONFIG.student;
 
+  const studentHasLearningAccess = (() => {
+    if (role !== 'student') return true;
+    const sid = session?.id || session?._id;
+    if (!sid || !Array.isArray(students)) return true;
+    const me = students.find((s) => String(s?.id || s?._id) === String(sid));
+    return hasLearningAccessEnrollment(me);
+  })();
+
   const canSeeItem = (item) => {
+    if (role === 'student' && item.requiresLearningAccess && !studentHasLearningAccess) return false;
     if (role !== 'admin' && role !== 'staff') return true;
     if (session?.id === 'admin' || adminRole === 'SUPER_ADMIN') return true;
     // HIGH_ADMIN: check permissions (không bypass toàn quyền)
@@ -331,7 +449,7 @@ const AppSidebar = ({
     }
     if (role === 'admin') {
       if (itemKey === 'students') {
-        return (students || []).filter(s => s && !s.paid).length;
+        return (students || []).filter((s) => isUnpaidTuitionAlertStudent(s)).length;
       }
       if (itemKey === 'teachers') {
         return (teachers || []).filter(t => {
@@ -405,9 +523,10 @@ const AppSidebar = ({
 
   const initials = userName ? userName.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase() : 'HV';
   const avatarUrl = resolveAvatarUrl({
-    avatar: userAvatar,
+    avatar: effectiveAvatar,
     role,
     adminRole: session?.id === 'admin' ? 'SUPER_ADMIN' : adminRole,
+    gender: effectiveGender,
   });
 
   // Trả về element (không khai báo component con) — tránh unmount/remount mỗi lần data refresh → sidebar nhảy cuộn
@@ -470,10 +589,11 @@ const AppSidebar = ({
         <div data-guide-key="welcome" className="px-5 pt-8 pb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
             <EditableAvatar
-              avatar={session?.avatar}
+              avatar={effectiveAvatar}
               name={userName}
               role={role}
               adminRole={session?.adminRole}
+              gender={effectiveGender}
               className="w-10 h-10 rounded-full border-2 border-white/40 bg-white shadow-sm flex-shrink-0"
             />
             <div className="min-w-0">

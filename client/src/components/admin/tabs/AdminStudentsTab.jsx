@@ -11,6 +11,10 @@ import {
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
 import { getActiveClientEnrollments, getClientEnrollments } from '../../../utils/enrollments';
+import {
+  resolveLearningModeLabel,
+  resolveBranchDisplayName,
+} from '../../../utils/learningModeBranchDisplay';
 import { isTeacherActive } from '../../../constants/teacherStatus';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import api, { apiFetch } from '../../../services/api';
@@ -289,17 +293,24 @@ function PaidBadge({ paid }) {
 }
 
 function ModeBranchBadges({ s, safeBranches }) {
-  const branch = s.branchId ? safeBranches.find((b) => String(b._id) === String(s.branchId)) : null;
+  const mode = String(s?.learningMode || '').toUpperCase() === 'ONLINE' ? 'ONLINE' : 'OFFLINE';
+  const modeLabel = resolveLearningModeLabel(mode);
+  const branch = s?.branchId
+    ? (safeBranches || []).find((b) => String(b._id) === String(s.branchId))
+    : null;
+  const branchLabel = resolveBranchDisplayName(branch, mode);
+
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <span className={s.learningMode === 'ONLINE' ? 'cms-students-badge-info' : 'cms-students-badge-neutral'}>
-        {s.learningMode === 'ONLINE'
-          ? <><Globe size={10} aria-hidden="true" /> Online</>
-          : <><Building2 size={10} aria-hidden="true" /> Offline</>}
+    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+      <span className={mode === 'ONLINE' ? 'cms-students-badge-info' : 'cms-students-badge-neutral'}>
+        {mode === 'ONLINE'
+          ? <><Globe size={10} aria-hidden="true" /> {modeLabel}</>
+          : <><Building2 size={10} aria-hidden="true" /> {modeLabel}</>}
       </span>
-      <span className="cms-students-badge-neutral">
-        <MapPin size={10} aria-hidden="true" />
-        {branch?.name || 'Chưa phân cơ sở'}
+      <span className="text-slate-300 select-none" aria-hidden="true">·</span>
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 min-w-0">
+        <MapPin size={10} className="shrink-0 text-slate-400" aria-hidden="true" />
+        <span className="truncate">{branchLabel}</span>
       </span>
     </div>
   );
@@ -451,7 +462,7 @@ export default function AdminStudentsTab() {
 
   const teacherSelectClass =
     'w-full min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-sky-400 cursor-pointer';
-  const teacherSelectWrapClass = 'w-2/3 max-w-full';
+  const teacherSelectWrapClass = 'w-full max-w-full';
 
   const renderTeacherSelects = (s, enrollments, hasMultiCourse, primaryEnr, teacherVal) => {
     if (hasMultiCourse) {
@@ -617,34 +628,37 @@ export default function AdminStudentsTab() {
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="paid">Đã đóng phí</option>
-            <option value="unpaid">Hoàn học phí</option>
+            <option value="unpaid">Chưa nộp phí</option>
+            <option value="refunded">Hoàn học phí</option>
           </CmsSelect>
         </div>
 
-        {/* Action buttons — Xuất/Excel auto, Thêm học viên lấy phần còn lại */}
-        <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] gap-2 sm:flex sm:flex-wrap sm:justify-end">
+        {/* Action buttons */}
+        <div className="flex flex-wrap items-stretch gap-2 min-w-0">
           <button
             type="button"
             onClick={handleExportExcel}
             disabled={isExportingExcel}
             className="cms-students-btn-outline !px-2.5 shrink-0"
+            title="Xuất Excel"
           >
             {isExportingExcel
-              ? <><Loader2 size={15} className="animate-spin shrink-0" /> ...</>
-              : <><Download size={15} className="shrink-0" /> Xuất</>}
+              ? <><Loader2 size={15} className="animate-spin shrink-0" /><span className="hidden min-[380px]:inline">...</span></>
+              : <><Download size={15} className="shrink-0" /><span className="hidden min-[380px]:inline">Xuất</span></>}
           </button>
           <button
             type="button"
             onClick={() => setShowImportModal(true)}
             className="cms-students-btn-outline !px-2.5 shrink-0"
+            title="Import Excel"
           >
             <FileSpreadsheet size={15} className="shrink-0" />
-            Excel
+            <span className="hidden min-[380px]:inline">Excel</span>
           </button>
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="cms-students-btn-primary !px-2.5 min-w-0 text-[12px] min-[360px]:text-[13px] sm:text-sm whitespace-nowrap"
+            className="cms-students-btn-primary !px-2.5 flex-1 min-w-[9rem] sm:flex-none sm:min-w-0 text-[12px] min-[360px]:text-[13px] sm:text-sm whitespace-nowrap"
           >
             <Plus size={15} className="shrink-0" />
             Thêm học viên
@@ -737,12 +751,12 @@ export default function AdminStudentsTab() {
                 </div>
               </div>
 
-              {/* 3 cột: Giảng viên HD / Học phí / Trạng thái */}
+              {/* Meta: stack trên mobile hẹp, 3 cột từ ~420px */}
               <div className="mt-3 pt-3 border-t border-slate-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,0.9fr)_minmax(4.25rem,auto)] gap-x-2 gap-y-2 items-start">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Giảng viên HD</p>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Học phí</p>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right">Trạng thái</p>
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-[minmax(0,1fr)_minmax(4.5rem,0.9fr)_minmax(4.25rem,auto)] gap-x-2 gap-y-2 items-start min-w-0">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide hidden min-[420px]:block">Giảng viên HD</p>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide hidden min-[420px]:block">Học phí</p>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right hidden min-[420px]:block">Trạng thái</p>
 
                   {hasMultiCourse ? (
                     <>
@@ -754,6 +768,7 @@ export default function AdminStudentsTab() {
                         return (
                           <div key={enrId} className="contents">
                             <div className="min-w-0 space-y-1">
+                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden">Giảng viên HD</p>
                               <p className="text-[11px] font-semibold text-sky-700 truncate" title={courseLabel}>
                                 {courseLabel}
                               </p>
@@ -779,6 +794,7 @@ export default function AdminStudentsTab() {
                               </CmsSelect>
                             </div>
                             <div className="min-w-0 pt-0.5">
+                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden">Học phí</p>
                               <p className="text-sm font-semibold text-slate-800 leading-tight tabular-nums">
                                 {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
                               </p>
@@ -786,7 +802,8 @@ export default function AdminStudentsTab() {
                                 {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
                               </p>
                             </div>
-                            <div className="flex justify-end pt-0.5">
+                            <div className="flex justify-start min-[420px]:justify-end pt-0.5 min-w-0">
+                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden mr-2 self-center">Trạng thái</p>
                               <PaidBadge paid={isEnrollmentPaidFlag(enr)} />
                             </div>
                           </div>
@@ -794,17 +811,18 @@ export default function AdminStudentsTab() {
                       })}
                       {getStudentRefundedTotal(s) > 0 ? (
                         <div className="contents">
-                          <div aria-hidden="true" />
+                          <div aria-hidden="true" className="hidden min-[420px]:block" />
                           <div className="min-w-0">
                             <RefundHint amount={getStudentRefundedTotal(s)} />
                           </div>
-                          <div aria-hidden="true" />
+                          <div aria-hidden="true" className="hidden min-[420px]:block" />
                         </div>
                       ) : null}
                     </>
                   ) : (
                     <>
                       <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden mb-1">Giảng viên HD</p>
                         {locked ? (
                           <span className="text-xs text-slate-400 font-semibold">—</span>
                         ) : (
@@ -812,9 +830,11 @@ export default function AdminStudentsTab() {
                         )}
                       </div>
                       <div className="min-w-0 pt-0.5">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden mb-1">Học phí</p>
                         {renderTuition(s, enrollments.length ? enrollments : (primaryEnr ? [primaryEnr] : []), false)}
                       </div>
-                      <div className="flex justify-end pt-0.5">
+                      <div className="flex justify-start min-[420px]:justify-end pt-0.5 min-w-0 items-center gap-2">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden">Trạng thái</p>
                         {locked ? (
                           <span className="cms-students-badge-neutral text-slate-400">Đã hoàn</span>
                         ) : (
@@ -833,14 +853,14 @@ export default function AdminStudentsTab() {
       {/* ── DESKTOP TABLE (≥ lg) ─────────────────────────────────── */}
       <div className="hidden lg:block cms-table-wrap overscroll-x-contain flex-1 min-h-0 overflow-auto touch-pan-x">
         <table className="w-full text-left border-collapse min-w-[900px]">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/70">
-              <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Học viên</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Khóa học</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Giáo viên</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Học phí</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Trạng thái</th>
-              <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center w-14" />
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-slate-100 bg-slate-50/95 backdrop-blur-sm">
+              <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50/95">Học viên</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50/95">Khóa học</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50/95">Giáo viên</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50/95">Học phí</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center bg-slate-50/95">Trạng thái</th>
+              <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center w-14 bg-slate-50/95" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -940,16 +960,16 @@ export default function AdminStudentsTab() {
       </div>
 
       {/* Pagination */}
-      <div className="px-3 py-3 sm:px-4 lg:px-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0">
-        <p className="text-xs text-slate-500 font-medium">
+      <div className="px-3 py-3 sm:px-4 lg:px-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0 min-w-0">
+        <p className="text-xs text-slate-500 font-medium text-center sm:text-left min-w-0">
           Hiển thị {filteredStudents.length} / {studentsPagination.totalRecords} học viên · Trang {studentsPagination.currentPage}/{studentsPagination.totalPages}
         </p>
-        <div className="flex items-center gap-1 pb-[env(safe-area-inset-bottom,0px)] sm:pb-0">
+        <div className="flex items-center gap-1 max-w-full overflow-x-auto overscroll-x-contain pb-[env(safe-area-inset-bottom,0px)] sm:pb-0 justify-center">
           <button
             type="button"
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage <= 1}
-            className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <ChevronLeft size={14} />
           </button>
@@ -968,13 +988,13 @@ export default function AdminStudentsTab() {
             }
             return pages.map((p, idx) => (
               p === '...' ? (
-                <span key={`dot-${idx}`} className="w-9 h-9 flex items-center justify-center text-slate-300 text-xs">…</span>
+                <span key={`dot-${idx}`} className="w-9 h-9 shrink-0 flex items-center justify-center text-slate-300 text-xs">…</span>
               ) : (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setCurrentPage(p)}
-                  className={`w-9 h-9 rounded-lg text-sm font-semibold transition-all ${
+                  className={`w-9 h-9 shrink-0 rounded-lg text-sm font-semibold transition-all ${
                     p === cp
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -987,7 +1007,7 @@ export default function AdminStudentsTab() {
             type="button"
             onClick={() => setCurrentPage((p) => Math.min(studentsPagination.totalPages, p + 1))}
             disabled={currentPage >= studentsPagination.totalPages}
-            className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <ChevronRight size={14} />
           </button>
@@ -997,22 +1017,22 @@ export default function AdminStudentsTab() {
       {refundModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !refundSubmitting && setRefundModal(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 border border-red-100">
-            <div className="flex items-center gap-3 mb-4">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-4 sm:p-6 z-10 border border-red-100 max-h-[min(92dvh,900px)] overflow-y-auto overflow-x-hidden">
+            <div className="flex items-center gap-3 mb-4 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
                 <CircleDollarSign size={18} className="text-red-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-base font-black text-slate-800">Hoàn học phí</h3>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                <p className="text-xs text-slate-500 font-medium mt-0.5 leading-snug">
                   Hủy khóa + hoàn tiền · HV vẫn hiện trong danh sách (mờ)
                 </p>
               </div>
             </div>
 
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 min-w-0">
               <p className="text-xs font-black text-red-700 uppercase tracking-wide mb-0.5">Khóa học bị hủy</p>
-              <p className="text-sm font-bold text-slate-800">{refundModal.enr.courseName || refundModal.enr.name}</p>
+              <p className="text-sm font-bold text-slate-800 break-words">{refundModal.enr.courseName || refundModal.enr.name}</p>
               <p className="text-xs text-red-600 mt-1">
                 Đã thanh toán:{' '}
                 <strong>{Number(refundModal.enr.price || 0).toLocaleString('vi-VN')}đ</strong>
@@ -1027,14 +1047,14 @@ export default function AdminStudentsTab() {
                   value={refundModal.reason}
                   onChange={(e) => setRefundModal((p) => ({ ...p, reason: e.target.value }))}
                   placeholder="Nhập lý do hủy khóa..."
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-red-300 outline-none"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-red-300 outline-none min-w-0"
                 />
               </div>
               <div>
-                <div className="flex items-end gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end min-w-0">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">
-                      Số tiền hoàn (tối đa {Number(refundModal.maxRefund).toLocaleString('vi-VN')}đ)
+                      Số tiền hoàn
                     </label>
                     <input
                       type="number"
@@ -1051,10 +1071,13 @@ export default function AdminStudentsTab() {
                           return { ...p, refundAmount: amt, refundPercent: pct };
                         });
                       }}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-red-300 outline-none min-w-0"
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Tối đa {Number(refundModal.maxRefund).toLocaleString('vi-VN')}đ
+                    </p>
                   </div>
-                  <div className="w-[96px] shrink-0">
+                  <div className="w-full sm:w-[96px] shrink-0">
                     <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">% hoàn</label>
                     <div className="relative">
                       <input
@@ -1083,12 +1106,12 @@ export default function AdminStudentsTab() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col-reverse min-[400px]:flex-row gap-2 min-w-0">
               <button
                 type="button"
                 onClick={() => setRefundModal(null)}
                 disabled={refundSubmitting}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                className="flex-1 min-h-11 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 whitespace-nowrap"
               >
                 Giữ lại
               </button>
@@ -1096,12 +1119,19 @@ export default function AdminStudentsTab() {
                 type="button"
                 onClick={handleConfirmRefund}
                 disabled={refundSubmitting}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-black hover:bg-red-700 disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                className="flex-1 min-h-11 px-3 py-2.5 rounded-xl bg-red-600 text-white text-sm font-black hover:bg-red-700 disabled:opacity-50 inline-flex items-center justify-center gap-2 min-w-0 text-center leading-tight"
               >
-                {refundSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
-                {Number(refundModal.refundAmount) > 0
-                  ? `Hủy & hoàn ${Number(refundModal.refundAmount).toLocaleString('vi-VN')}đ`
-                  : 'Xác nhận hủy'}
+                {refundSubmitting ? <Loader2 size={14} className="animate-spin shrink-0" /> : null}
+                <span className="min-w-0 break-words">
+                  {Number(refundModal.refundAmount) > 0
+                    ? (
+                      <>
+                        <span className="min-[400px]:hidden">Hoàn {Number(refundModal.refundAmount).toLocaleString('vi-VN')}đ</span>
+                        <span className="hidden min-[400px]:inline">{`Hủy & hoàn ${Number(refundModal.refundAmount).toLocaleString('vi-VN')}đ`}</span>
+                      </>
+                    )
+                    : 'Xác nhận hủy'}
+                </span>
               </button>
             </div>
           </div>

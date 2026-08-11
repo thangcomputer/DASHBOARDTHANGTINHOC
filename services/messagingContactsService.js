@@ -117,6 +117,43 @@ async function loadSuperAdminDocs() {
   ).lean();
 }
 
+/** Read-only display name for root SUPER (id=admin). Never creates/updates settings. */
+async function resolveRootSuperAdminDisplayName() {
+  try {
+    const SystemSettings = require('../models/SystemSettings');
+    const s = await SystemSettings.findOne({ _key: 'main' }).select('adminName').lean();
+    if (s?.adminName && String(s.adminName).trim()) return String(s.adminName).trim();
+  } catch (_) { /* ignore */ }
+  if (process.env.ADMIN_NAME && String(process.env.ADMIN_NAME).trim()) {
+    return String(process.env.ADMIN_NAME).trim();
+  }
+  return 'Super Admin';
+}
+
+function isRootSuperAdminDoc(doc) {
+  if (!doc) return false;
+  return String(doc._id) === 'admin' || String(doc.phone || '') === 'admin' || String(doc.id || '') === 'admin';
+}
+
+/**
+ * In-memory only: ensure HIGH discovery includes canonical root SUPER (id=admin)
+ * when no Teacher document exists. Does not write MongoDB.
+ */
+async function ensureRootSuperAdminAmongDocs(superDocs) {
+  const list = Array.isArray(superDocs) ? [...superDocs] : [];
+  if (list.some(isRootSuperAdminDoc)) return list;
+  const name = await resolveRootSuperAdminDisplayName();
+  list.push({
+    _id: 'admin',
+    id: 'admin',
+    name,
+    phone: 'admin',
+    role: 'admin',
+    adminRole: 'SUPER_ADMIN',
+  });
+  return list;
+}
+
 async function loadCandidateDocs(actorUser, { queryBranchId } = {}) {
   const userId = String(actorUser.id || actorUser._id || '');
   const userRole = String(actorUser.role || '').toLowerCase();
@@ -136,13 +173,15 @@ async function loadCandidateDocs(actorUser, { queryBranchId } = {}) {
     const branchFilter = queryBranchId && queryBranchId !== 'all'
       ? { branchId: queryBranchId }
       : {};
-    const [supers, staffDocs, teacherDocs, studentDocs, highs] = await Promise.all([
+    const [supersRaw, staffDocs, teacherDocs, studentDocs, highs] = await Promise.all([
       loadSuperAdminDocs(),
       Teacher.find({ adminRole: { $in: ['STAFF', 'SUPPORT'] }, ...branchFilter }, CONTACT_SELECT).lean(),
       Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] }, ...branchFilter }, CONTACT_SELECT).lean(),
       Student.find({ ...branchFilter }, CONTACT_SELECT).lean(),
       loadHighAdminDocs(),
     ]);
+    // HIGH_SEES_ALL: keep Teacher SUPER docs; append in-memory root id=admin if missing.
+    const supers = await ensureRootSuperAdminAmongDocs(supersRaw);
     pushTeachers(supers, { elevated: 'SUPER_ADMIN' });
     pushTeachers(highs.filter((h) => String(h._id) !== userId), { elevated: 'HIGH_ADMIN' });
     pushTeachers(staffDocs);
@@ -329,4 +368,7 @@ module.exports = {
   listDiscoverableContacts,
   /** WRAPPER — re-export of MessagingPolicy.canDiscoverContacts (no second matrix). */
   canDiscoverContacts,
+  /** Test/helper: in-memory root SUPER ensure (no DB write). */
+  ensureRootSuperAdminAmongDocs,
+  isRootSuperAdminDoc,
 };

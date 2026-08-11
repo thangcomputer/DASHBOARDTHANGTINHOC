@@ -7,7 +7,7 @@ const fileAssetSchema = new mongoose.Schema({
   size: { type: Number, default: 0 },
   category: {
     type: String,
-    enum: ['messages', 'assignments', 'training', 'invoices', 'images', 'general', 'popup', 'signature', 'logo'],
+    enum: ['messages', 'assignments', 'training', 'invoices', 'images', 'general', 'popup', 'signature', 'logo', 'avatars'],
     required: true,
     index: true,
   },

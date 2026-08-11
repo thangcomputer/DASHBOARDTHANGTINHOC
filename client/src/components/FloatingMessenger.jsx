@@ -409,7 +409,7 @@ export default function FloatingMessenger({ session, role }) {
   const isInbox = location.pathname.includes('/inbox');
   const toast = useToast();
   const { onlineUsers, onMessageReceive, onContactListUpdated } = useSocket() || {};
-  const { sendMessage, getMessages, getConversations, markMessagesRead, recallMessage, staffs } = useData();
+  const { sendMessage, getMessages, getConversations, markMessagesRead, recallMessage } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
     openChat, closeChat, minimizeChat, focusChat,
@@ -442,14 +442,14 @@ export default function FloatingMessenger({ session, role }) {
     return map;
   }, [conversations]);
 
-  // Phase 7: non-elevated floating directory uses GET /contacts only — never fall back to local staffs[].
+  // Elevated + non-elevated: GET /contacts is the authorization source.
+  // Presence only overlays online — never fall back to local staffs[] for WHO.
   const [fmContacts, setFmContacts] = useState([]);
   useEffect(() => {
-    if (usePresenceDirectory) return undefined;
     const fetchContacts = () => {
       messagesAPI.getContacts().then((res) => {
-        if (res?.success) setFmContacts(Array.isArray(res.data) ? res.data : []);
-        else setFmContacts([]);
+        const data = res?.success && Array.isArray(res.data) ? res.data : [];
+        setFmContacts(data);
       }).catch(() => {
         setFmContacts([]);
       });
@@ -462,7 +462,7 @@ export default function FloatingMessenger({ session, role }) {
     return undefined;
   }, [usePresenceDirectory, onContactListUpdated]);
 
-  const effectiveStaffs = usePresenceDirectory ? staffs : fmContacts;
+  const effectiveStaffs = fmContacts;
 
   const directory = useMemo(
     () => buildSupportDirectory({ session, onlineUsers, meId, staffs: effectiveStaffs }),

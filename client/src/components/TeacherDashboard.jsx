@@ -201,7 +201,7 @@ const TeacherDashboard = ({ onNavigate }) => {
     return {
       ...s,
       displayName: getDisplayName(s),
-      avatar: getDisplayName(s).substring(0, 2).toUpperCase(),
+      // Giữ avatar upload từ API — không ghi đè bằng initials (tránh fallback cartoon mặc định)
       color: (typeof studentId === 'number' ? studentId : (String(studentId).charCodeAt(0) || 0)) % 2 === 1 ? 'bg-purple-500' : 'bg-red-500',
     };
   });

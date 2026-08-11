@@ -56,6 +56,26 @@ function personFromPresence(u) {
   };
 }
 
+function personFromAuthorizedContact(st, online) {
+  const rawRole = String(st.role || '').toLowerCase();
+  const ar = String(st.adminRole || st.productRole || '').toUpperCase();
+  const roleKey = normalizeChatRole(rawRole === 'staff' ? 'staff' : rawRole);
+  let displayRole = roleKey;
+  if (rawRole === 'staff' || ar === 'STAFF' || ar === 'SUPPORT') displayRole = 'staff';
+  else if (ar === 'SUPER_ADMIN' || ar === 'HIGH_ADMIN' || rawRole === 'admin') displayRole = 'admin';
+  return {
+    id: String(st.id || st._id || ''),
+    name: st.name || (displayRole === 'admin' ? 'Quản trị viên' : displayRole === 'staff' ? 'Hỗ trợ viên' : displayRole === 'teacher' ? 'Giảng viên' : 'Học viên'),
+    role: rawRole === 'staff' ? 'staff' : roleKey,
+    adminRole: st.adminRole || (ar === 'SUPER_ADMIN' || ar === 'HIGH_ADMIN' ? ar : null),
+    productRole: st.productRole || null,
+    displayRole,
+    avatar: st.avatar || '',
+    online: Boolean(online),
+    branchId: st.branchId || null,
+  };
+}
+
 /**
  * @returns {{ mode: 'directory'|'support_only', groups: Array<{ key: string, label: string, people: object[] }> }}
  */
@@ -122,6 +142,15 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
     };
   }
 
+  // Elevated: contacts = WHO (authorization); presence = online overlay only.
+  // Do not invent peers from presence outside the authorized contact set.
+  const presenceById = new Map();
+  for (const u of users) {
+    const uid = String(u.userId || u.id || '');
+    if (uid) presenceById.set(uid, u);
+  }
+
+  const authorized = Array.isArray(staffs) ? staffs : [];
   const seen = new Set();
   const buckets = {
     admin: [],
@@ -129,22 +158,26 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
     student: [],
   };
 
-  for (const u of users) {
-    const uid = String(u.userId || '');
+  for (const st of authorized) {
+    if (!st || st.status === 'Deleted' || st.status === 'inactive' || st.isDeleted) continue;
+    const uid = String(st.id || st._id || '');
     if (!uid || uid === me) continue;
-    // Super Admin không cần chat chính mình (id admin)
     if (uid === 'admin' && me === 'admin') continue;
+    if (seen.has(uid)) continue;
+    seen.add(uid);
 
-    const rawRole = String(u.role || '').toLowerCase();
-    const roleKey = normalizeChatRole(rawRole);
-    const key = `${roleKey}_${uid}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const online = presenceById.has(uid);
+    const person = personFromAuthorizedContact(st, online);
+    if (online) {
+      const u = presenceById.get(uid);
+      if (u?.name) person.name = u.name;
+      if (u?.avatar) person.avatar = u.avatar;
+    }
 
-    const person = personFromPresence(u);
-    if (roleKey === 'teacher') buckets.teacher.push(person);
-    else if (roleKey === 'student') buckets.student.push(person);
-    else buckets.admin.push(person); // admin + staff (chi nhánh)
+    const display = String(person.displayRole || person.role || '').toLowerCase();
+    if (display === 'teacher') buckets.teacher.push(person);
+    else if (display === 'student') buckets.student.push(person);
+    else buckets.admin.push(person);
   }
 
   const sortPeople = (arr) => arr.sort((a, b) => {

@@ -217,7 +217,7 @@ export function useAdminDashboardState() {
 
   // Branch-aware stats (dashboard tab only)
   const statsFetcher = async ([, branch_id]) => {
-    const params = branch_id && branch_id !== 'all' ? { branch_id } : {};
+    const params = branch_id ? { branch_id } : {};
     const res = await api.students.getStats(params);
     return res?.success ? res.data : null;
   };
@@ -248,10 +248,10 @@ export function useAdminDashboardState() {
     const params = {
       limit: 100,
       page: 1,
-      ...(branch_id && branch_id !== 'all' ? { branch_id } : {}),
+      ...(branch_id ? { branch_id } : {}),
     };
     const [resTx, firstPage] = await Promise.all([
-      api.transactions.getAll(branch_id && branch_id !== 'all' ? { branch_id } : {}),
+      api.transactions.getAll(branch_id ? { branch_id } : {}),
       api.students.getAll(params),
     ]);
 
@@ -509,7 +509,7 @@ export function useAdminDashboardState() {
     sendDebtReminder, approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
     handlePrintInvoice, removeStudent, currentPage, setCurrentPage,
     refreshStudentList,
-    teachers, filteredTeachers, teacherSearch, setTeacherSearch, isSuperAdmin, setShowTeacherModal, getTeacherRating,
+    teachers, filteredTeachers, teacherSearch, setTeacherSearch, isSuperAdmin, isHighAdmin, setShowTeacherModal, getTeacherRating,
     setReviewModal, setGrantModal, setApproveModal, setEditTeacher, handlePayTeacher,
     removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed,
     courseBuilderMode, setCourseBuilderMode, trainingData, updateTrainingItem, trainingTab, setTrainingTab,
@@ -539,7 +539,7 @@ export function useAdminDashboardState() {
     sendDebtReminder, approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
     handlePrintInvoice, removeStudent, currentPage,
     refreshStudentList,
-    teachers, filteredTeachers, isSuperAdmin, getTeacherRating,
+    teachers, filteredTeachers, isSuperAdmin, isHighAdmin, getTeacherRating,
     handlePayTeacher, removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed,
     courseBuilderMode, trainingData, updateTrainingItem, trainingTab,
     trainingForm, questions, trainingFileUploading,
@@ -593,6 +593,7 @@ export function useAdminDashboardState() {
     teacherForm,
     setTeacherForm,
     isSuperAdmin,
+    isHighAdmin,
     safeBranches,
     ctxAddTeacher,
     toast,

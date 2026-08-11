@@ -19,6 +19,8 @@ function uploadMiddleware(req, res, next) {
   try {
     uploader = fileService.createUploader(category);
   } catch (err) {
+    // Drain body để proxy/browser nhận JSON 400 thay vì ERR_CONNECTION_RESET
+    req.resume();
     return res.status(err.status || 400).json({ success: false, message: err.message });
   }
   uploader.single('file')(req, res, (err) => {

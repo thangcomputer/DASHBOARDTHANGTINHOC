@@ -379,8 +379,18 @@ const branchFilter = async (req, res, next) => {
           req.branchFilter = {};
         }
       } else if (isHighAdmin) {
+        const isApprovedHighAllBranchRead = () => {
+          const url = req.originalUrl || '';
+          // Mục tiêu: chỉ mở ALL cho đúng 5 module (Overview/HR/Teachers/Students/Finance)
+          // Đảm bảo không bypass branchFilter toàn hệ thống.
+          return /\/(students|teachers|employees|finance|transactions)(\/|\?|$)/.test(url);
+        };
         if (qBranch && qBranch !== 'all' && qBranch !== '') {
           req.branchFilter = { branchId: qBranch };
+        } else if (qBranch === 'all' && req.method === 'GET' && isApprovedHighAllBranchRead()) {
+          // HIGH_ADMIN + ?branch_id=all → ALL BRANCHES trong tenant hiện tại
+          // (fail-closed: chỉ áp dụng cho allowlist READ của 5 module).
+          req.branchFilter = {};
         } else if (user.branchId) {
           req.branchFilter = { branchId: user.branchId };
           req.userBranchId = user.branchId;

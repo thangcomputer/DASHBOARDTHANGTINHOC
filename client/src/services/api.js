@@ -178,7 +178,7 @@ export const getRolePrefix = (overrideRole = null) => {
 };
 
 /** Chuẩn hóa URL file upload (IP/http cũ → domain hiện tại) */
-const PUBLIC_UPLOAD_RE = /\/uploads\/(logo|favicon|popup|images|invoice_logo|feed)(\/|$)/i;
+const PUBLIC_UPLOAD_RE = /\/uploads\/(logo|favicon|popup|images|avatars|invoice_logo|feed|blog)(\/|$)/i;
 
 function withUploadAccessToken(url) {
   if (!url || typeof window === 'undefined') return url;
@@ -1699,6 +1699,7 @@ export const financeAPI = {
   summary: async ({ branchId = 'all', from = '', to = '', studentId = '' } = {}) => {
     const q = new URLSearchParams();
     if (branchId) q.set('branchId', branchId);
+    if (branchId) q.set('branch_id', branchId);
     if (from) q.set('from', from);
     if (to) q.set('to', to);
     if (studentId) q.set('studentId', studentId);
@@ -1711,6 +1712,7 @@ export const financeAPI = {
   } = {}) => {
     const q = new URLSearchParams();
     if (branchId) q.set('branchId', branchId);
+    if (branchId) q.set('branch_id', branchId);
     if (studentId) q.set('studentId', studentId);
     if (teacherId) q.set('teacherId', teacherId);
     if (type) q.set('type', type);
@@ -1736,6 +1738,7 @@ export const financeAPI = {
   reconcile: async ({ branchId = 'all', from = '', to = '' } = {}) => {
     const q = new URLSearchParams();
     if (branchId) q.set('branchId', branchId);
+    if (branchId) q.set('branch_id', branchId);
     if (from) q.set('from', from);
     if (to) q.set('to', to);
     const res = await apiFetch(`/finance/reconcile?${q}`);

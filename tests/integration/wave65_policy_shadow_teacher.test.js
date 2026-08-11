@@ -269,7 +269,7 @@ test('Wave6.5 finance_self: admin role ALLOW; staff other DENY; self ALLOW', () 
   );
 });
 
-test('Wave6.5 finance_pay requires MANAGE_FINANCE + SUPER', () => {
+test('Wave6.5 finance_pay requires MANAGE_FINANCE + Super hoặc HIGH_ADMIN', () => {
   const superFin = subjectOf({
     role: 'admin',
     adminRole: 'SUPER_ADMIN',
@@ -281,12 +281,21 @@ test('Wave6.5 finance_pay requires MANAGE_FINANCE + SUPER', () => {
     adminRole: 'HIGH_ADMIN',
     permissions: [PERMISSIONS.MANAGE_FINANCE],
   });
+  const staffFin = subjectOf({
+    role: 'staff',
+    adminRole: 'STAFF',
+    permissions: [PERMISSIONS.MANAGE_FINANCE],
+  });
   assert.equal(
     assertMatch('pay+', superFin, 'finance_pay_flexible', null).legacy.decision,
     'ALLOW',
   );
   assert.equal(
-    assertMatch('pay-', highFin, 'finance_pay_all', null).legacy.decision,
+    assertMatch('pay-high', highFin, 'finance_pay_all', null).legacy.decision,
+    'ALLOW',
+  );
+  assert.equal(
+    assertMatch('pay-staff', staffFin, 'finance_pay_flexible', null).legacy.decision,
     'DENY',
   );
 });

@@ -6,12 +6,13 @@ const jwt = require('jsonwebtoken');
 const blacklist = require('./tokenBlacklist');
 const logger = require('../config/logger');
 
-/** Thư mục công khai (logo, popup marketing) — không cần đăng nhập */
+/** Thư mục công khai (logo, popup marketing, avatar) — không cần đăng nhập */
 const PUBLIC_UPLOAD_PREFIXES = [
   '/logo/',
   '/favicon/',
   '/popup/',
   '/images/',
+  '/avatars/', // ảnh đại diện — <img> không gửi Bearer → cần public giống /images/
   '/invoice_logo/',
   '/feed/',
   '/blog/', // ảnh/file tin tức — cần public để <img> trong HTML hiển thị
@@ -34,10 +35,12 @@ async function uploadsAuthMiddleware(req, res, next) {
     const token = bearer || queryToken;
 
     if (!token) {
+      res.setHeader('Cache-Control', 'no-store');
       return res.status(401).json({ success: false, message: 'Cần đăng nhập để tải tệp này' });
     }
 
     if (await blacklist.isBlacklisted(token)) {
+      res.setHeader('Cache-Control', 'no-store');
       return res.status(401).json({ success: false, code: 'TOKEN_REVOKED', message: 'Phiên đã hết hạn' });
     }
 
@@ -45,9 +48,11 @@ async function uploadsAuthMiddleware(req, res, next) {
     return next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
+      res.setHeader('Cache-Control', 'no-store');
       return res.status(401).json({ success: false, code: 'TOKEN_EXPIRED', message: 'Token hết hạn' });
     }
     logger.warn('[UPLOADS] auth failed:', err.message);
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(401).json({ success: false, message: 'Token không hợp lệ' });
   }
 }

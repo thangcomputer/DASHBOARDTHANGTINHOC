@@ -332,7 +332,7 @@ export default function TeacherOverviewTab({
                     className="w-full text-left bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex items-center gap-3 hover:bg-indigo-50/60 hover:border-indigo-200 transition group cursor-pointer"
                   >
                     <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white shadow-sm border border-slate-200">
-                      <img src={resolveAvatarUrl({ role: 'student' })} alt="" className="w-full h-full object-cover" />
+                      <img src={resolveAvatarUrl({ avatar: s.avatar, role: 'student', gender: s.gender })} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs sm:text-sm font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{s.name}</p>

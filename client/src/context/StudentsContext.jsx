@@ -24,9 +24,17 @@ async function fetchStudents([, scope, arg]) {
     const q = arg;
     const params = { page: q.page || 1, limit: q.limit || 10 };
     if (q.search) params.search = q.search;
-    if (q.paid !== undefined && q.paid !== 'all') params.paid = q.paid === 'paid' ? 'true' : 'false';
+    if (q.paid !== undefined && q.paid !== 'all') {
+      // Pass semantic filters: paid | unpaid | refunded (legacy true/false kept)
+      if (q.paid === 'paid' || q.paid === true || q.paid === 'true') params.paid = 'paid';
+      else if (q.paid === 'unpaid') params.paid = 'unpaid';
+      else if (q.paid === 'refunded' || q.paid === false || q.paid === 'false') params.paid = 'refunded';
+      else params.paid = q.paid;
+    }
     if (q.course && q.course !== 'all') params.course = q.course;
-    if (q.branch_id && q.branch_id !== 'all') params.branch_id = q.branch_id;
+    if (q.branch_id && (q.branch_id !== 'all' || q.forceBranchIdAll)) {
+      params.branch_id = q.branch_id;
+    }
     const res = await api.students.getAll(params);
     if (!res?.success) return { students: [], pagination: EMPTY_PAGINATION };
     return {
@@ -81,15 +89,27 @@ export function StudentsProvider({ user, children }) {
       paid: params.paid,
       course: params.course,
       branch_id: params.branch_id,
+      forceBranchIdAll: !!params.forceBranchIdAll,
     };
     setAdminQuery(q);
+    const paidParam = q.paid !== undefined && q.paid !== 'all'
+      ? (q.paid === 'paid' || q.paid === true || q.paid === 'true'
+        ? 'paid'
+        : q.paid === 'unpaid'
+          ? 'unpaid'
+          : q.paid === 'refunded' || q.paid === false || q.paid === 'false'
+            ? 'refunded'
+            : q.paid)
+      : undefined;
     const res = await api.students.getAll({
       page: q.page,
       limit: q.limit,
       ...(q.search ? { search: q.search } : {}),
-      ...(q.paid !== undefined && q.paid !== 'all' ? { paid: q.paid === 'paid' ? 'true' : 'false' } : {}),
+      ...(paidParam !== undefined ? { paid: paidParam } : {}),
       ...(q.course && q.course !== 'all' ? { course: q.course } : {}),
-      ...(q.branch_id && q.branch_id !== 'all' ? { branch_id: q.branch_id } : {}),
+      ...(q.branch_id && (q.branch_id !== 'all' || q.forceBranchIdAll)
+        ? { branch_id: q.branch_id }
+        : {}),
     });
     if (res?.success) {
       await mutate({

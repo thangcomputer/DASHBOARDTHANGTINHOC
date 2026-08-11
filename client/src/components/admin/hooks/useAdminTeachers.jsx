@@ -50,8 +50,7 @@ export function useAdminTeachers({
 
   const fetchTeachers = useCallback(async () => {
     try {
-      const params = selectedBranchId && selectedBranchId !== 'all'
-        ? { branch_id: selectedBranchId } : {};
+      const params = selectedBranchId ? { branch_id: selectedBranchId } : {};
       const res = await api.teachers.getAll(params);
       if (res?.success) setLocalTeachers(res.data.map((t) => ({ ...t, id: t._id })));
       else toast?.error?.(res?.message || 'Không tải được danh sách giảng viên');

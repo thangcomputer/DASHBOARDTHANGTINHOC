@@ -305,9 +305,14 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                   className="cms-input pl-10 font-mono"
                   placeholder="09xxxxxxxx"
-                  readOnly={isEdit}
+                  readOnly={isEdit && !(isSuperAdmin || isRootSuperAdmin)}
                 />
               </div>
+              {isEdit && (isSuperAdmin || isRootSuperAdmin) && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Super Admin có thể đổi SĐT đăng nhập cho mọi tài khoản nội bộ.
+                </p>
+              )}
             </div>
 
             <div>
@@ -685,7 +690,12 @@ function StaffCard({ s, deleting, isRootSuperAdmin, isSuperAdmin, onEdit, onRese
     <article className="cms-rbac-card">
       <div className="flex items-start gap-3">
         <img
-          src={resolveAvatarUrl({ ...s, role: 'staff' })}
+          src={resolveAvatarUrl({
+            ...s,
+            role: s.adminRole === 'SUPPORT' ? 'support' : 'staff',
+            adminRole: s.adminRole,
+            gender: s.gender,
+          })}
           alt=""
           className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-slate-100 bg-white"
         />

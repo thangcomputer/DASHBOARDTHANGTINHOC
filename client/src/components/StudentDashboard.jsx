@@ -102,6 +102,9 @@ const StudentDashboard = ({ onNavigate }) => {
 
     return {
       ...student,
+      // Đồng bộ avatar gender với session (sidebar) — tránh profile lệch nam/nữ
+      gender: session?.gender || student.gender || '',
+      avatar: session?.avatar || student.avatar || '',
       joinClassUrl,
       isLikelyLiveClass,
       teacher: teacherDisplay,
@@ -114,7 +117,7 @@ const StudentDashboard = ({ onNavigate }) => {
       completedSessions: student.sessionsCompleted || (student.totalSessions - student.remainingSessions) || 0,
       totalSessions: student.totalSessions || 12,
     };
-  }, [student, teachers]);
+  }, [student, teachers, session?.gender, session?.avatar]);
 
   const enrollments = useMemo(() => studentData?.courses || [], [studentData?.courses]);
 
@@ -702,6 +705,7 @@ const StudentDashboard = ({ onNavigate }) => {
         ) : currentHash === 'profile' ? (
           <StudentLazyProfileTab
             studentData={studentData}
+            sessionGender={session?.gender || ''}
             progressPct={progressPct}
             setShowUpdateProfileModal={setShowUpdateProfileModal}
             setShowTuitionModal={setShowTuitionModal}

@@ -145,7 +145,7 @@ export default function EmployeeManagementTab() {
     setLoading(true);
     setError('');
     try {
-      const bQuery = selectedBranchId && selectedBranchId !== 'all' ? `&branch_id=${selectedBranchId}` : '';
+      const bQuery = selectedBranchId ? `&branch_id=${encodeURIComponent(selectedBranchId)}` : '';
       const [empRes, statsRes, payRes] = await Promise.all([
         fetch(`${API}/api/employees?position=${posFilter}&search=${search}${bQuery}`, { headers }).then(r => r.json()),
         fetch(`${API}/api/employees/stats?${bQuery.slice(1)}`, { headers }).then(r => r.json()),

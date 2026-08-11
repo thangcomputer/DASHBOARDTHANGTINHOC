@@ -16,6 +16,7 @@ export default function StudentProfileTab({
   progressPct,
   setShowUpdateProfileModal,
   setShowTuitionModal,
+  sessionGender = '',
 }) {
   const [openSections, setOpenSections] = useState({
     personal: true,
@@ -23,6 +24,9 @@ export default function StudentProfileTab({
     courses: true,
   });
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  // Cùng thứ tự với sidebar: ưu tiên gender đã hydrate trên session, rồi gender hồ sơ
+  const profileGender = sessionGender || studentData?.gender || '';
 
   const teacherValue = Array.isArray(studentData?.teacherNames) && studentData.teacherNames.length
     ? studentData.teacherNames.join(', ')
@@ -51,6 +55,7 @@ export default function StudentProfileTab({
               avatar={studentData?.avatar}
               name={studentData?.name}
               role="student"
+              gender={profileGender}
               className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl border-2 border-white/35 bg-white shadow-lg"
             />
             <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full border-2 border-white flex items-center justify-center">
@@ -106,19 +111,20 @@ export default function StudentProfileTab({
           </section>
 
           <section className="cms-sd-card !p-0 overflow-hidden">
-            <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2">
+            <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 min-w-0">
               <button type="button" onClick={() => toggleSection('personal')} className="flex items-center gap-2 text-sm lg:text-base font-extrabold text-slate-800 min-w-0">
-                <User size={16} className="text-teal-600 shrink-0" aria-hidden="true" /> Thông tin cá nhân
+                <User size={16} className="text-teal-600 shrink-0" aria-hidden="true" />
+                <span className="truncate">Thông tin cá nhân</span>
               </button>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 ml-auto">
                 <button
                   type="button"
                   onClick={() => setShowUpdateProfileModal(true)}
-                  className="text-[11px] lg:text-xs font-extrabold uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 lg:px-3 min-h-9 rounded-lg transition-colors flex items-center gap-1"
+                  className="text-[11px] lg:text-xs font-extrabold uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 lg:px-3 min-h-9 rounded-lg transition-colors inline-flex items-center gap-1 whitespace-nowrap shrink-0"
                 >
                   <Settings size={13} aria-hidden="true" /> Cập nhật
                 </button>
-                <button type="button" onClick={() => toggleSection('personal')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center lg:hidden">
+                <button type="button" onClick={() => toggleSection('personal')} className="w-9 h-9 rounded-lg hover:bg-slate-50 flex items-center justify-center lg:hidden shrink-0" aria-label="Thu gọn thông tin cá nhân">
                   <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.personal ? 'rotate-180' : ''}`} />
                 </button>
               </div>
@@ -142,11 +148,12 @@ export default function StudentProfileTab({
           </section>
 
           <section className="cms-sd-card !p-0 overflow-hidden">
-            <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2">
-              <button type="button" onClick={() => toggleSection('summary')} className="text-sm lg:text-base font-extrabold text-slate-800 flex items-center gap-2">
-                <BookOpen size={16} className="text-blue-600 shrink-0" aria-hidden="true" /> Tóm tắt học tập
+            <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
+              <button type="button" onClick={() => toggleSection('summary')} className="text-sm lg:text-base font-extrabold text-slate-800 flex items-center gap-2 min-w-0">
+                <BookOpen size={16} className="text-blue-600 shrink-0" aria-hidden="true" />
+                <span className="truncate">Tóm tắt học tập</span>
               </button>
-              <button type="button" onClick={() => toggleSection('summary')} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center lg:hidden">
+              <button type="button" onClick={() => toggleSection('summary')} className="w-9 h-9 rounded-lg hover:bg-slate-50 flex items-center justify-center lg:hidden shrink-0" aria-label="Thu gọn tóm tắt học tập">
                 <ChevronDown size={16} className={`text-slate-400 transition-transform ${openSections.summary ? 'rotate-180' : ''}`} />
               </button>
             </div>
@@ -194,7 +201,7 @@ export default function StudentProfileTab({
                   <button
                     type="button"
                     onClick={() => setShowTuitionModal(true)}
-                    className="cms-sd-btn bg-red-600 text-white hover:bg-red-700 w-full sm:w-auto"
+                    className="cms-sd-btn bg-red-600 text-white hover:bg-red-700 w-full sm:w-auto shrink-0 whitespace-nowrap"
                   >
                     Đóng ngay
                   </button>

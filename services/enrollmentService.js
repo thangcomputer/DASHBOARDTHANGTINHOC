@@ -387,6 +387,41 @@ function expandStudentsForTeacher(students, teacherId) {
   return result;
 }
 
+/**
+ * Mirror primary/active enrollment onto Student root fields.
+ * When no active enrollment remains, Student.course must stay non-empty (schema required).
+ */
+function syncStudentFromPrimaryEnrollment(student) {
+  if (!student?.enrollments?.length) {
+    return;
+  }
+  const list = student.enrollments;
+  const active = list.filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
+  if (!active.length) {
+    student.course = '(Đã hủy)';
+    student.price = 0;
+    student.paid = false;
+    student.paidAt = undefined;
+    student.teacherId = null;
+    student.teacherName = '';
+    student.completedSessions = 0;
+    student.remainingSessions = 0;
+    student.totalSessions = 12;
+    return;
+  }
+  const primary = active.find((e) => e.isPrimary) || active[0];
+  if (!primary) return;
+  student.course = primary.courseName;
+  student.price = Number(primary.price) || 0;
+  student.paid = !!primary.paid;
+  student.teacherId = primary.teacherId || null;
+  student.teacherName = primary.teacherName || '';
+  if (primary.paidAt) student.paidAt = primary.paidAt;
+  student.totalSessions = primary.totalSessions || 12;
+  student.remainingSessions = primary.remainingSessions ?? primary.totalSessions ?? 12;
+  student.completedSessions = primary.completedSessions || 0;
+}
+
 module.exports = {
   legacyEnrollmentFromStudent,
   getEnrollmentsFromStudent,
@@ -398,4 +433,5 @@ module.exports = {
   resolveEnrollmentExamSubjects,
   recordAttendanceGrade,
   normCourseName,
+  syncStudentFromPrimaryEnrollment,
 };

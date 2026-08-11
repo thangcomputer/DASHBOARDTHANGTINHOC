@@ -789,12 +789,13 @@
   }
 
   .cms-students-filters > * {
-    @apply min-w-0 flex-1 basis-[calc(50%-4px)];
+    @apply min-w-0 flex-1 basis-full;
   }
 
-  @media (min-width: 414px) {
-    .cms-students-filters > * {
-      flex-basis: calc(33.333% - 6px);
+  /* Branch full-width; course + paid share a row from ~360px */
+  @media (min-width: 360px) {
+    .cms-students-filters > *:not(:first-child) {
+      flex-basis: calc(50% - 4px);
     }
   }
 
@@ -802,6 +803,7 @@
     .cms-students-filters > * {
       flex: 1 1 0;
       max-width: 280px;
+      flex-basis: 0;
     }
   }
 
@@ -3018,19 +3020,22 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   .cms-quick-neutral .cms-quick-icon { @apply bg-slate-100 text-slate-700; }
   .cms-quick-info .cms-quick-icon { @apply bg-sky-50 text-sky-700; }
 
-  /* Notification bottom sheet (mobile) / panel (desktop) */
+  /* Notification bottom sheet (mobile) / panel (desktop) — portal to body
+     so backdrop-filter on topbar does not trap position:fixed */
   .cms-notif-backdrop {
-    @apply fixed inset-0 z-[69] bg-slate-900/40 backdrop-blur-[2px];
+    @apply fixed inset-0 z-[85] bg-slate-900/40 backdrop-blur-[2px];
     animation: cms-fade-in 200ms ease;
   }
 
   .cms-notif-sheet {
-    @apply fixed z-[70] flex flex-col bg-white overflow-hidden;
+    @apply fixed z-[90] flex flex-col bg-white overflow-hidden;
     left: 0;
     right: 0;
     bottom: 0;
+    top: auto;
     width: 100%;
-    max-height: min(85dvh, 640px);
+    /* Keep sheet lower on screen — leave headroom under topbar/status */
+    max-height: min(72dvh, 560px);
     border-radius: var(--dash-r-sheet, 24px) var(--dash-r-sheet, 24px) 0 0;
     box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.12);
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -3044,11 +3049,10 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
     }
 
     .cms-notif-sheet {
-      position: absolute;
       left: auto;
-      right: 0;
+      right: var(--notif-right, 1rem);
+      top: var(--notif-top, 4.5rem);
       bottom: auto;
-      top: calc(100% + 8px);
       width: min(24rem, calc(100vw - 1.25rem));
       max-height: min(70vh, 520px);
       border-radius: var(--dash-r-card, 20px);
@@ -3179,7 +3183,7 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   padding: 12px 16px;
   transition: background 160ms ease;
 }
-@media (min-width: 480px) {
+@media (min-width: 640px) {
   .cms-m-list-row {
     flex-direction: row;
     align-items: center;

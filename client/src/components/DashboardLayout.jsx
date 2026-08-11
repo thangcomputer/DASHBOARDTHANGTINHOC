@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import BranchFilterDropdown from './BranchFilterDropdown';
@@ -10,7 +11,7 @@ import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/toast';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
-  Bell, LogOut, CheckCircle2, Clock, X, Lock, MoreVertical,
+  Bell, LogOut, CheckCircle2, Clock, X, Lock,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award,
 } from 'lucide-react';
 
@@ -217,8 +218,29 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   const [showNotif, setShowNotif] = React.useState(false);
   const [notifLimit, setNotifLimit] = React.useState(5);
+  const [notifPos, setNotifPos] = React.useState({ top: 72, right: 16 });
   const notifRef = React.useRef(null);
   const bellRef = React.useRef(null);
+
+  useLayoutEffect(() => {
+    if (!showNotif) return undefined;
+    const updatePos = () => {
+      const el = bellRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setNotifPos({
+        top: Math.round(r.bottom + 8),
+        right: Math.max(12, Math.round(window.innerWidth - r.right)),
+      });
+    };
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [showNotif]);
 
   React.useEffect(() => {
     if (!showNotif) return;
@@ -311,8 +333,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <header className={`cms-topbar-glass flex flex-col border-b border-slate-100/80 flex-shrink-0 z-40 safe-pad-top ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="h-14 sm:h-16 flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-3 pl-[max(5.5rem,calc(env(safe-area-inset-left,0px)+3.75rem))] sm:pl-[max(6rem,calc(env(safe-area-inset-left,0px)+4.25rem))] md:pl-6 lg:pl-6 pr-2 sm:pr-4 min-w-0">
-            <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center sm:gap-3">
+          <div className="h-14 sm:h-16 flex flex-nowrap items-center gap-1.5 sm:gap-3 pl-[max(5.5rem,calc(env(safe-area-inset-left,0px)+3.75rem))] sm:pl-[max(6rem,calc(env(safe-area-inset-left,0px)+4.25rem))] md:pl-6 lg:pl-6 pr-2 sm:pr-4 min-w-0 overflow-hidden">
+            <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center sm:gap-3 overflow-hidden">
               <h1 className="text-base sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
               {/* Tên user đẩy khỏi nav khi có hamburger (mobile/tablet hẹp); hiện từ md+ */}
               <p className="hidden md:block text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5 sm:mt-0">
@@ -322,7 +344,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               </p>
             </div>
 
-            <div className="flex items-center flex-nowrap justify-end gap-0.5 sm:gap-2 min-w-0 flex-shrink-0">
+            <div className="flex items-center flex-nowrap justify-end gap-0.5 sm:gap-2 shrink-0">
               {showAdminBranch && (
                 <div className={isStudentsTab ? 'hidden lg:block' : 'hidden md:block'}>
                   <BranchFilterDropdown />
@@ -357,154 +379,20 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                     </span>
                   )}
                 </button>
-
-                {showNotif && (
-                  <>
-                    <div
-                      className="cms-notif-backdrop md:hidden"
-                      aria-hidden="true"
-                      onClick={() => setShowNotif(false)}
-                    />
-                    <div
-                      ref={notifRef}
-                      role="dialog"
-                      aria-modal="true"
-                      aria-label="Danh sách thông báo"
-                      className="cms-notif-sheet"
-                    >
-                      <div className="md:hidden flex justify-center pt-2 pb-1" aria-hidden="true">
-                        <span className="w-10 h-1 rounded-full bg-slate-200" />
-                      </div>
-                      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
-                        <h3 className="font-semibold text-slate-900 text-base">Thông báo mới</h3>
-                        <button
-                          type="button"
-                          onClick={() => setShowNotif(false)}
-                          aria-label="Đóng thông báo"
-                          className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
-                        >
-                          <X size={16} aria-hidden="true" />
-                        </button>
-                      </div>
-                      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-                        {myNotifications.length === 0 ? (
-                          <div className="p-10 text-center">
-                            <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                              <Bell size={28} className="text-slate-300" aria-hidden="true" />
-                            </div>
-                            <p className="text-sm font-semibold text-slate-400">Không có thông báo mới nào</p>
-                          </div>
-                        ) : (
-                          <div className="divide-y divide-slate-50">
-                            {myNotifications.slice(0, notifLimit).map(n => {
-                              const style = getNotifStyle(n.type);
-                              const Icon = style.icon;
-                              return (
-                                <div 
-                                  key={n.id || n._id} 
-                                  onClick={() => { 
-                                    markNotificationRead(n.id || n._id); 
-                                    if (n.payload?.action === 'RESET_PASSWORD') {
-                                      window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
-                                    } else if (n.payload?.action === 'blog_published' && n.payload?.slug) {
-                                      const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
-                                      navigate(`${base}/news/${n.payload.slug}`);
-                                    } else if (n.path) {
-                                      let targetPath = n.path;
-                                      
-                                      if (targetPath.startsWith('http')) {
-                                        try {
-                                          const urlObj = new URL(targetPath);
-                                          targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                                        } catch (e) {}
-                                      }
-
-                                      if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && targetPath !== '/admin/news' && !targetPath.includes('/news/') && !targetPath.includes('#')) {
-                                        targetPath = '/admin#' + targetPath.replace('/admin/', '');
-                                      } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
-                                        targetPath = '/student#' + targetPath.replace('/student/', '');
-                                      } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
-                                        targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
-                                      }
-                                      
-                                      navigate(targetPath); 
-                                    }
-                                    setShowNotif(false); 
-                                  }}
-                                  className={`px-4 py-3 hover:bg-slate-50 active:bg-slate-50 transition-colors duration-200 cursor-pointer flex gap-3 border-l-[3px] min-w-0 ${!n.read ? `bg-white ${style.border.replace('border-', 'border-l-')}` : 'bg-white border-l-transparent opacity-80'}`}
-                                >
-                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
-                                    <Icon size={18} aria-hidden="true" />
-                                    {!n.read && (
-                                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-red-500" aria-hidden="true" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                                      <span className={`text-[11px] font-semibold ${style.color}`}>{style.label}</span>
-                                      <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
-                                    </div>
-                                    {n.title && <h4 className={`text-sm font-semibold mb-0.5 break-anywhere ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</h4>}
-                                    <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>
-                                       {formatNotificationStudentMask(n.text || n.message || n.content, students)}
-                                     </p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
-                        <button type="button" onClick={() => markNotificationRead()} className="text-[12px] font-semibold text-slate-500 hover:text-red-600 transition-colors duration-200">Đọc tất cả</button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowNotif(false);
-                            const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
-                            navigate(`${base}/notifications`);
-                          }}
-                          className="text-[12px] font-semibold text-red-600 hover:underline"
-                        >
-                          Xem tất cả
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
               </div>
 
               <div className="h-8 w-px bg-slate-100 mx-0.5 hidden md:block" />
 
-              {/* Desktop logout */}
+              {/* Desktop / large tablet+: logout in topbar (mobile+tablet dùng sidebar) */}
               <button
                 type="button"
                 onClick={handleLogout}
                 aria-label="Đăng xuất"
-                className="hidden md:inline-flex h-11 px-3 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors duration-200 items-center gap-1.5"
+                className="hidden lg:inline-flex h-11 px-3 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors duration-200 items-center gap-1.5"
               >
                 <LogOut size={15} aria-hidden="true" />
                 <span>Đăng xuất</span>
               </button>
-
-              {/* Mobile overflow: logout */}
-              <details className="relative md:hidden">
-                <summary
-                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center list-none cursor-pointer [&::-webkit-details-marker]:hidden"
-                  aria-label="Thêm tùy chọn"
-                >
-                  <MoreVertical size={18} aria-hidden="true" />
-                </summary>
-                <div className="absolute right-0 top-[calc(100%+6px)] z-50 min-w-[160px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_6px_20px_rgba(15,23,42,0.08)]">
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="w-full min-h-11 px-3 rounded-lg text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center gap-2"
-                  >
-                    <LogOut size={15} aria-hidden="true" /> Đăng xuất
-                  </button>
-                </div>
-              </details>
             </div>
           </div>
 
@@ -541,6 +429,126 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           </div>
         </div>
       </main>
+
+      {showNotif && typeof document !== 'undefined' && createPortal(
+        <>
+          <div
+            className="cms-notif-backdrop md:hidden"
+            aria-hidden="true"
+            onClick={() => setShowNotif(false)}
+          />
+          <div
+            ref={notifRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Danh sách thông báo"
+            className="cms-notif-sheet"
+            style={{
+              '--notif-top': `${notifPos.top}px`,
+              '--notif-right': `${notifPos.right}px`,
+            }}
+          >
+            <div className="md:hidden flex justify-center pt-2 pb-1" aria-hidden="true">
+              <span className="w-10 h-1 rounded-full bg-slate-200" />
+            </div>
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
+              <h3 className="font-semibold text-slate-900 text-base">Thông báo mới</h3>
+              <button
+                type="button"
+                onClick={() => setShowNotif(false)}
+                aria-label="Đóng thông báo"
+                className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              {myNotifications.length === 0 ? (
+                <div className="p-10 text-center">
+                  <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Bell size={28} className="text-slate-300" aria-hidden="true" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-400">Không có thông báo mới nào</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {myNotifications.slice(0, notifLimit).map(n => {
+                    const style = getNotifStyle(n.type);
+                    const Icon = style.icon;
+                    return (
+                      <div
+                        key={n.id || n._id}
+                        onClick={() => {
+                          markNotificationRead(n.id || n._id);
+                          if (n.payload?.action === 'RESET_PASSWORD') {
+                            window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
+                          } else if (n.payload?.action === 'blog_published' && n.payload?.slug) {
+                            const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
+                            navigate(`${base}/news/${n.payload.slug}`);
+                          } else if (n.path) {
+                            let targetPath = n.path;
+
+                            if (targetPath.startsWith('http')) {
+                              try {
+                                const urlObj = new URL(targetPath);
+                                targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                              } catch (e) {}
+                            }
+
+                            if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && targetPath !== '/admin/news' && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                              targetPath = '/admin#' + targetPath.replace('/admin/', '');
+                            } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                              targetPath = '/student#' + targetPath.replace('/student/', '');
+                            } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                              targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
+                            }
+
+                            navigate(targetPath);
+                          }
+                          setShowNotif(false);
+                        }}
+                        className={`px-4 py-3 hover:bg-slate-50 active:bg-slate-50 transition-colors duration-200 cursor-pointer flex gap-3 border-l-[3px] min-w-0 ${!n.read ? `bg-white ${style.border.replace('border-', 'border-l-')}` : 'bg-white border-l-transparent opacity-80'}`}
+                      >
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
+                          <Icon size={18} aria-hidden="true" />
+                          {!n.read && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-red-500" aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-0.5">
+                            <span className={`text-[11px] font-semibold ${style.color}`}>{style.label}</span>
+                            <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
+                          </div>
+                          {n.title && <h4 className={`text-sm font-semibold mb-0.5 break-anywhere ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</h4>}
+                          <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>
+                            {formatNotificationStudentMask(n.text || n.message || n.content, students)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
+              <button type="button" onClick={() => markNotificationRead()} className="text-[12px] font-semibold text-slate-500 hover:text-red-600 transition-colors duration-200">Đọc tất cả</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNotif(false);
+                  const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
+                  navigate(`${base}/notifications`);
+                }}
+                className="text-[12px] font-semibold text-red-600 hover:underline"
+              >
+                Xem tất cả
+              </button>
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
 
       <ChangePasswordModal session={session} role={role} />
 

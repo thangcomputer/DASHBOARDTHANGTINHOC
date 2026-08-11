@@ -222,11 +222,11 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
               <div className="cms-chip-grid">
                 <label className={`cms-chip-option ${form.learningMode === 'OFFLINE' ? 'is-on' : ''}`}>
                   <input type="radio" name="learningMode" value="OFFLINE" checked={form.learningMode === 'OFFLINE'} onChange={handleChange} className="sr-only" />
-                  🏢 Offline — Tại cơ sở
+                  🏢 Trực tiếp
                 </label>
                 <label className={`cms-chip-option ${form.learningMode === 'ONLINE' ? 'is-on' : ''}`}>
                   <input type="radio" name="learningMode" value="ONLINE" checked={form.learningMode === 'ONLINE'} onChange={handleChange} className="sr-only" />
-                  🌐 Online — Từ xa
+                  🌐 Online
                 </label>
               </div>
             </div>

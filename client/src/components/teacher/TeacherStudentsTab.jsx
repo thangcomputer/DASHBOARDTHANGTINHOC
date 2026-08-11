@@ -10,10 +10,10 @@ export default function TeacherStudentsTab({
   markAttendance, updateLink, saveGrade, updateNotes, lockStudentExam,
 }) {
   return (
-          <div className="px-4 md:px-8 py-4 sm:py-6 min-h-[calc(100vh-120px)] xl:h-[calc(100vh-120px)] flex flex-col xl:flex-row gap-4 sm:gap-6 xl:overflow-hidden">
+          <div className="px-3 sm:px-4 md:px-8 py-4 sm:py-6 min-h-[calc(100vh-120px)] xl:h-[calc(100vh-120px)] flex flex-col xl:flex-row gap-4 sm:gap-6 xl:overflow-hidden min-w-0 w-full max-w-full">
             
             {/* CỘT 1: DANH SÁCH HỌC VIÊN (Sidebar) */}
-            <div className="w-full xl:w-80 h-[420px] sm:h-[500px] xl:h-full flex flex-col bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex-shrink-0">
+            <div className="w-full xl:w-80 h-[min(420px,55dvh)] sm:h-[500px] xl:h-full flex flex-col bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden shrink-0 min-w-0">
                <div className="p-3 sm:p-4 border-b border-slate-50 bg-slate-50/40">
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -49,7 +49,7 @@ export default function TeacherStudentsTab({
                         >
                           <div className="relative shrink-0">
                             <div className="w-10 h-10 rounded-full overflow-hidden shadow-sm bg-white border border-slate-100">
-                              <img src={resolveAvatarUrl({ role: 'student' })} alt="" className="w-full h-full object-cover" />
+                              <img src={resolveAvatarUrl({ avatar: s.avatar, role: 'student', gender: s.gender })} alt="" className="w-full h-full object-cover" />
                             </div>
                             {isOnline && (
                               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" title="Đang hoạt động" />
@@ -89,7 +89,7 @@ export default function TeacherStudentsTab({
                                   avatar: s.avatar,
                                 });
                               }} 
-                              className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 hover:text-blue-700 transition-all border-none outline-none shrink-0"
+                              className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 hover:text-blue-700 transition-all border-none outline-none shrink-0"
                               title="Nhắn tin nội bộ"
                               aria-label="Nhắn tin nội bộ"
                             >
@@ -109,7 +109,7 @@ export default function TeacherStudentsTab({
             </div>
 
             {/* CỘT 2: CHI TIẾT HỌC VIÊN (Main Content) */}
-            <div className="flex-1 xl:overflow-y-auto pr-1">
+            <div className="flex-1 min-w-0 xl:overflow-y-auto pr-0 sm:pr-1">
               {selectedEnrollmentKey ? (
                 (() => {
                   const student = students.find(s => String(s._enrollmentKey || s._id || s.id) === String(selectedEnrollmentKey));

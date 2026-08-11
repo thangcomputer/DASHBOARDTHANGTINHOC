@@ -41,7 +41,7 @@ const AdminDashboard = () => {
     payoutModal, setPayoutModal, handleGoToQR, handlePayout, handleSaveHoaHongRate,
     printStudent,
     showTeacherModal, setShowTeacherModal, teacherForm, setTeacherForm,
-    isSuperAdmin, safeBranches, ctxAddTeacher, toast, fetchTeachers,
+    isSuperAdmin, isHighAdmin, safeBranches, ctxAddTeacher, toast, fetchTeachers,
     editTeacher, setEditTeacher, handleOpenResetPw, ctxUpdateTeacher, examSubjectsCatalog,
     getTeacherRating,
     editStudent, setEditStudent, globalTeachers, ctxUpdateStudent,
@@ -141,7 +141,7 @@ const AdminDashboard = () => {
         <AddTeacherModal
           teacherForm={teacherForm}
           setTeacherForm={setTeacherForm}
-          isSuperAdmin={isSuperAdmin}
+          isSuperAdmin={isSuperAdmin || isHighAdmin}
           safeBranches={safeBranches}
           onClose={() => setShowTeacherModal(false)}
           onSubmit={async () => {
@@ -187,7 +187,7 @@ const AdminDashboard = () => {
         <EditTeacherModal
           editTeacher={editTeacher}
           setEditTeacher={setEditTeacher}
-          isSuperAdmin={isSuperAdmin}
+          isSuperAdmin={isSuperAdmin || isHighAdmin}
           safeBranches={safeBranches}
           getTeacherRating={getTeacherRating}
           onClose={() => setEditTeacher(null)}
@@ -254,7 +254,15 @@ const AdminDashboard = () => {
               toast.success('Đã cập nhật học viên!');
               mutate(['admin_stats', selectedBranchId]);
               mutate(['admin_finance', selectedBranchId]);
-              fetchStudentsPaginated({ page: currentPage, limit: PAGE_SIZE, search, paid: filterPaid, course: filterCourse, branch_id: selectedBranchId });
+              fetchStudentsPaginated({
+                page: currentPage,
+                limit: PAGE_SIZE,
+                search,
+                paid: filterPaid,
+                course: filterCourse,
+                branch_id: selectedBranchId,
+                forceBranchIdAll: selectedBranchId === 'all' && ['students', 'dashboard'].includes(activeTab),
+              });
             } catch (err) {
               toast.error('Lỗi cập nhật học viên: ' + (err.message || 'Không xác định'));
             }

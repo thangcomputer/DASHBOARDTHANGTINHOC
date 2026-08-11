@@ -18,7 +18,7 @@ const ROLE_RING = {
 };
 
 /**
- * Avatar dung chung — anh cartoon mac dinh theo role
+ * Avatar dung chung — anh cartoon mac dinh theo role + gender
  * + badge GV/HV de phan biet nhanh khi danh sach dai.
  */
 export default function Avatar({
@@ -61,8 +61,15 @@ export default function Avatar({
         className={`${sizeClass} rounded-2xl object-cover shadow-sm border-2 border-white bg-white ${ring} ${className}`}
         onError={(e) => {
           const el = e.currentTarget;
-          if (el.dataset.fallback === '1') return;
-          el.dataset.fallback = '1';
+          const step = Number(el.dataset.fallbackStep || '0');
+          if (step >= 2) return;
+          el.dataset.fallbackStep = String(step + 1);
+          if (step === 0) {
+            // Gender-aware / role default (ignore broken custom src)
+            el.src = resolveAvatarUrl({ role, adminRole, name, gender, avatar: '' });
+            return;
+          }
+          // Role-neutral last resort
           el.src = DEFAULT_AVATARS[normalized] || DEFAULT_AVATARS.student;
         }}
       />

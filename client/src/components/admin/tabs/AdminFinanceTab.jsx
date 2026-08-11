@@ -142,8 +142,8 @@ export default function AdminFinanceTab() {
       )}
 
       <div className={`grid grid-cols-1 ${isSuperAdmin ? 'lg:grid-cols-2' : ''} gap-4 sm:gap-6`}>
-        <div className="cms-m-card flex flex-col h-[560px] sm:h-[620px] min-h-[500px] overflow-hidden shadow-sm">
-          <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0 shrink-0">
+        <div className="cms-m-card flex flex-col max-h-[min(620px,70dvh)] h-[min(560px,70dvh)] sm:h-[min(620px,72dvh)] min-h-[280px] overflow-hidden shadow-sm">
+          <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0 shrink-0">
             <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
               <DollarSign size={18} className="text-sky-700 flex-shrink-0" /> Doanh Thu Học Phí
             </h3>
@@ -153,7 +153,7 @@ export default function AdminFinanceTab() {
                 const tid = toast.loading('Đang xuất báo cáo doanh thu...');
                 try {
                   const exportData = financeRows.map((r) => ({
-                    'Mã HV': r.studentId || 'N/A',
+                    'Mã HV': r.studentCode || 'N/A',
                     'Học viên': r.studentName || 'N/A',
                     'Khóa học': r.courseName || 'N/A',
                     'Số tiền (VNĐ)': r.price || 0,
@@ -175,9 +175,11 @@ export default function AdminFinanceTab() {
                   toast.error('Xuất thất bại: ' + (e.message || 'Lỗi'));
                 }
               }}
-              className="cms-m-btn border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex-1 sm:flex-initial text-[13px]"
+              className="cms-m-btn border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 w-full sm:w-auto shrink-0 text-[13px]"
             >
-              <Download size={14} className="flex-shrink-0" /> Xuất báo cáo doanh thu
+              <Download size={14} className="shrink-0" />
+              <span className="sm:hidden">Xuất CSV</span>
+              <span className="hidden sm:inline">Xuất báo cáo doanh thu</span>
             </button>
           </div>
           <div className="p-3 sm:p-4 shrink-0">
@@ -200,9 +202,9 @@ export default function AdminFinanceTab() {
                   )}
                 </div>
                 {ledger && (
-                  <div className="bg-white/20 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20 flex items-center gap-1.5 shrink-0 self-start min-h-11">
-                    <TrendingUp size={14} className="text-emerald-300" />
-                    <span className="text-xs font-bold">
+                  <div className="bg-white/20 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20 flex items-center gap-1.5 max-w-full min-w-0 self-start min-h-11">
+                    <TrendingUp size={14} className="text-emerald-300 shrink-0" />
+                    <span className="text-xs font-bold tabular-nums truncate min-w-0">
                       LN {(totalProfit || 0).toLocaleString('vi-VN')}đ
                     </span>
                   </div>
@@ -244,12 +246,14 @@ export default function AdminFinanceTab() {
                     </div>
                     <div className="min-w-0">
                       <p className="cms-m-list-title">{r.studentName}</p>
-                      <p className="cms-m-caption line-clamp-2">{r.courseName}</p>
+                      <p className="cms-m-caption line-clamp-2">
+                        {r.studentCode ? `${r.studentCode} · ` : ''}{r.courseName}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                    <div className="text-left sm:text-right min-w-0">
-                      <p className={`text-[15px] font-extrabold break-words ${isRefund ? 'text-red-600' : 'text-slate-900'}`}>
+                  <div className="flex flex-col gap-2 min-[640px]:flex-row min-[640px]:flex-wrap min-[640px]:items-center min-[640px]:justify-end min-w-0 w-full min-[640px]:w-auto">
+                    <div className="text-left min-[640px]:text-right min-w-0">
+                      <p className={`text-[15px] font-extrabold break-words tabular-nums ${isRefund ? 'text-red-600' : 'text-slate-900'}`}>
                         {(Number(r.price) || 0).toLocaleString('vi-VN')}đ
                       </p>
                       <span className={`text-[13px] font-bold ${
@@ -262,7 +266,7 @@ export default function AdminFinanceTab() {
                       <button
                         type="button"
                         onClick={() => handlePayRow(r)}
-                        className="cms-m-btn bg-sky-50 text-sky-700 border border-sky-100 hover:bg-sky-100 w-full sm:w-auto"
+                        className="cms-m-btn bg-sky-50 text-sky-700 border border-sky-100 hover:bg-sky-100 w-full min-[640px]:w-auto shrink-0"
                       >
                         Xác nhận thu
                       </button>
@@ -275,8 +279,8 @@ export default function AdminFinanceTab() {
         </div>
 
         {isSuperAdmin && (
-          <div className="cms-m-card flex flex-col h-[560px] sm:h-[620px] min-h-[500px] overflow-hidden shadow-sm">
-            <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0 shrink-0">
+          <div className="cms-m-card flex flex-col max-h-[min(620px,70dvh)] h-[min(560px,70dvh)] sm:h-[min(620px,72dvh)] min-h-[280px] overflow-hidden shadow-sm">
+            <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0 shrink-0">
               <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
                 <CreditCard size={18} className="text-blue-600 flex-shrink-0" /> Thanh Toán Giảng Viên
               </h3>
@@ -309,9 +313,11 @@ export default function AdminFinanceTab() {
                     toast.error(e.message || 'Lỗi khi xuất file');
                   }
                 }}
-                className="cms-m-btn bg-slate-800 text-white hover:bg-slate-700 w-full sm:w-auto text-[13px]"
+                className="cms-m-btn bg-slate-800 text-white hover:bg-slate-700 w-full sm:w-auto shrink-0 text-[13px]"
               >
-                <Download size={14} /> Xuất Báo Cáo
+                <Download size={14} className="shrink-0" />
+                <span className="sm:hidden">Xuất CSV</span>
+                <span className="hidden sm:inline">Xuất Báo Cáo</span>
               </button>
             </div>
             <div className="p-3 sm:p-4 shrink-0">
@@ -349,7 +355,7 @@ export default function AdminFinanceTab() {
                       </div>
                     </div>
                     {bankInfo?.accountNumber && (
-                      <div className="mt-2 ml-0 sm:ml-13 flex items-center gap-2 flex-wrap">
+                      <div className="mt-2 ml-0 sm:ml-12 flex items-center gap-2 flex-wrap min-w-0">
                         <span className="inline-flex items-center gap-1 text-[12px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1.5 rounded-xl border border-emerald-100">
                           <CreditCard size={10} /> {bankInfo.bankName || 'N/A'}
                         </span>
@@ -371,13 +377,13 @@ export default function AdminFinanceTab() {
 
       {/* P1: Sổ cái Ledger */}
       <div className="cms-m-card flex flex-col min-h-[380px] overflow-hidden shadow-sm">
-        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
-          <h3 className="cms-m-heading flex items-center gap-2">
-            <BookOpen size={18} className="text-indigo-600" /> Sổ cái (Ledger)
+        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between shrink-0 min-w-0">
+          <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
+            <BookOpen size={18} className="text-indigo-600 shrink-0" /> Sổ cái (Ledger)
           </h3>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap items-stretch sm:items-center w-full sm:w-auto min-w-0">
             <select
-              className="cms-m-btn border border-slate-200 bg-white text-slate-700 text-[13px]"
+              className="cms-m-btn border border-slate-200 bg-white text-slate-700 text-[13px] w-full sm:w-auto min-w-0 max-w-full"
               value={ledgerType}
               onChange={(e) => setLedgerType(e.target.value)}
             >
@@ -389,8 +395,10 @@ export default function AdminFinanceTab() {
               <option value="discount,coupon">Giảm giá</option>
               <option value="adjustment">Điều chỉnh</option>
             </select>
-            <button type="button" onClick={exportLedger} className="cms-m-btn border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-[13px]">
-              <Download size={14} /> Xuất sổ cái
+            <button type="button" onClick={exportLedger} className="cms-m-btn border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-[13px] w-full sm:w-auto shrink-0">
+              <Download size={14} className="shrink-0" />
+              <span className="sm:hidden">Xuất CSV</span>
+              <span className="hidden sm:inline">Xuất sổ cái</span>
             </button>
           </div>
         </div>

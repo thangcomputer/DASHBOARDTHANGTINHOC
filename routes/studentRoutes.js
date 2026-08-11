@@ -17,11 +17,13 @@ function requireManageStudentsUnlessTeacher(req, res, next) {
 }
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
+const { buildMongoPaidFilterCondition } = require('../utils/studentPaidFilterBuckets');
 const {
   applyEnrollmentStats,
   legacyEnrollmentFromStudent,
   studentMatchesTeacher,
   resolveEnrollmentExamSubjects,
+  syncStudentFromPrimaryEnrollment,
 } = require('../services/enrollmentService');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const { generateTempPassword } = require('../utils/tempPassword');
@@ -158,29 +160,8 @@ router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), 
     }
 
     if (paid && paid !== 'all') {
-      if (paid === 'paid' || paid === 'true') {
-        andConditions.push({
-          $or: [
-            { paid: true },
-            { 'enrollments.paid': true },
-            { 'enrollments.status': 'active' },
-            { 'enrollments.status': 'completed' },
-            { 'enrollments.status': 'pending_payment' },
-            { course: { $exists: true, $ne: '' } },
-          ],
-        });
-      } else if (paid === 'unpaid' || paid === 'refunded' || paid === 'false') {
-        andConditions.push({
-          $or: [
-            { 'enrollments.status': 'cancelled' },
-            { 'enrollments.status': 'refunded' },
-            { 'enrollments.refundedAmount': { $gt: 0 } },
-            { refundedAmount: { $gt: 0 } },
-            { status: 'cancelled' },
-            { status: 'refunded' },
-          ],
-        });
-      }
+      const paidCond = buildMongoPaidFilterCondition(paid);
+      if (paidCond) andConditions.push(paidCond);
     }
 
     if (status) andConditions.push({ status });
@@ -2047,36 +2028,6 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
   }
 });
 
-function syncStudentFromPrimaryEnrollment(student) {
-  if (!student?.enrollments?.length) return;
-  const list = student.enrollments;
-  const active = list.filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
-  if (!active.length) {
-    student.course = '';
-    student.price = 0;
-    student.paid = false;
-    student.paidAt = undefined;
-    student.teacherId = null;
-    student.teacherName = '';
-    student.completedSessions = 0;
-    student.remainingSessions = 0;
-    student.totalSessions = 12;
-    return;
-  }
-  const primary = active.find((e) => e.isPrimary) || active[0];
-  if (!primary) return;
-  student.course = primary.courseName;
-  student.price = Number(primary.price) || 0;
-  student.paid = !!primary.paid;
-  student.teacherId = primary.teacherId || null;
-  student.teacherName = primary.teacherName || '';
-  if (primary.paidAt) student.paidAt = primary.paidAt;
-  student.totalSessions = primary.totalSessions || 12;
-  student.remainingSessions = primary.remainingSessions ?? primary.totalSessions ?? 12;
-  student.completedSessions = primary.completedSessions || 0;
-}
-
-
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/settings ─────────────────
 // Cập nhật quyền theo khóa: requireWebcam, examUnlocked
 router.put('/:id/enrollments/:enrollmentId/settings', [
@@ -2308,21 +2259,28 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
       }
     }
 
-    // Ledger refund trước khi soft-cancel (nếu có tiền hoàn)
+    // Ledger refund trước soft-cancel+save:
+    // 1) idempotencyKey ổn định → retry không double-post
+    // 2) nếu save từng fail sau refund, retry vẫn postRefund(created:false) rồi hoàn tất cancel
+    // Không bọc Mongo transaction: postEntry hiện không nhận session; withTransaction chưa dùng trên path này.
+    let refundLedgerCreated = false;
+    let refundIdempotencyKey = '';
     if (refundAmt > 0) {
+      refundIdempotencyKey = `refund:cancel:${student._id}:${enr._id}`;
       try {
-        await postRefund({
+        const refundResult = await postRefund({
           amount: refundAmt,
           student,
           enrollmentId: String(enr._id),
           courseName,
           note: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${cancelReason}`,
           sourceRef: `cancel:${student._id}:${enr._id}`,
-          idempotencyKey: `refund:cancel:${student._id}:${enr._id}`,
+          idempotencyKey: refundIdempotencyKey,
           actor: financeActor(req),
           reqMeta: financeReqMeta(req, student),
           metadata: { enrollmentId: String(enr._id), cancelReason },
         });
+        refundLedgerCreated = !!refundResult?.created;
       } catch (ledgerErr) {
         logger.error('[STUDENTS] cancel enrollment refund FAILED: %s', ledgerErr.message);
         return res.status(ledgerErr.status || 500).json({
@@ -2354,7 +2312,28 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
       student.paidAmount = Math.max(0, (Number(student.paidAmount) || 0) - refundAmt);
     }
     student.markModified('enrollments');
-    await student.save();
+    try {
+      await student.save();
+    } catch (saveErr) {
+      logger.error(
+        '[STUDENTS] cancel enrollment save FAILED after refundAmt=%s ledgerCreated=%s key=%s: %s',
+        refundAmt,
+        refundLedgerCreated,
+        refundIdempotencyKey || 'n/a',
+        saveErr.message,
+      );
+      return res.status(500).json({
+        success: false,
+        message: saveErr.message || 'Lưu hủy khóa thất bại',
+        meta: {
+          refundLedgerMayExist: refundAmt > 0,
+          refundIdempotencyKey: refundIdempotencyKey || undefined,
+          hint: refundAmt > 0
+            ? 'Ledger có thể đã ghi hoàn (idempotent). Retry cùng enrollment sẽ không double-refund; sửa lỗi save rồi retry để hoàn tất hủy khóa.'
+            : undefined,
+        },
+      });
+    }
     if (refundAmt > 0) bustFinanceCaches();
 
     let refundMsg = '';

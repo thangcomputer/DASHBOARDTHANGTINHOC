@@ -233,6 +233,7 @@ async function completeInternalLogin(user, userRole, deviceFingerprint) {
         _id: user._id, name: user.name, role: userRole,
         phone:       user.phone || '',
         avatar:      user.avatar || '',
+        gender:      user.gender || '',
         adminRole:   user.adminRole  || null,
         permissions: user.permissions || [],
         branchId:    user.branchId   || null,
@@ -279,6 +280,8 @@ async function issueAdminTokens(sysSettings, audience = 'public') {
         adminRole: 'SUPER_ADMIN',
         permissions: [],
         status: 'active',
+        avatar: '',
+        gender: '',
       },
     },
   };
@@ -693,6 +696,8 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
       branchId:    user.branchId   || null,
       branchCode:  user.branchCode || '',
       status:      user.status,
+      avatar:      user.avatar || '',
+      gender:      user.gender || '',
       ...(userRole === 'teacher' || userRole === 'admin' || userRole === 'staff'
         ? {
             testScore:       user.testScore,
@@ -701,7 +706,6 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
             assignedClasses: user.assignedClasses,
             specialty:       user.specialty,
             subjectIds:      Array.isArray(user.subjectIds) ? user.subjectIds : [],
-            avatar:          user.avatar,
             isFirstLogin:    !!user.isFirstLogin,
           }
         : {
@@ -839,7 +843,18 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
       success: true,
       message: `Chào mừng ${user.name}!`,
       data: {
-        user: { _id: user._id, name: user.name, role: userRole, phone: user.phone || user.zalo || '', status: user.status, course: user.course, remainingSessions: user.remainingSessions, isFirstLogin: !!user.isFirstLogin },
+        user: {
+          _id: user._id,
+          name: user.name,
+          role: userRole,
+          phone: user.phone || user.zalo || '',
+          status: user.status,
+          course: user.course,
+          remainingSessions: user.remainingSessions,
+          isFirstLogin: !!user.isFirstLogin,
+          avatar: user.avatar || '',
+          gender: user.gender || '',
+        },
         accessToken, refreshToken,
       },
     });
@@ -1379,6 +1394,7 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
           role:   'admin',
           status: 'active',
           avatar: '',
+          gender: '',
         },
       });
     }
@@ -1412,6 +1428,7 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
         branchCode:  user.branchCode || '',
         status:      user.status,
         avatar:      user.avatar || '',
+        gender:      user.gender || '',
         isFirstLogin: !!user.isFirstLogin,
         ...(decoded.role === 'teacher' || decoded.role === 'admin' || decoded.role === 'staff' ? {
           testScore:       user.testScore,

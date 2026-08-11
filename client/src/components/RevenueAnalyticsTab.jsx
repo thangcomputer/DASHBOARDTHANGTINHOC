@@ -147,7 +147,10 @@ export default function RevenueAnalyticsTab() {
     setLoading(true);
     setError('');
     try {
-      const qs = `period=${p}&branchId=${b || 'all'}`;
+      // Backend `branchFilter` ưu tiên convention `branch_id` cho allowlist READ.
+      // FE legacy đôi khi chỉ gửi `branchId` => HIGH_ADMIN bị fail-closed.
+      const branch = b || 'all';
+      const qs = `period=${encodeURIComponent(p)}&branchId=${encodeURIComponent(branch)}&branch_id=${encodeURIComponent(branch)}`;
       const [rev, enr, brOv] = await Promise.all([
         fetch(`${API}/api/analytics/revenue?${qs}`, { headers }).then(r => r.json()),
         fetch(`${API}/api/analytics/enrollment?${qs}`, { headers }).then(r => r.json()),

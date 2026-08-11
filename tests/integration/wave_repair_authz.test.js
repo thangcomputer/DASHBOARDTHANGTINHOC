@@ -105,6 +105,118 @@ test('branchFilter: SUPPORT is scoped to own branch (not all-branch)', async () 
   }
 });
 
+test('branchFilter: HIGH_ADMIN + GET + branch_id=all → req.branchFilter={} (allowlisted READ)', async () => {
+  const { branchFilter } = require('../../middleware/auth');
+  const TeacherOrig = Teacher.findById;
+  Teacher.findById = () => ({
+    select() {
+      return {
+        lean: async () => ({
+          adminRole: 'HIGH_ADMIN',
+          branchId: '507f1f77bcf86cd799439099',
+          branchCode: 'CN1',
+        }),
+      };
+    },
+  });
+
+  try {
+    const req = {
+      user: {
+        id: '507f1f77bcf86cd799439011',
+        role: 'staff',
+        adminRole: 'HIGH_ADMIN',
+      },
+      method: 'GET',
+      query: { branch_id: 'all' },
+      headers: {},
+      originalUrl: '/api/employees?branch_id=all',
+    };
+    const res = mockRes();
+    let next = false;
+    await branchFilter(req, res, () => { next = true; });
+    assert.equal(next, true);
+    assert.deepEqual(req.branchFilter, {});
+  } finally {
+    Teacher.findById = TeacherOrig;
+  }
+});
+
+test('branchFilter: HIGH_ADMIN + GET + branch_id=all → fail-closed outside allowlist', async () => {
+  const { branchFilter } = require('../../middleware/auth');
+  const TeacherOrig = Teacher.findById;
+  Teacher.findById = () => ({
+    select() {
+      return {
+        lean: async () => ({
+          adminRole: 'HIGH_ADMIN',
+          branchId: '507f1f77bcf86cd799439099',
+          branchCode: 'CN1',
+        }),
+      };
+    },
+  });
+
+  try {
+    const req = {
+      user: {
+        id: '507f1f77bcf86cd799439011',
+        role: 'staff',
+        adminRole: 'HIGH_ADMIN',
+      },
+      method: 'GET',
+      query: { branch_id: 'all' },
+      headers: {},
+      originalUrl: '/api/courses?branch_id=all',
+    };
+    const res = mockRes();
+    let next = false;
+    await branchFilter(req, res, () => { next = true; });
+    assert.equal(next, true);
+    assert.equal(String(req.branchFilter.branchId), '507f1f77bcf86cd799439099');
+    assert.equal(req.userBranchId, '507f1f77bcf86cd799439099');
+  } finally {
+    Teacher.findById = TeacherOrig;
+  }
+});
+
+test('branchFilter: HIGH_ADMIN + POST should not treat branch_id=all as all-branches READ', async () => {
+  const { branchFilter } = require('../../middleware/auth');
+  const TeacherOrig = Teacher.findById;
+  Teacher.findById = () => ({
+    select() {
+      return {
+        lean: async () => ({
+          adminRole: 'HIGH_ADMIN',
+          branchId: '507f1f77bcf86cd799439099',
+          branchCode: 'CN1',
+        }),
+      };
+    },
+  });
+
+  try {
+    const req = {
+      user: {
+        id: '507f1f77bcf86cd799439011',
+        role: 'staff',
+        adminRole: 'HIGH_ADMIN',
+      },
+      method: 'POST',
+      query: { branch_id: 'all' },
+      headers: {},
+      originalUrl: '/api/employees?branch_id=all',
+    };
+    const res = mockRes();
+    let next = false;
+    await branchFilter(req, res, () => { next = true; });
+    assert.equal(next, true);
+    assert.equal(String(req.branchFilter.branchId), '507f1f77bcf86cd799439099');
+  } finally {
+    Teacher.findById = TeacherOrig;
+  }
+});
+
 test('realtimeEmit helpers export emitBranch/emitDataRefresh', () => {
   const rt = require('../../utils/realtimeEmit');
   assert.equal(typeof rt.emitBranch, 'function');

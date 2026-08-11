@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { authAPI } from '../services/api';
@@ -10,6 +10,7 @@ export default function EditableAvatar({
   name,
   role,
   adminRole,
+  gender = '',
   className = '',
   imgClassName = '',
   onSuccess,
@@ -21,12 +22,21 @@ export default function EditableAvatar({
   const [loading, setLoading] = useState(false);
   const [localAvatar, setLocalAvatar] = useState(avatar);
 
-  const displayAvatar = resolveAvatarUrl({
+  useEffect(() => {
+    setLocalAvatar(avatar);
+  }, [avatar]);
+
+  const resolved = resolveAvatarUrl({
     avatar: localAvatar || avatar,
     role,
     adminRole,
+    gender,
     name,
   });
+  // Cache-bust /uploads để tránh browser giữ bản 401 cũ sau khi đổi quyền public
+  const displayAvatar = resolved.startsWith('/uploads/')
+    ? `${resolved}${resolved.includes('?') ? '&' : '?'}v=${encodeURIComponent(String(localAvatar || avatar || '').slice(-24))}`
+    : resolved;
 
   const handleClick = (e) => {
     e.stopPropagation();
@@ -58,7 +68,12 @@ export default function EditableAvatar({
         toast.success('Đã thay đổi ảnh đại diện thành công!');
       }
     } catch (err) {
-      toast.error(err.message || 'Thay đổi ảnh đại diện thất bại');
+      const isNet = !!err?.isNetworkError || err?.name === 'NetworkOfflineError';
+      toast.error(
+        isNet
+          ? 'Không tải được ảnh đại diện — mất kết nối máy chủ. Thử lại hoặc chọn ảnh nhỏ hơn (tối đa 5MB).'
+          : (err.message || 'Thay đổi ảnh đại diện thất bại'),
+      );
     } finally {
       setLoading(false);
     }
@@ -80,6 +95,7 @@ export default function EditableAvatar({
         />
       )}
       <img
+        key={displayAvatar}
         src={displayAvatar}
         alt={name || 'Avatar'}
         className={`w-full h-full object-cover transition-transform duration-300 ${editable ? 'group-hover:scale-105' : ''} ${imgClassName}`}

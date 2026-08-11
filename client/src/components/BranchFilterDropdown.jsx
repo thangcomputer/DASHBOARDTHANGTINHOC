@@ -1,6 +1,6 @@
 /**
  * BranchFilterDropdown.jsx — Dropdown chọn Chi nhánh (Topbar)
- * SUPER_ADMIN / HIGH_ADMIN: chọn chi nhánh (HIGH không có "Tất cả").
+ * SUPER_ADMIN / HIGH_ADMIN: chọn chi nhánh (mặc định "Tất cả chi nhánh").
  * STAFF: chỉ hiện nhãn chi nhánh đã khóa.
  */
 import { Building2, ChevronDown, Check } from 'lucide-react';
@@ -123,7 +123,7 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
 
   const activeBranches = branches.filter((b) => b && b.isActive !== false);
   const isFiltered = selectedBranchId && selectedBranchId !== 'all';
-  const allowAllBranches = isSuperAdmin && !isHighAdmin;
+  const allowAllBranches = isSuperAdmin || isHighAdmin;
 
   const menu = open
     ? createPortal(

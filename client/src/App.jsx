@@ -32,6 +32,7 @@ const PublicPaymentPage = lazy(() => import('./components/PublicPaymentPage'));
 const FeedBoard = lazy(() => import('./components/FeedBoard'));
 const NewsPage = lazy(() => import('./components/NewsPage'));
 import DashboardLayout                       from './components/DashboardLayout';
+import StudentLearningAccessGate             from './components/student/StudentLearningAccessGate';
 import api, { clearTokens, getRolePrefix, NetworkOfflineError } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
 import { useIsDesktopExamDevice } from './utils/examDevice';
@@ -386,8 +387,20 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
           <DashboardLayout role="student" session={session} onLogout={onLogout} />
         </Guard>
       }>
-        <Route path="/student"      element={<ErrorBoundary inline><StudentDashboard onNavigate={go} /></ErrorBoundary>} />
-        <Route path="/student/exam" element={<StudentExamWrapper session={session} />} />
+        <Route path="/student" element={
+          <ErrorBoundary inline>
+            <StudentLearningAccessGate session={session}>
+              <StudentDashboard onNavigate={go} />
+            </StudentLearningAccessGate>
+          </ErrorBoundary>
+        } />
+        <Route path="/student/exam" element={
+          <ErrorBoundary inline>
+            <StudentLearningAccessGate session={session} allowHashes={[]}>
+              <StudentExamWrapper session={session} />
+            </StudentLearningAccessGate>
+          </ErrorBoundary>
+        } />
         <Route path="/student/notifications" element={
           <ErrorBoundary inline><NotificationCenterPage role="student" session={session} /></ErrorBoundary>
         } />
@@ -410,7 +423,9 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
       {/* ═══ Fullscreen Exam (không sidebar) ═══ */}
       <Route path="/student/exam/:subjectId" element={
         <Guard allowedRoles={['student', 'admin']} session={session}>
-          <StudentTestWrapper session={session} />
+          <StudentLearningAccessGate session={session} allowHashes={[]}>
+            <StudentTestWrapper session={session} />
+          </StudentLearningAccessGate>
         </Guard>
       } />
 
@@ -516,7 +531,17 @@ function App() {
         const res = await api.auth.me();
         
         if (res.success && res.data) {
-          const freshUser = { ...savedUser, ...res.data };
+          // /me cũ có thể thiếu key gender → không xóa gender đã có trong session
+          const freshUser = {
+            ...savedUser,
+            ...res.data,
+            gender: Object.prototype.hasOwnProperty.call(res.data, 'gender')
+              ? (res.data.gender || savedUser.gender || '')
+              : (savedUser.gender || ''),
+            avatar: Object.prototype.hasOwnProperty.call(res.data, 'avatar')
+              ? (res.data.avatar || savedUser.avatar || '')
+              : (savedUser.avatar || ''),
+          };
           setSession(freshUser);
           saveSession(freshUser);
         } else {
@@ -539,6 +564,24 @@ function App() {
     };
 
     restoreSession();
+  }, []);
+
+  // Sidebar có thể patch gender/avatar từ hồ sơ self vào localStorage
+  useEffect(() => {
+    const onPatched = (e) => {
+      const patched = e?.detail;
+      if (!patched) return;
+      setSession((prev) => {
+        if (!prev) return prev;
+        if (String(prev.id || prev._id) !== String(patched.id || patched._id)) return prev;
+        const nextGender = patched.gender || prev.gender || '';
+        const nextAvatar = patched.avatar || prev.avatar || '';
+        if ((prev.gender || '') === nextGender && (prev.avatar || '') === nextAvatar) return prev;
+        return { ...prev, gender: nextGender, avatar: nextAvatar };
+      });
+    };
+    window.addEventListener('cms:session-patched', onPatched);
+    return () => window.removeEventListener('cms:session-patched', onPatched);
   }, []);
 
   const handleLogout = useCallback(async () => {

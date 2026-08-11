@@ -113,6 +113,45 @@ export function getClientEnrollments(student) {
 export function getActiveClientEnrollments(student) {
   return getClientEnrollments(student).filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
 }
+
+/**
+ * Learning Dashboard access SoT: enrollment.status === 'active' only.
+ * Completed / cancelled / refunded / paused → không mở learning shell.
+ */
+export function getLearningAccessEnrollments(student) {
+  return getClientEnrollments(student).filter((e) => String(e?.status || '').toLowerCase() === 'active');
+}
+
+export function hasLearningAccessEnrollment(student) {
+  return getLearningAccessEnrollments(student).length > 0;
+}
+
+function isEnrollmentPaidFlag(e) {
+  return e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
+}
+
+/**
+ * Sidebar badge «Học Viên»: chỉ HV còn khóa đang học và chưa đóng phí.
+ * Không đếm HV đã hoàn/hủy hết khóa (paid root thường false sau refund).
+ */
+export function isUnpaidTuitionAlertStudent(student) {
+  if (!student) return false;
+  const enrollments = getClientEnrollments(student);
+  const learning = enrollments.filter((e) => {
+    const st = String(e?.status || '').toLowerCase();
+    return st !== 'cancelled' && st !== 'refunded';
+  });
+  if (learning.length > 0) {
+    return learning.some((e) => !isEnrollmentPaidFlag(e));
+  }
+  // Legacy: no enrollments, not cancelled root, unpaid
+  const rootSt = String(student.status || '').toLowerCase();
+  if (rootSt === 'cancelled' || rootSt === 'refunded') return false;
+  if (Number(student.refundedAmount) > 0) return false;
+  if (!String(student.course || '').trim()) return false;
+  return !(student.paid === true || student.paid === 'Đã đóng phí' || student.paid === 'true');
+}
+
 export function expandStudentsForTeacher(students, teacherId) {
   const tid = String(teacherId); const result = [];
   (students || []).filter(Boolean).forEach((student) => {
@@ -196,6 +235,7 @@ export function expandFinanceEnrollmentRows(students) {
 
   (students || []).forEach((student) => {
     const sid = student.id || student._id;
+    const studentCode = String(student.studentCode || '').trim();
     const all = getClientEnrollments(student);
     const active = all.filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
     const cancelled = all.filter((e) => e?.status === 'cancelled' || e?.status === 'refunded');
@@ -204,6 +244,7 @@ export function expandFinanceEnrollmentRows(students) {
       rows.push({
         key: String(sid),
         studentId: sid,
+        studentCode,
         studentName: student.name || '—',
         courseName: student.course || '—',
         price: Number(student.price) || 0,
@@ -221,6 +262,7 @@ export function expandFinanceEnrollmentRows(students) {
       rows.push({
         key: `${sid}-${enrId || idx}`,
         studentId: sid,
+        studentCode,
         studentName: student.name || '—',
         courseName: enr.courseName || enr.name || student.course || '—',
         price: Number(enr.price) || 0,
@@ -241,6 +283,7 @@ export function expandFinanceEnrollmentRows(students) {
       rows.push({
         key: `${sid}-refund-${enrId || idx}`,
         studentId: sid,
+        studentCode,
         studentName: student.name || '—',
         courseName: `${courseName} — Hoàn học phí`,
         price: -refundAmt,

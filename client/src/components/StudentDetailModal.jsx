@@ -11,7 +11,7 @@ import {
 import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
-import { getClientEnrollments } from '../utils/enrollments';
+import { getClientEnrollments, hasLearningAccessEnrollment } from '../utils/enrollments';
 import { teacherMatchesCourse } from '../utils/examSubjects';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
 import { useToast } from '../utils/toast';
@@ -46,6 +46,117 @@ const isRefundInvoice = (inv) => {
 };
 
 const courseKeyOf = (name) => String(name || '').trim().toLowerCase();
+
+/** Khóa hủy/hoàn: hiện trong filter nhưng không chọn được. */
+const isEnrollmentFilterLocked = (e) => {
+  const st = String(e?.status || '').toLowerCase();
+  return st === 'cancelled' || st === 'refunded';
+};
+
+const enrollmentFilterLockLabel = (e) => {
+  const st = String(e?.status || '').toLowerCase();
+  if (st === 'refunded' || Number(e?.refundedAmount) > 0) return 'Đã hoàn';
+  if (st === 'cancelled') return 'Đã hủy';
+  return '';
+};
+
+/** Display-only: real invoice codes from maHoaDon / sourceRef (never write back to DB). */
+const isValidInvoiceDisplayCode = (raw) => {
+  const v = String(raw ?? '').trim();
+  if (!v) return false;
+  const upper = v.toUpperCase();
+  if (v === '—' || upper === 'HĐ' || upper === 'HD' || upper === 'HOÀN') return false;
+  // Ledger refund stubs are not display invoice codes
+  if (/^cancel:/i.test(v)) return false;
+  return true;
+};
+
+const resolveInvoiceDisplayCode = ({ maHoaDon, sourceRef } = {}) => {
+  if (isValidInvoiceDisplayCode(maHoaDon)) return String(maHoaDon).trim();
+  if (isValidInvoiceDisplayCode(sourceRef)) return String(sourceRef).trim();
+  return null;
+};
+
+/** Parse enrollmentId from ledger refund sourceRef `cancel:{studentId}:{enrollmentId}`. */
+const enrollmentIdFromCancelRef = (sourceRef) => {
+  const m = String(sourceRef || '').match(/^cancel:[^:]+:(.+)$/i);
+  return m ? String(m[1]).trim() : '';
+};
+
+/**
+ * Refund display code: ưu tiên mã HĐ thu gốc (cùng enrollment / khóa),
+ * không dùng raw `cancel:…`, không bịa HOÀN-#### nếu còn map được.
+ */
+const resolveRefundLinkedInvoiceCode = ({
+  line,
+  allLines = [],
+  invoiceList = [],
+} = {}) => {
+  const direct = resolveInvoiceDisplayCode({
+    maHoaDon: line?.maHoaDon,
+    sourceRef: line?.sourceRef,
+  });
+  if (direct) return direct;
+
+  const lines = Array.isArray(allLines) ? allLines : [];
+  const invoices = Array.isArray(invoiceList) ? invoiceList : [];
+
+  if (line?.reversesEntryId) {
+    const orig = lines.find((l) => String(l?._id) === String(line.reversesEntryId));
+    const fromReverse = resolveInvoiceDisplayCode({
+      maHoaDon: orig?.maHoaDon,
+      sourceRef: orig?.sourceRef,
+    });
+    if (fromReverse) return fromReverse;
+  }
+
+  const enrId = String(line?.enrollmentId || '').trim()
+    || enrollmentIdFromCancelRef(line?.sourceRef);
+
+  const paymentCodeFromLine = (p) => resolveInvoiceDisplayCode({
+    maHoaDon: p?.maHoaDon,
+    sourceRef: p?.sourceRef,
+  });
+
+  if (enrId) {
+    const payments = lines
+      .filter((l) => {
+        if (!l || l.type === 'refund') return false;
+        return String(l.enrollmentId || '').trim() === enrId;
+      })
+      .slice()
+      .sort((a, b) => new Date(b.postedAt || b.createdAt || 0) - new Date(a.postedAt || a.createdAt || 0));
+    for (const p of payments) {
+      const code = paymentCodeFromLine(p);
+      if (code) return code;
+    }
+  }
+
+  const courseKey = courseKeyOf(line?.courseName || line?.khoaHoc);
+  if (courseKey) {
+    const coursePayments = lines
+      .filter((l) => {
+        if (!l || l.type === 'refund') return false;
+        return courseKeyOf(l.courseName) === courseKey;
+      })
+      .slice()
+      .sort((a, b) => new Date(b.postedAt || b.createdAt || 0) - new Date(a.postedAt || a.createdAt || 0));
+    for (const p of coursePayments) {
+      const code = paymentCodeFromLine(p);
+      if (code) return code;
+    }
+
+    const invPayments = invoices
+      .filter((inv) => !isRefundInvoice(inv) && courseKeyOf(inv?.khoaHoc) === courseKey)
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || b.ngayXuat || 0) - new Date(a.createdAt || a.ngayXuat || 0));
+    for (const inv of invPayments) {
+      if (isValidInvoiceDisplayCode(inv?.maHoaDon)) return String(inv.maHoaDon).trim();
+    }
+  }
+
+  return null;
+};
 
 const summarizeEnrollments = (list) => {
   const items = Array.isArray(list) ? list : [];
@@ -114,6 +225,24 @@ export default function StudentDetailModal({ studentId, onClose }) {
     setCourseFilter('all');
     setActiveTab('summary');
   }, [studentId]);
+
+  // Refund/hủy khóa đang chọn → về «Tất cả»
+  useEffect(() => {
+    if (courseFilter === 'all' || !data?.student) return;
+    const list = getClientEnrollments(data.student);
+    const enr = list.find((e) => String(e.enrollmentId || e.id) === String(courseFilter));
+    if (!enr || isEnrollmentFilterLocked(enr)) {
+      setCourseFilter('all');
+    }
+  }, [data?.student, courseFilter]);
+
+  useEffect(() => {
+    if (!data?.student) return;
+    if (!hasLearningAccessEnrollment(data.student)
+      && (activeTab === 'assignments' || activeTab === 'edit')) {
+      setActiveTab('summary');
+    }
+  }, [data?.student, activeTab]);
 
   useEffect(() => {
     const s = data?.student;
@@ -385,8 +514,10 @@ export default function StudentDetailModal({ studentId, onClose }) {
   }, [activeTab, studentId]);
 
   const liveEnrollments = data?.student ? getClientEnrollments(data.student) : [];
+  const assignableEnrollments = liveEnrollments.filter((e) => !isEnrollmentFilterLocked(e));
   const liveFilterValid = courseFilter === 'all'
-    || liveEnrollments.some((e) => String(e.enrollmentId || e.id) === String(courseFilter));
+    || liveEnrollments.some((e) => String(e.enrollmentId || e.id) === String(courseFilter)
+      && !isEnrollmentFilterLocked(e));
   const liveCourseFilter = liveFilterValid ? courseFilter : 'all';
   const liveActiveEnrollment = liveCourseFilter !== 'all'
     ? liveEnrollments.find((e) => String(e.enrollmentId || e.id) === String(liveCourseFilter)) || null
@@ -396,12 +527,18 @@ export default function StudentDetailModal({ studentId, onClose }) {
     : assignTargetCourse;
 
   useEffect(() => {
-    if (liveActiveEnrollment) {
+    if (liveActiveEnrollment && !isEnrollmentFilterLocked(liveActiveEnrollment)) {
       setAssignTargetCourse(liveActiveEnrollment.courseName || liveActiveEnrollment.name || '');
       return;
     }
-    if (!assignTargetCourse && liveEnrollments[0]) {
-      setAssignTargetCourse(liveEnrollments[0].courseName || liveEnrollments[0].name || '');
+    const currentOk = assignableEnrollments.some(
+      (e) => String(e.courseName || e.name).trim() === String(assignTargetCourse || '').trim(),
+    );
+    if (currentOk) return;
+    if (assignableEnrollments[0]) {
+      setAssignTargetCourse(assignableEnrollments[0].courseName || assignableEnrollments[0].name || '');
+    } else {
+      setAssignTargetCourse('');
     }
   }, [liveCourseFilter, liveActiveEnrollment?.enrollmentId, liveActiveEnrollment?.id, liveEnrollments.length]);
 
@@ -475,8 +612,12 @@ export default function StudentDetailModal({ studentId, onClose }) {
       return;
     }
     const enr = liveEnrollments.find(
-      (e) => String(e.courseName || e.name).trim() === courseName,
+      (e) => String(e.courseName || e.name).trim() === courseName && !isEnrollmentFilterLocked(e),
     );
+    if (!enr) {
+      toast.error('Không thể giao bài cho khóa đã hủy/hoàn');
+      return;
+    }
     try {
       const res = await api.assignments.create({
         ...newAssign,
@@ -505,7 +646,8 @@ export default function StudentDetailModal({ studentId, onClose }) {
 
   const enrollments = data?.student ? getClientEnrollments(data.student) : [];
   const filterIsValid = courseFilter === 'all'
-    || enrollments.some((e) => String(e.enrollmentId || e.id) === String(courseFilter));
+    || enrollments.some((e) => String(e.enrollmentId || e.id) === String(courseFilter)
+      && !isEnrollmentFilterLocked(e));
   const effectiveCourseFilter = filterIsValid ? courseFilter : 'all';
   const scopedEnrollments = effectiveCourseFilter === 'all'
     ? enrollments
@@ -524,12 +666,18 @@ export default function StudentDetailModal({ studentId, onClose }) {
       : (data?.student?.teacherId?.name
         || data?.student?.teacherName
         || 'Chưa gán'));
-  const statusLabel = activeEnrollment
-    ? (activeEnrollment.status === 'completed' || activeEnrollment.status === 'Hoàn thành'
-      ? 'Hoàn thành'
-      : (activeEnrollment.status === 'active' ? 'Đang học' : (activeEnrollment.status || data?.student?.status || '—')))
-    : (data?.student?.status || '—');
+  const statusLabel = (() => {
+    if (activeEnrollment) {
+      if (activeEnrollment.status === 'completed' || activeEnrollment.status === 'Hoàn thành') return 'Hoàn thành';
+      if (activeEnrollment.status === 'cancelled' || activeEnrollment.status === 'refunded') return 'Không còn học';
+      if (activeEnrollment.status === 'active') return 'Đang học';
+      return activeEnrollment.status || data?.student?.status || '—';
+    }
+    if (!hasLearningAccessEnrollment(data?.student)) return 'Không còn học';
+    return data?.student?.status || '—';
+  })();
   const avgGradeDisplay = summaryMetrics.avgGrade ?? data?.student?.avgGrade ?? '—';
+  const learningTabsLocked = !hasLearningAccessEnrollment(data?.student);
   const invoiceList = Array.isArray(data?.invoices) ? data.invoices : [];
   // Mỗi khóa đã hủy → ẩn đúng 1 hóa đơn thu cũ nhất (giữ HĐ mới nếu đăng ký lại)
   const hidePaymentQuotaByCourse = {};
@@ -598,10 +746,33 @@ export default function StudentDetailModal({ studentId, onClose }) {
 
   const financeAllPaid = summaryMetrics.enrollmentCount > 0
     && summaryMetrics.paidCount >= summaryMetrics.enrollmentCount;
-  // Badge header theo khóa đang hoạt động (không phụ thuộc student.paid sau khi hoàn)
-  const headerPaid = summaryMetrics.enrollmentCount > 0
-    ? financeAllPaid
-    : !!data?.student?.paid;
+  // Badge header: 0 active → không fallback student.paid («Chưa đóng phí»)
+  const learningActiveCount = enrollments.filter(
+    (e) => String(e?.status || '').toLowerCase() === 'active',
+  ).length;
+  const hasRefundSignal = financeRefundedTotal > 0
+    || enrollments.some((e) => Number(e?.refundedAmount) > 0 || e?.status === 'refunded');
+  const hasCancelledSignal = enrollments.some(
+    (e) => e?.status === 'cancelled' || e?.status === 'refunded',
+  );
+  const headerBadge = (() => {
+    if (learningActiveCount === 0 && (hasRefundSignal || hasCancelledSignal)) {
+      return {
+        label: hasRefundSignal ? 'Đã hoàn' : 'Đã hủy khóa',
+        className: 'bg-amber-50 text-amber-800 border border-amber-100',
+      };
+    }
+    if (learningActiveCount > 0) {
+      return financeAllPaid
+        ? { label: 'Đã thanh toán', className: 'bg-emerald-50 text-emerald-700 border border-emerald-100' }
+        : { label: 'Chưa đóng phí', className: 'bg-red-50 text-red-600 border border-red-100' };
+    }
+    // Không active, không hủy/hoàn trong danh sách — giữ paid root nếu có
+    if (data?.student?.paid) {
+      return { label: 'Đã thanh toán', className: 'bg-emerald-50 text-emerald-700 border border-emerald-100' };
+    }
+    return { label: 'Chưa đóng phí', className: 'bg-red-50 text-red-600 border border-red-100' };
+  })();
 
   const paidScopedEnrollments = scopedEnrollments.filter(
     (e) => e.status !== 'cancelled' && isEnrollmentPaid(e),
@@ -662,17 +833,21 @@ export default function StudentDetailModal({ studentId, onClose }) {
         const signed = Number(line.signedAmount != null ? line.signedAmount : (line.type === 'refund' ? -line.amount : line.amount)) || 0;
         const isRefund = line.type === 'refund' || signed < 0;
 
-        let code = line.maHoaDon;
+        let code;
         if (isRefund) {
           rCounter += 1;
-          if (!code || code === '—' || code.startsWith('R-')) {
-            code = `HOÀN-${String(rCounter).padStart(4, '0')}`;
-          }
+          // Map về mã HĐ thu gốc (kể cả payment đã ẩn vì khóa hủy)
+          code = resolveRefundLinkedInvoiceCode({
+            line,
+            allLines: ledgerCard.lines,
+            invoiceList,
+          }) || `HOÀN-${String(rCounter).padStart(4, '0')}`;
         } else {
           hdCounter += 1;
-          if (!code || code === '—' || code === 'HĐ') {
-            code = `HĐ-${String(hdCounter).padStart(4, '0')}`;
-          }
+          code = resolveInvoiceDisplayCode({
+            maHoaDon: line.maHoaDon,
+            sourceRef: line.sourceRef,
+          }) || `HĐ-${String(hdCounter).padStart(4, '0')}`;
         }
 
         return {
@@ -723,9 +898,18 @@ export default function StudentDetailModal({ studentId, onClose }) {
         const hasRefundRow = rows.some((r) => r.isRefund && courseKeyOf(r.khoaHoc) === key);
         if (hasRefundRow) return;
         const refundAmt = Number(enr.refundedAmount) || 0;
+        const linkedCode = resolveRefundLinkedInvoiceCode({
+          line: {
+            courseName,
+            enrollmentId: enr.enrollmentId || enr.id || enr._id,
+            sourceRef: `cancel:x:${enr.enrollmentId || enr.id || enr._id || ''}`,
+          },
+          allLines: [],
+          invoiceList,
+        });
         rows.push({
           key: `cancel-refund-${enr.enrollmentId || enr.id || idx}`,
-          maHoaDon: '—',
+          maHoaDon: linkedCode || '—',
           createdAt: enr.cancelledAt || enr.registeredAt,
           khoaHoc: courseName,
           ghiChu: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${String(enr.cancelReason || '').trim() || 'Admin hủy khóa'}`,
@@ -761,17 +945,26 @@ export default function StudentDetailModal({ studentId, onClose }) {
     let hdCounter = 0;
     let rCounter = 0;
     const formattedRows = rows.map((r) => {
-      let code = r.maHoaDon;
+      let code;
       if (r.isRefund) {
         rCounter += 1;
-        if (!code || code === '—' || code.startsWith('R-')) {
-          code = `HOÀN-${String(rCounter).padStart(4, '0')}`;
-        }
+        code = resolveRefundLinkedInvoiceCode({
+          line: {
+            maHoaDon: r.maHoaDon,
+            sourceRef: r.sourceRef,
+            courseName: r.khoaHoc,
+            enrollmentId: r.enrollmentId,
+          },
+          allLines: [],
+          invoiceList,
+        }) || (isValidInvoiceDisplayCode(r.maHoaDon) ? String(r.maHoaDon).trim() : null)
+          || `HOÀN-${String(rCounter).padStart(4, '0')}`;
       } else {
         hdCounter += 1;
-        if (!code || code === '—' || code === 'HĐ') {
-          code = `HĐ-${String(hdCounter).padStart(4, '0')}`;
-        }
+        code = resolveInvoiceDisplayCode({
+          maHoaDon: r.maHoaDon,
+          sourceRef: r.sourceRef,
+        }) || `HĐ-${String(hdCounter).padStart(4, '0')}`;
       }
       return { ...r, maHoaDon: code };
     });
@@ -849,10 +1042,8 @@ export default function StudentDetailModal({ studentId, onClose }) {
                     <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight break-words max-w-full">
                       {data.student.name}
                     </h2>
-                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
-                      headerPaid ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'
-                    }`}>
-                      {headerPaid ? 'Đã thanh toán' : 'Chưa đóng phí'}
+                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${headerBadge.className}`}>
+                      {headerBadge.label}
                     </span>
                   </div>
 
@@ -871,6 +1062,14 @@ export default function StudentDetailModal({ studentId, onClose }) {
                   </div>
 
                   <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-4 gap-y-1.5 text-[13px] text-slate-600 font-medium">
+                    {String(data.student.studentCode || '').trim() ? (
+                      <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
+                        <Hash size={14} className="text-slate-400 shrink-0" />
+                        <span className="truncate font-mono font-semibold text-slate-700">
+                          {String(data.student.studentCode).trim()}
+                        </span>
+                      </div>
+                    ) : null}
                     <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
                       <Smartphone size={14} className="text-slate-400 shrink-0" />
                       <span className="truncate font-mono">{data.student.phone || data.student.zalo || '—'}</span>
@@ -902,28 +1101,35 @@ export default function StudentDetailModal({ studentId, onClose }) {
                 {[
                   { id: 'summary', label: 'Tổng quan', icon: ClipboardList },
                   { id: 'attendance', label: 'Lịch học', icon: Clock },
-                  { id: 'assignments', label: 'Bài tập', icon: BookOpen },
+                  { id: 'assignments', label: 'Bài tập', icon: BookOpen, requiresLearning: true },
                   { id: 'finance', label: 'Tài chính', icon: CreditCard },
                   { id: 'academic', label: 'Điểm số', icon: Trophy },
-                  { id: 'edit', label: 'Sửa thông tin', icon: Edit3 },
-                ].map((tab) => (
+                  { id: 'edit', label: 'Sửa thông tin', icon: Edit3, requiresLearning: true },
+                ].map((tab) => {
+                  const locked = !!(tab.requiresLearning && learningTabsLocked);
+                  return (
                   <button
                     type="button"
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => !locked && setActiveTab(tab.id)}
+                    disabled={locked}
+                    title={locked ? 'Không còn khóa đang học — không thể thao tác học / sửa' : undefined}
                     className={`relative flex items-center gap-1.5 shrink-0 min-h-12 px-3 sm:px-4 text-[13px] font-semibold whitespace-nowrap transition-colors ${
-                      activeTab === tab.id
-                        ? 'text-indigo-600'
-                        : 'text-slate-500 hover:text-slate-700'
+                      locked
+                        ? 'text-slate-300 cursor-not-allowed'
+                        : activeTab === tab.id
+                          ? 'text-indigo-600'
+                          : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
                     <tab.icon size={15} className="shrink-0" />
                     {tab.label}
-                    {activeTab === tab.id && (
+                    {activeTab === tab.id && !locked && (
                       <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-600 rounded-full" />
                     )}
                   </button>
-                ))}
+                  );
+                })}
               </div>
               {enrollments.length > 1 && activeTab !== 'edit' && (
                 <div className="px-3 sm:px-6 pb-2.5 pt-0.5 flex justify-stretch sm:justify-end">
@@ -936,9 +1142,12 @@ export default function StudentDetailModal({ studentId, onClose }) {
                       <option value="all">Tất cả khóa học ({enrollments.length})</option>
                       {enrollments.map((enr) => {
                         const id = String(enr.enrollmentId || enr.id);
+                        const locked = isEnrollmentFilterLocked(enr);
+                        const lockLabel = locked ? enrollmentFilterLockLabel(enr) : '';
+                        const name = enr.courseName || enr.name || 'Khóa học';
                         return (
-                          <option key={id} value={id}>
-                            {enr.courseName || enr.name}
+                          <option key={id} value={id} disabled={locked}>
+                            {locked && lockLabel ? `${name} (${lockLabel})` : name}
                           </option>
                         );
                       })}
@@ -1441,7 +1650,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                            </button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {liveCourseFilter === 'all' && liveEnrollments.length > 0 && (
+                          {liveCourseFilter === 'all' && assignableEnrollments.length > 0 && (
                             <div className="md:col-span-2">
                               <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Khóa học giao bài</label>
                               <CmsSelect
@@ -1449,7 +1658,7 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                 onChange={(e) => setAssignTargetCourse(e.target.value)}
                                 aria-label="Chọn khóa học giao bài"
                               >
-                                {liveEnrollments.map((enr) => {
+                                {assignableEnrollments.map((enr) => {
                                   const name = enr.courseName || enr.name;
                                   return (
                                     <option key={enr.enrollmentId || enr.id || name} value={name}>

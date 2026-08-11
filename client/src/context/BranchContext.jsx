@@ -1,8 +1,7 @@
 /**
  * BranchContext.jsx — Global Branch Filter Context
  *
- * SUPER_ADMIN: có thể chọn "Tất cả" hoặc một chi nhánh.
- * HIGH_ADMIN: bắt buộc một chi nhánh cụ thể (không "all").
+ * SUPER_ADMIN / HIGH_ADMIN: mặc định "Tất cả chi nhánh"; có thể chọn 1 CN.
  * STAFF: khóa theo branchId tài khoản.
  */
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
@@ -53,18 +52,8 @@ export function BranchProvider({ session, children }) {
     }
   }, [isStaff, staffBranchId, branches]);
 
-  // HIGH_ADMIN: không dùng "Tất cả" (backend fail-closed). Gắn chi nhánh đầu tiên / account branch.
-  useEffect(() => {
-    if (!isHighAdmin || !branches.length) return;
-    if (selectedBranchId && selectedBranchId !== 'all') return;
-    const home = session?.branchId
-      ? branches.find((b) => String(b._id) === String(session.branchId))
-      : null;
-    const pick = home || branches[0];
-    if (!pick?._id) return;
-    setSelectedBranchId(pick._id);
-    setSelectedBranchName(pick.name || 'Chi nhánh');
-  }, [isHighAdmin, branches, selectedBranchId, session?.branchId]);
+  // HIGH_ADMIN: giữ mặc định "Tất cả chi nhánh" (state init).
+  // Không auto-ép về chi nhánh nhà / branches[0] — user chọn CN cụ thể khi cần.
 
   const setSelectedTenant = useCallback((id) => {
     const next = id || 'all';
@@ -126,11 +115,10 @@ export function BranchProvider({ session, children }) {
 
   const setSelectedBranch = useCallback((id, name) => {
     if (isStaff) return;
-    // HIGH_ADMIN: bắt buộc một chi nhánh cụ thể (không cho "all")
-    if (isHighAdmin && (!id || id === 'all')) return;
-    setSelectedBranchId(id || 'all');
-    setSelectedBranchName(name || 'Tất cả chi nhánh');
-  }, [isStaff, isHighAdmin]);
+    const nextId = id || 'all';
+    setSelectedBranchId(nextId);
+    setSelectedBranchName(name || (nextId === 'all' ? 'Tất cả chi nhánh' : 'Chi nhánh'));
+  }, [isStaff]);
 
   const branchQueryParam = selectedBranchId && selectedBranchId !== 'all'
     ? `branch_id=${selectedBranchId}`

@@ -62,6 +62,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
       fetchStudentsPaginated({
         page: currentPage, limit: PAGE_SIZE, search,
         paid: filterPaid, course: filterCourse, branch_id: selectedBranchId,
+        forceBranchIdAll: selectedBranchId === 'all',
       });
       return;
     }
@@ -74,6 +75,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         paid: 'all',
         course: 'all',
         branch_id: selectedBranchId,
+        forceBranchIdAll: selectedBranchId === 'all',
       });
     }
   }, [activeTab, currentPage, search, filterPaid, filterCourse, fetchStudentsPaginated, selectedBranchId]);
@@ -117,6 +119,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
     fetchStudentsPaginated({
       page, limit: PAGE_SIZE, search,
       paid: filterPaid, course: filterCourse, branch_id: selectedBranchId,
+      forceBranchIdAll: selectedBranchId === 'all' && ['students', 'dashboard'].includes(activeTab),
     });
   };
 

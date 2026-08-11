@@ -156,12 +156,28 @@ router.put('/:id', guard('update'), async (req, res) => {
       });
     }
 
-    const { name, adminRole, permissions = [], status, password, branchId, gender } = req.body;
+    const { name, adminRole, permissions = [], status, password, branchId, gender, phone } = req.body;
     const updates = {};
 
     if (name)   updates.name   = name;
     if (status) updates.status = status;
     if (gender) updates.gender = gender;
+
+    // SUPER_ADMIN/root can update phone for any staff account (HIGH/SUPPORT/STAFF/SUPER).
+    // Non-SUPER requests are ignored to keep legacy behavior.
+    if (actorIsSuperAdmin(req) && phone != null) {
+      const nextPhone = String(phone).trim();
+      if (nextPhone) {
+        const exists = await Teacher.findOne({
+          phone: nextPhone,
+          _id: { $ne: req.params.id },
+        }).select('_id').lean();
+        if (exists) {
+          return res.status(409).json({ success: false, message: 'Số điện thoại đã được sử dụng' });
+        }
+        updates.phone = nextPhone;
+      }
+    }
 
     if (adminRole) {
       // Đổi vai trò sang SUPER_ADMIN hoặc từ SUPER_ADMIN xuống STAFF: chỉ dành cho Root Admin
