@@ -181,12 +181,24 @@ const StudentVideoPlayer = ({
 
   const actualWatchedRef = useRef(bestInitial);
 
+  // Chỉ reset overlay khi đổi bài — không bật lại nút Play khi parent cập nhật tiến độ
   useEffect(() => {
-    actualWatchedRef.current = bestInitial;
-    setDisplayWatched(bestInitial);
+    const sessionWatched = sessionStorage.getItem(`student_lms_watched_${lessonId}`);
+    const initial = sessionWatched !== null
+      ? Number(sessionWatched)
+      : (Number(initialWatchedSeconds) || 0);
+    actualWatchedRef.current = initial;
+    setDisplayWatched(initial);
     setHasEnded(false);
     setOverlayVisible(true);
-  }, [lessonId, bestInitial]);
+  }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
+
+  useEffect(() => {
+    if (bestInitial > actualWatchedRef.current) {
+      actualWatchedRef.current = bestInitial;
+      setDisplayWatched(bestInitial);
+    }
+  }, [bestInitial]);
 
   // ── Auto-Unlock khi đạt 2/3 ──────────────────────────────────────────
   useEffect(() => {
@@ -198,30 +210,22 @@ const StudentVideoPlayer = ({
     }
   }, [displayWatched, totalDuration, onEligibilityReached, antiSeekEnabled]);
 
-  // ── Giám sát tương tác Tab ───────────────────────────────────────────
+  // ── Giám sát tab ẩn (không dùng window.blur — iframe YouTube fire blur khi rê/click) ──
   useEffect(() => {
-    const handleInactive = () => {
-      setIsTabActive(false);
-      if (playerRef.current?.pauseVideo) {
-        try { playerRef.current.pauseVideo(); } catch (e) { void 0 }
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setIsTabActive(false);
+        if (playerRef.current?.pauseVideo) {
+          try { playerRef.current.pauseVideo(); } catch (e) { void 0; }
+        }
+      } else {
+        setIsTabActive(true);
       }
     };
-    const handleActive = () => {
-      setIsTabActive(true);
-    };
-    const handleVisibilityChange = () => {
-      if (document.hidden) handleInactive();
-      else handleActive();
-    };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", handleInactive);
-    window.addEventListener("focus", handleActive);
-
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", handleInactive);
-      window.removeEventListener("focus", handleActive);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -347,31 +351,37 @@ const StudentVideoPlayer = ({
   }
 
   return (
-    <div className="flex flex-col w-full h-full">
-      <div ref={containerRef} className="relative w-full h-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg group">
+    <div className="flex flex-col w-full h-full min-h-0">
+      <div ref={containerRef} className="relative w-full h-full min-h-0 aspect-video lg:rounded-2xl overflow-hidden bg-black shadow-lg group">
         <div id={`student-yt-player-${lessonId}`} className="absolute inset-0 w-full h-full" />
 
-        {/* ▶️ PREMIUM OVERLAY */}
+        {/* ▶️ PREMIUM OVERLAY — chỉ lúc chưa phát / xem lại */}
         {overlayVisible && (
           <div
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, rgba(10,14,24,0.88) 0%, rgba(15,25,50,0.75) 100%)', backdropFilter: 'blur(2px)' }}
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center px-4"
+            style={{ background: 'linear-gradient(135deg, rgba(10,14,24,0.88) 0%, rgba(15,25,50,0.75) 100%)' }}
             onContextMenu={e => e.preventDefault()}
           >
-            <div className="absolute top-4 left-4 flex items-center gap-2">
+            <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
               <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest uppercase shadow-lg">THẮNG TIN HỌC</div>
-              <div className="bg-white/10 text-white/60 text-[9px] font-bold px-2 py-0.5 rounded backdrop-blur-sm border border-white/10">Nội dung độc quyền</div>
             </div>
             <button
+              type="button"
               onClick={() => playerRef.current?.playVideo?.()}
-              className="relative w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)', boxShadow: '0 0 40px rgba(16,185,129,0.45), 0 8px 32px rgba(0,0,0,0.4)' }}
+              className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)', boxShadow: '0 0 32px rgba(16,185,129,0.4), 0 8px 24px rgba(0,0,0,0.35)' }}
+              aria-label="Phát video"
             >
-              <div className="absolute inset-0 rounded-full border-2 border-emerald-300/40 animate-ping" />
-              <Play size={32} className="text-white ml-1 drop-shadow-lg" fill="white" />
+              <Play size={28} className="text-white ml-1 drop-shadow-lg" fill="white" />
             </button>
-            <p className="mt-5 text-white/70 text-sm font-semibold tracking-wide">Nhấn để bắt đầu học</p>
-            {hasEnded && <span className="mt-2 text-emerald-400 text-xs font-bold flex items-center gap-1.5"><CheckCircle size={13} /> Đã xem xong — Xem lại?</span>}
+            <p className="mt-4 text-white/70 text-sm font-semibold tracking-wide text-center">
+              {hasEnded ? 'Xem lại bài học' : 'Nhấn để bắt đầu học'}
+            </p>
+            {hasEnded && (
+              <span className="mt-2 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
+                <CheckCircle size={13} /> Đã xem xong
+              </span>
+            )}
           </div>
         )}
 
@@ -379,7 +389,6 @@ const StudentVideoPlayer = ({
         {!isTabActive && !overlayVisible && (
           <div
             className="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 text-center bg-slate-950/95"
-            style={{ backdropFilter: 'blur(4px)' }}
             onContextMenu={e => e.preventDefault()}
           >
             <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-4">
@@ -908,9 +917,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%)] pointer-events-none" />
 
                       <div className="absolute top-4 right-4">
-                        <span className="bg-white/20 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-medium uppercase tracking-wider">
-                          {course.category || 'MẶC ĐỊNH'}
-                        </span>
+                        {course.category && String(course.category).trim() && String(course.category).toUpperCase() !== 'MẶC ĐỊNH' ? (
+                          <span className="bg-white/20 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-medium uppercase tracking-wider">
+                            {course.category}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
 
@@ -1331,15 +1342,15 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       </div>
 
       {/* ─── BODY: RESPONSIVE LAYOUT (Mobile: 1 cột; Desktop: 2 cột) ──────────────── */}
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto lg:overflow-hidden" style={{ background: '#0b1018' }}>
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden" style={{ background: '#0b1018' }}>
 
         {/* ══ LEFT COLUMN: Video & Details ══ */}
-        <div className="flex flex-col flex-1 min-w-0 w-full overflow-y-auto lg:overflow-hidden custom-scrollbar-dark">
+        <div className="flex flex-col flex-1 min-w-0 w-full min-h-0 overflow-y-auto overscroll-contain custom-scrollbar-dark">
 
-          {/* VIDEO WRAPPER — 16:9 */}
-          <div className="flex-shrink-0 px-2 sm:px-4 pt-2 sm:pt-4 pb-2 flex justify-center w-full">
+          {/* VIDEO WRAPPER — full-bleed mobile, padded desktop */}
+          <div className="flex-shrink-0 px-0 sm:px-4 pt-0 sm:pt-4 pb-0 sm:pb-2 flex justify-center w-full">
             <div
-              className="relative overflow-hidden shadow-2xl shadow-black/80 w-full rounded-2xl"
+              className="relative overflow-hidden shadow-2xl shadow-black/80 w-full rounded-none sm:rounded-2xl"
               style={{
                 aspectRatio: '16 / 9',
               }}
