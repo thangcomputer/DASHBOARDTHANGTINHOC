@@ -123,6 +123,7 @@ const YouTubePlayerSecure = ({
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [isTabActive, setIsTabActive] = useState(true);
+  const [playerInteractive, setPlayerInteractive] = useState(false);
   const pauseTimeoutRef = useRef(null);
 
   // ── Bộ đếm thực tế ──────────────────────────────────────────────────────────
@@ -141,6 +142,7 @@ const YouTubePlayerSecure = ({
     setTotalDuration(lessonDuration || 0);
     setHasEnded(false);
     setOverlayVisible(true);
+    setPlayerInteractive(false);
   }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
 
   useEffect(() => {
@@ -206,6 +208,7 @@ const YouTubePlayerSecure = ({
       }
       setIsReady(false);
       setHasEnded(false);
+      setPlayerInteractive(false);
 
       playerRef.current = new window.YT.Player(`yt-player-${lessonId}`, {
         videoId: extractYouTubeId(videoId),
@@ -344,8 +347,24 @@ const YouTubePlayerSecure = ({
   return (
     <div className="flex flex-col w-full h-full min-h-0">
       {/* YouTube Player */}
-      <div ref={containerRef} className="relative w-full h-full min-h-0 lg:rounded-2xl overflow-hidden bg-black shadow-lg group">
-        <div id={`yt-player-${lessonId}`} className="absolute inset-0 w-full h-full" />
+      <div
+        ref={containerRef}
+        className="relative w-full h-full min-h-0 lg:rounded-2xl overflow-hidden bg-black shadow-lg group"
+        onMouseLeave={() => setPlayerInteractive(false)}
+      >
+        <div
+          id={`yt-player-${lessonId}`}
+          className="absolute inset-0 w-full h-full"
+          style={{ pointerEvents: playerInteractive || overlayVisible ? 'auto' : 'none' }}
+        />
+        {!overlayVisible && !playerInteractive ? (
+          <button
+            type="button"
+            aria-label="Tương tác video"
+            className="absolute inset-0 z-[15] cursor-default bg-transparent border-0 p-0"
+            onClick={() => setPlayerInteractive(true)}
+          />
+        ) : null}
 
         {/* ▶️ PREMIUM OVERLAY — chỉ lúc chưa phát / xem lại */}
         {overlayVisible && (
@@ -1113,11 +1132,14 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
       {/* ─── BODY: Udemy-style — cột trái scroll; video+tabs sticky; sidebar độc lập ─── */}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden" style={{ background: '#0b1018' }}>
 
-        <div className="flex flex-col flex-1 min-w-0 w-full min-h-0 overflow-y-auto overscroll-contain custom-scrollbar-dark">
+        <div
+          data-lms-scroll
+          className="flex-1 basis-0 min-w-0 min-h-0 w-full overflow-y-scroll overscroll-y-contain custom-scrollbar-dark"
+        >
 
           <div className="sticky top-0 z-20 bg-[#0b1018] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
             <div className="px-0 sm:px-4 pt-0 sm:pt-3 pb-0 sm:pb-2 flex justify-center w-full bg-black/40">
-              <div className="relative w-full rounded-none sm:rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80 h-[36dvh] sm:h-[40dvh] lg:h-[min(46dvh,480px)] max-h-[420px]">
+              <div className="relative w-full rounded-none sm:rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80 h-[44dvh] sm:h-[50dvh] lg:h-[min(56dvh,560px)]">
                 <YouTubePlayerSecure
                   key={currentLesson?._id}
                   videoId={currentLesson?.videoUrl}
@@ -1137,7 +1159,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             <LmsTabBar courseTab={courseTab} setCourseTab={setCourseTab} />
           </div>
 
-          <div className="px-4 sm:px-6 py-4 sm:py-5 w-full" style={{ background: '#0d1117' }}>
+          <div className="px-4 sm:px-6 py-4 sm:py-5 pb-16 w-full" style={{ background: '#0d1117' }}>
             <LmsPlayerPanels
               courseTab={courseTab}
               userId={teacherSession?.id || teacherSession?._id || 'teacher'}
@@ -1195,7 +1217,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
         {/* ══ RIGHT SIDEBAR ══ */}
         <div
-          className="hidden lg:flex flex-col lg:w-80 flex-shrink-0 border-l h-full overflow-hidden"
+          className="hidden lg:flex flex-col lg:w-80 flex-shrink-0 border-l min-h-0 self-stretch overflow-hidden"
           style={{ borderColor: 'rgba(255,255,255,0.06)', background: '#0b1018' }}
         >
 
