@@ -1,10 +1,45 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Clock, ArrowLeft, Send, CheckCircle, XCircle, AlertTriangle,
-  ChevronLeft, ChevronRight, LayoutGrid, Award, BookOpen, User, RefreshCw
+  ChevronLeft, ChevronRight, LayoutGrid, Award, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
 import { useToast } from '../../utils/toast';
+
+/** Lớp phủ toàn app — che sidebar/header/messenger */
+function ExamOverlay({ children }) {
+  if (typeof document === 'undefined') return children;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99999] h-[100dvh] w-screen max-w-[100vw] bg-[#0b1018] text-white flex flex-col overflow-hidden font-sans"
+      style={{ isolation: 'isolate' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Phòng thi trắc nghiệm"
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
+
+async function enterBrowserFullscreen() {
+  try {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      await el.requestFullscreen();
+    }
+  } catch { /* trình duyệt có thể chặn */ }
+}
+
+async function leaveBrowserFullscreen() {
+  try {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      await document.exitFullscreen();
+    }
+  } catch { /* ignore */ }
+}
 
 export default function StudentQuizExamRoom({ quizId, onBack }) {
   const toast = useToast();
@@ -15,32 +50,95 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
   const [resultData, setResultData] = useState(null);
 
   const timerRef = useRef(null);
+  const resultDataRef = useRef(null);
+  const submittingRef = useRef(false);
+  const selectedAnswersRef = useRef({});
+  const quizDataRef = useRef(null);
+  const allowUnloadRef = useRef(false);
+  const forfeitKey = `quiz_forfeit_pending:${quizId}`;
 
-  // 1. Tải thông tin đề thi trắc nghiệm
+  useEffect(() => { resultDataRef.current = resultData; }, [resultData]);
+  useEffect(() => { submittingRef.current = submitting; }, [submitting]);
+  useEffect(() => { selectedAnswersRef.current = selectedAnswers; }, [selectedAnswers]);
+  useEffect(() => { quizDataRef.current = quizData; }, [quizData]);
+
+  const applyResult = useCallback((data) => {
+    if (!data) return;
+    allowUnloadRef.current = true;
+    try { localStorage.removeItem(forfeitKey); } catch { /* ignore */ }
+    setResultData(data);
+  }, [forfeitKey]);
+
+  const submitForfeit = useCallback(async (reason, { leaveAfter = false } = {}) => {
+    if (resultDataRef.current || submittingRef.current) return false;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setShowExitModal(false);
+    setShowConfirmModal(false);
+    try {
+      const res = await api.quizzes.submit(quizId, [], {
+        forfeit: true,
+        exitReason: reason || 'Thoát giữa giờ làm bài',
+      });
+      if (res?.success && res.data) {
+        applyResult(res.data);
+        toast.error(res.message || 'Bạn đã bị tính RỚT do thoát giữa giờ');
+        if (leaveAfter) onBack?.();
+        return true;
+      }
+      if (res?.code === 'QUIZ_FORFEITED' && res.data) {
+        applyResult(res.data);
+        toast.error(res.message || 'Bạn đã bị tính RỚT do thoát giữa giờ');
+        if (leaveAfter) onBack?.();
+        return true;
+      }
+      toast.error(res?.message || 'Không ghi nhận được trạng thái thoát');
+      return false;
+    } catch {
+      toast.error('Lỗi kết nối khi ghi nhận thoát bài');
+      return false;
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  }, [quizId, applyResult, toast, onBack]);
+
+  // 1. Tải đề + xử lý dấu vết thoát lần trước (reload/đóng tab)
   useEffect(() => {
     let active = true;
     setLoading(true);
     api.quizzes.getQuizForExam(quizId)
-      .then(res => {
+      .then(async (res) => {
         if (!active) return;
-        if (res.success && res.data) {
-          setQuizData(res.data);
-          setTimeLeft((res.data.timeLimitMinutes || 15) * 60);
-          // Nếu đã làm rồi, hiển thị bài nộp trước đó
-          if (res.data.mySubmission) {
-            setResultData({
-              score: res.data.mySubmission.score,
-              correctCount: res.data.mySubmission.correctCount,
-              totalQuestions: res.data.mySubmission.totalQuestions,
-              status: res.data.mySubmission.status,
-              submittedAt: res.data.mySubmission.submittedAt,
-            });
-          }
-        } else {
+        if (!res.success || !res.data) {
           toast.error(res.message || 'Không thể tải bài trắc nghiệm');
+          return;
+        }
+        setQuizData(res.data);
+        setTimeLeft((res.data.timeLimitMinutes || 15) * 60);
+
+        if (res.data.mySubmission) {
+          applyResult({
+            score: res.data.mySubmission.score,
+            correctCount: res.data.mySubmission.correctCount,
+            totalQuestions: res.data.mySubmission.totalQuestions,
+            status: res.data.mySubmission.status,
+            submittedAt: res.data.mySubmission.submittedAt,
+            forfeit: !!res.data.mySubmission.forfeit,
+            exitReason: res.data.mySubmission.exitReason || '',
+          });
+          return;
+        }
+
+        let pendingForfeit = false;
+        try { pendingForfeit = localStorage.getItem(forfeitKey) === '1'; } catch { /* ignore */ }
+        if (pendingForfeit) {
+          try { localStorage.removeItem(forfeitKey); } catch { /* ignore */ }
+          await submitForfeit('Tải lại hoặc đóng trang khi đang làm bài');
         }
       })
       .catch(() => {
@@ -50,54 +148,134 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [quizId]);
+  }, [quizId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 2. Đếm ngược thời gian
   useEffect(() => {
-    if (loading || resultData || timeLeft <= 0) return;
+    if (loading || resultData) return undefined;
     timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
+      setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current);
-          handleAutoSubmit();
+          toast.info('Hết giờ làm bài! Đang tự động nộp bài...');
+          submitAnswersRef.current?.();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [loading, resultData, timeLeft]);
+  }, [loading, resultData, toast]);
 
-  // Nộp bài tự động khi hết giờ
-  const handleAutoSubmit = () => {
-    toast.info('Hết giờ làm bài! Đang tự động nộp bài...');
-    submitAnswers();
-  };
-
-  // 3. Thực hiện nộp bài
-  const submitAnswers = async () => {
-    if (submitting || !quizData) return;
+  const submitAnswers = useCallback(async () => {
+    if (submittingRef.current || resultDataRef.current || !quizDataRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setShowConfirmModal(false);
 
-    const questions = quizData.questions || [];
+    const questions = quizDataRef.current.questions || [];
+    const answersMap = selectedAnswersRef.current;
     const answerArray = questions.map((_, idx) => (
-      selectedAnswers[idx] !== undefined ? selectedAnswers[idx] : null
+      answersMap[idx] !== undefined ? answersMap[idx] : null
     ));
 
     try {
       const res = await api.quizzes.submit(quizId, answerArray);
       if (res.success && res.data) {
-        setResultData(res.data);
+        applyResult(res.data);
         toast.success('Đã nộp bài thành công!');
+      } else if (res?.code === 'QUIZ_FORFEITED' && res.data) {
+        applyResult(res.data);
+        toast.error(res.message || 'Bạn đã bị tính RỚT do thoát giữa giờ');
       } else {
         toast.error(res.message || 'Lỗi nộp bài');
       }
     } catch {
       toast.error('Lỗi nộp bài trắc nghiệm');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
+  }, [quizId, applyResult, toast]);
+
+  const submitAnswersRef = useRef(submitAnswers);
+  useEffect(() => { submitAnswersRef.current = submitAnswers; }, [submitAnswers]);
+
+  // Khóa scroll body khi mở phòng thi
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+      leaveBrowserFullscreen();
+    };
+  }, []);
+
+  // Toàn màn hình trình duyệt khi đang làm bài (chưa có kết quả)
+  useEffect(() => {
+    if (loading || !quizData || resultData) return undefined;
+    enterBrowserFullscreen();
+
+    const onFsChange = () => {
+      const stillInExam = Boolean(quizDataRef.current && !resultDataRef.current);
+      if (!document.fullscreenElement && stillInExam && !allowUnloadRef.current) {
+        setShowExitModal(true);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, [loading, quizData, resultData]);
+
+  // Có kết quả → thoát fullscreen browser (vẫn giữ overlay app)
+  useEffect(() => {
+    if (resultData) leaveBrowserFullscreen();
+  }, [resultData]);
+
+  // Reload / đóng tab vẫn cảnh báo + ghi rớt (không bắt F5/Back browser — chỉ nút ← trong phòng thi)
+  useEffect(() => {
+    const inExam = () => Boolean(quizDataRef.current && !resultDataRef.current && !loading);
+
+    const handleBeforeUnload = (e) => {
+      if (!inExam() || allowUnloadRef.current) return;
+      e.preventDefault();
+      e.returnValue = 'Thoát lúc này sẽ bị tính RỚT. Bạn có chắc không?';
+    };
+
+    const markPendingAndBeacon = () => {
+      if (!inExam() || allowUnloadRef.current) return;
+      try { localStorage.setItem(forfeitKey, '1'); } catch { /* ignore */ }
+      api.quizzes.submitForfeitBeacon(quizId, 'Tải lại hoặc đóng trang khi đang làm bài');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', markPendingAndBeacon);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', markPendingAndBeacon);
+    };
+  }, [quizId, forfeitKey, loading]);
+
+  const handleLeaveExamRoom = useCallback(() => {
+    allowUnloadRef.current = true;
+    leaveBrowserFullscreen();
+    onBack?.();
+  }, [onBack]);
+
+  const requestExit = () => {
+    if (resultData) {
+      handleLeaveExamRoom();
+      return;
+    }
+    setShowExitModal(true);
+  };
+
+  const stayInExam = () => {
+    setShowExitModal(false);
+    enterBrowserFullscreen();
+  };
+
+  const confirmExitForfeit = () => {
+    submitForfeit('Thoát phòng thi giữa giờ', { leaveAfter: false });
   };
 
   const formatTime = (secs) => {
@@ -108,21 +286,25 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
-        <RefreshCw className="animate-spin text-emerald-400 mb-3" size={32} />
-        <p className="text-sm font-bold">Đang tải phòng thi trắc nghiệm...</p>
-      </div>
+      <ExamOverlay>
+        <div className="flex-1 flex flex-col items-center justify-center text-white">
+          <RefreshCw className="animate-spin text-emerald-400 mb-3" size={32} />
+          <p className="text-sm font-bold">Đang tải phòng thi trắc nghiệm...</p>
+        </div>
+      </ExamOverlay>
     );
   }
 
   if (!quizData) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
-        <p className="text-base font-bold text-red-400 mb-4">Không có dữ liệu bài thi</p>
-        <button type="button" onClick={onBack} className="px-4 py-2 bg-slate-800 rounded-xl text-sm font-bold">
-          Quay lại
-        </button>
-      </div>
+      <ExamOverlay>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-white">
+          <p className="text-base font-bold text-red-400 mb-4">Không có dữ liệu bài thi</p>
+          <button type="button" onClick={handleLeaveExamRoom} className="px-4 py-2 bg-slate-800 rounded-xl text-sm font-bold">
+            Quay lại
+          </button>
+        </div>
+      </ExamOverlay>
     );
   }
 
@@ -132,14 +314,16 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
 
   // ── 4. MÀN HÌNH KẾT QUẢ VÀ XEM LẠI BÀI ──────────────────────────────────────
   if (resultData) {
-    const isPassed = resultData.status === 'passed' || resultData.score >= 70;
+    const isForfeit = !!resultData.forfeit;
+    const isPassed = !isForfeit && (resultData.status === 'passed' || resultData.score >= 70);
     return (
-      <div className="min-h-screen bg-[#0d1117] text-white p-4 sm:p-6 lg:p-8 flex flex-col items-center">
+      <ExamOverlay>
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center">
         <div className="w-full max-w-4xl space-y-6">
           <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
             <button
               type="button"
-              onClick={onBack}
+              onClick={handleLeaveExamRoom}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold transition"
             >
               <ArrowLeft size={16} /> Quay lại danh sách
@@ -161,9 +345,15 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                 {resultData.score}%
               </span>
               <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
-                {isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT'}
+                {isForfeit ? 'RỚT · THOÁT GIỮA GIỜ' : (isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT')}
               </span>
             </div>
+
+            {isForfeit && (
+              <p className="text-xs text-red-300/90 mb-6 max-w-md mx-auto leading-relaxed">
+                {resultData.exitReason || 'Bạn đã thoát phòng thi khi đang làm bài nên bị tính RỚT.'}
+              </p>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-md mx-auto text-left text-xs font-semibold">
               <div className="bg-white/5 p-3 rounded-xl border border-white/5">
@@ -177,7 +367,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
               <div className="bg-white/5 p-3 rounded-xl border border-white/5 col-span-2 sm:col-span-1">
                 <span className="text-slate-400 block text-[10px]">Trạng thái</span>
                 <span className={`font-bold text-sm ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {isPassed ? 'Đã hoàn thành' : 'Cần học lại'}
+                  {isForfeit ? 'Rớt do thoát' : (isPassed ? 'Đã hoàn thành' : 'Cần học lại')}
                 </span>
               </div>
             </div>
@@ -235,19 +425,21 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      </ExamOverlay>
     );
   }
 
-  // ── 5. MÀN HÌNH THI TRẮC NGHIỆM CHUẨN BỐ CỤC PHÒNG THI CHỨNG CHỈ ──────────
+  // ── 5. MÀN HÌNH THI TRẮC NGHIỆM (TOÀN MÀN HÌNH) ─────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0b1018] text-white flex flex-col font-sans select-none overflow-x-hidden">
+    <ExamOverlay>
+    <div className="flex-1 min-h-0 flex flex-col select-none overflow-x-hidden">
       {/* ── TOPBAR PHÒNG THI ── */}
       <header className="h-14 bg-[#0e1420] border-b border-white/10 px-4 sm:px-6 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
-            onClick={onBack}
+            onClick={requestExit}
             className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition"
           >
             <ArrowLeft size={16} />
@@ -278,20 +470,20 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
         {/* Cột trái: Câu hỏi hiện tại */}
         <div className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 overflow-y-auto">
           {currentQ ? (
-            <div className="max-w-3xl mx-auto w-full space-y-6">
+            <div className="max-w-3xl mx-auto w-full space-y-4">
               <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-400 border-b border-white/10 pb-3">
-                <span className="text-emerald-400 uppercase tracking-widest text-[11px]">
+                <span className="text-sky-400 uppercase tracking-widest text-[11px]">
                   Câu hỏi {currentIndex + 1} / {questions.length}
                 </span>
                 <span>Đã chọn: {answeredCount}/{questions.length}</span>
               </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 sm:p-6 shadow-xl">
-                <h2 className="text-base sm:text-lg font-bold text-slate-100 leading-relaxed mb-6">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 shadow-xl">
+                <h2 className="text-base sm:text-lg font-bold text-slate-100 leading-relaxed mb-4">
                   {currentQ.questionText}
                 </h2>
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {(currentQ.options || []).map((opt, optIdx) => {
                     const isSelected = selectedAnswers[currentIndex] === optIdx;
                     return (
@@ -301,7 +493,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                         onClick={() => {
                           setSelectedAnswers(prev => ({ ...prev, [currentIndex]: optIdx }));
                         }}
-                        className={`w-full p-4 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                        className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 ${
                           isSelected
                             ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-900/20'
                             : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300'
@@ -322,12 +514,12 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
               </div>
 
               {/* Điều hướng Trước / Sau */}
-              <div className="flex items-center justify-between gap-3 pt-2">
+              <div className="flex items-center justify-between gap-3 pt-1">
                 <button
                   type="button"
                   disabled={currentIndex <= 0}
                   onClick={() => setCurrentIndex(prev => prev - 1)}
-                  className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-30 text-xs font-bold flex items-center gap-1.5 transition"
+                  className="px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1.5 transition text-slate-200"
                 >
                   <ChevronLeft size={16} /> Câu trước
                 </button>
@@ -335,7 +527,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                   type="button"
                   disabled={currentIndex >= questions.length - 1}
                   onClick={() => setCurrentIndex(prev => prev + 1)}
-                  className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-30 text-xs font-bold flex items-center gap-1.5 transition"
+                  className="px-4 py-2.5 rounded-xl border border-sky-500/40 bg-sky-500/20 hover:bg-sky-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1.5 transition text-sky-100"
                 >
                   Câu tiếp <ChevronRight size={16} />
                 </button>
@@ -347,21 +539,21 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
         </div>
 
         {/* Cột phải: Ma trận số câu hỏi (Sidebar) */}
-        <div className="lg:w-80 border-t lg:border-t-0 lg:border-l border-white/10 p-4 sm:p-6 bg-[#0e1420] flex flex-col shrink-0">
-          <div className="flex items-center gap-2 mb-4 text-xs font-bold text-slate-300">
-            <LayoutGrid size={16} className="text-emerald-400" />
+        <div className="lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-white/10 p-4 sm:p-5 bg-[#0e1420] flex flex-col shrink-0 lg:overflow-y-auto">
+          <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-300">
+            <LayoutGrid size={16} className="text-sky-400" />
             <span>Danh sách câu hỏi</span>
           </div>
 
-          <div className="grid grid-cols-5 gap-2 overflow-y-auto flex-1 max-h-60 lg:max-h-none pr-1">
+          <div className="grid grid-cols-5 gap-2 content-start self-start w-full max-h-[min(40vh,280px)] lg:max-h-none overflow-y-auto pr-0.5">
             {questions.map((_, idx) => {
               const isAnswered = selectedAnswers[idx] !== undefined;
               const isCurrent = idx === currentIndex;
-              let btnStyle = 'bg-white/5 border-white/10 text-slate-400';
+              let btnStyle = 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10';
               if (isCurrent) {
-                btnStyle = 'bg-emerald-500 text-slate-950 font-black border-emerald-400 ring-2 ring-emerald-400/50';
+                btnStyle = 'bg-sky-500 text-slate-950 font-black border-sky-300 ring-2 ring-sky-400/40';
               } else if (isAnswered) {
-                btnStyle = 'bg-emerald-500/25 border-emerald-500/50 text-emerald-300 font-bold';
+                btnStyle = 'bg-emerald-500/30 border-emerald-500/60 text-emerald-200 font-bold';
               }
 
               return (
@@ -377,9 +569,13 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
             })}
           </div>
 
-          <div className="mt-4 pt-4 border-t border-white/10 space-y-2 text-[11px] text-slate-400 font-semibold">
+          <div className="mt-3 pt-3 border-t border-white/10 space-y-1.5 text-[11px] text-slate-400 font-semibold shrink-0">
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-md bg-emerald-500/25 border border-emerald-500/50" />
+              <span className="w-3 h-3 rounded-md bg-sky-500 border border-sky-300" />
+              <span>Đang xem</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-md bg-emerald-500/30 border border-emerald-500/60" />
               <span>Đã làm ({answeredCount})</span>
             </div>
             <div className="flex items-center gap-2">
@@ -420,6 +616,38 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
           </div>
         </div>
       )}
+
+      {/* ── MODAL THOÁT = RỚT ── */}
+      {showExitModal && (
+        <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#161d2a] border border-red-500/30 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <AlertTriangle className="text-red-400" size={20} /> Thoát sẽ bị RỚT
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bạn đang trong giờ làm bài. Nếu thoát hoặc tải lại trang, bài sẽ được ghi nhận <strong className="text-red-300">RỚT (0 điểm)</strong> và gửi cho giảng viên.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={stayInExam}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold transition"
+              >
+                Ở lại làm tiếp
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={confirmExitForfeit}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md"
+              >
+                {submitting ? 'Đang ghi nhận...' : 'Đồng ý thoát (Rớt)'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+    </ExamOverlay>
   );
 }

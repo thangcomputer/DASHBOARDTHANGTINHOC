@@ -690,16 +690,25 @@ export default function TeacherQuizManager({ myStudents = [] }) {
             {selectedDetailQuiz.submissions && selectedDetailQuiz.submissions.length > 0 ? (
               <div className="divide-y divide-slate-100">
                 {selectedDetailQuiz.submissions.map((sub, idx) => (
-                  <div key={idx} className="py-3 flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm">{sub.studentName}</p>
-                      <p className="text-slate-400 text-[11px]">SĐT: {sub.studentPhone || 'N/A'} · Ngày nộp: {new Date(sub.submittedAt).toLocaleDateString('vi-VN')}</p>
+                  <div key={idx} className="py-3 flex items-center justify-between text-xs gap-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-800 text-sm truncate">{sub.studentName}</p>
+                      <p className="text-slate-400 text-[11px]">
+                        SĐT: {sub.studentPhone || 'N/A'} · Ngày nộp: {new Date(sub.submittedAt).toLocaleDateString('vi-VN')}
+                      </p>
+                      {sub.forfeit && (
+                        <p className="text-red-600 text-[11px] font-bold mt-0.5">
+                          Rớt do thoát giữa giờ{sub.exitReason ? ` · ${sub.exitReason}` : ''}
+                        </p>
+                      )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <span className={`px-2 py-0.5 rounded-md font-black text-xs ${
-                        sub.status === 'passed' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                        sub.forfeit || sub.status !== 'passed' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
                       }`}>
-                        {sub.score}% · {sub.correctCount}/{sub.totalQuestions} câu đúng
+                        {sub.forfeit
+                          ? 'RỚT · Thoát'
+                          : `${sub.score}% · ${sub.correctCount}/${sub.totalQuestions} câu đúng`}
                       </span>
                     </div>
                   </div>

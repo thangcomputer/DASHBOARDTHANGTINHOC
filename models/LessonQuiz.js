@@ -16,7 +16,10 @@ const SubmissionSchema = new mongoose.Schema({
   correctCount: { type: Number, default: 0 },
   totalQuestions: { type: Number, default: 0 },
   submittedAt: { type: Date, default: Date.now },
-  status: { type: String, enum: ['passed', 'failed'], default: 'passed' }
+  status: { type: String, enum: ['passed', 'failed'], default: 'passed' },
+  /** Thoát / reload giữa giờ → rớt */
+  forfeit: { type: Boolean, default: false },
+  exitReason: { type: String, default: '' },
 });
 
 const LessonQuizSchema = new mongoose.Schema({

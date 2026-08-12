@@ -74,8 +74,9 @@ export default function StudentQuizList() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {quizzes.map((quiz) => {
             const hasSubmitted = !!quiz.mySubmission;
+            const isForfeit = !!quiz.mySubmission?.forfeit;
             const score = quiz.mySubmission?.score;
-            const isPassed = quiz.mySubmission?.status === 'passed' || (score != null && score >= 70);
+            const isPassed = !isForfeit && (quiz.mySubmission?.status === 'passed' || (score != null && score >= 70));
 
             return (
               <div
@@ -91,7 +92,7 @@ export default function StudentQuizList() {
                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
                         isPassed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
                       }`}>
-                        {isPassed ? 'ĐẠT' : 'CHƯA ĐẠT'}
+                        {isForfeit ? 'RỚT · THOÁT' : (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT')}
                       </span>
                     )}
                   </div>
@@ -107,9 +108,15 @@ export default function StudentQuizList() {
                   </div>
 
                   {hasSubmitted && (
-                    <div className="bg-emerald-50/60 rounded-xl p-2.5 border border-emerald-100 flex items-center justify-between text-xs my-1">
-                      <span className="text-emerald-800 font-semibold">Kết quả đã nộp:</span>
-                      <span className="font-black text-emerald-700 text-sm">{score}% ({quiz.mySubmission.correctCount}/{quiz.mySubmission.totalQuestions} câu)</span>
+                    <div className={`rounded-xl p-2.5 border flex items-center justify-between text-xs my-1 ${
+                      isForfeit ? 'bg-red-50/70 border-red-100' : 'bg-emerald-50/60 border-emerald-100'
+                    }`}>
+                      <span className={`font-semibold ${isForfeit ? 'text-red-800' : 'text-emerald-800'}`}>
+                        {isForfeit ? 'Rớt do thoát giữa giờ' : 'Kết quả đã nộp:'}
+                      </span>
+                      <span className={`font-black text-sm ${isForfeit ? 'text-red-700' : 'text-emerald-700'}`}>
+                        {score}%{!isForfeit ? ` (${quiz.mySubmission.correctCount}/${quiz.mySubmission.totalQuestions} câu)` : ''}
+                      </span>
                     </div>
                   )}
                 </div>

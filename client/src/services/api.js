@@ -1895,12 +1895,33 @@ export const quizzesAPI = {
     const res = await apiFetch(`/quizzes/${id}`);
     return res.json();
   },
-  submit: async (id, answers) => {
+  submit: async (id, answers, opts = {}) => {
     const res = await apiFetch(`/quizzes/${id}/submit`, {
       method: 'POST',
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({
+        answers,
+        forfeit: opts.forfeit === true,
+        exitReason: opts.exitReason || '',
+      }),
     });
     return res.json();
+  },
+  /** Best-effort forfeit khi đóng tab / reload (keepalive, không chờ retry) */
+  submitForfeitBeacon: (id, exitReason = 'Tải lại hoặc đóng trang khi đang làm bài') => {
+    try {
+      const token = getAccessToken('student') || getAccessToken();
+      const csrf = _csrfToken;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      fetch(`${API_BASE}/quizzes/${id}/submit`, {
+        method: 'POST',
+        credentials: 'include',
+        keepalive: true,
+        headers,
+        body: JSON.stringify({ answers: [], forfeit: true, exitReason }),
+      }).catch(() => {});
+    } catch { /* ignore */ }
   },
 };
 

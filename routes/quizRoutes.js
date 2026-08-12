@@ -191,7 +191,8 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
   try {
     const quizId = req.params.id;
     const studentId = req.user.id || req.user._id;
-    const { answers } = req.body; // Array of option indices e.g. [0, 2, 1, 3]
+    const { answers, forfeit, exitReason } = req.body || {};
+    const isForfeit = forfeit === true || forfeit === 'true' || forfeit === 1;
 
     const quiz = await LessonQuiz.findById(quizId);
     if (!quiz) {
@@ -203,34 +204,80 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
 
-    // Chấm điểm
-    let correctCount = 0;
+    const existingIndex = quiz.submissions.findIndex(s => String(s.studentId) === String(studentId));
+    const existing = existingIndex >= 0 ? quiz.submissions[existingIndex] : null;
+
+    if (existing?.forfeit) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn đã bị tính RỚT do thoát giữa giờ. Không thể làm lại bài này.',
+        code: 'QUIZ_FORFEITED',
+        data: {
+          score: existing.score,
+          correctCount: existing.correctCount,
+          totalQuestions: existing.totalQuestions,
+          status: existing.status,
+          forfeit: true,
+          exitReason: existing.exitReason || '',
+          submittedAt: existing.submittedAt,
+        },
+      });
+    }
+
+    // Đã nộp bình thường rồi mà gửi forfeit (reload muộn) → giữ bài cũ
+    if (isForfeit && existing && !existing.forfeit) {
+      return res.json({
+        success: true,
+        message: 'Bài đã nộp trước đó',
+        data: {
+          score: existing.score,
+          correctCount: existing.correctCount,
+          totalQuestions: existing.totalQuestions,
+          status: existing.status,
+          forfeit: false,
+          exitReason: '',
+          submittedAt: existing.submittedAt,
+          detailedReview: [],
+        },
+      });
+    }
+
     const totalQuestions = quiz.questions.length;
     const userAnswers = Array.isArray(answers) ? answers : [];
+    let correctCount = 0;
+    let score = 0;
+    let status = 'failed';
+    let reason = '';
 
-    quiz.questions.forEach((q, idx) => {
-      if (userAnswers[idx] === q.correctAnswer) {
-        correctCount += 1;
-      }
-    });
-
-    const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-    const status = score >= 70 ? 'passed' : 'failed';
+    if (isForfeit) {
+      correctCount = 0;
+      score = 0;
+      status = 'failed';
+      reason = String(exitReason || 'Thoát giữa giờ làm bài').slice(0, 200);
+    } else {
+      quiz.questions.forEach((q, idx) => {
+        if (userAnswers[idx] === q.correctAnswer) {
+          correctCount += 1;
+        }
+      });
+      score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+      status = score >= 70 ? 'passed' : 'failed';
+    }
 
     const submissionData = {
       studentId: student._id,
       studentName: student.name,
       studentPhone: student.phone || student.zalo || '',
-      answers: userAnswers,
+      answers: isForfeit ? [] : userAnswers,
       score,
       correctCount,
       totalQuestions,
       submittedAt: new Date(),
       status,
+      forfeit: isForfeit,
+      exitReason: reason,
     };
 
-    // Cập nhật hoặc lưu bài làm mới
-    const existingIndex = quiz.submissions.findIndex(s => String(s.studentId) === String(studentId));
     if (existingIndex >= 0) {
       quiz.submissions[existingIndex] = submissionData;
     } else {
@@ -239,25 +286,28 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
 
     await quiz.save();
 
-    // Trả về kết quả kèm lời giải chi tiết
-    const detailedReview = quiz.questions.map((q, idx) => ({
-      _id: q._id,
-      questionText: q.questionText,
-      options: q.options,
-      correctAnswer: q.correctAnswer,
-      userAnswer: userAnswers[idx] ?? null,
-      isCorrect: userAnswers[idx] === q.correctAnswer,
-      explanation: q.explanation || '',
-    }));
+    const detailedReview = isForfeit
+      ? []
+      : quiz.questions.map((q, idx) => ({
+        _id: q._id,
+        questionText: q.questionText,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        userAnswer: userAnswers[idx] ?? null,
+        isCorrect: userAnswers[idx] === q.correctAnswer,
+        explanation: q.explanation || '',
+      }));
 
     return res.json({
       success: true,
-      message: 'Nộp bài thành công',
+      message: isForfeit ? 'Đã ghi nhận RỚT do thoát giữa giờ' : 'Nộp bài thành công',
       data: {
         score,
         correctCount,
         totalQuestions,
         status,
+        forfeit: isForfeit,
+        exitReason: reason,
         submittedAt: submissionData.submittedAt,
         detailedReview,
       },
