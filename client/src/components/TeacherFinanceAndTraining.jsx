@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   DollarSign, PlayCircle, Download, Calendar as CalendarIcon,
   Clock, TrendingUp, CreditCard,
@@ -10,6 +10,8 @@ import { useModal } from '../utils/Modal.jsx';
 import api, { getRolePrefix } from '../services/api';
 import { sanitizeCsvField } from '../utils/csvSanitizer';
 
+const isPaidTxStatus = (status) => ['completed', 'paid', 'confirmed'].includes(String(status || ''));
+const isPendingTxStatus = (status) => !isPaidTxStatus(status);
 const CircularProgress = ({ progress }) => {
   const radius = 35;
   const circumference = 2 * Math.PI * radius;
@@ -68,7 +70,7 @@ const TeacherFinanceAndTraining = () => {
       setIsLoadingFinance(true);
       Promise.all([
         api.transactions.getByTeacher(teacherId).catch(() => ({ success: false })),
-        api.teachers.getFinance(teacherId).catch(() => ({ success: false }))
+        api.teachers.getFinance(teacherId).catch(() => ({ success: false })),
       ]).then(([txRes, finRes]) => {
         if (txRes && txRes.success) setMyPayments(txRes.data || []);
         if (finRes && finRes.success) setFinanceStats(finRes.data || { totalSessions: 0, unpaidAmount: 0, paidAmount: 0, salaryPerSession: 0 });
@@ -91,23 +93,48 @@ const TeacherFinanceAndTraining = () => {
   const totalSessions = financeStats.totalSessions || 0;
   const [filterStatus, setFilterStatus] = useState('all');
 
-  const filteredPayments = filterStatus === 'all'
-    ? myPayments
-    : myPayments.filter(p => {
-        if (filterStatus === 'paid') return p.status === 'completed' || p.status === 'paid' || p.status === 'confirmed';
-        return p.status === filterStatus;
+  /** Gộp transaction thật + dòng hoa hồng chưa chi (tính từ buổi completed chưa thanh toán) */
+  const displayPayments = useMemo(() => {
+    const list = (myPayments || []).map((p) => ({
+      ...p,
+      id: p.id || p._id,
+    }));
+
+    const unpaid = Number(financeStats.unpaidAmount) || 0;
+    if (unpaid > 0) {
+      const rate = Number(financeStats.salaryPerSession) || 0;
+      const sessions = rate > 0 ? Math.round(unpaid / rate) : 0;
+      list.unshift({
+        id: 'synthetic-pending-commission',
+        amount: unpaid,
+        status: 'pending',
+        sessions,
+        month: 'Hiện tại',
+        date: new Date().toLocaleDateString('vi-VN'),
+        createdAt: new Date().toISOString(),
+        note: sessions > 0
+          ? `Hoa hồng ${sessions} buổi dạy đã hoàn thành — chờ Admin chuyển`
+          : 'Hoa hồng buổi dạy đã hoàn thành — chờ Admin chuyển',
+        _synthetic: true,
       });
+    }
+    return list;
+  }, [myPayments, financeStats.unpaidAmount, financeStats.salaryPerSession]);
+
+  const filteredPayments = useMemo(() => {
+    if (filterStatus === 'all') return displayPayments;
+    if (filterStatus === 'paid') return displayPayments.filter((p) => isPaidTxStatus(p.status));
+    return displayPayments.filter((p) => isPendingTxStatus(p.status));
+  }, [displayPayments, filterStatus]);
 
   // Prepare chart data
-  const chartData = React.useMemo(() => {
+  const chartData = useMemo(() => {
     const dataObj = {};
-    myPayments.filter(p => p.status === 'completed' || p.status === 'paid' || p.status === 'confirmed').forEach(p => {
+    myPayments.filter((p) => isPaidTxStatus(p.status)).forEach((p) => {
         const key = p.month || 'Không rõ';
         dataObj[key] = (dataObj[key] || 0) + (p.amount || 0);
     });
-    // Create array and sort implicitly if needed
     const arr = Object.entries(dataObj).map(([month, amount]) => ({ month, amount }));
-    // Assuming months are like "Tháng 03/2026", "Tháng 04/2026"
     return arr.sort((a,b) => a.month.localeCompare(b.month));
   }, [myPayments]);
 
@@ -118,7 +145,7 @@ const TeacherFinanceAndTraining = () => {
       let csvContent = "\uFEFF";
       csvContent += "Tháng,Ngày chuyển,Số tiền (VNĐ),Số buổi,Trạng thái,Ghi chú\n";
       filteredPayments.forEach(p => {
-          const th_status = (p.status === 'completed' || p.status === 'paid' || p.status === 'confirmed') ? 'Đã nhận' : 'Chưa nhận';
+          const th_status = isPaidTxStatus(p.status) ? 'Đã nhận' : 'Chưa nhận';
           const row = `"${sanitizeCsvField(p.month)}","${p.date || new Date(p.createdAt).toLocaleDateString('vi-VN')}","${p.amount}","${p.sessions || 0}","${th_status}","${sanitizeCsvField(p.note || '').replace(/"/g, '""')}"`;
           csvContent += row + "\n";
       });
@@ -285,12 +312,12 @@ const TeacherFinanceAndTraining = () => {
 
               <div className="divide-y divide-slate-50">
                 {filteredPayments.map(p => (
-                  <div key={p.id} className={`px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-3 hover:bg-slate-50/50 transition ${p.status === 'pending' ? 'bg-amber-50/30' : ''}`}>
+                  <div key={p.id || p._id} className={`px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-3 hover:bg-slate-50/50 transition ${isPendingTxStatus(p.status) ? 'bg-amber-50/30' : ''}`}>
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                       <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${
-                        (p.status === 'completed' || p.status === 'paid' || p.status === 'confirmed') ? 'bg-emerald-100' : 'bg-amber-100'
+                        isPaidTxStatus(p.status) ? 'bg-emerald-100' : 'bg-amber-100'
                       }`}>
-                        {(p.status === 'completed' || p.status === 'paid' || p.status === 'confirmed')
+                        {isPaidTxStatus(p.status)
                           ? <CheckCircle2 size={18} className="text-emerald-600" />
                           : <Clock size={18} className="text-amber-600" />
                         }
@@ -304,7 +331,7 @@ const TeacherFinanceAndTraining = () => {
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      {(p.status === 'completed' || p.status === 'paid' || p.status === 'confirmed') ? (
+                      {isPaidTxStatus(p.status) ? (
                         <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full">
                           <CheckCircle2 size={12} /> Đã nhận
                         </span>

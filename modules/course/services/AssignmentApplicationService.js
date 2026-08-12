@@ -365,7 +365,6 @@ class AssignmentApplicationService {
     );
 
     const io = data.app.get('io');
-    const Notification = require('../../notification/models/Notification');
     const student = await Student.findById(studentId);
 
     let resolvedTeacherId = teacherId;
@@ -395,15 +394,6 @@ class AssignmentApplicationService {
         ? `Học viên ${student?.name || 'Vô danh'} vừa nộp bài "${assignment?.title || ''}" (Admin giao). Hãy chấm bài.`
         : `Học viên ${student?.name || 'Vô danh'} vừa nộp bài tập "${assignment?.title || ''}".`;
 
-      await Notification.create({
-        type: 'COURSE',
-        title: submitTitle,
-        content: submitContent,
-        receivers: [resolvedTeacherId],
-        payload: { studentId, assignmentId: data.id, type: 'assignment' },
-        path: `/teacher#assignments?courseId=${assignment?.courseId || ''}&assignmentId=${data.id}&studentId=${studentId}`
-      });
-
       if (io) {
         const NotificationService = require('../../notification/services/NotificationService');
         io.to(`teacher_${resolvedTeacherId}`).emit('submission:new', submission);
@@ -413,7 +403,7 @@ class AssignmentApplicationService {
           title: submitTitle,
           content: submitContent,
           receivers: resolvedTeacherId,
-          payload: { studentId, assignmentId: data.id },
+          payload: { studentId, assignmentId: data.id, type: 'assignment' },
           link: `/teacher#assignments?courseId=${assignment?.courseId || ''}&assignmentId=${data.id}&studentId=${studentId}`
         });
 

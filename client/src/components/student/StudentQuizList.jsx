@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Award, Clock, HelpCircle, User, CheckCircle, Play, RefreshCw, AlertCircle } from 'lucide-react';
 import api from '../../services/api';
 import StudentQuizExamRoom from './StudentQuizExamRoom';
+import { PENDING_QUIZ_START_KEY } from './StudentQuizInviteHost';
 
 export default function StudentQuizList() {
   const [quizzes, setQuizzes] = useState([]);
@@ -24,6 +25,15 @@ export default function StudentQuizList() {
 
   useEffect(() => {
     fetchQuizzes();
+    try {
+      const pending = sessionStorage.getItem(PENDING_QUIZ_START_KEY);
+      if (pending) {
+        sessionStorage.removeItem(PENDING_QUIZ_START_KEY);
+        setActiveQuizId(pending);
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   if (activeQuizId) {

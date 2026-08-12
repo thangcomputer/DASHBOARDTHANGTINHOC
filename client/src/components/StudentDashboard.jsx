@@ -738,6 +738,7 @@ const StudentDashboard = ({ onNavigate }) => {
             teacherRatingData={teacherRatingData}
             isNew={isNew}
             myAssignments={myAssignments}
+            mySchedules={mySchedules}
             upcomingScheduleCount={upcomingScheduleCount}
             myUnreadMsgs={myUnreadMsgs}
             studyLogs={studyLogs}

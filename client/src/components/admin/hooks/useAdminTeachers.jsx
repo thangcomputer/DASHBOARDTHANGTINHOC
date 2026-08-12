@@ -2,7 +2,19 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { mutate } from 'swr';
 import api from '../../../services/api';
 import { parseQuestionBankExcel } from '../../../utils/studentQuestionsExcel';
+import {
+  buildTeacherPayoutTransferNote,
+  pickFifoPendingSessions,
+} from '../../../utils/teacherPayoutNote';
 
+function monthLabelNow(d = new Date()) {
+  return `tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
+function buildNoteFromPending(pendingSessions, sessionsCount) {
+  const picked = pickFifoPendingSessions(pendingSessions, sessionsCount);
+  return buildTeacherPayoutTransferNote(picked, { monthLabel: monthLabelNow() });
+}
 /**
  * Teacher list, payout, approve/review, and teacher-tab UI state.
  */
@@ -72,7 +84,6 @@ export function useAdminTeachers({
 
   const handlePayTeacher = async (teacher) => {
     const teacherId = String(teacher.id || teacher._id);
-    const now = new Date();
     const rating = typeof getTeacherRating === 'function' ? getTeacherRating(teacherId) : null;
     const ratingLabel = rating?.count > 0
       ? `Đánh giá HV: ${rating.avg}/5 · ${rating.count} lượt`
@@ -85,9 +96,11 @@ export function useAdminTeachers({
       teacherName: teacher.name,
       baseSalaryPerSession: teacher.baseSalaryPerSession || 0,
       pendingSessionsCount: 0,
+      pendingSessions: [],
       sessionsCount: '',
       amount: '',
-      note: `Lương giảng dạy tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
+      note: '',
+      noteTouched: false,
       bankInfo: teacher.bankAccount || {},
       ratingLabel,
       rateDirty: false,
@@ -97,18 +110,28 @@ export function useAdminTeachers({
     try {
       const res = await api.teachers.getPendingSessions(teacherId);
       if (res.success) {
-        const { pendingSessionsCount, salaryPerSession, bankInfo, starBonus } = res.data;
+        const {
+          pendingSessionsCount,
+          salaryPerSession,
+          bankInfo,
+          starBonus,
+          pendingSessions = [],
+        } = res.data;
         const rate = salaryPerSession || teacher.baseSalaryPerSession || 0;
         const bonusTotal = Number(starBonus?.unpaidBonusTotal) || 0;
         const includeBonus = bonusTotal > 0;
         const autoAmount = pendingSessionsCount * rate + (includeBonus ? bonusTotal : 0);
+        const note = buildNoteFromPending(pendingSessions, pendingSessionsCount);
         setPayoutModal((prev) => (prev ? {
           ...prev,
           isLoading: false,
           pendingSessionsCount,
+          pendingSessions: Array.isArray(pendingSessions) ? pendingSessions : [],
           baseSalaryPerSession: rate || prev.baseSalaryPerSession,
           sessionsCount: String(pendingSessionsCount),
           amount: String(autoAmount),
+          note,
+          noteTouched: false,
           bankInfo: bankInfo || prev.bankInfo || {},
           starBonus: starBonus || null,
           includeStarBonus: includeBonus,

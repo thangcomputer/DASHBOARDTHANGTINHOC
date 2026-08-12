@@ -7,7 +7,7 @@ import {
   ChevronRight, BookOpen, Award, Zap, BarChart3, Users, Eye, X, XCircle,
   Search, Download, AlertCircle, Clipboard, Send, UserCheck, Check,
   Activity, Trash2, Ban, PlayCircle, Phone, Mail, Edit3, Shield,
-  Plus, Loader2, History, ListChecks,
+  Plus, Loader2, History, ListChecks, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
@@ -18,6 +18,8 @@ import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
 import { openSiteChat } from '../FloatingMessenger';
 import TeacherQuizManager from './TeacherQuizManager';
+import { useData } from '../../context/DataContext';
+import { buildStudentActivityLogs, ACTIVITY_LOG_META } from '../../utils/studentActivityLogs';
 
 const getDisplayName = (person) => {
   if (!person) return 'Không rõ';
@@ -28,6 +30,44 @@ const getDisplayName = (person) => {
 
 /** Chỉ đánh trượt khi học viên đã được mở khóa phòng thi (chưa mở / đã trượt → không bấm lại). */
 const canTeacherFailStudentExam = (student) => Boolean(student?.studentExamUnlocked);
+
+const GRADE_INPUT_CLASS =
+  'w-full bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white rounded-2xl pl-14 pr-16 py-4 text-3xl font-black text-slate-700 outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
+
+function AttendanceGradeInput({ value, onChange, onNudge }) {
+  return (
+    <div className="relative">
+      <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-10">
+        <button
+          type="button"
+          onClick={() => onNudge(0.5)}
+          className="w-9 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 transition shadow-sm"
+          aria-label="Tăng điểm 0.5"
+        >
+          <ChevronUp size={18} strokeWidth={2.5} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onNudge(-0.5)}
+          className="w-9 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 transition shadow-sm"
+          aria-label="Giảm điểm 0.5"
+        >
+          <ChevronDown size={18} strokeWidth={2.5} />
+        </button>
+      </div>
+      <input
+        type="number"
+        min="0"
+        max="10"
+        step="0.5"
+        value={value}
+        onChange={onChange}
+        className={GRADE_INPUT_CLASS}
+      />
+      <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-black pointer-events-none">/ 10</div>
+    </div>
+  );
+}
 
 const FailExamButton = ({ student, onLockExam, compact = false }) => {
   const { showModal } = useModal();
@@ -89,6 +129,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const navigate = useNavigate();
   const { showModal } = useModal();
   const { onDataRefresh, socket } = useSocket();
+  const { privateEvaluations = [] } = useData();
   const [linkInput, setLinkInput] = useState(student.linkHoc);
   const [gradeInput, setGradeInput] = useState(student.avgGrade ?? student.lastGrade ?? '');
   const [notesInput, setNotesInput] = useState(student.notes || '');
@@ -97,7 +138,25 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const [gradeSaved, setGradeSaved] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
-  const [attForm, setAttForm] = useState({ note: 'Đã điểm danh hoàn thành buổi học', grade: student.avgGrade ?? student.lastGrade ?? 0 });
+  const [studentQuizzes, setStudentQuizzes] = useState([]);
+  const [studentEvals, setStudentEvals] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const done = student.completedSessions != null ? student.completedSessions : (student.totalSessions - student.remainingSessions);
+  const nextSessionNumber = Math.max(0, Number(done) || 0) + 1;
+  const defaultAttendanceNote = `Buổi ${nextSessionNumber}: Đã điểm danh hoàn thành buổi học`;
+  const [attForm, setAttForm] = useState({
+    note: defaultAttendanceNote,
+    grade: student.avgGrade ?? student.lastGrade ?? 0,
+  });
+
+  const nudgeAttGrade = useCallback((delta) => {
+    setAttForm((prev) => {
+      const cur = Number(prev.grade);
+      const base = Number.isFinite(cur) ? cur : 0;
+      const next = Math.round((base + delta) * 2) / 2;
+      return { ...prev, grade: Math.min(10, Math.max(0, next)) };
+    });
+  }, []);
 
   useEffect(() => {
     setGradeInput(student.avgGrade ?? student.lastGrade ?? '');
@@ -144,7 +203,6 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
     }
   };
 
-  const done = student.completedSessions != null ? student.completedSessions : (student.totalSessions - student.remainingSessions);
   const progressPct = Math.round((done / student.totalSessions) * 100);
   const isCompleted = student.remainingSessions === 0;
 
@@ -201,10 +259,57 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   }, [student.id, student._id, student.course]);
 
   useEffect(() => {
-    if (activePanel === 'assignments') {
+    if (activePanel === 'assignments' || activePanel === 'logs') {
       fetchStudentAssignments();
     }
   }, [activePanel, student.id, student.course, fetchStudentAssignments]);
+
+  const fetchActivityExtras = useCallback(async () => {
+    setLoadingLogs(true);
+    const sid = String(student.id || student._id || '');
+    const teacherId = student.teacherId || student.teacherIds?.[0];
+    try {
+      const [quizRes, evalRes] = await Promise.all([
+        api.quizzes.getTeacherQuizzes().catch(() => null),
+        teacherId ? api.evaluations.getByTeacher(teacherId).catch(() => null) : Promise.resolve(null),
+      ]);
+      if (quizRes?.success) {
+        setStudentQuizzes(quizRes.data || []);
+      }
+      const fromApi = evalRes?.success
+        ? (evalRes.data || []).filter((e) => String(e.studentId?._id || e.studentId) === sid)
+        : [];
+      setStudentEvals(fromApi);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, [student.id, student._id, student.teacherId, student.teacherIds]);
+
+  useEffect(() => {
+    if (activePanel === 'logs') {
+      fetchActivityExtras();
+    }
+  }, [activePanel, fetchActivityExtras]);
+
+  const activityLogs = useMemo(() => {
+    const sid = String(student.id || student._id || '');
+    const localEvals = (privateEvaluations || []).filter(
+      (e) => String(e.studentId?._id || e.studentId) === sid
+    );
+    const evalMap = new Map();
+    [...studentEvals, ...localEvals].forEach((e) => {
+      const key = String(e._id || e.id || `${e.type}_${e.createdAt}_${e.content || ''}`);
+      if (!evalMap.has(key)) evalMap.set(key, e);
+    });
+    return buildStudentActivityLogs({
+      student,
+      assignments: courseAssignments,
+      quizzes: studentQuizzes,
+      evaluations: [...evalMap.values()],
+    });
+  }, [student, courseAssignments, studentQuizzes, studentEvals, privateEvaluations]);
 
   /** Realtime: học viên nộp bài → cập nhật trạng thái ngay */
   useEffect(() => {
@@ -534,7 +639,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        onClick={() => {
                          if (!canCheckIn && !isCompleted) return;
                          const tGrade = (student.grades || []).find(g => g.date === todayStr);
-                         setAttForm({ note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học', grade: tGrade?.grade ?? (student.lastGrade || 0) });
+                         setAttForm({
+                           note: tGrade?.note || defaultAttendanceNote,
+                           grade: tGrade?.grade ?? (student.lastGrade || 0),
+                         });
                          setShowAttendanceModal(true);
                        }} 
                        disabled={isCompleted || !canCheckIn || attendanceGate?.status === 'no_schedule'}
@@ -930,77 +1038,69 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                         Nhật ký Hoạt động &amp; Lịch sử Học viên
                       </h3>
                       <p className="text-[11px] text-slate-400 font-medium leading-snug">
-                        Điểm danh, lịch sử nộp bài tập và quá trình cập nhật điểm số
+                        Điểm danh, bài nộp, cập nhật điểm, trắc nghiệm và đánh giá
                       </p>
                     </div>
                   </div>
                   <span className="text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600 shrink-0 whitespace-nowrap">
-                    {(student.grades || []).length} lượt
+                    {activityLogs.length} lượt
                   </span>
                 </div>
 
-                {/* Dynamic timeline list */}
                 <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                  {student.grades && student.grades.length > 0 ? (
-                    student.grades.map((g, idx) => {
-                      let parsedDate = g.date;
-                      if (parsedDate && parsedDate.includes('T')) {
-                        parsedDate = new Date(parsedDate).toLocaleDateString('vi-VN');
-                      }
-                      const noteLower = (g.note || '').toLowerCase();
-                      const isUpdated = noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm');
-                      const isHomework = noteLower.includes('bài nộp') || isUpdated;
-                      const isQuiz = noteLower.includes('trắc nghiệm');
-
+                  {loadingLogs || (activePanel === 'logs' && loadingAssign && activityLogs.length === 0) ? (
+                    <div className="py-16 text-center animate-pulse text-xs font-black text-slate-300 uppercase tracking-[4px]">
+                      Đang tải nhật ký...
+                    </div>
+                  ) : activityLogs.length > 0 ? (
+                    activityLogs.map((log) => {
+                      const meta = ACTIVITY_LOG_META[log.type] || ACTIVITY_LOG_META.attendance;
+                      const Icon =
+                        log.type === 'quiz' ? Award
+                          : log.type === 'homework' ? Clipboard
+                            : log.type === 'grade_update' ? Edit3
+                              : log.type === 'evaluation' ? Star
+                                : CheckCircle;
                       return (
                         <div
-                          key={g._idx ?? idx}
+                          key={log.id}
                           className="bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 transition flex items-center justify-between gap-3"
                         >
                           <div className="flex items-start gap-3 min-w-0">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs mt-0.5 ${
-                              isQuiz ? 'bg-purple-100 text-purple-700' :
-                              isHomework ? 'bg-emerald-100 text-emerald-700' :
-                              'bg-blue-100 text-blue-700'
-                            }`}>
-                              {isQuiz ? <Award size={16} /> : isHomework ? <Clipboard size={16} /> : <CheckCircle size={16} />}
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs mt-0.5 ${meta.iconWrap}`}>
+                              <Icon size={16} />
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-black text-slate-900 font-mono">
-                                  {g.time ? `${g.time} — ${parsedDate}` : parsedDate}
+                                  {log.time ? `${log.time} — ${log.date}` : log.date}
                                 </span>
-                                {isUpdated ? (
-                                  <span className="text-[9px] font-black uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200">
-                                    Cập nhật điểm
-                                  </span>
-                                ) : isHomework ? (
-                                  <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200">
-                                    Bài nộp
-                                  </span>
-                                ) : isQuiz ? (
-                                  <span className="text-[9px] font-black uppercase bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md border border-purple-200">
-                                    Trắc nghiệm
-                                  </span>
-                                ) : (
-                                  <span className="text-[9px] font-black uppercase bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200">
-                                    Điểm danh
-                                  </span>
-                                )}
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border ${meta.badge}`}>
+                                  {meta.label}
+                                </span>
                               </div>
                               <p className="text-xs text-slate-600 font-medium mt-1 leading-snug">
-                                {g.note || 'Đã điểm danh hoàn thành buổi học'}
+                                {log.note}
                               </p>
                             </div>
                           </div>
 
                           <div className="text-right shrink-0">
-                            {g.grade > 0 ? (
+                            {(log.type === 'quiz' && log.rawScore != null) ? (
                               <div className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs inline-flex items-baseline gap-0.5">
                                 <span className={`text-sm font-black tabular-nums ${
-                                  g.grade >= 8 ? 'text-emerald-600' : g.grade >= 6.5 ? 'text-blue-600' : g.grade >= 5 ? 'text-amber-600' : 'text-rose-600'
+                                  log.rawScore >= 70 ? 'text-emerald-600' : 'text-rose-600'
                                 }`}>
-                                  {g.grade}
+                                  {log.rawScore}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-bold">%</span>
+                              </div>
+                            ) : log.grade != null && Number(log.grade) >= 0 ? (
+                              <div className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs inline-flex items-baseline gap-0.5">
+                                <span className={`text-sm font-black tabular-nums ${
+                                  log.grade >= 8 ? 'text-emerald-600' : log.grade >= 6.5 ? 'text-blue-600' : log.grade >= 5 ? 'text-amber-600' : 'text-rose-600'
+                                }`}>
+                                  {log.grade}
                                 </span>
                                 <span className="text-[10px] text-slate-400 font-bold">/10</span>
                               </div>
@@ -1017,7 +1117,9 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                         <History size={20} />
                       </div>
                       <p className="font-bold text-slate-600">Chưa có nhật ký hoạt động nào</p>
-                      <p className="text-[11px] text-slate-400">Các lượt điểm danh, bài nộp và chấm điểm sẽ được tự động hiển thị ở đây.</p>
+                      <p className="text-[11px] text-slate-400">
+                        Điểm danh, nộp bài, chấm điểm, thi trắc nghiệm và đánh giá sẽ hiện tại đây.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1063,15 +1165,11 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 
                 <div>
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Đánh giá buổi học (0-10)</label>
-                  <div className="relative">
-                    <input 
-                      type="number" min="0" max="10" step="0.5" 
-                      value={attForm.grade}
-                      onChange={(e) => setAttForm({ ...attForm, grade: e.target.value })}
-                      className="w-full bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white rounded-2xl px-6 py-4 text-3xl font-black text-slate-700 outline-none transition-all"
-                    />
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-black">/ 10</div>
-                  </div>
+                  <AttendanceGradeInput
+                    value={attForm.grade}
+                    onChange={(e) => setAttForm({ ...attForm, grade: e.target.value })}
+                    onNudge={nudgeAttGrade}
+                  />
                 </div>
 
                 <div>
@@ -1210,7 +1308,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 <button onClick={() => {
                     if (!canCheckIn && !isCompleted) return;
                     const tGrade = (student.grades || []).find(g => g.date === todayStr);
-                    setAttForm({ note: tGrade?.note || 'Đã điểm danh hoàn thành buổi học', grade: tGrade?.grade ?? (student.lastGrade || 0) });
+                    setAttForm({
+                      note: tGrade?.note || defaultAttendanceNote,
+                      grade: tGrade?.grade ?? (student.lastGrade || 0),
+                    });
                     setShowAttendanceModal(true);
                   }} 
                   disabled={isCompleted || !canCheckIn || attendanceGate?.status === 'no_schedule'}
@@ -1336,15 +1437,11 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
               
               <div>
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Đánh giá buổi học (0-10)</label>
-                <div className="relative">
-                  <input 
-                    type="number" min="0" max="10" step="0.5" 
-                    value={attForm.grade}
-                    onChange={(e) => setAttForm({ ...attForm, grade: e.target.value })}
-                    className="w-full bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white rounded-2xl px-6 py-4 text-3xl font-black text-slate-700 outline-none transition-all"
-                  />
-                  <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 text-lg font-black">/ 10</div>
-                </div>
+                <AttendanceGradeInput
+                  value={attForm.grade}
+                  onChange={(e) => setAttForm({ ...attForm, grade: e.target.value })}
+                  onNudge={nudgeAttGrade}
+                />
               </div>
 
               <div>

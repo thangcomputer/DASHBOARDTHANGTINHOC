@@ -508,7 +508,6 @@ router.post('/:id/submit', [authMiddleware, ...assignmentsGuard('submit')], asyn
     );
 
     const io = req.app.get('io');
-    const Notification = require('../models/Notification');
     const student = await Student.findById(studentId);
 
     let resolvedTeacherId = teacherId;
@@ -538,15 +537,6 @@ router.post('/:id/submit', [authMiddleware, ...assignmentsGuard('submit')], asyn
         ? `Học viên ${student?.name || 'Vô danh'} vừa nộp bài "${assignment?.title || ''}" (Admin giao). Hãy chấm bài.`
         : `Học viên ${student?.name || 'Vô danh'} vừa nộp bài tập "${assignment?.title || ''}".`;
 
-      await Notification.create({
-        type: 'COURSE',
-        title: submitTitle,
-        content: submitContent,
-        receivers: [resolvedTeacherId],
-        payload: { studentId, assignmentId: req.params.id, type: 'assignment' },
-        path: `/teacher#assignments?courseId=${assignment?.courseId || ''}&assignmentId=${req.params.id}&studentId=${studentId}`
-      });
-
       if (io) {
         const NotificationService = require('../services/NotificationService');
         io.to(`teacher_${resolvedTeacherId}`).emit('submission:new', submission);
@@ -556,7 +546,7 @@ router.post('/:id/submit', [authMiddleware, ...assignmentsGuard('submit')], asyn
           title: submitTitle,
           content: submitContent,
           receivers: resolvedTeacherId,
-          payload: { studentId, assignmentId: req.params.id },
+          payload: { studentId, assignmentId: req.params.id, type: 'assignment' },
           link: `/teacher#assignments?courseId=${assignment?.courseId || ''}&assignmentId=${req.params.id}&studentId=${studentId}`
         });
 

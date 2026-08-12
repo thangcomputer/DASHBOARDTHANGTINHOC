@@ -932,21 +932,57 @@ router.get('/:id/finance', authMiddleware, ...teacherRouteGuard('finance_self'),
 });
 
 // ─── GET /api/teachers/:id/finance/pending ──────────────────────────────────────
-// Lấy số buổi còn nợ thanh toán + thưởng sao tích lũy (cho modal Step 1)
+// Lấy số buổi còn nợ thanh toán + list FIFO (kèm số buổi HV) + thưởng sao
 router.get('/:id/finance/pending', authMiddleware, ...teacherRouteGuard('finance_pending'), async (req, res) => {
   try {
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
 
-    const pendingSessionsCount = await Schedule.countDocuments({
-      teacherId: req.params.id,
+    const teacherOid = req.params.id;
+    const pending = await Schedule.find({
+      teacherId: teacherOid,
       status: 'completed',
-      is_paid_to_teacher: { $ne: true }
-    });
+      is_paid_to_teacher: { $ne: true },
+    }).sort({ date: 1, createdAt: 1 }).lean();
 
+    const pendingSessionsCount = pending.length;
     const salaryPerSession = teacher.baseSalaryPerSession || 0;
     const unpaidAmount = pendingSessionsCount * salaryPerSession;
     const starBonus = await computeStarBonusSummary(teacher);
+
+    // Số buổi thứ mấy của HV (trong khóa, theo lịch completed của GV này)
+    const studentIds = [...new Set(
+      pending.map((s) => (s.studentId ? String(s.studentId) : '')).filter(Boolean)
+    )];
+    const sessionNoMap = new Map();
+    if (studentIds.length > 0) {
+      const allCompleted = await Schedule.find({
+        teacherId: teacherOid,
+        status: 'completed',
+        studentId: { $in: studentIds },
+      }).sort({ date: 1, createdAt: 1 }).select('_id studentId course').lean();
+
+      const groups = Object.create(null);
+      for (const s of allCompleted) {
+        const key = `${s.studentId || ''}|${s.course || ''}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(s);
+      }
+      for (const list of Object.values(groups)) {
+        list.forEach((s, i) => sessionNoMap.set(String(s._id), i + 1));
+      }
+    }
+
+    const pendingSessions = pending.map((s) => ({
+      id: s._id,
+      date: s.date,
+      startTime: s.startTime || '',
+      endTime: s.endTime || '',
+      course: s.course || '',
+      studentId: s.studentId || null,
+      studentName: s.studentName || '',
+      sessionNo: sessionNoMap.get(String(s._id)) || null,
+    }));
 
     return res.json({
       success: true,
@@ -955,6 +991,7 @@ router.get('/:id/finance/pending', authMiddleware, ...teacherRouteGuard('finance
         salaryPerSession,
         unpaidAmount,
         starBonus,
+        pendingSessions,
         bankInfo: {
           bankName: teacher.bankAccount?.bankName || '',
           accountNumber: teacher.bankAccount?.accountNumber || '',
@@ -1033,6 +1070,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
     // Tìm buổi chưa thanh toán theo FIFO (chỉ tính các buổi đã hoàn thành - completed)
     let sessionIds = [];
     let actualCount = 0;
+    let claimedSessions = [];
     if (paidCount > 0) {
       const pendingSessions = await Schedule.find({
         teacherId: req.params.id,
@@ -1040,6 +1078,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
         is_paid_to_teacher: { $ne: true }
       }).sort({ date: 1, createdAt: 1 }).limit(paidCount);
 
+      claimedSessions = pendingSessions;
       sessionIds = pendingSessions.map(s => s._id);
 
       if (sessionIds.length > 0) {
@@ -1060,8 +1099,15 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
     const bonusNote = starBonusAmount > 0
       ? ` + thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ (${starBonusMonthKeys.join(', ')})`
       : '';
+    const fifoNote = claimedSessions.length
+      ? claimedSessions.map((s) => {
+          const name = s.studentName || 'HV';
+          const d = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
+          return d ? `Buổi - ${name} (${d})` : `Buổi - ${name}`;
+        }).join('; ')
+      : '';
     const defaultDesc = paidCount > 0
-      ? `Thù lao ${paidCount} buổi dạy${bonusNote}`
+      ? `${fifoNote || `Thù lao ${paidCount} buổi dạy`}${bonusNote}`
       : `Thưởng sao giảng viên${bonusNote}`;
 
     let transaction;
@@ -1167,15 +1213,25 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
     const io = req.app.get('io');
     if (io) {
       const financeScope = { branchId: teacher.branchId, userIds: [teacher._id] };
+      const financeMsg = `Admin đã thanh toán ${Number(amount).toLocaleString('vi-VN')}đ`
+        + (paidCount > 0 ? ` cho ${paidCount} buổi` : '')
+        + (starBonusAmount > 0 ? ` (gồm thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ)` : '')
+        + '.';
       emitFinanceEvent(io, financeScope, 'teacher:financeUpdated', {
         teacherId: req.params.id,
-        message: `Admin đã thanh toán ${Number(amount).toLocaleString('vi-VN')}đ`
-          + (paidCount > 0 ? ` cho ${paidCount} buổi` : '')
-          + (starBonusAmount > 0 ? ` (gồm thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ)` : '')
-          + '.',
+        message: financeMsg,
       });
       emitFinanceEvent(io, financeScope, 'transactions:new', transaction);
       emitFinanceEvent(io, financeScope, 'revenue:updated', { amount: Number(amount), type: 'salary' });
+
+      NotificationService.send(io, {
+        type: 'FINANCE',
+        title: '✅ Lương đã được thanh toán',
+        content: financeMsg,
+        receivers: String(teacher._id),
+        payload: { transactionId: transaction._id, amount: Number(amount), sessionsCount: paidCount },
+        link: '/teacher/finance',
+      }).catch((err) => logger.warn('[FINANCE] notify teacher pay-flexible: %s', err.message));
     }
 
     return res.json({
@@ -1316,12 +1372,22 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
     const io = req.app.get('io');
     if (io) {
       const financeScope = { branchId: teacher.branchId, userIds: [teacher._id] };
+      const financeMsg = `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${paidCount} buổi dạy.`;
       emitFinanceEvent(io, financeScope, 'teacher:financeUpdated', {
         teacherId: req.params.id,
-        message: `Admin đã thanh toán ${totalAmount.toLocaleString('vi-VN')}đ cho ${paidCount} buổi dạy.`
+        message: financeMsg,
       });
       emitFinanceEvent(io, financeScope, 'transactions:new', transaction);
       emitFinanceEvent(io, financeScope, 'revenue:updated', { amount: totalAmount, type: 'salary' });
+
+      NotificationService.send(io, {
+        type: 'FINANCE',
+        title: '✅ Lương đã được thanh toán',
+        content: financeMsg,
+        receivers: String(teacher._id),
+        payload: { transactionId: transaction._id, amount: totalAmount, sessionsCount: paidCount },
+        link: '/teacher/finance',
+      }).catch((err) => logger.warn('[FINANCE] notify teacher pay-all: %s', err.message));
     }
 
     return res.json({

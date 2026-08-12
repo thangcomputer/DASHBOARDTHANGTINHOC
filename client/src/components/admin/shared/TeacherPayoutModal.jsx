@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DollarSign, X, CreditCard, CheckCircle2, AlertCircle, Loader2, Star } from 'lucide-react';
 import { generateVietQRUrl } from '../../BankSelect';
 import { formatHoaHong, formatStarBonusRule } from '../../../utils/teacherCommission';
+import {
+  buildTeacherPayoutTransferNote,
+  pickFifoPendingSessions,
+  formatSessionDateVi,
+} from '../../../utils/teacherPayoutNote';
 
 function calcAutoAmount(sessions, rate, includeBonus, bonusTotal) {
   const sessionAmt = Math.max(0, Number(sessions) || 0) * Math.max(0, Number(rate) || 0);
@@ -9,15 +14,25 @@ function calcAutoAmount(sessions, rate, includeBonus, bonusTotal) {
   return sessionAmt + bonusAmt;
 }
 
+function monthLabelNow(d = new Date()) {
+  return `tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
 export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoToQR, onConfirm, onSaveRate }) {
-  if (!payoutModal) return null;
   const pm = payoutModal;
-  const sessCount = Number(pm.sessionsCount) || 0;
-  const salaryPS = Number(pm.baseSalaryPerSession) || 0;
-  const bonusTotal = Number(pm.starBonus?.unpaidBonusTotal) || 0;
-  const includeBonus = !!pm.includeStarBonus && bonusTotal > 0;
+  const sessCount = Number(pm?.sessionsCount) || 0;
+  const salaryPS = Number(pm?.baseSalaryPerSession) || 0;
+  const bonusTotal = Number(pm?.starBonus?.unpaidBonusTotal) || 0;
+  const includeBonus = !!pm?.includeStarBonus && bonusTotal > 0;
   const sessionPay = sessCount * salaryPS;
   const autoAmt = calcAutoAmount(sessCount, salaryPS, includeBonus, bonusTotal);
+  const selectedSessions = useMemo(
+    () => pickFifoPendingSessions(pm?.pendingSessions || [], sessCount),
+    [pm?.pendingSessions, sessCount]
+  );
+
+  if (!payoutModal) return null;
+
   const qrUrl = generateVietQRUrl(
     pm.bankInfo?.bankCode || '',
     pm.bankInfo?.accountNumber || '',
@@ -49,7 +64,14 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
       const rate = Math.max(0, Number(next.baseSalaryPerSession) || 0);
       const bTotal = Number(next.starBonus?.unpaidBonusTotal) || 0;
       const bonusOn = !!next.includeStarBonus && bTotal > 0;
-      return { ...next, amount: String(calcAutoAmount(sessions, rate, bonusOn, bTotal)) };
+      const withAmount = { ...next, amount: String(calcAutoAmount(sessions, rate, bonusOn, bTotal)) };
+      if (patch.sessionsCount != null && !prev.noteTouched) {
+        withAmount.note = buildTeacherPayoutTransferNote(
+          pickFifoPendingSessions(prev.pendingSessions || [], sessions),
+          { monthLabel: monthLabelNow() }
+        );
+      }
+      return withAmount;
     });
   };
 
@@ -186,7 +208,10 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                         <button
                           type="button"
                           onClick={() => syncAmountFromParts({
-                            sessionsCount: String(sessCount + 1),
+                            sessionsCount: String(Math.min(
+                              Number(pm.pendingSessionsCount) || sessCount + 1,
+                              sessCount + 1
+                            )),
                           })}
                           className="w-9 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold flex items-center justify-center shrink-0"
                           aria-label="Tăng"
@@ -264,11 +289,55 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                     <input
                       type="text"
                       value={pm.note || ''}
-                      onChange={(e) => setPayoutModal((prev) => ({ ...prev, note: e.target.value }))}
+                      onChange={(e) => setPayoutModal((prev) => ({
+                        ...prev,
+                        note: e.target.value,
+                        noteTouched: true,
+                      }))}
                       className="cms-input"
-                      placeholder="Lương giảng dạy tháng..."
+                      placeholder="Buổi X - Tên HV..."
                     />
+                    {pm.noteTouched && (
+                      <button
+                        type="button"
+                        onClick={() => setPayoutModal((prev) => ({
+                          ...prev,
+                          noteTouched: false,
+                          note: buildTeacherPayoutTransferNote(
+                            pickFifoPendingSessions(prev.pendingSessions || [], Number(prev.sessionsCount) || 0),
+                            { monthLabel: monthLabelNow() }
+                          ),
+                        }))}
+                        className="text-xs text-sky-700 mt-1 font-semibold hover:underline"
+                      >
+                        Dùng lại nội dung tự động theo buổi
+                      </button>
+                    )}
                   </div>
+
+                  {selectedSessions.length > 0 && (
+                    <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-3.5 py-3 space-y-1.5">
+                      <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
+                        Buổi sẽ chi (FIFO — cũ trước)
+                      </p>
+                      <ul className="space-y-1 max-h-28 overflow-y-auto">
+                        {selectedSessions.map((s) => (
+                          <li key={String(s.id)} className="text-xs text-slate-700 flex justify-between gap-2">
+                            <span className="min-w-0 truncate font-medium">
+                              {s.sessionNo != null ? `Buổi ${s.sessionNo}` : 'Buổi'}
+                              {' — '}
+                              {s.studentName || 'Học viên'}
+                              {s.course ? ` · ${s.course}` : ''}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-slate-500">
+                              {formatSessionDateVi(s.date)}
+                              {s.startTime ? ` ${s.startTime}` : ''}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {/* Breakdown */}
                   <div className="rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-3 space-y-1.5 text-xs">

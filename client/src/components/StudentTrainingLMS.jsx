@@ -585,11 +585,23 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   const [expandedChapters, setExpandedChapters] = useState({});
   const [courseTab, setCourseTab] = useState('overview');
   const playerApiRef = useRef(null);
-  const [mainTab, setMainTab] = useState('courses'); // courses | guides | files
+  const [mainTab, setMainTab] = useState('courses'); // courses | guides | files | assignments | exams
   const [localSubmissions, setLocalSubmissions] = useState({});
   const [uploadingAssignId, setUploadingAssignId] = useState(null);
   const [expandedFileDescKey, setExpandedFileDescKey] = useState(null);
   const [expandedAssignKey, setExpandedAssignKey] = useState(null);
+
+  useEffect(() => {
+    try {
+      const tab = sessionStorage.getItem('student_lms_main_tab');
+      if (tab && ['courses', 'files', 'assignments', 'exams'].includes(tab)) {
+        setMainTab(tab);
+        sessionStorage.removeItem('student_lms_main_tab');
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const handleFileChange = async (assignmentObj, idx, file) => {
     if (!file) return;

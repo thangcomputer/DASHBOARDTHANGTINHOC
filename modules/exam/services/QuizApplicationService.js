@@ -2,6 +2,7 @@
 const { lessonQuizRepository } = require('./../repositories');
 const Student = require('./../../student/models/Student');
 const logger = require('./../../../config/logger');
+const { scheduleQuizAssignedNotify } = require('./../../../services/quizAssignedNotifier');
 
 class QuizApplicationService {
   async get_teacher(data) {
@@ -39,6 +40,11 @@ class QuizApplicationService {
         questions,
         status: 'active',
       });
+
+      const notifyUser = data.app && typeof data.app.notifyUser === 'function'
+        ? data.app.notifyUser.bind(data.app)
+        : null;
+      scheduleQuizAssignedNotify({ quiz, notifyUser });
 
       return { _status: 200, _body: { success: true, data: quiz, message: 'Tạo bài trắc nghiệm thành công' } };
     } catch (err) {
@@ -239,6 +245,47 @@ class QuizApplicationService {
       }
 
       await quiz.save();
+
+      try {
+        const teacherId = quiz.teacherId ? String(quiz.teacherId) : '';
+        const io = data.app && typeof data.app.get === 'function' ? data.app.get('io') : null;
+        if (teacherId) {
+          const NotificationService = require('./../../../services/NotificationService');
+          const title = isForfeit
+            ? '⚠️ Học viên thoát giữa giờ trắc nghiệm'
+            : '📝 Học viên đã nộp trắc nghiệm';
+          const content = isForfeit
+            ? `${student.name || 'Học viên'} — "${quiz.title}": RỚT (thoát giữa giờ).`
+            : `${student.name || 'Học viên'} — "${quiz.title}": ${score}% (${correctCount}/${totalQuestions} câu) · ${status === 'passed' ? 'ĐẠT' : 'CHƯA ĐẠT'}.`;
+          await NotificationService.send(io, {
+            type: 'COURSE',
+            title,
+            content,
+            receivers: teacherId,
+            payload: {
+              quizId: String(quiz._id),
+              studentId: String(studentId),
+              score,
+              status,
+              forfeit: isForfeit,
+            },
+            link: '/teacher#students',
+          });
+          if (io) {
+            io.to(`teacher_${teacherId}`).emit('quiz:submitted', {
+              quizId: String(quiz._id),
+              studentId: String(studentId),
+              studentName: student.name,
+              title: quiz.title,
+              score,
+              status,
+              forfeit: isForfeit,
+            });
+          }
+        }
+      } catch (notifyErr) {
+        logger.warn({ err: notifyErr.message }, '[QUIZ] notify teacher on submit');
+      }
 
       const detailedReview = isForfeit
         ? []

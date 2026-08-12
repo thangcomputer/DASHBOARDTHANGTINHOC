@@ -17,6 +17,7 @@ import {
 
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { getMessagingRole } from '../lib/messagingRoles';
+import StudentQuizInviteHost from './student/StudentQuizInviteHost';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -429,6 +430,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           </div>
         </div>
       </main>
+
+      {role === 'student' ? <StudentQuizInviteHost /> : null}
 
       {showNotif && typeof document !== 'undefined' && createPortal(
         <>

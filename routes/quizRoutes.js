@@ -9,6 +9,7 @@ const logger = require('../config/logger');
 const { policyShadowQuizAdminRead } = require('../middleware/policyShadowQuizAdminRead');
 const { policyShadowQuiz } = require('../middleware/policyShadowQuiz');
 const { quizzesCutoverGate } = require('../middleware/quizzesCutoverGate');
+const { scheduleQuizAssignedNotify } = require('../services/quizAssignedNotifier');
 
 /** Phase 7.22: policyShadowQuiz → quizzesCutoverGate */
 function quizzesGuard(action) {
@@ -56,6 +57,12 @@ router.post('/create', [authMiddleware, ...quizzesGuard('create')], async (req, 
       deadline: deadline ? new Date(deadline) : null,
       questions,
       status: 'active',
+    });
+
+    // ~10s after create: popup invite for assigned students (online now or after login poll)
+    scheduleQuizAssignedNotify({
+      quiz,
+      notifyUser: typeof req.app.notifyUser === 'function' ? req.app.notifyUser.bind(req.app) : null,
     });
 
     return res.json({ success: true, data: quiz, message: 'Tạo bài trắc nghiệm thành công' });
@@ -285,6 +292,48 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
     }
 
     await quiz.save();
+
+    // Thông báo GV (bỏ qua forfeit trùng khi đã nộp bình thường — đã return sớm ở trên)
+    try {
+      const teacherId = quiz.teacherId ? String(quiz.teacherId) : '';
+      if (teacherId) {
+        const NotificationService = require('../services/NotificationService');
+        const io = req.app.get('io');
+        const title = isForfeit
+          ? '⚠️ Học viên thoát giữa giờ trắc nghiệm'
+          : '📝 Học viên đã nộp trắc nghiệm';
+        const content = isForfeit
+          ? `${student.name || 'Học viên'} — "${quiz.title}": RỚT (thoát giữa giờ).`
+          : `${student.name || 'Học viên'} — "${quiz.title}": ${score}% (${correctCount}/${totalQuestions} câu) · ${status === 'passed' ? 'ĐẠT' : 'CHƯA ĐẠT'}.`;
+        await NotificationService.send(io, {
+          type: 'COURSE',
+          title,
+          content,
+          receivers: teacherId,
+          payload: {
+            quizId: String(quiz._id),
+            studentId: String(studentId),
+            score,
+            status,
+            forfeit: isForfeit,
+          },
+          link: '/teacher#students',
+        });
+        if (io) {
+          io.to(`teacher_${teacherId}`).emit('quiz:submitted', {
+            quizId: String(quiz._id),
+            studentId: String(studentId),
+            studentName: student.name,
+            title: quiz.title,
+            score,
+            status,
+            forfeit: isForfeit,
+          });
+        }
+      }
+    } catch (notifyErr) {
+      logger.warn({ err: notifyErr.message }, '[QUIZ] notify teacher on submit');
+    }
 
     const detailedReview = isForfeit
       ? []
