@@ -13,19 +13,28 @@ const EMPTY_QUESTION = {
   explanation: '',
 };
 
-export default function TeacherQuizManager({ myStudents = [] }) {
+export default function TeacherQuizManager({
+  myStudents = [],
+  autoOpenCreate = false,
+  createOnly = false,
+  presetStudentId = null,
+  presetCourseName = '',
+  onCreateClose = null,
+}) {
   const toast = useToast();
   const [quizzes, setQuizzes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [loading, setLoading] = useState(!createOnly);
+  const [showCreateModal, setShowCreateModal] = useState(Boolean(autoOpenCreate));
   const [selectedDetailQuiz, setSelectedDetailQuiz] = useState(null);
 
   // Form tạo bài trắc nghiệm
   const uniqueCourses = [...new Set((myStudents || []).map(s => s.course).filter(Boolean))];
 
   const [title, setTitle] = useState('');
-  const [courseName, setCourseName] = useState(uniqueCourses[0] || '');
-  const [targetStudentIds, setTargetStudentIds] = useState([]);
+  const [courseName, setCourseName] = useState(presetCourseName || uniqueCourses[0] || '');
+  const [targetStudentIds, setTargetStudentIds] = useState(
+    presetStudentId ? [String(presetStudentId)] : []
+  );
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(15);
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
   const [deadline, setDeadline] = useState('');
@@ -36,7 +45,7 @@ export default function TeacherQuizManager({ myStudents = [] }) {
   const [promptError, setPromptError] = useState(false);
   const titleInputRef = useRef(null);
 
-  const [questions, setQuestions] = useState([{ ...EMPTY_QUESTION, options: [...EMPTY_QUESTION.options] }]);
+  const [questions, setQuestions] = useState([]);
 
   // Load danh sách bài trắc nghiệm của giảng viên
   const fetchQuizzes = async () => {
@@ -54,8 +63,20 @@ export default function TeacherQuizManager({ myStudents = [] }) {
   };
 
   useEffect(() => {
-    fetchQuizzes();
-  }, []);
+    if (!createOnly) fetchQuizzes();
+  }, [createOnly]);
+
+  useEffect(() => {
+    if (!autoOpenCreate) return;
+    setShowCreateModal(true);
+    if (presetCourseName) setCourseName(presetCourseName);
+    if (presetStudentId) setTargetStudentIds([String(presetStudentId)]);
+  }, [autoOpenCreate, presetCourseName, presetStudentId]);
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    onCreateClose?.();
+  };
 
   const studentIdOf = (s) => String(s?._id || s?.id || '');
 
@@ -222,9 +243,10 @@ export default function TeacherQuizManager({ myStudents = [] }) {
         toast.success('Đã tạo bài trắc nghiệm thành công!');
         setShowCreateModal(false);
         setTitle('');
-        setTargetStudentIds([]);
-        setQuestions([{ ...EMPTY_QUESTION, options: [...EMPTY_QUESTION.options] }]);
-        fetchQuizzes();
+        setTargetStudentIds(presetStudentId ? [String(presetStudentId)] : []);
+        setQuestions([]);
+        if (!createOnly) fetchQuizzes();
+        onCreateClose?.();
       } else {
         toast.error(res.message || 'Lỗi khi tạo bài trắc nghiệm');
       }
@@ -252,7 +274,9 @@ export default function TeacherQuizManager({ myStudents = [] }) {
   };
 
   return (
-    <div className="space-y-4 w-full">
+    <div className={createOnly ? '' : 'space-y-4 w-full'}>
+      {!createOnly && (
+      <>
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
         <div>
@@ -343,6 +367,8 @@ export default function TeacherQuizManager({ myStudents = [] }) {
           })}
         </div>
       )}
+      </>
+      )}
 
       {/* ── MODAL SOẠN BÀI TRẮC NGHIỆM MỚI ── */}
       {showCreateModal && (
@@ -357,7 +383,7 @@ export default function TeacherQuizManager({ myStudents = [] }) {
               </div>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={closeCreateModal}
                 className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100"
               >
                 <X size={18} />
@@ -651,7 +677,7 @@ export default function TeacherQuizManager({ myStudents = [] }) {
               <div className="flex gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeCreateModal}
                   className="flex-1 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-bold"
                 >
                   Hủy
@@ -670,7 +696,7 @@ export default function TeacherQuizManager({ myStudents = [] }) {
       )}
 
       {/* ── MODAL XEM CHI TIẾT KẾT QUẢ HỌC VIÊN ── */}
-      {selectedDetailQuiz && (
+      {!createOnly && selectedDetailQuiz && (
         <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-slate-100 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

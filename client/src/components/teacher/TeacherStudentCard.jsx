@@ -7,7 +7,7 @@ import {
   ChevronRight, BookOpen, Award, Zap, BarChart3, Users, Eye, X, XCircle,
   Search, Download, AlertCircle, Clipboard, Send, UserCheck, Check,
   Activity, Trash2, Ban, PlayCircle, Phone, Mail, Edit3, Shield,
-  Plus, Loader2, History,
+  Plus, Loader2, History, ListChecks,
 } from 'lucide-react';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
@@ -17,6 +17,7 @@ import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
 import { openSiteChat } from '../FloatingMessenger';
+import TeacherQuizManager from './TeacherQuizManager';
 
 const getDisplayName = (person) => {
   if (!person) return 'Không rõ';
@@ -84,7 +85,7 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
-export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam, isDetailed, attendanceGate }) => {
+export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam, isDetailed, attendanceGate, myStudents = [] }) => {
   const navigate = useNavigate();
   const { showModal } = useModal();
   const { onDataRefresh, socket } = useSocket();
@@ -95,6 +96,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const [linkSaved, setLinkSaved] = useState(false);
   const [gradeSaved, setGradeSaved] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [attForm, setAttForm] = useState({ note: 'Đã điểm danh hoàn thành buổi học', grade: student.avgGrade ?? student.lastGrade ?? 0 });
 
   useEffect(() => {
@@ -370,10 +372,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const panels = [
     { key: 'progress', icon: Activity, label: 'Tiến độ' },
     { key: 'assignments', icon: BookOpen, label: 'Bài tập' },
+    { key: 'quiz', icon: ListChecks, label: 'Trắc nghiệm' },
     { key: 'link', icon: Video, label: 'Link học' },
     { key: 'grade', icon: Award, label: 'Đánh giá' },
     { key: 'logs', icon: History, label: 'Nhật ký' },
   ];
+
+  const quizStudents = (myStudents && myStudents.length > 0) ? myStudents : [student];
+  const studentId = String(student._id || student.id || '');
+
+  const openQuizCreate = () => {
+    setActivePanel('quiz');
+    setShowQuizCreate(true);
+  };
 
   if (isDetailed) {
     return (
@@ -456,15 +467,21 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
         </div>
         </div>
 
-        {/* Tabs — 5 cột: Tiến độ, Bài tập, Link học, Đánh giá, Nhật ký */}
-        <div className="grid grid-cols-5 w-full bg-white border-b border-slate-100 min-w-0">
+        {/* Tabs — Tiến độ, Bài tập, Tạo TN, Link học, Đánh giá, Nhật ký */}
+        <div className="grid grid-cols-6 w-full bg-white border-b border-slate-100 min-w-0">
           {panels.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               type="button"
-              onClick={() => setActivePanel(key)}
-              title={label}
-              aria-label={label}
+              onClick={() => {
+                if (key === 'quiz') {
+                  openQuizCreate();
+                  return;
+                }
+                setActivePanel(key);
+              }}
+              title={key === 'quiz' ? 'Tạo trắc nghiệm' : label}
+              aria-label={key === 'quiz' ? 'Tạo trắc nghiệm' : label}
               aria-current={activePanel === key ? 'page' : undefined}
               className={`relative flex flex-col items-center justify-center gap-0.5 px-0.5 sm:px-1 min-h-11 sm:min-h-0 py-2 sm:py-3.5 text-[10px] sm:text-xs font-bold tracking-wide transition-all min-w-0 ${
                 activePanel === key ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
@@ -837,6 +854,29 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 )}
               </div>
             )}
+
+            {activePanel === 'quiz' && (
+              <div className="animate-in fade-in duration-300 py-8 sm:py-12 text-center space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600">
+                  <ListChecks size={28} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Tạo trắc nghiệm</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                    Soạn đề giao cho <strong>{getDisplayName(student)}</strong>
+                    {student.course ? ` · ${student.course}` : ''}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openQuizCreate}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm"
+                >
+                  <Plus size={14} /> Mở form tạo trắc nghiệm
+                </button>
+              </div>
+            )}
+
             {activePanel === 'grade' && (
               <div className="space-y-6 sm:space-y-8 animate-in slide-in-from-right-10 duration-500">
                  <div className="bg-amber-50 border border-amber-100 rounded-2xl sm:rounded-[40px] p-5 sm:p-10 text-center flex flex-col items-center gap-4 sm:gap-6">
@@ -985,6 +1025,17 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
            )}
         </div>
         
+        {showQuizCreate && (
+          <TeacherQuizManager
+            myStudents={quizStudents}
+            createOnly
+            autoOpenCreate
+            presetStudentId={studentId}
+            presetCourseName={student.course || ''}
+            onCreateClose={() => setShowQuizCreate(false)}
+          />
+        )}
+
         {/* Attendance Modal - Added to Detailed View */}
         {showAttendanceModal && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300">

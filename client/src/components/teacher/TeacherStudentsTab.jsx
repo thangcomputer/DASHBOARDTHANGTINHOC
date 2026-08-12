@@ -150,6 +150,7 @@ export default function TeacherStudentsTab({
                       onLockExam={lockStudentExam} 
                       isDetailed={true}
                       attendanceGate={attendanceGate}
+                      myStudents={students}
                     />
                   );
                 })()
