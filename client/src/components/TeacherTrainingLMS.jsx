@@ -1139,7 +1139,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
           <div className="bg-[#0b1018]">
             <div className="px-0 sm:px-4 pt-0 sm:pt-3 pb-0 sm:pb-2 flex justify-center w-full bg-black/40">
-              <div className="relative w-full rounded-none sm:rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80 h-[44dvh] sm:h-[50dvh] lg:h-[min(56dvh,560px)]">
+              <div className="relative w-full rounded-none sm:rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80 h-[44dvh] sm:h-[50dvh] lg:h-[min(56dvh,620px)]">
                 <YouTubePlayerSecure
                   key={currentLesson?._id}
                   videoId={currentLesson?.videoUrl}

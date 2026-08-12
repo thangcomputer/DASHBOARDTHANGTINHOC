@@ -1392,7 +1392,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           <div className="bg-[#0b1018]">
             <div className="px-0 sm:px-4 pt-0 sm:pt-3 pb-0 sm:pb-2 flex justify-center w-full bg-black/40">
               <div
-                className="relative overflow-hidden shadow-2xl shadow-black/80 w-full rounded-none sm:rounded-2xl bg-black h-[44dvh] sm:h-[50dvh] lg:h-[min(56dvh,560px)]"
+                className="relative overflow-hidden shadow-2xl shadow-black/80 w-full rounded-none sm:rounded-2xl bg-black h-[44dvh] sm:h-[50dvh] lg:h-[min(56dvh,620px)]"
               >
                 <StudentVideoPlayer
                   key={currentLesson?._id}

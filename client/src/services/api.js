@@ -1876,6 +1876,13 @@ export const quizzesAPI = {
     });
     return res.json();
   },
+  generateAi: async (payload) => {
+    const res = await apiFetch('/quizzes/generate-ai', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
   remove: async (id) => {
     const res = await apiFetch(`/quizzes/${id}`, { method: 'DELETE' });
     return res.json();

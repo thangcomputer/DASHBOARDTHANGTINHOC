@@ -29,7 +29,7 @@ function getConfig() {
     ? 'https://generativelanguage.googleapis.com/v1beta/openai'
     : 'https://api.openai.com/v1';
   const defaultModel = geminiKey && !process.env.AI_MODEL && !process.env.OPENAI_MODEL
-    ? 'gemini-2.5-flash'
+    ? 'gemini-flash-latest'
     : 'gpt-4o-mini';
   return {
     apiKey,

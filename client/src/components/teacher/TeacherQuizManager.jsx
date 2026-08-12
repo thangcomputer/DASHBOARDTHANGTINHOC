@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Trash2, Clock, Calendar, Users, Award, BookOpen, CheckCircle,
-  X, HelpCircle, Eye, AlertCircle, RefreshCw, Send, Check
+  X, HelpCircle, Eye, AlertCircle, RefreshCw, Send, Check, Sparkles
 } from 'lucide-react';
 import api from '../../services/api';
 import { useToast } from '../../utils/toast';
+
+const EMPTY_QUESTION = {
+  questionText: '',
+  options: ['', '', '', ''],
+  correctAnswer: 0,
+  explanation: '',
+};
 
 export default function TeacherQuizManager({ myStudents = [] }) {
   const toast = useToast();
@@ -23,15 +30,13 @@ export default function TeacherQuizManager({ myStudents = [] }) {
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
   const [deadline, setDeadline] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiCount, setAiCount] = useState(10);
+  const [aiDifficulty, setAiDifficulty] = useState('trung bình');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [promptError, setPromptError] = useState(false);
+  const titleInputRef = useRef(null);
 
-  const [questions, setQuestions] = useState([
-    {
-      questionText: 'Ví dụ: Phím tắt để lưu tài liệu trong MS Word là gì?',
-      options: ['Ctrl + S', 'Ctrl + C', 'Ctrl + V', 'Ctrl + P'],
-      correctAnswer: 0,
-      explanation: 'Ctrl + S là phím tắt tiêu chuẩn để Save (Lưu) tài liệu.',
-    },
-  ]);
+  const [questions, setQuestions] = useState([{ ...EMPTY_QUESTION, options: [...EMPTY_QUESTION.options] }]);
 
   // Load danh sách bài trắc nghiệm của giảng viên
   const fetchQuizzes = async () => {
@@ -52,28 +57,53 @@ export default function TeacherQuizManager({ myStudents = [] }) {
     fetchQuizzes();
   }, []);
 
-  // Lọc học viên thuộc khóa đã chọn
-  const filteredStudents = myStudents.filter(s => !courseName || s.course === courseName);
+  const studentIdOf = (s) => String(s?._id || s?.id || '');
+
+  const studentDisplayName = (s) => {
+    const name = s?.displayName || s?.name || '';
+    if (name && !/^\d{5,}$/.test(name)) return name;
+    return s?.email || s?.phone || `HV-${studentIdOf(s).slice(-4)}`;
+  };
+
+  // Lọc HV theo khóa; cùng 1 HV học nhiều môn thì gộp 1 dòng (tên + các môn)
+  const pickerStudents = useMemo(() => {
+    const map = new Map();
+    (myStudents || []).forEach((s) => {
+      if (courseName && s.course !== courseName) return;
+      const id = studentIdOf(s);
+      if (!id) return;
+      const existing = map.get(id);
+      const course = String(s.course || '').trim();
+      if (!existing) {
+        map.set(id, { id, name: studentDisplayName(s), courses: course ? [course] : [] });
+        return;
+      }
+      if (course && !existing.courses.includes(course)) existing.courses.push(course);
+    });
+    return [...map.values()];
+  }, [myStudents, courseName]);
+
+  const toggleTargetStudent = (id) => {
+    const sid = String(id);
+    setTargetStudentIds((prev) => (
+      prev.map(String).includes(sid)
+        ? prev.filter((x) => String(x) !== sid)
+        : [...prev, sid]
+    ));
+  };
+
+  const selectAllVisibleStudents = () => {
+    setTargetStudentIds(pickerStudents.map((s) => s.id));
+  };
+
+  const clearTargetStudents = () => setTargetStudentIds([]);
 
   // Thêm 1 câu hỏi mới
   const addQuestion = () => {
-    setQuestions(prev => [
-      ...prev,
-      {
-        questionText: '',
-        options: ['', '', '', ''],
-        correctAnswer: 0,
-        explanation: '',
-      },
-    ]);
+    setQuestions(prev => [...prev, { ...EMPTY_QUESTION, options: [...EMPTY_QUESTION.options] }]);
   };
 
-  // Xóa 1 câu hỏi
   const removeQuestion = (index) => {
-    if (questions.length <= 1) {
-      toast.warning('Bài thi trắc nghiệm phải có ít nhất 1 câu hỏi');
-      return;
-    }
     setQuestions(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -124,10 +154,54 @@ export default function TeacherQuizManager({ myStudents = [] }) {
     toast.success(`Đã thêm mẫu câu hỏi ${type.toUpperCase()}`);
   };
 
+  const handleGenerateAi = async () => {
+    const topic = title.trim();
+    if (!topic) {
+      setPromptError(true);
+      toast.warning('Nhập prompt (tên bài kiểm tra) trước khi tạo bằng AI');
+      titleInputRef.current?.focus();
+      return;
+    }
+    setPromptError(false);
+    setAiGenerating(true);
+    try {
+      const res = await api.quizzes.generateAi({
+        topic,
+        courseName,
+        count: Number(aiCount) || 10,
+        difficulty: aiDifficulty,
+      });
+      if (!res?.success || !Array.isArray(res.data?.questions) || !res.data.questions.length) {
+        toast.error(res?.message || 'AI không tạo được câu hỏi');
+        return;
+      }
+      setQuestions(res.data.questions.map((q) => ({
+        questionText: q.questionText || '',
+        options: Array.isArray(q.options) && q.options.length >= 4
+          ? q.options.slice(0, 4)
+          : ['', '', '', ''],
+        correctAnswer: Number(q.correctAnswer) || 0,
+        explanation: q.explanation || '',
+      })));
+      if (res.data.source === 'fallback') {
+        toast.warning(res.message || 'Đây là câu mẫu — hãy sửa trước khi giao bài');
+      } else {
+        toast.success(res.message || `Đã soạn ${res.data.questions.length} câu. Kiểm tra rồi bấm Tạo bài.`);
+      }
+    } catch {
+      toast.error('Lỗi kết nối khi gọi AI');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   // Submit tạo bài trắc nghiệm
   const handleCreateQuiz = async (e) => {
     e.preventDefault();
     if (!title.trim()) return toast.warning('Vui lòng nhập tên bài trắc nghiệm');
+    if (questions.length === 0) {
+      return toast.warning('Thêm ít nhất 1 câu hỏi trước khi tạo bài');
+    }
     if (questions.some(q => !q.questionText.trim() || q.options.some(o => !o.trim()))) {
       return toast.warning('Vui lòng điền đầy đủ câu hỏi và 4 lựa chọn đáp án');
     }
@@ -148,14 +222,8 @@ export default function TeacherQuizManager({ myStudents = [] }) {
         toast.success('Đã tạo bài trắc nghiệm thành công!');
         setShowCreateModal(false);
         setTitle('');
-        setQuestions([
-          {
-            questionText: 'Ví dụ: Phím tắt để lưu tài liệu trong MS Word là gì?',
-            options: ['Ctrl + S', 'Ctrl + C', 'Ctrl + V', 'Ctrl + P'],
-            correctAnswer: 0,
-            explanation: 'Ctrl + S là phím tắt tiêu chuẩn để Save (Lưu) tài liệu.',
-          },
-        ]);
+        setTargetStudentIds([]);
+        setQuestions([{ ...EMPTY_QUESTION, options: [...EMPTY_QUESTION.options] }]);
         fetchQuizzes();
       } else {
         toast.error(res.message || 'Lỗi khi tạo bài trắc nghiệm');
@@ -233,7 +301,9 @@ export default function TeacherQuizManager({ myStudents = [] }) {
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase">
-                      {quiz.courseName || 'Tất cả lớp'}
+                      {quiz.targetStudentIds?.length
+                        ? `${quiz.targetStudentIds.length} học viên`
+                        : (quiz.courseName || 'Tất cả lớp')}
                     </span>
                     <button
                       type="button"
@@ -299,25 +369,107 @@ export default function TeacherQuizManager({ myStudents = [] }) {
                 <div>
                   <label className="block text-slate-600 mb-1">Tên bài kiểm tra / Buổi học *</label>
                   <input
+                    ref={titleInputRef}
                     value={title}
-                    onChange={e => setTitle(e.target.value)}
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      if (promptError) setPromptError(false);
+                    }}
                     placeholder="Ví dụ: Trắc nghiệm Buổi 1 - MS Word"
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold"
+                    className={`w-full px-3 py-2.5 rounded-xl border outline-none font-bold ${
+                      promptError
+                        ? 'border-red-500 ring-2 ring-red-100'
+                        : 'border-slate-200 focus:border-red-500'
+                    }`}
                     required
                   />
+                  {promptError && (
+                    <p className="mt-1.5 text-[11px] text-red-600 font-bold">
+                      Bắt buộc nhập prompt trước khi tạo bằng AI.
+                    </p>
+                  )}
+                  <p className="mt-1.5 text-[11px] text-slate-500 font-medium leading-snug">
+                    Tên bài cũng là prompt AI. Viết rõ môn + nội dung, ví dụ: Ribbon Word — tab Trang chủ.
+                  </p>
                 </div>
                 <div>
-                  <label className="block text-slate-600 mb-1">Khóa học / Lớp áp dụng</label>
+                  <label className="block text-slate-600 mb-1">Giao cho học viên</label>
                   <select
                     value={courseName}
-                    onChange={e => setCourseName(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setCourseName(next);
+                      const allowed = new Set(
+                        (myStudents || [])
+                          .filter((s) => !next || s.course === next)
+                          .map(studentIdOf)
+                          .filter(Boolean)
+                      );
+                      setTargetStudentIds((prev) => prev.filter((id) => allowed.has(String(id))));
+                    }}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold bg-white"
                   >
-                    <option value="">-- Tất cả các lớp --</option>
-                    {uniqueCourses.map(c => (
+                    <option value="">-- Lọc tất cả môn --</option>
+                    {uniqueCourses.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/80 max-h-40 overflow-y-auto">
+                    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2.5 py-1.5 bg-slate-50/95 border-b border-slate-200">
+                      <span className="text-[10px] text-slate-500 font-bold">
+                        {targetStudentIds.length > 0
+                          ? `Đã chọn ${targetStudentIds.length}/${pickerStudents.length} HV`
+                          : `Không chọn = cả lớp đang lọc (${pickerStudents.length} HV)`}
+                      </span>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={selectAllVisibleStudents}
+                          disabled={pickerStudents.length === 0}
+                          className="px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 rounded disabled:opacity-40"
+                        >
+                          Tất cả
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearTargetStudents}
+                          disabled={targetStudentIds.length === 0}
+                          className="px-1.5 py-0.5 text-[10px] font-bold text-slate-500 hover:bg-slate-100 rounded disabled:opacity-40"
+                        >
+                          Bỏ chọn
+                        </button>
+                      </div>
+                    </div>
+                    {pickerStudents.length === 0 ? (
+                      <p className="px-3 py-3 text-[11px] text-slate-400 font-medium">
+                        Chưa có học viên trong bộ lọc này.
+                      </p>
+                    ) : (
+                      <ul className="py-1">
+                        {pickerStudents.map((s) => {
+                          const checked = targetStudentIds.map(String).includes(s.id);
+                          return (
+                            <li key={s.id}>
+                              <label className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-white cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleTargetStudent(s.id)}
+                                  className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                />
+                                <span className="font-bold text-slate-800 truncate">{s.name}</span>
+                                {s.courses.length > 0 && (
+                                  <span className="ml-auto text-[10px] text-slate-400 font-semibold truncate max-w-[45%]">
+                                    {s.courses.join(', ')}
+                                  </span>
+                                )}
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -344,23 +496,63 @@ export default function TeacherQuizManager({ myStudents = [] }) {
                 </div>
               </div>
 
-              {/* Mẫu nhanh */}
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                <span className="text-slate-500 text-[11px]">Nạp mẫu nhanh:</span>
-                <button
-                  type="button"
-                  onClick={() => loadTemplateQuestions('word')}
-                  className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold"
-                >
-                  Mẫu Word (3 câu)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => loadTemplateQuestions('excel')}
-                  className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[11px] font-bold"
-                >
-                  Mẫu Excel (2 câu)
-                </button>
+              {/* Mẫu nhanh + AI */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-slate-500 text-[11px]">Nạp mẫu nhanh:</span>
+                  <button
+                    type="button"
+                    onClick={() => loadTemplateQuestions('word')}
+                    className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold"
+                  >
+                    Mẫu Word (3 câu)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => loadTemplateQuestions('excel')}
+                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[11px] font-bold"
+                  >
+                    Mẫu Excel (2 câu)
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-end gap-2 rounded-xl border border-violet-100 bg-violet-50/60 p-2.5">
+                  <div>
+                    <label className="block text-violet-700 text-[10px] font-black uppercase mb-1">Số câu AI</label>
+                    <select
+                      value={aiCount}
+                      onChange={(e) => setAiCount(Number(e.target.value))}
+                      className="px-2.5 py-1.5 rounded-lg border border-violet-200 bg-white text-[11px] font-bold outline-none"
+                    >
+                      <option value={5}>5 câu</option>
+                      <option value={10}>10 câu</option>
+                      <option value={15}>15 câu</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-violet-700 text-[10px] font-black uppercase mb-1">Độ khó</label>
+                    <select
+                      value={aiDifficulty}
+                      onChange={(e) => setAiDifficulty(e.target.value)}
+                      className="px-2.5 py-1.5 rounded-lg border border-violet-200 bg-white text-[11px] font-bold outline-none"
+                    >
+                      <option value="dễ">Dễ</option>
+                      <option value="trung bình">Trung bình</option>
+                      <option value="khó">Khó</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGenerateAi}
+                    disabled={aiGenerating}
+                    className="ml-auto px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5"
+                  >
+                    {aiGenerating ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                    {aiGenerating ? 'Đang soạn...' : 'Tạo bằng AI (Gemini)'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  AI chỉ điền câu hỏi vào form. Bạn kiểm tra đáp án rồi mới bấm “Tạo bài trắc nghiệm”.
+                </p>
               </div>
 
               {/* SOẠN CÂU HỎI TRẮC NGHIỆM */}
@@ -376,19 +568,26 @@ export default function TeacherQuizManager({ myStudents = [] }) {
                   </button>
                 </div>
 
+                {questions.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                    <p className="text-sm font-bold text-slate-600">Chưa có câu hỏi</p>
+                    <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                      Thêm câu mới, nạp mẫu Word/Excel, hoặc dùng AI trước khi tạo bài.
+                    </p>
+                  </div>
+                )}
+
                 {questions.map((q, qIdx) => (
                   <div key={qIdx} className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 relative">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-bold text-slate-800 text-xs">Câu hỏi số {qIdx + 1}</span>
-                      {questions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeQuestion(qIdx)}
-                          className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1"
-                        >
-                          <Trash2 size={13} /> Xóa câu
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeQuestion(qIdx)}
+                        className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1"
+                      >
+                        <Trash2 size={13} /> Xóa câu
+                      </button>
                     </div>
 
                     <input

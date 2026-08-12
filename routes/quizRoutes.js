@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const LessonQuiz = require('../models/LessonQuiz');
 const Student = require('../models/Student');
+const quizGenerator = require('../shared/ai/QuizGeneratorProvider');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const Teacher = require('../models/Teacher');
 const logger = require('../config/logger');
@@ -61,6 +62,34 @@ router.post('/create', [authMiddleware, ...quizzesGuard('create')], async (req, 
   } catch (err) {
     logger.error('[QUIZ] Create error:', err.message);
     return res.status(500).json({ success: false, message: 'Lỗi khi tạo bài trắc nghiệm' });
+  }
+});
+
+// ── POST /api/quizzes/generate-ai: Gemini sinh câu hỏi, GV duyệt trước khi tạo ─
+router.post('/generate-ai', [authMiddleware, ...quizzesGuard('generate_ai')], async (req, res) => {
+  try {
+    const { topic, courseName, count, difficulty } = req.body || {};
+    const data = await quizGenerator.generateForTeacher({
+      topic: topic || '',
+      courseName: courseName || '',
+      count,
+      difficulty,
+    });
+    return res.json({
+      success: true,
+      data,
+      message: data.source === 'fallback'
+        ? 'AI chưa sẵn sàng — đây là câu mẫu, hãy sửa trước khi giao bài'
+        : `Đã soạn ${data.count} câu. Kiểm tra rồi bấm Tạo bài trắc nghiệm.`,
+    });
+  } catch (err) {
+    logger.warn({ err: err.message }, '[QUIZ] generate-ai');
+    const status = err.status === 400 ? 400 : (err.status && err.status >= 400 && err.status < 600 ? err.status : 502);
+    return res.status(status).json({
+      success: false,
+      message: err.message || 'Không tạo được câu hỏi AI',
+      code: err.code,
+    });
   }
 });
 

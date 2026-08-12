@@ -128,7 +128,7 @@ async function probeHealth() {
 
 /** Fallback quiz khi chua co API key — demo co cau truc dung */
 function fallbackQuiz({ topic, count, subject }) {
-  const n = Math.min(10, Math.max(1, Number(count) || 5));
+  const n = Math.min(15, Math.max(1, Number(count) || 10));
   const questions = [];
   for (let i = 1; i <= n; i++) {
     questions.push({
@@ -141,8 +141,8 @@ function fallbackQuiz({ topic, count, subject }) {
   return { questions, source: 'fallback', model: null };
 }
 
-async function generateQuiz({ topic, count = 5, subject = 'Tin hoc van phong' } = {}) {
-  const n = Math.min(10, Math.max(1, Number(count) || 5));
+async function generateQuiz({ topic, count = 10, subject = 'Tin hoc van phong' } = {}) {
+  const n = Math.min(15, Math.max(1, Number(count) || 10));
   const t = clampText(topic || subject, 200);
   if (!isAiConfigured()) return fallbackQuiz({ topic: t, count: n, subject });
 
@@ -159,7 +159,7 @@ async function generateQuiz({ topic, count = 5, subject = 'Tin hoc van phong' } 
         { role: 'user', content: user },
       ],
       temperature: 0.5,
-      maxTokens: 2000,
+      maxTokens: Math.min(8000, 800 + n * 350),
       responseFormat: 'json',
     });
 

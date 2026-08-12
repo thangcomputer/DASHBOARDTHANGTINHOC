@@ -21,6 +21,7 @@ const {
 const AUTH_ONLY_ACTIONS = new Set([
   'teacher_list',
   'create',
+  'generate_ai',
   'delete',
   'student_list',
   'get',
