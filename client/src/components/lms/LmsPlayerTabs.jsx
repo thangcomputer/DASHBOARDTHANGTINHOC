@@ -3,7 +3,7 @@ import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
   FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
-import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp } from '../../utils/lmsLessonUi';
+import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getLessonAccessStatusLines, getLessonCompletionProgressUi, lessonStatusToneClass } from '../../utils/lmsLessonUi';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
 import { buildMediaDownloadUrl, apiFetch } from '../../services/api';
 import useLmsLocalStore, { lmsStoreKey } from '../../hooks/useLmsLocalStore';
@@ -761,6 +761,9 @@ function ListPanel({
               chapterLessons.map((lesson) => {
                 const globalIdx = lessons.findIndex((l) => String(l._id) === String(lesson._id));
                 const isCurrent = currentLesson?._id === lesson._id;
+                const statusLines = getLessonAccessStatusLines(lesson, { isCurrent });
+                const progressUi = getLessonCompletionProgressUi(lesson);
+                const showBar = lesson.isUnlocked !== false && !lesson.isCompleted && progressUi.required > 0;
                 return (
                   <div
                     key={lesson._id}
@@ -808,6 +811,24 @@ function ListPanel({
                       >
                         {formatLessonDisplayTitle(lesson.title, globalIdx)}
                       </h4>
+                      <div className="mt-1 space-y-0.5">
+                        {statusLines.map((line) => (
+                          <p
+                            key={line.key}
+                            className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone)}`}
+                          >
+                            {line.text}
+                          </p>
+                        ))}
+                      </div>
+                      {showBar ? (
+                        <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-sky-400/80 transition-all duration-300"
+                            style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 );

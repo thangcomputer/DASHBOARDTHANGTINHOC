@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Plus, Edit3, Trash2, Video, ChevronDown, ChevronUp, Save, Layers, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Plus, Edit3, Trash2, Video, ChevronDown, ChevronUp, Save, Layers, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
 import { useToast } from '../utils/toast.jsx';
+import { probeYouTubeDurationSeconds, extractYouTubeId } from '../utils/youtubeDuration';
 
 const AdminCourseBuilder = ({ course, onBack, onSave }) => {
   const toast = useToast();
@@ -15,6 +16,32 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
   const [tempUrl, setTempUrl] = useState('');
   const [tempDuration, setTempDuration] = useState(0);
   const [tempAntiSeek, setTempAntiSeek] = useState(true);
+  const [tempAllowEarlyAccess, setTempAllowEarlyAccess] = useState(false);
+  const [probingDuration, setProbingDuration] = useState(false);
+  const probeSeqRef = useRef(0);
+
+  // Auto-lấy thời lượng thật từ YouTube khi nhập/sửa URL
+  useEffect(() => {
+    if (!editingLessonId) return undefined;
+    const ytId = extractYouTubeId(tempUrl);
+    if (!ytId) return undefined;
+
+    const seq = ++probeSeqRef.current;
+    const timer = setTimeout(async () => {
+      setProbingDuration(true);
+      try {
+        const secs = await probeYouTubeDurationSeconds(ytId);
+        if (probeSeqRef.current !== seq) return;
+        if (secs > 0) {
+          setTempDuration(secs);
+        }
+      } finally {
+        if (probeSeqRef.current === seq) setProbingDuration(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [tempUrl, editingLessonId]);
 
   // --- CHAPTER ACTIONS ---
   const addChapter = () => {
@@ -57,6 +84,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
       duration: 0,
       videoUrl: '',
       antiSeek: true,
+      allowEarlyAccess: false,
     };
     setChapters(chapters.map(c => {
       if (c.id === chapterId) {
@@ -275,26 +303,64 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                 />
                               </div>
                               <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Thời lượng (s)</label>
-                                <input
-                                  type="number"
-                                  value={tempDuration}
-                                  onChange={(e) => setTempDuration(e.target.value)}
-                                  className="w-full border border-slate-200 p-2.5 rounded-xl outline-none focus:border-violet-400 text-sm"
-                                />
+                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                                  Thời lượng (s){probingDuration ? ' · đang lấy từ YT…' : ''}
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    value={tempDuration}
+                                    onChange={(e) => setTempDuration(e.target.value)}
+                                    className="w-full border border-slate-200 p-2.5 rounded-xl outline-none focus:border-violet-400 text-sm pr-9"
+                                  />
+                                  {probingDuration ? (
+                                    <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-violet-500" />
+                                  ) : null}
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                                  Tự lấy từ YouTube khi dán link. Nên khớp độ dài thật để % hoàn thành đúng.
+                                </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 pt-1">
-                              <input
-                                type="checkbox"
-                                id={`antiSeek_${lesson.id}`}
-                                checked={tempAntiSeek}
-                                onChange={(e) => setTempAntiSeek(e.target.checked)}
-                                className="w-4 h-4 text-red-600 rounded focus:ring-red-500 cursor-pointer"
-                              />
-                              <label htmlFor={`antiSeek_${lesson.id}`} className="text-xs font-bold text-slate-700 cursor-pointer select-none">
-                                🛡️ Bật chống tua bài học này (xem đủ 2/3 thời lượng)
-                              </label>
+                            <div className="flex flex-col gap-3 pt-1">
+                              <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`antiSeek_${lesson.id}`}
+                                    checked={tempAntiSeek}
+                                    onChange={(e) => setTempAntiSeek(e.target.checked)}
+                                    className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
+                                  />
+                                  <label htmlFor={`antiSeek_${lesson.id}`} className="text-xs font-bold text-slate-800 cursor-pointer select-none">
+                                    Chống tua (antiSeek)
+                                  </label>
+                                </div>
+                                <p className="text-[11px] text-slate-600 leading-relaxed pl-6">
+                                  {tempAntiSeek
+                                    ? 'Bật: học viên không thể tua vượt quá phần đã xem.'
+                                    : 'Tắt: học viên có thể tua tự do trong bài, nhưng vẫn phải đạt 2/3 thời lượng để hoàn thành.'}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-3 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`earlyAccess_${lesson.id}`}
+                                    checked={tempAllowEarlyAccess}
+                                    onChange={(e) => setTempAllowEarlyAccess(e.target.checked)}
+                                    className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 cursor-pointer"
+                                  />
+                                  <label htmlFor={`earlyAccess_${lesson.id}`} className="text-xs font-bold text-slate-800 cursor-pointer select-none">
+                                    Cho phép mở bài sớm (allowEarlyAccess)
+                                  </label>
+                                </div>
+                                <p className="text-[11px] text-slate-600 leading-relaxed pl-6">
+                                  {tempAllowEarlyAccess
+                                    ? 'Bật: học viên có thể mở bài này trước khi hoàn thành bài trước.'
+                                    : 'Tắt: học viên phải hoàn thành bài trước mới được mở bài này.'}
+                                </p>
+                              </div>
                             </div>
                             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
                               <button type="button" onClick={() => setEditingLessonId(null)} className="min-h-11 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-bold transition">Hủy</button>
@@ -306,6 +372,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                   url: tempUrl,
                                   duration: parseInt(tempDuration, 10) || 0,
                                   antiSeek: tempAntiSeek,
+                                  allowEarlyAccess: tempAllowEarlyAccess,
                                 })}
                                 className="min-h-11 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition"
                               >
@@ -329,11 +396,16 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                               <p className="text-[11px] text-slate-400 mt-1 break-all leading-relaxed flex flex-wrap items-center gap-1.5">
                                 <span>{lesson.videoUrl || lesson.url || 'Chưa thiết lập URL'}</span>
                                 <span className="text-slate-300"> · </span>
-                                <span>{lesson.duration || 0}s</span>
+                                <span>{Number(lesson.duration) > 0 ? `${lesson.duration}s` : 'Chưa có thời lượng'}</span>
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                                   lesson.antiSeek !== false ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 }`}>
-                                  {lesson.antiSeek !== false ? '🛡️ Chống tua: BẬT' : '⚡ Tua tự do'}
+                                  {lesson.antiSeek !== false ? 'Chống tua: BẬT' : 'Tua tự do'}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                  lesson.allowEarlyAccess === true ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-slate-50 text-slate-500 border border-slate-200'
+                                }`}>
+                                  {lesson.allowEarlyAccess === true ? 'Mở sớm: BẬT' : 'Mở sớm: TẮT'}
                                 </span>
                               </p>
                             </div>
@@ -346,6 +418,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                   setTempUrl(lesson.videoUrl || lesson.url || '');
                                   setTempDuration(lesson.duration || 0);
                                   setTempAntiSeek(lesson.antiSeek !== false);
+                                  setTempAllowEarlyAccess(lesson.allowEarlyAccess === true);
                                 }}
                                 className="inline-flex items-center justify-center min-w-10 min-h-10 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl"
                                 aria-label="Sửa bài học"

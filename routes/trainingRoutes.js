@@ -9,12 +9,18 @@ const { trainingLmsCutoverGate } = require('../middleware/trainingLmsCutoverGate
 const {
   isLessonAntiSeekEnabled,
   parseLessonDurationSeconds,
-  requiredWatchSeconds,
   resolveEffectiveDuration,
   findLessonInCourse,
   clampWatchProgressIncrease,
   previousLessonId,
 } = require('../utils/antiSeekPolicy');
+const {
+  isLessonAllowEarlyAccess,
+  resolveLessonLearningState,
+  evaluateCompletionRequirement,
+  LESSON_COMPLETION_REQUIREMENT_CODE,
+  LESSON_COMPLETION_REQUIREMENT_MESSAGE,
+} = require('../utils/lessonLearningPolicy');
 
 /**
  * LIVE mount: server.js → app.use('/api/training-lms', trainingRoutes)
@@ -97,32 +103,36 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
     const watchedSecondsMap = {};
     progress.forEach(p => { watchedSecondsMap[String(p.lessonId)] = p.watchedSeconds || 0; });
 
-    // 3. Xử lý logic Mở khóa tuần tự
-    let lastWasCompleted = true; // Bài đầu tiên luôn được mở nếu xét mặc định
-    
+    // 3. ACCESS / SEEK / COMPLETION — independent (see lessonLearningPolicy)
     const lessonsWithStatus = lessons.map((lesson, index) => {
-      const isCompleted = completedLessonIds.includes(String(lesson._id));
-      
-      // Logic: Bài đầu tiên (index 0) luôn mở. 
-      // Các bài sau chỉ mở nếu bài trước đó đã completed.
-      const isUnlocked = index === 0 || lastWasCompleted;
-      
-      // Cập nhật trạng thái cho bài tiếp theo
-      lastWasCompleted = isCompleted;
+      const watched = watchedSecondsMap[String(lesson._id)] || 0;
+      const state = resolveLessonLearningState({
+        lesson,
+        index,
+        course,
+        completedLessonIds,
+        watchedSeconds: watched,
+      });
 
       const base = {
         ...lesson,
-        isCompleted,
-        isUnlocked,
-        watchedSeconds: watchedSecondsMap[String(lesson._id)] || 0,
-        antiSeek: lesson.antiSeek !== false,
-        adminDurationSeconds: parseLessonDurationSeconds(lesson.duration),
-        requiredWatchSeconds: isLessonAntiSeekEnabled(lesson)
-          ? requiredWatchSeconds(parseLessonDurationSeconds(lesson.duration))
-          : 0,
+        isCompleted: state.isCompleted,
+        isUnlocked: state.isUnlocked,
+        canAccess: state.canAccess,
+        allowEarlyAccess: state.allowEarlyAccess,
+        watchedSeconds: watched,
+        antiSeek: state.antiSeekEnabled,
+        adminDurationSeconds: state.adminDurationSeconds,
+        requiredWatchSeconds: state.requiredSeconds,
+        requiredSeconds: state.requiredSeconds,
+        completionEligible: state.completionEligible,
+        durationUnknown: state.durationUnknown,
+        effectiveDurationSeconds: state.effectiveDurationSeconds,
+        prerequisiteLessonId: state.prerequisiteLessonId,
+        prerequisiteCompleted: state.prerequisiteCompleted,
       };
-      // Module 2 — không lộ nội dung video bài khóa qua API list
-      if (!isUnlocked) {
+      // Không lộ nội dung video bài khóa qua API list
+      if (!state.canAccess) {
         return {
           ...base,
           videoUrl: undefined,
@@ -141,7 +151,7 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
   }
 });
 
-// Hoàn thành bài học — SoT: TrainingProgress + sequential prev + antiSeek duration sync
+// Hoàn thành bài học — SoT: TrainingProgress + ACCESS/COMPLETION độc lập với SEEK
 router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -167,9 +177,10 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       return res.status(404).json({ success: false, message: 'Bài học không tồn tại trong khóa' });
     }
 
-    // Module 2 — sequential: cannot complete N if N-1 not completed
+    // ACCESS: prerequisite required unless allowEarlyAccess (does NOT bypass 2/3)
+    const allowEarly = isLessonAllowEarlyAccess(lesson);
     const prevId = previousLessonId(course, lessonId);
-    if (prevId) {
+    if (prevId && !allowEarly) {
       const prevProg = await TrainingProgress.findOne({ userId, lessonId: prevId, status: 'completed' }).lean();
       if (!prevProg) {
         return res.status(403).json({
@@ -180,7 +191,6 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       }
     }
 
-    const antiSeekOn = isLessonAntiSeekEnabled(lesson);
     const effectiveDuration = resolveEffectiveDuration(lesson.duration, videoDuration);
 
     // Flush client watch into server with elapsed clamp (same as save-watch)
@@ -193,7 +203,7 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       maxSeconds: effectiveDuration > 0 ? effectiveDuration : 0,
     });
 
-    // Persist flushed progress even if we later reject anti-seek (so next try has SoT)
+    // Persist flushed progress even if we later reject completion (so next try has SoT)
     if (credited > serverWatched) {
       await TrainingProgress.findOneAndUpdate(
         { userId, lessonId, status: { $ne: 'completed' } },
@@ -202,23 +212,44 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       );
     }
 
-    if (antiSeekOn) {
-      const required = requiredWatchSeconds(effectiveDuration);
-      const minRequired = required > 0 ? required : 1;
-      if (credited < minRequired) {
-        return res.status(422).json({
-          success: false,
-          code: 'ANTI_SEEK_PROGRESS_REQUIRED',
-          message: 'Bạn chưa xem đủ thời lượng yêu cầu của bài học.',
-          data: {
-            watchedSeconds: credited,
-            requiredSeconds: minRequired,
-            durationSeconds: effectiveDuration,
-            adminDurationSeconds: parseLessonDurationSeconds(lesson.duration),
-            videoDurationSeconds: Math.floor(Number(videoDuration) || 0) || null,
-          },
-        });
-      }
+    // COMPLETION: ALWAYS require 2/3 — independent of antiSeek / allowEarlyAccess
+    // Duration SoT: resolveEffectiveDuration(admin, YouTube client report)
+    const completion = evaluateCompletionRequirement({
+      watchedSeconds: credited,
+      effectiveDuration,
+    });
+    if (completion.durationUnknown) {
+      return res.status(422).json({
+        success: false,
+        code: LESSON_COMPLETION_REQUIREMENT_CODE,
+        message: 'Chưa xác định được thời lượng video. Hãy phát video để hệ thống lấy độ dài YouTube.',
+        data: {
+          watchedSeconds: completion.watchedSeconds,
+          requiredSeconds: 0,
+          durationSeconds: 0,
+          durationUnknown: true,
+          adminDurationSeconds: parseLessonDurationSeconds(lesson.duration),
+          videoDurationSeconds: Math.floor(Number(videoDuration) || 0) || null,
+          antiSeekEnabled: isLessonAntiSeekEnabled(lesson),
+          allowEarlyAccess: allowEarly,
+        },
+      });
+    }
+    if (!completion.completionEligible) {
+      return res.status(422).json({
+        success: false,
+        code: LESSON_COMPLETION_REQUIREMENT_CODE,
+        message: LESSON_COMPLETION_REQUIREMENT_MESSAGE,
+        data: {
+          watchedSeconds: completion.watchedSeconds,
+          requiredSeconds: completion.requiredSeconds,
+          durationSeconds: completion.durationSeconds,
+          adminDurationSeconds: parseLessonDurationSeconds(lesson.duration),
+          videoDurationSeconds: Math.floor(Number(videoDuration) || 0) || null,
+          antiSeekEnabled: isLessonAntiSeekEnabled(lesson),
+          allowEarlyAccess: allowEarly,
+        },
+      });
     }
 
     await TrainingProgress.findOneAndUpdate(
@@ -242,6 +273,7 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
         status: 'completed',
         watchedSeconds: Math.max(credited, serverWatched),
         effectiveDuration,
+        requiredSeconds: completion.requiredSeconds,
       },
     });
   } catch (error) {
@@ -409,13 +441,39 @@ router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res)
     }
 
     let maxSeconds = 0;
+    let course = null;
+    let lesson = null;
     try {
       const SystemSettings = require('../models/SystemSettings');
       const settings = await SystemSettings.findOne() || {};
-      const course = findCourseInSettings(settings, courseId);
-      const lesson = course ? findLessonInCourse(course, lessonId) : null;
+      course = findCourseInSettings(settings, courseId);
+      lesson = course ? findLessonInCourse(course, lessonId) : null;
       maxSeconds = resolveEffectiveDuration(lesson?.duration, videoDuration);
     } catch { /* ignore */ }
+
+    // ACCESS gate: do not accept watch progress for locked lessons
+    if (course && lesson) {
+      const completed = await TrainingProgress.find({
+        userId,
+        courseId: String(courseId),
+        status: 'completed',
+      }).select('lessonId').lean();
+      const completedLessonIds = completed.map((p) => String(p.lessonId));
+      const { resolveCanAccessLesson } = require('../utils/lessonLearningPolicy');
+      const access = resolveCanAccessLesson({
+        course,
+        lessonId,
+        lesson,
+        completedLessonIds,
+      });
+      if (!access.canAccess) {
+        return res.status(403).json({
+          success: false,
+          code: 'PREVIOUS_LESSON_REQUIRED',
+          message: 'Hoàn thành bài trước để mở bài này.',
+        });
+      }
+    }
 
     const nextWatched = clampWatchProgressIncrease({
       previous: existing?.watchedSeconds || 0,

@@ -90,17 +90,17 @@ test('clampWatchProgressIncrease first save accepts incoming (bounded by max)', 
   assert.equal(next, 50);
 });
 
-test('complete-lesson route source enforces anti-seek + sequential prev', () => {
+test('complete-lesson route source enforces completion + sequential prev', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const src = fs.readFileSync(path.join(__dirname, '../../routes/trainingRoutes.js'), 'utf8');
-  assert.ok(src.includes('ANTI_SEEK_PROGRESS_REQUIRED'));
+  assert.ok(src.includes('LESSON_COMPLETION_REQUIREMENT_CODE'));
   assert.ok(src.includes('PREVIOUS_LESSON_REQUIRED'));
   assert.ok(src.includes('resolveEffectiveDuration'));
   assert.ok(src.includes('contentLocked'));
-  assert.ok(src.includes('isLessonAntiSeekEnabled'));
+  assert.ok(src.includes('evaluateCompletionRequirement'));
   assert.ok(src.includes('clampWatchProgressIncrease'));
-  assert.ok(src.includes('credited < minRequired'));
+  assert.ok(src.includes('completionEligible'));
 });
 
 test('FE players do not override Admin antiSeek via localStorage', () => {

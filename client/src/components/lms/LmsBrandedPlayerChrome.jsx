@@ -41,13 +41,16 @@ export default function LmsBrandedPlayerChrome({
   const [showVol, setShowVol] = useState(false);
   const barRef = useRef(null);
 
-  const safeDur = duration > 0 ? duration : 0;
+  const rawDur = Math.max(0, Number(duration) || 0);
+  const rawTime = Math.max(0, Number(dragging ? dragRatio * rawDur : currentTime) || 0);
+  // Nếu YT báo current > duration: mở rộng hiển thị tổng để không lệch (vd 1:38:38 / 1:38:35)
+  const safeDur = rawDur > 0 ? Math.max(rawDur, Math.ceil(rawTime)) : rawDur;
+  const displayTime = safeDur > 0 ? Math.min(rawTime, safeDur) : rawTime;
   const lockSeek = antiSeekEnabled && !seekUnlocked;
   // Chưa đủ điều kiện: chỉ tua trong vùng đã xem. Đã đủ: tua full.
   const seekCap = lockSeek
-    ? Math.max(Number(maxSeekable) || 0, Number(currentTime) || 0)
+    ? Math.max(Number(maxSeekable) || 0, Number(displayTime) || 0)
     : safeDur;
-  const displayTime = dragging ? dragRatio * safeDur : currentTime;
   const progressPct = safeDur > 0 ? Math.min(100, (displayTime / safeDur) * 100) : 0;
   const maxPct = safeDur > 0 ? Math.min(100, (seekCap / safeDur) * 100) : 0;
 
@@ -176,8 +179,8 @@ export default function LmsBrandedPlayerChrome({
             }}
             onKeyDown={(e) => {
               if (!safeDur) return;
-              if (e.key === 'ArrowRight') commitSeek((currentTime + 5) / safeDur);
-              if (e.key === 'ArrowLeft') commitSeek((currentTime - 5) / safeDur);
+              if (e.key === 'ArrowRight') commitSeek((displayTime + 5) / safeDur);
+              if (e.key === 'ArrowLeft') commitSeek((displayTime - 5) / safeDur);
             }}
           >
             <div className="absolute inset-x-0 h-2.5 rounded-full bg-white/20">
