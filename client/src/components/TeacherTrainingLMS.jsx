@@ -68,7 +68,7 @@ const CircularProgress = ({ progress, size = 112 }) => {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
   let strokeColor = 'text-slate-100';
-  let pathColor = 'text-blue-500';
+  let pathColor = 'text-red-500';
   if (progress === 0) pathColor = 'text-slate-200';
   else if (progress === 100) pathColor = 'text-emerald-500';
 
@@ -654,7 +654,7 @@ const YouTubePlayerSecure = ({
         {!isReady && (
           <div className="absolute inset-0 z-20 bg-slate-900 flex items-center justify-center rounded-none lg:rounded-2xl">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-[3px] border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
+              <div className="w-12 h-12 border-[3px] border-red-500/30 border-t-red-500 rounded-full animate-spin" />
               <p className="text-slate-400 font-semibold text-xs animate-pulse tracking-widest uppercase">Đang tải video...</p>
             </div>
           </div>
@@ -683,7 +683,7 @@ const YouTubePlayerSecure = ({
               <span className={`text-[10px] px-2.5 py-1 rounded-full border backdrop-blur-md font-bold ${
                 lessonCompleted || displayWatched >= requiredSeconds || seekUnlocked
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                  : 'bg-sky-500/20 text-sky-200 border-sky-500/30'
+                  : 'bg-red-500/20 text-red-200 border-red-500/30'
               }`}>
                 {lessonCompleted
                   ? 'Đã hoàn thành'
@@ -769,7 +769,7 @@ const AdminProgressPanel = ({ courseId }) => {
 
   return (
     <div className="bg-white rounded-[32px] border border-gray-100 overflow-hidden">
-      <div className="px-8 py-6 bg-gradient-to-r from-blue-900 to-slate-900 flex items-center justify-between">
+      <div className="px-8 py-6 bg-gradient-to-r from-red-900 to-slate-900 flex items-center justify-between">
         <div className="flex items-center gap-3 text-white">
           <Users size={20} />
           <h3 className="font-black text-base uppercase tracking-wide">Tiến độ Giảng viên</h3>
@@ -787,7 +787,7 @@ const AdminProgressPanel = ({ courseId }) => {
         <div className="divide-y divide-gray-50">
           {data.map(t => (
             <div key={t.teacherId} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-              <div className="w-10 h-10 bg-blue-100 rounded-2xl flex items-center justify-center font-black text-blue-700 text-sm flex-shrink-0">
+              <div className="w-10 h-10 bg-red-100 rounded-2xl flex items-center justify-center font-black text-red-700 text-sm flex-shrink-0">
                 {(t.teacherName || 'GV')[0]}
               </div>
               <div className="flex-1 min-w-0">
@@ -1192,7 +1192,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             {isAdmin && (
               <button
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-red-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${showAdminPanel ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
               >
                 <BarChart2 size={16} /> Xem tiến độ
               </button>
@@ -1248,10 +1248,10 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {courses.map((course, idx) => {
                  const gradients = [
-                    "from-blue-600 to-indigo-700",
+                    "from-red-600 to-red-800",
                     "from-teal-500 to-emerald-600",
                     "from-violet-600 to-fuchsia-600",
-                    "from-sky-500 to-blue-700"
+                    "from-red-500 to-red-700"
                  ];
                  const bgClass = gradients[idx % gradients.length];
                  const progress = courseProgressMap[course.id || course._id] || course.overallProgress || course.progress || 0;
@@ -1277,7 +1277,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                     <div className="p-5 flex-1 flex flex-col">
                        <div className="flex items-start gap-3 mb-2">
                          <div className="flex-1 min-w-0">
-                           <h3 className="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
+                           <h3 className="font-bold text-slate-800 text-lg group-hover:text-red-600 transition-colors line-clamp-2 leading-snug">
                           {course.title}
                            </h3>
                          </div>
@@ -1287,7 +1287,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                        </div>
                        <div className="flex items-center gap-2 mb-3">
                          <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
-                           <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
+                           <div className="h-full rounded-full bg-red-600 transition-all" style={{ width: `${progress}%` }} />
                          </div>
                        </div>
                        <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
@@ -1300,7 +1300,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                              <span>{lessonCount} BÀI HỌC</span>
                           </div>
                           
-                          <div className="flex items-center gap-1 text-sm font-semibold text-blue-600 group-hover:translate-x-1 transition-transform">
+                          <div className="flex items-center gap-1 text-sm font-semibold text-red-600 group-hover:translate-x-1 transition-transform">
                              <span>VÀO HỌC</span>
                              <ChevronRight size={14} />
                           </div>
@@ -1316,7 +1316,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         {mainTab === 'guides' && (
            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
              <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-               <FileText className="text-blue-600" /> Quy trình & Hướng dẫn
+               <FileText className="text-red-600" /> Quy trình & Hướng dẫn
              </h2>
              <div className="grid grid-cols-1 gap-4 w-full max-w-full">
                {visibleTraining?.guides?.map((guide, idx) => {
@@ -1330,16 +1330,16 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                  return (
                    <div
                      key={gKey}
-                     className="p-5 sm:p-6 rounded-2xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all flex gap-4 sm:gap-5 items-start w-full"
+                     className="p-5 sm:p-6 rounded-2xl border border-slate-100 hover:border-red-200 hover:bg-red-50/50 transition-all flex gap-4 sm:gap-5 items-start w-full"
                    >
-                     <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-2xl shrink-0">{guide.icon || '📄'}</div>
+                     <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center text-2xl shrink-0">{guide.icon || '📄'}</div>
                      <div className="min-w-0 flex-1">
                        <h3 className="font-bold text-slate-800">{guide.title}</h3>
                        {emptyBody ? (
                          <p className="text-xs text-slate-400 mt-1">Chưa có nội dung chi tiết.</p>
                        ) : expanded && hasHtml ? (
                          <div
-                           className="text-sm text-slate-600 mt-2 leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-blue-600 [&_a]:underline"
+                           className="text-sm text-slate-600 mt-2 leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-red-600 [&_a]:underline"
                            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(descHtml) }}
                          />
                        ) : (
@@ -1351,7 +1351,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                          <button
                            type="button"
                            onClick={() => setExpandedGuideKey(expanded ? null : gKey)}
-                           className="text-[11px] font-bold text-blue-600 hover:text-blue-800 mt-1"
+                           className="text-[11px] font-bold text-red-600 hover:text-red-800 mt-1"
                          >
                            {expanded ? 'Thu gọn' : 'Xem thêm'}
                          </button>
@@ -1633,7 +1633,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                           {showBar ? (
                             <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
                               <div
-                                className="h-full rounded-full bg-sky-400/80 transition-all duration-300"
+                                className="h-full rounded-full bg-red-400/80 transition-all duration-300"
                                 style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
                               />
                             </div>

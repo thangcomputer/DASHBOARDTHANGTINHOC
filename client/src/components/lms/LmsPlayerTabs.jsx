@@ -493,8 +493,8 @@ function QaPanel({
                     </p>
 
                     {it.status === 'answered' && it.answer ? (
-                      <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2.5">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-sky-300 mb-1">
+                      <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2.5">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-red-300 mb-1">
                           Trả lời · {it.answeredByName || 'Admin/GV'}
                         </p>
                         <p className="text-[13px] text-slate-200 whitespace-pre-wrap">{it.answer}</p>
@@ -508,13 +508,13 @@ function QaPanel({
                           onChange={(e) => setAnswerDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
                           rows={2}
                           placeholder="Nhập câu trả lời..."
-                          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/40 resize-y"
+                          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-red-500/40 resize-y"
                         />
                         <button
                           type="button"
                           disabled={sending || !String(answerDrafts[id] || '').trim()}
                           onClick={() => submitAnswer(id)}
-                          className="px-3 min-h-9 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-xs font-bold"
+                          className="px-3 min-h-9 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-xs font-bold"
                         >
                           Gửi trả lời
                         </button>
@@ -824,7 +824,7 @@ function ListPanel({
                       {showBar ? (
                         <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-sky-400/80 transition-all duration-300"
+                                className="h-full rounded-full bg-red-400/80 transition-all duration-300"
                             style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
                           />
                         </div>

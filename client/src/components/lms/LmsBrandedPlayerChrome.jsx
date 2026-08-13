@@ -13,7 +13,7 @@ function formatClock(secs) {
 }
 
 /**
- * Custom Thắng Tin Học player chrome (blue).
+ * Custom Thắng Tin Học player chrome (brand red).
  * Parent: YT controls:0 + iframe pointer-events:none.
  */
 export default function LmsBrandedPlayerChrome({
@@ -111,7 +111,7 @@ export default function LmsBrandedPlayerChrome({
           onContextMenu={(e) => e.preventDefault()}
         >
           <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
-            <div className="bg-sky-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest uppercase shadow-lg">
+            <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest uppercase shadow-lg">
               {brandLabel}
             </div>
           </div>
@@ -120,8 +120,8 @@ export default function LmsBrandedPlayerChrome({
             onClick={() => onPlay?.()}
             className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95"
             style={{
-              background: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
-              boxShadow: '0 0 32px rgba(14,165,233,0.45), 0 8px 24px rgba(0,0,0,0.35)',
+              background: 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)',
+              boxShadow: '0 0 32px rgba(220,38,38,0.45), 0 8px 24px rgba(0,0,0,0.35)',
             }}
             aria-label="Phát video"
           >
@@ -186,7 +186,7 @@ export default function LmsBrandedPlayerChrome({
             <div className="absolute inset-x-0 h-2.5 rounded-full bg-white/20">
               {lockSeek && maxPct > 0 && maxPct < 100 && (
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-sky-300/30"
+                  className="absolute inset-y-0 left-0 rounded-full bg-red-300/30"
                   style={{ width: `${maxPct}%` }}
                 />
               )}
@@ -194,11 +194,11 @@ export default function LmsBrandedPlayerChrome({
                 className="absolute inset-y-0 left-0 rounded-full"
                 style={{
                   width: `${progressPct}%`,
-                  background: 'linear-gradient(90deg, #7dd3fc 0%, #0ea5e9 55%, #0284c7 100%)',
+                  background: 'linear-gradient(90deg, #fca5a5 0%, #ef4444 55%, #dc2626 100%)',
                 }}
               />
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-md"
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-red-500 shadow-md"
                 style={{ left: `calc(${progressPct}% - 8px)` }}
               />
             </div>
@@ -213,8 +213,8 @@ export default function LmsBrandedPlayerChrome({
               }}
               className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white transition hover:scale-105 active:scale-95"
               style={{
-                background: 'linear-gradient(135deg, #38bdf8 0%, #0369a1 100%)',
-                boxShadow: '0 4px 14px rgba(14,165,233,0.35)',
+                background: 'linear-gradient(135deg, #f87171 0%, #b91c1c 100%)',
+                boxShadow: '0 4px 14px rgba(220,38,38,0.35)',
               }}
               aria-label={isPlaying ? 'Tạm dừng' : 'Phát'}
             >
@@ -223,7 +223,7 @@ export default function LmsBrandedPlayerChrome({
                 : <Play size={16} fill="white" className="text-white ml-0.5" />}
             </button>
 
-            <span className="text-[11px] sm:text-xs font-bold tabular-nums text-sky-100 shrink-0 min-w-[2.5rem]">
+            <span className="text-[11px] sm:text-xs font-bold tabular-nums text-red-100 shrink-0 min-w-[2.5rem]">
               {formatClock(displayTime)}
             </span>
             <span className="text-[11px] sm:text-xs font-bold tabular-nums text-slate-400 shrink-0">
@@ -244,7 +244,7 @@ export default function LmsBrandedPlayerChrome({
                   e.stopPropagation();
                   onToggleMute?.();
                 }}
-                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-sky-100 border border-white/10 transition"
+                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-red-100 border border-white/10 transition"
                 aria-label={muted ? 'Bật tiếng' : 'Tắt tiếng'}
               >
                 <VolIcon size={16} />
@@ -259,7 +259,7 @@ export default function LmsBrandedPlayerChrome({
                     const v = Number(e.target.value);
                     onVolumeChange?.(v);
                   }}
-                  className="w-full h-1.5 accent-sky-400 cursor-pointer"
+                  className="w-full h-1.5 accent-red-400 cursor-pointer"
                   aria-label="Âm lượng"
                 />
               </div>

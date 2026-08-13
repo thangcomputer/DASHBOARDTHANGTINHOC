@@ -708,7 +708,7 @@ const StudentVideoPlayer = ({
           </div>
         ) : null}
         {!isReady && !playerError && overlayVisible ? (
-          <div className="absolute top-3 right-3 z-40 text-[10px] font-bold uppercase tracking-wider text-sky-200/80 bg-black/40 px-2 py-1 rounded-md">
+          <div className="absolute top-3 right-3 z-40 text-[10px] font-bold uppercase tracking-wider text-red-200/80 bg-black/40 px-2 py-1 rounded-md">
             Đang tải…
           </div>
         ) : null}
@@ -724,7 +724,7 @@ const StudentVideoPlayer = ({
             <span className={`text-[10px] px-2 py-1 rounded-md border backdrop-blur-md font-bold ${
               lessonCompleted || seekUnlocked
                 ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30'
-                : 'bg-sky-500/20 text-sky-100 border-sky-500/30'
+                : 'bg-red-500/20 text-red-100 border-red-500/30'
             }`}>
               {lessonCompleted
                 ? 'Đã hoàn thành'
@@ -1355,10 +1355,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {courses.map((course, idx) => {
                 const gradients = [
-                  "from-blue-600 to-indigo-700",
+                  "from-red-600 to-red-800",
                   "from-emerald-500 to-teal-600",
                   "from-violet-600 to-fuchsia-600",
-                  "from-cyan-500 to-blue-700"
+                  "from-red-500 to-red-700"
                 ];
                 const bgClass = gradients[idx % gradients.length];
                 const progress = courseProgressMap[course.id || course._id] || course.overallProgress || course.progress || 0;
@@ -1386,7 +1386,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                     <div className="p-5 flex-1 flex flex-col">
                       <div className="flex items-start gap-3 mb-2">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
+                          <h3 className="font-bold text-slate-800 text-lg group-hover:text-red-600 transition-colors line-clamp-2 leading-snug">
                         {course.title}
                           </h3>
                         </div>
@@ -1396,7 +1396,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                       </div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
+                          <div className="h-full rounded-full bg-red-600 transition-all" style={{ width: `${progress}%` }} />
                         </div>
                       </div>
                       <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
@@ -1410,7 +1410,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                           <span>{lessonCount} BÀI HỌC</span>
                         </div>
 
-                        <div className="flex items-center gap-1 text-sm font-semibold text-blue-600 group-hover:translate-x-1 transition-transform">
+                        <div className="flex items-center gap-1 text-sm font-semibold text-red-600 group-hover:translate-x-1 transition-transform">
                           <span>VÀO HỌC</span>
                           <ChevronRight size={14} />
                         </div>
@@ -1551,7 +1551,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                           <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border ${
                             isAdminAssign
                               ? 'bg-violet-100 text-violet-700 border-violet-200'
-                              : 'bg-sky-100 text-sky-700 border-sky-200'
+                              : 'bg-red-100 text-red-700 border-red-200'
                           }`}>
                             {assignerLabel}
                           </span>
@@ -1983,7 +1983,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                           {showBar ? (
                             <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
                               <div
-                                className="h-full rounded-full bg-sky-400/80 transition-all duration-300"
+                                className="h-full rounded-full bg-red-400/80 transition-all duration-300"
                                 style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
                               />
                             </div>

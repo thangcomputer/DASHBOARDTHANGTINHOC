@@ -142,7 +142,7 @@ export function lessonStatusToneClass(tone) {
   switch (tone) {
     case 'active': return 'text-emerald-400';
     case 'success': return 'text-emerald-500/80';
-    case 'info': return 'text-sky-400';
+    case 'info': return 'text-red-400';
     case 'warn': return 'text-amber-400/90';
     default: return 'text-slate-600';
   }
