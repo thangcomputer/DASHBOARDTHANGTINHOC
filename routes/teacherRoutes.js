@@ -22,6 +22,7 @@ const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
 const { emitTeacherEvent, emitDataRefresh, emitFinanceEvent, emitUser } = require('../utils/realtimeEmit');
+const { purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
 
 const router = express.Router();
 
@@ -865,13 +866,16 @@ router.put('/:id/reject', [
 // Admin xóa giảng viên (STAFF bị chặn)
 router.delete('/:id', [authMiddleware, ...teacherRouteGuard('delete')], async (req, res) => {
   try {
-    const teacher = await Teacher.findByIdAndDelete(req.params.id);
+    const teacher = await Teacher.findById(req.params.id);
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
+    const cascade = await purgeTeacherSideEffects(teacher._id, { teacherName: teacher.name });
+    await Teacher.findByIdAndDelete(teacher._id);
     return res.json({
       success: true,
       message: `Đã xóa giảng viên ${teacher.name}`,
+      cascade,
     });
   } catch (error) {
     logger.error('[TEACHERS] Delete error:', error);

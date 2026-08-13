@@ -331,6 +331,52 @@ export default function AdminStudentsTab() {
   const [dbCourses, setDbCourses] = useState([]);
   const [refundModal, setRefundModal] = useState(null); // { student, enr, reason, refundAmount, refundPercent, maxRefund }
   const [refundSubmitting, setRefundSubmitting] = useState(false);
+  const [purgingCancelled, setPurgingCancelled] = useState(false);
+
+  const ghostCancelledCount = useMemo(
+    () => (filteredStudents || []).filter(isStudentRowLocked).length,
+    [filteredStudents],
+  );
+
+  const handlePurgeCancelledStudents = async () => {
+    if (purgingCancelled) return;
+    setPurgingCancelled(true);
+    const tid = toast.loading('Đang kiểm tra học viên đã hủy khóa...');
+    try {
+      const preview = await api.students.purgeCancelled({ dryRun: true });
+      toast.dismiss(tid);
+      if (!preview?.success) {
+        toast.error(preview?.message || 'Không kiểm tra được');
+        return;
+      }
+      const count = preview.data?.count || 0;
+      if (count <= 0) {
+        toast.success('Không có học viên ghost (chỉ còn khóa đã hủy/hoàn)');
+        return;
+      }
+      const names = (preview.data?.names || []).slice(0, 8).join(', ');
+      const ok = window.confirm(
+        `Tìm thấy ${count} học viên chỉ còn khóa đã hủy/hoàn.\n`
+        + (names ? `Ví dụ: ${names}${count > 8 ? '…' : ''}\n\n` : '\n')
+        + 'Xóa VĨNH VIỄN các tài khoản này? (Lịch học & chat liên quan cũng được dọn. Hóa đơn/sổ cái giữ lại để đối soát.)',
+      );
+      if (!ok) return;
+      const tid2 = toast.loading(`Đang xóa ${count} học viên...`);
+      const res = await api.students.purgeCancelled({ dryRun: false });
+      toast.dismiss(tid2);
+      if (res?.success) {
+        toast.success(res.message || `Đã xóa ${res.data?.deleted || 0} học viên`);
+        refreshStudentList?.();
+      } else {
+        toast.error(res?.message || 'Xóa thất bại');
+      }
+    } catch (err) {
+      toast.dismiss(tid);
+      toast.error(err?.message || 'Lỗi kết nối API');
+    } finally {
+      setPurgingCancelled(false);
+    }
+  };
 
   const openRefundModal = (student, enr) => {
     const enrId = enr?.enrollmentId || enr?.id || enr?._id;
@@ -654,6 +700,20 @@ export default function AdminStudentsTab() {
           >
             <FileSpreadsheet size={15} className="shrink-0" />
             <span className="hidden min-[380px]:inline">Excel</span>
+          </button>
+          <button
+            type="button"
+            onClick={handlePurgeCancelledStudents}
+            disabled={purgingCancelled}
+            className="cms-students-btn-outline !px-2.5 shrink-0 text-rose-700 border-rose-200 hover:bg-rose-50"
+            title="Xóa vĩnh viễn HV chỉ còn khóa đã hủy/hoàn (ghost)"
+          >
+            {purgingCancelled
+              ? <Loader2 size={15} className="animate-spin shrink-0" />
+              : <Trash2 size={15} className="shrink-0" />}
+            <span className="hidden min-[420px]:inline">
+              Dọn HV hủy khóa{ghostCancelledCount > 0 ? ` (${ghostCancelledCount})` : ''}
+            </span>
           </button>
           <button
             type="button"
@@ -1025,7 +1085,7 @@ export default function AdminStudentsTab() {
               <div className="min-w-0">
                 <h3 className="text-base font-black text-slate-800">Hoàn học phí</h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5 leading-snug">
-                  Hủy khóa + hoàn tiền · HV vẫn hiện trong danh sách (mờ)
+                  Hủy khóa + hoàn tiền · HV vẫn hiện trong danh sách (mờ). Muốn mất hẳn: menu ⋮ → Xóa học viên, hoặc nút &quot;Dọn HV hủy khóa&quot;.
                 </p>
               </div>
             </div>

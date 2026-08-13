@@ -35,6 +35,11 @@ const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../s
 const { refundStudentTuition, payTeacherForStudent } = require('../services/studentFinanceService');
 const cache = require('../utils/cache');
 const { emitDataRefresh, emitBranch } = require('../utils/realtimeEmit');
+const {
+  purgeStudentSideEffects,
+  purgeCancelledOnlyStudents,
+  purgeOrphanMessages,
+} = require('../services/userCascadeCleanup');
 
 function financeActor(req) {
   return {
@@ -2740,14 +2745,60 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
 });
 
 
+// ─── POST /api/students/purge-cancelled ───────────────────────────────────────
+// Xóa vĩnh viễn HV chỉ còn khóa đã hủy/hoàn (ghost sau refund). Dry-run: { dryRun: true }
+router.post('/purge-cancelled', [
+  authMiddleware,
+  branchFilter,
+  checkPermission(PERMISSIONS.MANAGE_STUDENTS),
+], async (req, res) => {
+  try {
+    const dryRun = req.body?.dryRun === true || req.query?.dryRun === '1';
+    let branchId = req.body?.branchId || null;
+    if (!branchId && req.branchFilter?.branchId && typeof req.branchFilter.branchId === 'string') {
+      branchId = req.branchFilter.branchId;
+    }
+    const result = await purgeCancelledOnlyStudents({ branchId, dryRun });
+    if (!dryRun) {
+      try {
+        const orphan = await purgeOrphanMessages();
+        result.orphanMessages = orphan.deletedMessages || 0;
+      } catch (err) {
+        logger.warn('[STUDENTS] orphan message cleanup:', err.message);
+      }
+      cache.flush?.();
+      emitDataRefresh(req.app.get('io'), { type: 'students', scope: 'system' });
+    }
+    return res.json({
+      success: true,
+      message: dryRun
+        ? `Tìm thấy ${result.count} học viên chỉ còn khóa đã hủy/hoàn`
+        : `Đã xóa vĩnh viễn ${result.deleted} học viên ghost`,
+      data: result,
+    });
+  } catch (error) {
+    logger.error('[STUDENTS] purge-cancelled:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ─── DELETE /api/students/:id ──────────────────────────────────────────────────
 router.delete('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('delete'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
-    const student = await Student.findByIdAndDelete(req.params.id);
+    const student = await Student.findById(req.params.id);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
-    res.json({ success: true, message: `Đã xóa học viên ${student.name}` });
+    const cascade = await purgeStudentSideEffects(student._id, { studentName: student.name });
+    await Student.findByIdAndDelete(student._id);
+    try {
+      emitDataRefresh(req.app.get('io'), { type: 'students', scope: 'system' });
+    } catch { /* ignore */ }
+    res.json({
+      success: true,
+      message: `Đã xóa học viên ${student.name}`,
+      cascade,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

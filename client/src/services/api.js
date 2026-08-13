@@ -836,6 +836,13 @@ export const studentsAPI = {
     const res = await apiFetch(`/students/${id}`, { method: 'DELETE' });
     return res.json();
   },
+  purgeCancelled: async (payload = {}) => {
+    const res = await apiFetch('/students/purge-cancelled', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
   payTeacher: async (studentId, action) => {
     const res = await apiFetch(`/students/${studentId}/pay-teacher`, {
       method: 'POST',
