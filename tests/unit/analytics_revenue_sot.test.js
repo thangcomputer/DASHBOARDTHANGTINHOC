@@ -73,3 +73,26 @@ test('routes/analyticsRevenue no longer uses listPaidItems for chart', () => {
   assert.ok(!src.includes('listPaidItems'));
   assert.ok(!/generateTimeSeries\(paidItems/.test(src));
 });
+
+test('period consistency — revenue byBranch includes branchName enrichment', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '../../routes/analyticsRoutes.js'), 'utf8');
+  assert.ok(src.includes('sumFinancialRevenueByBranch'));
+  assert.ok(src.includes('branchName'));
+  assert.ok(src.includes("source: 'ledger'"));
+  assert.ok(src.includes("source: 'enrollment_ops'"));
+});
+
+test('FE revenue tab does not mix all-time /analytics/branches into period report', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '../../client/src/components/RevenueAnalyticsTab.jsx'),
+    'utf8'
+  );
+  assert.ok(!/fetch\([^)]*\/analytics\/branches/.test(src));
+  assert.ok(!src.includes('branchOverview'));
+  assert.ok(src.includes('data?.byBranch'));
+  assert.ok(src.includes('ops đăng ký') || src.includes('Ops enrollment'));
+});

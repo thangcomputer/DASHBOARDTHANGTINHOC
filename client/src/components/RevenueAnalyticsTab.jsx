@@ -141,7 +141,6 @@ export default function RevenueAnalyticsTab() {
   const [period, setPeriod]       = useState('1m');
   const [data, setData]           = useState(null);
   const [enrollment, setEnrollment] = useState(null);
-  const [branchOverview, setBranchOverview] = useState([]);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [activeTab, setActiveTab] = useState('revenue');
@@ -168,20 +167,16 @@ export default function RevenueAnalyticsTab() {
       // FE legacy đôi khi chỉ gửi `branchId` => HIGH_ADMIN bị fail-closed.
       const branch = b || 'all';
       const qs = `period=${encodeURIComponent(p)}&branchId=${encodeURIComponent(branch)}&branch_id=${encodeURIComponent(branch)}`;
-      const [rev, enr, brOv] = await Promise.all([
-        fetch(`${API}/api/analytics/revenue?${qs}`, { headers }).then(r => r.json()),
-        fetch(`${API}/api/analytics/enrollment?${qs}`, { headers }).then(r => r.json()),
-        // Staff không cần xem tổng quan tất cả chi nhánh
-        isSuperAdmin
-          ? fetch(`${API}/api/analytics/branches`, { headers }).then(r => r.json())
-          : Promise.resolve({ success: true, data: [] }),
+      // Chỉ fetch revenue + enrollment theo cùng period — không gọi /branches (all-time).
+      const [rev, enr] = await Promise.all([
+        fetch(`${API}/api/analytics/revenue?${qs}`, { headers }).then((r) => r.json()),
+        fetch(`${API}/api/analytics/enrollment?${qs}`, { headers }).then((r) => r.json()),
       ]);
-      if (rev.success)  setData(rev.data);
-      if (enr.success)  setEnrollment(enr.data);
-      if (brOv.success) setBranchOverview(brOv.data);
+      if (rev.success) setData(rev.data);
+      if (enr.success) setEnrollment(enr.data);
     } catch { setError('Lỗi kết nối server. Vui lòng thử lại.'); }
     finally { setLoading(false); }
-  }, [isSuperAdmin]);
+  }, []);
 
   useEffect(() => { 
     // Khi gọi API lấy thông số, dùng selectedBranchId từ Topbar
@@ -242,16 +237,16 @@ export default function RevenueAnalyticsTab() {
       <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
         <StatCard label={`Doanh thu ${selectedPeriodLabel}`} value={fmt(data?.totalRevenue)}
           icon={DollarSign} color="#6366f1" trend={data?.growthPct} loading={loading}
-          sub={`So với kỳ trước: ${fmt(data?.prevRevenue)}`} />
-        <StatCard label="Học viên đóng tiền" value={data?.paidStudentsCount ?? '—'}
+          sub={`Ledger net · so với kỳ trước: ${fmt(data?.prevRevenue)}`} />
+        <StatCard label="Giao dịch thu (Ledger)" value={data?.paidStudentsCount ?? '—'}
           icon={Users} color="#10b981" trend={null} loading={loading}
           sub={`Trong ${selectedPeriodLabel}`} />
         <StatCard label="Học viên mới đăng ký" value={data?.newStudentsCount ?? '—'}
           icon={Target} color="#f59e0b" trend={null} loading={loading}
-          sub={`Trong ${selectedPeriodLabel}`} />
+          sub={`Ops · trong ${selectedPeriodLabel}`} />
         <StatCard label="Tổng tích lũy (all-time)" value={fmt(data?.allTimeRevenue)}
           icon={TrendingUp} color="#ef4444" trend={null} loading={loading}
-          sub="Toàn bộ thời gian" />
+          sub="Ledger · toàn thời gian (cố ý, không theo kỳ)" />
       </div>
 
       {/* ── Sub-tabs ───────────────────────────────────────────────── */}
@@ -311,9 +306,12 @@ export default function RevenueAnalyticsTab() {
       {/* ── Tab: By Branch ─────────────────────────────────────────── */}
       {activeTab === 'branches' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Donut */}
+          {/* Donut — cùng data.byBranch (Ledger + period) */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="font-black text-gray-700 mb-4">Tỷ lệ đóng góp</h3>
+            <h3 className="font-black text-gray-700 mb-1">Tỷ lệ đóng góp</h3>
+            <p className="text-[11px] text-gray-400 mb-4">
+              Ledger net · {selectedPeriodLabel} · {data?.timezone || 'Asia/Ho_Chi_Minh'}
+            </p>
             {loading ? (
               <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
             ) : (data?.byBranch?.length ? (
@@ -321,59 +319,80 @@ export default function RevenueAnalyticsTab() {
                 <DonutChart segments={data.byBranch} size={110} />
                 <div className="space-y-2 flex-1">
                   {data.byBranch.map((b, i) => (
-                    <div key={i} className="flex items-center justify-between">
+                    <div key={b.branchId || i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: BRANCH_COLORS[i % BRANCH_COLORS.length] }} />
-                        <span className="text-xs font-medium text-gray-700">{b.branchCode || 'Không xác định'}</span>
+                        <span className="text-xs font-medium text-gray-700">
+                          {b.branchName || b.branchCode || 'Không xác định'}
+                        </span>
                       </div>
                       <span className="text-xs font-black text-gray-600">{b.pct}%</span>
                     </div>
                   ))}
                 </div>
               </div>
-            ) : <div className="text-center text-gray-400 py-4 text-sm">Chưa có dữ liệu</div>)}
+            ) : <div className="text-center text-gray-400 py-4 text-sm">Chưa có doanh thu Ledger trong kỳ</div>)}
           </div>
 
-          {/* Table */}
+          {/* Table — cùng data.byBranch (period Ledger); không dùng endpoint branches all-time */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="font-black text-gray-700 mb-4">Chi tiết từng chi nhánh</h3>
+            <h3 className="font-black text-gray-700 mb-1">Chi tiết từng chi nhánh</h3>
+            <p className="text-[11px] text-gray-400 mb-4">
+              Doanh thu thuần Ledger trong kỳ đã chọn ({selectedPeriodLabel})
+            </p>
             {loading ? (
-              <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />)}</div>
-            ) : (branchOverview.length ? (
+              <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />)}</div>
+            ) : (data?.byBranch?.length ? (
               <div className="space-y-3">
-                {branchOverview.map((b, i) => (
-                  <div key={b._id} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-black"
-                        style={{ background: BRANCH_COLORS[i % BRANCH_COLORS.length] }}>
-                        {(b.code || b.name || '?')[0]}
+                {data.byBranch.map((b, i) => {
+                  const label = b.branchName || b.branchCode || 'Không xác định';
+                  const initial = String(label)[0] || '?';
+                  return (
+                    <div key={b.branchId || i} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-black shrink-0"
+                          style={{ background: BRANCH_COLORS[i % BRANCH_COLORS.length] }}
+                        >
+                          {initial}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm text-gray-700 truncate">{label}</p>
+                          <p className="text-[10px] text-gray-400">
+                            {b.count || 0} giao dịch thu
+                            {b.branchCode && b.branchName ? ` · ${b.branchCode}` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-sm text-gray-700">{b.name}</p>
-                        <p className="text-[10px] text-gray-400">{b.studentCount} học viên · {b.paidCount} đã thu</p>
+                      <div className="text-right shrink-0">
+                        <p className="font-black text-sm text-indigo-700">{fmt(b.total)}</p>
+                        <p className="text-[10px] text-gray-400">{b.pct}% tổng kỳ</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-black text-sm text-indigo-700">{b.revenue.toLocaleString('vi-VN')}đ</p>
-                      <p className="text-[10px] text-gray-400">{b.pct}% tổng</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            ) : <div className="text-center text-gray-400 py-4 text-sm">Chưa có chi nhánh</div>)}
+            ) : (
+              <div className="text-center text-gray-400 py-4 text-sm">Chưa có doanh thu Ledger trong kỳ</div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ── Tab: Enrollment ────────────────────────────────────────── */}
+      {/* ── Tab: Enrollment (ops — không phải Ledger revenue) ───────── */}
       {activeTab === 'enrollment' && (
         <div className="space-y-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 leading-relaxed">
+            Tab này là <strong>ops đăng ký</strong> (HV mới theo <code>createdAt</code> + học phí trên enrollment).
+            {' '}KPI doanh thu phía trên và tab chi nhánh dùng <strong>Ledger</strong> — hai nguồn không bắt buộc bằng nhau.
+          </div>
+
           {/* Summary row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { label: 'Học viên mới', value: enrollment?.total ?? '—', color: '#6366f1' },
-              { label: 'Đã đóng học phí', value: enrollment?.paid ?? '—', color: '#10b981' },
-              { label: 'Học phí thu được', value: enrollment?.totalFee ? fmt(enrollment.totalFee) : '0đ', color: '#f59e0b' },
+              { label: 'Học viên mới (ops)', value: enrollment?.total ?? '—', color: '#6366f1' },
+              { label: 'HV có enrollment đã đóng', value: enrollment?.paid ?? '—', color: '#10b981' },
+              { label: 'Học phí enrollment (ops)', value: fmt(enrollment?.totalFee), color: '#f59e0b' },
             ].map((s, i) => (
               <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
                 <p className="text-2xl font-black" style={{ color: s.color }}>{s.value}</p>
@@ -384,7 +403,8 @@ export default function RevenueAnalyticsTab() {
 
           {/* Enrollment chart */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="font-black text-gray-700 mb-4">Đăng ký theo thời gian — {selectedPeriodLabel}</h3>
+            <h3 className="font-black text-gray-700 mb-1">Đăng ký theo thời gian — {selectedPeriodLabel}</h3>
+            <p className="text-[11px] text-gray-400 mb-4">Số liệu ops theo ngày đăng ký HV (không phải Ledger)</p>
             <div className="cms-m-chart min-h-[180px] flex flex-col">
               {loading
                 ? <div className="flex flex-1 items-center justify-center min-h-[160px]"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
@@ -392,7 +412,7 @@ export default function RevenueAnalyticsTab() {
                   ? (
                     <div className="flex-1 flex flex-col justify-end min-h-[260px]">
                       <BarChart
-                        data={enrollment.timeSeries.map(d => ({ ...d, value: d.value || 0 }))}
+                        data={enrollment.timeSeries.map((d) => ({ ...d, value: d.value || 0 }))}
                         color="#10b981"
                         height={100}
                         emptyMessage="Chưa có dữ liệu"
@@ -406,34 +426,44 @@ export default function RevenueAnalyticsTab() {
 
           {/* By branch table */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="font-black text-gray-700 mb-4">Đăng ký theo chi nhánh</h3>
+            <h3 className="font-black text-gray-700 mb-1">Đăng ký theo chi nhánh</h3>
+            <p className="text-[11px] text-gray-400 mb-4">Ops enrollment — cột tiền = học phí trên hồ sơ, không phải doanh thu Ledger</p>
             {loading ? (
-              <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}</div>
+              <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}</div>
             ) : (enrollment?.byBranch?.length ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[400px]">
                   <thead>
                     <tr className="text-xs text-gray-400 border-b border-gray-100">
                       <th className="pb-2 text-left font-bold">Chi nhánh</th>
-                      <th className="pb-2 text-center font-bold whitespace-nowrap">Học viên mới</th>
-                      <th className="pb-2 text-center font-bold whitespace-nowrap">Đã thu phí</th>
-                      <th className="pb-2 text-right font-bold whitespace-nowrap">Doanh thu</th>
+                      <th className="pb-2 text-center font-bold whitespace-nowrap">HV mới</th>
+                      <th className="pb-2 text-center font-bold whitespace-nowrap">Có đóng phí</th>
+                      <th className="pb-2 text-right font-bold whitespace-nowrap">Học phí enrollment</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {enrollment.byBranch.map((b, i) => (
-                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="py-2.5 font-medium text-gray-700 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <Building2 size={13} className="text-gray-400 flex-shrink-0" />
-                            {b.branchCode || 'Không xác định'}
-                          </div>
-                        </td>
-                        <td className="py-2.5 text-center font-bold text-indigo-700">{b.count}</td>
-                        <td className="py-2.5 text-center text-emerald-600 font-bold">{b.paid}</td>
-                        <td className="py-2.5 text-right font-black text-gray-800 whitespace-nowrap">{b.revenue.toLocaleString('vi-VN')}đ</td>
-                      </tr>
-                    ))}
+                    {enrollment.byBranch.map((b, i) => {
+                      const branchLabel = b.branchName || b.branchCode || 'Không xác định';
+                      const idHint = (!b.branchCode && !b.branchName && b.branchId && b.branchId !== 'unknown')
+                        ? String(b.branchId).slice(-6)
+                        : '';
+                      return (
+                        <tr key={b.branchId || i} className="border-b border-gray-50 hover:bg-gray-50">
+                          <td className="py-2.5 font-medium text-gray-700 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <Building2 size={13} className="text-gray-400 flex-shrink-0" />
+                              <span>
+                                {branchLabel}
+                                {idHint ? <span className="text-[10px] text-gray-400 ml-1">…{idHint}</span> : null}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-center font-bold text-indigo-700">{b.count}</td>
+                          <td className="py-2.5 text-center text-emerald-600 font-bold">{b.paid}</td>
+                          <td className="py-2.5 text-right font-black text-gray-800 whitespace-nowrap">{fmt(b.revenue)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -443,7 +473,8 @@ export default function RevenueAnalyticsTab() {
           {/* By course */}
           {enrollment?.byCourse?.length > 0 && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-black text-gray-700 mb-4">Đăng ký theo khóa học</h3>
+              <h3 className="font-black text-gray-700 mb-1">Đăng ký theo khóa học</h3>
+              <p className="text-[11px] text-gray-400 mb-4">Đếm lượt enrollment/khóa (một HV nhiều khóa → tổng có thể &gt; số HV)</p>
               <div className="space-y-2">
                 {enrollment.byCourse.slice(0, 6).map((c, i) => {
                   const maxCount = enrollment.byCourse[0]?.count || 1;
@@ -451,9 +482,9 @@ export default function RevenueAnalyticsTab() {
                     <div key={i} className="flex items-center gap-3">
                       <div className="w-28 min-w-[5rem] flex-shrink-0 text-xs text-gray-600 font-medium line-clamp-2 break-words leading-snug">{c.course}</div>
                       <div className="flex-1 bg-gray-100 rounded-full h-2">
-                        <div className="h-2 rounded-full transition-all" style={{ width: `${(c.count/maxCount)*100}%`, background: BRANCH_COLORS[i % BRANCH_COLORS.length] }} />
+                        <div className="h-2 rounded-full transition-all" style={{ width: `${(c.count / maxCount) * 100}%`, background: BRANCH_COLORS[i % BRANCH_COLORS.length] }} />
                       </div>
-                      <div className="w-16 text-right text-xs font-black text-gray-700">{c.count} HV</div>
+                      <div className="w-20 text-right text-xs font-black text-gray-700">{c.count} lượt</div>
                     </div>
                   );
                 })}

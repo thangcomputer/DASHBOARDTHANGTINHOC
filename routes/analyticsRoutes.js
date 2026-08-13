@@ -103,16 +103,23 @@ router.get('/revenue', guard('revenue'), async (req, res) => {
     const branchIds = byBranchRaw
       .map((b) => b.branchId)
       .filter((id) => id && id !== 'unknown');
-    let codeMap = {};
+    let branchMeta = {};
     if (branchIds.length) {
       const branches = await Branch.find({ _id: { $in: branchIds } }).select('code name').lean();
-      codeMap = Object.fromEntries(branches.map((b) => [String(b._id), b.code || b.name || '']));
+      branchMeta = Object.fromEntries(
+        branches.map((b) => [String(b._id), { code: b.code || '', name: b.name || '' }])
+      );
     }
-    const byBranch = byBranchRaw.map((b) => ({
-      ...b,
-      branchCode: codeMap[b.branchId] || (b.branchId === 'unknown' ? 'Không xác định' : b.branchId),
-      pct: totalRevenue > 0 ? Math.round((b.total / totalRevenue) * 100) : 0,
-    }));
+    const byBranch = byBranchRaw.map((b) => {
+      const meta = branchMeta[b.branchId] || {};
+      const isUnknown = b.branchId === 'unknown';
+      return {
+        ...b,
+        branchCode: meta.code || (isUnknown ? 'Không xác định' : b.branchId),
+        branchName: meta.name || (isUnknown ? 'Không xác định' : meta.code || ''),
+        pct: totalRevenue > 0 ? Math.round((b.total / totalRevenue) * 100) : 0,
+      };
+    });
 
     const seriesSum = timeSeries.reduce((s, p) => s + (Number(p.value) || 0), 0);
 
@@ -173,7 +180,7 @@ router.get('/enrollment', guard('enrollment'), async (req, res) => {
       if (!branchMap[key]) {
         branchMap[key] = {
           branchId: key,
-          branchCode: st.branchCode || 'Không xác định',
+          branchCode: st.branchCode || '',
           count: 0,
           paid: 0,
           revenue: 0,
@@ -186,6 +193,26 @@ router.get('/enrollment', guard('enrollment'), async (req, res) => {
         branchMap[key].revenue += rev;
       }
     });
+
+    const enrollBranchIds = Object.keys(branchMap).filter((id) => id && id !== 'unknown');
+    let enrollBranchMeta = {};
+    if (enrollBranchIds.length) {
+      const branches = await Branch.find({ _id: { $in: enrollBranchIds } }).select('code name').lean();
+      enrollBranchMeta = Object.fromEntries(
+        branches.map((b) => [String(b._id), { code: b.code || '', name: b.name || '' }])
+      );
+    }
+    const byBranch = Object.values(branchMap)
+      .map((b) => {
+        const meta = enrollBranchMeta[b.branchId] || {};
+        const isUnknown = b.branchId === 'unknown';
+        return {
+          ...b,
+          branchCode: meta.code || b.branchCode || (isUnknown ? 'Không xác định' : ''),
+          branchName: meta.name || (isUnknown ? 'Không xác định' : meta.code || b.branchCode || ''),
+        };
+      })
+      .sort((a, b) => b.count - a.count);
 
     const courseMap = {};
     students.forEach((st) => {
@@ -216,7 +243,7 @@ router.get('/enrollment', guard('enrollment'), async (req, res) => {
         total,
         paid,
         totalFee,
-        byBranch: Object.values(branchMap).sort((a, b) => b.count - a.count),
+        byBranch,
         byCourse: Object.values(courseMap).sort((a, b) => b.count - a.count),
         timeSeries,
       },
@@ -255,7 +282,13 @@ router.get('/branches', guard('branches'), async (req, res) => {
       b.pct = grandTotal > 0 ? Math.round((b.revenue / grandTotal) * 100) : 0;
     });
 
-    return res.json({ success: true, data: result.sort((a, b) => b.revenue - a.revenue) });
+    return res.json({
+      success: true,
+      data: result.sort((a, b) => b.revenue - a.revenue),
+      period: 'all-time',
+      source: 'ledger',
+      note: 'All-time branch overview. Period-filtered branch revenue: GET /analytics/revenue → byBranch',
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
