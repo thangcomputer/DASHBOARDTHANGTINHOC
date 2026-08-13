@@ -153,6 +153,9 @@ export default function RevenueAnalyticsTab() {
     return {};
   })();
   const isSuperAdmin = sess?.id === 'admin' || sess?.adminRole === 'SUPER_ADMIN';
+  const isHighAdmin = sess?.adminRole === 'HIGH_ADMIN';
+  // HIGH xem báo cáo đa chi nhánh giống Super khi Topbar chọn "Tất cả"
+  const isElevatedAdmin = isSuperAdmin || isHighAdmin;
   const staffBranchCode = sess?.branchCode || '';
 
   const { selectedBranchId } = useBranch();
@@ -195,10 +198,10 @@ export default function RevenueAnalyticsTab() {
             <BarChart3 size={22} className="text-sky-700" />
             Báo cáo Doanh thu
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">{isSuperAdmin ? 'Thống kê đa chi nhánh theo thời gian thực' : `Doanh thu chi nhánh ${staffBranchCode}`}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{isElevatedAdmin ? 'Thống kê đa chi nhánh theo thời gian thực' : `Doanh thu chi nhánh ${staffBranchCode}`}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {!isSuperAdmin && (
+          {!isElevatedAdmin && (
             <div className="flex items-center gap-1.5 border border-sky-200 bg-sky-50 rounded-xl px-3 py-2 text-sm font-bold text-indigo-700">
               <Building2 size={14} /> {staffBranchCode || 'Chi nhánh của bạn'}
             </div>
@@ -254,7 +257,7 @@ export default function RevenueAnalyticsTab() {
         <div className="flex gap-1 flex-nowrap overflow-x-auto">
           {[
             { id: 'revenue',  label: '📈 Doanh thu theo thời gian' },
-            ...(isSuperAdmin ? [{ id: 'branches', label: '🏢 Theo chi nhánh' }] : []),
+            ...(isElevatedAdmin ? [{ id: 'branches', label: '🏢 Theo chi nhánh' }] : []),
             { id: 'enrollment', label: '👥 Học viên đăng ký' },
           ].map(t => (
             <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}

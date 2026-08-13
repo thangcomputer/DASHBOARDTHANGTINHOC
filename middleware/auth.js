@@ -381,15 +381,15 @@ const branchFilter = async (req, res, next) => {
       } else if (isHighAdmin) {
         const isApprovedHighAllBranchRead = () => {
           const url = req.originalUrl || '';
-          // Mục tiêu: chỉ mở ALL cho đúng 5 module (Overview/HR/Teachers/Students/Finance)
-          // Đảm bảo không bypass branchFilter toàn hệ thống.
-          return /\/(students|teachers|employees|finance|transactions)(\/|\?|$)/.test(url);
+          // 5 module gốc (Overview/HR/Teachers/Students/Finance) + analytics báo cáo doanh thu
+          // (cùng UI Super khi chọn Tất cả chi nhánh). Không mở messaging/courses/…
+          return /\/(students|teachers|employees|finance|transactions|analytics)(\/|\?|$)/.test(url);
         };
         if (qBranch && qBranch !== 'all' && qBranch !== '') {
           req.branchFilter = { branchId: qBranch };
         } else if (qBranch === 'all' && req.method === 'GET' && isApprovedHighAllBranchRead()) {
           // HIGH_ADMIN + ?branch_id=all → ALL BRANCHES trong tenant hiện tại
-          // (fail-closed: chỉ áp dụng cho allowlist READ của 5 module).
+          // (fail-closed: chỉ áp dụng cho allowlist READ).
           req.branchFilter = {};
         } else if (user.branchId) {
           req.branchFilter = { branchId: user.branchId };

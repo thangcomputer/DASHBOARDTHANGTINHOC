@@ -14,12 +14,13 @@ Chỉ mở rộng khi đồng thời thỏa:
 1. **Role**: `HIGH_ADMIN`
 2. **Request**: `GET` (read)
 3. **Query**: `?branch_id=all`
-4. **Module (5 module được phê duyệt)**:
+4. **Module (allowlist READ)**:
    - Tổng quan (Overview)
    - Nhân sự & Lương (HR & Payroll)
    - Giảng viên (Teachers)
    - Học viên (Students)
    - Tài chính (Finance)
+   - **Báo cáo doanh thu (Analytics)** — `/api/analytics/*` (HIGH xem ops/Ledger giống Super khi `branch_id=all`)
 
 Ngoài điều kiện trên: **fail-closed** (không bypass `branchFilter`).
 
@@ -58,7 +59,8 @@ Ngoài điều kiện trên: **fail-closed** (không bypass `branchFilter`).
 - `client/src/components/admin/hooks/useAdminDashboardState.jsx`
 - `client/src/components/admin/hooks/useAdminTeachers.jsx`
 - `client/src/services/api.js`
-- `middleware/auth.js`
+- `middleware/auth.js` — allowlist gồm `analytics` (HIGH báo cáo doanh thu = Super khi `branch_id=all`)
+- `client/src/components/RevenueAnalyticsTab.jsx` — HIGH dùng UI đa chi nhánh như Super
 - `tests/integration/wave_repair_authz.test.js`
 - `docs/rbac/HIGH_ADMIN_ALL_BRANCH_READ_SCOPE_2026-08-11.md`
 
