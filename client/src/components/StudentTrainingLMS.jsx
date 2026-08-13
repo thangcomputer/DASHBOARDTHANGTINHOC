@@ -162,6 +162,7 @@ const StudentVideoPlayer = ({
   initialWatchedSeconds = 0,
   adminDurationSeconds = 0,
   antiSeekEnabled = true,
+  lessonCompleted = false,
   onSaveProgress,
   onVideoEnded,
   onEligibilityReached,
@@ -192,42 +193,55 @@ const StudentVideoPlayer = ({
   const uiTickRef = useRef(null);
   const seekUnlockedRef = useRef(false);
 
-  // Restore watched seconds from sessionStorage or initialWatchedSeconds
+  // Restore watched seconds: lấy max(session, server) — không để session thấp ghi đè SoT
   const bestInitial = useMemo(() => {
-    const sessionWatched = sessionStorage.getItem(`student_lms_watched_${lessonId}`);
-    if (sessionWatched !== null) {
-      return Number(sessionWatched);
-    }
-    return Number(initialWatchedSeconds) || 0;
+    const sessionWatched = Number(sessionStorage.getItem(`student_lms_watched_${lessonId}`) || 0);
+    const serverWatched = Number(initialWatchedSeconds) || 0;
+    return Math.max(sessionWatched, serverWatched);
   }, [lessonId, initialWatchedSeconds]);
 
   const actualWatchedRef = useRef(bestInitial);
 
   const effectiveDuration = resolveEffectiveDuration(adminDurationSeconds, totalDuration);
+  // Server completed / đủ threshold → tua tự do (không phụ thuộc session watch thấp)
   const seekUnlocked = !antiSeekEnabled
+    || lessonCompleted
     || (effectiveDuration > 0 && displayWatched >= requiredWatchSeconds(effectiveDuration) && displayWatched > 0);
   seekUnlockedRef.current = seekUnlocked;
 
   // Chỉ reset overlay khi đổi bài — không bật lại nút Play khi parent cập nhật tiến độ
   useEffect(() => {
-    const sessionWatched = sessionStorage.getItem(`student_lms_watched_${lessonId}`);
-    const initial = sessionWatched !== null
-      ? Number(sessionWatched)
-      : (Number(initialWatchedSeconds) || 0);
+    const sessionWatched = Number(sessionStorage.getItem(`student_lms_watched_${lessonId}`) || 0);
+    const serverWatched = Number(initialWatchedSeconds) || 0;
+    const initial = Math.max(sessionWatched, serverWatched);
     actualWatchedRef.current = initial;
     setDisplayWatched(initial);
     setHasEnded(false);
     setOverlayVisible(true);
     setIsPlaying(false);
     setCurrentTime(0);
-    eligibilitySentRef.current = false;
+    eligibilitySentRef.current = !!lessonCompleted;
     const posKey = `student_lms_pos_${lessonId}`;
     const savedPos = Number(sessionStorage.getItem(posKey) || 0);
-    // Anti-seek: vị trí tua tối đa ≠ wall-clock watched; không seed bằng watchedSeconds
-    maxPosRef.current = antiSeekEnabled ? Math.max(0, savedPos) : Math.max(0, savedPos, initial);
+    // Completed / antiSeek off: cho tua full. Anti-seek đang học: chỉ maxPos đã xem.
+    if (!antiSeekEnabled || lessonCompleted) {
+      maxPosRef.current = Math.max(0, savedPos, initial, Number(totalDuration) || 0);
+    } else {
+      maxPosRef.current = Math.max(0, savedPos);
+    }
     setMaxSeekableUi(maxPosRef.current);
     seekGuardRef.current = false;
   }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
+
+  // Khi vừa complete trên server hoặc duration YT load xong → mở seek full
+  useEffect(() => {
+    if (!lessonCompleted && antiSeekEnabled) return;
+    const full = Number(totalDuration) || Number(effectiveDuration) || 0;
+    if (full > maxPosRef.current) {
+      maxPosRef.current = full;
+      setMaxSeekableUi(full);
+    }
+  }, [lessonCompleted, antiSeekEnabled, totalDuration, effectiveDuration]);
 
   useEffect(() => {
     if (bestInitial > actualWatchedRef.current) {
@@ -293,8 +307,10 @@ const StudentVideoPlayer = ({
           modestbranding: 1,
           iv_load_policy: 3,
           fs: 0,
-          // Anti-seek: không resume bằng wall-clock (tránh nhảy timeline)
-          start: antiSeekEnabled ? Math.floor(maxPosRef.current || 0) : (bestInitial ? Math.floor(bestInitial) : 0),
+          // Anti-seek đang học: resume tại maxPos. Đã complete / tắt anti-seek: resume theo tiến độ.
+          start: (antiSeekEnabled && !lessonCompleted)
+            ? Math.floor(maxPosRef.current || 0)
+            : (bestInitial ? Math.floor(bestInitial) : 0),
           playsinline: 1,
           enablejsapi: 1,
           origin: window.location.origin,
@@ -309,7 +325,7 @@ const StudentVideoPlayer = ({
               event.target.setVolume?.(100);
               event.target.unMute?.();
             } catch { /* ignore */ }
-            const resumeAt = antiSeekEnabled ? maxPosRef.current : bestInitial;
+            const resumeAt = (antiSeekEnabled && !lessonCompleted) ? maxPosRef.current : bestInitial;
             if (resumeAt > 0) {
               event.target.seekTo(resumeAt, true);
               setCurrentTime(resumeAt);
@@ -339,7 +355,7 @@ const StudentVideoPlayer = ({
       playerRef.current?.destroy?.();
       playerRef.current = null;
     };
-  }, [videoId, lessonId, antiSeekEnabled]);
+  }, [videoId, lessonId, antiSeekEnabled, lessonCompleted]);
 
   // ── Đếm giây thực tế khi PLAYING + snap seek vượt maxPos ───────────────
   const startCounting = useCallback(() => {
@@ -1580,6 +1596,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                     || resolveEffectiveDuration(currentLesson?.duration, 0)
                   }
                   antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
+                  lessonCompleted={!!currentLesson?.isCompleted}
                   onSaveProgress={handleSaveProgress}
                   onVideoEnded={handleVideoEnded}
                   onEligibilityReached={handleEligibilityReached}

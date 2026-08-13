@@ -122,6 +122,7 @@ const YouTubePlayerSecure = ({
   initialWatchedSeconds = 0,
   onVideoEnded, onSaveProgress, onEligibilityReached, isLocked,
   antiSeekEnabled = true,
+  lessonCompleted = false,
   playerApiRef = null,
 }) => {
   const playerRef = useRef(null);
@@ -154,6 +155,7 @@ const YouTubePlayerSecure = ({
 
   const effectiveDuration = resolveEffectiveDuration(lessonDuration, totalDuration);
   const seekUnlocked = !antiSeekEnabled
+    || lessonCompleted
     || (effectiveDuration > 0 && displayWatched >= requiredWatchSeconds(effectiveDuration) && displayWatched > 0);
   seekUnlockedRef.current = seekUnlocked;
 
@@ -168,12 +170,25 @@ const YouTubePlayerSecure = ({
     setOverlayVisible(true);
     setIsPlaying(false);
     setCurrentTime(0);
-    eligibilitySentRef.current = false;
+    eligibilitySentRef.current = !!lessonCompleted;
     const savedPos = Number(sessionStorage.getItem(`lms_pos_${lessonId}`) || 0);
-    maxPosRef.current = antiSeekEnabled ? Math.max(0, savedPos) : Math.max(0, savedPos, bestSecs);
+    if (!antiSeekEnabled || lessonCompleted) {
+      maxPosRef.current = Math.max(0, savedPos, bestSecs, Number(lessonDuration) || 0);
+    } else {
+      maxPosRef.current = Math.max(0, savedPos);
+    }
     setMaxSeekableUi(maxPosRef.current);
     seekGuardRef.current = false;
   }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
+
+  useEffect(() => {
+    if (!lessonCompleted && antiSeekEnabled) return;
+    const full = Number(totalDuration) || Number(effectiveDuration) || 0;
+    if (full > maxPosRef.current) {
+      maxPosRef.current = full;
+      setMaxSeekableUi(full);
+    }
+  }, [lessonCompleted, antiSeekEnabled, totalDuration, effectiveDuration]);
 
   useEffect(() => {
     const localSecs = parseInt(sessionStorage.getItem(`lms_watched_${lessonId}`) || '0', 10);
@@ -255,7 +270,9 @@ const YouTubePlayerSecure = ({
           modestbranding: 1,
           iv_load_policy: 3,
           fs: 0,
-          start: antiSeekEnabled ? Math.floor(maxPosRef.current || 0) : (bestInitial ? Math.floor(bestInitial) : 0),
+          start: (antiSeekEnabled && !lessonCompleted)
+            ? Math.floor(maxPosRef.current || 0)
+            : (bestInitial ? Math.floor(bestInitial) : 0),
           playsinline: 1,
           enablejsapi: 1,
           origin: window.location.origin,
@@ -270,7 +287,7 @@ const YouTubePlayerSecure = ({
               event.target.setVolume?.(100);
               event.target.unMute?.();
             } catch { /* ignore */ }
-            const resumeAt = antiSeekEnabled ? maxPosRef.current : bestInitial;
+            const resumeAt = (antiSeekEnabled && !lessonCompleted) ? maxPosRef.current : bestInitial;
             if (resumeAt > 0) {
               event.target.seekTo(resumeAt, true);
               setCurrentTime(resumeAt);
@@ -300,7 +317,7 @@ const YouTubePlayerSecure = ({
       playerRef.current?.destroy?.();
       playerRef.current = null;
     };
-  }, [videoId, lessonId, isLocked, antiSeekEnabled]);
+  }, [videoId, lessonId, isLocked, antiSeekEnabled, lessonCompleted]);
 
   // ── Đếm giây thực tế khi PLAYING + snap seek vượt maxPos ───────────────────
   const startCounting = useCallback(() => {
@@ -527,15 +544,17 @@ const YouTubePlayerSecure = ({
             <CheckCircle size={12} /> Đã xem xong
           </div>
         )}
-        {requiredSeconds > 0 && !overlayVisible && !hasEnded && (
+        {antiSeekEnabled && requiredSeconds > 0 && !overlayVisible && !hasEnded && (
           <div className={`absolute top-3 right-3 z-10 text-xs px-2.5 py-1 rounded-full border backdrop-blur-md font-bold ${
-            displayWatched >= requiredSeconds
+            lessonCompleted || displayWatched >= requiredSeconds || seekUnlocked
               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
               : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
           }`}>
-            {displayWatched >= requiredSeconds
-              ? 'Đủ điều kiện'
-              : `Cần xem ${formatTime(Math.max(0, requiredSeconds - displayWatched))} nữa`}
+            {lessonCompleted
+              ? 'Đã hoàn thành'
+              : (displayWatched >= requiredSeconds || seekUnlocked)
+                ? 'Đủ điều kiện'
+                : `Cần xem ${formatTime(Math.max(0, requiredSeconds - displayWatched))} nữa`}
           </div>
         )}
       </div>
@@ -1250,6 +1269,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                   onEligibilityReached={handleEligibilityReached}
                   isLocked={!currentLesson?.isUnlocked}
                   antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
+                  lessonCompleted={!!currentLesson?.isCompleted}
                   playerApiRef={playerApiRef}
                 />
               </div>
