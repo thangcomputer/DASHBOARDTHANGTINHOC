@@ -363,6 +363,26 @@ export function buildExamSubjectsFromProgress(examProgress, subjectIds) {
   });
 }
 
+/**
+ * Môn bị khóa với HV: còn countdown, đã rớt (khong_dat), hoặc dang_khoa.
+ * Thi lại chỉ khi admin reset status về chua_thi (và xóa lockUntil).
+ */
+export function isExamProgressLocked(entry, now = Date.now()) {
+  if (!entry) return false;
+  const lu = Number(entry.lockUntil);
+  if (Number.isFinite(lu) && lu > now) return true;
+  const st = String(entry.status || '');
+  if (st === 'khong_dat' || st === 'dang_khoa') return true;
+  return false;
+}
+
+/** HV được phép START/RESUME certification exam cho môn này. */
+export function canEnterCertificationExam(entry, now = Date.now()) {
+  if (isExamProgressLocked(entry, now)) return false;
+  const st = String(entry?.status || '');
+  return !st || st === 'chua_thi' || st === 'dang_thi';
+}
+
 export function resolveExamFilterStatus(subject) {
   if (subject.lockUntil && subject.lockUntil > Date.now()) return 'rot';
   if (subject.status === 'khong_dat') return 'rot';

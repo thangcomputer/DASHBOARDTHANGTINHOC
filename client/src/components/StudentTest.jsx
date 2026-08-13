@@ -8,7 +8,7 @@ import ExamMonitor, { CameraHeaderPanel } from './ExamMonitor';
 import { useSocket } from '../context/SocketContext';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments } from '../utils/enrollments';
-import { getExamSubjectMeta, requireWebcamForSubject } from '../utils/examSubjects';
+import { getExamSubjectMeta, requireWebcamForSubject, canEnterCertificationExam } from '../utils/examSubjects';
 import { useModal } from '../utils/Modal.jsx';
 import { getStudentMcQuestionsForExam, normalizeMcCorrectIndex, getStudentPracticeFilesForSubject } from '../utils/htmlContent';
 import {
@@ -219,10 +219,29 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const fileRef    = useRef(null);
   const examPhaseRef = useRef('mc');
   const startingExamRef = useRef(false);
+  const LOCK_MS = 7 * 24 * 60 * 60 * 1000;
+
+  const progressEntry = useMemo(
+    () => (student?.examProgress || []).find((s) => String(s.id) === String(subjectId)) || null,
+    [student?.examProgress, subjectId],
+  );
+
+  const refuseLockedExam = useCallback(() => {
+    clearCertificationAttempt(attemptKey);
+    startingExamRef.current = false;
+    onBack?.();
+  }, [attemptKey, onBack]);
 
   const beginOrResumeExam = useCallback(() => {
     if (startingExamRef.current) return;
     if (!rawQuestions.length) return;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(punishKey) === 'true') {
+      return; // punish effect sẽ khóa bài
+    }
+    if (!canEnterCertificationExam(progressEntry)) {
+      refuseLockedExam();
+      return;
+    }
     startingExamRef.current = true;
     const saved = loadCertificationAttempt(attemptKey);
     const resolved = resolveCertificationExamAttempt({
@@ -256,7 +275,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       examPhase: resolved.examPhase,
     });
     setPhase('test');
-  }, [rawQuestions, attemptKey, meta.time, meta.essayTime]);
+  }, [rawQuestions, attemptKey, meta.time, meta.essayTime, progressEntry, punishKey, refuseLockedExam]);
 
   useEffect(() => {
     if (phase !== 'test') startingExamRef.current = false;
@@ -277,9 +296,14 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   // ── BỎ QUA YÊU CẦU CAMERA NẾU ADMIN ĐÃ TẮT (theo khóa của môn thi) ──
   useEffect(() => {
     if (!requireWebcam && phase === 'hardware_check' && bankTotal > 0 && !questionsLoading) {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem(punishKey) === 'true') return;
+      if (!canEnterCertificationExam(progressEntry)) {
+        refuseLockedExam();
+        return;
+      }
       beginOrResumeExam();
     }
-  }, [requireWebcam, phase, bankTotal, questionsLoading, beginOrResumeExam]);
+  }, [requireWebcam, phase, bankTotal, questionsLoading, beginOrResumeExam, punishKey, progressEntry, refuseLockedExam]);
 
   // Persist attempt while in test (answers / nav / timer) — no reshuffle
   useEffect(() => {
@@ -302,11 +326,14 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     clearCertificationAttempt(attemptKey);
   }, [phase, attemptKey]);
 
-  const updateExamProgress = useCallback((changes) => {
-    if (!student || !updateStudent) return;
+  const updateExamProgress = useCallback(async (changes, { revertOnFail = false } = {}) => {
+    if (!student || !updateStudent) return false;
     const id = student._id || student.id;
+    const previousProgress = Array.isArray(student.examProgress)
+      ? student.examProgress.map((e) => ({ ...e }))
+      : [];
     const progress = student.examProgress || [];
-    const idx = progress.findIndex(s => s.id === subjectId);
+    const idx = progress.findIndex((s) => s.id === subjectId);
     let newProgress = [...progress];
     if (idx !== -1) {
       newProgress[idx] = { ...newProgress[idx], ...changes };
@@ -315,10 +342,29 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     }
     // Optimistic UI + API riêng (không ghi examProgress qua PUT generic)
     updateStudent(id, { examProgress: newProgress }, { localOnly: true });
-    api.students.updateExamProgress(id, { subjectId, changes }).catch((err) => {
+    try {
+      const res = await api.students.updateExamProgress(id, { subjectId, changes });
+      if (res && res.success === false) throw new Error(res.message || 'exam-progress failed');
+      return true;
+    } catch (err) {
       console.error('[exam-progress]', err);
-    });
+      if (revertOnFail) {
+        updateStudent(id, { examProgress: previousProgress }, { localOnly: true });
+      }
+      return false;
+    }
   }, [student, updateStudent, subjectId]);
+
+  const applyFailAndLock = useCallback(async (totalOverride) => {
+    const total = Number.isFinite(totalOverride) ? totalOverride : TOTAL;
+    clearCertificationAttempt(attemptKey);
+    await updateExamProgress({
+      tracNghiem: { score: 0, total },
+      thucHanh: 'chua_nop',
+      status: 'khong_dat',
+      lockUntil: Date.now() + LOCK_MS,
+    }, { revertOnFail: false });
+  }, [TOTAL, attemptKey, updateExamProgress, LOCK_MS]);
 
   // ── Tải ngân hàng câu hỏi từ server (luôn đồng bộ Admin → HV) ──
   useEffect(() => {
@@ -416,14 +462,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   // ── Browser Trap (Chống F5, Ctrl+R, Back) ──
   const failAndExitRef = useRef();
   failAndExitRef.current = () => {
-    clearCertificationAttempt(attemptKey);
-    updateExamProgress({
-      tracNghiem: { score: 0, total: TOTAL },
-      thucHanh: 'chua_nop',
-      status: 'khong_dat',
-      lockUntil: Date.now() + 7 * 24 * 60 * 60 * 1000
+    void applyFailAndLock().then(() => {
+      onBack?.();
     });
-    onBack?.();
   };
 
 
@@ -487,14 +528,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     clearInterval(timerRef.current);
     setBanReason(reason);
     setPhase('banned');
-    
-    updateExamProgress({
-      tracNghiem: { score: 0, total: TOTAL },
-      thucHanh: 'chua_nop',
-      status: 'khong_dat',
-      lockUntil: Date.now() + 7 * 24 * 60 * 60 * 1000
-    });
-    
+    void applyFailAndLock();
+
     // Phát cảnh báo qua socket cho Admin & Giảng viên
     if (socket) {
       socket.emit('exam:violation', {
@@ -507,7 +542,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     }
     // 🔔 Thông báo admin (persistent)
     addNotification(null, 'admin', `⚠️ Vi phạm thi cử: ${session.name || studentName} - môn ${meta.label}. Lý do: ${reason}`);
-  }, [socket, STUDENT_ID, session.name, studentName, teacherId, meta.label, addNotification, updateExamProgress, TOTAL]);
+  }, [socket, STUDENT_ID, session.name, studentName, teacherId, meta.label, addNotification, applyFailAndLock]);
 
   // Kiểm tra dấu vết tải lại trang từ lần trước (theo từng học viên)
   useEffect(() => {
@@ -527,16 +562,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       clearInterval(timerRef.current);
       setBanReason(data.reason || 'Bị khóa bởi Giảng viên/Ban quản trị');
       setPhase('banned');
-      updateExamProgress({
-        tracNghiem: { score: 0, total: TOTAL },
-        thucHanh: 'chua_nop',
-        status: 'khong_dat',
-        lockUntil: Date.now() + 7 * 24 * 60 * 60 * 1000,
-      });
+      void applyFailAndLock();
     };
     socket.on('exam:locked', onLocked);
     return () => socket.off('exam:locked', onLocked);
-  }, [socket, STUDENT_ID, updateExamProgress, TOTAL]);
+  }, [socket, STUDENT_ID, applyFailAndLock]);
 
   // Reset bài thi khi camera không phát hiện mặt 5 lần liên tiếp (lần đầu)
   const handleResetExam = useCallback(() => {
@@ -562,27 +592,25 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     setIsTracNghiemSubmitted(true);
 
     if (!passedTN) {
-      // Rớt trắc nghiệm => khóa 7 ngày, về result
+      // Rớt trắc nghiệm => khóa, về result
       clearInterval(timerRef.current);
-      updateExamProgress({
+      clearCertificationAttempt(attemptKey);
+      void updateExamProgress({
         tracNghiem: { score: finalScore, total: TOTAL },
         thucHanh: 'chua_nop',
         status: 'khong_dat',
-        lockUntil: Date.now() + 7 * 24 * 60 * 60 * 1000
-      });
+        lockUntil: Date.now() + LOCK_MS,
+      }, { revertOnFail: true });
       setPhase('result');
-      // 🔔 Thông báo admin
       addNotification(null, 'admin', `❌ Học viên ${studentName} rớt trắc nghiệm môn ${meta.label}: ${finalScore}/${TOTAL} (${finalPct}%)`);
     } else {
-      // Đậu trắc nghiệm => chuyển sang tab tự luận với thời gian riêng
-      updateExamProgress({
+      void updateExamProgress({
         tracNghiem: { score: finalScore, total: TOTAL },
-        status: 'dang_thi'
-      });
+        status: 'dang_thi',
+      }, { revertOnFail: true });
       examPhaseRef.current = 'essay';
       setTimeLeft(meta.essayTime);
       setTab('tu_luan');
-      // 🔔 Thông báo admin
       addNotification(null, 'admin', `✅ Học viên ${studentName} đạt trắc nghiệm môn ${meta.label}: ${finalScore}/${TOTAL} (${finalPct}%). Đang làm phần thực hành.`);
     }
   };
@@ -615,27 +643,37 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         setTuLuanSubmitting(false);
       }
     }
-    // Kiểm tra lại điểm Trắc nghiệm
     const finalScore = answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
     const finalPct = TOTAL > 0 ? Math.round((finalScore / TOTAL) * 100) : 0;
     const passedTN = finalPct >= 50;
 
     const nextStatus = !passedTN ? 'khong_dat' : 'dang_thi';
-    const lockUntil = !passedTN ? Date.now() + 7 * 24 * 60 * 60 * 1000 : null;
+    const lockUntil = !passedTN ? Date.now() + LOCK_MS : null;
 
-    updateExamProgress({
+    const ok = await updateExamProgress({
       tracNghiem: { score: finalScore, total: TOTAL },
       thucHanh: essayFileStored ? 'da_nop' : 'chua_nop',
       status: nextStatus,
       ...(lockUntil ? { lockUntil } : {}),
       ...(essayFileStored ? { essayFile: essayFileStored } : {}),
-    });
+    }, { revertOnFail: true });
+
+    if (!ok && !passedTN) {
+      // Vẫn khóa local nếu API từ chối sửa điểm nhưng cần giữ trạng thái rớt
+      await updateExamProgress({
+        status: 'khong_dat',
+        lockUntil: Date.now() + LOCK_MS,
+        thucHanh: 'chua_nop',
+      }, { revertOnFail: false });
+    }
+
+    clearCertificationAttempt(attemptKey);
     setUploadDone(true);
     setPhase('result');
     if (essayFileStored && passedTN) {
       addNotification(null, 'admin', `📝 Học viên ${session.name || studentName} đã nộp bài thực hành môn ${meta.label}. Vui lòng chấm điểm.`);
     }
-  }, [uploadFile, updateExamProgress, showModal, addNotification, session.name, studentName, meta.label, answers, questions, TOTAL]);
+  }, [uploadFile, updateExamProgress, showModal, addNotification, session.name, studentName, meta.label, answers, questions, TOTAL, attemptKey, LOCK_MS]);
 
   handleFinalTuLuanRef.current = handleFinalTuLuan;
 
@@ -982,13 +1020,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                       confirmText: 'ĐỒNG Ý HỦY BÀI',
                       cancelText: 'Làm bài tiếp',
                       onConfirm: () => {
-                        updateExamProgress({
-                          tracNghiem: { score: 0, total: TOTAL },
-                          thucHanh: 'chua_nop',
-                          status: 'khong_dat',
-                          lockUntil: Date.now() + 7 * 24 * 60 * 60 * 1000,
-                        });
-                        onBack?.();
+                        void applyFailAndLock().then(() => onBack?.());
                       },
                     });
                   }}

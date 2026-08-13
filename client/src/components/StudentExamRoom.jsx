@@ -15,6 +15,8 @@ import {
   getExamSubjectMeta,
   getExamSubjectInitials,
   isExamUnlockedForSubject,
+  isExamProgressLocked,
+  canEnterCertificationExam,
 } from '../utils/examSubjects';
 import { useIsDesktopExamDevice } from '../utils/examDevice';
 import StudentQuizList from './student/StudentQuizList';
@@ -104,35 +106,36 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
   };
 
   const isLocked = subject.status === 'dang_khoa';
+  const failedLocked = isExamProgressLocked(subject);
   const awaitingGrade =
     subject.thucHanh === 'da_nop' &&
     (subject.essayScore === null || subject.essayScore === undefined);
-  const canStart  = allowStartExam && isApproved && !isLocked && !isLockedCountDown && (subject.status === 'chua_thi' || !subject.status);
-  // Chỉ "Tiếp tục thi" khi còn dang dở — không khi đã nộp thực hành đang chờ chấm
+  const canStart  = allowStartExam && isApproved && canEnterCertificationExam(subject) && (subject.status === 'chua_thi' || !subject.status);
+  // Chỉ "Tiếp tục thi" khi còn dang dở — không khi đã nộp thực hành đang chờ chấm / đã rớt-khóa
   const isOngoing =
     allowStartExam &&
     isApproved &&
-    !isLocked &&
-    !isLockedCountDown &&
+    canEnterCertificationExam(subject) &&
     subject.status === 'dang_thi' &&
     !awaitingGrade;
-  const canRetry  = allowStartExam && isApproved && !isLocked && !isLockedCountDown && subject.status === 'khong_dat';
+  // Không tự "Thi lại" khi khong_dat — phải admin mở khóa (reset status)
+  const canRetry = false;
   const isPassed  = subject.status === 'dat';
   const isAwaitingGrade = awaitingGrade && !isPassed && subject.status !== 'khong_dat';
   const wouldBeAbleToStart =
-    isApproved && !isLocked && !isLockedCountDown &&
-    (subject.status === 'chua_thi' || !subject.status || (subject.status === 'dang_thi' && !awaitingGrade) || subject.status === 'khong_dat');
+    isApproved && canEnterCertificationExam(subject) &&
+    (subject.status === 'chua_thi' || !subject.status || (subject.status === 'dang_thi' && !awaitingGrade));
 
   return (
     <div className={`bg-white rounded-2xl border shadow-sm transition-all duration-200 overflow-hidden ${
-      !isApproved || isLocked || isLockedCountDown ? 'opacity-80 border-gray-200 bg-gray-50' : 'hover:shadow-md'
+      !isApproved || failedLocked ? 'opacity-80 border-gray-200 bg-gray-50' : 'hover:shadow-md'
     }`}>
       {/* Card header */}
       <div className="p-5 pb-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 shrink-0 ${(!isApproved || isLocked || isLockedCountDown) ? 'bg-gray-200' : meta.bg} rounded-xl flex items-center justify-center shadow-sm transition-colors`}>
-              <span className={`font-black leading-none tracking-tight ${initials.length > 2 ? 'text-sm' : 'text-lg'} ${(!isApproved || isLocked || isLockedCountDown) ? 'text-gray-400' : 'text-white'}`}>
+            <div className={`w-12 h-12 shrink-0 ${(!isApproved || failedLocked) ? 'bg-gray-200' : meta.bg} rounded-xl flex items-center justify-center shadow-sm transition-colors`}>
+              <span className={`font-black leading-none tracking-tight ${initials.length > 2 ? 'text-sm' : 'text-lg'} ${(!isApproved || failedLocked) ? 'text-gray-400' : 'text-white'}`}>
                 {initials}
               </span>
             </div>
@@ -177,6 +180,14 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
             className="w-full py-2.5 bg-gray-100 border border-gray-200 text-gray-400 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed uppercase tracking-wide"
           >
             <Clock size={15} /> Mở khóa sau: {countdown}
+          </button>
+        ) : failedLocked ? (
+          <button
+            type="button"
+            disabled
+            className="w-full py-2.5 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed"
+          >
+            <Lock size={15} /> Đã rớt — chờ admin mở khóa
           </button>
         ) : isAwaitingGrade ? (
           <button
@@ -525,6 +536,8 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
 
   const handleStart = (subjectId) => {
     if (!allowStartExam) return;
+    const entry = subjects.find((s) => String(s.id) === String(subjectId));
+    if (!canEnterCertificationExam(entry)) return;
     if (onStartExam) onStartExam(subjectId);
   };
 
