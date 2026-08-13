@@ -180,6 +180,19 @@ export const getRolePrefix = (overrideRole = null) => {
 /** Chuẩn hóa URL file upload (IP/http cũ → domain hiện tại) */
 const PUBLIC_UPLOAD_RE = /\/uploads\/(logo|favicon|popup|images|avatars|invoice_logo|feed|blog)(\/|$)/i;
 
+/** Origin API (VITE_API_URL) hoặc origin hiện tại — tránh /uploads/ trỏ nhầm SPA. */
+function mediaOrigin() {
+  if (SOCKET_BASE) return String(SOCKET_BASE).replace(/\/$/, '');
+  if (typeof window !== 'undefined') return window.location.origin;
+  return '';
+}
+
+function toAbsoluteUploadsPath(uploadsPath) {
+  const path = uploadsPath.startsWith('/') ? uploadsPath : `/${uploadsPath}`;
+  const origin = mediaOrigin();
+  return origin ? `${origin}${path}` : path;
+}
+
 function withUploadAccessToken(url) {
   if (!url || typeof window === 'undefined') return url;
   if (!url.includes('/uploads/') || PUBLIC_UPLOAD_RE.test(url)) return url;
@@ -190,6 +203,17 @@ function withUploadAccessToken(url) {
   return `${url}${sep}access_token=${encodeURIComponent(token)}`;
 }
 
+/** Giữ đuôi file từ URL khi tiêu đề không có extension (vd. ZIP). */
+function ensureDownloadFileName(displayName, sourceUrl) {
+  const name = String(displayName || '').trim();
+  const pathPart = String(sourceUrl || '').split('?')[0];
+  const extMatch = pathPart.match(/(\.[a-z0-9]{1,8})$/i);
+  const ext = extMatch ? extMatch[1] : '';
+  if (!name) return extMatch ? pathPart.split('/').pop() : 'download';
+  if (ext && !/\.[a-z0-9]{1,8}$/i.test(name)) return `${name}${ext}`;
+  return name;
+}
+
 export const resolveMediaUrl = (url) => {
   if (!url || url === '#') return '';
   const trimmed = String(url).trim();
@@ -197,14 +221,22 @@ export const resolveMediaUrl = (url) => {
   if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) return trimmed;
   // Sửa URL hỏng kiểu https:///uploads/...
   if (/^https?:\/\/\//i.test(trimmed)) {
-    return withUploadAccessToken(trimmed.replace(/^https?:\/\/+/, '/'));
+    const fixed = trimmed.replace(/^https?:\/\/+/, '/');
+    if (fixed.startsWith('/uploads/')) {
+      return withUploadAccessToken(toAbsoluteUploadsPath(fixed.split('?')[0]) + (fixed.includes('?') ? `?${fixed.split('?').slice(1).join('?')}` : ''));
+    }
+    return withUploadAccessToken(fixed);
   }
-  if (trimmed.startsWith('/uploads/')) return withUploadAccessToken(trimmed);
+  if (trimmed.startsWith('/uploads/')) {
+    return withUploadAccessToken(toAbsoluteUploadsPath(trimmed.split('?')[0]) + (trimmed.includes('?') ? `?${trimmed.split('?').slice(1).join('?')}` : ''));
+  }
   if (trimmed.startsWith('/')) return trimmed;
-  if (trimmed.startsWith('uploads/')) return withUploadAccessToken(`/${trimmed}`);
+  if (trimmed.startsWith('uploads/')) {
+    return withUploadAccessToken(toAbsoluteUploadsPath(`/${trimmed.split('?')[0]}`));
+  }
 
   const uploadsPath = trimmed.match(/\/uploads\/[^\s?#]+/i);
-  if (uploadsPath) return withUploadAccessToken(uploadsPath[0]);
+  if (uploadsPath) return withUploadAccessToken(toAbsoluteUploadsPath(uploadsPath[0]));
 
   // Link ngoài không có https:// (Drive, Dropbox, …)
   if (/^https?:\/\//i.test(trimmed)) {
@@ -212,7 +244,7 @@ export const resolveMediaUrl = (url) => {
     try {
       const parsed = new URL(trimmed);
       if (parsed.pathname.startsWith('/uploads/')) {
-        return withUploadAccessToken(`${window.location.origin}${parsed.pathname}${parsed.search || ''}`);
+        return withUploadAccessToken(`${toAbsoluteUploadsPath(parsed.pathname)}${parsed.search || ''}`);
       }
       if (parsed.hostname === window.location.hostname) {
         return `${window.location.origin}${parsed.pathname}${parsed.search || ''}`;
@@ -231,7 +263,7 @@ export const resolveMediaUrl = (url) => {
   try {
     const parsed = new URL(trimmed, window.location.origin);
     if (parsed.pathname.startsWith('/uploads/')) {
-      return withUploadAccessToken(`${window.location.origin}${parsed.pathname}${parsed.search || ''}`);
+      return withUploadAccessToken(`${toAbsoluteUploadsPath(parsed.pathname)}${parsed.search || ''}`);
     }
     if (parsed.hostname === window.location.hostname) {
       return `${window.location.origin}${parsed.pathname}${parsed.search || ''}`;
@@ -246,7 +278,7 @@ export const resolveMediaUrl = (url) => {
 export const buildMediaDownloadUrl = (url, displayName) => {
   const base = resolveMediaUrl(url);
   if (!base) return '';
-  const name = String(displayName || '').trim();
+  const name = ensureDownloadFileName(displayName, url || base);
   const params = new URLSearchParams();
   if (base.includes('/uploads/')) params.set('download', '1');
   if (name) params.set('downloadAs', name);
@@ -255,17 +287,87 @@ export const buildMediaDownloadUrl = (url, displayName) => {
   return `${base}${sep}${params.toString()}`;
 };
 
-/** Tải file upload — phải đồng bộ trong click handler (không await trước khi mở link) */
-export const downloadMediaFile = (url, fileName) => {
-  const fullUrl = resolveMediaUrl(url);
-  if (!fullUrl) throw new Error('Không có link tải file');
+/**
+ * Tải file upload — ưu tiên fetch + Bearer (ổn định hơn <a href> + access_token trên URL dài).
+ * Fallback: mở buildMediaDownloadUrl nếu fetch thất bại do CORS/network.
+ */
+export const downloadMediaFile = async (url, fileName) => {
+  const raw = String(url || '').trim();
+  if (!raw || raw === '#') throw new Error('Không có link tải file');
 
-  // Server đã gửi Content-Disposition: attachment — navigate trực tiếp là cách tin cậy nhất
+  const displayName = ensureDownloadFileName(fileName, raw);
+  const token = typeof window !== 'undefined' ? getAccessToken() : null;
+
+  // Absolute uploads URL (không nhét token vào query — dùng Bearer)
+  let absolute = '';
+  try {
+    const uploadsPath = raw.match(/\/uploads\/[^\s?#]+/i)?.[0]
+      || (raw.startsWith('uploads/') ? `/${raw.split('?')[0]}` : '');
+    if (uploadsPath) {
+      absolute = toAbsoluteUploadsPath(uploadsPath);
+    } else {
+      absolute = resolveMediaUrl(raw).replace(/([?&])access_token=[^&]*/g, '').replace(/[?&]$/, '');
+    }
+  } catch {
+    absolute = '';
+  }
+
+  if (absolute && absolute.includes('/uploads/') && typeof window !== 'undefined') {
+    try {
+      const sep = absolute.includes('?') ? '&' : '?';
+      const fetchUrl = `${absolute}${sep}download=1${displayName ? `&downloadAs=${encodeURIComponent(displayName)}` : ''}`;
+      const headers = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(fetchUrl, {
+        method: 'GET',
+        credentials: 'include',
+        headers,
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const ct = String(res.headers.get('content-type') || '');
+        // 401/404 đôi khi trả JSON nhưng status vẫn lạ — chặn tải nhầm JSON lỗi
+        if (ct.includes('application/json')) {
+          const text = await blob.text();
+          let msg = 'Không tải được file';
+          try { msg = JSON.parse(text)?.message || msg; } catch { /* ignore */ }
+          throw new Error(msg);
+        }
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = displayName || 'download';
+        a.rel = 'noopener noreferrer';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+        return true;
+      }
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('Phiên đăng nhập hết hạn — hãy đăng nhập lại rồi tải xuống');
+      }
+      if (res.status === 404) {
+        throw new Error('File không còn trên máy chủ — Admin cần upload lại');
+      }
+      throw new Error(`Tải thất bại (HTTP ${res.status})`);
+    } catch (err) {
+      // Chỉ fallback khi lỗi mạng; lỗi nghiệp vụ (401/404) ném tiếp
+      if (err?.message && !/Failed to fetch|NetworkError|network/i.test(err.message)
+        && !err.isNetworkError) {
+        throw err;
+      }
+    }
+  }
+
+  const fullUrl = buildMediaDownloadUrl(raw, displayName);
+  if (!fullUrl) throw new Error('Không có link tải file');
   if (typeof window !== 'undefined') {
     const a = document.createElement('a');
     a.href = fullUrl;
     a.rel = 'noopener noreferrer';
-    if (fileName) a.setAttribute('download', fileName);
+    a.setAttribute('download', displayName || 'download');
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();

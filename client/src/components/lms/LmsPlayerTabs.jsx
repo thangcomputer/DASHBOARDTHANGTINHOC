@@ -6,7 +6,7 @@ import {
 import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp } from '../../utils/lmsLessonUi';
 import LessonSidebarMeta from './LessonSidebarMeta';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
-import { buildMediaDownloadUrl, apiFetch } from '../../services/api';
+import { buildMediaDownloadUrl, downloadMediaFile, apiFetch } from '../../services/api';
 import useLmsLocalStore, { lmsStoreKey } from '../../hooks/useLmsLocalStore';
 
 function initials(name = '') {
@@ -702,12 +702,20 @@ function ResourcesPanel({ files }) {
               <p className="text-[11px] text-slate-500 mt-1">{file.fileSize || file.size || file.type || 'File'}</p>
             </div>
             {href ? (
-              <a
-                href={href}
-                className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 text-xs font-bold hover:bg-emerald-500/25 no-underline shrink-0"
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await downloadMediaFile(file.fileUrl || file.url, file.fileOriginalName || file.title);
+                  } catch (err) {
+                    // eslint-disable-next-line no-alert
+                    window.alert(err?.message || 'Không tải được tài liệu');
+                  }
+                }}
+                className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 border-0 cursor-pointer"
               >
                 <Download size={14} /> Tải về
-              </a>
+              </button>
             ) : (
               <span className="text-xs font-bold text-slate-500 shrink-0">Chưa có file</span>
             )}

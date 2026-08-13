@@ -14,7 +14,7 @@ import {
   getSubjectIdsForStudent,
 } from '../utils/examSubjects';
 import StudentExamRoom from './StudentExamRoom';
-import api, { buildMediaDownloadUrl, resolveMediaUrl, csrfFetch } from '../services/api';
+import api, { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, csrfFetch } from '../services/api';
 import { useToast } from '../utils/toast';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import {
@@ -1492,11 +1492,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         <p className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 w-fit rounded mt-1">{file.fileSize || 'N/A'}</p>
                       </div>
                     </div>
-                    {!file.fileUrl ? (
+                    {!file.fileUrl && !file.url ? (
                       <span className="w-full md:w-auto px-5 py-2.5 rounded-[10px] text-sm font-bold text-slate-400 border border-slate-100 bg-slate-50 text-center shrink-0 self-center md:self-start">Chưa có file</span>
                     ) : (() => {
+                      const rawUrl = file.fileUrl || file.url || '';
                       const href = buildMediaDownloadUrl(
-                        file.fileUrl,
+                        rawUrl,
                         file.fileOriginalName || file.title,
                       );
                       if (!href) {
@@ -1507,13 +1508,21 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         );
                       }
                       return (
-                        <a
-                          href={href}
-                          className="w-full md:w-auto px-5 py-2.5 bg-green-50 text-green-700 border border-transparent rounded-[10px] text-sm font-bold group-hover:bg-green-600 group-hover:text-white group-hover:shadow-md transition-all shrink-0 flex items-center justify-center gap-2 self-center md:self-start no-underline"
-                          onClick={(e) => e.stopPropagation()}
+                        <button
+                          type="button"
+                          className="w-full md:w-auto px-5 py-2.5 bg-red-600 text-white border border-transparent rounded-[10px] text-sm font-bold hover:bg-red-700 hover:shadow-md transition-all shrink-0 flex items-center justify-center gap-2 self-center md:self-start"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            try {
+                              await downloadMediaFile(rawUrl, file.fileOriginalName || file.title);
+                            } catch (err) {
+                              toast.error(err?.message || 'Không tải được tài liệu');
+                            }
+                          }}
                         >
                           <Download size={16} /> Tải về
-                        </a>
+                        </button>
                       );
                     })()}
                   </div>

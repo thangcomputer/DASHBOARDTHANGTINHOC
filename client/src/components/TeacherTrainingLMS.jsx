@@ -11,7 +11,7 @@ import {
   filterTrainingItemsBySubject,
   resolveTeacherSubjectIds,
 } from '../utils/trainingSubjectFilter';
-import api, { buildMediaDownloadUrl, csrfFetch } from '../services/api';
+import api, { downloadMediaFile, csrfFetch } from '../services/api';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import {
   formatLessonDisplayTitle,
@@ -1393,30 +1393,43 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         {mainTab === 'files' && (
            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
              <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-               <Download className="text-green-600" /> Tài liệu Đào tạo
+               <Download className="text-red-600" /> Tài liệu Đào tạo
              </h2>
              <div className="space-y-3">
-               {visibleTraining?.files?.map((file, idx) => (
-                 <div key={idx} className="p-4 rounded-xl border border-slate-100 hover:bg-green-50 hover:border-green-200 transition-all flex justify-between items-center group cursor-pointer">
-                   <div className="flex items-center gap-4">
-                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black text-white ${file.fileType === 'PDF' ? 'bg-red-500' : 'bg-green-500'}`}>{file.fileType || 'FILE'}</div>
-                     <div>
-                       <h3 className="font-bold text-slate-800">{file.title}</h3>
+               {visibleTraining?.files?.map((file, idx) => {
+                 const rawUrl = file.fileUrl || file.url || file.link || '';
+                 const displayName = file.fileOriginalName || file.title || 'tai-lieu';
+                 return (
+                 <div key={file.id || file._id || idx} className="p-4 rounded-xl border border-slate-100 hover:bg-red-50 hover:border-red-200 transition-all flex justify-between items-center gap-3">
+                   <div className="flex items-center gap-4 min-w-0">
+                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 ${file.fileType === 'PDF' ? 'bg-red-500' : 'bg-red-600'}`}>{file.fileType || 'FILE'}</div>
+                     <div className="min-w-0">
+                       <h3 className="font-bold text-slate-800 truncate">{file.title}</h3>
                        <p className="text-xs text-slate-400">{file.fileSize || 'N/A'}</p>
                      </div>
                    </div>
-                   {file.fileUrl ? (
-                     <a
-                       href={buildMediaDownloadUrl(file.fileUrl, file.fileOriginalName || file.title)}
-                       className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 group-hover:bg-green-500 group-hover:text-white group-hover:border-green-500 transition-all inline-block text-center"
+                   {rawUrl ? (
+                     <button
+                       type="button"
+                       onClick={async (e) => {
+                         e.preventDefault();
+                         e.stopPropagation();
+                         try {
+                           await downloadMediaFile(rawUrl, displayName);
+                         } catch (err) {
+                           toast.error(err?.message || 'Không tải được tài liệu');
+                         }
+                       }}
+                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-all shrink-0"
                      >
                        Tải xuống
-                     </a>
+                     </button>
                    ) : (
-                     <span className="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 border border-slate-100 bg-slate-50 cursor-not-allowed">Chưa có file</span>
+                     <span className="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 border border-slate-100 bg-slate-50 cursor-not-allowed shrink-0">Chưa có file</span>
                    )}
                  </div>
-               ))}
+                 );
+               })}
                {(!visibleTraining?.files || visibleTraining.files.length === 0) && (
                  <p className="text-slate-400 text-sm">Chưa có tài liệu nào.</p>
                )}
