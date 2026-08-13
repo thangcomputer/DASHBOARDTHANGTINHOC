@@ -11,6 +11,14 @@ import { getClientEnrollments } from '../utils/enrollments';
 import { getExamSubjectMeta, requireWebcamForSubject } from '../utils/examSubjects';
 import { useModal } from '../utils/Modal.jsx';
 import { getStudentMcQuestionsForExam, normalizeMcCorrectIndex, getStudentPracticeFilesForSubject } from '../utils/htmlContent';
+import {
+  getCertificationAttemptKey,
+  loadCertificationAttempt,
+  saveCertificationAttempt,
+  clearCertificationAttempt,
+  resolveCertificationExamAttempt,
+  bankFingerprint,
+} from '../utils/studentCertificationExam';
 import { EXAM_CAMERA_PERMISSION_LABEL } from '../utils/examUi';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../services/api';
 import StudentQuizList from './student/StudentQuizList';
@@ -121,7 +129,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     return fetched.length >= ctx.length ? fetched : ctx;
   }, [studentQuestions, fetchedExamBank]);
 
-  const questions = useMemo(() => {
+  /** Normalized bank snapshot — never shuffled; Question Bank SoT stays untouched. */
+  const rawQuestions = useMemo(() => {
     const raw = getStudentMcQuestionsForExam(examQuestionBank, subjectId);
     return raw.map((q, i) => {
       const options = (q.options || []).filter((o) => o && String(o).trim());
@@ -136,11 +145,17 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     });
   }, [examQuestionBank, subjectId]);
 
-  const TOTAL = questions.length;
+  const bankTotal = rawQuestions.length;
+  const bankFp = useMemo(() => bankFingerprint(rawQuestions), [rawQuestions]);
 
-  const questionIdsKey = useMemo(() => questions.map((q) => q.id).join('|'), [questions]);
+  /** Exam instance (shuffled once per attempt). Empty until START. */
+  const [questions, setQuestions] = useState([]);
+  const [phase, setPhase] = useState('hardware_check'); // hardware_check | test | result | banned
+  /** During hardware check use bank size; after start use instance length only. */
+  const TOTAL = (phase === 'hardware_check') ? bankTotal : questions.length;
+
   const { socket } = useSocket() || {};
-  const student = students?.find(s => String(s.id) === String(STUDENT_ID));
+  const student = students?.find((s) => String(s.id) === String(STUDENT_ID));
   const { showModal } = useModal();
   const teacherId = student?.teacherId;
   const enrollments = useMemo(() => getClientEnrollments(student), [student]);
@@ -149,18 +164,19 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       enrollments,
       subjectId,
       examSubjectsCatalog,
-      student?.requireWebcam !== false
+      student?.requireWebcam !== false,
     ),
-    [enrollments, subjectId, examSubjectsCatalog, student?.requireWebcam]
+    [enrollments, subjectId, examSubjectsCatalog, student?.requireWebcam],
   );
 
-  const [tab, setTab]           = useState('trac_nghiem');
+  const [tab, setTab] = useState('trac_nghiem');
   const [isTracNghiemSubmitted, setIsTracNghiemSubmitted] = useState(false);
-  const [answers, setAnswers]   = useState([]);
+  const [answers, setAnswers] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [timeLeft, setTimeLeft] = useState(() => meta.time);
-  const [phase, setPhase]       = useState('hardware_check'); // hardware_check | test | result | banned
   const [banReason, setBanReason] = useState('');
+  const attemptKey = getCertificationAttemptKey(STUDENT_ID, subjectId);
+  const attemptFpRef = useRef('');
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
   const [webLogoUrl, setWebLogoUrl] = useState('');
@@ -198,29 +214,93 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const [tuLuanSubmitting, setTuLuanSubmitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  useEffect(() => {
-    setAnswers(Array(TOTAL).fill(null));
-    setCurrentQ(0);
-    setIsTracNghiemSubmitted(false);
-    setTab('trac_nghiem');
-  }, [questionIdsKey, TOTAL]);
-
-  useEffect(() => {
-    examPhaseRef.current = 'mc';
-    setTimeLeft(meta.time);
-  }, [meta.time, subjectId]);
-
-  // ── BỎ QUA YÊU CẦU CAMERA NẾU ADMIN ĐÃ TẮT (theo khóa của môn thi) ──
-  useEffect(() => {
-    if (!requireWebcam && phase === 'hardware_check' && TOTAL > 0) {
-      setPhase('test');
-    }
-  }, [requireWebcam, phase, TOTAL]);
-
   const timerRef   = useRef(null);
   const monitorRef = useRef(null);
   const fileRef    = useRef(null);
   const examPhaseRef = useRef('mc');
+  const startingExamRef = useRef(false);
+
+  const beginOrResumeExam = useCallback(() => {
+    if (startingExamRef.current) return;
+    if (!rawQuestions.length) return;
+    startingExamRef.current = true;
+    const saved = loadCertificationAttempt(attemptKey);
+    const resolved = resolveCertificationExamAttempt({
+      rawQuestions,
+      saved,
+    });
+    setQuestions(resolved.questions);
+    setAnswers(resolved.answers);
+    setCurrentQ(resolved.currentQ);
+    setIsTracNghiemSubmitted(resolved.isTracNghiemSubmitted);
+    setTab(resolved.tab);
+    examPhaseRef.current = resolved.examPhase;
+    if (resolved.timeLeft != null && resolved.timeLeft > 0) {
+      setTimeLeft(resolved.timeLeft);
+    } else if (resolved.examPhase === 'essay') {
+      setTimeLeft(meta.essayTime);
+    } else {
+      setTimeLeft(meta.time);
+    }
+    attemptFpRef.current = resolved.bankFingerprint;
+    saveCertificationAttempt(attemptKey, {
+      bankFingerprint: resolved.bankFingerprint,
+      questions: resolved.questions,
+      answers: resolved.answers,
+      currentQ: resolved.currentQ,
+      timeLeft: resolved.timeLeft != null && resolved.timeLeft > 0
+        ? resolved.timeLeft
+        : (resolved.examPhase === 'essay' ? meta.essayTime : meta.time),
+      isTracNghiemSubmitted: resolved.isTracNghiemSubmitted,
+      tab: resolved.tab,
+      examPhase: resolved.examPhase,
+    });
+    setPhase('test');
+  }, [rawQuestions, attemptKey, meta.time, meta.essayTime]);
+
+  useEffect(() => {
+    if (phase !== 'test') startingExamRef.current = false;
+  }, [phase]);
+
+  // Reset timer defaults when subject changes (before start)
+  useEffect(() => {
+    if (phase !== 'hardware_check') return;
+    examPhaseRef.current = 'mc';
+    setTimeLeft(meta.time);
+    setQuestions([]);
+    setAnswers([]);
+    setCurrentQ(0);
+    setIsTracNghiemSubmitted(false);
+    setTab('trac_nghiem');
+  }, [meta.time, subjectId, phase]);
+
+  // ── BỎ QUA YÊU CẦU CAMERA NẾU ADMIN ĐÃ TẮT (theo khóa của môn thi) ──
+  useEffect(() => {
+    if (!requireWebcam && phase === 'hardware_check' && bankTotal > 0 && !questionsLoading) {
+      beginOrResumeExam();
+    }
+  }, [requireWebcam, phase, bankTotal, questionsLoading, beginOrResumeExam]);
+
+  // Persist attempt while in test (answers / nav / timer) — no reshuffle
+  useEffect(() => {
+    if (phase !== 'test' || !questions.length) return;
+    saveCertificationAttempt(attemptKey, {
+      bankFingerprint: attemptFpRef.current || bankFp,
+      questions,
+      answers,
+      currentQ,
+      timeLeft,
+      isTracNghiemSubmitted,
+      tab,
+      examPhase: examPhaseRef.current,
+    });
+  }, [phase, questions, answers, currentQ, timeLeft, isTracNghiemSubmitted, tab, attemptKey, bankFp]);
+
+  // Clear attempt when exam ends
+  useEffect(() => {
+    if (phase !== 'result' && phase !== 'banned') return;
+    clearCertificationAttempt(attemptKey);
+  }, [phase, attemptKey]);
 
   const updateExamProgress = useCallback((changes) => {
     if (!student || !updateStudent) return;
@@ -336,6 +416,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   // ── Browser Trap (Chống F5, Ctrl+R, Back) ──
   const failAndExitRef = useRef();
   failAndExitRef.current = () => {
+    clearCertificationAttempt(attemptKey);
     updateExamProgress({
       tracNghiem: { score: 0, total: TOTAL },
       thucHanh: 'chua_nop',
@@ -586,7 +667,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   // HARDWARE CHECK / MODE SELECTOR
   // ══════════════════════════════════════════════════════
   const [examMode, setExamMode] = useState('lesson_quiz'); // 'lesson_quiz' | 'cert'
-  const canStartExam = cameraReady && TOTAL > 0 && !questionsLoading;
+  const canStartExam = cameraReady && bankTotal > 0 && !questionsLoading;
 
   if (!STUDENT_ID) {
     return (
@@ -725,7 +806,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
          <button 
              type="button"
              disabled={!canStartExam}
-             onClick={() => setPhase('test')} 
+             onClick={() => beginOrResumeExam()} 
              className={`w-full py-3 font-black rounded-[14px] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${
                  canStartExam
                  ? 'bg-red-500 text-white shadow-xl shadow-red-500/30 hover:bg-red-600 hover:scale-[1.02] active:scale-95' 
@@ -737,7 +818,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                  ? 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'
                  : 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'}
          </button>
-         {!canStartExam && cameraReady && !questionsLoading && TOTAL === 0 && (
+         {!canStartExam && cameraReady && !questionsLoading && bankTotal === 0 && (
            <p className="text-[10px] text-amber-700 font-bold mt-2 px-1">Admin cần thêm câu hỏi môn {meta.short} tại Đào tạo HV → Ngân hàng câu hỏi.</p>
          )}
          {!cameraReady && !cameraError && (
