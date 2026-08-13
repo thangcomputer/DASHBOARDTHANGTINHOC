@@ -54,8 +54,6 @@ export default function AdminStudentTrainingTab() {
   } = useAdminTab();
 
   const [dbCourses, setDbCourses] = React.useState([]);
-  const [studentAntiSeekEnabled, setStudentAntiSeekEnabled] = React.useState(() => localStorage.getItem('student_anti_seek_disabled') !== 'true');
-  const [teacherAntiSeekEnabled, setTeacherAntiSeekEnabled] = React.useState(() => localStorage.getItem('teacher_anti_seek_disabled') !== 'true' && localStorage.getItem('teacher_anti_seek') !== 'false');
 
   React.useEffect(() => {
     let cancelled = false;

@@ -20,6 +20,12 @@ import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import { formatLessonDisplayTitle } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
+import {
+  isLessonAntiSeekEnabled,
+  requiredWatchSeconds,
+  ANTI_SEEK_PROGRESS_CODE,
+  ANTI_SEEK_PROGRESS_MESSAGE,
+} from '../utils/antiSeekPolicy';
 
 const MOCK_COURSES = [
   {
@@ -173,6 +179,9 @@ const StudentVideoPlayer = ({
   const intervalRef = useRef(null);
   const autoSaveTimerRef = useRef(null);
   const pauseTimeoutRef = useRef(null);
+  const maxPosRef = useRef(0);
+  const seekGuardRef = useRef(false);
+  const eligibilitySentRef = useRef(false);
 
   // Restore watched seconds from sessionStorage or initialWatchedSeconds
   const bestInitial = useMemo(() => {
@@ -196,6 +205,12 @@ const StudentVideoPlayer = ({
     setHasEnded(false);
     setOverlayVisible(true);
     setPlayerInteractive(false);
+    eligibilitySentRef.current = false;
+    const posKey = `student_lms_pos_${lessonId}`;
+    const savedPos = Number(sessionStorage.getItem(posKey) || 0);
+    // Anti-seek: vị trí tua tối đa ≠ wall-clock watched; không seed bằng watchedSeconds
+    maxPosRef.current = antiSeekEnabled ? Math.max(0, savedPos) : Math.max(0, savedPos, initial);
+    seekGuardRef.current = false;
   }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
 
   useEffect(() => {
@@ -208,10 +223,16 @@ const StudentVideoPlayer = ({
   // ── Auto-Unlock khi đạt 2/3 ──────────────────────────────────────────
   useEffect(() => {
     if (!totalDuration || !onEligibilityReached) return;
+    if (eligibilitySentRef.current) return;
     const reqSecs = Math.ceil(totalDuration * 2 / 3);
-    // Nếu tắt chống tua (antiSeekEnabled === false) hoặc xem đủ mốc 2/3
-    if (!antiSeekEnabled || (displayWatched >= reqSecs && displayWatched > 0)) {
+    if (!antiSeekEnabled) {
+      eligibilitySentRef.current = true;
       onEligibilityReached(displayWatched || totalDuration, totalDuration);
+      return;
+    }
+    if (displayWatched >= reqSecs && displayWatched > 0) {
+      eligibilitySentRef.current = true;
+      onEligibilityReached(displayWatched, totalDuration);
     }
   }, [displayWatched, totalDuration, onEligibilityReached, antiSeekEnabled]);
 
@@ -250,12 +271,13 @@ const StudentVideoPlayer = ({
       playerRef.current = new window.YT.Player(`student-yt-player-${lessonId}`, {
         videoId: extractYouTubeId(videoId),
         playerVars: {
-          controls: 1,           // Cho phép tua nhưng đếm giây thực tế
+          controls: 1,           // Timeline vẫn hiện; antiSeek snap-back nếu vượt maxPos
           rel: 0,
           modestbranding: 1,
           iv_load_policy: 3,
           fs: 0,
-          start: bestInitial ? Math.floor(bestInitial) : 0,
+          // Anti-seek: không resume bằng wall-clock (tránh nhảy timeline)
+          start: antiSeekEnabled ? Math.floor(maxPosRef.current || 0) : (bestInitial ? Math.floor(bestInitial) : 0),
           playsinline: 1,
           enablejsapi: 1,
           origin: window.location.origin,
@@ -265,8 +287,9 @@ const StudentVideoPlayer = ({
             setIsReady(true);
             const dur = event.target.getDuration();
             if (dur > 0) setTotalDuration(dur);
-            if (bestInitial > 0) {
-              event.target.seekTo(bestInitial, true);
+            const resumeAt = antiSeekEnabled ? maxPosRef.current : bestInitial;
+            if (resumeAt > 0) {
+              event.target.seekTo(resumeAt, true);
             }
           },
           onStateChange: handleStateChange,
@@ -292,17 +315,36 @@ const StudentVideoPlayer = ({
       playerRef.current?.destroy?.();
       playerRef.current = null;
     };
-  }, [videoId, lessonId]);
+  }, [videoId, lessonId, antiSeekEnabled]);
 
-  // ── Đếm giây thực tế khi PLAYING ─────────────────────────────────────────────
+  // ── Đếm giây thực tế khi PLAYING + snap seek vượt maxPos ───────────────
   const startCounting = useCallback(() => {
     if (intervalRef.current) return;
     intervalRef.current = setInterval(() => {
+      try {
+        const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
+        if (antiSeekEnabled && !seekGuardRef.current) {
+          if (t > maxPosRef.current + 1.25) {
+            seekGuardRef.current = true;
+            playerRef.current?.seekTo?.(maxPosRef.current, true);
+            setTimeout(() => { seekGuardRef.current = false; }, 450);
+            return;
+          }
+          if (t >= maxPosRef.current - 0.35) {
+            maxPosRef.current = Math.max(maxPosRef.current, t);
+            sessionStorage.setItem(`student_lms_pos_${lessonId}`, String(maxPosRef.current));
+          }
+        } else if (!antiSeekEnabled && t > maxPosRef.current) {
+          maxPosRef.current = t;
+        }
+      } catch { /* ignore */ }
+
+      if (seekGuardRef.current) return;
       actualWatchedRef.current += 1;
       setDisplayWatched(actualWatchedRef.current);
       sessionStorage.setItem(`student_lms_watched_${lessonId}`, actualWatchedRef.current);
     }, 1000);
-  }, [lessonId]);
+  }, [lessonId, antiSeekEnabled]);
 
   const stopCounting = useCallback(() => {
     clearInterval(intervalRef.current);
@@ -776,7 +818,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   const handleEligibilityReached = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse) return;
     try {
-      await lmsApiFetch('/complete-lesson', {
+      const res = await lmsApiFetch('/complete-lesson', {
         method: 'POST',
         body: JSON.stringify({
           lessonId: currentLesson._id || currentLesson.id,
@@ -784,40 +826,54 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           watchedSeconds: actualWatched,
         }),
       });
+      if (res?.success === false && res?.code === ANTI_SEEK_PROGRESS_CODE) {
+        toast.error(res.message || ANTI_SEEK_PROGRESS_MESSAGE);
+        return;
+      }
+      if (res?.success === false) return;
       const courseId = selectedCourse._id || selectedCourse.id;
       await fetchLessons(courseId);
       try {
         const prog = await lmsApiFetch('/progress/me');
         if (prog?.success && prog.data) setCourseProgressMap(prog.data);
       } catch { /* ignore */ }
-    } catch (e) { }
-  }, [currentLesson, selectedCourse]);
+    } catch (e) { /* ignore */ }
+  }, [currentLesson, selectedCourse, toast]);
 
-  // Video kết thúc (được component con tính toán 2/3 và gọi)
+  // Video kết thúc
   const handleVideoEnded = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse || completing) return;
 
-    const requiredSeconds = Math.ceil((totalDur || 0) * 2 / 3);
-    // Tránh việc hiển thị Alert gây khó chịu, nếu người dùng tua video tới cuối mà chưa đủ % học
-    // thì video sẽ kết thúc nhưng không gửi API mở khóa, chờ hệ thống tính toán tiến độ thực tế (actualWatched)
-    if (false) {
+    const antiOn = isLessonAntiSeekEnabled(currentLesson);
+    const requiredSeconds = requiredWatchSeconds(totalDur || 0);
+    if (antiOn && requiredSeconds > 0 && actualWatched < requiredSeconds) {
+      toast.error(ANTI_SEEK_PROGRESS_MESSAGE);
       return;
     }
 
     setCompleting(true);
     try {
-      await lmsApiFetch('/complete-lesson', {
+      const res = await lmsApiFetch('/complete-lesson', {
         method: 'POST',
         body: JSON.stringify({
           lessonId: currentLesson._id || currentLesson.id,
           courseId: selectedCourse._id || selectedCourse.id,
-          watchedSeconds: actualWatched, // Lưu luôn giây thực tế lúc complete
+          watchedSeconds: actualWatched,
         }),
       });
+      if (res?.success === false && res?.code === ANTI_SEEK_PROGRESS_CODE) {
+        toast.error(res.message || ANTI_SEEK_PROGRESS_MESSAGE);
+        setCompleting(false);
+        return;
+      }
+      if (res?.success === false) {
+        setCompleting(false);
+        return;
+      }
       const courseId = selectedCourse._id || selectedCourse.id;
-      const res = await lmsApiFetch(`/courses/${courseId}/lessons`);
-      if (res?.success && Array.isArray(res.data)) {
-        const updatedLessons = res.data;
+      const lessonsRes = await lmsApiFetch(`/courses/${courseId}/lessons`);
+      if (lessonsRes?.success && Array.isArray(lessonsRes.data)) {
+        const updatedLessons = lessonsRes.data;
         setLessons(updatedLessons);
         const currentIdx = updatedLessons.findIndex(l => String(l._id) === String(currentLesson._id));
         const next = updatedLessons[currentIdx + 1];
@@ -831,7 +887,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       } catch { /* ignore */ }
     } catch (e) { void 0 }
     setCompleting(false);
-  }, [currentLesson, selectedCourse, completing]);
+  }, [currentLesson, selectedCourse, completing, toast]);
 
   // Handle lưu progress tạm thời
   const handleSaveProgress = useCallback((lessonId, watchedSeconds) => {
@@ -1412,11 +1468,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                   lessonId={currentLesson?._id}
                   courseId={selectedCourse?._id || selectedCourse?.id}
                   initialWatchedSeconds={currentLesson?.watchedSeconds || 0}
-                  antiSeekEnabled={
-                    currentLesson?.antiSeek !== false
-                    && localStorage.getItem('student_anti_seek_disabled') !== 'true'
-                    && localStorage.getItem('admin_anti_seek_disabled') !== 'true'
-                  }
+                  antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
                   onSaveProgress={handleSaveProgress}
                   onVideoEnded={handleVideoEnded}
                   onEligibilityReached={handleEligibilityReached}
@@ -1450,11 +1502,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                   return 0;
                 }
               }}
-              antiSeekEnabled={
-                currentLesson?.antiSeek !== false
-                && localStorage.getItem('student_anti_seek_disabled') !== 'true'
-                && localStorage.getItem('admin_anti_seek_disabled') !== 'true'
-              }
+              antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
             />
           </div>
         </div>

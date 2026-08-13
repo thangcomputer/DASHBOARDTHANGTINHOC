@@ -6,6 +6,13 @@ const TrainingProgress = require('../models/TrainingProgress');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowTrainingLms } = require('../middleware/policyShadowTrainingLms');
 const { trainingLmsCutoverGate } = require('../middleware/trainingLmsCutoverGate');
+const {
+  isLessonAntiSeekEnabled,
+  parseLessonDurationSeconds,
+  requiredWatchSeconds,
+  findLessonInCourse,
+  clampWatchProgressIncrease,
+} = require('../utils/antiSeekPolicy');
 
 /**
  * LIVE mount: server.js → app.use('/api/training-lms', trainingRoutes)
@@ -115,7 +122,7 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
   }
 });
 
-// Hoàn thành bài học
+// Hoàn thành bài học — antiSeek: server SoT = TrainingProgress.watchedSeconds + lesson.antiSeek
 router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -125,15 +132,53 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       return res.status(400).json({ success: false, message: 'Thiếu dữ liệu bài học' });
     }
 
-    // Upsert tiến độ (kèm watchedSeconds)
+    const existing = await TrainingProgress.findOne({ userId, lessonId }).lean();
+    if (existing?.status === 'completed') {
+      return res.json({ success: true, message: 'Bài học đã được hoàn thành trước đó.' });
+    }
+
+    const SystemSettings = require('../models/SystemSettings');
+    const settings = await SystemSettings.findOne() || {};
+    const course = findCourseInSettings(settings, courseId);
+    const lesson = course ? findLessonInCourse(course, lessonId) : null;
+    const antiSeekOn = isLessonAntiSeekEnabled(lesson || { antiSeek: true });
+
+    // Server progress SoT — do not trust client watchedSeconds alone
+    const serverWatched = Math.max(0, Number(existing?.watchedSeconds) || 0);
+    const clientClaim = Math.max(0, Number(watchedSeconds) || 0);
+    // Allow small catch-up from last autosave (same request race); never jump to full duration from client
+    const credited = Math.max(
+      serverWatched,
+      Math.min(clientClaim, serverWatched + 15)
+    );
+
+    if (antiSeekOn) {
+      const durationSec = parseLessonDurationSeconds(lesson?.duration);
+      const required = requiredWatchSeconds(durationSec);
+      // duration missing → cannot compute 2/3; still require some server progress (residual)
+      const minRequired = required > 0 ? required : 1;
+      if (credited < minRequired) {
+        return res.status(422).json({
+          success: false,
+          code: 'ANTI_SEEK_PROGRESS_REQUIRED',
+          message: 'Bạn chưa xem đủ thời lượng yêu cầu của bài học.',
+          data: {
+            watchedSeconds: credited,
+            requiredSeconds: minRequired,
+            durationSeconds: durationSec,
+          },
+        });
+      }
+    }
+
     await TrainingProgress.findOneAndUpdate(
       { userId, lessonId },
-      { 
-        status: 'completed', 
+      {
+        status: 'completed',
         courseId,
-        watchedSeconds: watchedSeconds || 0,
+        watchedSeconds: Math.max(credited, serverWatched),
         completedAt: new Date(),
-        lastWatchedAt: new Date()
+        lastWatchedAt: new Date(),
       },
       { upsert: true, returnDocument: 'after' }
     );
@@ -293,14 +338,39 @@ router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res)
       return res.status(400).json({ success: false, message: 'Thiếu dữ liệu' });
     }
 
-    // Chỉ cập nhật watchedSeconds nếu chưa completed (tránh ghi đè bài đã hoàn thành)
+    const existing = await TrainingProgress.findOne({
+      userId,
+      lessonId,
+      status: { $ne: 'completed' },
+    }).lean();
+
+    if (existing?.status === 'completed') {
+      return res.json({ success: true });
+    }
+
+    let maxSeconds = 0;
+    try {
+      const SystemSettings = require('../models/SystemSettings');
+      const settings = await SystemSettings.findOne() || {};
+      const course = findCourseInSettings(settings, courseId);
+      const lesson = course ? findLessonInCourse(course, lessonId) : null;
+      maxSeconds = parseLessonDurationSeconds(lesson?.duration);
+    } catch { /* ignore */ }
+
+    const nextWatched = clampWatchProgressIncrease({
+      previous: existing?.watchedSeconds || 0,
+      incoming: watchedSeconds,
+      lastWatchedAt: existing?.lastWatchedAt,
+      maxSeconds: maxSeconds > 0 ? maxSeconds : 0,
+    });
+
     await TrainingProgress.findOneAndUpdate(
       { userId, lessonId, status: { $ne: 'completed' } },
-      { watchedSeconds, courseId, lastWatchedAt: new Date() },
+      { watchedSeconds: nextWatched, courseId, lastWatchedAt: new Date() },
       { upsert: true, returnDocument: 'after' }
     );
 
-    res.json({ success: true });
+    res.json({ success: true, data: { watchedSeconds: nextWatched } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -15,6 +15,13 @@ import api, { buildMediaDownloadUrl, csrfFetch } from '../services/api';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import { formatLessonDisplayTitle } from '../utils/lmsLessonUi';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
+import {
+  isLessonAntiSeekEnabled,
+  requiredWatchSeconds,
+  ANTI_SEEK_PROGRESS_CODE,
+  ANTI_SEEK_PROGRESS_MESSAGE,
+} from '../utils/antiSeekPolicy';
+import { useToast } from '../utils/toast';
 
 const MOCK_COURSES = [
   { _id: '1', title: 'Đào tạo Giảng viên Mới', progress: 0, 
@@ -125,6 +132,9 @@ const YouTubePlayerSecure = ({
   const [isTabActive, setIsTabActive] = useState(true);
   const [playerInteractive, setPlayerInteractive] = useState(false);
   const pauseTimeoutRef = useRef(null);
+  const maxPosRef = useRef(0);
+  const seekGuardRef = useRef(false);
+  const eligibilitySentRef = useRef(false);
 
   // ── Bộ đếm thực tế ──────────────────────────────────────────────────────────
   const initialLocal = parseInt(sessionStorage.getItem(`lms_watched_${lessonId}`) || "0", 10);
@@ -143,6 +153,10 @@ const YouTubePlayerSecure = ({
     setHasEnded(false);
     setOverlayVisible(true);
     setPlayerInteractive(false);
+    eligibilitySentRef.current = false;
+    const savedPos = Number(sessionStorage.getItem(`lms_pos_${lessonId}`) || 0);
+    maxPosRef.current = antiSeekEnabled ? Math.max(0, savedPos) : Math.max(0, savedPos, bestSecs);
+    seekGuardRef.current = false;
   }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
 
   useEffect(() => {
@@ -168,13 +182,19 @@ const YouTubePlayerSecure = ({
 
   const requiredSeconds = totalDuration > 0 ? Math.ceil(totalDuration * 2 / 3) : 0;
 
-  // ── Auto-Unlock khi đạt 2/3 (Mới) ──────────────────────────────────────────
+  // ── Auto-Unlock khi đạt 2/3 ──────────────────────────────────────────
   useEffect(() => {
     if (!totalDuration || !onEligibilityReached) return;
+    if (eligibilitySentRef.current) return;
     const reqSecs = Math.ceil(totalDuration * 2 / 3);
-    // Nếu tắt chống tua (antiSeekEnabled === false) hoặc xem đủ mốc 2/3
-    if (!antiSeekEnabled || (displayWatched >= reqSecs && displayWatched > 0)) {
-       onEligibilityReached(displayWatched || totalDuration, totalDuration);
+    if (!antiSeekEnabled) {
+      eligibilitySentRef.current = true;
+      onEligibilityReached(displayWatched || totalDuration, totalDuration);
+      return;
+    }
+    if (displayWatched >= reqSecs && displayWatched > 0) {
+      eligibilitySentRef.current = true;
+      onEligibilityReached(displayWatched, totalDuration);
     }
   }, [displayWatched, totalDuration, onEligibilityReached, antiSeekEnabled]);
 
@@ -213,12 +233,12 @@ const YouTubePlayerSecure = ({
       playerRef.current = new window.YT.Player(`yt-player-${lessonId}`, {
         videoId: extractYouTubeId(videoId),
         playerVars: {
-          controls: 1,           // ✅ Cho phép tua — nhưng chỉ đếm giây thực
+          controls: 1,           // Timeline vẫn hiện; antiSeek snap-back nếu vượt maxPos
           rel: 0,
           modestbranding: 1,
           iv_load_policy: 3,
           fs: 0,
-          start: bestInitial ? Math.floor(bestInitial) : 0,
+          start: antiSeekEnabled ? Math.floor(maxPosRef.current || 0) : (bestInitial ? Math.floor(bestInitial) : 0),
           playsinline: 1,
           enablejsapi: 1,
           origin: window.location.origin,
@@ -228,10 +248,9 @@ const YouTubePlayerSecure = ({
             setIsReady(true);
             const dur = event.target.getDuration();
             if (dur > 0) setTotalDuration(dur);
-            
-            // Resume video from where left off
-            if (bestInitial > 0) {
-              event.target.seekTo(bestInitial, true);
+            const resumeAt = antiSeekEnabled ? maxPosRef.current : bestInitial;
+            if (resumeAt > 0) {
+              event.target.seekTo(resumeAt, true);
             }
           },
           onStateChange: handleStateChange,
@@ -257,17 +276,36 @@ const YouTubePlayerSecure = ({
       playerRef.current?.destroy?.();
       playerRef.current = null;
     };
-  }, [videoId, lessonId, isLocked]);
+  }, [videoId, lessonId, isLocked, antiSeekEnabled]);
 
-  // ── Đếm giây thực tế khi PLAYING ─────────────────────────────────────────────
+  // ── Đếm giây thực tế khi PLAYING + snap seek vượt maxPos ───────────────────
   const startCounting = useCallback(() => {
-    if (intervalRef.current) return; // Đã chạy rồi
+    if (intervalRef.current) return;
     intervalRef.current = setInterval(() => {
+      try {
+        const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
+        if (antiSeekEnabled && !seekGuardRef.current) {
+          if (t > maxPosRef.current + 1.25) {
+            seekGuardRef.current = true;
+            playerRef.current?.seekTo?.(maxPosRef.current, true);
+            setTimeout(() => { seekGuardRef.current = false; }, 450);
+            return;
+          }
+          if (t >= maxPosRef.current - 0.35) {
+            maxPosRef.current = Math.max(maxPosRef.current, t);
+            sessionStorage.setItem(`lms_pos_${lessonId}`, String(maxPosRef.current));
+          }
+        } else if (!antiSeekEnabled && t > maxPosRef.current) {
+          maxPosRef.current = t;
+        }
+      } catch { /* ignore */ }
+
+      if (seekGuardRef.current) return;
       actualWatchedRef.current += 1;
       setDisplayWatched(actualWatchedRef.current);
       sessionStorage.setItem(`lms_watched_${lessonId}`, actualWatchedRef.current);
     }, 1000);
-  }, [lessonId]);
+  }, [lessonId, antiSeekEnabled]);
 
   const stopCounting = useCallback(() => {
     clearInterval(intervalRef.current);
@@ -657,7 +695,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
   const playerApiRef = useRef(null);
   const [mainTab, setMainTab] = useState('courses'); // courses | guides | files
   const [expandedGuideKey, setExpandedGuideKey] = useState(null);
-  const [antiSeekEnabled, setAntiSeekEnabled] = useState(() => localStorage.getItem('teacher_anti_seek') !== 'false');
+  const toast = useToast();
   const teacherSession = (() => { try { return JSON.parse(localStorage.getItem('teacher_user') || '{}'); } catch { return {}; } })();
 
   // Lấy tiến độ các khóa học của GV để hiển thị bên ngoài (Bổ sung mới)
@@ -759,9 +797,9 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
       const token = localStorage.getItem('teacher_access_token') ||
                     (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
                     localStorage.getItem('admin_access_token');
-      
+
       const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-      await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
+      const httpRes = await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -770,22 +808,27 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           watchedSeconds: actualWatched,
         }),
       });
-      // Tải lại bài giảng để UI gỡ bỏ ổ khóa bài tiếp theo ở sidebar
-      const res = await lmsApiFetch(`/courses/${selectedCourse._id || selectedCourse.id}/lessons`);
-      if (res.success) {
-        setLessons(res.data);
+      const res = await httpRes.json().catch(() => ({}));
+      if (res?.success === false && res?.code === ANTI_SEEK_PROGRESS_CODE) {
+        toast.error(res.message || ANTI_SEEK_PROGRESS_MESSAGE);
+        return;
       }
-    } catch (e) {}
-  }, [currentLesson, selectedCourse]);
+      if (res?.success === false) return;
+      const lessonsRes = await lmsApiFetch(`/courses/${selectedCourse._id || selectedCourse.id}/lessons`);
+      if (lessonsRes.success) {
+        setLessons(lessonsRes.data);
+      }
+    } catch (e) { /* ignore */ }
+  }, [currentLesson, selectedCourse, toast]);
 
-  // Video kết thúc (được component con tính toán 2/3 và gọi)
+  // Video kết thúc
   const handleVideoEnded = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse || completing) return;
-    
-    const requiredSeconds = Math.ceil((totalDur || 0) * 2 / 3);
-    // Tránh việc hiển thị Alert gây khó chịu, nếu người dùng tua video tới cuối mà chưa đủ % học
-    // thì video sẽ kết thúc nhưng không gửi API mở khóa, chờ hệ thống tính toán tiến độ thực tế (actualWatched)
-    if (actualWatched < requiredSeconds) {
+
+    const antiOn = isLessonAntiSeekEnabled(currentLesson);
+    const req = requiredWatchSeconds(totalDur || 0);
+    if (antiOn && req > 0 && actualWatched < req) {
+      toast.error(ANTI_SEEK_PROGRESS_MESSAGE);
       return;
     }
 
@@ -798,21 +841,29 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         '';
 
       const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-      await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
+      const httpRes = await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           lessonId: currentLesson._id || currentLesson.id,
           courseId: selectedCourse._id || selectedCourse.id,
-          watchedSeconds: actualWatched, // Lưu luôn giây thực tế lúc complete
+          watchedSeconds: actualWatched,
         }),
       });
-      // Reload để mở khóa bài tiếp theo
-      const res = await lmsApiFetch(`/courses/${selectedCourse._id}/lessons`);
-      if (res.success) {
-        const updatedLessons = res.data;
+      const body = await httpRes.json().catch(() => ({}));
+      if (body?.success === false && body?.code === ANTI_SEEK_PROGRESS_CODE) {
+        toast.error(body.message || ANTI_SEEK_PROGRESS_MESSAGE);
+        setCompleting(false);
+        return;
+      }
+      if (body?.success === false) {
+        setCompleting(false);
+        return;
+      }
+      const lessonsRes = await lmsApiFetch(`/courses/${selectedCourse._id}/lessons`);
+      if (lessonsRes.success) {
+        const updatedLessons = lessonsRes.data;
         setLessons(updatedLessons);
-        // Tự động chuyển sang bài tiếp theo nếu có
         const currentIdx = updatedLessons.findIndex(l => String(l._id) === String(currentLesson._id));
         const next = updatedLessons[currentIdx + 1];
         if (next?.isUnlocked) {
@@ -821,7 +872,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
       }
     } catch (e) { void 0 }
     setCompleting(false);
-  }, [currentLesson, selectedCourse, completing]);
+  }, [currentLesson, selectedCourse, completing, toast]);
 
   // Handle lưu progress tạm thời
   const handleSaveProgress = useCallback((lessonId, watchedSeconds) => {
@@ -1151,7 +1202,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                   onSaveProgress={handleSaveProgress}
                   onEligibilityReached={handleEligibilityReached}
                   isLocked={!currentLesson?.isUnlocked}
-                  antiSeekEnabled={currentLesson?.antiSeek !== false && antiSeekEnabled}
+                  antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
                   playerApiRef={playerApiRef}
                 />
               </div>
@@ -1182,35 +1233,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                   return 0;
                 }
               }}
-              antiSeekEnabled={currentLesson?.antiSeek !== false && antiSeekEnabled}
-              teacherAntiSeekSlot={currentLesson ? (
-                <div className="flex items-center justify-between gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <AlertCircle size={15} className="text-amber-400/80 flex-shrink-0" />
-                    <p className="text-amber-200/70 text-[11px] sm:text-xs leading-relaxed min-w-0">
-                      <strong className="text-amber-400 font-bold">Chống tua bài học này:</strong>{' '}
-                      {currentLesson?.antiSeek !== false
-                        ? 'ĐÃ BẬT (Phải xem đủ 2/3 thời lượng)'
-                        : 'ĐÃ TẮT (Tự do tua video & xem nội dung)'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextVal = currentLesson?.antiSeek === false ? true : false;
-                      setCurrentLesson(prev => prev ? { ...prev, antiSeek: nextVal } : prev);
-                      setLessons(prev => prev.map(l => String(l._id) === String(currentLesson._id) ? { ...l, antiSeek: nextVal } : l));
-                    }}
-                    className={
-                      currentLesson?.antiSeek !== false
-                        ? 'shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
-                        : 'shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                    }
-                  >
-                    {currentLesson?.antiSeek !== false ? 'Tắt chống tua bài này' : 'Bật chống tua bài này'}
-                  </button>
-                </div>
-              ) : null}
+              antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
             />
           </div>
         </div>
