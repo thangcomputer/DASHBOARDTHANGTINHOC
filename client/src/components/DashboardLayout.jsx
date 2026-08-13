@@ -204,8 +204,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }
   }, [currentTeacher?.status, session?.status, role, sessionTeacherId, navigate, isRefetching, location.pathname]);
 
-  // Admin/staff lần đầu: mở đổi MK ngay.
-  // HV/GV: chờ hoàn thành hướng dẫn (LmsGuideHost) rồi mới mở.
+  // Admin/staff lần đầu: mở đổi MK ngay. HV/GV: không auto — đổi thủ công ở Hồ sơ/menu.
   useEffect(() => {
     if (session?.isFirstLogin !== true) return;
     if (role === 'student' || role === 'teacher') return;

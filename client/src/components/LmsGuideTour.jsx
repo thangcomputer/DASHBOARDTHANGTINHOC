@@ -353,35 +353,20 @@ export function LmsGuideHost({ role, userId, pathname, hash, hideButton = false,
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('tour');
   const enabled = role === 'student' || role === 'teacher';
-  const pendingPasswordRef = useRef(false);
-
-  const openPasswordIfNeeded = useCallback(() => {
-    if (!isFirstLogin && !pendingPasswordRef.current) return;
-    pendingPasswordRef.current = false;
-    try {
-      window.dispatchEvent(new CustomEvent('open-change-password-modal'));
-    } catch { /* ignore */ }
-  }, [isFirstLogin]);
 
   useEffect(() => {
     if (!enabled || !userId) return;
     // Chỉ tự mở trợ giúp với tài khoản mới (lần đăng nhập đầu).
-    // Lần 2 trở đi: không auto — vẫn mở được bằng nút Trợ giúp.
+    // Không còn auto mở popup đổi mật khẩu — HV/GV đổi MK thủ công ở Hồ sơ / menu.
     if (!isFirstLogin) return undefined;
 
     const seen = hasSeenLmsGuide(role, userId);
-    if (!seen) {
-      pendingPasswordRef.current = true;
-      const t = setTimeout(() => {
-        setMode('tour');
-        setOpen(true);
-      }, 600);
-      return () => clearTimeout(t);
-    }
-    // Đã xem hướng dẫn nhưng vẫn chưa đổi MK lần đầu
+    if (seen) return undefined;
+
     const t = setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('open-change-password-modal'));
-    }, 400);
+      setMode('tour');
+      setOpen(true);
+    }, 600);
     return () => clearTimeout(t);
   }, [enabled, role, userId, isFirstLogin]);
 
@@ -399,8 +384,6 @@ export function LmsGuideHost({ role, userId, pathname, hash, hideButton = false,
 
   const handleClose = () => {
     setOpen(false);
-    // Sau khi người dùng đóng/hoàn thành hướng dẫn → mở đổi mật khẩu
-    setTimeout(openPasswordIfNeeded, 200);
   };
 
   return (
