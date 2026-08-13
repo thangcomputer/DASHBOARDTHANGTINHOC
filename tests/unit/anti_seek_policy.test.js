@@ -6,8 +6,11 @@ const {
   isLessonAntiSeekEnabled,
   parseLessonDurationSeconds,
   requiredWatchSeconds,
+  resolveEffectiveDuration,
   findLessonInCourse,
   clampWatchProgressIncrease,
+  listCourseLessonIds,
+  previousLessonId,
 } = require('../../utils/antiSeekPolicy');
 
 test('SoT: antiSeek !== false => enabled', () => {
@@ -29,6 +32,28 @@ test('parseLessonDurationSeconds supports number and mm:ss', () => {
   assert.equal(parseLessonDurationSeconds('15:00'), 900);
   assert.equal(parseLessonDurationSeconds('1:30'), 90);
   assert.equal(parseLessonDurationSeconds(''), 0);
+});
+
+test('resolveEffectiveDuration prefers sane YouTube duration', () => {
+  assert.equal(resolveEffectiveDuration(600, 580), 580);
+  assert.equal(resolveEffectiveDuration('10:00', 580), 580);
+  assert.equal(resolveEffectiveDuration(600, 0), 600);
+  assert.equal(resolveEffectiveDuration(0, 580), 580);
+  // Client under-reports (<45% admin) → fail-closed to admin
+  assert.equal(resolveEffectiveDuration(600, 200), 600);
+});
+
+test('previousLessonId / listCourseLessonIds sequential order', () => {
+  const course = {
+    chapters: [
+      { lessons: [{ id: 'a' }, { id: 'b' }] },
+      { lessons: [{ _id: 'c' }] },
+    ],
+  };
+  assert.deepEqual(listCourseLessonIds(course), ['a', 'b', 'c']);
+  assert.equal(previousLessonId(course, 'a'), null);
+  assert.equal(previousLessonId(course, 'b'), 'a');
+  assert.equal(previousLessonId(course, 'c'), 'b');
 });
 
 test('findLessonInCourse walks lessons/videos/chapters', () => {
@@ -65,11 +90,14 @@ test('clampWatchProgressIncrease first save accepts incoming (bounded by max)', 
   assert.equal(next, 50);
 });
 
-test('complete-lesson route source enforces ANTI_SEEK_PROGRESS_REQUIRED', () => {
+test('complete-lesson route source enforces anti-seek + sequential prev', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const src = fs.readFileSync(path.join(__dirname, '../../routes/trainingRoutes.js'), 'utf8');
   assert.ok(src.includes('ANTI_SEEK_PROGRESS_REQUIRED'));
+  assert.ok(src.includes('PREVIOUS_LESSON_REQUIRED'));
+  assert.ok(src.includes('resolveEffectiveDuration'));
+  assert.ok(src.includes('contentLocked'));
   assert.ok(src.includes('isLessonAntiSeekEnabled'));
   assert.ok(src.includes('clampWatchProgressIncrease'));
   assert.ok(src.includes('credited < minRequired'));
@@ -90,7 +118,10 @@ test('FE players do not override Admin antiSeek via localStorage', () => {
   assert.ok(!student.includes('admin_anti_seek_disabled'));
   assert.ok(!student.includes('if (false)'));
   assert.ok(student.includes('isLessonAntiSeekEnabled'));
+  assert.ok(student.includes('videoDuration'));
+  assert.ok(student.includes('resolveEffectiveDuration'));
   assert.ok(!teacher.includes('teacher_anti_seek'));
   assert.ok(!teacher.includes('Tắt chống tua bài này'));
   assert.ok(teacher.includes('isLessonAntiSeekEnabled'));
+  assert.ok(teacher.includes('videoDuration'));
 });

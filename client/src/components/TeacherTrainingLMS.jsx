@@ -19,8 +19,10 @@ import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrande
 import {
   isLessonAntiSeekEnabled,
   requiredWatchSeconds,
+  resolveEffectiveDuration,
   ANTI_SEEK_PROGRESS_CODE,
   ANTI_SEEK_PROGRESS_MESSAGE,
+  PREV_LESSON_REQUIRED_CODE,
 } from '../utils/antiSeekPolicy';
 import { useToast } from '../utils/toast';
 
@@ -150,8 +152,9 @@ const YouTubePlayerSecure = ({
   const [displayWatched, setDisplayWatched] = useState(bestInitial);
   const [totalDuration, setTotalDuration] = useState(lessonDuration || 0);
 
+  const effectiveDuration = resolveEffectiveDuration(lessonDuration, totalDuration);
   const seekUnlocked = !antiSeekEnabled
-    || (totalDuration > 0 && displayWatched >= Math.ceil((totalDuration * 2) / 3) && displayWatched > 0);
+    || (effectiveDuration > 0 && displayWatched >= requiredWatchSeconds(effectiveDuration) && displayWatched > 0);
   seekUnlockedRef.current = seekUnlocked;
 
   // Reset overlay chỉ khi đổi bài — tránh bật lại nút Play khi cập nhật tiến độ
@@ -193,23 +196,23 @@ const YouTubePlayerSecure = ({
     return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   };
 
-  const requiredSeconds = totalDuration > 0 ? Math.ceil(totalDuration * 2 / 3) : 0;
+  const requiredSeconds = effectiveDuration > 0 ? requiredWatchSeconds(effectiveDuration) : 0;
 
-  // ── Auto-Unlock khi đạt 2/3 ──────────────────────────────────────────
+  // ── Complete khi đủ threshold (server vẫn là SoT) ────────────────────
   useEffect(() => {
-    if (!totalDuration || !onEligibilityReached) return;
+    if (!effectiveDuration || !onEligibilityReached) return;
     if (eligibilitySentRef.current) return;
-    const reqSecs = Math.ceil(totalDuration * 2 / 3);
+    const reqSecs = requiredWatchSeconds(effectiveDuration);
     if (!antiSeekEnabled) {
       eligibilitySentRef.current = true;
-      onEligibilityReached(displayWatched || totalDuration, totalDuration);
+      onEligibilityReached(displayWatched || effectiveDuration, totalDuration || effectiveDuration);
       return;
     }
-    if (displayWatched >= reqSecs && displayWatched > 0) {
+    if (reqSecs > 0 && displayWatched >= reqSecs && displayWatched > 0) {
       eligibilitySentRef.current = true;
-      onEligibilityReached(displayWatched, totalDuration);
+      onEligibilityReached(displayWatched, totalDuration || effectiveDuration);
     }
-  }, [displayWatched, totalDuration, onEligibilityReached, antiSeekEnabled]);
+  }, [displayWatched, effectiveDuration, totalDuration, onEligibilityReached, antiSeekEnabled]);
 
   // ── Giám sát tab ẩn (không dùng window.blur — iframe YouTube fire blur khi rê/click) ──
   useEffect(() => {
@@ -361,11 +364,18 @@ const YouTubePlayerSecure = ({
           return 0;
         }
       },
+      getDuration: () => {
+        try {
+          return Number(playerRef.current?.getDuration?.()) || Number(totalDuration) || 0;
+        } catch {
+          return Number(totalDuration) || 0;
+        }
+      },
     };
     return () => {
       playerApiRef.current = null;
     };
-  }, [playerApiRef, isReady, lessonId]);
+  }, [playerApiRef, isReady, lessonId, totalDuration]);
 
   const handleStateChange = useCallback((event) => {
     const state = event.data;
@@ -541,8 +551,9 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
   return (
     <div
       onClick={() => lesson.isUnlocked && onClick(lesson)}
+      title={!lesson.isUnlocked ? 'Hoàn thành bài trước để mở bài này' : undefined}
       className={`flex items-start gap-3 px-5 py-4 border-b border-slate-100 transition-all relative
-        ${!lesson.isUnlocked ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}
+        ${!lesson.isUnlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : lesson.isCompleted ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
       `}
     >
@@ -812,27 +823,46 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
     }
   }, [courses, selectedCourse]);
 
-  // Auto-Unlock sự kiện khi đạt chuẩn 2/3 (Chạy ngầm, không nhảy video)
+  const completeLessonOnServer = useCallback(async (actualWatched, totalDur) => {
+    if (!currentLesson || !selectedCourse) return { success: false };
+    const token = localStorage.getItem('teacher_access_token') ||
+                  (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
+                  localStorage.getItem('admin_access_token');
+    const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+    const videoDuration = Math.floor(Number(totalDur) || Number(playerApiRef.current?.getDuration?.()) || 0);
+    const payload = {
+      lessonId: currentLesson._id || currentLesson.id,
+      courseId: selectedCourse._id || selectedCourse.id,
+      watchedSeconds: actualWatched,
+      videoDuration,
+    };
+    try {
+      await csrfFetch(`${API_BASE}/training-lms/save-watch-progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+    } catch { /* ignore flush */ }
+
+    const httpRes = await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+    return httpRes.json().catch(() => ({ success: false }));
+  }, [currentLesson, selectedCourse]);
+
+  // Complete khi đủ threshold — chỉ unlock bài sau khi SERVER completed
   const handleEligibilityReached = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse) return;
     try {
-      const token = localStorage.getItem('teacher_access_token') ||
-                    (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
-                    localStorage.getItem('admin_access_token');
-
-      const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-      const httpRes = await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          lessonId: currentLesson._id || currentLesson.id,
-          courseId: selectedCourse._id || selectedCourse.id,
-          watchedSeconds: actualWatched,
-        }),
-      });
-      const res = await httpRes.json().catch(() => ({}));
+      const res = await completeLessonOnServer(actualWatched, totalDur);
       if (res?.success === false && res?.code === ANTI_SEEK_PROGRESS_CODE) {
         toast.error(res.message || ANTI_SEEK_PROGRESS_MESSAGE);
+        return;
+      }
+      if (res?.success === false && res?.code === PREV_LESSON_REQUIRED_CODE) {
+        toast.error(res.message || 'Hoàn thành bài trước để mở bài này.');
         return;
       }
       if (res?.success === false) return;
@@ -841,14 +871,15 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         setLessons(lessonsRes.data);
       }
     } catch (e) { /* ignore */ }
-  }, [currentLesson, selectedCourse, toast]);
+  }, [currentLesson, selectedCourse, toast, completeLessonOnServer]);
 
   // Video kết thúc
   const handleVideoEnded = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse || completing) return;
 
     const antiOn = isLessonAntiSeekEnabled(currentLesson);
-    const req = requiredWatchSeconds(totalDur || 0);
+    const effDur = resolveEffectiveDuration(currentLesson?.duration || currentLesson?.adminDurationSeconds, totalDur);
+    const req = requiredWatchSeconds(effDur);
     if (antiOn && req > 0 && actualWatched < req) {
       toast.error(ANTI_SEEK_PROGRESS_MESSAGE);
       return;
@@ -856,25 +887,14 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
     setCompleting(true);
     try {
-      const token =
-        localStorage.getItem('teacher_access_token') ||
-        (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
-        localStorage.getItem('admin_access_token') ||
-        '';
-
-      const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-      const httpRes = await csrfFetch(`${API_BASE}/training-lms/complete-lesson`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          lessonId: currentLesson._id || currentLesson.id,
-          courseId: selectedCourse._id || selectedCourse.id,
-          watchedSeconds: actualWatched,
-        }),
-      });
-      const body = await httpRes.json().catch(() => ({}));
+      const body = await completeLessonOnServer(actualWatched, totalDur);
       if (body?.success === false && body?.code === ANTI_SEEK_PROGRESS_CODE) {
         toast.error(body.message || ANTI_SEEK_PROGRESS_MESSAGE);
+        setCompleting(false);
+        return;
+      }
+      if (body?.success === false && body?.code === PREV_LESSON_REQUIRED_CODE) {
+        toast.error(body.message || 'Hoàn thành bài trước để mở bài này.');
         setCompleting(false);
         return;
       }
@@ -894,7 +914,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
       }
     } catch (e) { void 0 }
     setCompleting(false);
-  }, [currentLesson, selectedCourse, completing, toast]);
+  }, [currentLesson, selectedCourse, completing, toast, completeLessonOnServer]);
 
   // Handle lưu progress tạm thời
   const handleSaveProgress = useCallback((lessonId, watchedSeconds) => {
@@ -904,6 +924,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                   localStorage.getItem('admin_access_token');
                   
     const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+    const videoDuration = Math.floor(Number(playerApiRef.current?.getDuration?.()) || 0);
     csrfFetch(`${API_BASE}/training-lms/save-watch-progress`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -911,6 +932,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         lessonId: lessonId,
         courseId: selectedCourse._id || selectedCourse.id,
         watchedSeconds: watchedSeconds,
+        videoDuration,
       }),
     }).catch(e => void 0);
   }, [selectedCourse]);
@@ -1212,13 +1234,16 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
           <div className="bg-[#0b1018]">
             <div className="px-0 sm:px-4 pt-0 sm:pt-3 pb-0 sm:pb-2 flex justify-center w-full bg-black/40">
-              <div className="relative w-full rounded-none sm:rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80 h-[44dvh] sm:h-[50dvh] lg:h-[min(56dvh,620px)]">
+              <div className="relative w-full rounded-none sm:rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/80 h-[calc(44dvh+40px)] sm:h-[calc(50dvh+40px)] lg:h-[min(calc(56dvh+40px),660px)]">
                 <YouTubePlayerSecure
                   key={currentLesson?._id}
                   videoId={currentLesson?.videoUrl}
                   lessonId={currentLesson?._id}
                   courseId={selectedCourse?._id}
-                  duration={currentLesson?.duration}
+                  duration={
+                    currentLesson?.adminDurationSeconds
+                    || resolveEffectiveDuration(currentLesson?.duration, 0)
+                  }
                   initialWatchedSeconds={currentLesson?.watchedSeconds || 0}
                   onVideoEnded={handleVideoEnded}
                   onSaveProgress={handleSaveProgress}
@@ -1324,8 +1349,9 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                       <div
                         key={lesson._id}
                         onClick={() => lesson.isUnlocked && setCurrentLesson(lesson)}
-                        className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-all relative ${
-                          !lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
+                        title={!lesson.isUnlocked ? 'Hoàn thành bài trước để mở bài này' : undefined}
+                        className={`flex items-start gap-3 px-4 py-3.5 transition-all relative ${
+                          !lesson.isUnlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
                         } ${
                           isCurrent
                             ? 'bg-emerald-500/10 border-l-4 border-emerald-500'

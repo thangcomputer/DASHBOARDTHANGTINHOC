@@ -24,8 +24,10 @@ import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrande
 import {
   isLessonAntiSeekEnabled,
   requiredWatchSeconds,
+  resolveEffectiveDuration,
   ANTI_SEEK_PROGRESS_CODE,
   ANTI_SEEK_PROGRESS_MESSAGE,
+  PREV_LESSON_REQUIRED_CODE,
 } from '../utils/antiSeekPolicy';
 
 const MOCK_COURSES = [
@@ -158,6 +160,7 @@ const StudentVideoPlayer = ({
   lessonId,
   courseId,
   initialWatchedSeconds = 0,
+  adminDurationSeconds = 0,
   antiSeekEnabled = true,
   onSaveProgress,
   onVideoEnded,
@@ -200,8 +203,9 @@ const StudentVideoPlayer = ({
 
   const actualWatchedRef = useRef(bestInitial);
 
+  const effectiveDuration = resolveEffectiveDuration(adminDurationSeconds, totalDuration);
   const seekUnlocked = !antiSeekEnabled
-    || (totalDuration > 0 && displayWatched >= Math.ceil((totalDuration * 2) / 3) && displayWatched > 0);
+    || (effectiveDuration > 0 && displayWatched >= requiredWatchSeconds(effectiveDuration) && displayWatched > 0);
   seekUnlockedRef.current = seekUnlocked;
 
   // Chỉ reset overlay khi đổi bài — không bật lại nút Play khi parent cập nhật tiến độ
@@ -232,21 +236,21 @@ const StudentVideoPlayer = ({
     }
   }, [bestInitial]);
 
-  // ── Auto-Unlock khi đạt 2/3 ──────────────────────────────────────────
+  // ── Complete khi đủ threshold (server vẫn là SoT) ────────────────────
   useEffect(() => {
-    if (!totalDuration || !onEligibilityReached) return;
+    if (!effectiveDuration || !onEligibilityReached) return;
     if (eligibilitySentRef.current) return;
-    const reqSecs = Math.ceil(totalDuration * 2 / 3);
+    const reqSecs = requiredWatchSeconds(effectiveDuration);
     if (!antiSeekEnabled) {
       eligibilitySentRef.current = true;
-      onEligibilityReached(displayWatched || totalDuration, totalDuration);
+      onEligibilityReached(displayWatched || effectiveDuration, totalDuration || effectiveDuration);
       return;
     }
-    if (displayWatched >= reqSecs && displayWatched > 0) {
+    if (reqSecs > 0 && displayWatched >= reqSecs && displayWatched > 0) {
       eligibilitySentRef.current = true;
-      onEligibilityReached(displayWatched, totalDuration);
+      onEligibilityReached(displayWatched, totalDuration || effectiveDuration);
     }
-  }, [displayWatched, totalDuration, onEligibilityReached, antiSeekEnabled]);
+  }, [displayWatched, effectiveDuration, totalDuration, onEligibilityReached, antiSeekEnabled]);
 
   // ── Giám sát tab ẩn (không dùng window.blur — iframe YouTube fire blur khi rê/click) ──
   useEffect(() => {
@@ -399,11 +403,18 @@ const StudentVideoPlayer = ({
           return 0;
         }
       },
+      getDuration: () => {
+        try {
+          return Number(playerRef.current?.getDuration?.()) || Number(totalDuration) || 0;
+        } catch {
+          return Number(totalDuration) || 0;
+        }
+      },
     };
     return () => {
       playerApiRef.current = null;
     };
-  }, [playerApiRef, isReady, lessonId]);
+  }, [playerApiRef, isReady, lessonId, totalDuration]);
 
   const handleStateChange = useCallback((event) => {
     const state = event.data;
@@ -562,8 +573,9 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
   return (
     <div
       onClick={() => lesson.isUnlocked && onClick(lesson)}
+      title={!lesson.isUnlocked ? 'Hoàn thành bài trước để mở bài này' : undefined}
       className={`flex items-start gap-3 px-5 py-4 border-b border-slate-100 transition-all relative
-        ${!lesson.isUnlocked ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}
+        ${!lesson.isUnlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : lesson.isCompleted ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
       `}
     >
@@ -815,14 +827,21 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           (selectedCourse.chapters || [{ title: 'Danh mục', lessons: selectedCourse.lessons || selectedCourse.videos || [] }]).forEach((chap) => {
             (chap.lessons || []).forEach((l) => {
               const lId = l.id || l._id || `${courseId}-${list.length}`;
-              list.push({ ...l, chapterTitle: chap.title, isUnlocked: true, isCompleted: false, _id: lId });
+              // Offline fallback: chỉ mở bài 1 — không tin UI state để mở tuần tự
+              list.push({
+                ...l,
+                chapterTitle: chap.title,
+                isUnlocked: list.length === 0,
+                isCompleted: false,
+                _id: lId,
+              });
             });
           });
           setLessons(list);
           const chapters = {};
           list.forEach((l) => { chapters[l.chapterTitle || 'Danh mục'] = true; });
           setExpandedChapters(chapters);
-          setCurrentLesson(list[0]);
+          setCurrentLesson(list.find((l) => l.isUnlocked) || list[0]);
         }
       } catch {
         /* keep prior lessons */
@@ -880,20 +899,42 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
     }
   }, [courses, selectedCourse]);
 
-  // Auto-Unlock sự kiện khi đạt chuẩn 2/3 (Chạy ngầm, không nhảy video)
+  // Complete chỉ khi SERVER xác nhận — flush progress trước, gửi videoDuration để FE/BE cùng threshold
+  const completeLessonOnServer = useCallback(async (actualWatched, totalDur) => {
+    if (!currentLesson || !selectedCourse) return { success: false };
+    const lessonId = currentLesson._id || currentLesson.id;
+    const courseId = selectedCourse._id || selectedCourse.id;
+    const videoDuration = Math.floor(Number(totalDur) || Number(playerApiRef.current?.getDuration?.()) || 0);
+    const payload = {
+      lessonId,
+      courseId,
+      watchedSeconds: actualWatched,
+      videoDuration,
+    };
+    try {
+      await lmsApiFetch('/save-watch-progress', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch { /* ignore flush errors; complete still validates */ }
+
+    const res = await lmsApiFetch('/complete-lesson', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res;
+  }, [currentLesson, selectedCourse]);
+
   const handleEligibilityReached = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse) return;
     try {
-      const res = await lmsApiFetch('/complete-lesson', {
-        method: 'POST',
-        body: JSON.stringify({
-          lessonId: currentLesson._id || currentLesson.id,
-          courseId: selectedCourse._id || selectedCourse.id,
-          watchedSeconds: actualWatched,
-        }),
-      });
+      const res = await completeLessonOnServer(actualWatched, totalDur);
       if (res?.success === false && res?.code === ANTI_SEEK_PROGRESS_CODE) {
         toast.error(res.message || ANTI_SEEK_PROGRESS_MESSAGE);
+        return;
+      }
+      if (res?.success === false && res?.code === PREV_LESSON_REQUIRED_CODE) {
+        toast.error(res.message || 'Hoàn thành bài trước để mở bài này.');
         return;
       }
       if (res?.success === false) return;
@@ -904,14 +945,15 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         if (prog?.success && prog.data) setCourseProgressMap(prog.data);
       } catch { /* ignore */ }
     } catch (e) { /* ignore */ }
-  }, [currentLesson, selectedCourse, toast]);
+  }, [currentLesson, selectedCourse, toast, completeLessonOnServer]);
 
   // Video kết thúc
   const handleVideoEnded = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse || completing) return;
 
     const antiOn = isLessonAntiSeekEnabled(currentLesson);
-    const requiredSeconds = requiredWatchSeconds(totalDur || 0);
+    const effDur = resolveEffectiveDuration(currentLesson?.duration, totalDur);
+    const requiredSeconds = requiredWatchSeconds(effDur);
     if (antiOn && requiredSeconds > 0 && actualWatched < requiredSeconds) {
       toast.error(ANTI_SEEK_PROGRESS_MESSAGE);
       return;
@@ -919,16 +961,14 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
 
     setCompleting(true);
     try {
-      const res = await lmsApiFetch('/complete-lesson', {
-        method: 'POST',
-        body: JSON.stringify({
-          lessonId: currentLesson._id || currentLesson.id,
-          courseId: selectedCourse._id || selectedCourse.id,
-          watchedSeconds: actualWatched,
-        }),
-      });
+      const res = await completeLessonOnServer(actualWatched, totalDur);
       if (res?.success === false && res?.code === ANTI_SEEK_PROGRESS_CODE) {
         toast.error(res.message || ANTI_SEEK_PROGRESS_MESSAGE);
+        setCompleting(false);
+        return;
+      }
+      if (res?.success === false && res?.code === PREV_LESSON_REQUIRED_CODE) {
+        toast.error(res.message || 'Hoàn thành bài trước để mở bài này.');
         setCompleting(false);
         return;
       }
@@ -953,18 +993,19 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       } catch { /* ignore */ }
     } catch (e) { void 0 }
     setCompleting(false);
-  }, [currentLesson, selectedCourse, completing, toast]);
+  }, [currentLesson, selectedCourse, completing, toast, completeLessonOnServer]);
 
   // Handle lưu progress tạm thời
   const handleSaveProgress = useCallback((lessonId, watchedSeconds) => {
     if (!selectedCourse) return;
-    
+    const videoDuration = Math.floor(Number(playerApiRef.current?.getDuration?.()) || 0);
     lmsApiFetch('/save-watch-progress', {
       method: 'POST',
       body: JSON.stringify({
         lessonId: lessonId,
         courseId: selectedCourse._id || selectedCourse.id,
         watchedSeconds: watchedSeconds,
+        videoDuration,
       }),
     }).catch(e => void 0);
   }, [selectedCourse]);
@@ -1526,7 +1567,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           <div className="bg-[#0b1018]">
             <div className="px-0 sm:px-4 pt-0 sm:pt-3 pb-0 sm:pb-2 flex justify-center w-full bg-black/40">
               <div
-                className="relative overflow-hidden shadow-2xl shadow-black/80 w-full rounded-none sm:rounded-2xl bg-black h-[44dvh] sm:h-[50dvh] lg:h-[min(56dvh,620px)]"
+                className="relative overflow-hidden shadow-2xl shadow-black/80 w-full rounded-none sm:rounded-2xl bg-black h-[calc(44dvh+40px)] sm:h-[calc(50dvh+40px)] lg:h-[min(calc(56dvh+40px),660px)]"
               >
                 <StudentVideoPlayer
                   key={currentLesson?._id}
@@ -1534,6 +1575,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                   lessonId={currentLesson?._id}
                   courseId={selectedCourse?._id || selectedCourse?.id}
                   initialWatchedSeconds={currentLesson?.watchedSeconds || 0}
+                  adminDurationSeconds={
+                    currentLesson?.adminDurationSeconds
+                    || resolveEffectiveDuration(currentLesson?.duration, 0)
+                  }
                   antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
                   onSaveProgress={handleSaveProgress}
                   onVideoEnded={handleVideoEnded}
@@ -1638,7 +1683,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                           if (!lesson.isUnlocked) return;
                           setCurrentLesson(lesson);
                         }}
-                        className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-all relative ${!lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
+                        title={!lesson.isUnlocked ? 'Hoàn thành bài trước để mở bài này' : undefined}
+                        className={`flex items-start gap-3 px-4 py-3.5 transition-all relative ${!lesson.isUnlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
                           } ${isCurrent
                             ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
                             : 'border-l-4 border-transparent hover:bg-white/[0.04]'

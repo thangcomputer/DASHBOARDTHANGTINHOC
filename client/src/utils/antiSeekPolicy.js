@@ -1,6 +1,5 @@
 /**
- * Anti-seek policy — SoT: lesson.antiSeek
- * Must stay in sync with utils/antiSeekPolicy.js (server).
+ * Anti-seek / duration policy — keep in sync with utils/antiSeekPolicy.js
  */
 
 export function isLessonAntiSeekEnabled(lesson) {
@@ -25,6 +24,17 @@ export function requiredWatchSeconds(durationSeconds) {
   return Math.ceil((d * 2) / 3);
 }
 
+export function resolveEffectiveDuration(adminDuration, reportedDuration) {
+  const admin = parseLessonDurationSeconds(adminDuration);
+  const reported = Math.max(0, Math.floor(Number(reportedDuration) || 0));
+  if (reported <= 0 && admin <= 0) return 0;
+  if (reported <= 0) return admin;
+  if (admin <= 0) return reported;
+  if (reported < admin * 0.45) return admin;
+  return reported;
+}
+
 export const ANTI_SEEK_PROGRESS_CODE = 'ANTI_SEEK_PROGRESS_REQUIRED';
 export const ANTI_SEEK_PROGRESS_MESSAGE =
   'Bạn chưa xem đủ thời lượng yêu cầu. Hãy tiếp tục xem bài học.';
+export const PREV_LESSON_REQUIRED_CODE = 'PREVIOUS_LESSON_REQUIRED';
