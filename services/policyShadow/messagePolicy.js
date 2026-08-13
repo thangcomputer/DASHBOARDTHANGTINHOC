@@ -25,6 +25,7 @@ const ACTIONS = new Set([
   'group_delete',
   'unread',
   'broadcast',
+  'purge_orphans',
 ]);
 
 function buildSubject({ user, actorDoc, userBranchId }) {
@@ -258,6 +259,16 @@ function evaluateBroadcast(subject) {
   return { decision: 'DENY', reason: 'broadcast_role_denied', statusHint: 403 };
 }
 
+function evaluatePurgeOrphans(subject) {
+  if (!subject?.id) {
+    return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };
+  }
+  if (isAdminLevelAccount(subject) || subject.role === 'admin') {
+    return { decision: 'ALLOW', reason: 'admin_purge_orphans', statusHint: 200 };
+  }
+  return { decision: 'DENY', reason: 'purge_orphans_denied', statusHint: 403 };
+}
+
 async function evaluateLegacyMessage(subject, action, ctx = {}) {
   if (!ACTIONS.has(action)) {
     return { decision: 'DENY', reason: 'unknown_action', statusHint: 403 };
@@ -293,6 +304,8 @@ async function evaluateLegacyMessage(subject, action, ctx = {}) {
       return evaluateGroupDelete(subject, ctx);
     case 'broadcast':
       return evaluateBroadcast(subject);
+    case 'purge_orphans':
+      return evaluatePurgeOrphans(subject);
     default:
       return { decision: 'DENY', reason: 'unknown_action', statusHint: 403 };
   }

@@ -359,6 +359,14 @@ export function MessagesProvider({ user, children }) {
         const otherUserId = String(m.senderId) === sId ? m.receiverId : m.senderId;
         const otherName = String(m.senderId) === sId ? m.receiverName : m.senderName;
         const otherRole = String(m.senderId) === sId ? m.receiverRole : m.senderRole;
+        const oid = String(otherUserId || '');
+        if (oid && oid !== 'admin' && !oid.startsWith('ALL_') && !oid.startsWith('group_')) {
+          if ((students.length + teachers.length) > 0) {
+            const alive = students.some((s) => String(s.id || s._id) === oid)
+              || teachers.some((t) => String(t.id || t._id) === oid);
+            if (!alive) return;
+          }
+        }
         convMap[m.convId] = {
           id: m.convId,
           user: {

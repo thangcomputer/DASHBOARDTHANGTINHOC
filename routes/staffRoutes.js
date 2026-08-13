@@ -11,6 +11,8 @@ const { policyShadowStaff } = require('../middleware/policyShadowStaff');
 const { staffCutoverGate } = require('../middleware/staffCutoverGate');
 const { HIGH_ADMIN_DEFAULT_PERMISSIONS, SUPPORT_DEFAULT_PERMISSIONS } = require('../constants/permissions');
 const { generateTeacherCode } = require('../services/businessCodeService');
+const { purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
+const logger = require('../config/logger');
 
 const router = express.Router();
 /**
@@ -258,7 +260,7 @@ router.delete('/:id', guard('delete'), async (req, res) => {
     if (req.params.id === req.user.id)
       return res.status(400).json({ success: false, message: 'Không thể tự xóa chính mình' });
 
-    const target = await Teacher.findById(req.params.id).select('adminRole').lean();
+    const target = await Teacher.findById(req.params.id).select('adminRole name').lean();
     if (!target) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
 
     // Chỉ Admin Super mới được xóa SUPER_ADMIN. Chỉ SUPER_ADMIN trở lên mới xóa HIGH_ADMIN.
@@ -275,8 +277,20 @@ router.delete('/:id', guard('delete'), async (req, res) => {
       });
     }
 
+    const cascade = await purgeTeacherSideEffects(req.params.id, {
+      teacherName: target.name || '',
+    });
     await Teacher.findByIdAndDelete(req.params.id);
-    return res.json({ success: true, message: 'Đã xóa tài khoản' });
+    logger.info('[STAFF] deleted with cascade', {
+      id: req.params.id,
+      messages: cascade.messages,
+      schedules: cascade.schedules,
+    });
+    return res.json({
+      success: true,
+      message: 'Đã xóa tài khoản',
+      cascade,
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

@@ -27,11 +27,42 @@ const { expandConversationIdAliases } = require('../services/messagingPairing');
 const { sanitizeMessages, sanitizeMessageDoc } = require('../utils/messageFileRetention');
 const { enrichMessageIdentities } = require('../services/messagingIdentity');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
+const { purgeOrphanMessages } = require('../services/userCascadeCleanup');
 const isStaffAccount = (u = {}) => u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';
 const isSuperAdminAccount = (u = {}) => u.id === 'admin' || u.adminRole === 'SUPER_ADMIN';
 const isHighAdminAccount = (u = {}) => u.adminRole === 'HIGH_ADMIN';
 /** SUPER_ADMIN + HIGH_ADMIN — chia sẻ admin mailbox legacy (không gồm STAFF/SUPPORT) */
 const isAdminLevelAccount = (u = {}) => isSuperAdminAccount(u) || isHighAdminAccount(u);
+
+function isSpecialPeerId(id) {
+  const s = String(id || '');
+  return !s || s === 'admin' || s.startsWith('ALL_') || s.startsWith('group_');
+}
+
+async function filterAliveConversationPeers(conversations) {
+  const peerIds = [...new Set(
+    (conversations || [])
+      .map((c) => String(c?.otherUser?.id || ''))
+      .filter((id) => id && !isSpecialPeerId(id)),
+  )];
+  if (peerIds.length === 0) return conversations || [];
+
+  const objectIds = peerIds.filter((id) => require('mongoose').Types.ObjectId.isValid(id));
+  const [teachers, students] = await Promise.all([
+    Teacher.find({ _id: { $in: objectIds } }).select('_id').lean(),
+    Student.find({ _id: { $in: objectIds } }).select('_id').lean(),
+  ]);
+  const alive = new Set([
+    ...teachers.map((t) => String(t._id)),
+    ...students.map((s) => String(s._id)),
+  ]);
+
+  return (conversations || []).filter((c) => {
+    const id = String(c?.otherUser?.id || '');
+    if (isSpecialPeerId(id)) return true;
+    return alive.has(id);
+  });
+}
 
 function toClientMessage(doc) {
   const plain = doc?.toObject ? doc.toObject() : { ...(doc || {}) };
@@ -138,8 +169,27 @@ router.get('/conversations/:userId', messagesGuard('conversations'), async (req,
       };
     });
 
-    res.json({ success: true, data: conversations });
+    const aliveConversations = await filterAliveConversationPeers(conversations);
+    res.json({ success: true, data: aliveConversations });
   } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── Dọn tin nhắn orphan (peer đã xóa tài khoản) — SUPER/HIGH ──
+router.post('/purge-orphans', messagesGuard('purge_orphans'), async (req, res) => {
+  try {
+    if (!isAdminLevelAccount(req.user) && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Không có quyền dọn tin nhắn orphan' });
+    }
+    const result = await purgeOrphanMessages();
+    res.json({
+      success: true,
+      message: `Đã xóa ${result.deletedMessages || 0} tin nhắn orphan`,
+      data: result,
+    });
+  } catch (err) {
+    logger.error('[MESSAGES] purge-orphans:', err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 });

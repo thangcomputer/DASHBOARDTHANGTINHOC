@@ -199,7 +199,7 @@ async function resolveCanonicalPeer(receiverId, clientReceiverRoleHint = '') {
     };
   }
 
-  return { ok: false, message: 'Khong tim thay lien he' };
+  return { ok: false, message: 'Không tìm thấy liên hệ' };
 }
 
 async function assertPairScope(sender, senderProduct, peer, peerProduct) {

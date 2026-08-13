@@ -1047,6 +1047,10 @@ export const messagesAPI = {
     const res = await apiFetch('/messages/hidden');
     return res.json();
   },
+  purgeOrphans: async () => {
+    const res = await apiFetch('/messages/purge-orphans', { method: 'POST' });
+    return res.json();
+  },
   hideConversation: async (conversationId) => {
     const res = await apiFetch(`/messages/hide/${conversationId}`, { method: 'POST' });
     return res.json();

@@ -13,7 +13,7 @@ import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { displayFileName } from '../utils/validators';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
-import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE } from '../lib/messagingIdentity';
+import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE, isAliveMessagingPeer } from '../lib/messagingIdentity';
 import { mergeConversationsById } from '../lib/conversationList';
 import { getMessagingRole } from '../lib/messagingRoles';
 import {
@@ -167,7 +167,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, groups,
     teachers, students, staffs, toggleMessageReaction: ctxToggleReaction,
-    softDeleteMessage: ctxDeleteMessage
+    softDeleteMessage: ctxDeleteMessage, currentUser
   } = useData();
 
   const dataContextConvs = getConversations(currentUserId);
@@ -231,6 +231,28 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     })();
   }, []);
 
+  // Dọn tin nhắn orphan trên server (user đã xóa) rồi sync lại hộp thư
+  useEffect(() => {
+    const elevated = currentUserRole === 'admin'
+      || currentUser?.adminRole === 'SUPER_ADMIN'
+      || currentUser?.adminRole === 'HIGH_ADMIN';
+    if (!elevated || !currentUserId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await messagesAPI.purgeOrphans();
+        if (cancelled) return;
+        if (res?.success && Number(res?.data?.deletedMessages || 0) > 0) {
+          await syncMessages?.(currentUserId);
+          toast.info(`Đã dọn ${res.data.deletedMessages} tin nhắn từ tài khoản đã xóa`);
+        }
+      } catch {
+        /* ignore — client filter vẫn ẩn ghost */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUserId, currentUserRole]);
+
   const refreshHiddenList = useCallback(async () => {
     try {
       const hiddenRes = await messagesAPI.getHiddenConversations();
@@ -280,6 +302,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
+
+  // Đóng hội thoại nếu peer đã bị xóa khỏi hệ thống
+  useEffect(() => {
+    if (!activeConv || activeConv.isGroup) return;
+    const peerId = activeConv.user?.id;
+    const hasDirectoryData = (students?.length || 0) + (teachers?.length || 0) + (staffs?.length || 0) > 0;
+    if (!hasDirectoryData || !peerId) return;
+    if (!isAliveMessagingPeer(peerId, { students, teachers, staffs })) {
+      setActiveConv(null);
+      setMessages([]);
+    }
+  }, [activeConv, students, teachers, staffs]);
   const [pendingImage, setPendingImage] = useState(null);
 
   const conversations = useMemo(() => {

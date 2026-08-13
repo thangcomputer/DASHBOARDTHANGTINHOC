@@ -386,7 +386,7 @@ test('Wave6.9 static: routes keep legacy + shadow; CQRS OFF; no global Policy', 
   for (const a of [
     'contacts', 'conversations', 'search', 'hidden', 'get_conversation', 'sync',
     'upload', 'send', 'hide', 'read', 'reaction', 'recall', 'soft_delete',
-    'group_create', 'group_list', 'group_delete', 'unread', 'broadcast',
+    'group_create', 'group_list', 'group_delete', 'unread', 'broadcast', 'purge_orphans',
   ]) {
     assert.ok(
       src.includes(`messagesGuard('${a}')`) || src.includes(`policyShadowMessage('${a}')`),

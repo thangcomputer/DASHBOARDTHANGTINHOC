@@ -168,6 +168,25 @@ export function resolveMessagingActor(
   });
 }
 
+/** System / broadcast / group peer ids — never treated as deleted users. */
+export function isSpecialMessagingPeerId(id) {
+  const s = String(id || '');
+  return !s || s === 'admin' || s.startsWith('ALL_') || s.startsWith('group_');
+}
+
+/**
+ * True when peer still exists in live directories (Student / Teacher / Staff).
+ * Used to hide ghost DMs after account delete.
+ */
+export function isAliveMessagingPeer(peerId, { students = [], teachers = [], staffs = [] } = {}) {
+  const id = String(peerId || '');
+  if (isSpecialMessagingPeerId(id)) return true;
+  if (students.some((s) => String(s?.id || s?._id) === id)) return true;
+  if (teachers.some((t) => String(t?.id || t?._id) === id)) return true;
+  if (staffs.some((st) => String(st?.id || st?._id) === id)) return true;
+  return false;
+}
+
 /**
  * Canonical FE message shape — used for HTTP, socket, sync, optimistic merge.
  * Preserves senderId/senderRole/conversationId; prefers server sender{} identity.
