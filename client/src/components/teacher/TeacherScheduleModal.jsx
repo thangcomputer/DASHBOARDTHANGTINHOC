@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import CmsSelect from '../ui/CmsSelect';
-import { X, Save, Calendar } from 'lucide-react';
+import { X, Calendar } from 'lucide-react';
 import {
   isEndTimeAfterStart, normalizeScheduleDate, normalizeTimeHHmm,
   getCurrentTimeHHmm, endTimeFromStart, findStudentScheduleConflict, formatScheduleConflictMessage,
 } from '../../utils/scheduleTime';
-import { showGlossyAlert } from './TeacherShared';
+import { getStudentScheduleGate, MAX_STUDENT_SESSIONS_PER_DAY } from '../../utils/schedulingLimits';
 
 export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSubmit }) => {
   const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -18,6 +18,7 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
   const findStudentByKey = (key) => students.find((s) => studentKey(s) === String(key));
 
   const isEdit = Boolean(schedule?.id || schedule?._id);
+  const excludeId = schedule?.id || schedule?._id;
   const initDate = normalizeScheduleDate(schedule?.date);
   const nowStart = getCurrentTimeHHmm();
   const initStart = isEdit ? normalizeTimeHHmm(schedule?.startTime, nowStart) : nowStart;
@@ -43,6 +44,14 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
       course: matched?.course || initCourse || students[0]?.course || '',
     };
   });
+
+  const selectedStudent = findStudentByKey(form.enrollmentKey)
+    || students.find((s) => String(s.id || s._id) === String(form.studentId));
+
+  const gate = useMemo(
+    () => getStudentScheduleGate(selectedStudent, allSchedules, form.date, isEdit ? excludeId : null),
+    [selectedStudent, allSchedules, form.date, isEdit, excludeId],
+  );
 
   const applyStartTime = (raw) => {
     const start = normalizeTimeHHmm(raw, getCurrentTimeHHmm());
@@ -79,6 +88,10 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
       setFormError('Vui lòng chọn học viên');
       return;
     }
+    if (!gate.canSchedule) {
+      setFormError(gate.reason || 'Không thể xếp lịch cho học viên này');
+      return;
+    }
     if (!form.date?.trim()) {
       setFormError('Vui lòng chọn ngày học');
       return;
@@ -87,7 +100,6 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
       setFormError('Vui lòng chọn giờ bắt đầu');
       return;
     }
-    // Mỗi buổi cố định 1 giờ 30 phút
     const startTime = normalizeTimeHHmm(form.startTime);
     const endTime = endTimeFromStart(startTime);
     if (!isEndTimeAfterStart(startTime, endTime)) {
@@ -121,14 +133,39 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chọn học viên</label>
             <CmsSelect name="enrollmentKey" value={form.enrollmentKey} onChange={handleChange} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none">
-              {students.map(s => {
+              {students.map((s) => {
                 const key = studentKey(s);
                 const sid = String(s.id || s._id || '');
                 const displayName = (s.name && !/^\d{5,}$/.test(s.name)) ? s.name : (s.email || s.phone || `HV-${sid.slice(-4)}`);
-                return <option key={key} value={key}>{displayName} ({s.course})</option>;
+                const g = getStudentScheduleGate(s, allSchedules, form.date, isEdit ? excludeId : null);
+                const suffix = g.canSchedule
+                  ? `${g.progressLabel} · còn ${g.remaining}`
+                  : g.reason;
+                return (
+                  <option key={key} value={key} disabled={!g.canSchedule && !isEdit}>
+                    {displayName} ({s.course}) — {suffix}
+                  </option>
+                );
               })}
             </CmsSelect>
           </div>
+
+          {selectedStudent && (
+            <div className={`rounded-2xl border px-4 py-3 text-sm ${gate.canSchedule ? 'bg-slate-50 border-slate-100' : 'bg-amber-50 border-amber-100'}`}>
+              <p className="font-bold text-slate-800">{selectedStudent.name || 'Học viên'}</p>
+              <p className="text-slate-500 mt-0.5">Khóa: <span className="font-semibold text-blue-700">{gate.course || '—'}</span></p>
+              <p className="text-slate-600 mt-1">Tiến độ: <span className="font-black">{gate.progressLabel}</span>
+                {gate.remaining > 0 ? <> · Còn <span className="font-black text-emerald-700">{gate.remaining}</span> buổi</> : null}
+              </p>
+              <p className="text-slate-600">Hôm nay: <span className="font-black">{gate.todayLabel}</span>
+                {' '}(tối đa {MAX_STUDENT_SESSIONS_PER_DAY} ca/HV)
+              </p>
+              {!gate.canSchedule && (
+                <p className="text-amber-800 font-bold text-xs mt-2">{gate.reason}</p>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Ngày học (Ngày / Tháng / Năm)</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
@@ -167,7 +204,8 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
                 value={form.startTime}
                 onChange={handleChange}
                 onInput={handleChange}
-                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none"
+                disabled={!gate.canSchedule && !isEdit}
+                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none disabled:opacity-50"
               />
             </div>
             <div>
@@ -194,7 +232,12 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
           {formError && (
             <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{formError}</p>
           )}
-          <button type="button" onClick={handleSubmit} className="w-full bg-red-600 py-4 rounded-2xl text-white font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!gate.canSchedule && !isEdit}
+            className="w-full bg-red-600 py-4 rounded-2xl text-white font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+          >
             {(schedule?.id || schedule?._id) ? 'CẬP NHẬT LỊCH' : 'XẾP LỊCH NGAY'}
           </button>
         </div>
@@ -202,7 +245,5 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
     </div>
   );
 };
-
-// ─── STUDENT CARD ─────────────────────────────────────────────────────────
 
 export default ScheduleModal;

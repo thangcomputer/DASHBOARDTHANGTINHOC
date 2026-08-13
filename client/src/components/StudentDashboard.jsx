@@ -477,16 +477,19 @@ const StudentDashboard = ({ onNavigate }) => {
               timestamp: ts
            });
          }
-       } else if (kind === 'past_pending') {
+       } else if (kind === 'past_pending' || kind === 'pending_attendance' || kind === 'overdue_attendance') {
          const key = `past_${dateStr}_${s.startTime || sIdx}`;
          if (!seenKeys.has(key)) {
            seenKeys.add(key);
+           const pendingNote = kind === 'overdue_attendance'
+             ? `Quá hạn điểm danh — chờ quản trị viên điểm danh bù (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`
+             : `Chưa điểm danh — buổi đã kết thúc (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`;
            logs.push({
-              type: 'past_pending',
+              type: kind === 'overdue_attendance' ? 'overdue_attendance' : 'pending_attendance',
               displayKind: kind,
               date: dateStr,
               time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
-              note: s.title || s.subject || `Lịch đã qua — chờ giảng viên điểm danh (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`,
+              note: s.title || s.subject || pendingNote,
               grade: null,
               index: null,
               timestamp: ts

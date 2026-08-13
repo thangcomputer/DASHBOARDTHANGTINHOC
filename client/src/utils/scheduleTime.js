@@ -136,18 +136,21 @@ export function isSchedulePastEnd(schedule, now = new Date()) {
   return now.getTime() > endAt.getTime();
 }
 
-/** Nhãn hiển thị lịch (không ghi DB) */
+/** Nhãn hiển thị lịch (không ghi DB) — aligned with attendance state machine */
 export const SCHEDULE_DISPLAY = {
-  completed: { kind: 'completed', label: 'ĐÃ HỌC', shortLabel: 'Hoàn thành' },
-  cancelled: { kind: 'cancelled', label: 'ĐÃ HỦY', shortLabel: 'Hủy' },
-  ongoing: { kind: 'ongoing', label: 'ĐANG DIỄN RA', shortLabel: 'Đang học' },
+  completed: { kind: 'completed', label: 'ĐÃ HỌC', shortLabel: 'Đã học' },
+  cancelled: { kind: 'cancelled', label: 'ĐÃ HỦY', shortLabel: 'Đã hủy' },
+  ongoing: { kind: 'ongoing', label: 'ĐANG DIỄN RA', shortLabel: 'Đang diễn ra' },
   upcoming: { kind: 'upcoming', label: 'SẮP TỚI', shortLabel: 'Sắp tới' },
-  past_pending: { kind: 'past_pending', label: 'ĐÃ QUA', shortLabel: 'Đã qua' },
+  pending_attendance: { kind: 'pending_attendance', label: 'CHƯA ĐIỂM DANH', shortLabel: 'Chưa điểm danh' },
+  overdue_attendance: { kind: 'overdue_attendance', label: 'QUÁ HẠN ĐIỂM DANH', shortLabel: 'Quá hạn điểm danh' },
+  past_pending: { kind: 'past_pending', label: 'CHƯA ĐIỂM DANH', shortLabel: 'Chưa điểm danh' },
 };
 
+const ATTENDANCE_GRACE_MS = 60 * 60 * 1000; // sync with services/attendanceWindow.js default
+
 /**
- * Phân loại hiển thị lịch theo status + thời gian thực.
- * completed / cancelled giữ nguyên; scheduled quá giờ → past_pending.
+ * Phân loại hiển thị lịch theo status + thời gian thực + grace 60'.
  */
 export function getScheduleDisplayKind(schedule, now = new Date()) {
   if (!schedule) return 'upcoming';
@@ -155,7 +158,23 @@ export function getScheduleDisplayKind(schedule, now = new Date()) {
   if (status === 'completed') return 'completed';
   if (status === 'cancelled' || status === 'no_show') return 'cancelled';
   if (isScheduleOngoingNow(schedule, now)) return 'ongoing';
-  if (isSchedulePastEnd(schedule, now)) return 'past_pending';
+  if (isSchedulePastEnd(schedule, now)) {
+    // Grace window → pending; after grace → overdue
+    try {
+      const dateStr = normalizeScheduleDate(schedule.date);
+      const parts = String(dateStr || '').split('-').map((n) => parseInt(n, 10));
+      if (parts.length === 3 && !parts.some((n) => !Number.isFinite(n))) {
+        const [y, m, d] = parts;
+        const endMins = parseTimeToMinutes(schedule.endTime)
+          ?? ((parseTimeToMinutes(schedule.startTime) ?? 0) + SESSION_DURATION_MINS);
+        const endAt = new Date(y, m - 1, d, Math.floor(endMins / 60), endMins % 60, 0, 0);
+        if (now.getTime() <= endAt.getTime() + ATTENDANCE_GRACE_MS) {
+          return 'pending_attendance';
+        }
+      }
+    } catch { /* fall through */ }
+    return 'overdue_attendance';
+  }
   return 'upcoming';
 }
 

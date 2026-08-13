@@ -460,6 +460,26 @@ router.get('/teacher/:teacherId', [authMiddleware, ...schedulesGuard('get_teache
       .populate('studentId', 'name course zalo')
       .sort({ date: 1, startTime: 1 });
 
+    // Overdue attendance → idempotent admin notify (non-blocking)
+    const io = req.app.get('io');
+    if (io) {
+      const { maybeNotifyOverdueAttendance, resolveAttendanceState } = (() => {
+        const svc = require('../services/attendanceService');
+        const win = require('../services/attendanceWindow');
+        return {
+          maybeNotifyOverdueAttendance: svc.maybeNotifyOverdueAttendance,
+          resolveAttendanceState: win.resolveAttendanceState,
+        };
+      })();
+      Promise.all(
+        schedules
+          .filter((s) => String(s.status) === 'scheduled' && !s.reminderSent)
+          .filter((s) => resolveAttendanceState(s).state === 'OVERDUE_ATTENDANCE')
+          .slice(0, 20)
+          .map((s) => maybeNotifyOverdueAttendance(io, s).catch(() => null)),
+      ).catch(() => null);
+    }
+
     res.json({ success: true, count: schedules.length, data: schedules });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -569,32 +589,57 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       return res.status(400).json({ success: false, message: timeErr });
     }
 
-    const studentClash = await findStudentScheduleClash({
-      studentId, date, startTime, endTime: resolvedEndTime,
-    });
-    if (studentClash) {
-      return res.status(409).json({ success: false, message: formatStudentClashMessage(studentClash) });
-    }
-
-    // ✅ ARCHITECTURAL UPGRADE: Anti-Clash Logic (Chống trùng lịch Giảng viên)
-    const existingClash = await Schedule.findOne({
-      teacherId,
-      date: new Date(date),
-      startTime,
-      status: { $ne: 'cancelled' }
-    });
-    
-    if (existingClash) {
-      return res.status(409).json({ 
-        success: false, 
-        message: `TRÙNG LỊCH: Giảng viên đã có lịch dạy vào ${startTime} ngày ${new Date(date).toLocaleDateString('vi-VN')} (Học viên: ${existingClash.studentName}).` 
-      });
+    // Shared SoT: enrollment session cap + student daily limit + teacher time overlap
+    {
+      const {
+        validateScheduleCreate,
+        sendSchedulingError,
+      } = require('../services/schedulingValidation');
+      try {
+        await validateScheduleCreate({
+          studentId,
+          teacherId,
+          courseName: courseFinal,
+          date,
+          startTime,
+          endTime: resolvedEndTime,
+        });
+      } catch (valErr) {
+        if (valErr.code) return sendSchedulingError(res, valErr);
+        throw valErr;
+      }
     }
 
     // ✅ COOLDOWN 12H: Chống điểm danh trùng lặp giữa Admin và Giảng viên
     // Chỉ áp dụng khi tạo schedule với status = 'completed' (tức là đang điểm danh)
     const incomingStatus = status || 'scheduled';
     if (incomingStatus === 'completed') {
+      // Server-time attendance window (teachers cannot bypass after grace)
+      const { assertAttendanceAllowed } = require('../services/attendanceWindow');
+      const lateReason = String(req.body?.lateReason || '').trim();
+      try {
+        if (String(req.user.role || '').toLowerCase() === 'teacher') {
+          assertAttendanceAllowed(
+            {
+              date,
+              startTime,
+              endTime: resolvedEndTime,
+              status: 'scheduled',
+            },
+            { lateReason },
+          );
+        }
+      } catch (winErr) {
+        if (winErr.code) {
+          return res.status(winErr.status || 409).json({
+            success: false,
+            code: winErr.code,
+            message: winErr.message,
+          });
+        }
+        throw winErr;
+      }
+
       const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
       const lastAttendance = await Schedule.findOne({
         studentId,
@@ -632,7 +677,13 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       startTime, endTime: resolvedEndTime,
       course: courseFinal, 
       linkHoc: linkHoc || '',
-      note: note || topic || '',
+      note: (() => {
+        if (incomingStatus === 'completed') {
+          const late = String(req.body?.lateReason || '').trim();
+          if (late) return `[LATE] ${late}`;
+        }
+        return note || topic || '';
+      })(),
       status: status || 'scheduled',
       is_paid_to_teacher: finalPaidToTeacher,
       paymentStatus: paymentStatus,
@@ -760,7 +811,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     if (!isStaffSide && !isStudent) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền chỉnh sửa lịch học' });
     }
-    const { status, note, linkHoc, startTime, endTime, date, topic } = req.body;
+    const { status, note, linkHoc, startTime, endTime, date, topic, lateReason } = req.body;
 
     const schedule = await Schedule.findById(req.params.scheduleId);
     if (!schedule) {
@@ -770,6 +821,97 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     // Teacher chỉ sửa lịch của mình
     if (role === 'teacher' && String(schedule.teacherId) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: 'Bạn chỉ được chỉnh sửa lịch của chính mình' });
+    }
+
+    // ── Canonical attendance completion (teacher window / admin makeup) ──
+    if (status === 'completed' && schedule.status !== 'completed') {
+      try {
+        const { completeScheduleAttendance } = require('../services/attendanceService');
+        const ioAttend = req.app.get('io');
+        const result = await completeScheduleAttendance({
+          schedule,
+          actor: {
+            id: req.user.id || req.user._id,
+            role: req.user.role,
+            name: req.user.name,
+          },
+          lateReason: lateReason || note,
+          note: note !== undefined ? note : undefined,
+          io: ioAttend,
+          forceAdminMakeup: Boolean(req.body.adminMakeup || req.body.makeup),
+        });
+
+        if (ioAttend && result.schedule?.studentId) {
+          notifyAttendanceTaken(ioAttend, {
+            studentId: result.schedule.studentId._id || result.schedule.studentId,
+            studentName: result.schedule.studentName || result.schedule.studentId?.name,
+            teacherName: result.schedule.teacherName || req.user?.name,
+            course: result.schedule.course,
+            date: result.schedule.date,
+          }).catch((e) => logger.warn('[SCHEDULE] attendance notify:', e.message));
+
+          checkAndUnlockExam(
+            String(result.schedule.studentId._id || result.schedule.studentId),
+            ioAttend,
+            result.schedule.course,
+          ).catch((e) => logger.warn('[SCHEDULE] unlock:', e.message));
+
+          emitScheduleEvent(ioAttend, {
+            branchId: result.schedule.branchId,
+            teacherId: result.schedule.teacherId,
+            studentId: result.schedule.studentId,
+          }, 'schedule:updated', result.schedule);
+
+          emitScheduleEvent(ioAttend, {
+            branchId: result.schedule.branchId,
+            teacherId: result.schedule.teacherId,
+            studentId: result.schedule.studentId,
+          }, 'attendance:locked', {
+            studentId: String(result.schedule.studentId._id || result.schedule.studentId),
+            course: result.schedule.course,
+            can_check_in: false,
+            meta: result.meta,
+          });
+        }
+
+        if (result.student?.teacher_payment_status === 'PAID_IN_ADVANCE') {
+          await Schedule.findByIdAndUpdate(result.schedule._id, {
+            is_paid_to_teacher: true,
+            paymentStatus: 'paid',
+          });
+        }
+
+        if (ioAttend && result.student) {
+          emitDataRefresh(ioAttend, { type: 'student', id: result.student._id }, {
+            branchId: result.student.branchId,
+            userIds: [result.schedule.teacherId, result.student._id].filter(Boolean),
+          });
+        }
+
+        return res.json({
+          success: true,
+          data: result.schedule,
+          meta: result.meta,
+        });
+      } catch (attErr) {
+        if (attErr.code) {
+          return res.status(attErr.status || 409).json({
+            success: false,
+            code: attErr.code,
+            message: attErr.message,
+          });
+        }
+        throw attErr;
+      }
+    }
+
+    if (status === 'completed' && schedule.status === 'completed') {
+      return res.status(409).json({
+        success: false,
+        code: 'ATTENDANCE_ALREADY_COMPLETED',
+        message: 'Buổi học đã được điểm danh.',
+        data: schedule,
+      });
     }
 
     const effectiveStart = startTime || schedule.startTime;
@@ -784,16 +926,24 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     }
 
     const timeFieldsChanging = Boolean(startTime || endTime !== undefined || date);
-    if (timeFieldsChanging) {
-      const studentClash = await findStudentScheduleClash({
-        studentId: schedule.studentId,
-        date: effectiveDate,
-        startTime: effectiveStart,
-        endTime: effectiveEnd,
-        excludeScheduleId: schedule._id,
-      });
-      if (studentClash) {
-        return res.status(409).json({ success: false, message: formatStudentClashMessage(studentClash) });
+    if (timeFieldsChanging && isStaffSide) {
+      const {
+        validateScheduleReschedule,
+        sendSchedulingError,
+      } = require('../services/schedulingValidation');
+      try {
+        await validateScheduleReschedule({
+          studentId: schedule.studentId,
+          teacherId: schedule.teacherId,
+          courseName: schedule.course,
+          date: effectiveDate,
+          startTime: effectiveStart,
+          endTime: effectiveEnd,
+          excludeScheduleId: schedule._id,
+        });
+      } catch (valErr) {
+        if (valErr.code) return sendSchedulingError(res, valErr);
+        throw valErr;
       }
     }
 
@@ -827,7 +977,11 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     }
     if (date)      updates.date      = new Date(date);
     const noteVal = note !== undefined ? note : topic;
-    if (noteVal !== undefined) updates.note = String(noteVal).trim();
+    if (req.body._lateNote) {
+      updates.note = req.body._lateNote;
+    } else if (noteVal !== undefined) {
+      updates.note = String(noteVal).trim();
+    }
     if ('studentNote' in req.body) {
       updates.studentNote = req.body.studentNote;
       updates.hasUnreadStudentNote = true; // Bật cờ có tin nhắn mới cho Giảng viên

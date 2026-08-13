@@ -33,10 +33,22 @@ const STATUS_COLORS = {
     label: '● Đang diễn ra',
   },
   past_pending: {
-    cell: 'bg-slate-50 border-slate-200 text-slate-600',
-    badge: 'bg-slate-200 text-slate-700 border-slate-300',
-    dot: 'bg-slate-400',
-    label: '● Đã qua',
+    cell: 'bg-orange-50 border-orange-200 text-orange-700',
+    badge: 'bg-orange-100 text-orange-700 border-orange-200',
+    dot: 'bg-orange-500',
+    label: '● Chưa điểm danh',
+  },
+  pending_attendance: {
+    cell: 'bg-orange-50 border-orange-200 text-orange-700',
+    badge: 'bg-orange-100 text-orange-700 border-orange-200',
+    dot: 'bg-orange-500',
+    label: '● Chưa điểm danh',
+  },
+  overdue_attendance: {
+    cell: 'bg-red-50 border-red-200 text-red-700',
+    badge: 'bg-red-100 text-red-700 border-red-200',
+    dot: 'bg-red-500',
+    label: '● Quá hạn điểm danh',
   },
   cancelled: {
     cell: 'bg-red-50 border-red-200 text-red-400',

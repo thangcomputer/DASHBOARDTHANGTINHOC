@@ -129,7 +129,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const navigate = useNavigate();
   const { showModal } = useModal();
   const { onDataRefresh, socket } = useSocket();
-  const { privateEvaluations = [] } = useData();
+  const { privateEvaluations = [], schedules: allSchedules = [] } = useData();
   const [linkInput, setLinkInput] = useState(student.linkHoc);
   const [gradeInput, setGradeInput] = useState(student.avgGrade ?? student.lastGrade ?? '');
   const [notesInput, setNotesInput] = useState(student.notes || '');
@@ -215,7 +215,38 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
     return () => clearInterval(timer);
   }, []);
 
-  const lastAttendanceAt = student.last_attendance_at ? new Date(student.last_attendance_at) : null;
+  const lastAttendanceAt = useMemo(() => {
+    if (student.last_attendance_at) {
+      const d = new Date(student.last_attendance_at);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+    // Fallback SoT: completed schedule hôm nay (khớp API reset-today-attendance)
+    const sid = String(student._id || student.id || '');
+    const course = String(student.course || '').trim();
+    const now = new Date();
+    const todays = (allSchedules || []).filter((sch) => {
+      if (String(sch.status || '') !== 'completed') return false;
+      const schSid = String(sch.studentId?._id || sch.studentId?.id || sch.studentId || '');
+      if (schSid !== sid) return false;
+      if (course && sch.course && String(sch.course) !== course) return false;
+      const sd = new Date(sch.date || sch.createdAt);
+      return (
+        sd.getFullYear() === now.getFullYear()
+        && sd.getMonth() === now.getMonth()
+        && sd.getDate() === now.getDate()
+      );
+    });
+    if (!todays.length) return null;
+    todays.sort((a, b) => {
+      const ta = new Date(a.updatedAt || a.createdAt || a.date).getTime();
+      const tb = new Date(b.updatedAt || b.createdAt || b.date).getTime();
+      return tb - ta;
+    });
+    const latest = todays[0];
+    const at = new Date(latest.updatedAt || latest.createdAt || latest.date);
+    return Number.isNaN(at.getTime()) ? null : at;
+  }, [student.last_attendance_at, student._id, student.id, student.course, allSchedules, attendanceTick]);
+
   const cooldownHours = useMemo(() => {
     if (lastAttendanceAt) {
       const diffMs = Date.now() - lastAttendanceAt.getTime();
@@ -229,12 +260,34 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
     ? false
     : (student.can_check_in !== undefined ? student.can_check_in : !hasAttendedToday);
 
-  // ⏰ GIỚI HẠN HỦY ĐIỂM DANH 1 TIẾNG
-  const minsElapsedSinceAttend = lastAttendanceAt ? Math.floor((Date.now() - lastAttendanceAt.getTime()) / 60000) : null;
-  const canCancelAttendance = hasAttendedToday && (minsElapsedSinceAttend === null || minsElapsedSinceAttend < 60);
-  const cancelTimeLeft = (minsElapsedSinceAttend !== null && minsElapsedSinceAttend < 60)
-    ? (60 - minsElapsedSinceAttend)
-    : 0;
+  // ⏰ GIỚI HẠN HỦY ĐIỂM DANH 1 TIẾNG — nút đỏ khi còn hạn, mờ khi hết hạn (không mở modal lỗi)
+  const minsElapsedSinceAttend = lastAttendanceAt
+    ? Math.floor((Date.now() - lastAttendanceAt.getTime()) / 60000)
+    : null;
+  const canCancelAttendance = Boolean(
+    hasAttendedToday
+    && !isCompleted
+    && lastAttendanceAt
+    && minsElapsedSinceAttend !== null
+    && minsElapsedSinceAttend < 60,
+  );
+  const cancelTimeLeft = canCancelAttendance ? Math.max(0, 60 - minsElapsedSinceAttend) : 0;
+  const cancelButtonLabel = canCancelAttendance
+    ? (cancelTimeLeft > 0 ? `Hủy (${cancelTimeLeft}p)` : 'Hủy điểm danh')
+    : hasAttendedToday
+      ? 'Không thể hủy'
+      : 'Hủy điểm danh';
+  const cancelButtonTitle = !hasAttendedToday
+    ? 'Chưa điểm danh hôm nay'
+    : !lastAttendanceAt
+      ? 'Không xác định được thời điểm điểm danh — không thể hủy'
+    : !canCancelAttendance
+      ? `Đã quá 1 tiếng, không thể hủy (${minsElapsedSinceAttend ?? 0} phút trước)`
+      : `Còn ${cancelTimeLeft} phút để hủy. Nhấn để hủy điểm danh hôm nay`;
+  const cancelButtonClassActive =
+    'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-600/25 active:scale-[0.98] cursor-pointer';
+  const cancelButtonClassDisabled =
+    'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60';
 
   const fetchStudentAssignments = useCallback(async () => {
     setLoadingAssign(true);
@@ -431,13 +484,9 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   };
 
   const handleUndoAttendance = async () => {
-    const sid = student._id || student.id;
+    if (!canCancelAttendance) return;
 
-    // FE guard: kiểm tra trước khi call API
-    if (minsElapsedSinceAttend !== null && minsElapsedSinceAttend >= 60) {
-      showModal({ title: 'Không thể hủy', content: `Đã quá 1 tiếng kể từ lúc điểm danh (${minsElapsedSinceAttend} phút). Không thể hủy nữa.`, type: 'error' });
-      return;
-    }
+    const sid = student._id || student.id;
 
     showModal({
       title: 'Hủy điểm danh hôm nay',
@@ -678,23 +727,16 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                    <button
                      type="button"
                      onClick={() => { if (canCancelAttendance) handleUndoAttendance(); }}
-                     disabled={!canCancelAttendance || isCompleted}
-                     title={
-                       !hasAttendedToday ? 'Chưa điểm danh hôm nay'
-                       : !canCancelAttendance ? `Đã quá 1 tiếng, không thể hủy (${minsElapsedSinceAttend} phút trước)`
-                       : `Còn ${cancelTimeLeft} phút để hủy. Nhấn để hủy điểm danh hôm nay`
-                     }
-                     className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
-                       canCancelAttendance && !isCompleted
-                         ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
-                         : 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                     disabled={!canCancelAttendance}
+                     aria-disabled={!canCancelAttendance}
+                     title={cancelButtonTitle}
+                     className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 border ${
+                       canCancelAttendance ? cancelButtonClassActive : cancelButtonClassDisabled
                      }`}
                    >
                      <X size={14} className="shrink-0" aria-hidden="true" />
                      <span className="min-w-0 text-center leading-tight whitespace-normal">
-                       {canCancelAttendance && cancelTimeLeft > 0
-                         ? `Hủy (${cancelTimeLeft}p)`
-                         : 'Hủy điểm danh'}
+                       {cancelButtonLabel}
                      </span>
                    </button>
                  </div>
@@ -1343,25 +1385,24 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 </button>
               )}
 
-              {/* CỘT PHẢI: Nút HỦY */}
+              {/* CỘT PHẢI: Nút HỦY — đỏ trong 1h, mờ khi hết hạn */}
               <button
+                type="button"
                 onClick={() => { if (canCancelAttendance) handleUndoAttendance(); }}
-                disabled={!canCancelAttendance || isCompleted}
-                title={
-                  !hasAttendedToday ? 'Chưa điểm danh hôm nay'
-                  : !canCancelAttendance ? `Đã quá 1 tiếng, không thể hủy (${minsElapsedSinceAttend ?? 0} phút trước)`
-                  : `Còn ${cancelTimeLeft} phút để hủy. Nhấn để hủy điểm danh hôm nay`
-                }
+                disabled={!canCancelAttendance}
+                aria-disabled={!canCancelAttendance}
+                title={cancelButtonTitle}
                 className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all border-2 ${
-                  canCancelAttendance && !isCompleted
-                    ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100 hover:border-red-400 active:scale-[0.97] cursor-pointer shadow-sm'
-                    : 'bg-slate-50 border-slate-300 text-slate-700 cursor-not-allowed pointer-events-none select-none shadow-sm'
-                }`}>
+                  canCancelAttendance ? cancelButtonClassActive : cancelButtonClassDisabled
+                }`}
+              >
                 <X size={18} />
                 <span className="text-xs text-center leading-tight">
                   {canCancelAttendance && cancelTimeLeft > 0
                     ? <>{`HỦY`}<br/>{`(${cancelTimeLeft}p)`}</>
-                    : <>HỦY<br/>ĐIỂM DANH</>}
+                    : hasAttendedToday
+                      ? <>KHÔNG<br/>THỂ HỦY</>
+                      : <>HỦY<br/>ĐIỂM DANH</>}
                 </span>
               </button>
             </div>

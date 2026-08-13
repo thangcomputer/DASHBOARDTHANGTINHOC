@@ -196,6 +196,10 @@ export default function TeacherQuizManager({
         toast.error(res?.message || 'AI không tạo được câu hỏi');
         return;
       }
+      if (res.data.source === 'fallback') {
+        toast.error(res.message || 'AI chưa sẵn sàng — không dùng câu mẫu. Kiểm tra GEMINI_API_KEY trên server.');
+        return;
+      }
       setQuestions(res.data.questions.map((q) => ({
         questionText: q.questionText || '',
         options: Array.isArray(q.options) && q.options.length >= 4
@@ -204,13 +208,9 @@ export default function TeacherQuizManager({
         correctAnswer: Number(q.correctAnswer) || 0,
         explanation: q.explanation || '',
       })));
-      if (res.data.source === 'fallback') {
-        toast.warning(res.message || 'Đây là câu mẫu — hãy sửa trước khi giao bài');
-      } else {
-        toast.success(res.message || `Đã soạn ${res.data.questions.length} câu. Kiểm tra rồi bấm Tạo bài.`);
-      }
-    } catch {
-      toast.error('Lỗi kết nối khi gọi AI');
+      toast.success(res.message || `Đã soạn ${res.data.questions.length} câu. Kiểm tra rồi bấm Tạo bài.`);
+    } catch (err) {
+      toast.error(err?.message || 'Lỗi kết nối khi gọi AI');
     } finally {
       setAiGenerating(false);
     }

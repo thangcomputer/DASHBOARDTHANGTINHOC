@@ -95,7 +95,9 @@ export function useAdminDashboardState() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const activeTab = (location.hash?.replace('#', '') || 'dashboard').split(/[?#]/)[0] || 'dashboard';
+  const hashRaw = (location.hash || '').replace(/^#/, '');
+  const activeTab = (hashRaw.split(/[?#]/)[0] || 'dashboard') || 'dashboard';
+  const hashQuery = hashRaw.includes('?') ? hashRaw.slice(hashRaw.indexOf('?') + 1) : '';
 
   // Chặn mở tab bằng URL hash khi không có quyền (menu đã ẩn nhưng URL vẫn vào được)
   useEffect(() => {
@@ -186,6 +188,20 @@ export function useAdminDashboardState() {
     refreshStudentsForTab,
     refreshStudentList,
   } = studentsApi;
+
+  // Deep link: /admin#students?studentId=&tab=attendance&scheduleId=
+  const [studentDetailTab, setStudentDetailTab] = useState(null);
+  const [studentDetailScheduleId, setStudentDetailScheduleId] = useState(null);
+  useEffect(() => {
+    if (activeTab !== 'students' || !hashQuery) return undefined;
+    const params = new URLSearchParams(hashQuery);
+    const sid = params.get('studentId');
+    if (!sid) return undefined;
+    setShowStudentDetailId(sid);
+    setStudentDetailTab(params.get('tab') || 'attendance');
+    setStudentDetailScheduleId(params.get('scheduleId') || null);
+    return undefined;
+  }, [activeTab, hashQuery, setShowStudentDetailId]);
 
   const {
     teachers,
@@ -623,6 +639,8 @@ export function useAdminDashboardState() {
     confirmDelete,
     showStudentDetailId,
     setShowStudentDetailId,
+    studentDetailTab,
+    studentDetailScheduleId,
     showImportModal,
     setShowImportModal,
     enrollmentModalStudent,

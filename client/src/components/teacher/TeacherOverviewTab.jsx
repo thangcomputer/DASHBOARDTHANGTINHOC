@@ -324,11 +324,20 @@ export default function TeacherOverviewTab({
               {students.map((s) => {
                 const done = s.totalSessions - s.remainingSessions;
                 const pct = Math.round((done / s.totalSessions) * 100) || 0;
+                const studentId = s._id || s.id;
+                const enrollmentKey = s._enrollmentKey || studentId;
+                const openStudent = () => {
+                  const q = new URLSearchParams();
+                  if (studentId) q.set('studentId', String(studentId));
+                  if (enrollmentKey) q.set('enrollmentKey', String(enrollmentKey));
+                  if (s.course) q.set('course', String(s.course));
+                  navigate(`/teacher#students?${q.toString()}`);
+                };
                 return (
                   <button
                     type="button"
-                    key={s.id}
-                    onClick={() => navigate('/teacher#students')}
+                    key={enrollmentKey}
+                    onClick={openStudent}
                     className="w-full text-left bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex items-center gap-3 hover:bg-indigo-50/60 hover:border-indigo-200 transition group cursor-pointer"
                   >
                     <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white shadow-sm border border-slate-200">

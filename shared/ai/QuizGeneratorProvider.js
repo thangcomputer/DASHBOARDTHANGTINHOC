@@ -53,11 +53,30 @@ async function generateForTeacher(opts = {}) {
     throw err;
   }
 
+  if (!isAiConfigured()) {
+    const err = new Error(
+      'VPS chưa cấu hình AI (thiếu GEMINI_API_KEY hoặc AI_API_KEY trong .env). Thêm key rồi restart server, hoặc soạn tay.',
+    );
+    err.status = 503;
+    err.code = 'AI_NOT_CONFIGURED';
+    throw err;
+  }
+
   const result = await aiService.generateQuiz({
     topic: `${topic} (độ khó: ${difficulty})`,
     count,
     subject,
   });
+
+  // Không cho GV nhận/lưu câu mẫu "Dap an A/B" khi Gemini lỗi hoặc thiếu key
+  if (result.source === 'fallback') {
+    const err = new Error(
+      'AI không phản hồi (sai key, hết hạn mức, hoặc lỗi mạng). Kiểm tra GEMINI_API_KEY trên VPS rồi thử lại, hoặc soạn tay.',
+    );
+    err.status = 502;
+    err.code = 'AI_QUIZ_FALLBACK';
+    throw err;
+  }
 
   const questions = (result.questions || [])
     .map(toLessonQuestion)
@@ -75,7 +94,7 @@ async function generateForTeacher(opts = {}) {
     questions,
     source: result.source || 'llm',
     model: result.model || null,
-    configured: isAiConfigured(),
+    configured: true,
     count: questions.length,
   };
 }

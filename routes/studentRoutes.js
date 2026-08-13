@@ -1015,19 +1015,27 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
         if (doc?.enrollments?.length) {
           const idx = doc.enrollments.findIndex((e) => e.courseName === enrollmentCourse);
           if (idx >= 0) {
+            const { mapEnrollmentStatusToRoot } = require('../utils/studentStatusMap');
             const patchKeys = ['completedSessions', 'remainingSessions', 'lastGrade', 'avgGrade', 'grades', 'status', 'notes', 'linkHoc', 'nextClass', 'nextClassTime'];
             patchKeys.forEach((k) => {
               if (safeBody[k] !== undefined) doc.enrollments[idx][k] = safeBody[k];
             });
             if (doc.enrollments[idx].isPrimary) {
               patchKeys.forEach((k) => {
-                if (safeBody[k] !== undefined) doc[k] = safeBody[k];
+                if (safeBody[k] === undefined) return;
+                // Root student.status uses Vietnamese labels; enrollment uses enum
+                if (k === 'status') {
+                  doc.status = mapEnrollmentStatusToRoot(safeBody.status);
+                } else {
+                  doc[k] = safeBody[k];
+                }
               });
             }
             await doc.save();
             const populated = await Student.findById(doc._id).populate('teacherId', 'name phone specialty');
             const io = req.app.get('io');
-            if (io) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', populated._id);
+            // Use populated (post-save) — never reference later `const student` (TDZ)
+            if (io) studentRealtime(io, populated, 'student:updated', populated._id);
             return res.json({ success: true, data: populated });
           }
         }
@@ -2746,17 +2754,25 @@ router.delete('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation
 });
 
 // ─── POST /api/students/:id/reset-today-attendance ─────────────────────────────
-// Xóa điểm danh HÔM NAY của học viên — CHỈ CHO PHÉP TRONG VÒNG 1 TIẾNG
+// Xóa điểm danh HÔM NAY — Admin/Staff (MANAGE_STUDENTS) hoặc GV phụ trách, trong 1 tiếng
 router.post('/:id/reset-today-attendance', [
   authMiddleware,
   branchFilter,
   policyShadowStudentMutation('reset_today_attendance'),
-  checkPermission(PERMISSIONS.MANAGE_STUDENTS),
+  requireManageStudentsUnlessTeacher,
   assertStudentBranchAccess,
 ], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+
+    const role = String(req.user?.role || '').toLowerCase();
+    if (role === 'teacher' && !studentMatchesTeacher(student, req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ được hủy điểm danh học viên do bạn phụ trách',
+      });
+    }
 
     const todayVN = new Date().toLocaleDateString('vi-VN');
     const oldGrades = student.grades || [];
@@ -2809,7 +2825,7 @@ router.post('/:id/reset-today-attendance', [
 
     const io = req.app.get('io');
     if (io) {
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: req.params.id });
+      studentDataRefresh(io, student, { type: 'student', id: req.params.id });
     }
 
     res.json({ success: true, message: `✅ Đã hủy điểm danh hôm nay cho "${student.name}"` });

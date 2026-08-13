@@ -50,6 +50,7 @@ const AdminDashboard = () => {
     grantModal, setGrantModal, grantPending,
     deleteModal, setDeleteModal, confirmDelete,
     showStudentDetailId, setShowStudentDetailId,
+    studentDetailTab, studentDetailScheduleId,
     showImportModal, setShowImportModal,
     enrollmentModalStudent, setEnrollmentModalStudent,
     addEnrollment,
@@ -298,6 +299,8 @@ const AdminDashboard = () => {
       {showStudentDetailId && (
         <StudentDetailModal
           studentId={showStudentDetailId}
+          initialTab={studentDetailTab || undefined}
+          highlightScheduleId={studentDetailScheduleId || undefined}
           onClose={() => setShowStudentDetailId(null)}
         />
       )}

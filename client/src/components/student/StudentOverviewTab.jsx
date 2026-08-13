@@ -317,7 +317,10 @@ export default function StudentOverviewTab({
                 {studyLogs.map((item, idx) => {
                   const isCancelled = item.type === 'cancelled';
                   const isScheduled = item.type === 'scheduled';
-                  const isPastPending = item.type === 'past_pending';
+                  const isPastPending = item.type === 'past_pending'
+                    || item.type === 'pending_attendance'
+                    || item.type === 'overdue_attendance';
+                  const isOverdue = item.type === 'overdue_attendance' || item.displayKind === 'overdue_attendance';
                   const isHomework = item.type === 'homework';
                   const isQuiz = item.type === 'quiz';
                   const isAttendance = item.type === 'attendance';
@@ -326,7 +329,7 @@ export default function StudentOverviewTab({
                     <div
                       key={idx}
                       className={`px-3.5 py-3 flex flex-col justify-between gap-1.5 ${
-                        isCancelled ? 'bg-red-50/30' : isPastPending ? 'bg-slate-50/80' : isScheduled ? 'bg-blue-50/30' : isQuiz ? 'bg-amber-50/20' : 'hover:bg-slate-50'
+                        isCancelled ? 'bg-red-50/30' : isOverdue ? 'bg-red-50/40' : isPastPending ? 'bg-orange-50/50' : isScheduled ? 'bg-blue-50/30' : isQuiz ? 'bg-amber-50/20' : 'hover:bg-slate-50'
                       } transition-colors duration-200`}
                     >
                       <div className="flex items-start gap-2.5 min-w-0">
@@ -334,8 +337,10 @@ export default function StudentOverviewTab({
                           className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
                             isCancelled
                               ? 'bg-red-100 text-red-600'
+                              : isOverdue
+                              ? 'bg-red-100 text-red-600'
                               : isPastPending
-                              ? 'bg-slate-200 text-slate-600'
+                              ? 'bg-orange-100 text-orange-700'
                               : isScheduled
                               ? 'bg-blue-100 text-blue-600'
                               : isHomework
@@ -359,7 +364,7 @@ export default function StudentOverviewTab({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-1">
-                            <p className={`text-xs font-bold truncate ${isCancelled ? 'text-red-700' : isPastPending ? 'text-slate-700' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
+                            <p className={`text-xs font-bold truncate ${isCancelled || isOverdue ? 'text-red-700' : isPastPending ? 'text-orange-800' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
                               {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
                             </p>
                             {isScheduled && (
@@ -368,8 +373,10 @@ export default function StudentOverviewTab({
                               </span>
                             )}
                             {isPastPending && (
-                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 uppercase tracking-wide shrink-0">
-                                ĐÃ QUA
+                              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wide shrink-0 ${
+                                isOverdue ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {isOverdue ? 'QUÁ HẠN ĐIỂM DANH' : 'CHƯA ĐIỂM DANH'}
                               </span>
                             )}
                             {isCancelled && (

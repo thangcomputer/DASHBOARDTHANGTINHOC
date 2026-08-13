@@ -1,5 +1,23 @@
 import { useCallback } from 'react';
 import api from '../services/api';
+import { normalizeScheduleDate } from '../utils/scheduleTime';
+
+/** enrollment.status enum trên server */
+function attendanceStatusForApi(remaining) {
+  return remaining <= 0 ? 'completed' : 'active';
+}
+
+/** Nhãn hiển thị root student.status (UI tiếng Việt) */
+function attendanceStatusForDisplay(remaining) {
+  return remaining <= 0 ? 'Hoàn thành' : 'Đang học';
+}
+
+function localDateISO(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 /**
  * Schedule mutations and attendance (schedules list owned by ScheduleContext / SWR).
@@ -9,7 +27,7 @@ export function useDataSchedule({
 }) {
 
   // Điểm danh (GV)
-  const markAttendance = useCallback(async (studentId, note, grade, courseName) => {
+  const markAttendance = useCallback(async (studentId, note, grade, courseName, scheduleId, lateReason) => {
     const root = students.find(s => String(s._id || s.id) === String(studentId));
     if (!root) throw new Error('Không tìm thấy học viên');
 
@@ -56,7 +74,7 @@ export function useDataSchedule({
 
     try {
       const todayVN = new Date().toLocaleDateString('vi-VN');
-      const todayISO = new Date().toISOString().split('T')[0];
+      const todayISO = localDateISO();
 
       const newGrade = {
         date: todayVN,
@@ -72,6 +90,8 @@ export function useDataSchedule({
 
       const newCompleted = (targetStudentSync.completedSessions || 0) + 1;
       const newRemaining = targetStudentSync.remainingSessions - 1;
+      const enrollmentStatus = attendanceStatusForApi(newRemaining);
+      const displayStatus = attendanceStatusForDisplay(newRemaining);
 
       // Optimistic Student Update
       setStudents(prev => prev.map(s => {
@@ -82,7 +102,7 @@ export function useDataSchedule({
           lastGrade: grade || s.lastGrade,
           avgGrade: avg,
           grades: newGrades,
-          status: newRemaining <= 0 ? 'Hoàn thành' : 'Đang học',
+          status: displayStatus,
           can_check_in: false,
           remaining_cooldown_hours: 12,
         };
@@ -92,7 +112,14 @@ export function useDataSchedule({
             ...patch,
             enrollments: s.enrollments.map((e) =>
               e.courseName === courseName
-                ? { ...e, completedSessions: newCompleted, remainingSessions: newRemaining, grades: newGrades, avgGrade: avg }
+                ? {
+                  ...e,
+                  completedSessions: newCompleted,
+                  remainingSessions: newRemaining,
+                  grades: newGrades,
+                  avgGrade: avg,
+                  status: enrollmentStatus,
+                }
                 : e
             ),
           };
@@ -100,19 +127,34 @@ export function useDataSchedule({
         return { ...s, ...patch };
       }));
 
-      // Check if schedule exists today
-      const existSch = schedules.find(sch => {
-        const schDate = new Date(sch.date).toISOString().split('T')[0];
-        const courseOk = !courseName || !sch.course || sch.course === courseName;
-        return String(sch.studentId) === String(studentId) && schDate === todayISO && sch.status !== 'cancelled' && courseOk;
-      });
+      // Check if schedule exists today (or use explicit scheduleId from popup)
+      let existSch = scheduleId
+        ? schedules.find((sch) => String(sch._id || sch.id) === String(scheduleId))
+        : null;
+      if (!existSch) {
+        existSch = schedules.find((sch) => {
+          const schDate = normalizeScheduleDate(sch.date);
+          const courseOk = !courseName || !sch.course || sch.course === courseName;
+          return String(sch.studentId) === String(studentId) && schDate === todayISO && sch.status !== 'cancelled' && courseOk;
+        });
+      }
 
       if (existSch) {
         // Optimistic Schedule Update
         setSchedules(prev => prev.map(s => (s._id || s.id) === (existSch._id || existSch.id) ? { ...s, status: 'completed' } : s));
 
-        const resSch = await api.schedules?.update(existSch._id || existSch.id, { status: 'completed' });
-        if (!resSch?.success) throw new Error(resSch?.message || 'Lỗi cập nhật lịch học');
+        const schedulePayload = { status: 'completed' };
+        const late = String(lateReason || '').trim();
+        if (late) {
+          schedulePayload.lateReason = late;
+          schedulePayload.note = note || late;
+        }
+        const resSch = await api.schedules?.update(existSch._id || existSch.id, schedulePayload);
+        if (!resSch?.success) {
+          const err = new Error(resSch?.message || 'Lỗi cập nhật lịch học');
+          if (resSch?.code) err.code = resSch.code;
+          throw err;
+        }
       } else {
         // Create new schedule
         const getActiveSession = () => {
@@ -130,7 +172,7 @@ export function useDataSchedule({
           teacherName: activeSession.name || 'Giảng viên',
           studentId: String(studentId),
           studentName: targetStudentSync.name,
-          date: now.toISOString().split('T')[0],
+          date: localDateISO(now),
           startTime: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           endTime: new Date(now.getTime() + 90 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           course: courseName || targetStudentSync.course || '',
@@ -148,13 +190,15 @@ export function useDataSchedule({
       }
 
       // Finalize Student on Server (Already did optimistic UI)
+      // With courseName: enrollment enum (active/completed); root mapped server-side when primary.
+      // Without courseName: root Vietnamese labels.
       const resStud = await api.students?.update(studentId, {
         lastGrade: grade || targetStudentSync.lastGrade,
         avgGrade: avg,
         grades: newGrades,
         completedSessions: newCompleted,
         remainingSessions: newRemaining,
-        status: newRemaining <= 0 ? 'Hoàn thành' : 'Đang học',
+        status: courseName ? enrollmentStatus : displayStatus,
         ...(courseName ? { courseName } : {}),
       });
 
@@ -244,14 +288,17 @@ export function useDataSchedule({
       startTime: updates.startTime,
       endTime: updates.endTime,
       note: updates.note ?? updates.topic ?? '',
+      status: updates.status,
     };
     if (payload.date == null) delete payload.date;
     if (payload.startTime == null) delete payload.startTime;
     if (payload.endTime == null) delete payload.endTime;
+    if (payload.status == null) delete payload.status;
+    if (payload.note === '') delete payload.note;
 
     setSchedules((prev) => prev.map((sch) => {
       if (String(sch.id) === String(scheduleId) || String(sch._id) === String(scheduleId)) {
-        return { ...sch, ...payload, topic: payload.note };
+        return { ...sch, ...updates, ...(payload.note != null ? { topic: payload.note } : {}) };
       }
       return sch;
     }));

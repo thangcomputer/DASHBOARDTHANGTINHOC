@@ -15,6 +15,7 @@ import { getClientEnrollments, hasLearningAccessEnrollment } from '../utils/enro
 import { teacherMatchesCourse } from '../utils/examSubjects';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
 import { useToast } from '../utils/toast';
+import { getAttendanceAction, attendanceToneClass } from '../utils/attendanceAction';
 
 const fmt = (n) => n ? Number(n).toLocaleString('vi-VN') + 'đ' : '0đ';
 const fmtTuition = (n) => {
@@ -206,13 +207,14 @@ const fmtDateTimeVN = (input) => {
   });
 };
 
-export default function StudentDetailModal({ studentId, onClose }) {
+export default function StudentDetailModal({ studentId, onClose, initialTab, highlightScheduleId }) {
   const [loading, setLoading]     = useState(true);
   const [data, setData]           = useState(null);
   const { showModal }             = useModal();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'attendance' | 'finance' | 'academic' | 'edit'
+  const [activeTab, setActiveTab] = useState(initialTab || 'summary'); // 'summary' | 'attendance' | 'finance' | 'academic' | 'edit'
   const [courseFilter, setCourseFilter] = useState('all'); // 'all' | enrollmentId
+  const [makeupBusyId, setMakeupBusyId] = useState(null);
   const [editForm, setEditForm] = useState({
     name: '', email: '', phone: '', age: '', zalo: '', password: '', gender: 'male',
   });
@@ -223,9 +225,40 @@ export default function StudentDetailModal({ studentId, onClose }) {
 
   useEffect(() => {
     setCourseFilter('all');
-    setActiveTab('summary');
-  }, [studentId]);
+    setActiveTab(initialTab || 'summary');
+  }, [studentId, initialTab]);
 
+  const handleAdminMakeup = (sch) => {
+    const action = getAttendanceAction(sch);
+    if (!action.canAdminMakeup || action.state === 'COMPLETED' || action.state === 'CANCELLED') return;
+    const sid = sch._id || sch.id;
+    showModal({
+      title: 'Xác nhận điểm danh bù',
+      content: `Học viên: ${sch.studentName || data?.student?.name || '—'}\nKhóa học: ${sch.course || '—'}\nGiảng viên: ${sch.teacherName || '—'}\nThời gian: ${sch.startTime || '?'} - ${sch.endTime || '?'}\n\nThao tác này sẽ hoàn thành buổi học và cộng 1 buổi vào tiến độ khóa học.`,
+      type: 'warning',
+      confirmText: 'Xác nhận điểm danh bù',
+      onConfirm: async () => {
+        setMakeupBusyId(String(sid));
+        try {
+          const res = await api.schedules.update(sid, {
+            status: 'completed',
+            adminMakeup: true,
+            note: 'Điểm danh bù bởi Admin',
+          });
+          if (!res?.success) {
+            toast.error(res?.message || 'Không thể điểm danh bù');
+            return;
+          }
+          toast.success('Đã điểm danh bù — buổi học hoàn thành');
+          reloadProfile();
+        } catch (e) {
+          toast.error(e?.message || 'Lỗi kết nối');
+        } finally {
+          setMakeupBusyId(null);
+        }
+      },
+    });
+  };
   // Refund/hủy khóa đang chọn → về «Tất cả»
   useEffect(() => {
     if (courseFilter === 'all' || !data?.student) return;
@@ -1465,8 +1498,17 @@ export default function StudentDetailModal({ studentId, onClose }) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
-                            {data.schedules.map(sch => (
-                              <tr key={sch._id} className="hover:bg-slate-50/50 transition">
+                            {data.schedules.map(sch => {
+                              const action = getAttendanceAction(sch);
+                              const schId = String(sch._id || sch.id || '');
+                              const highlighted = highlightScheduleId && schId === String(highlightScheduleId);
+                              const canMakeup = action.canAdminMakeup
+                                && (action.state === 'OVERDUE_ATTENDANCE' || action.state === 'PENDING_ATTENDANCE');
+                              return (
+                              <tr
+                                key={sch._id}
+                                className={`hover:bg-slate-50/50 transition ${highlighted ? 'bg-amber-50/80 ring-1 ring-amber-200' : ''}`}
+                              >
                                 <td className="px-4 sm:px-6 py-3.5 text-xs font-bold text-slate-700 whitespace-nowrap">{fmtDate(sch.date)}</td>
                                 {(getClientEnrollments(data.student).length > 1) && (
                                   <td className="px-3 sm:px-4 py-3.5 text-xs font-bold text-blue-600">{sch.course || '—'}</td>
@@ -1474,18 +1516,25 @@ export default function StudentDetailModal({ studentId, onClose }) {
                                 <td className="px-3 sm:px-4 py-3.5 text-xs font-semibold text-slate-600">{sch.teacherName || '—'}</td>
                                 <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-400 max-w-[160px] break-words">{sch.note || sch.subject || 'Dạy thực tế'}</td>
                                 <td className="px-3 sm:px-4 py-3.5 text-center">
-                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${
-                                    sch.status === 'completed'
-                                      ? 'bg-emerald-50 text-emerald-600'
-                                      : sch.status === 'cancelled'
-                                        ? 'bg-red-50 text-red-600'
-                                        : 'bg-amber-50 text-amber-600'
-                                  }`}>
-                                    {sch.status === 'completed' ? 'Đã học' : sch.status === 'cancelled' ? 'Đã hủy' : 'Sắp tới'}
-                                  </span>
+                                  <div className="inline-flex flex-col items-center gap-1.5">
+                                    <span className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${attendanceToneClass(action.tone)}`}>
+                                      {action.label}
+                                    </span>
+                                    {canMakeup && (
+                                      <button
+                                        type="button"
+                                        disabled={makeupBusyId === schId}
+                                        onClick={() => handleAdminMakeup(sch)}
+                                        className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 shadow-sm"
+                                      >
+                                        {makeupBusyId === schId ? 'Đang xử lý…' : 'Điểm danh bù'}
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
