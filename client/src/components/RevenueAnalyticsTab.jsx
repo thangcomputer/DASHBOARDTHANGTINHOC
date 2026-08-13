@@ -314,7 +314,7 @@ export default function RevenueAnalyticsTab() {
             </p>
             {loading ? (
               <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
-            ) : (data?.byBranch?.length ? (
+            ) : data?.byBranch?.length ? (
               <div className="flex items-center gap-6">
                 <DonutChart segments={data.byBranch} size={110} />
                 <div className="space-y-2 flex-1">
@@ -331,7 +331,9 @@ export default function RevenueAnalyticsTab() {
                   ))}
                 </div>
               </div>
-            ) : <div className="text-center text-gray-400 py-4 text-sm">Chưa có doanh thu Ledger trong kỳ</div>)}
+            ) : (
+              <div className="text-center text-gray-400 py-4 text-sm">Chưa có doanh thu Ledger trong kỳ</div>
+            )}
           </div>
 
           {/* Table — cùng data.byBranch (period Ledger); không dùng endpoint branches all-time */}
@@ -342,7 +344,7 @@ export default function RevenueAnalyticsTab() {
             </p>
             {loading ? (
               <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />)}</div>
-            ) : (data?.byBranch?.length ? (
+            ) : data?.byBranch?.length ? (
               <div className="space-y-3">
                 {data.byBranch.map((b, i) => {
                   const label = b.branchName || b.branchCode || 'Không xác định';
@@ -430,7 +432,7 @@ export default function RevenueAnalyticsTab() {
             <p className="text-[11px] text-gray-400 mb-4">Ops enrollment — cột tiền = học phí trên hồ sơ, không phải doanh thu Ledger</p>
             {loading ? (
               <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}</div>
-            ) : (enrollment?.byBranch?.length ? (
+            ) : enrollment?.byBranch?.length ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[400px]">
                   <thead>
@@ -467,7 +469,9 @@ export default function RevenueAnalyticsTab() {
                   </tbody>
                 </table>
               </div>
-            ) : <div className="text-center text-gray-400 py-4 text-sm">Chưa có dữ liệu đăng ký</div>)}
+            ) : (
+              <div className="text-center text-gray-400 py-4 text-sm">Chưa có dữ liệu đăng ký</div>
+            )}
           </div>
 
           {/* By course */}
