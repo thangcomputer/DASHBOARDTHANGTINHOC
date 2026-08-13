@@ -55,7 +55,7 @@ async function generateForTeacher(opts = {}) {
 
   if (!isAiConfigured()) {
     const err = new Error(
-      'VPS chưa cấu hình AI (thiếu GEMINI_API_KEY hoặc AI_API_KEY trong .env). Thêm key rồi restart server, hoặc soạn tay.',
+      'VPS chưa cấu hình AI (thiếu GEMINI_API_KEYS / GEMINI_API_KEY hoặc AI_API_KEY trong .env). Thêm key rồi restart server, hoặc soạn tay.',
     );
     err.status = 503;
     err.code = 'AI_NOT_CONFIGURED';
