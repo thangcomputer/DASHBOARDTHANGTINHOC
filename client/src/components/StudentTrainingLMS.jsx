@@ -29,6 +29,7 @@ import {
   ANTI_SEEK_PROGRESS_MESSAGE,
   PREV_LESSON_REQUIRED_CODE,
 } from '../utils/antiSeekPolicy';
+import { parseLmsHashQuery } from '../utils/lmsDeepLink';
 
 const MOCK_COURSES = [
   {
@@ -720,6 +721,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   const [courseProgressMap, setCourseProgressMap] = useState({});
   const [expandedChapters, setExpandedChapters] = useState({});
   const [courseTab, setCourseTab] = useState('overview');
+  const [highlightQaId, setHighlightQaId] = useState(null);
+  const deepLinkRef = useRef(null);
   const playerApiRef = useRef(null);
   const [mainTab, setMainTab] = useState('courses'); // courses | guides | files | assignments | exams
   const [localSubmissions, setLocalSubmissions] = useState({});
@@ -736,6 +739,13 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       }
     } catch {
       /* ignore */
+    }
+    const { params } = parseLmsHashQuery();
+    if (params.courseId || params.lessonId || params.tab || params.qaId) {
+      deepLinkRef.current = params;
+      if (params.tab) setCourseTab(params.tab);
+      if (params.qaId) setHighlightQaId(params.qaId);
+      setMainTab('courses');
     }
   }, []);
 
@@ -815,6 +825,27 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       setLoading(false);
     }
   }, [trainingData]);
+
+  // Deep-link: mở đúng khóa từ hash (?courseId=)
+  useEffect(() => {
+    const dl = deepLinkRef.current;
+    if (!dl?.courseId || !courses.length || selectedCourse) return;
+    const hit = courses.find((c) => String(c._id || c.id) === String(dl.courseId));
+    if (hit) setSelectedCourse(hit);
+  }, [courses, selectedCourse]);
+
+  // Deep-link: mở đúng bài + tab qa sau khi lessons load
+  useEffect(() => {
+    const dl = deepLinkRef.current;
+    if (!dl || !lessons.length) return;
+    if (dl.lessonId) {
+      const hit = lessons.find((l) => String(l._id) === String(dl.lessonId) && l.isUnlocked);
+      if (hit) setCurrentLesson(hit);
+    }
+    if (dl.tab) setCourseTab(dl.tab);
+    if (dl.qaId) setHighlightQaId(dl.qaId);
+    deepLinkRef.current = null;
+  }, [lessons]);
 
   // Load lessons khi chọn khoá học — ưu tiên API server (completed/unlocked)
   useEffect(() => {
@@ -1631,6 +1662,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                 }
               }}
               antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
+              audience="student"
+              canAnswerQa={false}
+              highlightQaId={highlightQaId}
             />
           </div>
         </div>

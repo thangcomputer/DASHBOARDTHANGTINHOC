@@ -17,6 +17,9 @@ const ACTIONS = new Set([
   'lms_teacher_overview',
   'lms_save_watch',
   'lms_admin_progress',
+  'lms_qa_list',
+  'lms_qa_create',
+  'lms_qa_answer',
   'guide_list',
 ]);
 
@@ -93,6 +96,9 @@ function evaluateLegacyTraining(subject, action, ctx = {}) {
     case 'lms_complete_lesson':
     case 'lms_progress_me':
     case 'lms_save_watch':
+    case 'lms_qa_list':
+    case 'lms_qa_create':
+    case 'lms_qa_answer':
     case 'guide_list':
       return evaluateAuthOnly(subject);
     case 'lms_teacher_overview':

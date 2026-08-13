@@ -488,4 +488,198 @@ router.get('/admin/progress/:courseId', lmsGuard('lms_admin_progress'), async (r
   }
 });
 
+// ─── LMS Q&A (server SoT) ───────────────────────────────────────────────────
+const LmsLessonQa = require('../models/LmsLessonQa');
+const NotificationService = require('../services/NotificationService');
+const Student = require('../models/Student');
+
+function mapQaDoc(doc) {
+  const o = doc.toObject ? doc.toObject() : { ...doc };
+  return {
+    ...o,
+    id: String(o._id),
+    createdAt: o.createdAt ? new Date(o.createdAt).getTime() : Date.now(),
+    answeredAt: o.answeredAt ? new Date(o.answeredAt).getTime() : null,
+  };
+}
+
+function buildAskerDeepLink(doc) {
+  const role = doc.audience === 'teacher' ? 'teacher' : 'student';
+  const section = role === 'teacher' ? 'training' : 'materials';
+  const q = new URLSearchParams({
+    courseId: String(doc.courseId || ''),
+    lessonId: String(doc.lessonId || ''),
+    tab: 'qa',
+    qaId: String(doc._id || doc.id || ''),
+  });
+  return `/${role}#${section}?${q.toString()}`;
+}
+
+function buildStaffDeepLink(doc, role = 'admin') {
+  const q = new URLSearchParams({ qaId: String(doc._id || doc.id || '') });
+  if (role === 'teacher') return `/teacher/notifications?${q.toString()}`;
+  return `/admin/notifications?${q.toString()}`;
+}
+
+// GET /qa?courseId=&lessonId=&status=&qaId=
+router.get('/qa', lmsGuard('lms_qa_list'), async (req, res) => {
+  try {
+    const { courseId, lessonId, status, qaId, audience } = req.query;
+    const filter = {};
+    if (qaId) filter._id = qaId;
+    if (courseId) filter.courseId = String(courseId);
+    if (lessonId) filter.lessonId = String(lessonId);
+    if (status === 'open' || status === 'answered') filter.status = status;
+    if (audience === 'student' || audience === 'teacher') filter.audience = audience;
+
+    const role = String(req.user.role || '').toLowerCase();
+    const userId = String(req.user.id || req.user._id || '');
+    // Students/teachers only see Q&A for courses they query; admins can list open inbox
+    if ((role === 'admin' || role === 'staff') && !courseId && !qaId) {
+      filter.status = filter.status || 'open';
+    }
+
+    const rows = await LmsLessonQa.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+    res.json({ success: true, data: rows.map(mapQaDoc) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /qa — ask a question
+router.post('/qa', lmsGuard('lms_qa_create'), async (req, res) => {
+  try {
+    const userId = String(req.user.id || req.user._id || '');
+    const role = String(req.user.role || 'student').toLowerCase();
+    const {
+      courseId,
+      courseTitle,
+      lessonId,
+      lessonTitle,
+      title,
+      body,
+      audience,
+    } = req.body || {};
+
+    if (!courseId || !lessonId || !String(title || '').trim()) {
+      return res.status(400).json({ success: false, message: 'Thiếu courseId, lessonId hoặc tiêu đề' });
+    }
+
+    const askerName = req.user.name || req.user.fullName || (role === 'teacher' ? 'Giảng viên' : 'Học viên');
+    let assignedTeacherId = null;
+    if (role === 'student') {
+      try {
+        const st = await Student.findById(userId).select('teacherId name').lean();
+        if (st?.teacherId) assignedTeacherId = String(st.teacherId);
+      } catch { /* ignore */ }
+    }
+
+    const doc = await LmsLessonQa.create({
+      courseId: String(courseId),
+      courseTitle: String(courseTitle || ''),
+      lessonId: String(lessonId),
+      lessonTitle: String(lessonTitle || ''),
+      audience: audience === 'teacher' ? 'teacher' : 'student',
+      askerId: userId,
+      askerRole: ['teacher', 'admin', 'staff'].includes(role) ? role : 'student',
+      askerName,
+      assignedTeacherId,
+      title: String(title).trim().slice(0, 300),
+      body: String(body || '').trim().slice(0, 5000),
+      status: 'open',
+    });
+
+    const io = req.app.get('io');
+    const preview = doc.title.length > 80 ? `${doc.title.slice(0, 80)}…` : doc.title;
+    const payload = {
+      kind: 'lms_qa',
+      action: 'lms_qa_open',
+      qaId: String(doc._id),
+      courseId: String(doc.courseId),
+      lessonId: String(doc.lessonId),
+      audience: doc.audience,
+      status: 'open',
+    };
+
+    await NotificationService.send(io, {
+      type: 'COURSE',
+      title: 'Học viên có câu hỏi mới',
+      content: `${askerName}: "${preview}"${doc.lessonTitle ? ` · Bài: ${doc.lessonTitle}` : ''}`,
+      sender_id: userId,
+      receivers: ['ALL_ADMIN'],
+      payload,
+      link: buildStaffDeepLink(doc, 'admin'),
+    });
+
+    if (assignedTeacherId) {
+      await NotificationService.send(io, {
+        type: 'COURSE',
+        title: 'Học viên có câu hỏi mới',
+        content: `${askerName}: "${preview}"${doc.lessonTitle ? ` · Bài: ${doc.lessonTitle}` : ''}`,
+        sender_id: userId,
+        receivers: [assignedTeacherId],
+        payload,
+        link: buildStaffDeepLink(doc, 'teacher'),
+      });
+    }
+
+    res.json({ success: true, data: mapQaDoc(doc) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /qa/:id/answer — admin/teacher/staff answer
+router.post('/qa/:id/answer', lmsGuard('lms_qa_answer'), async (req, res) => {
+  try {
+    const userId = String(req.user.id || req.user._id || '');
+    const role = String(req.user.role || '').toLowerCase();
+    const answer = String(req.body?.answer || '').trim();
+    if (!answer) {
+      return res.status(400).json({ success: false, message: 'Nhập nội dung trả lời' });
+    }
+
+    const canAnswer = role === 'admin' || role === 'staff' || role === 'teacher' || userId === 'admin';
+    if (!canAnswer) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền trả lời' });
+    }
+
+    const doc = await LmsLessonQa.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy câu hỏi' });
+    }
+
+    doc.answer = answer.slice(0, 8000);
+    doc.status = 'answered';
+    doc.answeredBy = userId;
+    doc.answeredByName = req.user.name || req.user.fullName || (role === 'teacher' ? 'Giảng viên' : 'Admin');
+    doc.answeredByRole = role || 'admin';
+    doc.answeredAt = new Date();
+    await doc.save();
+
+    const io = req.app.get('io');
+    await NotificationService.send(io, {
+      type: 'COURSE',
+      title: 'Câu hỏi của bạn đã được trả lời',
+      content: `${doc.answeredByName} đã trả lời: "${doc.title}"`,
+      sender_id: userId,
+      receivers: [String(doc.askerId)],
+      payload: {
+        kind: 'lms_qa',
+        action: 'lms_qa_answered',
+        qaId: String(doc._id),
+        courseId: String(doc.courseId),
+        lessonId: String(doc.lessonId),
+        audience: doc.audience,
+        status: 'answered',
+      },
+      link: buildAskerDeepLink(doc),
+    });
+
+    res.json({ success: true, data: mapQaDoc(doc) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

@@ -487,6 +487,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                           } else if (n.payload?.action === 'blog_published' && n.payload?.slug) {
                             const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
                             navigate(`${base}/news/${n.payload.slug}`);
+                          } else if (n.payload?.kind === 'lms_qa' && n.payload?.qaId) {
+                            const qaId = n.payload.qaId;
+                            if (role === 'admin' || role === 'staff') {
+                              navigate(`/admin/notifications?qaId=${encodeURIComponent(qaId)}`);
+                            } else if (role === 'teacher') {
+                              navigate(`/teacher/notifications?qaId=${encodeURIComponent(qaId)}`);
+                            } else if (role === 'student') {
+                              const p = n.path || `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`;
+                              navigate(p.includes('#') ? p : `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`);
+                            }
                           } else if (n.path) {
                             let targetPath = n.path;
 

@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
   FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
 import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp } from '../../utils/lmsLessonUi';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
-import { buildMediaDownloadUrl } from '../../services/api';
+import { buildMediaDownloadUrl, apiFetch } from '../../services/api';
 import useLmsLocalStore, { lmsStoreKey } from '../../hooks/useLmsLocalStore';
 
 function initials(name = '') {
@@ -271,11 +271,61 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
   );
 }
 
-function QaPanel({ storageKey, lessonId, lessonTitle, userName }) {
-  const [items, setItems] = useLmsLocalStore(storageKey, []);
+function QaPanel({
+  courseId,
+  lessonId,
+  lessonTitle,
+  courseTitle,
+  userName,
+  audience = 'student',
+  canAnswer = false,
+  highlightQaId = null,
+}) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [q, setQ] = useState('');
+  const [answerDrafts, setAnswerDrafts] = useState({});
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    if (!courseId) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const qs = new URLSearchParams({ courseId: String(courseId) });
+      if (audience) qs.set('audience', audience);
+      const res = await apiFetch(`/training-lms/qa?${qs.toString()}`);
+      const json = await res.json().catch(() => ({}));
+      if (json?.success && Array.isArray(json.data)) {
+        setItems(json.data);
+      } else {
+        setError(json?.message || 'Không tải được hỏi đáp');
+      }
+    } catch {
+      setError('Lỗi kết nối hỏi đáp');
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId, audience]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!highlightQaId) return;
+    const el = document.getElementById(`lms-qa-${highlightQaId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightQaId, items]);
 
   const filtered = useMemo(() => {
     const list = [...(Array.isArray(items) ? items : [])].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -284,33 +334,76 @@ function QaPanel({ storageKey, lessonId, lessonTitle, userName }) {
     return list.filter(
       (it) =>
         String(it.title || '').toLowerCase().includes(needle) ||
-        String(it.body || '').toLowerCase().includes(needle)
+        String(it.body || '').toLowerCase().includes(needle) ||
+        String(it.answer || '').toLowerCase().includes(needle)
     );
   }, [items, q]);
 
-  const submit = () => {
+  const submit = async () => {
     const t = title.trim();
-    if (!t) return;
-    setItems((prev) => [
-      {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        title: t,
-        body: body.trim(),
-        lessonId: String(lessonId || ''),
-        lessonTitle: lessonTitle || '',
-        author: userName || 'Học viên',
-        createdAt: Date.now(),
-        votes: 0,
-        replies: 0,
-      },
-      ...(Array.isArray(prev) ? prev : []),
-    ]);
-    setTitle('');
-    setBody('');
+    if (!t || !courseId || !lessonId || sending) return;
+    setSending(true);
+    setError('');
+    try {
+      const res = await apiFetch('/training-lms/qa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId,
+          courseTitle: courseTitle || '',
+          lessonId,
+          lessonTitle: lessonTitle || '',
+          title: t,
+          body: body.trim(),
+          audience,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!json?.success) {
+        setError(json?.message || 'Gửi câu hỏi thất bại');
+        return;
+      }
+      setTitle('');
+      setBody('');
+      await load();
+    } catch {
+      setError('Lỗi kết nối khi gửi câu hỏi');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const submitAnswer = async (qaId) => {
+    const text = String(answerDrafts[qaId] || '').trim();
+    if (!text) return;
+    setSending(true);
+    try {
+      const res = await apiFetch(`/training-lms/qa/${qaId}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer: text }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!json?.success) {
+        setError(json?.message || 'Trả lời thất bại');
+        return;
+      }
+      setAnswerDrafts((prev) => ({ ...prev, [qaId]: '' }));
+      await load();
+    } catch {
+      setError('Lỗi kết nối khi trả lời');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto w-full">
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-3 text-[12px] text-slate-300">
+        Tab <span className="font-bold text-emerald-300">Hỏi đáp</span> nằm ngay dưới video.
+        Câu hỏi lưu trên server — Admin/Giảng viên nhận thông báo chuông và có thể trả lời.
+      </div>
+
       <div className="flex gap-2">
         <div className="flex-1 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
           <Search size={14} className="text-slate-500 shrink-0" />
@@ -341,36 +434,97 @@ function QaPanel({ storageKey, lessonId, lessonTitle, userName }) {
         <button
           type="button"
           onClick={submit}
-          className="inline-flex items-center gap-2 px-4 min-h-10 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+          disabled={sending || !title.trim() || !lessonId}
+          className="inline-flex items-center gap-2 px-4 min-h-10 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold"
         >
-          <MessageSquare size={14} /> Gửi câu hỏi
+          <MessageSquare size={14} /> {sending ? 'Đang gửi...' : 'Gửi câu hỏi'}
         </button>
+        {!lessonId ? (
+          <p className="text-[11px] text-amber-400">Chọn một bài học trước khi gửi câu hỏi.</p>
+        ) : null}
+        {error ? <p className="text-[11px] text-red-400">{error}</p> : null}
       </div>
 
       <h3 className="text-sm font-bold text-slate-300">
         Các câu hỏi trong khóa học này ({filtered.length})
       </h3>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <p className="text-slate-500 text-sm py-8 text-center">Đang tải hỏi đáp...</p>
+      ) : filtered.length === 0 ? (
         <p className="text-slate-500 text-sm py-8 text-center">Chưa có câu hỏi. Hãy là người đầu tiên hỏi!</p>
       ) : (
         <ul className="space-y-3">
-          {filtered.map((it) => (
-            <li key={it.id} className="flex gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black flex items-center justify-center shrink-0">
-                {initials(it.author)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-100">{it.title}</p>
-                {it.body ? <p className="text-[13px] text-slate-400 mt-1 line-clamp-2">{it.body}</p> : null}
-                <p className="text-[11px] text-slate-500 mt-2">
-                  <span className="text-emerald-400/90 font-semibold">{it.author}</span>
-                  {it.lessonTitle ? ` · ${it.lessonTitle}` : ''}
-                  {` · ${timeAgo(it.createdAt)}`}
-                </p>
-              </div>
-            </li>
-          ))}
+          {filtered.map((it) => {
+            const id = String(it.id || it._id);
+            const highlighted = highlightQaId && String(highlightQaId) === id;
+            return (
+              <li
+                key={id}
+                id={`lms-qa-${id}`}
+                className={`rounded-xl border p-4 ${
+                  highlighted
+                    ? 'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30'
+                    : 'border-white/[0.06] bg-white/[0.02]'
+                }`}
+              >
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black flex items-center justify-center shrink-0">
+                    {initials(it.askerName || it.author)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-slate-100">{it.title}</p>
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                          it.status === 'answered'
+                            ? 'bg-emerald-500/15 text-emerald-300'
+                            : 'bg-amber-500/15 text-amber-300'
+                        }`}
+                      >
+                        {it.status === 'answered' ? 'Đã trả lời' : 'Chờ trả lời'}
+                      </span>
+                    </div>
+                    {it.body ? <p className="text-[13px] text-slate-400 mt-1 whitespace-pre-wrap">{it.body}</p> : null}
+                    <p className="text-[11px] text-slate-500 mt-2">
+                      <span className="text-emerald-400/90 font-semibold">{it.askerName || it.author || userName}</span>
+                      {it.lessonTitle ? ` · ${it.lessonTitle}` : ''}
+                      {` · ${timeAgo(it.createdAt)}`}
+                    </p>
+
+                    {it.status === 'answered' && it.answer ? (
+                      <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2.5">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-sky-300 mb-1">
+                          Trả lời · {it.answeredByName || 'Admin/GV'}
+                        </p>
+                        <p className="text-[13px] text-slate-200 whitespace-pre-wrap">{it.answer}</p>
+                      </div>
+                    ) : null}
+
+                    {canAnswer && it.status !== 'answered' ? (
+                      <div className="mt-3 space-y-2">
+                        <textarea
+                          value={answerDrafts[id] || ''}
+                          onChange={(e) => setAnswerDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
+                          rows={2}
+                          placeholder="Nhập câu trả lời..."
+                          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/40 resize-y"
+                        />
+                        <button
+                          type="button"
+                          disabled={sending || !String(answerDrafts[id] || '').trim()}
+                          onClick={() => submitAnswer(id)}
+                          className="px-3 min-h-9 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-xs font-bold"
+                        >
+                          Gửi trả lời
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -689,6 +843,9 @@ export default function LmsPlayerPanels({
   getCurrentTime,
   antiSeekEnabled = true,
   teacherAntiSeekSlot = null,
+  audience = 'student',
+  canAnswerQa = false,
+  highlightQaId = null,
 }) {
   const courseId = selectedCourse?._id || selectedCourse?.id || 'course';
   const lessonId = currentLesson?._id;
@@ -700,7 +857,6 @@ export default function LmsPlayerPanels({
     : '';
 
   const notesKey = lmsStoreKey('notes', userId, courseId);
-  const qaKey = lmsStoreKey('qa', userId, courseId);
   const reviewsKey = lmsStoreKey('reviews', userId, courseId);
 
   if (courseTab === 'overview') {
@@ -728,10 +884,14 @@ export default function LmsPlayerPanels({
   if (courseTab === 'qa') {
     return (
       <QaPanel
-        storageKey={qaKey}
+        courseId={courseId}
+        courseTitle={selectedCourse?.title || ''}
         lessonId={lessonId}
         lessonTitle={lessonTitle}
         userName={userName}
+        audience={audience}
+        canAnswer={canAnswerQa}
+        highlightQaId={highlightQaId}
       />
     );
   }

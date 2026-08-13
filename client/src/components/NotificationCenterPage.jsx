@@ -5,10 +5,11 @@ import {
   Bell, CheckCheck, ChevronLeft, ChevronRight, Filter, Loader2,
   Trash2, Megaphone, RefreshCw, X, ExternalLink,
 } from 'lucide-react';
-import { notificationsAPI } from '../services/api';
+import { notificationsAPI, apiFetch } from '../services/api';
 import { useData } from '../context/DataContext';
 import { useToast } from '../utils/toast';
 import { formatNotificationStudentMask } from '../utils/studentMask';
+import { useSearchParams } from 'react-router-dom';
 
 const TYPES = [
   { value: '', label: 'Tất cả' },
@@ -59,9 +60,11 @@ function resolveNavPath(path) {
  */
 export default function NotificationCenterPage({ role = 'admin', session }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const { markNotificationRead, dismissNotificationLocal, students } = useData();
   const isAdmin = role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF';
+  const canAnswerQa = isAdmin || role === 'teacher';
 
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
@@ -73,6 +76,9 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [selectedNotif, setSelectedNotif] = useState(null);
+  const [qaDetail, setQaDetail] = useState(null);
+  const [qaAnswer, setQaAnswer] = useState('');
+  const [qaSaving, setQaSaving] = useState(false);
 
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [bcTitle, setBcTitle] = useState('');
@@ -101,6 +107,67 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   useEffect(() => {
     load(1);
   }, [type, unreadOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openQaById = useCallback(async (qaId) => {
+    if (!qaId) return;
+    try {
+      const res = await apiFetch(`/training-lms/qa?qaId=${encodeURIComponent(qaId)}`);
+      const json = await res.json().catch(() => ({}));
+      const row = Array.isArray(json?.data) ? json.data[0] : null;
+      if (!json?.success || !row) {
+        toast.error(json?.message || 'Không tải được câu hỏi LMS');
+        return;
+      }
+      setQaDetail(row);
+      setQaAnswer('');
+      setSelectedNotif({
+        title: 'Hỏi đáp LMS',
+        type: 'COURSE',
+        message: `${row.askerName || 'Học viên'}: ${row.title}`,
+        content: row.body || row.title,
+        payload: { kind: 'lms_qa', qaId: String(row.id || row._id), status: row.status },
+        time: row.createdAt,
+      });
+    } catch {
+      toast.error('Lỗi kết nối hỏi đáp');
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    const qaId = searchParams.get('qaId');
+    if (!qaId || !canAnswerQa) return;
+    openQaById(qaId);
+    const next = new URLSearchParams(searchParams);
+    next.delete('qaId');
+    setSearchParams(next, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- open once from query
+
+  const submitQaAnswer = async () => {
+    const qaId = qaDetail?.id || qaDetail?._id || selectedNotif?.payload?.qaId;
+    const text = qaAnswer.trim();
+    if (!qaId || !text) return;
+    setQaSaving(true);
+    try {
+      const res = await apiFetch(`/training-lms/qa/${qaId}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer: text }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!json?.success) {
+        toast.error(json?.message || 'Trả lời thất bại');
+        return;
+      }
+      toast.success('Đã trả lời câu hỏi');
+      setQaDetail(json.data || { ...qaDetail, status: 'answered', answer: text });
+      setQaAnswer('');
+      await load(page);
+    } catch {
+      toast.error('Lỗi kết nối');
+    } finally {
+      setQaSaving(false);
+    }
+  };
 
   const onMarkRead = async (id) => {
     setBusyId(id || 'all');
@@ -140,11 +207,16 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       navigate(`/${role}/news/${n.payload.slug}`);
       return;
     }
+    if (n.payload?.kind === 'lms_qa' && n.payload?.qaId && canAnswerQa) {
+      await openQaById(n.payload.qaId);
+      return;
+    }
     const path = resolveNavPath(n.path);
-    if (path) {
+    if (path && !n.payload?.kind) {
       navigate(path);
     } else {
       setSelectedNotif(n);
+      setQaDetail(null);
     }
   };
 
@@ -387,12 +459,46 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 text-sm text-slate-700 leading-relaxed whitespace-pre-line pr-1 font-medium">
+            <div className="overflow-y-auto flex-1 text-sm text-slate-700 leading-relaxed whitespace-pre-line pr-1 font-medium space-y-3">
               {formatNotificationStudentMask(selectedNotif.message || selectedNotif.content || selectedNotif.text, students)}
+              {qaDetail ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-left">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Chi tiết câu hỏi LMS</p>
+                  <p className="text-sm font-bold text-slate-900">{qaDetail.title}</p>
+                  {qaDetail.body ? <p className="text-xs text-slate-600 whitespace-pre-wrap">{qaDetail.body}</p> : null}
+                  <p className="text-[11px] text-slate-500">
+                    {qaDetail.askerName} · {qaDetail.lessonTitle || 'Bài học'} · {qaDetail.courseTitle || ''}
+                  </p>
+                  {qaDetail.status === 'answered' && qaDetail.answer ? (
+                    <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-2.5">
+                      <p className="text-[10px] font-black text-emerald-700 uppercase mb-1">Đã trả lời</p>
+                      <p className="text-xs text-emerald-900 whitespace-pre-wrap">{qaDetail.answer}</p>
+                    </div>
+                  ) : canAnswerQa ? (
+                    <div className="space-y-2 pt-1">
+                      <textarea
+                        value={qaAnswer}
+                        onChange={(e) => setQaAnswer(e.target.value)}
+                        rows={3}
+                        placeholder="Nhập câu trả lời cho học viên/giảng viên..."
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-300"
+                      />
+                      <button
+                        type="button"
+                        disabled={qaSaving || !qaAnswer.trim()}
+                        onClick={submitQaAnswer}
+                        className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold disabled:opacity-40"
+                      >
+                        {qaSaving ? 'Đang gửi...' : 'Gửi trả lời'}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
-              {resolveNavPath(selectedNotif.path) && (
+              {resolveNavPath(selectedNotif.path) && !qaDetail && (
                 <button
                   type="button"
                   onClick={() => {
@@ -407,7 +513,11 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
               )}
               <button
                 type="button"
-                onClick={() => setSelectedNotif(null)}
+                onClick={() => {
+                  setSelectedNotif(null);
+                  setQaDetail(null);
+                  setQaAnswer('');
+                }}
                 className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 transition-colors"
               >
                 Đóng

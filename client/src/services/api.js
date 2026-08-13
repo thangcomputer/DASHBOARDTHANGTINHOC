@@ -1692,6 +1692,30 @@ export const trainingLmsAPI = {
     });
     return res.json();
   },
+  listQa: async ({ courseId, lessonId, qaId, audience, status } = {}) => {
+    const q = new URLSearchParams();
+    if (courseId) q.set('courseId', courseId);
+    if (lessonId) q.set('lessonId', lessonId);
+    if (qaId) q.set('qaId', qaId);
+    if (audience) q.set('audience', audience);
+    if (status) q.set('status', status);
+    const res = await apiFetch(`/training-lms/qa?${q.toString()}`);
+    return res.json();
+  },
+  createQa: async (payload) => {
+    const res = await apiFetch('/training-lms/qa', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+  answerQa: async (qaId, answer) => {
+    const res = await apiFetch(`/training-lms/qa/${qaId}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ answer }),
+    });
+    return res.json();
+  },
 };
 
 // ─── FINANCE (Ledger SoT) ────────────────────────────────────────────────────

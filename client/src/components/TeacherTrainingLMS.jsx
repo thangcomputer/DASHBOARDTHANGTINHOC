@@ -24,6 +24,7 @@ import {
   ANTI_SEEK_PROGRESS_MESSAGE,
   PREV_LESSON_REQUIRED_CODE,
 } from '../utils/antiSeekPolicy';
+import { parseLmsHashQuery } from '../utils/lmsDeepLink';
 import { useToast } from '../utils/toast';
 
 const MOCK_COURSES = [
@@ -744,11 +745,23 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
   const [courseProgressMap, setCourseProgressMap] = useState({});
   const [expandedChapters, setExpandedChapters] = useState({});
   const [courseTab, setCourseTab] = useState('overview');
+  const [highlightQaId, setHighlightQaId] = useState(null);
+  const deepLinkRef = useRef(null);
   const playerApiRef = useRef(null);
   const [mainTab, setMainTab] = useState('courses'); // courses | guides | files
   const [expandedGuideKey, setExpandedGuideKey] = useState(null);
   const toast = useToast();
   const teacherSession = (() => { try { return JSON.parse(localStorage.getItem('teacher_user') || '{}'); } catch { return {}; } })();
+
+  useEffect(() => {
+    const { params } = parseLmsHashQuery();
+    if (params.courseId || params.lessonId || params.tab || params.qaId) {
+      deepLinkRef.current = params;
+      if (params.tab) setCourseTab(params.tab);
+      if (params.qaId) setHighlightQaId(params.qaId);
+      setMainTab('courses');
+    }
+  }, []);
 
   // Lấy tiến độ các khóa học của GV để hiển thị bên ngoài (Bổ sung mới)
   useEffect(() => {
@@ -791,6 +804,29 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
     return () => { cancelled = true; };
   }, [visibleTraining, teacherSubjectIds]);
+
+  // Deep-link từ chuông thông báo
+  useEffect(() => {
+    const dl = deepLinkRef.current;
+    if (!dl?.courseId || !courses.length || selectedCourse) return;
+    const hit = courses.find((c) => String(c._id || c.id) === String(dl.courseId));
+    if (hit) {
+      setSelectedCourse(hit);
+      fetchLessons(hit._id || hit.id);
+    }
+  }, [courses, selectedCourse]);
+
+  useEffect(() => {
+    const dl = deepLinkRef.current;
+    if (!dl || !lessons.length) return;
+    if (dl.lessonId) {
+      const hit = lessons.find((l) => String(l._id) === String(dl.lessonId) && l.isUnlocked);
+      if (hit) setCurrentLesson(hit);
+    }
+    if (dl.tab) setCourseTab(dl.tab);
+    if (dl.qaId) setHighlightQaId(dl.qaId);
+    deepLinkRef.current = null;
+  }, [lessons]);
 
   // ── Persist session khi reload (Issue #3) ──
   // Lưu courseId đang mở vào sessionStorage
@@ -1301,6 +1337,9 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                 }
               }}
               antiSeekEnabled={isLessonAntiSeekEnabled(currentLesson)}
+              audience="teacher"
+              canAnswerQa
+              highlightQaId={highlightQaId}
             />
           </div>
         </div>
