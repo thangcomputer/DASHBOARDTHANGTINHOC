@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Volume1 } from 'lucide-react';
 
 function formatClock(secs) {
   const s = Math.max(0, Math.floor(Number(secs) || 0));
@@ -13,8 +13,8 @@ function formatClock(secs) {
 }
 
 /**
- * Custom Thắng Tin Học player chrome (blue) — hides YouTube native controls UX.
- * Parent must set YT playerVars.controls = 0 and keep iframe pointer-events: none.
+ * Custom Thắng Tin Học player chrome (blue).
+ * Parent: YT controls:0 + iframe pointer-events:none.
  */
 export default function LmsBrandedPlayerChrome({
   visible = true,
@@ -25,21 +25,28 @@ export default function LmsBrandedPlayerChrome({
   duration = 0,
   maxSeekable = 0,
   antiSeekEnabled = true,
+  volume = 100,
+  muted = false,
   onPlay,
   onPause,
   onSeek,
+  onVolumeChange,
+  onToggleMute,
   brandLabel = 'THẮNG TIN HỌC',
 }) {
   const [dragging, setDragging] = useState(false);
   const [dragRatio, setDragRatio] = useState(0);
+  const [showVol, setShowVol] = useState(false);
   const barRef = useRef(null);
 
   const safeDur = duration > 0 ? duration : 0;
+  // Cho phép tua trong vùng đã xem (+ vị trí hiện tại)
+  const seekCap = antiSeekEnabled
+    ? Math.max(Number(maxSeekable) || 0, Number(currentTime) || 0)
+    : safeDur;
   const displayTime = dragging ? dragRatio * safeDur : currentTime;
   const progressPct = safeDur > 0 ? Math.min(100, (displayTime / safeDur) * 100) : 0;
-  const maxPct = safeDur > 0
-    ? Math.min(100, ((antiSeekEnabled ? maxSeekable : safeDur) / safeDur) * 100)
-    : 0;
+  const maxPct = safeDur > 0 ? Math.min(100, (seekCap / safeDur) * 100) : 0;
 
   const ratioFromEvent = useCallback((clientX) => {
     const el = barRef.current;
@@ -49,38 +56,33 @@ export default function LmsBrandedPlayerChrome({
     return rect.width > 0 ? x / rect.width : 0;
   }, [safeDur]);
 
+  const clampRatio = useCallback((ratio) => {
+    const r = Math.min(1, Math.max(0, ratio));
+    if (!antiSeekEnabled || safeDur <= 0) return r;
+    return Math.min(r, seekCap / safeDur);
+  }, [antiSeekEnabled, safeDur, seekCap]);
+
   const commitSeek = useCallback((ratio) => {
     if (!onSeek || safeDur <= 0) return;
-    let t = ratio * safeDur;
-    if (antiSeekEnabled) {
-      t = Math.min(t, Math.max(0, maxSeekable));
-    }
-    t = Math.max(0, Math.min(safeDur, t));
+    const t = clampRatio(ratio) * safeDur;
     onSeek(t);
-  }, [onSeek, safeDur, antiSeekEnabled, maxSeekable]);
+  }, [onSeek, safeDur, clampRatio]);
 
   useEffect(() => {
     if (!dragging) return undefined;
     const onMove = (e) => {
+      e.preventDefault?.();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const ratio = ratioFromEvent(clientX);
-      const capped = antiSeekEnabled
-        ? Math.min(ratio, maxPct / 100)
-        : ratio;
-      setDragRatio(capped);
+      setDragRatio(clampRatio(ratioFromEvent(clientX)));
     };
     const onUp = (e) => {
       const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-      const ratio = ratioFromEvent(clientX);
-      const capped = antiSeekEnabled
-        ? Math.min(ratio, maxPct / 100)
-        : ratio;
-      commitSeek(capped);
+      if (clientX != null) commitSeek(ratioFromEvent(clientX));
       setDragging(false);
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: false });
     window.addEventListener('touchend', onUp);
     return () => {
       window.removeEventListener('mousemove', onMove);
@@ -88,13 +90,14 @@ export default function LmsBrandedPlayerChrome({
       window.removeEventListener('touchmove', onMove);
       window.removeEventListener('touchend', onUp);
     };
-  }, [dragging, ratioFromEvent, commitSeek, antiSeekEnabled, maxPct]);
+  }, [dragging, ratioFromEvent, commitSeek, clampRatio]);
 
   if (!visible) return null;
 
+  const VolIcon = muted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
+
   return (
     <>
-      {/* Start / replay overlay */}
       {overlayVisible && (
         <div
           className="absolute inset-0 z-20 flex flex-col items-center justify-center px-4"
@@ -124,23 +127,78 @@ export default function LmsBrandedPlayerChrome({
         </div>
       )}
 
-      {/* Tap center to toggle play/pause (no YouTube hit-target) */}
+      {/* Chỉ vùng trên thanh điều khiển — không che scrubber/volume */}
       {!overlayVisible && (
         <button
           type="button"
           aria-label={isPlaying ? 'Tạm dừng' : 'Phát'}
-          className="absolute inset-0 z-[16] bg-transparent border-0 p-0 cursor-pointer"
+          className="absolute inset-x-0 top-0 z-[16] bg-transparent border-0 p-0 cursor-pointer"
+          style={{ bottom: 72 }}
           onClick={() => (isPlaying ? onPause?.() : onPlay?.())}
         />
       )}
 
-      {/* Bottom control bar */}
       {!overlayVisible && (
         <div
-          className="absolute inset-x-0 bottom-0 z-[18] px-3 sm:px-4 pt-10 pb-3 sm:pb-3.5 pointer-events-none"
-          style={{ background: 'linear-gradient(to top, rgba(8,15,28,0.92) 0%, rgba(8,15,28,0.55) 55%, transparent 100%)' }}
+          className="absolute inset-x-0 bottom-0 z-[30] px-3 sm:px-4 pt-8 pb-3"
+          style={{ background: 'linear-gradient(to top, rgba(8,15,28,0.95) 0%, rgba(8,15,28,0.65) 60%, transparent 100%)' }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
-          <div className="pointer-events-auto flex items-center gap-2.5 sm:gap-3">
+          {/* Seek track — hit area cao để kéo dễ */}
+          <div
+            ref={barRef}
+            role="slider"
+            aria-valuemin={0}
+            aria-valuemax={Math.floor(safeDur)}
+            aria-valuenow={Math.floor(displayTime)}
+            aria-label="Tiến độ video"
+            tabIndex={0}
+            className="relative h-8 flex items-center cursor-pointer touch-none select-none mb-2"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const ratio = clampRatio(ratioFromEvent(e.clientX));
+              setDragRatio(ratio);
+              setDragging(true);
+              commitSeek(ratio);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              const ratio = clampRatio(ratioFromEvent(e.touches[0].clientX));
+              setDragRatio(ratio);
+              setDragging(true);
+              commitSeek(ratio);
+            }}
+            onKeyDown={(e) => {
+              if (!safeDur) return;
+              if (e.key === 'ArrowRight') commitSeek((currentTime + 5) / safeDur);
+              if (e.key === 'ArrowLeft') commitSeek((currentTime - 5) / safeDur);
+            }}
+          >
+            <div className="absolute inset-x-0 h-2.5 rounded-full bg-white/20">
+              {antiSeekEnabled && maxPct > 0 && (
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-sky-300/30"
+                  style={{ width: `${maxPct}%` }}
+                />
+              )}
+              <div
+                className="absolute inset-y-0 left-0 rounded-full"
+                style={{
+                  width: `${progressPct}%`,
+                  background: 'linear-gradient(90deg, #7dd3fc 0%, #0ea5e9 55%, #0284c7 100%)',
+                }}
+              />
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-md"
+                style={{ left: `calc(${progressPct}% - 8px)` }}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={(e) => {
@@ -159,58 +217,45 @@ export default function LmsBrandedPlayerChrome({
                 : <Play size={16} fill="white" className="text-white ml-0.5" />}
             </button>
 
-            <div className="flex-1 min-w-0">
-              <div
-                ref={barRef}
-                role="slider"
-                aria-valuemin={0}
-                aria-valuemax={Math.floor(safeDur)}
-                aria-valuenow={Math.floor(displayTime)}
-                aria-label="Tiến độ video"
-                tabIndex={0}
-                className="relative h-2.5 sm:h-3 rounded-full cursor-pointer touch-none select-none bg-white/15"
-                onMouseDown={(e) => {
-                  e.preventDefault();
+            <span className="text-[11px] sm:text-xs font-bold tabular-nums text-sky-100 shrink-0 min-w-[2.5rem]">
+              {formatClock(displayTime)}
+            </span>
+            <span className="text-[11px] sm:text-xs font-bold tabular-nums text-slate-400 shrink-0">
+              / {formatClock(safeDur)}
+            </span>
+
+            <div className="flex-1" />
+
+            {/* Volume */}
+            <div
+              className="relative flex items-center gap-1.5"
+              onMouseEnter={() => setShowVol(true)}
+              onMouseLeave={() => setShowVol(false)}
+            >
+              <button
+                type="button"
+                onClick={(e) => {
                   e.stopPropagation();
-                  const ratio = ratioFromEvent(e.clientX);
-                  const capped = antiSeekEnabled ? Math.min(ratio, maxPct / 100) : ratio;
-                  setDragRatio(capped);
-                  setDragging(true);
+                  onToggleMute?.();
                 }}
-                onTouchStart={(e) => {
-                  e.stopPropagation();
-                  const ratio = ratioFromEvent(e.touches[0].clientX);
-                  const capped = antiSeekEnabled ? Math.min(ratio, maxPct / 100) : ratio;
-                  setDragRatio(capped);
-                  setDragging(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') commitSeek((currentTime + 5) / safeDur);
-                  if (e.key === 'ArrowLeft') commitSeek((currentTime - 5) / safeDur);
-                }}
+                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-sky-100 border border-white/10 transition"
+                aria-label={muted ? 'Bật tiếng' : 'Tắt tiếng'}
               >
-                {/* Watched / allowed region hint when anti-seek */}
-                {antiSeekEnabled && maxPct > 0 && (
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-sky-400/25"
-                    style={{ width: `${maxPct}%` }}
-                  />
-                )}
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full"
-                  style={{
-                    width: `${progressPct}%`,
-                    background: 'linear-gradient(90deg, #7dd3fc 0%, #0ea5e9 55%, #0284c7 100%)',
+                <VolIcon size={16} />
+              </button>
+              <div className={`overflow-hidden transition-all duration-200 ${showVol ? 'w-20 sm:w-24 opacity-100' : 'w-0 opacity-0 sm:w-20 sm:opacity-100'}`}>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={muted ? 0 : volume}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    onVolumeChange?.(v);
                   }}
+                  className="w-full h-1.5 accent-sky-400 cursor-pointer"
+                  aria-label="Âm lượng"
                 />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-white border-2 border-sky-500 shadow"
-                  style={{ left: `calc(${progressPct}% - 7px)` }}
-                />
-              </div>
-              <div className="mt-1.5 flex items-center justify-between text-[10px] sm:text-[11px] font-bold tabular-nums tracking-wide">
-                <span className="text-sky-200">{formatClock(displayTime)}</span>
-                <span className="text-slate-400">{formatClock(safeDur)}</span>
               </div>
             </div>
           </div>
@@ -218,4 +263,24 @@ export default function LmsBrandedPlayerChrome({
       )}
     </>
   );
+}
+
+/** Prefer highest available YouTube quality (best-effort; YT may ignore). */
+export function preferMaxYouTubeQuality(player) {
+  if (!player) return;
+  try {
+    const levels = typeof player.getAvailableQualityLevels === 'function'
+      ? (player.getAvailableQualityLevels() || [])
+      : [];
+    const order = ['highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small'];
+    const best = order.find((q) => levels.includes(q)) || levels[0];
+    if (best && typeof player.setPlaybackQuality === 'function') {
+      player.setPlaybackQuality(best);
+    }
+    if (typeof player.setPlaybackQualityRange === 'function' && best) {
+      try {
+        player.setPlaybackQualityRange(best, best);
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
 }

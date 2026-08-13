@@ -20,7 +20,7 @@ import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import { formatLessonDisplayTitle } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
-import LmsBrandedPlayerChrome from './lms/LmsBrandedPlayerChrome';
+import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrandedPlayerChrome';
 import {
   isLessonAntiSeekEnabled,
   requiredWatchSeconds,
@@ -175,6 +175,8 @@ const StudentVideoPlayer = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [isTabActive, setIsTabActive] = useState(true);
   const [maxSeekableUi, setMaxSeekableUi] = useState(0);
+  const [volume, setVolume] = useState(100);
+  const [muted, setMuted] = useState(false);
 
   const playerRef = useRef(null);
   const containerRef = useRef(null);
@@ -293,6 +295,11 @@ const StudentVideoPlayer = ({
             setIsReady(true);
             const dur = event.target.getDuration();
             if (dur > 0) setTotalDuration(dur);
+            preferMaxYouTubeQuality(event.target);
+            try {
+              event.target.setVolume?.(100);
+              event.target.unMute?.();
+            } catch { /* ignore */ }
             const resumeAt = antiSeekEnabled ? maxPosRef.current : bestInitial;
             if (resumeAt > 0) {
               event.target.seekTo(resumeAt, true);
@@ -396,6 +403,7 @@ const StudentVideoPlayer = ({
       setIsPaused(false);
       setIsPlaying(true);
       setHasEnded(false);
+      preferMaxYouTubeQuality(event.target);
       startCounting();
       if (!totalDuration || totalDuration === 0) {
         const dur = event.target.getDuration?.();
@@ -428,10 +436,18 @@ const StudentVideoPlayer = ({
       try {
         const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
         setCurrentTime(t);
+        if (antiSeekEnabled && t > maxPosRef.current) {
+          maxPosRef.current = t;
+          setMaxSeekableUi(t);
+          sessionStorage.setItem(`student_lms_pos_${lessonId}`, String(t));
+        } else if (!antiSeekEnabled && t > maxPosRef.current) {
+          maxPosRef.current = t;
+          setMaxSeekableUi(t);
+        }
       } catch { /* ignore */ }
     }, 250);
     return () => clearInterval(uiTickRef.current);
-  }, [isPlaying]);
+  }, [isPlaying, antiSeekEnabled, lessonId]);
 
   if (!yId) {
     return (
@@ -463,13 +479,42 @@ const StudentVideoPlayer = ({
           duration={totalDuration}
           maxSeekable={maxSeekableUi}
           antiSeekEnabled={antiSeekEnabled}
+          volume={volume}
+          muted={muted}
           onPlay={() => playerRef.current?.playVideo?.()}
           onPause={() => playerRef.current?.pauseVideo?.()}
           onSeek={(t) => {
             try {
-              const capped = antiSeekEnabled ? Math.min(t, maxPosRef.current) : t;
+              const cap = antiSeekEnabled
+                ? Math.max(maxPosRef.current, currentTime)
+                : Number.POSITIVE_INFINITY;
+              const capped = antiSeekEnabled ? Math.min(t, cap) : t;
+              seekGuardRef.current = true;
               playerRef.current?.seekTo?.(capped, true);
               setCurrentTime(capped);
+              setTimeout(() => { seekGuardRef.current = false; }, 500);
+            } catch { /* ignore */ }
+          }}
+          onVolumeChange={(v) => {
+            setVolume(v);
+            setMuted(v === 0);
+            try {
+              playerRef.current?.setVolume?.(v);
+              if (v > 0) playerRef.current?.unMute?.();
+              else playerRef.current?.mute?.();
+            } catch { /* ignore */ }
+          }}
+          onToggleMute={() => {
+            try {
+              if (muted) {
+                playerRef.current?.unMute?.();
+                playerRef.current?.setVolume?.(volume || 80);
+                setMuted(false);
+                if (volume === 0) setVolume(80);
+              } else {
+                playerRef.current?.mute?.();
+                setMuted(true);
+              }
             } catch { /* ignore */ }
           }}
         />
