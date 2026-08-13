@@ -28,6 +28,13 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const [gradeData, setGradeData] = useState({ grade: '', teacherFeedback: '' });
   const [highlightStudentId, setHighlightStudentId] = useState(null);
 
+  // First paint often has myStudents=[] — pick first course when data arrives
+  useEffect(() => {
+    if (!uniqueCourses.length) return;
+    if (selectedCourse && uniqueCourses.includes(selectedCourse)) return;
+    setSelectedCourse(uniqueCourses[0]);
+  }, [uniqueCourses, selectedCourse]);
+
   useEffect(() => {
     fetchAssignments();
   }, [selectedCourse]);
@@ -104,11 +111,18 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   };
 
   if (!selectedCourse) {
+    const waitingForStudents = !(myStudents && myStudents.length);
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <Search size={48} className="mb-4 opacity-20" />
-        <p className="font-medium text-lg">Chưa chọn Lớp / Khóa học</p>
-        <p className="text-sm">Vui lòng chọn một lớp bên Sidebar để xem bài tập.</p>
+        <p className="font-medium text-lg">
+          {waitingForStudents ? 'Đang tải lớp / khóa học…' : 'Chưa có Lớp / Khóa học'}
+        </p>
+        <p className="text-sm text-center max-w-sm">
+          {waitingForStudents
+            ? 'Vui lòng chờ danh sách học viên tải xong.'
+            : 'Chưa có học viên được phân công khóa học — không thể xem bài tập.'}
+        </p>
       </div>
     );
   }

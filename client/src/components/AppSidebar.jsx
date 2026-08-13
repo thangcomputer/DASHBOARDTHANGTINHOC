@@ -314,7 +314,8 @@ const AppSidebar = ({
           } catch { /* ignore */ }
         }
 
-        if (!g && role !== 'student') {
+        // Teacher không có quyền /api/staff — chỉ thử khi admin/staff (tránh 403 ồn console)
+        if (!g && role !== 'student' && role !== 'teacher') {
           try {
             const sRes = await api.staff.getAll();
             const list = Array.isArray(sRes?.data) ? sRes.data : [];
