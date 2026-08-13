@@ -187,6 +187,7 @@ const StudentVideoPlayer = ({
   const seekGuardRef = useRef(false);
   const eligibilitySentRef = useRef(false);
   const uiTickRef = useRef(null);
+  const seekUnlockedRef = useRef(false);
 
   // Restore watched seconds from sessionStorage or initialWatchedSeconds
   const bestInitial = useMemo(() => {
@@ -198,6 +199,10 @@ const StudentVideoPlayer = ({
   }, [lessonId, initialWatchedSeconds]);
 
   const actualWatchedRef = useRef(bestInitial);
+
+  const seekUnlocked = !antiSeekEnabled
+    || (totalDuration > 0 && displayWatched >= Math.ceil((totalDuration * 2) / 3) && displayWatched > 0);
+  seekUnlockedRef.current = seekUnlocked;
 
   // Chỉ reset overlay khi đổi bài — không bật lại nút Play khi parent cập nhật tiến độ
   useEffect(() => {
@@ -339,7 +344,8 @@ const StudentVideoPlayer = ({
       try {
         const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
         setCurrentTime(t);
-        if (antiSeekEnabled && !seekGuardRef.current) {
+        const unlocked = seekUnlockedRef.current;
+        if (antiSeekEnabled && !unlocked && !seekGuardRef.current) {
           if (t > maxPosRef.current + 1.25) {
             seekGuardRef.current = true;
             playerRef.current?.seekTo?.(maxPosRef.current, true);
@@ -351,9 +357,12 @@ const StudentVideoPlayer = ({
             setMaxSeekableUi(maxPosRef.current);
             sessionStorage.setItem(`student_lms_pos_${lessonId}`, String(maxPosRef.current));
           }
-        } else if (!antiSeekEnabled && t > maxPosRef.current) {
+        } else if (t > maxPosRef.current) {
           maxPosRef.current = t;
           setMaxSeekableUi(t);
+          if (antiSeekEnabled) {
+            sessionStorage.setItem(`student_lms_pos_${lessonId}`, String(t));
+          }
         }
       } catch { /* ignore */ }
 
@@ -436,11 +445,12 @@ const StudentVideoPlayer = ({
       try {
         const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
         setCurrentTime(t);
-        if (antiSeekEnabled && t > maxPosRef.current) {
+        const unlocked = seekUnlockedRef.current;
+        if (antiSeekEnabled && !unlocked && t > maxPosRef.current) {
           maxPosRef.current = t;
           setMaxSeekableUi(t);
           sessionStorage.setItem(`student_lms_pos_${lessonId}`, String(t));
-        } else if (!antiSeekEnabled && t > maxPosRef.current) {
+        } else if ((!antiSeekEnabled || unlocked) && t > maxPosRef.current) {
           maxPosRef.current = t;
           setMaxSeekableUi(t);
         }
@@ -479,16 +489,18 @@ const StudentVideoPlayer = ({
           duration={totalDuration}
           maxSeekable={maxSeekableUi}
           antiSeekEnabled={antiSeekEnabled}
+          seekUnlocked={seekUnlocked}
           volume={volume}
           muted={muted}
           onPlay={() => playerRef.current?.playVideo?.()}
           onPause={() => playerRef.current?.pauseVideo?.()}
           onSeek={(t) => {
             try {
-              const cap = antiSeekEnabled
+              const unlocked = seekUnlockedRef.current;
+              const cap = (antiSeekEnabled && !unlocked)
                 ? Math.max(maxPosRef.current, currentTime)
                 : Number.POSITIVE_INFINITY;
-              const capped = antiSeekEnabled ? Math.min(t, cap) : t;
+              const capped = (antiSeekEnabled && !unlocked) ? Math.min(t, cap) : t;
               seekGuardRef.current = true;
               playerRef.current?.seekTo?.(capped, true);
               setCurrentTime(capped);

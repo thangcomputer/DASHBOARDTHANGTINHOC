@@ -25,6 +25,8 @@ export default function LmsBrandedPlayerChrome({
   duration = 0,
   maxSeekable = 0,
   antiSeekEnabled = true,
+  /** true khi đã đủ 2/3 giây xem → cho tua tự do toàn video */
+  seekUnlocked = false,
   volume = 100,
   muted = false,
   onPlay,
@@ -40,8 +42,9 @@ export default function LmsBrandedPlayerChrome({
   const barRef = useRef(null);
 
   const safeDur = duration > 0 ? duration : 0;
-  // Cho phép tua trong vùng đã xem (+ vị trí hiện tại)
-  const seekCap = antiSeekEnabled
+  const lockSeek = antiSeekEnabled && !seekUnlocked;
+  // Chưa đủ điều kiện: chỉ tua trong vùng đã xem. Đã đủ: tua full.
+  const seekCap = lockSeek
     ? Math.max(Number(maxSeekable) || 0, Number(currentTime) || 0)
     : safeDur;
   const displayTime = dragging ? dragRatio * safeDur : currentTime;
@@ -58,9 +61,9 @@ export default function LmsBrandedPlayerChrome({
 
   const clampRatio = useCallback((ratio) => {
     const r = Math.min(1, Math.max(0, ratio));
-    if (!antiSeekEnabled || safeDur <= 0) return r;
+    if (!lockSeek || safeDur <= 0) return r;
     return Math.min(r, seekCap / safeDur);
-  }, [antiSeekEnabled, safeDur, seekCap]);
+  }, [lockSeek, safeDur, seekCap]);
 
   const commitSeek = useCallback((ratio) => {
     if (!onSeek || safeDur <= 0) return;
@@ -178,7 +181,7 @@ export default function LmsBrandedPlayerChrome({
             }}
           >
             <div className="absolute inset-x-0 h-2.5 rounded-full bg-white/20">
-              {antiSeekEnabled && maxPct > 0 && (
+              {lockSeek && maxPct > 0 && maxPct < 100 && (
                 <div
                   className="absolute inset-y-0 left-0 rounded-full bg-sky-300/30"
                   style={{ width: `${maxPct}%` }}

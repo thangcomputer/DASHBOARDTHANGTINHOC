@@ -141,6 +141,7 @@ const YouTubePlayerSecure = ({
   const seekGuardRef = useRef(false);
   const eligibilitySentRef = useRef(false);
   const uiTickRef = useRef(null);
+  const seekUnlockedRef = useRef(false);
 
   // ── Bộ đếm thực tế ──────────────────────────────────────────────────────────
   const initialLocal = parseInt(sessionStorage.getItem(`lms_watched_${lessonId}`) || "0", 10);
@@ -148,6 +149,10 @@ const YouTubePlayerSecure = ({
   const actualWatchedRef = useRef(bestInitial); // Số giây xem thực tế
   const [displayWatched, setDisplayWatched] = useState(bestInitial);
   const [totalDuration, setTotalDuration] = useState(lessonDuration || 0);
+
+  const seekUnlocked = !antiSeekEnabled
+    || (totalDuration > 0 && displayWatched >= Math.ceil((totalDuration * 2) / 3) && displayWatched > 0);
+  seekUnlockedRef.current = seekUnlocked;
 
   // Reset overlay chỉ khi đổi bài — tránh bật lại nút Play khi cập nhật tiến độ
   useEffect(() => {
@@ -301,7 +306,8 @@ const YouTubePlayerSecure = ({
       try {
         const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
         setCurrentTime(t);
-        if (antiSeekEnabled && !seekGuardRef.current) {
+        const unlocked = seekUnlockedRef.current;
+        if (antiSeekEnabled && !unlocked && !seekGuardRef.current) {
           if (t > maxPosRef.current + 1.25) {
             seekGuardRef.current = true;
             playerRef.current?.seekTo?.(maxPosRef.current, true);
@@ -313,9 +319,12 @@ const YouTubePlayerSecure = ({
             setMaxSeekableUi(maxPosRef.current);
             sessionStorage.setItem(`lms_pos_${lessonId}`, String(maxPosRef.current));
           }
-        } else if (!antiSeekEnabled && t > maxPosRef.current) {
+        } else if (t > maxPosRef.current) {
           maxPosRef.current = t;
           setMaxSeekableUi(t);
+          if (antiSeekEnabled) {
+            sessionStorage.setItem(`lms_pos_${lessonId}`, String(t));
+          }
         }
       } catch { /* ignore */ }
 
@@ -397,10 +406,11 @@ const YouTubePlayerSecure = ({
       try {
         const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
         setCurrentTime(t);
+        const unlocked = seekUnlockedRef.current;
         if (t > maxPosRef.current) {
           maxPosRef.current = t;
           setMaxSeekableUi(t);
-          if (antiSeekEnabled) {
+          if (antiSeekEnabled && !unlocked) {
             sessionStorage.setItem(`lms_pos_${lessonId}`, String(t));
           }
         }
@@ -441,16 +451,18 @@ const YouTubePlayerSecure = ({
           duration={totalDuration}
           maxSeekable={maxSeekableUi}
           antiSeekEnabled={antiSeekEnabled}
+          seekUnlocked={seekUnlocked}
           volume={volume}
           muted={muted}
           onPlay={() => playerRef.current?.playVideo?.()}
           onPause={() => playerRef.current?.pauseVideo?.()}
           onSeek={(t) => {
             try {
-              const cap = antiSeekEnabled
+              const unlocked = seekUnlockedRef.current;
+              const cap = (antiSeekEnabled && !unlocked)
                 ? Math.max(maxPosRef.current, currentTime)
                 : Number.POSITIVE_INFINITY;
-              const capped = antiSeekEnabled ? Math.min(t, cap) : t;
+              const capped = (antiSeekEnabled && !unlocked) ? Math.min(t, cap) : t;
               seekGuardRef.current = true;
               playerRef.current?.seekTo?.(capped, true);
               setCurrentTime(capped);
