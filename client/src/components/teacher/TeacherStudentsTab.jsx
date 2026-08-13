@@ -3,11 +3,43 @@ import { Search, MessageSquare, Users, GraduationCap } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import TeacherStudentCard from './TeacherStudentCard';
 import { openSiteChat } from '../FloatingMessenger';
+import { getAttendanceAction } from '../../utils/attendanceAction';
+import { normalizeScheduleDate } from '../../utils/scheduleTime';
+
+function resolveTodayAttendanceGate(todaySchedules) {
+  if (!todaySchedules.length) return { status: 'no_schedule' };
+  const now = new Date();
+  const ranked = todaySchedules.map((schedule) => ({
+    schedule,
+    meta: getAttendanceAction(schedule, null, now),
+  }));
+  // Ưu tiên: đã điểm danh > còn điểm danh được > quá hạn (bù) > chưa tới giờ
+  const done = ranked.find(
+    (x) => x.meta.state === 'COMPLETED' || String(x.schedule?.status || '') === 'completed',
+  );
+  if (done) {
+    return { status: 'done', schedule: done.schedule, meta: done.meta };
+  }
+  const attendable = ranked.find((x) => x.meta.canAttend);
+  if (attendable) {
+    return { status: 'ready', schedule: attendable.schedule, meta: attendable.meta };
+  }
+  const overdue = ranked.find((x) => x.meta.state === 'OVERDUE_ATTENDANCE');
+  if (overdue) {
+    return { status: 'overdue', schedule: overdue.schedule, meta: overdue.meta };
+  }
+  const upcoming = ranked.find((x) => x.meta.state === 'UPCOMING');
+  if (upcoming) {
+    return { status: 'not_yet', schedule: upcoming.schedule, meta: upcoming.meta };
+  }
+  return { status: 'ready', schedule: ranked[0].schedule, meta: ranked[0].meta };
+}
 
 export default function TeacherStudentsTab({
   studentSearch, setStudentSearch, students, onlineUsers, lastSeenUsers, timeAgo,
   selectedEnrollmentKey, setSelectedEnrollmentKey, navigate, mySchedules,
   markAttendance, updateLink, saveGrade, updateNotes, lockStudentExam,
+  cancelSchedule,
 }) {
   return (
           <div className="px-3 sm:px-4 md:px-8 py-4 sm:py-6 min-h-[calc(100vh-120px)] xl:h-[calc(100vh-120px)] flex flex-col xl:flex-row gap-4 sm:gap-6 xl:overflow-hidden min-w-0 w-full max-w-full">
@@ -115,32 +147,43 @@ export default function TeacherStudentsTab({
                   const student = students.find(s => String(s._enrollmentKey || s._id || s.id) === String(selectedEnrollmentKey));
                   if (!student) return <div className="p-20 text-center text-gray-400">Không tìm thấy thông tin</div>;
 
-                  // ─── TÍNH TOÁN CỔNG ĐIỂM DANH (THEO LỊCH + KHÓA) ───
+                  // ─── CỔNG ĐIỂM DANH: hôm nay + buổi quá hạn hôm qua (điểm danh bù) ───
                   const now = new Date();
                   const y = now.getFullYear();
                   const m = String(now.getMonth() + 1).padStart(2, '0');
                   const d = String(now.getDate()).padStart(2, '0');
                   const todayStr = `${y}-${m}-${d}`;
+                  const yday = new Date(now);
+                  yday.setDate(yday.getDate() - 1);
+                  const ydayStr = `${yday.getFullYear()}-${String(yday.getMonth() + 1).padStart(2, '0')}-${String(yday.getDate()).padStart(2, '0')}`;
 
                   const studentId = student._id || student.id;
                   const courseName = student.course || '';
-                  const todaySchedules = mySchedules.filter(s =>
-                    String(s.studentId) === String(studentId) &&
-                    s.date.startsWith(todayStr) &&
-                    s.status === 'scheduled' &&
-                    (!courseName || !s.course || s.course === courseName)
+                  const matchStudentCourse = (s, statuses) =>
+                    String(s.studentId?._id || s.studentId?.id || s.studentId) === String(studentId) &&
+                    statuses.includes(String(s.status || '')) &&
+                    (!courseName || !s.course || s.course === courseName);
+
+                  const todayCompleted = (mySchedules || []).filter((s) =>
+                    matchStudentCourse(s, ['completed']) && normalizeScheduleDate(s.date) === todayStr
                   );
-                  
-                  let attendanceGate = { status: 'no_schedule' };
-                  if (todaySchedules.length > 0) {
-                    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-                    const readySch = todaySchedules.find(s => currentTime >= s.startTime);
-                    if (readySch) {
-                      attendanceGate = { status: 'ready' };
-                    } else {
-                      attendanceGate = { status: 'not_yet' };
-                    }
-                  }
+                  const todaySchedules = (mySchedules || []).filter((s) =>
+                    matchStudentCourse(s, ['scheduled']) && normalizeScheduleDate(s.date) === todayStr
+                  );
+                  // Chỉ lấy lịch hôm qua quá hạn khi hôm nay CHƯA điểm danh — tránh hiện "Điểm danh bù" sau khi đã điểm danh
+                  const ydayOverdue = todayCompleted.length
+                    ? []
+                    : (mySchedules || []).filter((s) =>
+                      matchStudentCourse(s, ['scheduled'])
+                      && normalizeScheduleDate(s.date) === ydayStr
+                      && getAttendanceAction(s, null, now).state === 'OVERDUE_ATTENDANCE'
+                    );
+
+                  const attendanceGate = todayCompleted.length
+                    ? resolveTodayAttendanceGate(todayCompleted)
+                    : resolveTodayAttendanceGate(
+                      todaySchedules.length ? todaySchedules : ydayOverdue
+                    );
 
                   return (
                     <TeacherStudentCard 
@@ -151,6 +194,7 @@ export default function TeacherStudentsTab({
                       isDetailed={true}
                       attendanceGate={attendanceGate}
                       myStudents={students}
+                      onCancelSchedule={cancelSchedule}
                     />
                   );
                 })()

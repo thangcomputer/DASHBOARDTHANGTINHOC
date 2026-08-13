@@ -31,6 +31,7 @@ const ERROR_CODES = {
   STUDENT_DAILY_SESSION_LIMIT: 'STUDENT_DAILY_SESSION_LIMIT',
   TEACHER_SCHEDULE_CONFLICT: 'TEACHER_SCHEDULE_CONFLICT',
   ENROLLMENT_NOT_FOUND: 'ENROLLMENT_NOT_FOUND',
+  SCHEDULE_DATE_PAST: 'SCHEDULE_DATE_PAST',
 };
 
 function schedulingError(code, message, extra = {}) {
@@ -219,14 +220,30 @@ async function assertTeacherNoConflict({
   return null;
 }
 
+/** Không cho xếp/sửa lịch về ngày trước hôm nay (local). */
+function assertScheduleDateNotPast(dateInput) {
+  const { start } = dayRange(dateInput);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (start.getTime() < today.getTime()) {
+    throw schedulingError(
+      ERROR_CODES.SCHEDULE_DATE_PAST,
+      'Không thể xếp hoặc sửa lịch cho ngày đã qua.',
+      {},
+    );
+  }
+}
+
 /**
  * Full CREATE validation (student enrollment + daily + teacher conflict).
- * Student time-overlap remain in route if desired; daily limit is stricter when MAX=1.
+ * Usage re-check still applies if moving would somehow add capacity (normally same slot).
  */
 async function validateScheduleCreate(opts = {}) {
   const {
     studentId, teacherId, courseName, date, startTime, endTime,
   } = opts;
+
+  assertScheduleDateNotPast(date);
 
   const enrollmentInfo = await assertEnrollmentCanSchedule({
     studentId,
@@ -251,7 +268,11 @@ async function validateScheduleCreate(opts = {}) {
 async function validateScheduleReschedule(opts = {}) {
   const {
     studentId, teacherId, courseName, date, startTime, endTime, excludeScheduleId,
+    originalDate,
   } = opts;
+
+  if (originalDate != null) assertScheduleDateNotPast(originalDate);
+  assertScheduleDateNotPast(date);
 
   // Enrollment cap: exclude self so editing alone does not trip limit
   await assertEnrollmentCanSchedule({
@@ -300,5 +321,6 @@ module.exports = {
   findTeacherScheduleClash,
   validateScheduleCreate,
   validateScheduleReschedule,
+  assertScheduleDateNotPast,
   sendSchedulingError,
 };

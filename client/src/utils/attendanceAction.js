@@ -140,7 +140,7 @@ export function getAttendanceAction(schedule, _attendance, now = new Date()) {
       action: 'CHECK_IN',
       canAttend: true,
       canLateAttend: true,
-      canAdminMakeup: true,
+      canAdminMakeup: false,
       canRequestCorrection: false,
       reason: 'Buổi học đã kết thúc — còn hạn điểm danh',
       remainingGraceMs: Math.max(0, graceEndAt.getTime() - t),

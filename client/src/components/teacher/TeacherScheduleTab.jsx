@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Calendar, Plus, CheckCircle, Clock, Ban } from 'lucide-react';
 import TeacherMonthlyCalendar from './TeacherMonthlyCalendar';
+import { isScheduleDateBeforeToday } from '../../utils/scheduleTime';
 
 export default function TeacherScheduleTab({
   setEditingSchedule,
@@ -94,10 +95,13 @@ export default function TeacherScheduleTab({
         schedules={mySchedules}
         onEditSchedule={startEditSchedule}
         onAddSchedule={(date) => {
+          if (isScheduleDateBeforeToday(date)) {
+            return;
+          }
           const yyyy = date.getFullYear();
           const mm = String(date.getMonth() + 1).padStart(2, '0');
           const dd = String(date.getDate()).padStart(2, '0');
-          setEditingSchedule({ date: `${yyyy}-${mm}-${dd}` });
+          setEditingSchedule({ date: `${yyyy}-${mm}-${dd}`, fromCalendar: true });
           setShowScheduleModal(true);
         }}
         onCancelSchedule={(scheduleId, reason) => {

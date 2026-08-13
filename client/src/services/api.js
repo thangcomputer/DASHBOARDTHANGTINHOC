@@ -1165,6 +1165,13 @@ export const schedulesAPI = {
     });
     return res.json();
   },
+  cancel: async (id, reason = '') => {
+    const res = await apiFetch(`/schedules/${id}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    });
+    return res.json();
+  },
   remove: async (id) => {
     const res = await apiFetch(`/schedules/${id}`, { method: 'DELETE' });
     return res.json();

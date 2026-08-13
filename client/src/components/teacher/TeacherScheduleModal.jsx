@@ -4,10 +4,12 @@ import { X, Calendar } from 'lucide-react';
 import {
   isEndTimeAfterStart, normalizeScheduleDate, normalizeTimeHHmm,
   getCurrentTimeHHmm, endTimeFromStart, findStudentScheduleConflict, formatScheduleConflictMessage,
+  findTeacherScheduleConflict, formatTeacherConflictMessage,
+  isScheduleDateBeforeToday, formatLocalDateKey,
 } from '../../utils/scheduleTime';
 import { getStudentScheduleGate, MAX_STUDENT_SESSIONS_PER_DAY } from '../../utils/schedulingLimits';
 
-export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSubmit }) => {
+export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSubmit, teacherId }) => {
   const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
   const getDayOfWeek = (dateStr) => {
     const d = new Date(dateStr + 'T00:00:00');
@@ -18,13 +20,20 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
   const findStudentByKey = (key) => students.find((s) => studentKey(s) === String(key));
 
   const isEdit = Boolean(schedule?.id || schedule?._id);
+  // Bấm ngày trên lịch: chỉ có date (không id) → prefill ngày đó + 00:00
+  // Nút "Xếp lịch dạy mới": schedule=null → hôm nay + giờ hiện tại
+  const isCalendarDayPrefill = Boolean(
+    !isEdit && schedule?.date && (schedule.fromCalendar === true || !schedule?.startTime),
+  );
   const excludeId = schedule?.id || schedule?._id;
   const initDate = normalizeScheduleDate(schedule?.date);
   const nowStart = getCurrentTimeHHmm();
-  const initStart = isEdit ? normalizeTimeHHmm(schedule?.startTime, nowStart) : nowStart;
+  const initStart = isEdit
+    ? normalizeTimeHHmm(schedule?.startTime, nowStart)
+    : (isCalendarDayPrefill ? '00:00' : nowStart);
   const initEnd = isEdit
     ? normalizeTimeHHmm(schedule?.endTime, endTimeFromStart(initStart))
-    : endTimeFromStart(nowStart);
+    : endTimeFromStart(initStart);
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState(() => {
     const initStudentId = String(schedule?.studentId?._id || schedule?.studentId || '');
@@ -52,6 +61,11 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
     () => getStudentScheduleGate(selectedStudent, allSchedules, form.date, isEdit ? excludeId : null),
     [selectedStudent, allSchedules, form.date, isEdit, excludeId],
   );
+
+  const dateIsPast = isScheduleDateBeforeToday(form.date);
+  const originalIsPast = isEdit && isScheduleDateBeforeToday(schedule?.date);
+  const todayKey = formatLocalDateKey(new Date());
+  const lockedPast = dateIsPast || originalIsPast;
 
   const applyStartTime = (raw) => {
     const start = normalizeTimeHHmm(raw, getCurrentTimeHHmm());
@@ -84,16 +98,26 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
   };
 
   const handleSubmit = () => {
+    if (lockedPast) {
+      setFormError(originalIsPast
+        ? 'Không thể sửa lịch đã qua ngày.'
+        : 'Không thể xếp lịch cho ngày đã qua.');
+      return;
+    }
     if (!form.studentId?.trim()) {
       setFormError('Vui lòng chọn học viên');
       return;
     }
-    if (!gate.canSchedule) {
+    if (!gate.canSchedule && !isEdit) {
       setFormError(gate.reason || 'Không thể xếp lịch cho học viên này');
       return;
     }
     if (!form.date?.trim()) {
       setFormError('Vui lòng chọn ngày học');
+      return;
+    }
+    if (isScheduleDateBeforeToday(form.date)) {
+      setFormError('Không thể xếp lịch cho ngày đã qua.');
       return;
     }
     if (!form.startTime?.trim()) {
@@ -118,6 +142,18 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
       setFormError(formatScheduleConflictMessage(conflict));
       return;
     }
+    const teacherConflict = findTeacherScheduleConflict({
+      schedules: allSchedules,
+      teacherId: teacherId || schedule?.teacherId,
+      date: form.date,
+      startTime,
+      endTime,
+      excludeScheduleId: schedule?.id || schedule?._id,
+    });
+    if (teacherConflict) {
+      setFormError(formatTeacherConflictMessage(teacherConflict));
+      return;
+    }
     setFormError('');
     onSubmit({ ...form, startTime, endTime });
   };
@@ -132,7 +168,7 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
         <div className="p-6 space-y-4 overflow-y-auto">
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chọn học viên</label>
-            <CmsSelect name="enrollmentKey" value={form.enrollmentKey} onChange={handleChange} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none">
+            <CmsSelect name="enrollmentKey" value={form.enrollmentKey} onChange={handleChange} disabled={lockedPast} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none">
               {students.map((s) => {
                 const key = studentKey(s);
                 const sid = String(s.id || s._id || '');
@@ -169,23 +205,47 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Ngày học (Ngày / Tháng / Năm)</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
-              <CmsSelect value={parseInt(form.date.split('-')[2])} onChange={(e) => {
+              <CmsSelect
+                disabled={lockedPast}
+                value={parseInt(form.date.split('-')[2], 10)}
+                onChange={(e) => {
                 const parts = form.date.split('-');
                 const newDate = `${parts[0]}-${parts[1]}-${String(e.target.value).padStart(2,'0')}`;
+                if (isScheduleDateBeforeToday(newDate)) {
+                  setFormError('Không thể chọn ngày đã qua.');
+                  return;
+                }
+                setFormError('');
                 setForm({...form, date: newDate, dayOfWeek: getDayOfWeek(newDate)});
               }} className="bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none text-center">
                 {Array.from({length:31},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}
               </CmsSelect>
-              <CmsSelect value={parseInt(form.date.split('-')[1])} onChange={(e) => {
+              <CmsSelect
+                disabled={lockedPast}
+                value={parseInt(form.date.split('-')[1], 10)}
+                onChange={(e) => {
                 const parts = form.date.split('-');
                 const newDate = `${parts[0]}-${String(e.target.value).padStart(2,'0')}-${parts[2]}`;
+                if (isScheduleDateBeforeToday(newDate)) {
+                  setFormError('Không thể chọn ngày đã qua.');
+                  return;
+                }
+                setFormError('');
                 setForm({...form, date: newDate, dayOfWeek: getDayOfWeek(newDate)});
               }} className="bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none text-center">
                 {Array.from({length:12},(_,i)=>i+1).map(m=><option key={m} value={m}>Tháng {m}</option>)}
               </CmsSelect>
-              <CmsSelect value={parseInt(form.date.split('-')[0])} onChange={(e) => {
+              <CmsSelect
+                disabled={lockedPast}
+                value={parseInt(form.date.split('-')[0], 10)}
+                onChange={(e) => {
                 const parts = form.date.split('-');
                 const newDate = `${e.target.value}-${parts[1]}-${parts[2]}`;
+                if (isScheduleDateBeforeToday(newDate)) {
+                  setFormError('Không thể chọn ngày đã qua.');
+                  return;
+                }
+                setFormError('');
                 setForm({...form, date: newDate, dayOfWeek: getDayOfWeek(newDate)});
               }} className="bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none text-center">
                 {[2026,2027,2028].map(y=><option key={y} value={y}>{y}</option>)}
@@ -194,6 +254,13 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
             <p className="text-xs text-blue-500 font-semibold mt-1.5 text-center">
               📅 {form.dayOfWeek}, ngày {parseInt(form.date.split('-')[2])}/{parseInt(form.date.split('-')[1])}/{form.date.split('-')[0]}
             </p>
+            {lockedPast && (
+              <p className="text-xs font-bold text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mt-2 text-center">
+                {originalIsPast
+                  ? 'Ca này đã qua ngày — không được sửa lịch.'
+                  : `Không xếp lịch trước ngày hôm nay (${todayKey.split('-').reverse().join('/')}).`}
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -204,7 +271,7 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
                 value={form.startTime}
                 onChange={handleChange}
                 onInput={handleChange}
-                disabled={!gate.canSchedule && !isEdit}
+                disabled={lockedPast || (!gate.canSchedule && !isEdit)}
                 className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none disabled:opacity-50"
               />
             </div>
@@ -227,7 +294,15 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
           </p>
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chủ đề buổi học</label>
-            <input type="text" name="topic" value={form.topic} onChange={handleChange} placeholder="VD: Ôn tập hàm IF, VLOOKUP" className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none" />
+            <input
+              type="text"
+              name="topic"
+              value={form.topic}
+              onChange={handleChange}
+              disabled={lockedPast}
+              placeholder="VD: Ôn tập hàm IF, VLOOKUP"
+              className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none disabled:opacity-50"
+            />
           </div>
           {formError && (
             <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{formError}</p>
@@ -235,7 +310,7 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={!gate.canSchedule && !isEdit}
+            disabled={lockedPast || (!gate.canSchedule && !isEdit)}
             className="w-full bg-red-600 py-4 rounded-2xl text-white font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
           >
             {(schedule?.id || schedule?._id) ? 'CẬP NHẬT LỊCH' : 'XẾP LỊCH NGAY'}

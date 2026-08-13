@@ -9,6 +9,24 @@ export function parseTimeToMinutes(raw) {
   return h * 60 + min;
 }
 
+/** YYYY-MM-DD theo lịch local (không dùng UTC slice — tránh lệch ngày lúc đêm VN). */
+export function formatLocalDateKey(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Ngày lịch (YYYY-MM-DD local) đã trước hôm nay — không cho xếp/sửa. */
+export function isScheduleDateBeforeToday(dateInput, now = new Date()) {
+  const key = normalizeScheduleDate(dateInput);
+  const today = formatLocalDateKey(now);
+  if (!key || !today) return false;
+  return key < today;
+}
+
 export function isEndTimeAfterStart(startTime, endTime) {
   const end = String(endTime || '').trim();
   if (!end) return true;
@@ -19,15 +37,16 @@ export function isEndTimeAfterStart(startTime, endTime) {
 }
 
 export function normalizeScheduleDate(raw) {
-  if (!raw) return new Date().toISOString().slice(0, 10);
-  const s = String(raw);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  if (raw == null || raw === '') return formatLocalDateKey(new Date());
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return formatLocalDateKey(raw);
+  }
+  const s = String(raw).trim();
+  // Chỉ YYYY-MM-DD thuần (không có giờ) — giữ nguyên ngày lịch
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return formatLocalDateKey(new Date());
+  return formatLocalDateKey(d);
 }
 
 export function normalizeTimeHHmm(raw, fallback = '19:30') {
@@ -82,10 +101,31 @@ export function findStudentScheduleConflict({ schedules, studentId, date, startT
   }) || null;
 }
 
+export function findTeacherScheduleConflict({ schedules, teacherId, date, startTime, endTime, excludeScheduleId }) {
+  const tid = String(teacherId || '');
+  if (!tid) return null;
+  const targetDate = normalizeScheduleDate(date);
+  return (schedules || []).find((sch) => {
+    if (!sch || sch.status === 'cancelled') return false;
+    const schId = String(sch.id || sch._id || '');
+    if (excludeScheduleId && schId === String(excludeScheduleId)) return false;
+    const schTeacherId = String(sch.teacherId?._id || sch.teacherId?.id || sch.teacherId || '');
+    if (schTeacherId !== tid) return false;
+    if (normalizeScheduleDate(sch.date) !== targetDate) return false;
+    return timeRangesOverlap(startTime, endTime, sch.startTime, sch.endTime);
+  }) || null;
+}
+
 export function formatScheduleConflictMessage(conflict) {
   const course = conflict?.course ? ` (${conflict.course})` : '';
   const end = conflict?.endTime ? ` - ${conflict.endTime}` : '';
   return `Học viên đã có lịch học${course} từ ${conflict.startTime}${end} trong ngày này. Vui lòng chọn khung giờ khác.`;
+}
+
+export function formatTeacherConflictMessage(conflict) {
+  const end = conflict?.endTime ? ` - ${conflict.endTime}` : '';
+  const hv = conflict?.studentName ? `, HV: ${conflict.studentName}` : '';
+  return `Giáo viên đã có lịch trùng thời gian này (${conflict.startTime}${end}${hv}). Vui lòng chọn khung giờ khác.`;
 }
 
 /** Buoi hoc dang dien ra: cung ngay va gio hien tai nam trong [startTime, endTime] */

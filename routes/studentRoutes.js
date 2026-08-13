@@ -2805,7 +2805,7 @@ router.delete('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation
 });
 
 // ─── POST /api/students/:id/reset-today-attendance ─────────────────────────────
-// Xóa điểm danh HÔM NAY — Admin/Staff (MANAGE_STUDENTS) hoặc GV phụ trách, trong 1 tiếng
+// Xóa điểm danh HÔM NAY (= hủy ca đã hoàn thành) — Admin/Staff hoặc GV phụ trách (không giới hạn 1 tiếng)
 router.post('/:id/reset-today-attendance', [
   authMiddleware,
   branchFilter,
@@ -2826,48 +2826,54 @@ router.post('/:id/reset-today-attendance', [
     }
 
     const todayVN = new Date().toLocaleDateString('vi-VN');
+    const scrubToday = (grades) => (grades || []).filter((g) => g && g.date !== todayVN);
     const oldGrades = student.grades || [];
-    const hadTodayRecord = oldGrades.some(g => g.date === todayVN);
+    const hadRootToday = oldGrades.some((g) => g.date === todayVN);
+    const hadEnrToday = Array.isArray(student.enrollments)
+      && student.enrollments.some((e) => (e.grades || []).some((g) => g && g.date === todayVN));
 
-    if (!hadTodayRecord) {
+    if (!hadRootToday && !hadEnrToday) {
       return res.json({ success: true, message: 'Học viên chưa được điểm danh hôm nay.' });
     }
 
-    // ⏰ Kiểm tra thời gian 1 tiếng: Lấy schedule gần nhất hôm nay
     const todayISO = new Date().toISOString().split('T')[0];
-    const latestSchedule = await Schedule.findOne({
-      studentId: req.params.id,
-      date: { $gte: new Date(todayISO), $lt: new Date(new Date(todayISO).getTime() + 86400000) },
-      status: 'completed',
-    }).sort({ createdAt: -1 }).lean();
 
-    if (latestSchedule) {
-      const diffMs = Date.now() - new Date(latestSchedule.createdAt).getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      if (diffMins >= 60) {
-        return res.status(403).json({
-          success: false,
-          message: `⏰ Đã quá 1 tiếng kể từ lúc điểm danh (${diffMins} phút). Không thể hủy nữa.`,
-          code: 'CANCEL_TIMEOUT'
-        });
-      }
-    }
-
-    // Xóa record hôm nay khỏi grades
-    const newGrades = oldGrades.filter(g => g.date !== todayVN);
-
-    // Khôi phục số buổi (tính toán toán học tuyệt đối để tránh sai số)
+    // Xóa record hôm nay khỏi grades (root + từng enrollment — FE đọc grades enrollment)
+    const newGrades = scrubToday(oldGrades);
     const newCompleted = newGrades.length;
     const newRemaining = Math.max(0, (student.totalSessions || 12) - newCompleted);
 
-    await Student.findByIdAndUpdate(req.params.id, {
+    const patch = {
       grades: newGrades,
       completedSessions: newCompleted,
       remainingSessions: newRemaining,
-      status: 'Đang học'
-    });
+      status: 'Đang học',
+      can_check_in: true,
+    };
 
-    // Xóa schedule hôm nay nếu có
+    if (Array.isArray(student.enrollments) && student.enrollments.length) {
+      patch.enrollments = student.enrollments.map((enr) => {
+        const plain = enr.toObject ? enr.toObject() : { ...enr };
+        const eg = scrubToday(plain.grades);
+        const total = plain.totalSessions || student.totalSessions || 12;
+        return {
+          ...plain,
+          grades: eg,
+          completedSessions: eg.length,
+          remainingSessions: Math.max(0, total - eg.length),
+        };
+      });
+      const primary = patch.enrollments.find((e) => e.isPrimary) || patch.enrollments[0];
+      if (primary) {
+        patch.completedSessions = primary.completedSessions;
+        patch.remainingSessions = primary.remainingSessions;
+        patch.grades = primary.grades?.length ? primary.grades : newGrades;
+      }
+    }
+
+    await Student.findByIdAndUpdate(req.params.id, patch);
+
+    // Xóa schedule hôm nay nếu có (hủy điểm danh = hủy ca đã hoàn thành)
     await Schedule.deleteMany({
       studentId: req.params.id,
       date: { $gte: new Date(todayISO), $lt: new Date(new Date(todayISO).getTime() + 86400000) },

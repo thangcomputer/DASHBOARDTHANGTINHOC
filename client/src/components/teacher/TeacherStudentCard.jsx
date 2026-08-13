@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import CmsSelect from '../ui/CmsSelect';
 import {
   Calendar, Video, CheckCircle, Save, MessageSquare, FileText,
@@ -9,7 +8,7 @@ import {
   Activity, Trash2, Ban, PlayCircle, Phone, Mail, Edit3, Shield,
   Plus, Loader2, History, ListChecks, ChevronUp, ChevronDown,
 } from 'lucide-react';
-import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../services/api';
+import api, { buildMediaDownloadUrl, resolveMediaUrl, messagesAPI } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../utils/Modal.jsx';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
@@ -20,6 +19,12 @@ import { openSiteChat } from '../FloatingMessenger';
 import TeacherQuizManager from './TeacherQuizManager';
 import { useData } from '../../context/DataContext';
 import { buildStudentActivityLogs, ACTIVITY_LOG_META } from '../../utils/studentActivityLogs';
+import {
+  buildAttendanceMakeupDraft,
+  pickAdminContactForMakeup,
+  getMakeupSessionSummary,
+} from '../../utils/attendanceMakeupRequest';
+import { useToast } from '../../utils/toast';
 
 const getDisplayName = (person) => {
   if (!person) return 'Không rõ';
@@ -125,11 +130,19 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
-export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam, isDetailed, attendanceGate, myStudents = [] }) => {
-  const navigate = useNavigate();
+export const StudentCard = ({
+  student, onAttendance, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam,
+  isDetailed, attendanceGate, myStudents = [], onCancelSchedule,
+}) => {
+  const toast = useToast();
   const { showModal } = useModal();
   const { onDataRefresh, socket } = useSocket();
-  const { privateEvaluations = [], schedules: allSchedules = [] } = useData();
+  const {
+    privateEvaluations = [],
+    schedules: allSchedules = [],
+    currentUser,
+    cancelSchedule: ctxCancelSchedule,
+  } = useData();
   const [linkInput, setLinkInput] = useState(student.linkHoc);
   const [gradeInput, setGradeInput] = useState(student.avgGrade ?? student.lastGrade ?? '');
   const [notesInput, setNotesInput] = useState(student.notes || '');
@@ -137,6 +150,8 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
   const [linkSaved, setLinkSaved] = useState(false);
   const [gradeSaved, setGradeSaved] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [showMakeupModal, setShowMakeupModal] = useState(false);
+  const [sendingMakeup, setSendingMakeup] = useState(false);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [studentQuizzes, setStudentQuizzes] = useState([]);
   const [studentEvals, setStudentEvals] = useState([]);
@@ -260,30 +275,74 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
     ? false
     : (student.can_check_in !== undefined ? student.can_check_in : !hasAttendedToday);
 
-  // ⏰ GIỚI HẠN HỦY ĐIỂM DANH 1 TIẾNG — nút đỏ khi còn hạn, mờ khi hết hạn (không mở modal lỗi)
-  const minsElapsedSinceAttend = lastAttendanceAt
-    ? Math.floor((Date.now() - lastAttendanceAt.getTime()) / 60000)
-    : null;
-  const canCancelAttendance = Boolean(
-    hasAttendedToday
-    && !isCompleted
-    && lastAttendanceAt
-    && minsElapsedSinceAttend !== null
-    && minsElapsedSinceAttend < 60,
+  // Đã điểm danh hôm nay — KHÔNG dùng !canCheckIn (cooldown cũng làm canCheckIn=false)
+  const alreadyAttendedToday = Boolean(
+    hasAttendedToday || attendanceGate?.status === 'done',
   );
-  const cancelTimeLeft = canCancelAttendance ? Math.max(0, 60 - minsElapsedSinceAttend) : 0;
-  const cancelButtonLabel = canCancelAttendance
-    ? (cancelTimeLeft > 0 ? `Hủy (${cancelTimeLeft}p)` : 'Hủy điểm danh')
-    : hasAttendedToday
-      ? 'Không thể hủy'
-      : 'Hủy điểm danh';
-  const cancelButtonTitle = !hasAttendedToday
-    ? 'Chưa điểm danh hôm nay'
-    : !lastAttendanceAt
-      ? 'Không xác định được thời điểm điểm danh — không thể hủy'
-    : !canCancelAttendance
-      ? `Đã quá 1 tiếng, không thể hủy (${minsElapsedSinceAttend ?? 0} phút trước)`
-      : `Còn ${cancelTimeLeft} phút để hủy. Nhấn để hủy điểm danh hôm nay`;
+  const isOverdueMakeup = attendanceGate?.status === 'overdue' && !alreadyAttendedToday && !isCompleted;
+
+  // Có buổi hôm nay (scheduled / overdue / done) → hiện cặp nút điểm danh + hủy
+  const showSessionActionRow = Boolean(
+    !isCompleted && (
+      alreadyAttendedToday
+      || (attendanceGate && attendanceGate.status !== 'no_schedule')
+    ),
+  );
+
+  const makeupSummary = useMemo(
+    () => getMakeupSessionSummary({ student, schedule: attendanceGate?.schedule }),
+    [student, attendanceGate?.schedule],
+  );
+
+  const openMakeupModal = useCallback(() => {
+    setShowMakeupModal(true);
+  }, []);
+
+  const sendMakeupRequestToAdmin = useCallback(async () => {
+    setSendingMakeup(true);
+    try {
+      const teacherName = currentUser?.name || 'Giảng viên';
+      const teacherId = String(currentUser?.id || currentUser?._id || '');
+      const draft = buildAttendanceMakeupDraft({
+        student,
+        schedule: attendanceGate?.schedule,
+        teacherName,
+      });
+      let peer = { id: 'admin', name: 'Admin', role: 'admin', adminRole: 'SUPER_ADMIN' };
+      try {
+        const res = await messagesAPI.getContacts();
+        if (res?.success) {
+          peer = pickAdminContactForMakeup(res.data || []);
+        }
+      } catch {
+        /* fallback admin mailbox */
+      }
+      await messagesAPI.send({
+        senderId: teacherId || 'teacher',
+        senderName: teacherName,
+        senderRole: 'teacher',
+        receiverId: String(peer.id),
+        receiverName: peer.name || 'Admin',
+        receiverRole: peer.role || 'admin',
+        content: draft,
+        messageType: 'text',
+      });
+      setShowMakeupModal(false);
+      toast.success('Đã gửi yêu cầu điểm danh bù tới Admin.');
+    } catch (err) {
+      toast.error(err?.message || 'Không gửi được yêu cầu. Thử lại sau.');
+    } finally {
+      setSendingMakeup(false);
+    }
+  }, [attendanceGate?.schedule, currentUser, student, toast]);
+
+  // Hủy ca (chưa điểm danh) / Hủy điểm danh (= hủy ca đã hoàn thành) — không giới hạn 1 tiếng
+  const canCancelSession = showSessionActionRow;
+  const cancelIsUndoAttendance = alreadyAttendedToday;
+  const cancelButtonLabel = cancelIsUndoAttendance ? 'Hủy điểm danh' : 'Hủy ca';
+  const cancelButtonTitle = cancelIsUndoAttendance
+    ? 'Hủy điểm danh hôm nay (= hủy ca đã hoàn thành)'
+    : 'Hủy ca lịch học hôm nay';
   const cancelButtonClassActive =
     'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-600/25 active:scale-[0.98] cursor-pointer';
   const cancelButtonClassDisabled =
@@ -483,30 +542,68 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
     e.target.value = '';
   };
 
-  const handleUndoAttendance = async () => {
-    if (!canCancelAttendance) return;
+  const handleCancelSession = async () => {
+    if (!canCancelSession) return;
 
     const sid = student._id || student.id;
+    const schedule = attendanceGate?.schedule;
+    const scheduleId = schedule?._id || schedule?.id;
+
+    if (cancelIsUndoAttendance) {
+      showModal({
+        title: 'Hủy điểm danh',
+        content: `Xác nhận hủy điểm danh hôm nay của "${student.name || sid}"?\nBuổi học sẽ bị hủy (giảm 1 buổi đã học).`,
+        type: 'warning',
+        confirmText: 'XÁC NHẬN HỦY',
+        cancelText: 'Đóng',
+        onConfirm: async () => {
+          try {
+            const res = await api.students.resetTodayAttendance(sid);
+            if (res.success) {
+              window.location.reload();
+            } else {
+              showModal({ title: 'Lỗi', content: res.message || 'Lỗi khi hủy điểm danh', type: 'error', confirmText: 'Đóng' });
+            }
+          } catch (e) {
+            showModal({ title: 'Lỗi', content: 'Lỗi kết nối server', type: 'error', confirmText: 'Đóng' });
+          }
+        },
+      });
+      return;
+    }
+
+    if (!scheduleId) {
+      toast.error('Không tìm thấy lịch để hủy.');
+      return;
+    }
 
     showModal({
-      title: 'Hủy điểm danh hôm nay',
-      content: `Xác nhận hủy điểm danh hôm nay của "${student.name || sid}"? Số buổi đã học sẽ giảm 1.${cancelTimeLeft > 0 ? `\n⏰ Còn ${cancelTimeLeft} phút để hủy.` : ''}`,
+      title: 'Hủy ca',
+      content: `Xác nhận hủy ca của "${student.name || sid}"?\nLịch: ${makeupSummary.dateLabel} · ${makeupSummary.timeRange}`,
       type: 'warning',
-      confirmText: 'XÁC NHẬN HỦY',
+      confirmText: 'XÁC NHẬN HỦY CA',
+      cancelText: 'Đóng',
       onConfirm: async () => {
         try {
-          const res = await api.students.resetTodayAttendance(sid);
-          if (res.success) {
-            window.location.reload();
-          } else if (res.code === 'CANCEL_TIMEOUT') {
-            showModal({ title: '⏰ Hết thời gian hủy', content: res.message, type: 'error' });
-          } else {
-            showModal({ title: 'Lỗi', content: res.message || 'Lỗi khi hủy điểm danh', type: 'error' });
+          const res = await api.schedules.cancel(scheduleId, 'GV hủy ca từ trang học viên');
+          if (res?.success === false) {
+            showModal({ title: 'Lỗi', content: res.message || 'Không hủy được ca', type: 'error', confirmText: 'Đóng' });
+            return;
           }
+          const applyLocal = onCancelSchedule || ctxCancelSchedule;
+          if (typeof applyLocal === 'function') {
+            try {
+              await applyLocal(scheduleId, 'GV hủy ca từ trang học viên');
+            } catch {
+              /* local sync optional — server đã hủy */
+            }
+          }
+          toast.success('Đã hủy ca.');
+          window.location.reload();
         } catch (e) {
-          showModal({ title: 'Lỗi', content: 'Lỗi kết nối server', type: 'error' });
+          showModal({ title: 'Lỗi', content: e?.message || 'Lỗi kết nối server', type: 'error', confirmText: 'Đóng' });
         }
-      }
+      },
     });
   };
 
@@ -676,9 +773,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                     </div>
                  </div>
 
-                 {/* Actions outlined gọn */}
+                 {/* Actions: Điểm danh | Hủy ca / Hủy điểm danh — ẩn khi không còn lịch */}
+                 {showSessionActionRow ? (
                  <div className="grid grid-cols-2 gap-2 mt-4 sm:gap-4 min-w-0">
-                   {attendanceGate?.status === 'not_yet' ? (
+                   {attendanceGate?.status === 'not_yet' && !alreadyAttendedToday ? (
                      <div className="flex items-center justify-center min-h-10 sm:min-h-[3.25rem] px-2 py-2 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide text-center leading-tight border border-dashed border-slate-300 rounded-xl bg-slate-50">
                         Chưa đến giờ dạy
                      </div>
@@ -686,6 +784,10 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                      <button 
                        type="button"
                        onClick={() => {
+                         if (isOverdueMakeup) {
+                           openMakeupModal();
+                           return;
+                         }
                          if (!canCheckIn && !isCompleted) return;
                          const tGrade = (student.grades || []).find(g => g.date === todayStr);
                          setAttForm({
@@ -694,19 +796,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                          });
                          setShowAttendanceModal(true);
                        }} 
-                       disabled={isCompleted || !canCheckIn || attendanceGate?.status === 'no_schedule'}
+                       disabled={isCompleted || (!isOverdueMakeup && !canCheckIn)}
                        title={
                          isCompleted ? 'Khóa học đã hoàn thành' :
-                         attendanceGate?.status === 'no_schedule' ? 'Hôm nay chưa có lịch dạy' :
-                         !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
+                         isOverdueMakeup ? 'Quá hạn điểm danh — gửi yêu cầu điểm danh bù tới Admin' :
+                         alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                          'Bấm để điểm danh buổi học hôm nay'
                        }
                        className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
                          isCompleted 
                            ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
-                         : attendanceGate?.status === 'no_schedule'
-                           ? 'bg-slate-100 text-slate-700 cursor-not-allowed'
-                         : !canCheckIn
+                         : isOverdueMakeup
+                           ? 'bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] shadow-sm'
+                         : alreadyAttendedToday
                            ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
                        }`}
@@ -715,9 +817,9 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                        <span className="min-w-0 text-center leading-tight whitespace-normal">
                          {isCompleted 
                            ? 'Hoàn thành'
-                           : attendanceGate?.status === 'no_schedule'
-                             ? 'Chưa có lịch'
-                             : !canCheckIn
+                           : isOverdueMakeup
+                             ? 'Điểm danh bù'
+                             : alreadyAttendedToday
                                ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
                                : 'Điểm danh'}
                        </span>
@@ -726,12 +828,12 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
 
                    <button
                      type="button"
-                     onClick={() => { if (canCancelAttendance) handleUndoAttendance(); }}
-                     disabled={!canCancelAttendance}
-                     aria-disabled={!canCancelAttendance}
+                     onClick={() => { if (canCancelSession) handleCancelSession(); }}
+                     disabled={!canCancelSession}
+                     aria-disabled={!canCancelSession}
                      title={cancelButtonTitle}
                      className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 border ${
-                       canCancelAttendance ? cancelButtonClassActive : cancelButtonClassDisabled
+                       canCancelSession ? cancelButtonClassActive : cancelButtonClassDisabled
                      }`}
                    >
                      <X size={14} className="shrink-0" aria-hidden="true" />
@@ -740,6 +842,7 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                      </span>
                    </button>
                  </div>
+                 ) : null}
 
                  {/* Notes */}
                  <div className="mt-4 sm:mt-0">
@@ -1180,6 +1283,66 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
           />
         )}
 
+        {/* Makeup modal — phải có trong isDetailed (tab Học viên) */}
+        {showMakeupModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
+                <div>
+                  <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh bù</h3>
+                  <p className="text-amber-50 text-xs font-bold mt-1">Quá hạn cửa sổ điểm danh 1 giờ</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !sendingMakeup && setShowMakeupModal(false)}
+                  className="hover:bg-white/10 p-2 rounded-2xl transition-all shrink-0"
+                  aria-label="Đóng"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 space-y-4 text-sm">
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-1.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Thông tin buổi học</p>
+                  <p className="font-bold text-slate-800">HV: {makeupSummary.name}</p>
+                  {makeupSummary.course ? (
+                    <p className="text-slate-600">Khóa: <span className="font-semibold text-blue-700">{makeupSummary.course}</span></p>
+                  ) : null}
+                  {makeupSummary.total > 0 ? (
+                    <p className="text-slate-600">Buổi: <span className="font-black">{makeupSummary.sessionNo}/{makeupSummary.total}</span></p>
+                  ) : null}
+                  <p className="text-slate-600">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
+                  <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-slate-700 leading-relaxed">
+                  <p className="font-bold text-slate-900">Giảng viên lưu ý:</p>
+                  <p>Bạn chịu trách nhiệm về buổi học này.</p>
+                  <p>Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa. Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.</p>
+                </div>
+              </div>
+              <div className="bg-slate-50 px-6 py-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowMakeupModal(false)}
+                  disabled={sendingMakeup}
+                  className="flex-1 py-3.5 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={sendMakeupRequestToAdmin}
+                  disabled={sendingMakeup}
+                  className="flex-[1.4] py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {sendingMakeup ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                  Gửi
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Attendance Modal - Added to Detailed View */}
         {showAttendanceModal && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300">
@@ -1339,15 +1502,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                 <p className="text-xs text-purple-400">/ 10</p>
               </div>
             </div>
-            {/* === 2-COLUMN LAYOUT: Điểm danh | Hủy điểm danh === */}
+            {/* === 2-COLUMN LAYOUT: Điểm danh | Hủy ca / Hủy điểm danh === */}
+            {showSessionActionRow ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* CỘT TRÁI: Nút ĐIỂM DANH */}
-              {attendanceGate?.status === 'not_yet' ? (
+              {attendanceGate?.status === 'not_yet' && !alreadyAttendedToday ? (
                 <div className="flex items-center justify-center py-4 text-xs font-black text-slate-600 uppercase tracking-widest border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50">
                   Chưa đến giờ
                 </div>
               ) : (
                 <button onClick={() => {
+                    if (isOverdueMakeup) {
+                      openMakeupModal();
+                      return;
+                    }
                     if (!canCheckIn && !isCompleted) return;
                     const tGrade = (student.grades || []).find(g => g.date === todayStr);
                     setAttForm({
@@ -1356,19 +1523,19 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                     });
                     setShowAttendanceModal(true);
                   }} 
-                  disabled={isCompleted || !canCheckIn || attendanceGate?.status === 'no_schedule'}
+                  disabled={isCompleted || (!isOverdueMakeup && !canCheckIn)}
                   title={
                     isCompleted ? 'Hoàn thành' :
-                    attendanceGate?.status === 'no_schedule' ? 'Chưa có lịch dạy' :
-                    !canCheckIn ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
+                    isOverdueMakeup ? 'Quá hạn — gửi yêu cầu điểm danh bù tới Admin' :
+                    alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                     'Bấm để điểm danh'
                   }
                   className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${
                     isCompleted 
                       ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-2 border-gray-300'
-                    : attendanceGate?.status === 'no_schedule'
-                      ? 'bg-slate-100 text-slate-800 cursor-not-allowed border-2 border-slate-300'
-                    : !canCheckIn
+                    : isOverdueMakeup
+                      ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:shadow-amber-200 shadow-amber-100 active:scale-[0.97] border-2 border-transparent'
+                    : alreadyAttendedToday
                       ? 'bg-slate-50 text-slate-600 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200'
                       : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
                   }`}>
@@ -1376,36 +1543,32 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
                   <span className="text-xs text-center leading-tight">
                     {isCompleted 
                       ? 'HOÀN THÀNH'
-                      : attendanceGate?.status === 'no_schedule'
-                        ? 'KHÔNG CÓ LỊCH'
-                        : !canCheckIn
+                      : isOverdueMakeup
+                        ? <>ĐIỂM DANH<br/>BÙ</>
+                        : alreadyAttendedToday
                           ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
                           : 'ĐIỂM DANH'}
                   </span>
                 </button>
               )}
 
-              {/* CỘT PHẢI: Nút HỦY — đỏ trong 1h, mờ khi hết hạn */}
               <button
                 type="button"
-                onClick={() => { if (canCancelAttendance) handleUndoAttendance(); }}
-                disabled={!canCancelAttendance}
-                aria-disabled={!canCancelAttendance}
+                onClick={() => { if (canCancelSession) handleCancelSession(); }}
+                disabled={!canCancelSession}
+                aria-disabled={!canCancelSession}
                 title={cancelButtonTitle}
                 className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all border-2 ${
-                  canCancelAttendance ? cancelButtonClassActive : cancelButtonClassDisabled
+                  canCancelSession ? cancelButtonClassActive : cancelButtonClassDisabled
                 }`}
               >
                 <X size={18} />
                 <span className="text-xs text-center leading-tight">
-                  {canCancelAttendance && cancelTimeLeft > 0
-                    ? <>{`HỦY`}<br/>{`(${cancelTimeLeft}p)`}</>
-                    : hasAttendedToday
-                      ? <>KHÔNG<br/>THỂ HỦY</>
-                      : <>HỦY<br/>ĐIỂM DANH</>}
+                  {cancelIsUndoAttendance ? <>HỦY<br/>ĐIỂM DANH</> : <>HỦY CA</>}
                 </span>
               </button>
             </div>
+            ) : null}
             <div>
               <label className="text-sm font-semibold text-gray-700 block mb-2 font-black uppercase text-xs text-gray-400 tracking-widest">📝 Ghi chú học viên</label>
               <textarea value={notesInput} onChange={e => setNotesInput(e.target.value)}
@@ -1450,6 +1613,66 @@ export const StudentCard = ({ student, onAttendance, onUpdateLink, onSaveGrade, 
         )}
       </div>
     </div>
+
+      {/* === MODAL ĐIỂM DANH BÙ → gửi thẳng Admin === */}
+      {showMakeupModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
+              <div>
+                <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh bù</h3>
+                <p className="text-amber-50 text-xs font-bold mt-1">Quá hạn cửa sổ điểm danh 1 giờ</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !sendingMakeup && setShowMakeupModal(false)}
+                className="hover:bg-white/10 p-2 rounded-2xl transition-all shrink-0"
+                aria-label="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-1.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Thông tin buổi học</p>
+                <p className="font-bold text-slate-800">HV: {makeupSummary.name}</p>
+                {makeupSummary.course ? (
+                  <p className="text-slate-600">Khóa: <span className="font-semibold text-blue-700">{makeupSummary.course}</span></p>
+                ) : null}
+                {makeupSummary.total > 0 ? (
+                  <p className="text-slate-600">Buổi: <span className="font-black">{makeupSummary.sessionNo}/{makeupSummary.total}</span></p>
+                ) : null}
+                <p className="text-slate-600">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
+                <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-slate-700 leading-relaxed">
+                <p className="font-bold text-slate-900">Giảng viên lưu ý:</p>
+                <p>Bạn chịu trách nhiệm về buổi học này.</p>
+                <p>Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa. Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.</p>
+              </div>
+            </div>
+            <div className="bg-slate-50 px-6 py-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowMakeupModal(false)}
+                disabled={sendingMakeup}
+                className="flex-1 py-3.5 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={sendMakeupRequestToAdmin}
+                disabled={sendingMakeup}
+                className="flex-[1.4] py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {sendingMakeup ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                Gửi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* === DUY NHẤT 1 MODAL ĐIỂM DANH (dùng chung cho cả 2 view) === */}
       {showAttendanceModal && (

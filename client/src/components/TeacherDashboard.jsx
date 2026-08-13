@@ -23,6 +23,7 @@ export { showGlossyAlert, GlossyAlertProvider, getDisplayName } from './teacher/
 import { getDisplayName } from './teacher/TeacherShared';
 import { classifyAttendancePrompt, resolveCheckInGate } from '../utils/attendancePrompt';
 import { getAttendanceAction, formatGraceRemaining } from '../utils/attendanceAction';
+import { isScheduleDateBeforeToday } from '../utils/scheduleTime';
 
 const TeacherDashboard = ({ onNavigate }) => {
   const { showModal } = useModal();
@@ -251,6 +252,10 @@ const TeacherDashboard = ({ onNavigate }) => {
   };
 
   const startEditSchedule = (sch) => {
+    if (isScheduleDateBeforeToday(sch?.date)) {
+      toast.error('Không thể sửa lịch đã qua ngày.');
+      return;
+    }
     setEditingSchedule(sch);
     setShowScheduleModal(true);
   };
@@ -550,6 +555,7 @@ const TeacherDashboard = ({ onNavigate }) => {
             saveGrade={saveGrade}
             updateNotes={updateNotes}
             lockStudentExam={lockStudentExam}
+            cancelSchedule={cancelSchedule}
           />
         ) : currentHash === 'schedule' ? (
           <TeacherLazyScheduleTab
@@ -589,6 +595,7 @@ const TeacherDashboard = ({ onNavigate }) => {
           students={students}
           allSchedules={schedules}
           schedule={editingSchedule}
+          teacherId={TEACHER_ID}
           onClose={() => setShowScheduleModal(false)}
           onSubmit={handleScheduleSubmit}
         />

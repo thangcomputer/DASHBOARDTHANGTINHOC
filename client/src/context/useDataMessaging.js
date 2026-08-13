@@ -126,9 +126,17 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     let unsubRead;
     if (onReadAck) {
       unsubRead = onReadAck((data) => {
-        setMessages((prev) => prev.map((m) =>
-          m.convId === data.conversationId ? { ...m, read: true } : m
-        ));
+        const convId = data?.conversationId;
+        if (!convId) return;
+        setMessages((prev) => {
+          let changed = false;
+          const next = prev.map((m) => {
+            if (String(m.convId) !== String(convId) || m.read === true) return m;
+            changed = true;
+            return { ...m, read: true };
+          });
+          return changed ? next : prev;
+        });
       });
     }
 

@@ -940,6 +940,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
           startTime: effectiveStart,
           endTime: effectiveEnd,
           excludeScheduleId: schedule._id,
+          originalDate: schedule.date,
         });
       } catch (valErr) {
         if (valErr.code) return sendSchedulingError(res, valErr);
@@ -1146,14 +1147,9 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       return res.status(400).json({ success: false, message: 'Lịch này đã bị hủy rồi' });
     }
     if (schedule.status === 'completed') {
-      return res.status(400).json({ success: false, message: 'Không thể hủy lịch đã hoàn thành' });
+      return res.status(400).json({ success: false, message: 'Không thể hủy lịch đã hoàn thành — dùng Hủy điểm danh' });
     }
-    // Ngăn hủy lịch trong quá khứ (chỉ cho hủy lịch tương lai)
-    const schedDate = new Date(schedule.date);
-    schedDate.setHours(23, 59, 59, 999);
-    if (schedDate < new Date()) {
-      return res.status(400).json({ success: false, message: 'Không thể hủy lịch trong quá khứ' });
-    }
+    // Cho phép hủy ca scheduled kể cả ngày đã qua (điểm danh bù / HV không học)
 
     const oldValue = { status: schedule.status, note: schedule.note || '' };
     schedule.status = 'cancelled';

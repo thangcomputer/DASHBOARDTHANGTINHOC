@@ -22,6 +22,26 @@ test('ERROR_CODES are stable', () => {
   assert.equal(ERROR_CODES.TEACHER_SCHEDULE_CONFLICT, 'TEACHER_SCHEDULE_CONFLICT');
   assert.equal(ERROR_CODES.ENROLLMENT_COMPLETED, 'ENROLLMENT_COMPLETED');
   assert.equal(ERROR_CODES.ENROLLMENT_NOT_ACTIVE, 'ENROLLMENT_NOT_ACTIVE');
+  assert.equal(ERROR_CODES.SCHEDULE_DATE_PAST, 'SCHEDULE_DATE_PAST');
+});
+
+test('assertScheduleDateNotPast rejects days before today', () => {
+  const { assertScheduleDateNotPast } = require('../../services/schedulingValidation');
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(12, 0, 0, 0);
+  assert.throws(
+    () => assertScheduleDateNotPast(yesterday),
+    (err) => err.code === 'SCHEDULE_DATE_PAST' && err.status === 409,
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  assert.doesNotThrow(() => assertScheduleDateNotPast(today));
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  assert.doesNotThrow(() => assertScheduleDateNotPast(tomorrow));
 });
 
 test('timeRangesOverlap detects teacher/student conflicts', () => {

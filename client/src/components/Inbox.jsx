@@ -167,10 +167,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, groups,
     teachers, students, staffs, toggleMessageReaction: ctxToggleReaction,
-    softDeleteMessage: ctxDeleteMessage, currentUser
+    softDeleteMessage: ctxDeleteMessage, currentUser, messages: contextMessages,
   } = useData();
 
-  const dataContextConvs = getConversations(currentUserId);
+  const dataContextConvs = useMemo(
+    () => getConversations(currentUserId),
+    [getConversations, currentUserId],
+  );
   const [contacts, setContacts] = useState([]);
   const [contactsLoaded, setContactsLoaded] = useState(false);
   const [seedContact, setSeedContact] = useState(null); // navigation intent — gated by resolveMessagingDeepLink
@@ -573,36 +576,61 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     );
   }, [teachers, students, staffs]);
 
-  // ─── Load messages khi chọn conversation ─────────────────────────────────────
+  // ─── Load messages khi chọn conversation (tránh loop: không phụ thuộc identity ctxGetMessages) ──
+  const activeConvId = activeConv?.id ? String(activeConv.id) : '';
+  const activeConvMsgKey = useMemo(() => {
+    if (!activeConvId || !Array.isArray(contextMessages)) return '';
+    return contextMessages
+      .filter((m) => m && String(m.convId) === activeConvId)
+      .map((m) => `${m.id}:${m.read ? 1 : 0}:${m.isRecalled ? 1 : 0}:${(m.reactions || []).length}`)
+      .join('|');
+  }, [contextMessages, activeConvId]);
+
+  const mapContextMsg = useCallback((m) => {
+    const meta = resolveSenderMeta(m);
+    return {
+      id: m.id,
+      senderId: m.senderId,
+      senderName: String(m.senderId) === String(currentUserId)
+        ? (currentUserName || meta.displayName)
+        : meta.displayName,
+      senderRole: m.senderRole || meta.role || (m.senderId === 'admin' ? 'admin' : activeConv?.user?.role),
+      senderAdminRole: meta.adminRole,
+      senderDisplayRole: meta.displayRole,
+      senderAvatar: meta.avatar || m.senderAvatar || '',
+      content: m.content,
+      time: m.time,
+      isRead: m.read,
+      isRecalled: m.isRecalled || false,
+      messageType: m.messageType || 'text',
+      fileName: m.fileName,
+      fileUrl: m.fileUrl,
+      fileExpired: m.fileExpired || false,
+      reactions: m.reactions || [],
+    };
+  }, [resolveSenderMeta, currentUserId, currentUserName, activeConv?.user?.role]);
+
   useEffect(() => {
-    if (activeConv) {
-      const msgs = ctxGetMessages(activeConv.id);
-      setMessages(msgs.map(m => {
-        const meta = resolveSenderMeta(m);
-        return {
-        id: m.id,
-        senderId: m.senderId,
-        senderName: String(m.senderId) === String(currentUserId)
-          ? (currentUserName || meta.displayName)
-          : meta.displayName,
-        senderRole: m.senderRole || meta.role || (m.senderId === 'admin' ? 'admin' : activeConv.user.role),
-        senderAdminRole: meta.adminRole,
-        senderDisplayRole: meta.displayRole,
-        senderAvatar: meta.avatar || m.senderAvatar || '',
-        content: m.content,
-        time: m.time,
-        isRead: m.read,
-        isRecalled: m.isRecalled || false,
-        messageType: m.messageType || 'text',
-        fileName: m.fileName,
-        fileUrl: m.fileUrl,
-        fileExpired: m.fileExpired || false,
-        reactions: m.reactions || [],
-      };
-      }));
-      markMessagesRead(activeConv.id, currentUserId, (currentUserRole === 'admin') ? ['admin'] : []);
+    if (!activeConvId) {
+      setMessages((prev) => (prev.length === 0 ? prev : []));
+      return;
     }
-  }, [activeConv, ctxGetMessages, markMessagesRead, currentUserId, currentUserName, currentUserRole, resolveSenderMeta]);
+    const msgs = ctxGetMessages(activeConvId);
+    setMessages(msgs.map(mapContextMsg));
+    // Chỉ sync khi đổi hội thoại / nội dung tin — tránh loop vì identity callback đổi mỗi render
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fingerprint deps
+  }, [activeConvId, activeConvMsgKey]);
+
+  const markedReadConvRef = useRef('');
+  useEffect(() => {
+    if (!activeConvId) {
+      markedReadConvRef.current = '';
+      return;
+    }
+    if (markedReadConvRef.current === activeConvId) return;
+    markedReadConvRef.current = activeConvId;
+    markMessagesRead(activeConvId, currentUserId, (currentUserRole === 'admin') ? ['admin'] : []);
+  }, [activeConvId, markMessagesRead, currentUserId, currentUserRole]);
 
   // ─── Socket real-time listeners ──────────────────────────────────────────────
   useEffect(() => {
@@ -985,23 +1013,46 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // Auto-select from navigation — Phase 7: never invent unauthorized peers
   const hasAutoSelected = useRef(false);
+  const draftAppliedKey = useRef('');
+  const lastDeepLinkId = useRef('');
   useEffect(() => {
     const selectId = location.state?.selectUserId;
     const selectUser = location.state?.selectUser;
+    if (selectId && String(selectId) !== lastDeepLinkId.current) {
+      lastDeepLinkId.current = String(selectId);
+      hasAutoSelected.current = false;
+      draftAppliedKey.current = '';
+    }
+
     if (selectUser?.id) {
-      setSeedContact({
+      const next = {
         id: String(selectUser.id),
         name: selectUser.name || 'Người dùng',
         role: normalizeRole(selectUser.role || 'admin'),
         adminRole: selectUser.adminRole || null,
         avatar: selectUser.avatar,
         phone: selectUser.phone || '',
+      };
+      setSeedContact((prev) => {
+        if (
+          prev
+          && String(prev.id) === next.id
+          && prev.name === next.name
+          && String(prev.adminRole || '') === String(next.adminRole || '')
+          && String(prev.role || '') === String(next.role || '')
+        ) {
+          return prev;
+        }
+        return next;
       });
     } else if (selectId) {
-      setSeedContact({
-        id: String(selectId),
-        name: 'Người dùng',
-        role: 'student',
+      setSeedContact((prev) => {
+        if (prev && String(prev.id) === String(selectId)) return prev;
+        return {
+          id: String(selectId),
+          name: 'Người dùng',
+          role: 'student',
+        };
       });
     }
 
@@ -1016,9 +1067,25 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       return;
     }
 
+    // Peer is an authorized contact — wait for seedContact merge into conversations
+    const inContacts = (contacts || []).some((c) => String(c?.id) === String(selectId));
+    if (inContacts) return;
+
     // Not in merged list (contacts + activity) → do not create a synthetic conversation
     hasAutoSelected.current = true;
-  }, [location.state?.selectUserId, location.state?.selectUser, conversations, currentUserId, currentUserRole, contactsLoaded]);
+  }, [location.state?.selectUserId, location.state?.selectUser, location.state?.draftMessage, conversations, currentUserId, currentUserRole, contactsLoaded, contacts]);
+
+  // Apply draft when conversation becomes active after deep-link
+  useEffect(() => {
+    const selectId = location.state?.selectUserId;
+    const draft = location.state?.draftMessage;
+    if (!selectId || !draft || !activeConv) return;
+    if (String(activeConv.user?.id) !== String(selectId)) return;
+    const key = `${selectId}::${String(draft).slice(0, 48)}`;
+    if (draftAppliedKey.current === key) return;
+    draftAppliedKey.current = key;
+    setNewMsg(String(draft));
+  }, [location.state?.selectUserId, location.state?.draftMessage, activeConv?.id, activeConv?.user?.id]);
 
   return (
     <div className="cms-chat-shell">

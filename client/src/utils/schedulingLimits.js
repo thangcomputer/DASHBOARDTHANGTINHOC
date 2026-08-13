@@ -13,10 +13,17 @@ function normCourse(name) {
 }
 
 function localDateKey(raw) {
-  if (!raw) return '';
-  const s = String(raw);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const d = new Date(raw);
+  if (raw == null || raw === '') return '';
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    const y = raw.getFullYear();
+    const m = String(raw.getMonth() + 1).padStart(2, '0');
+    const day = String(raw.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  const s = String(raw).trim();
+  // YYYY-MM-DD thuần — không slice ISO UTC (tránh lệch ngày đêm VN)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
   if (Number.isNaN(d.getTime())) return '';
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
