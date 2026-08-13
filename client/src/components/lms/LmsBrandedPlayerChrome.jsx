@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, Volume1 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Volume1, Maximize2, Minimize2 } from 'lucide-react';
 
 function formatClock(secs) {
   const s = Math.max(0, Math.floor(Number(secs) || 0));
@@ -34,6 +34,8 @@ export default function LmsBrandedPlayerChrome({
   onSeek,
   onVolumeChange,
   onToggleMute,
+  isFullscreen = false,
+  onToggleFullscreen = null,
   brandLabel = 'THẮNG TIN HỌC',
 }) {
   const [dragging, setDragging] = useState(false);
@@ -115,6 +117,20 @@ export default function LmsBrandedPlayerChrome({
               {brandLabel}
             </div>
           </div>
+          {typeof onToggleFullscreen === 'function' ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFullscreen();
+              }}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 rounded-full flex items-center justify-center bg-black/50 hover:bg-black/70 text-white border border-white/20 transition"
+              aria-label={isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
+              title={isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
+            >
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => onPlay?.()}
@@ -231,6 +247,21 @@ export default function LmsBrandedPlayerChrome({
             </span>
 
             <div className="flex-1" />
+
+            {typeof onToggleFullscreen === 'function' ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFullscreen();
+                }}
+                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 transition"
+                aria-label={isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
+                title={isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
+              >
+                {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            ) : null}
 
             {/* Volume */}
             <div

@@ -121,6 +121,67 @@ export function getLessonAccessStatusLines(lesson, opts = {}) {
 }
 
 /**
+ * Sidebar compact: tối đa vài chip + 1 dòng phụ + thanh % (tránh 3–4 dòng uppercase).
+ */
+export function getLessonSidebarUi(lesson, opts = {}) {
+  const { isCurrent = false } = opts;
+  const p = getLessonCompletionProgressUi(lesson);
+
+  if (lesson?.isUnlocked === false) {
+    return {
+      primary: null,
+      chips: [{ key: 'locked', text: 'Chưa mở', tone: 'muted' }],
+      showProgressBar: false,
+      towardGatePct: null,
+    };
+  }
+
+  if (p.completed) {
+    return {
+      primary: null,
+      chips: [{ key: 'done', text: 'Hoàn thành', tone: 'success' }],
+      showProgressBar: false,
+      towardGatePct: 100,
+    };
+  }
+
+  const chips = [];
+  if (isCurrent) chips.push({ key: 'current', text: 'Đang học', tone: 'active' });
+  else if (lesson?.allowEarlyAccess && !lesson?.prerequisiteCompleted) {
+    chips.push({ key: 'early', text: 'Học sớm', tone: 'info' });
+  }
+  if (p.freeSeek && !p.eligible) {
+    chips.push({ key: 'freeseek', text: 'Tua tự do', tone: 'warn' });
+  }
+
+  let primary = null;
+  if (p.eligible) {
+    primary = { text: 'Đủ điều kiện', tone: 'success' };
+  } else if (p.required <= 0) {
+    primary = { text: 'Đang tải video…', tone: 'muted' };
+  }
+
+  const showProgressBar = p.required > 0 && p.towardGatePct != null;
+
+  return {
+    primary,
+    chips,
+    showProgressBar,
+    towardGatePct: p.towardGatePct,
+  };
+}
+
+export function lessonSidebarChipClass(tone) {
+  switch (tone) {
+    case 'active': return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/25';
+    case 'success': return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20';
+    case 'info': return 'bg-white/10 text-slate-200 border border-white/10';
+    case 'warn': return 'bg-amber-500/15 text-amber-200 border border-amber-500/25';
+    default: return 'bg-white/5 text-slate-400 border border-white/10';
+  }
+}
+
+/**
  * Player overlay badge for completion (independent of antiSeek).
  */
 export function getPlayerCompletionBadgeText({

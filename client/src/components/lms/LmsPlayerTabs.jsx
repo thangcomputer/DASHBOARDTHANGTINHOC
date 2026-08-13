@@ -3,7 +3,8 @@ import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
   FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
-import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getLessonAccessStatusLines, getLessonCompletionProgressUi, lessonStatusToneClass, LMS_DARK_PROGRESS_TRACK_CLASS, LMS_DARK_PROGRESS_FILL_CLASS } from '../../utils/lmsLessonUi';
+import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp } from '../../utils/lmsLessonUi';
+import LessonSidebarMeta from './LessonSidebarMeta';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
 import { buildMediaDownloadUrl, apiFetch } from '../../services/api';
 import useLmsLocalStore, { lmsStoreKey } from '../../hooks/useLmsLocalStore';
@@ -761,9 +762,6 @@ function ListPanel({
               chapterLessons.map((lesson) => {
                 const globalIdx = lessons.findIndex((l) => String(l._id) === String(lesson._id));
                 const isCurrent = currentLesson?._id === lesson._id;
-                const statusLines = getLessonAccessStatusLines(lesson, { isCurrent });
-                const progressUi = getLessonCompletionProgressUi(lesson);
-                const showBar = lesson.isUnlocked !== false && !lesson.isCompleted && progressUi.required > 0;
                 return (
                   <div
                     key={lesson._id}
@@ -801,7 +799,7 @@ function ListPanel({
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4
-                        className={`text-[12px] leading-snug line-clamp-2 ${
+                        className={`text-[12px] leading-snug line-clamp-2 normal-case ${
                           isCurrent
                             ? 'text-emerald-400 font-bold'
                             : lesson.isCompleted
@@ -811,24 +809,7 @@ function ListPanel({
                       >
                         {formatLessonDisplayTitle(lesson.title, globalIdx)}
                       </h4>
-                      <div className="mt-1 space-y-0.5">
-                        {statusLines.map((line) => (
-                          <p
-                            key={line.key}
-                            className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone, 'dark')}`}
-                          >
-                            {line.text}
-                          </p>
-                        ))}
-                      </div>
-                      {showBar ? (
-                        <div className={`mt-1.5 ${LMS_DARK_PROGRESS_TRACK_CLASS}`}>
-                          <div
-                                className={LMS_DARK_PROGRESS_FILL_CLASS}
-                            style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
-                          />
-                        </div>
-                      ) : null}
+                      <LessonSidebarMeta lesson={lesson} isCurrent={isCurrent} />
                     </div>
                   </div>
                 );

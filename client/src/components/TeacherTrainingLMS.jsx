@@ -15,16 +15,12 @@ import api, { buildMediaDownloadUrl, csrfFetch } from '../services/api';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import {
   formatLessonDisplayTitle,
-  getLessonAccessStatusLines,
-  getLessonCompletionProgressUi,
   getPlayerCompletionBadgeText,
-  lessonStatusToneClass,
   LMS_PLAYER_PROGRESS_BADGE_CLASS,
-  LMS_DARK_PROGRESS_TRACK_CLASS,
-  LMS_DARK_PROGRESS_FILL_CLASS,
 } from '../utils/lmsLessonUi';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
 import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrandedPlayerChrome';
+import LessonSidebarMeta from './lms/LessonSidebarMeta';
 import {
   isLessonAntiSeekEnabled,
   requiredWatchSeconds,
@@ -166,6 +162,7 @@ const YouTubePlayerSecure = ({
   const [volume, setVolume] = useState(100);
   const [muted, setMuted] = useState(false);
   const [playerError, setPlayerError] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const pauseTimeoutRef = useRef(null);
   const maxPosRef = useRef(0);
   const seekGuardRef = useRef(false);
@@ -570,6 +567,26 @@ const YouTubePlayerSecure = ({
     return () => clearInterval(uiTickRef.current);
   }, [isPlaying, antiSeekEnabled, lessonId, lessonDuration, totalDuration]);
 
+  useEffect(() => {
+    const onFs = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    };
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = containerRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (el.requestFullscreen) {
+        await el.requestFullscreen();
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   if (isLocked) {
     return (
       <div className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center gap-4 rounded-2xl">
@@ -585,7 +602,7 @@ const YouTubePlayerSecure = ({
     <div className="flex flex-col w-full h-full min-h-0">
       <div
         ref={containerRef}
-        className="relative w-full h-full min-h-0 lg:rounded-2xl overflow-hidden bg-black shadow-lg group"
+        className={`relative w-full h-full min-h-0 overflow-hidden bg-black shadow-lg group ${isFullscreen ? 'rounded-none' : 'lg:rounded-2xl'}`}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div
@@ -642,6 +659,8 @@ const YouTubePlayerSecure = ({
               }
             } catch { /* ignore */ }
           }}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
         />
 
         {!isTabActive && !overlayVisible && (
@@ -1578,9 +1597,6 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                   {isExpanded && chapterLessons.map((lesson) => {
                     const globalIdx = lessons.findIndex(l => String(l._id) === String(lesson._id));
                     const isCurrent = currentLesson?._id === lesson._id;
-                    const statusLines = getLessonAccessStatusLines(lesson, { isCurrent });
-                    const progressUi = getLessonCompletionProgressUi(lesson);
-                    const showBar = lesson.isUnlocked !== false && !lesson.isCompleted && progressUi.required > 0;
                     return (
                       <div
                         key={lesson._id}
@@ -1592,7 +1608,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                               ? 'Có thể học sớm'
                               : undefined
                         }
-                        className={`flex items-start gap-3 px-4 py-3.5 transition-all relative ${
+                        className={`flex items-start gap-3 px-4 py-3 transition-all relative ${
                           !lesson.isUnlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
                         } ${
                           isCurrent
@@ -1618,36 +1634,13 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h4 className={`text-[12px] leading-snug line-clamp-2 ${
+                          <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${
                             isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
                           }`}>
                             {formatLessonDisplayTitle(lesson.title, globalIdx)}
                           </h4>
-                          <div className="mt-1 space-y-0.5">
-                            {statusLines.map((line) => (
-                              <p
-                                key={line.key}
-                                className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone, 'dark')}`}
-                              >
-                                {line.text}
-                              </p>
-                            ))}
-                          </div>
-                          {showBar ? (
-                            <div className={`mt-1.5 ${LMS_DARK_PROGRESS_TRACK_CLASS}`}>
-                              <div
-                                className={LMS_DARK_PROGRESS_FILL_CLASS}
-                                style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
-                              />
-                            </div>
-                          ) : null}
+                          <LessonSidebarMeta lesson={lesson} isCurrent={isCurrent} />
                         </div>
-
-                        {lesson.isCompleted && (
-                          <div className="flex-shrink-0 w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center mt-0.5">
-                            <CheckCircle size={9} className="text-emerald-500" />
-                          </div>
-                        )}
                       </div>
                     );
                   })}

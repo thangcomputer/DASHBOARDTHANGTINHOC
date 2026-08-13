@@ -19,17 +19,13 @@ import { useToast } from '../utils/toast';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import {
   formatLessonDisplayTitle,
-  getLessonAccessStatusLines,
-  getLessonCompletionProgressUi,
   getPlayerCompletionBadgeText,
-  lessonStatusToneClass,
   LMS_PLAYER_PROGRESS_BADGE_CLASS,
-  LMS_DARK_PROGRESS_TRACK_CLASS,
-  LMS_DARK_PROGRESS_FILL_CLASS,
 } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
 import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrandedPlayerChrome';
+import LessonSidebarMeta from './lms/LessonSidebarMeta';
 import {
   isLessonAntiSeekEnabled,
   requiredWatchSeconds,
@@ -210,6 +206,7 @@ const StudentVideoPlayer = ({
   const [volume, setVolume] = useState(100);
   const [muted, setMuted] = useState(false);
   const [playerError, setPlayerError] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Restore watched seconds: lấy max(session, server) — không để session thấp ghi đè SoT
   const bestInitial = useMemo(() => {
@@ -618,6 +615,26 @@ const StudentVideoPlayer = ({
     return () => clearInterval(uiTickRef.current);
   }, [isPlaying, antiSeekEnabled, lessonId, adminDurationSeconds, totalDuration]);
 
+  useEffect(() => {
+    const onFs = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    };
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = containerRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (el.requestFullscreen) {
+        await el.requestFullscreen();
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   if (!yId) {
     return (
       <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center rounded-2xl relative overflow-hidden group">
@@ -631,7 +648,7 @@ const StudentVideoPlayer = ({
     <div className="flex flex-col w-full h-full min-h-0">
       <div
         ref={containerRef}
-        className="relative w-full h-full min-h-0 lg:rounded-2xl overflow-hidden bg-black shadow-lg group"
+        className={`relative w-full h-full min-h-0 overflow-hidden bg-black shadow-lg group ${isFullscreen ? 'rounded-none' : 'lg:rounded-2xl'}`}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div
@@ -688,6 +705,8 @@ const StudentVideoPlayer = ({
               }
             } catch { /* ignore */ }
           }}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
         />
 
         {/* INACTIVE TAB OVERLAY */}
@@ -1928,9 +1947,6 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                   {isExpanded && chapterLessons.map((lesson) => {
                     const globalIdx = lessons.findIndex(l => String(l._id) === String(lesson._id));
                     const isCurrent = currentLesson?._id === lesson._id;
-                    const statusLines = getLessonAccessStatusLines(lesson, { isCurrent });
-                    const progressUi = getLessonCompletionProgressUi(lesson);
-                    const showBar = lesson.isUnlocked !== false && !lesson.isCompleted && progressUi.required > 0;
                     return (
                       <div
                         key={lesson._id}
@@ -1945,7 +1961,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                               ? 'Có thể học sớm'
                               : undefined
                         }
-                        className={`flex items-start gap-3 px-4 py-3.5 transition-all relative ${!lesson.isUnlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+                        className={`flex items-start gap-3 px-4 py-3 transition-all relative ${!lesson.isUnlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
                           } ${isCurrent
                             ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
                             : 'border-l-4 border-transparent hover:bg-white/[0.04]'
@@ -1969,35 +1985,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h4 className={`text-[12px] leading-snug line-clamp-2 ${isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
+                          <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
                             }`}>
                             {formatLessonDisplayTitle(lesson.title, globalIdx)}
                           </h4>
-                          <div className="mt-1 space-y-0.5">
-                            {statusLines.map((line) => (
-                              <p
-                                key={line.key}
-                                className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone, 'dark')}`}
-                              >
-                                {line.text}
-                              </p>
-                            ))}
-                          </div>
-                          {showBar ? (
-                            <div className={`mt-1.5 ${LMS_DARK_PROGRESS_TRACK_CLASS}`}>
-                              <div
-                                className={LMS_DARK_PROGRESS_FILL_CLASS}
-                                style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
-                              />
-                            </div>
-                          ) : null}
+                          <LessonSidebarMeta lesson={lesson} isCurrent={isCurrent} />
                         </div>
-
-                        {lesson.isCompleted && (
-                          <div className="flex-shrink-0 w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center mt-0.5">
-                            <CheckCircle size={9} className="text-emerald-500" />
-                          </div>
-                        )}
                       </div>
                     );
                   })}
