@@ -48,24 +48,41 @@ function BarChart({ data = [], color = '#6366f1', height = 80, emptyMessage = 'C
       </div>
     );
   }
-  const max = Math.max(...data.map(d => d.value), 1);
+  const max = Math.max(...data.map((d) => Number(d.value) || 0), 1);
+  const allZero = data.every((d) => !(Number(d.value) > 0));
+  const chartH = Math.max(Number(height) || 120, 80);
   return (
-    <div className="flex items-end gap-1 w-full" style={{ height }}>
-      {data.map((d, i) => {
-        const pct = (d.value / max) * 100;
-        return (
-          <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
+    <div className="w-full">
+      {allZero && (
+        <p className="text-center text-xs text-gray-400 mb-2">Doanh thu thuần = 0đ trong khoảng này</p>
+      )}
+      {/* Dùng height px (không %) — % trong flex-col không có chiều cao cố định → cột = 0 */}
+      <div className="flex items-end gap-0.5 sm:gap-1 w-full" style={{ height: chartH }}>
+        {data.map((d, i) => {
+          const val = Number(d.value) || 0;
+          const barPx = allZero
+            ? 8
+            : Math.max(Math.round((val / max) * chartH), val > 0 ? 4 : 1);
+          return (
             <div
-              className="w-full rounded-sm transition-all duration-300 hover:opacity-80 cursor-pointer"
-              style={{ height: `${Math.max(pct, 2)}%`, background: color, minHeight: 2 }}
-            />
-            {/* Tooltip */}
-            <div className="absolute bottom-full mb-1 hidden group-hover:flex bg-gray-900 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-10 shadow-lg">
-              {d.label}<br />{d.value.toLocaleString('vi-VN')}đ
+              key={`${d.label}-${i}`}
+              className="flex-1 h-full flex items-end justify-center group relative min-w-[3px]"
+              title={`${d.label}: ${val.toLocaleString('vi-VN')}đ`}
+            >
+              <div
+                className="w-full max-w-full rounded-t-sm transition-all duration-300 hover:opacity-80 cursor-pointer"
+                style={{
+                  height: barPx,
+                  background: allZero ? '#cbd5e1' : (val > 0 ? color : '#e2e8f0'),
+                }}
+              />
+              <div className="absolute bottom-full mb-1 hidden group-hover:flex bg-gray-900 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-10 shadow-lg pointer-events-none">
+                {d.label}<br />{val.toLocaleString('vi-VN')}đ
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -171,7 +188,7 @@ export default function RevenueAnalyticsTab() {
     fetchAll(period, selectedBranchId); 
   }, [period, selectedBranchId, fetchAll]);
 
-  const fmt = (n) => n ? n.toLocaleString('vi-VN') + 'đ' : '0đ';
+  const fmt = (n) => `${Number(n || 0).toLocaleString('vi-VN')}đ`;
   const selectedPeriodLabel = PERIODS.find(p => p.value === period)?.label || '';
 
   return (
@@ -260,10 +277,13 @@ export default function RevenueAnalyticsTab() {
       {/* ── Tab: Revenue Timeline ──────────────────────────────────── */}
       {activeTab === 'revenue' && (
         <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 flex flex-col min-h-[220px] lg:min-h-0 lg:h-full">
-          <h3 className="font-black text-gray-700 mb-4 flex items-center gap-2 shrink-0">
+          <h3 className="font-black text-gray-700 mb-1 flex items-center gap-2 shrink-0">
             <BarChart3 size={16} className="text-indigo-500" />
             Biểu đồ doanh thu — {selectedPeriodLabel}
           </h3>
+          <p className="text-[11px] text-gray-400 mb-4 shrink-0">
+            Doanh thu thuần từ sổ cái (Ledger: thu − hoàn) · {data?.timezone || 'Asia/Ho_Chi_Minh'}
+          </p>
           <div className="cms-m-chart min-h-[180px] flex-1 flex flex-col">
             {loading ? (
               <div className="flex flex-1 items-center justify-center text-gray-400 min-h-[160px]">
@@ -271,8 +291,8 @@ export default function RevenueAnalyticsTab() {
               </div>
             ) : data?.timeSeries?.length ? (
               <>
-                <div className="flex-1 flex flex-col justify-end min-h-[140px]">
-                  <BarChart data={data.timeSeries} color="#6366f1" height={120} />
+                <div className="flex-1 flex flex-col justify-end min-h-[160px]">
+                  <BarChart data={data.timeSeries} color="#6366f1" height={160} />
                 </div>
                 <div className="flex justify-between text-[10px] text-gray-400 mt-2">
                   <span>{data.timeSeries[0]?.label}</span>

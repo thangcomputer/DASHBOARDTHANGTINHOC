@@ -945,9 +945,98 @@ async function revenueByCourseFromLedger({
 }
 
 /**
- * Net revenue theo ngày (PAYMENT − REFUND) từ Ledger — cho BI trend.
+ * Net revenue theo ngày/tháng (PAYMENT − REFUND) từ Ledger — BI / Analytics.
+ * Bucket theo Asia/Ho_Chi_Minh (không dùng UTC midnight).
  */
 async function listNetRevenueByDay({
+  branchId = null,
+  from = null,
+  to = null,
+  bucket = 'day',
+} = {}) {
+  const mongoose = require('mongoose');
+  const { VN_TZ } = require('../utils/vnTimezone');
+  const match = {
+    status: 'posted',
+    type: { $in: ['payment', 'refund'] },
+  };
+  if (branchId) {
+    match.branchId = mongoose.Types.ObjectId.isValid(branchId)
+      ? new mongoose.Types.ObjectId(branchId)
+      : branchId;
+  }
+  if (from || to) {
+    match.postedAt = {};
+    if (from) match.postedAt.$gte = new Date(from);
+    if (to) match.postedAt.$lte = new Date(to);
+  }
+
+  const format = bucket === 'month' ? '%Y-%m' : '%Y-%m-%d';
+
+  return LedgerEntry.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: {
+          $dateToString: {
+            format,
+            date: '$postedAt',
+            timezone: VN_TZ,
+          },
+        },
+        payments: {
+          $sum: { $cond: [{ $eq: ['$type', 'payment'] }, '$amount', 0] },
+        },
+        refunds: {
+          $sum: { $cond: [{ $eq: ['$type', 'refund'] }, '$amount', 0] },
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        dateKey: '$_id',
+        revenue: { $subtract: ['$payments', '$refunds'] },
+      },
+    },
+    { $sort: { dateKey: 1 } },
+  ]);
+}
+
+/**
+ * Analytics chart series: Ledger net revenue with filled 0 buckets.
+ * Same financial definition as sumFinancialRevenue.net
+ */
+async function aggregateNetRevenueTimeSeries({
+  branchId = null,
+  from = null,
+  to = null,
+} = {}) {
+  const {
+    pickRevenueBucketSize,
+    enumerateVnBucketKeys,
+  } = require('../utils/vnTimezone');
+  const start = from ? new Date(from) : new Date(0);
+  const end = to ? new Date(to) : new Date();
+  const bucketSize = pickRevenueBucketSize(start, end);
+  const rows = await listNetRevenueByDay({
+    branchId,
+    from: start,
+    to: end,
+    bucket: bucketSize,
+  });
+  const map = new Map(rows.map((r) => [r.dateKey, Number(r.revenue) || 0]));
+  const keys = enumerateVnBucketKeys(start, end, bucketSize);
+  return keys.map((label) => ({
+    label,
+    value: map.has(label) ? map.get(label) : 0,
+  }));
+}
+
+/**
+ * Net revenue by branch from Ledger (PAYMENT − REFUND).
+ */
+async function sumFinancialRevenueByBranch({
   branchId = null,
   from = null,
   to = null,
@@ -972,22 +1061,33 @@ async function listNetRevenueByDay({
     { $match: match },
     {
       $group: {
-        _id: { $dateToString: { format: '%Y-%m-%d', date: '$postedAt' } },
+        _id: { $ifNull: ['$branchId', null] },
         payments: {
           $sum: { $cond: [{ $eq: ['$type', 'payment'] }, '$amount', 0] },
         },
         refunds: {
           $sum: { $cond: [{ $eq: ['$type', 'refund'] }, '$amount', 0] },
         },
+        paymentCount: {
+          $sum: { $cond: [{ $eq: ['$type', 'payment'] }, 1, 0] },
+        },
       },
     },
     {
       $project: {
         _id: 0,
-        dateKey: '$_id',
-        revenue: { $subtract: ['$payments', '$refunds'] },
+        branchId: {
+          $cond: [
+            { $eq: ['$_id', null] },
+            'unknown',
+            { $toString: '$_id' },
+          ],
+        },
+        total: { $subtract: ['$payments', '$refunds'] },
+        count: '$paymentCount',
       },
     },
+    { $sort: { total: -1 } },
   ]);
 }
 
@@ -1004,6 +1104,8 @@ module.exports = {
   sumFinancialRevenue,
   revenueByCourseFromLedger,
   listNetRevenueByDay,
+  aggregateNetRevenueTimeSeries,
+  sumFinancialRevenueByBranch,
   reconciliationReport,
   issueCreditNoteForRefund,
   rebuildDailySnapshots,

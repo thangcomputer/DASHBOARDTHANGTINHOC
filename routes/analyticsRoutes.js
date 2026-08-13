@@ -1,6 +1,7 @@
 /**
  * analyticsRoutes.js — Báo cáo Doanh thu & Thống kê đa chi nhánh
- * P0: KPI doanh thu chính = Ledger sumFinancialRevenue (net = payment − refund).
+ * P0: KPI + timeSeries + byBranch doanh thu = Ledger (net = payment − refund).
+ * Enrollment chỉ dùng cho metrics đăng ký (ops), không thay Ledger cho financial revenue.
  */
 const express = require('express');
 const router = express.Router();
@@ -12,11 +13,19 @@ const { policyShadowAnalytics } = require('../middleware/policyShadowAnalytics')
 const { analyticsCutoverGate } = require('../middleware/analyticsCutoverGate');
 const logger = require('../config/logger');
 const {
-  listPaidItems,
-  revenueByBranch,
   sumStudentPaidTuition,
 } = require('../services/revenueAggregate');
-const { sumFinancialRevenue } = require('../services/ledgerService');
+const {
+  sumFinancialRevenue,
+  aggregateNetRevenueTimeSeries,
+  sumFinancialRevenueByBranch,
+} = require('../services/ledgerService');
+const {
+  getAnalyticsPeriodRange,
+  vnDateKey,
+  vnMonthKey,
+  enumerateVnBucketKeys,
+} = require('../utils/vnTimezone');
 
 /**
  * Phase 7.27 — Controlled cutover for LIVE /api/analytics ONLY.
@@ -32,48 +41,25 @@ const guard = (action) => [
   analyticsCutoverGate(action),
 ];
 
+/** Enrollment/ops period helper — same calendar semantics as revenue. */
 function getPeriodRange(period) {
-  const now = new Date();
-  const start = new Date(now);
-  switch (period) {
-    case '1d': start.setDate(now.getDate() - 1); break;
-    case '7d': start.setDate(now.getDate() - 7); break;
-    case '1m': start.setMonth(now.getMonth() - 1); break;
-    case '2m': start.setMonth(now.getMonth() - 2); break;
-    case '10m': start.setMonth(now.getMonth() - 10); break;
-    case '1y': start.setFullYear(now.getFullYear() - 1); break;
-    case '2y': start.setFullYear(now.getFullYear() - 2); break;
-    default: start.setMonth(now.getMonth() - 1); break;
-  }
-  return { start, end: now };
+  const { start, end } = getAnalyticsPeriodRange(period);
+  return { start, end };
 }
 
+/** Enrollment/ops series only — VN calendar keys (not financial SoT). */
 function generateTimeSeries(docs, startDate, endDate, field = 'paidAt', valueField = 'amount') {
   const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-  const bucketSize = days > 60 ? 'month' : days > 14 ? 'week' : 'day';
+  const bucketSize = days > 60 ? 'month' : 'day';
 
   const buckets = {};
-  const cur = new Date(startDate);
-  while (cur <= endDate) {
-    const key = bucketSize === 'month'
-      ? `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`
-      : bucketSize === 'week'
-        ? `W${Math.ceil(cur.getDate() / 7)}-${cur.getMonth() + 1}/${cur.getFullYear()}`
-        : cur.toISOString().slice(0, 10);
-    buckets[key] = 0;
-    if (bucketSize === 'day') cur.setDate(cur.getDate() + 1);
-    else if (bucketSize === 'week') cur.setDate(cur.getDate() + 7);
-    else cur.setMonth(cur.getMonth() + 1);
-  }
+  const keys = enumerateVnBucketKeys(startDate, endDate, bucketSize === 'month' ? 'month' : 'day');
+  keys.forEach((k) => { buckets[k] = 0; });
 
   docs.forEach((doc) => {
     const d = new Date(doc[field] || doc.createdAt || doc.paidAt);
     if (Number.isNaN(d.getTime())) return;
-    const key = bucketSize === 'month'
-      ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      : bucketSize === 'week'
-        ? `W${Math.ceil(d.getDate() / 7)}-${d.getMonth() + 1}/${d.getFullYear()}`
-        : d.toISOString().slice(0, 10);
+    const key = bucketSize === 'month' ? vnMonthKey(d) : vnDateKey(d);
     if (buckets[key] !== undefined) buckets[key] += (Number(doc[valueField]) || 0);
   });
 
@@ -92,18 +78,16 @@ function buildBaseFilter(req, queryBranch) {
 router.get('/revenue', guard('revenue'), async (req, res) => {
   try {
     const { period = '1m', branchId: queryBranch } = req.query;
-    const { start, end } = getPeriodRange(period);
+    const { start, end, prevStart, prevEnd, timezone } = getAnalyticsPeriodRange(period);
     const baseFilter = buildBaseFilter(req, queryBranch);
     const branchId = baseFilter.branchId || null;
-    const periodMs = end - start;
-    const prevStart = new Date(start.getTime() - periodMs);
-    const prevEnd = new Date(start);
 
-    const [current, previous, allTime, paidItems, newStudents] = await Promise.all([
+    const [current, previous, allTime, timeSeries, byBranchRaw, newStudents] = await Promise.all([
       sumFinancialRevenue({ branchId, from: start, to: end }),
       sumFinancialRevenue({ branchId, from: prevStart, to: prevEnd }),
       sumFinancialRevenue({ branchId }),
-      listPaidItems({ branchFilter: baseFilter, start, end }),
+      aggregateNetRevenueTimeSeries({ branchId, from: start, to: end }),
+      sumFinancialRevenueByBranch({ branchId, from: start, to: end }),
       Student.countDocuments({
         ...baseFilter,
         createdAt: { $gte: start, $lte: end },
@@ -114,21 +98,33 @@ router.get('/revenue', guard('revenue'), async (req, res) => {
     const prevRevenue = previous.net || 0;
     const growthPct = prevRevenue > 0
       ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100)
-      : null;
+      : (totalRevenue > 0 ? 100 : null);
 
-    const byBranch = await revenueByBranch({ branchFilter: baseFilter, start, end });
-    byBranch.forEach((b) => {
-      b.pct = totalRevenue > 0 ? Math.round((b.total / totalRevenue) * 100) : 0;
-    });
+    const branchIds = byBranchRaw
+      .map((b) => b.branchId)
+      .filter((id) => id && id !== 'unknown');
+    let codeMap = {};
+    if (branchIds.length) {
+      const branches = await Branch.find({ _id: { $in: branchIds } }).select('code name').lean();
+      codeMap = Object.fromEntries(branches.map((b) => [String(b._id), b.code || b.name || '']));
+    }
+    const byBranch = byBranchRaw.map((b) => ({
+      ...b,
+      branchCode: codeMap[b.branchId] || (b.branchId === 'unknown' ? 'Không xác định' : b.branchId),
+      pct: totalRevenue > 0 ? Math.round((b.total / totalRevenue) * 100) : 0,
+    }));
 
-    const timeSeries = generateTimeSeries(paidItems, start, end, 'paidAt', 'amount');
+    const seriesSum = timeSeries.reduce((s, p) => s + (Number(p.value) || 0), 0);
 
     return res.json({
       success: true,
       data: {
         period,
         dateRange: { from: start, to: end },
+        prevDateRange: { from: prevStart, to: prevEnd },
+        timezone,
         source: 'ledger',
+        revenueDefinition: 'net',
         totalRevenue,
         grossRevenue: current.payments || 0,
         refunds: current.refunds || 0,
@@ -141,6 +137,7 @@ router.get('/revenue', guard('revenue'), async (req, res) => {
         refundCount: current.refundCount || 0,
         byBranch,
         timeSeries,
+        timeSeriesSum: seriesSum,
       },
     });
   } catch (err) {
@@ -203,7 +200,6 @@ router.get('/enrollment', guard('enrollment'), async (req, res) => {
       });
     });
 
-    // Time series đăng ký: mỗi HV 1 điểm; value = tổng học phí đã thu của HV đó
     const seriesDocs = students.map((st) => ({
       createdAt: st.createdAt,
       amount: sumStudentPaidTuition(st),
@@ -215,7 +211,6 @@ router.get('/enrollment', guard('enrollment'), async (req, res) => {
       data: {
         period,
         dateRange: { from: start, to: end },
-        // H6: ops enrollment cache — KPI tiền dùng /analytics/revenue (Ledger)
         source: 'enrollment_ops',
         note: 'totalFee/byCourse.revenue từ enrollment.paid (ops). Doanh thu SoT: GET /analytics/revenue',
         total,
