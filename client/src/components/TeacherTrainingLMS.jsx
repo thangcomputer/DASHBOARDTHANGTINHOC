@@ -19,6 +19,9 @@ import {
   getLessonCompletionProgressUi,
   getPlayerCompletionBadgeText,
   lessonStatusToneClass,
+  LMS_PLAYER_PROGRESS_BADGE_CLASS,
+  LMS_DARK_PROGRESS_TRACK_CLASS,
+  LMS_DARK_PROGRESS_FILL_CLASS,
 } from '../utils/lmsLessonUi';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
 import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrandedPlayerChrome';
@@ -683,7 +686,7 @@ const YouTubePlayerSecure = ({
               <span className={`text-[10px] px-2.5 py-1 rounded-full border backdrop-blur-md font-bold ${
                 lessonCompleted || displayWatched >= requiredSeconds || seekUnlocked
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                  : 'bg-red-500/20 text-red-200 border-red-500/30'
+                  : LMS_PLAYER_PROGRESS_BADGE_CLASS
               }`}>
                 {lessonCompleted
                   ? 'Đã hoàn thành'
@@ -1286,8 +1289,8 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                          </div>
                        </div>
                        <div className="flex items-center gap-2 mb-3">
-                         <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
-                           <div className="h-full rounded-full bg-red-600 transition-all" style={{ width: `${progress}%` }} />
+                         <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
+                           <div className="h-full rounded-full bg-red-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
                          </div>
                        </div>
                        <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
@@ -1624,16 +1627,16 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                             {statusLines.map((line) => (
                               <p
                                 key={line.key}
-                                className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone)}`}
+                                className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone, 'dark')}`}
                               >
                                 {line.text}
                               </p>
                             ))}
                           </div>
                           {showBar ? (
-                            <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
+                            <div className={`mt-1.5 ${LMS_DARK_PROGRESS_TRACK_CLASS}`}>
                               <div
-                                className="h-full rounded-full bg-red-400/80 transition-all duration-300"
+                                className={LMS_DARK_PROGRESS_FILL_CLASS}
                                 style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
                               />
                             </div>

@@ -3,7 +3,7 @@ import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
   FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
-import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getLessonAccessStatusLines, getLessonCompletionProgressUi, lessonStatusToneClass } from '../../utils/lmsLessonUi';
+import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getLessonAccessStatusLines, getLessonCompletionProgressUi, lessonStatusToneClass, LMS_DARK_PROGRESS_TRACK_CLASS, LMS_DARK_PROGRESS_FILL_CLASS } from '../../utils/lmsLessonUi';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
 import { buildMediaDownloadUrl, apiFetch } from '../../services/api';
 import useLmsLocalStore, { lmsStoreKey } from '../../hooks/useLmsLocalStore';
@@ -493,11 +493,11 @@ function QaPanel({
                     </p>
 
                     {it.status === 'answered' && it.answer ? (
-                      <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2.5">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-red-300 mb-1">
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-red-600 mb-1">
                           Trả lời · {it.answeredByName || 'Admin/GV'}
                         </p>
-                        <p className="text-[13px] text-slate-200 whitespace-pre-wrap">{it.answer}</p>
+                        <p className="text-[13px] text-slate-700 whitespace-pre-wrap">{it.answer}</p>
                       </div>
                     ) : null}
 
@@ -815,16 +815,16 @@ function ListPanel({
                         {statusLines.map((line) => (
                           <p
                             key={line.key}
-                            className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone)}`}
+                            className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone, 'dark')}`}
                           >
                             {line.text}
                           </p>
                         ))}
                       </div>
                       {showBar ? (
-                        <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
+                        <div className={`mt-1.5 ${LMS_DARK_PROGRESS_TRACK_CLASS}`}>
                           <div
-                                className="h-full rounded-full bg-red-400/80 transition-all duration-300"
+                                className={LMS_DARK_PROGRESS_FILL_CLASS}
                             style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
                           />
                         </div>

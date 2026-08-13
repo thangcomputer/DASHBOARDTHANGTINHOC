@@ -186,15 +186,15 @@ export default function LmsBrandedPlayerChrome({
             <div className="absolute inset-x-0 h-2.5 rounded-full bg-white/20">
               {lockSeek && maxPct > 0 && maxPct < 100 && (
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-red-300/30"
+                  className="absolute inset-y-0 left-0 rounded-full bg-white/25"
                   style={{ width: `${maxPct}%` }}
                 />
               )}
               <div
-                className="absolute inset-y-0 left-0 rounded-full"
+                className="absolute inset-y-0 left-0 rounded-full border border-white/30"
                 style={{
                   width: `${progressPct}%`,
-                  background: 'linear-gradient(90deg, #fca5a5 0%, #ef4444 55%, #dc2626 100%)',
+                  background: 'linear-gradient(90deg, #fecaca 0%, #ef4444 55%, #dc2626 100%)',
                 }}
               />
               <div
@@ -223,7 +223,7 @@ export default function LmsBrandedPlayerChrome({
                 : <Play size={16} fill="white" className="text-white ml-0.5" />}
             </button>
 
-            <span className="text-[11px] sm:text-xs font-bold tabular-nums text-red-100 shrink-0 min-w-[2.5rem]">
+            <span className="text-[11px] sm:text-xs font-bold tabular-nums text-white shrink-0 min-w-[2.5rem]">
               {formatClock(displayTime)}
             </span>
             <span className="text-[11px] sm:text-xs font-bold tabular-nums text-slate-400 shrink-0">
@@ -244,7 +244,7 @@ export default function LmsBrandedPlayerChrome({
                   e.stopPropagation();
                   onToggleMute?.();
                 }}
-                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-red-100 border border-white/10 transition"
+                className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 transition"
                 aria-label={muted ? 'Bật tiếng' : 'Tắt tiếng'}
               >
                 <VolIcon size={16} />

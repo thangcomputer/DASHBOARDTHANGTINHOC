@@ -23,6 +23,9 @@ import {
   getLessonCompletionProgressUi,
   getPlayerCompletionBadgeText,
   lessonStatusToneClass,
+  LMS_PLAYER_PROGRESS_BADGE_CLASS,
+  LMS_DARK_PROGRESS_TRACK_CLASS,
+  LMS_DARK_PROGRESS_FILL_CLASS,
 } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
@@ -708,7 +711,7 @@ const StudentVideoPlayer = ({
           </div>
         ) : null}
         {!isReady && !playerError && overlayVisible ? (
-          <div className="absolute top-3 right-3 z-40 text-[10px] font-bold uppercase tracking-wider text-red-200/80 bg-black/40 px-2 py-1 rounded-md">
+          <div className="absolute top-3 right-3 z-40 text-[10px] font-bold uppercase tracking-wider text-white/90 bg-black/50 px-2 py-1 rounded-md border border-white/15">
             Đang tải…
           </div>
         ) : null}
@@ -724,7 +727,7 @@ const StudentVideoPlayer = ({
             <span className={`text-[10px] px-2 py-1 rounded-md border backdrop-blur-md font-bold ${
               lessonCompleted || seekUnlocked
                 ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30'
-                : 'bg-red-500/20 text-red-100 border-red-500/30'
+                : LMS_PLAYER_PROGRESS_BADGE_CLASS
             }`}>
               {lessonCompleted
                 ? 'Đã hoàn thành'
@@ -1395,8 +1398,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full bg-red-600 transition-all" style={{ width: `${progress}%` }} />
+                        <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
+                          <div className="h-full rounded-full bg-red-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
                         </div>
                       </div>
                       <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
@@ -1974,16 +1977,16 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                             {statusLines.map((line) => (
                               <p
                                 key={line.key}
-                                className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone)}`}
+                                className={`text-[9px] font-bold uppercase tracking-wide leading-snug ${lessonStatusToneClass(line.tone, 'dark')}`}
                               >
                                 {line.text}
                               </p>
                             ))}
                           </div>
                           {showBar ? (
-                            <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
+                            <div className={`mt-1.5 ${LMS_DARK_PROGRESS_TRACK_CLASS}`}>
                               <div
-                                className="h-full rounded-full bg-red-400/80 transition-all duration-300"
+                                className={LMS_DARK_PROGRESS_FILL_CLASS}
                                 style={{ width: `${progressUi.towardGatePct ?? 0}%` }}
                               />
                             </div>
