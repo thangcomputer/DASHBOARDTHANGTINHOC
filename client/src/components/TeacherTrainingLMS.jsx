@@ -15,6 +15,7 @@ import api, { buildMediaDownloadUrl, csrfFetch } from '../services/api';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import { formatLessonDisplayTitle } from '../utils/lmsLessonUi';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
+import LmsBrandedPlayerChrome from './lms/LmsBrandedPlayerChrome';
 import {
   isLessonAntiSeekEnabled,
   requiredWatchSeconds,
@@ -129,12 +130,15 @@ const YouTubePlayerSecure = ({
   const [hasEnded, setHasEnded] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isTabActive, setIsTabActive] = useState(true);
-  const [playerInteractive, setPlayerInteractive] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [maxSeekableUi, setMaxSeekableUi] = useState(0);
   const pauseTimeoutRef = useRef(null);
   const maxPosRef = useRef(0);
   const seekGuardRef = useRef(false);
   const eligibilitySentRef = useRef(false);
+  const uiTickRef = useRef(null);
 
   // ── Bộ đếm thực tế ──────────────────────────────────────────────────────────
   const initialLocal = parseInt(sessionStorage.getItem(`lms_watched_${lessonId}`) || "0", 10);
@@ -152,10 +156,12 @@ const YouTubePlayerSecure = ({
     setTotalDuration(lessonDuration || 0);
     setHasEnded(false);
     setOverlayVisible(true);
-    setPlayerInteractive(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
     eligibilitySentRef.current = false;
     const savedPos = Number(sessionStorage.getItem(`lms_pos_${lessonId}`) || 0);
     maxPosRef.current = antiSeekEnabled ? Math.max(0, savedPos) : Math.max(0, savedPos, bestSecs);
+    setMaxSeekableUi(maxPosRef.current);
     seekGuardRef.current = false;
   }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
 
@@ -228,12 +234,13 @@ const YouTubePlayerSecure = ({
       }
       setIsReady(false);
       setHasEnded(false);
-      setPlayerInteractive(false);
+      setIsPlaying(false);
 
       playerRef.current = new window.YT.Player(`yt-player-${lessonId}`, {
         videoId: extractYouTubeId(videoId),
         playerVars: {
-          controls: 1,           // Timeline vẫn hiện; antiSeek snap-back nếu vượt maxPos
+          controls: 0,
+          disablekb: 1,
           rel: 0,
           modestbranding: 1,
           iv_load_policy: 3,
@@ -251,6 +258,7 @@ const YouTubePlayerSecure = ({
             const resumeAt = antiSeekEnabled ? maxPosRef.current : bestInitial;
             if (resumeAt > 0) {
               event.target.seekTo(resumeAt, true);
+              setCurrentTime(resumeAt);
             }
           },
           onStateChange: handleStateChange,
@@ -273,6 +281,7 @@ const YouTubePlayerSecure = ({
     return () => {
       clearInterval(intervalRef.current);
       clearInterval(autoSaveTimerRef.current);
+      clearInterval(uiTickRef.current);
       playerRef.current?.destroy?.();
       playerRef.current = null;
     };
@@ -284,6 +293,7 @@ const YouTubePlayerSecure = ({
     intervalRef.current = setInterval(() => {
       try {
         const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
+        setCurrentTime(t);
         if (antiSeekEnabled && !seekGuardRef.current) {
           if (t > maxPosRef.current + 1.25) {
             seekGuardRef.current = true;
@@ -293,10 +303,12 @@ const YouTubePlayerSecure = ({
           }
           if (t >= maxPosRef.current - 0.35) {
             maxPosRef.current = Math.max(maxPosRef.current, t);
+            setMaxSeekableUi(maxPosRef.current);
             sessionStorage.setItem(`lms_pos_${lessonId}`, String(maxPosRef.current));
           }
         } else if (!antiSeekEnabled && t > maxPosRef.current) {
           maxPosRef.current = t;
+          setMaxSeekableUi(t);
         }
       } catch { /* ignore */ }
 
@@ -341,35 +353,46 @@ const YouTubePlayerSecure = ({
 
   const handleStateChange = useCallback((event) => {
     const state = event.data;
-    // PLAYING = 1
     if (state === window.YT.PlayerState.PLAYING) {
       setOverlayVisible(false);
       setIsPaused(false);
+      setIsPlaying(true);
+      setHasEnded(false);
       startCounting();
-      // Lấy duration thực nếu chưa có
       if (!totalDuration || totalDuration === 0) {
         const dur = event.target.getDuration?.();
         if (dur > 0) setTotalDuration(dur);
       }
     }
-    // PAUSED = 2
     if (state === window.YT.PlayerState.PAUSED) {
       stopCounting();
+      setIsPlaying(false);
       setIsPaused(true);
       clearTimeout(pauseTimeoutRef.current);
       pauseTimeoutRef.current = setTimeout(() => setIsPaused(false), 1200);
     }
-    // ENDED = 0
     if (state === window.YT.PlayerState.ENDED) {
       stopCounting();
+      setIsPlaying(false);
       setHasEnded(true);
       setOverlayVisible(true);
-      // Kiểm tra 2/3 điều kiện
       if (onVideoEnded) {
         onVideoEnded(actualWatchedRef.current, totalDuration);
       }
     }
   }, [onVideoEnded, startCounting, stopCounting, totalDuration]);
+
+  useEffect(() => {
+    clearInterval(uiTickRef.current);
+    if (!isPlaying) return undefined;
+    uiTickRef.current = setInterval(() => {
+      try {
+        const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
+        setCurrentTime(t);
+      } catch { /* ignore */ }
+    }, 250);
+    return () => clearInterval(uiTickRef.current);
+  }, [isPlaying]);
 
   if (isLocked) {
     return (
@@ -384,57 +407,36 @@ const YouTubePlayerSecure = ({
 
   return (
     <div className="flex flex-col w-full h-full min-h-0">
-      {/* YouTube Player */}
       <div
         ref={containerRef}
         className="relative w-full h-full min-h-0 lg:rounded-2xl overflow-hidden bg-black shadow-lg group"
-        onMouseLeave={() => setPlayerInteractive(false)}
+        onContextMenu={(e) => e.preventDefault()}
       >
         <div
           id={`yt-player-${lessonId}`}
           className="absolute inset-0 w-full h-full"
-          style={{ pointerEvents: playerInteractive || overlayVisible ? 'auto' : 'none' }}
+          style={{ pointerEvents: 'none' }}
         />
-        {!overlayVisible && !playerInteractive ? (
-          <button
-            type="button"
-            aria-label="Tương tác video"
-            className="absolute inset-0 z-[15] cursor-default bg-transparent border-0 p-0"
-            onClick={() => setPlayerInteractive(true)}
-          />
-        ) : null}
 
-        {/* ▶️ PREMIUM OVERLAY — chỉ lúc chưa phát / xem lại */}
-        {overlayVisible && (
-          <div
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center px-4"
-            style={{ background: 'linear-gradient(135deg, rgba(10,14,24,0.88) 0%, rgba(15,25,50,0.75) 100%)' }}
-            onContextMenu={e => e.preventDefault()}
-          >
-            <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
-              <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest uppercase shadow-lg">THẮNG TIN HỌC</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => playerRef.current?.playVideo?.()}
-              className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)', boxShadow: '0 0 32px rgba(16,185,129,0.4), 0 8px 24px rgba(0,0,0,0.35)' }}
-              aria-label="Phát video"
-            >
-              <Play size={28} className="text-white ml-1 drop-shadow-lg" fill="white" />
-            </button>
-            <p className="mt-4 text-white/70 text-sm font-semibold tracking-wide text-center">
-              {hasEnded ? 'Xem lại bài học' : 'Nhấn để bắt đầu học'}
-            </p>
-            {hasEnded && (
-              <span className="mt-2 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
-                <CheckCircle size={13} /> Đã xem xong
-              </span>
-            )}
-          </div>
-        )}
+        <LmsBrandedPlayerChrome
+          overlayVisible={overlayVisible}
+          hasEnded={hasEnded}
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={totalDuration}
+          maxSeekable={maxSeekableUi}
+          antiSeekEnabled={antiSeekEnabled}
+          onPlay={() => playerRef.current?.playVideo?.()}
+          onPause={() => playerRef.current?.pauseVideo?.()}
+          onSeek={(t) => {
+            try {
+              const capped = antiSeekEnabled ? Math.min(t, maxPosRef.current) : t;
+              playerRef.current?.seekTo?.(capped, true);
+              setCurrentTime(capped);
+            } catch { /* ignore */ }
+          }}
+        />
 
-        {/* INACTIVE TAB OVERLAY */}
         {!isTabActive && !overlayVisible && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 text-center px-4 rounded-none lg:rounded-2xl">
             <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/40 mb-4">
@@ -445,17 +447,15 @@ const YouTubePlayerSecure = ({
           </div>
         )}
 
-        {/* Loading Overlay */}
         {!isReady && (
           <div className="absolute inset-0 z-20 bg-slate-900 flex items-center justify-center rounded-none lg:rounded-2xl">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-[3px] border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+              <div className="w-12 h-12 border-[3px] border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
               <p className="text-slate-400 font-semibold text-xs animate-pulse tracking-widest uppercase">Đang tải video...</p>
             </div>
           </div>
         )}
 
-        {/* Seen badge */}
         {hasEnded && !overlayVisible && (
           <div className="absolute top-3 right-3 z-20 bg-emerald-500 text-white px-3 py-1.5 rounded-xl font-bold text-[11px] flex items-center gap-1.5 shadow-lg">
             <CheckCircle size={12} /> Đã xem xong
@@ -472,44 +472,10 @@ const YouTubePlayerSecure = ({
               : `Cần xem ${formatTime(Math.max(0, requiredSeconds - displayWatched))} nữa`}
           </div>
         )}
-
-        {isReady && !overlayVisible && (
-          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/45 to-transparent p-3 pointer-events-none">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 bg-black/35 border border-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                <Clock size={12} className="text-emerald-300" />
-                <span className="text-white font-mono text-[11px] font-bold tabular-nums">
-                  {formatTime(displayWatched)}
-                </span>
-                <span className="text-slate-500 text-[11px]">/</span>
-                <span className="text-slate-300 font-mono text-[11px] tabular-nums">
-                  {formatTime(totalDuration)}
-                </span>
-              </div>
-
-              {totalDuration > 0 && (
-                <>
-                  <div className="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, (displayWatched / totalDuration) * 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-white/70 font-bold tabular-nums">
-                    {Math.round((displayWatched / totalDuration) * 100)}%
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 };
-
-
-
 
 // ─── LESSON SIDEBAR ITEM ─────────────────────────────────────────────────────
 const LessonItem = ({ lesson, index, isCurrent, onClick }) => {

@@ -20,6 +20,7 @@ import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import { formatLessonDisplayTitle } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
+import LmsBrandedPlayerChrome from './lms/LmsBrandedPlayerChrome';
 import {
   isLessonAntiSeekEnabled,
   requiredWatchSeconds,
@@ -166,13 +167,14 @@ const StudentVideoPlayer = ({
   const yId = extractYouTubeId(videoId);
   const [isReady, setIsReady] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [hasEnded, setHasEnded] = useState(false);
   const [totalDuration, setTotalDuration] = useState(0);
   const [displayWatched, setDisplayWatched] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const [isTabActive, setIsTabActive] = useState(true);
-  /** Cho phép lăn chuột qua vùng video (iframe YT bắt wheel nếu pointer-events: auto). */
-  const [playerInteractive, setPlayerInteractive] = useState(false);
+  const [maxSeekableUi, setMaxSeekableUi] = useState(0);
 
   const playerRef = useRef(null);
   const containerRef = useRef(null);
@@ -182,6 +184,7 @@ const StudentVideoPlayer = ({
   const maxPosRef = useRef(0);
   const seekGuardRef = useRef(false);
   const eligibilitySentRef = useRef(false);
+  const uiTickRef = useRef(null);
 
   // Restore watched seconds from sessionStorage or initialWatchedSeconds
   const bestInitial = useMemo(() => {
@@ -204,12 +207,14 @@ const StudentVideoPlayer = ({
     setDisplayWatched(initial);
     setHasEnded(false);
     setOverlayVisible(true);
-    setPlayerInteractive(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
     eligibilitySentRef.current = false;
     const posKey = `student_lms_pos_${lessonId}`;
     const savedPos = Number(sessionStorage.getItem(posKey) || 0);
     // Anti-seek: vị trí tua tối đa ≠ wall-clock watched; không seed bằng watchedSeconds
     maxPosRef.current = antiSeekEnabled ? Math.max(0, savedPos) : Math.max(0, savedPos, initial);
+    setMaxSeekableUi(maxPosRef.current);
     seekGuardRef.current = false;
   }, [lessonId]); // eslint-disable-line react-hooks/exhaustive-deps -- lesson switch only
 
@@ -266,12 +271,13 @@ const StudentVideoPlayer = ({
       }
       setIsReady(false);
       setHasEnded(false);
-      setPlayerInteractive(false);
+      setIsPlaying(false);
 
       playerRef.current = new window.YT.Player(`student-yt-player-${lessonId}`, {
         videoId: extractYouTubeId(videoId),
         playerVars: {
-          controls: 1,           // Timeline vẫn hiện; antiSeek snap-back nếu vượt maxPos
+          controls: 0,           // Custom skin — ẩn chrome YouTube
+          disablekb: 1,
           rel: 0,
           modestbranding: 1,
           iv_load_policy: 3,
@@ -290,6 +296,7 @@ const StudentVideoPlayer = ({
             const resumeAt = antiSeekEnabled ? maxPosRef.current : bestInitial;
             if (resumeAt > 0) {
               event.target.seekTo(resumeAt, true);
+              setCurrentTime(resumeAt);
             }
           },
           onStateChange: handleStateChange,
@@ -312,6 +319,7 @@ const StudentVideoPlayer = ({
     return () => {
       clearInterval(intervalRef.current);
       clearInterval(autoSaveTimerRef.current);
+      clearInterval(uiTickRef.current);
       playerRef.current?.destroy?.();
       playerRef.current = null;
     };
@@ -323,6 +331,7 @@ const StudentVideoPlayer = ({
     intervalRef.current = setInterval(() => {
       try {
         const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
+        setCurrentTime(t);
         if (antiSeekEnabled && !seekGuardRef.current) {
           if (t > maxPosRef.current + 1.25) {
             seekGuardRef.current = true;
@@ -332,10 +341,12 @@ const StudentVideoPlayer = ({
           }
           if (t >= maxPosRef.current - 0.35) {
             maxPosRef.current = Math.max(maxPosRef.current, t);
+            setMaxSeekableUi(maxPosRef.current);
             sessionStorage.setItem(`student_lms_pos_${lessonId}`, String(maxPosRef.current));
           }
         } else if (!antiSeekEnabled && t > maxPosRef.current) {
           maxPosRef.current = t;
+          setMaxSeekableUi(t);
         }
       } catch { /* ignore */ }
 
@@ -383,6 +394,8 @@ const StudentVideoPlayer = ({
     if (state === window.YT.PlayerState.PLAYING) {
       setOverlayVisible(false);
       setIsPaused(false);
+      setIsPlaying(true);
+      setHasEnded(false);
       startCounting();
       if (!totalDuration || totalDuration === 0) {
         const dur = event.target.getDuration?.();
@@ -391,12 +404,14 @@ const StudentVideoPlayer = ({
     }
     if (state === window.YT.PlayerState.PAUSED) {
       stopCounting();
+      setIsPlaying(false);
       setIsPaused(true);
       clearTimeout(pauseTimeoutRef.current);
       pauseTimeoutRef.current = setTimeout(() => setIsPaused(false), 1200);
     }
     if (state === window.YT.PlayerState.ENDED) {
       stopCounting();
+      setIsPlaying(false);
       setHasEnded(true);
       setOverlayVisible(true);
       if (onVideoEnded) {
@@ -404,6 +419,19 @@ const StudentVideoPlayer = ({
       }
     }
   }, [onVideoEnded, startCounting, stopCounting, totalDuration]);
+
+  // Smoother progress UI while playing
+  useEffect(() => {
+    clearInterval(uiTickRef.current);
+    if (!isPlaying) return undefined;
+    uiTickRef.current = setInterval(() => {
+      try {
+        const t = Number(playerRef.current?.getCurrentTime?.()) || 0;
+        setCurrentTime(t);
+      } catch { /* ignore */ }
+    }, 250);
+    return () => clearInterval(uiTickRef.current);
+  }, [isPlaying]);
 
   if (!yId) {
     return (
@@ -419,51 +447,32 @@ const StudentVideoPlayer = ({
       <div
         ref={containerRef}
         className="relative w-full h-full min-h-0 lg:rounded-2xl overflow-hidden bg-black shadow-lg group"
-        onMouseLeave={() => setPlayerInteractive(false)}
+        onContextMenu={(e) => e.preventDefault()}
       >
         <div
           id={`student-yt-player-${lessonId}`}
           className="absolute inset-0 w-full h-full"
-          style={{ pointerEvents: playerInteractive || overlayVisible ? 'auto' : 'none' }}
+          style={{ pointerEvents: 'none' }}
         />
-        {!overlayVisible && !playerInteractive ? (
-          <button
-            type="button"
-            aria-label="Tương tác video"
-            className="absolute inset-0 z-[15] cursor-default bg-transparent border-0 p-0"
-            onClick={() => setPlayerInteractive(true)}
-          />
-        ) : null}
 
-        {/* ▶️ PREMIUM OVERLAY — chỉ lúc chưa phát / xem lại */}
-        {overlayVisible && (
-          <div
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center px-4"
-            style={{ background: 'linear-gradient(135deg, rgba(10,14,24,0.88) 0%, rgba(15,25,50,0.75) 100%)' }}
-            onContextMenu={e => e.preventDefault()}
-          >
-            <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
-              <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest uppercase shadow-lg">THẮNG TIN HỌC</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => playerRef.current?.playVideo?.()}
-              className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)', boxShadow: '0 0 32px rgba(16,185,129,0.4), 0 8px 24px rgba(0,0,0,0.35)' }}
-              aria-label="Phát video"
-            >
-              <Play size={28} className="text-white ml-1 drop-shadow-lg" fill="white" />
-            </button>
-            <p className="mt-4 text-white/70 text-sm font-semibold tracking-wide text-center">
-              {hasEnded ? 'Xem lại bài học' : 'Nhấn để bắt đầu học'}
-            </p>
-            {hasEnded && (
-              <span className="mt-2 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
-                <CheckCircle size={13} /> Đã xem xong
-              </span>
-            )}
-          </div>
-        )}
+        <LmsBrandedPlayerChrome
+          overlayVisible={overlayVisible}
+          hasEnded={hasEnded}
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={totalDuration}
+          maxSeekable={maxSeekableUi}
+          antiSeekEnabled={antiSeekEnabled}
+          onPlay={() => playerRef.current?.playVideo?.()}
+          onPause={() => playerRef.current?.pauseVideo?.()}
+          onSeek={(t) => {
+            try {
+              const capped = antiSeekEnabled ? Math.min(t, maxPosRef.current) : t;
+              playerRef.current?.seekTo?.(capped, true);
+              setCurrentTime(capped);
+            } catch { /* ignore */ }
+          }}
+        />
 
         {/* INACTIVE TAB OVERLAY */}
         {!isTabActive && !overlayVisible && (
