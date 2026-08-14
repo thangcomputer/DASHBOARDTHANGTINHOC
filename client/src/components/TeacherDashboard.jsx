@@ -539,7 +539,7 @@ const TeacherDashboard = ({ onNavigate }) => {
       {/* Popup thông báo — hiện 1 lần/ngày */}
       <PopupBanner role="teacher" />
 
-      <div className="min-w-0 pt-4">
+      <div className="min-w-0">
         {/* Topbar removed - using DashboardLayout header */}
 
 
@@ -574,7 +574,7 @@ const TeacherDashboard = ({ onNavigate }) => {
             cancelSchedule={cancelSchedule}
           />
         ) : (currentHash === 'assignments' || currentHash === 'quizzes' || currentHash === 'test') ? (
-          <div className="px-2 sm:px-4 md:px-8 py-4 sm:py-6 md:py-8">
+          <div className="py-2 sm:py-6 md:py-8">
             <TeacherAssignmentsView teacherId={TEACHER_ID} myStudents={students} />
           </div>
         ) : currentHash === 'profile' ? (

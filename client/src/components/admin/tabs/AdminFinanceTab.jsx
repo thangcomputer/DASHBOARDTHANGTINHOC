@@ -120,20 +120,23 @@ export default function AdminFinanceTab() {
   };
 
   return (
-    <div className="cms-viewport-fill flex flex-col gap-4 sm:gap-6">
-      {/* P2 P&L strip */}
+    <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
+      {/* P2 P&L strip — 5 ô đều: mobile 2+2+full, md+ 5 cột */}
       {ledger && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 shrink-0">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
             { label: 'Doanh thu gộp', value: totalGross || 0, tone: 'text-slate-800' },
             { label: 'Hoàn tiền', value: totalRefunded, tone: 'text-red-600', neg: true },
             { label: 'Doanh thu thuần', value: totalNet, tone: 'text-emerald-700' },
             { label: 'Chi phí (Ledger)', value: totalCosts, tone: 'text-blue-700', neg: true },
             { label: 'Lợi nhuận', value: totalProfit, tone: totalProfit >= 0 ? 'text-emerald-700' : 'text-red-600' },
-          ].map((m) => (
-            <div key={m.label} className="cms-m-card !p-3 sm:!p-4">
+          ].map((m, idx, arr) => (
+            <div
+              key={m.label}
+              className={`cms-m-card p-3 sm:p-4 min-w-0 ${idx === arr.length - 1 ? 'col-span-2 md:col-span-1' : ''}`}
+            >
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{m.label}</p>
-              <p className={`text-base sm:text-lg font-extrabold break-words ${m.tone}`}>
+              <p className={`text-base sm:text-lg font-extrabold break-words tabular-nums ${m.tone}`}>
                 {m.neg && m.value > 0 ? '−' : ''}{(Number(m.value) || 0).toLocaleString('vi-VN')}đ
               </p>
             </div>
@@ -141,8 +144,8 @@ export default function AdminFinanceTab() {
         </div>
       )}
 
-      <div className={`grid grid-cols-1 ${isSuperAdmin ? 'lg:grid-cols-2' : ''} gap-4 sm:gap-6`}>
-        <div className="cms-m-card flex flex-col max-h-[min(620px,70dvh)] h-[min(560px,70dvh)] sm:h-[min(620px,72dvh)] min-h-[280px] overflow-hidden shadow-sm">
+      <div className={`grid grid-cols-1 ${isSuperAdmin ? 'lg:grid-cols-2 lg:items-stretch' : ''} gap-4 sm:gap-6`}>
+        <div className="cms-m-card flex flex-col overflow-hidden shadow-sm min-h-0 max-lg:h-auto lg:min-h-[28rem] lg:h-[min(32rem,calc(100dvh-14rem))]">
           <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0 shrink-0">
             <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
               <DollarSign size={18} className="text-sky-700 flex-shrink-0" /> Doanh Thu Học Phí
@@ -211,20 +214,20 @@ export default function AdminFinanceTab() {
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2 sm:gap-3 mt-3 sm:mt-4 text-xs font-semibold text-red-100 border-t border-white/10 pt-3">
-                <div className="flex-1 min-w-[100px] bg-white/5 px-3 py-2 rounded-xl border border-white/5">
-                  <p className="opacity-70 mb-0.5">Dự kiến (Tất cả)</p>
-                  <p className="text-sm sm:text-[15px] font-bold text-white">{totalListed.toLocaleString('vi-VN')}đ</p>
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4 text-xs font-semibold text-red-100 border-t border-white/10 pt-3">
+                <div className="min-w-0 bg-white/5 px-2.5 sm:px-3 py-2 rounded-xl border border-white/5">
+                  <p className="opacity-70 mb-0.5 truncate">Dự kiến</p>
+                  <p className="text-sm sm:text-[15px] font-bold text-white break-words tabular-nums">{totalListed.toLocaleString('vi-VN')}đ</p>
                 </div>
-                <div className="flex-1 min-w-[100px] bg-white/5 px-3 py-2 rounded-xl border border-white/5">
-                  <p className="opacity-70 mb-0.5">Đã hoàn</p>
-                  <p className="text-sm sm:text-[15px] font-bold text-red-200">
+                <div className="min-w-0 bg-white/5 px-2.5 sm:px-3 py-2 rounded-xl border border-white/5">
+                  <p className="opacity-70 mb-0.5 truncate">Đã hoàn</p>
+                  <p className="text-sm sm:text-[15px] font-bold text-red-200 break-words tabular-nums">
                     {totalRefunded > 0 ? `−${totalRefunded.toLocaleString('vi-VN')}đ` : '0đ'}
                   </p>
                 </div>
-                <div className="flex-1 min-w-[100px] bg-white/5 px-3 py-2 rounded-xl border border-white/5">
-                  <p className="opacity-70 mb-0.5">Công nợ (Chưa thu)</p>
-                  <p className="text-sm sm:text-[15px] font-bold text-red-200">{totalDebt.toLocaleString('vi-VN')}đ</p>
+                <div className="min-w-0 bg-white/5 px-2.5 sm:px-3 py-2 rounded-xl border border-white/5">
+                  <p className="opacity-70 mb-0.5 truncate">Công nợ</p>
+                  <p className="text-sm sm:text-[15px] font-bold text-red-200 break-words tabular-nums">{totalDebt.toLocaleString('vi-VN')}đ</p>
                 </div>
               </div>
             </div>
@@ -279,7 +282,7 @@ export default function AdminFinanceTab() {
         </div>
 
         {isSuperAdmin && (
-          <div className="cms-m-card flex flex-col max-h-[min(620px,70dvh)] h-[min(560px,70dvh)] sm:h-[min(620px,72dvh)] min-h-[280px] overflow-hidden shadow-sm">
+          <div className="cms-m-card flex flex-col overflow-hidden shadow-sm min-h-0 max-lg:h-auto lg:min-h-[28rem] lg:h-[min(32rem,calc(100dvh-14rem))]">
             <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0 shrink-0">
               <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
                 <CreditCard size={18} className="text-blue-600 flex-shrink-0" /> Thanh Toán Giảng Viên
@@ -338,8 +341,8 @@ export default function AdminFinanceTab() {
               {financialData.map((t) => {
                 const bankInfo = t.teacherId?.bankAccount || t.bankAccount;
                 return (
-                  <div key={t.id || t._id} className="px-4 py-4 sm:px-6 hover:bg-slate-50 transition-colors duration-200 min-w-0">
-                    <div className="cms-m-list-row !p-0">
+                  <div key={t.id || t._id} className="min-w-0 border-b border-slate-50 last:border-b-0">
+                    <div className="cms-m-list-row hover:bg-slate-50">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
                           <Users size={14} />
@@ -350,12 +353,12 @@ export default function AdminFinanceTab() {
                         </div>
                       </div>
                       <div className="text-left sm:text-right shrink-0">
-                        <p className="text-[15px] font-extrabold text-blue-600 break-words">-{t.amount ? t.amount.toLocaleString('vi-VN') : 0}đ</p>
+                        <p className="text-[15px] font-extrabold text-blue-600 break-words tabular-nums">-{t.amount ? t.amount.toLocaleString('vi-VN') : 0}đ</p>
                         <p className="cms-m-caption">{t.date || new Date(t.createdAt).toLocaleDateString('vi-VN')}</p>
                       </div>
                     </div>
                     {bankInfo?.accountNumber && (
-                      <div className="mt-2 ml-0 sm:ml-12 flex items-center gap-2 flex-wrap min-w-0">
+                      <div className="px-4 pb-3 flex items-center gap-2 flex-wrap min-w-0">
                         <span className="inline-flex items-center gap-1 text-[12px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1.5 rounded-xl border border-emerald-100">
                           <CreditCard size={10} /> {bankInfo.bankName || 'N/A'}
                         </span>
@@ -376,7 +379,7 @@ export default function AdminFinanceTab() {
       </div>
 
       {/* P1: Sổ cái Ledger */}
-      <div className="cms-m-card flex flex-col min-h-[380px] overflow-hidden shadow-sm">
+      <div className="cms-m-card flex flex-col min-h-[16rem] overflow-hidden shadow-sm">
         <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between shrink-0 min-w-0">
           <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
             <BookOpen size={18} className="text-indigo-600 shrink-0" /> Sổ cái (Ledger)

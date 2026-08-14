@@ -626,13 +626,13 @@ export default function AdminStudentsTab() {
     <div className="cms-students-module cms-viewport-module bg-white rounded-2xl lg:rounded-[28px] border border-slate-100 shadow-[0_4px_24px_rgba(15,23,42,0.04)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Title + actions */}
       <div className="px-3 pt-3 pb-2 sm:px-4 lg:px-6 lg:pt-4 space-y-3 shrink-0">
-        <div className="flex items-center justify-between gap-3 min-w-0">
-          <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
+        <div className="flex items-start justify-between gap-3 min-w-0">
+          <h2 className="text-base font-semibold text-slate-900 flex items-start gap-2 min-w-0">
             <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
               <BookOpen size={18} aria-hidden="true" />
             </span>
-            <span className="truncate">Quản lý Học Viên</span>
-            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0">
+            <span className="min-w-0 break-words leading-snug">Quản lý Học Viên</span>
+            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0 self-center">
               {studentsPagination.totalRecords}
             </span>
           </h2>
@@ -680,48 +680,49 @@ export default function AdminStudentsTab() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-wrap items-stretch gap-2 min-w-0">
+        <div className="grid grid-cols-2 gap-2 min-w-0 sm:flex sm:flex-wrap sm:items-stretch">
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="cms-students-btn-primary col-span-2 sm:col-auto sm:order-last sm:ml-auto !px-3"
+          >
+            <Plus size={15} className="shrink-0" />
+            Thêm học viên
+          </button>
           <button
             type="button"
             onClick={handleExportExcel}
             disabled={isExportingExcel}
-            className="cms-students-btn-outline !px-2.5 shrink-0"
+            className="cms-students-btn-outline !px-2.5 min-w-0"
             title="Xuất Excel"
           >
             {isExportingExcel
-              ? <><Loader2 size={15} className="animate-spin shrink-0" /><span className="hidden min-[380px]:inline">...</span></>
-              : <><Download size={15} className="shrink-0" /><span className="hidden min-[380px]:inline">Xuất</span></>}
+              ? <Loader2 size={15} className="animate-spin shrink-0" />
+              : <Download size={15} className="shrink-0" />}
+            <span>Xuất</span>
           </button>
           <button
             type="button"
             onClick={() => setShowImportModal(true)}
-            className="cms-students-btn-outline !px-2.5 shrink-0"
+            className="cms-students-btn-outline !px-2.5 min-w-0"
             title="Import Excel"
           >
             <FileSpreadsheet size={15} className="shrink-0" />
-            <span className="hidden min-[380px]:inline">Excel</span>
+            <span>Excel</span>
           </button>
           <button
             type="button"
             onClick={handlePurgeCancelledStudents}
             disabled={purgingCancelled}
-            className="cms-students-btn-outline !px-2.5 shrink-0 text-rose-700 border-rose-200 hover:bg-rose-50"
+            className="cms-students-btn-outline col-span-2 sm:col-auto !px-2.5 min-w-0 text-rose-700 border-rose-200 hover:bg-rose-50"
             title="Xóa vĩnh viễn HV chỉ còn khóa đã hủy/hoàn (ghost)"
           >
             {purgingCancelled
               ? <Loader2 size={15} className="animate-spin shrink-0" />
               : <Trash2 size={15} className="shrink-0" />}
-            <span className="hidden min-[420px]:inline">
+            <span>
               Dọn HV hủy khóa{ghostCancelledCount > 0 ? ` (${ghostCancelledCount})` : ''}
             </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            className="cms-students-btn-primary !px-2.5 flex-1 min-w-[9rem] sm:flex-none sm:min-w-0 text-[12px] min-[360px]:text-[13px] sm:text-sm whitespace-nowrap"
-          >
-            <Plus size={15} className="shrink-0" />
-            Thêm học viên
           </button>
         </div>
       </div>
@@ -811,12 +812,11 @@ export default function AdminStudentsTab() {
                 </div>
               </div>
 
-              {/* Meta: stack trên mobile hẹp, 3 cột từ ~420px */}
               <div className="mt-3 pt-3 border-t border-slate-100">
-                <div className="grid grid-cols-1 min-[420px]:grid-cols-[minmax(0,1fr)_minmax(4.5rem,0.9fr)_minmax(4.25rem,auto)] gap-x-2 gap-y-2 items-start min-w-0">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide hidden min-[420px]:block">Giảng viên HD</p>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide hidden min-[420px]:block">Học phí</p>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right hidden min-[420px]:block">Trạng thái</p>
+                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(4.5rem,0.9fr)_minmax(4.25rem,auto)] gap-x-2 gap-y-2 items-start min-w-0">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide hidden sm:block">Giảng viên HD</p>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide hidden sm:block">Học phí</p>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right hidden sm:block">Trạng thái</p>
 
                   {hasMultiCourse ? (
                     <>
@@ -828,7 +828,7 @@ export default function AdminStudentsTab() {
                         return (
                           <div key={enrId} className="contents">
                             <div className="min-w-0 space-y-1">
-                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden">Giảng viên HD</p>
+                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden">Giảng viên HD</p>
                               <p className="text-[11px] font-semibold text-sky-700 truncate" title={courseLabel}>
                                 {courseLabel}
                               </p>
@@ -854,7 +854,7 @@ export default function AdminStudentsTab() {
                               </CmsSelect>
                             </div>
                             <div className="min-w-0 pt-0.5">
-                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden">Học phí</p>
+                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden">Học phí</p>
                               <p className="text-sm font-semibold text-slate-800 leading-tight tabular-nums">
                                 {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
                               </p>
@@ -862,8 +862,8 @@ export default function AdminStudentsTab() {
                                 {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
                               </p>
                             </div>
-                            <div className="flex justify-start min-[420px]:justify-end pt-0.5 min-w-0">
-                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden mr-2 self-center">Trạng thái</p>
+                            <div className="flex justify-start sm:justify-end pt-0.5 min-w-0">
+                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden mr-2 self-center">Trạng thái</p>
                               <PaidBadge paid={isEnrollmentPaidFlag(enr)} />
                             </div>
                           </div>
@@ -871,18 +871,18 @@ export default function AdminStudentsTab() {
                       })}
                       {getStudentRefundedTotal(s) > 0 ? (
                         <div className="contents">
-                          <div aria-hidden="true" className="hidden min-[420px]:block" />
+                          <div aria-hidden="true" className="hidden sm:block" />
                           <div className="min-w-0">
                             <RefundHint amount={getStudentRefundedTotal(s)} />
                           </div>
-                          <div aria-hidden="true" className="hidden min-[420px]:block" />
+                          <div aria-hidden="true" className="hidden sm:block" />
                         </div>
                       ) : null}
                     </>
                   ) : (
                     <>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden mb-1">Giảng viên HD</p>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden mb-1">Giảng viên HD</p>
                         {locked ? (
                           <span className="text-xs text-slate-400 font-semibold">—</span>
                         ) : (
@@ -890,11 +890,11 @@ export default function AdminStudentsTab() {
                         )}
                       </div>
                       <div className="min-w-0 pt-0.5">
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden mb-1">Học phí</p>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden mb-1">Học phí</p>
                         {renderTuition(s, enrollments.length ? enrollments : (primaryEnr ? [primaryEnr] : []), false)}
                       </div>
-                      <div className="flex justify-start min-[420px]:justify-end pt-0.5 min-w-0 items-center gap-2">
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-[420px]:hidden">Trạng thái</p>
+                      <div className="flex justify-start sm:justify-end pt-0.5 min-w-0 items-center gap-2">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden">Trạng thái</p>
                         {locked ? (
                           <span className="cms-students-badge-neutral text-slate-400">Đã hoàn</span>
                         ) : (

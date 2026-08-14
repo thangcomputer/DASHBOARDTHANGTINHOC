@@ -190,7 +190,7 @@ export default function RevenueAnalyticsTab() {
   const selectedPeriodLabel = PERIODS.find(p => p.value === period)?.label || '';
 
   return (
-    <div className="cms-viewport-fill p-1">
+    <div className="cms-viewport-fill">
       {/* ── Header Controls ────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>

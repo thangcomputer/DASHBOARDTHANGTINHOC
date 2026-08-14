@@ -37,6 +37,17 @@ describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () =
     assert.ok(chunk.includes('Student.find'));
   });
 
+  it('2b HIGH_ADMIN candidates skip students', () => {
+    const src = read('services/messagingContactsService.js');
+    const idx = src.indexOf("else if (adminRole === 'HIGH_ADMIN')");
+    assert.ok(idx > 0);
+    const end = src.indexOf("else if (adminRole === 'SUPPORT')", idx);
+    const chunk = src.slice(idx, end > idx ? end : idx + 1800);
+    assert.equal(chunk.includes('Student.find'), false);
+    assert.ok(chunk.includes("role: 'teacher'"));
+    assert.ok(chunk.includes("adminRole: { $in: ['STAFF', 'SUPPORT'] }"));
+  });
+
   it('3 Inbox discovers contacts from API; message-activity DMs from dataContext', () => {
     const inbox = read('client/src/components/Inbox.jsx');
     assert.equal(inbox.includes("!== 'Chưa có tin nhắn'"), false);
@@ -50,7 +61,7 @@ describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () =
     assert.ok(inbox.includes("contactTab === 'staff'"));
     assert.ok(inbox.includes("contactTab === 'support'"));
     assert.ok(inbox.includes("ar === 'SUPPORT'"));
-    assert.ok(inbox.includes("{ id: 'support', label: 'Support' }"));
+    assert.ok(inbox.includes("{ id: 'support', label: 'Hỗ trợ' }"));
     assert.ok(inbox.includes("ar !== 'STAFF'") || inbox.includes("ar !== 'SUPPORT'"));
   });
 

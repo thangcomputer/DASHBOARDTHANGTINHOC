@@ -415,6 +415,9 @@ router.post('/', messagesGuard('send'), async (req, res) => {
     if (isBroadcast && !(req.user.role === 'admin' || req.user.role === 'staff')) {
       return res.status(403).json({ success: false, message: 'Chỉ admin/staff được gửi thông báo broadcast' });
     }
+    if (isBroadcast && receiverId === 'ALL_STUDENTS' && req.user.adminRole === 'HIGH_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Admin cấp cao không gửi thông báo tới học viên' });
+    }
 
     // Broadcast keeps dedicated path (role/global rooms). DM/group use canonical service.
     if (isBroadcast) {
@@ -854,6 +857,9 @@ router.post('/broadcast', messagesGuard('broadcast'), async (req, res) => {
     // Chỉ Admin hoặc STAFF mới được gửi broadcast
     if (userRole !== 'admin' && userRole !== 'staff') {
       return res.status(403).json({ success: false, message: 'Không có quyền thực hiện' });
+    }
+    if (adminRole === 'HIGH_ADMIN' && targetRole === 'student') {
+      return res.status(403).json({ success: false, message: 'Admin cấp cao không gửi thông báo tới học viên' });
     }
 
     if (!['student', 'teacher', 'admin'].includes(targetRole)) {

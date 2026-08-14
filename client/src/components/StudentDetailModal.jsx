@@ -1018,7 +1018,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
         role="dialog"
         aria-modal="true"
         aria-label="Hồ sơ học viên"
-        className="bg-[#f8fafc] w-full sm:max-w-5xl h-[min(96dvh,920px)] sm:h-[90vh] rounded-t-2xl sm:rounded-[24px] shadow-2xl relative z-10 flex flex-col overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-200 border border-white/20 pb-[env(safe-area-inset-bottom,0px)]"
+        className="bg-[#f8fafc] w-full min-w-0 max-w-full sm:max-w-5xl h-[min(96dvh,920px)] sm:h-[90vh] rounded-t-2xl sm:rounded-[24px] shadow-2xl relative z-10 flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-200 border border-white/20 pb-[env(safe-area-inset-bottom,0px)]"
       >
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
@@ -1129,8 +1129,8 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             </div>
 
             {/* ── TABS + Course filter ─────────────────────────────────────── */}
-            <div className="bg-white border-b border-slate-100 shrink-0">
-              <div className="flex gap-1 px-3 sm:px-6 overflow-x-auto overscroll-x-contain hide-scrollbar scroll-smooth">
+            <div className="bg-white border-b border-slate-100 shrink-0 min-w-0">
+              <div className="grid grid-cols-3 lg:flex lg:flex-wrap lg:gap-1 px-1 sm:px-3 lg:px-6">
                 {[
                   { id: 'summary', label: 'Tổng quan', icon: ClipboardList },
                   { id: 'attendance', label: 'Lịch học', icon: Clock },
@@ -1147,7 +1147,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                     onClick={() => !locked && setActiveTab(tab.id)}
                     disabled={locked}
                     title={locked ? 'Không còn khóa đang học — không thể thao tác học / sửa' : undefined}
-                    className={`relative flex items-center gap-1.5 shrink-0 min-h-12 px-3 sm:px-4 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                    className={`relative flex flex-col lg:flex-row items-center justify-center gap-0.5 lg:gap-1.5 min-w-0 min-h-11 lg:min-h-12 px-1 lg:px-4 py-1.5 text-[11px] lg:text-[13px] font-semibold text-center leading-tight whitespace-normal lg:whitespace-nowrap transition-colors ${
                       locked
                         ? 'text-slate-300 cursor-not-allowed'
                         : activeTab === tab.id
@@ -1155,8 +1155,8 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                           : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
-                    <tab.icon size={15} className="shrink-0" />
-                    {tab.label}
+                    <tab.icon size={14} className="shrink-0" />
+                    <span className="min-w-0">{tab.label}</span>
                     {activeTab === tab.id && !locked && (
                       <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-600 rounded-full" />
                     )}
@@ -1191,7 +1191,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             </div>
 
             {/* ── MAIN CONTENT AREA ─────────────────────────────────────────── */}
-            <div className={`flex-1 min-h-0 p-4 sm:p-6 md:p-8 ${activeTab === 'academic' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+            <div className={`flex-1 min-h-0 min-w-0 overflow-x-hidden p-3 sm:p-6 md:p-8 ${activeTab === 'academic' ? 'overflow-y-auto md:overflow-y-hidden' : 'overflow-y-auto'}`}>
               
               {/* --- TAB 1: SUMMARY --- */}
               {activeTab === 'summary' && (
@@ -1484,8 +1484,49 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                     {data.schedules.length === 0 ? (
                       <p className="cms-empty-cell">Chưa có dữ liệu điểm danh</p>
                     ) : (
-                      <div className="cms-modal-table-scroll">
-                        <table className="w-full text-left min-w-[520px]">
+                      <>
+                      <div className="sm:hidden divide-y divide-slate-100">
+                        {data.schedules.map((sch) => {
+                          const action = getAttendanceAction(sch);
+                          const schId = String(sch._id || sch.id || '');
+                          const highlighted = highlightScheduleId && schId === String(highlightScheduleId);
+                          const canMakeup = action.canAdminMakeup
+                            && (action.state === 'OVERDUE_ATTENDANCE' || action.state === 'PENDING_ATTENDANCE');
+                          const showCourse = getClientEnrollments(data.student).length > 1;
+                          return (
+                            <div
+                              key={sch._id}
+                              className={`p-3.5 space-y-2 ${highlighted ? 'bg-amber-50/80' : ''}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-slate-800">{fmtDate(sch.date)}</p>
+                                  <p className="text-[11px] font-semibold text-slate-600 mt-0.5">{sch.teacherName || '—'}</p>
+                                  {showCourse ? (
+                                    <p className="text-[11px] font-semibold text-blue-600 truncate">{sch.course || '—'}</p>
+                                  ) : null}
+                                </div>
+                                <span className={`shrink-0 inline-flex px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${attendanceToneClass(action.tone)}`}>
+                                  {action.label}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 break-words">{sch.note || sch.subject || 'Dạy thực tế'}</p>
+                              {canMakeup && (
+                                <button
+                                  type="button"
+                                  disabled={makeupBusyId === schId}
+                                  onClick={() => handleAdminMakeup(sch)}
+                                  className="w-full min-h-10 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                                >
+                                  {makeupBusyId === schId ? 'Đang xử lý…' : 'Điểm danh bù'}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="hidden sm:block cms-modal-table-scroll">
+                        <table className="w-full text-left">
                           <thead>
                             <tr className="bg-slate-50">
                               <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày học</th>
@@ -1538,6 +1579,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                           </tbody>
                         </table>
                       </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1554,10 +1596,13 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                       { label: 'Đã hoàn tiền', value: financeRefundedTotal, tone: 'text-red-600' },
                       { label: 'Doanh thu thuần', value: financeNetCollected, tone: 'text-indigo-700', hint: 'Ledger: Σ TT − Σ Hoàn' },
                       { label: 'Còn phải đóng', value: financeDebt, tone: financeDebt > 0 ? 'text-amber-700' : 'text-slate-800', hint: financeListedTotal > 0 ? `Đang dùng ${fmt(financeListedTotal)}` : '' },
-                    ].map((m) => (
-                      <div key={m.label} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+                    ].map((m, idx, arr) => (
+                      <div
+                        key={m.label}
+                        className={`bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm min-w-0 ${idx === arr.length - 1 ? 'col-span-2 lg:col-span-1' : ''}`}
+                      >
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{m.label}</p>
-                        <p className={`text-lg font-black break-words ${m.tone}`}>{fmt(m.value)}</p>
+                        <p className={`text-base sm:text-lg font-black break-words ${m.tone}`}>{fmt(m.value)}</p>
                         {m.hint ? <p className="text-[10px] text-slate-400 mt-1 font-semibold">{m.hint}</p> : null}
                       </div>
                     ))}
@@ -1570,8 +1615,30 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                     {financeHistory.length === 0 ? (
                       <p className="cms-empty-cell">Chưa phát sinh thanh toán nào</p>
                     ) : (
-                      <div className="cms-modal-table-scroll">
-                        <table className="w-full text-left min-w-[520px]">
+                      <>
+                      <div className="sm:hidden divide-y divide-slate-100">
+                        {financeHistory.map((inv) => (
+                          <div key={inv.key} className="p-3.5 space-y-1.5 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className={`text-xs font-black break-all ${inv.synthetic ? 'text-slate-400' : 'text-indigo-600'}`}>
+                                {inv.maHoaDon}
+                              </span>
+                              <span className="text-[11px] font-semibold text-slate-500 shrink-0">{fmtDate(inv.createdAt)}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 break-words">
+                              {inv.khoaHoc}{inv.ghiChu ? ` — ${inv.ghiChu}` : ''}
+                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-sm font-black tabular-nums ${inv.isRefund || inv.hocPhi < 0 ? 'text-red-600' : 'text-slate-800'}`}>
+                                {fmt(inv.hocPhi)}
+                              </span>
+                              <FinanceDoneBadge inv={inv} enrollments={scopedEnrollments} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="hidden sm:block cms-modal-table-scroll">
+                        <table className="w-full text-left">
                           <thead>
                             <tr className="bg-slate-50">
                               <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Mã HĐ</th>
@@ -1597,71 +1664,14 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                   {fmt(inv.hocPhi)}
                                 </td>
                                 <td className="px-3 sm:px-4 py-3.5 text-center">
-                                  {(() => {
-                                    if (inv.isRefund || inv.hocPhi < 0) {
-                                      return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200">
-                                          Hoàn học phí
-                                        </span>
-                                      );
-                                    }
-                                    // Dòng thu (+) = đã nhận tiền trên sổ; không gắn "Đã hủy" theo tên khóa
-                                    // (find theo tên dễ dính enrollment cancelled khi đăng ký lại cùng khóa).
-                                    if (!inv.isRefund && Number(inv.hocPhi) > 0) {
-                                      const enrById = inv.enrollmentId
-                                        ? (scopedEnrollments || []).find((e) => String(e._id || e.enrollmentId || e.id) === String(inv.enrollmentId))
-                                        : null;
-                                      if (enrById && (enrById.status === 'completed' || enrById.status === 'Hoàn thành')) {
-                                        return (
-                                          <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                            Hoàn thành
-                                          </span>
-                                        );
-                                      }
-                                      return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                          Đã thanh toán
-                                        </span>
-                                      );
-                                    }
-                                    const khoa = String(inv.khoaHoc || '').trim().toLowerCase();
-                                    const enr = (scopedEnrollments || []).find((e) => {
-                                      const name = String(e.courseName || e.name || '').trim().toLowerCase();
-                                      return name && name === khoa && e.status !== 'cancelled' && e.status !== 'refunded';
-                                    });
-                                    if (enr && (enr.status === 'completed' || enr.status === 'Hoàn thành')) {
-                                      return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                          Hoàn thành
-                                        </span>
-                                      );
-                                    }
-                                    if (enr && isEnrollmentPaid(enr)) {
-                                      return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                          Đã thanh toán
-                                        </span>
-                                      );
-                                    }
-                                    if (!enr && inv.synthetic === false) {
-                                      return (
-                                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                          Đã thanh toán
-                                        </span>
-                                      );
-                                    }
-                                    return (
-                                      <span className="inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-700 border border-amber-200">
-                                        Chưa thanh toán
-                                      </span>
-                                    );
-                                  })()}
+                                  <FinanceDoneBadge inv={inv} enrollments={scopedEnrollments} />
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1773,8 +1783,59 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                       ) : assignments.length === 0 ? (
                         <p className="cms-empty-cell">Chưa có bài tập nào được giao</p>
                       ) : (
-                      <div className="cms-modal-table-scroll">
-                        <table className="w-full text-left min-w-[520px]">
+                      <>
+                      <div className="sm:hidden divide-y divide-slate-100">
+                        {assignments.map((a) => {
+                          const sub = a.mySubmission;
+                          const isLate = new Date() > new Date(a.deadline) && !sub;
+                          const role = String(a.assignedByRole || '').toLowerCase();
+                          const isAdmin = role === 'admin' || role === 'staff';
+                          return (
+                            <div key={a._id} className="p-3.5 space-y-2 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-xs font-black text-slate-800 uppercase tracking-tight break-words min-w-0">
+                                  {a.title}
+                                </p>
+                                <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border ${
+                                  isAdmin
+                                    ? 'bg-violet-100 text-violet-700 border-violet-200'
+                                    : 'bg-sky-100 text-sky-700 border-sky-200'
+                                }`}>
+                                  {isAdmin ? 'Admin giao' : 'Giáo viên'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 font-bold break-words">{a.description || 'Không có mô tả'}</p>
+                              {(a.fileUrl || a.attachedFileUrl) && (
+                                <a href={(a.fileUrl || a.attachedFileUrl)} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-500 font-bold inline-flex items-center gap-1 hover:underline">
+                                  <Download size={10} /> Tải đề bài
+                                </a>
+                              )}
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <p className={`text-[11px] font-black ${isLate ? 'text-red-500' : 'text-slate-600'}`}>
+                                  Hạn {new Date(a.deadline).toLocaleDateString('vi-VN')}
+                                  {isLate ? <span className="ml-1 text-[9px] uppercase">Quá hạn</span> : null}
+                                </p>
+                                <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter border ${
+                                  sub
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                    : isLate ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                                }`}>
+                                  {sub ? 'Đã nộp' : isLate ? 'Trễ hạn' : 'Chưa nộp'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] font-bold text-slate-500">
+                                {sub?.status === 'graded'
+                                  ? `Điểm: ${sub.grade}`
+                                  : sub
+                                    ? 'Chờ chấm'
+                                    : 'Chưa có kết quả'}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="hidden sm:block cms-modal-table-scroll">
+                        <table className="w-full text-left">
                           <thead>
                             <tr className="bg-slate-50">
                             <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Bài tập</th>
@@ -1789,7 +1850,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                             const isLate = new Date() > new Date(a.deadline) && !sub;
                             return (
                               <tr key={a._id} className="hover:bg-slate-50/50 transition">
-                                <td className="px-6 py-4">
+                                <td className="px-4 sm:px-6 py-4 min-w-0">
                                   <p className="text-xs font-black text-slate-800 uppercase tracking-tight mb-0.5 flex items-center gap-2 flex-wrap">
                                     <span>{a.title}</span>
                                     {(() => {
@@ -1807,7 +1868,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                       );
                                     })()}
                                   </p>
-                                  <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">{a.description || 'Không có mô tả'}</p>
+                                  <p className="text-[10px] text-slate-400 font-bold break-words">{a.description || 'Không có mô tả'}</p>
                                   {(a.fileUrl || a.attachedFileUrl) && (
                                     <a href={(a.fileUrl || a.attachedFileUrl)} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-500 font-bold flex items-center gap-1 mt-1 hover:underline">
                                       <Download size={10} /> Tải đề bài
@@ -1835,7 +1896,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                       ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
                                       : isLate ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-600 border-amber-100'
                                   }`}>
-                                    {sub ? '✅ ĐÃ NỘP' : isLate ? '❌ TRỄ HẠN' : '⏳ CHƯA DÀNH'}
+                                    {sub ? 'Đã nộp' : isLate ? 'Trễ hạn' : 'Chưa nộp'}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 text-center">
@@ -1856,6 +1917,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                         </tbody>
                       </table>
                       </div>
+                      </>
                       )}
                     </div>
                   </div>
@@ -1864,12 +1926,12 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
               {/* --- TAB 4: ACADEMIC --- */}
               {activeTab === 'academic' && (
                 <div className="h-full min-h-0 flex flex-col animate-in slide-in-from-right-10 duration-500">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1 min-h-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 flex-1 min-h-0">
                     {/* Kết quả thi cử */}
                     <div className="flex flex-col min-h-0">
-                       <div className="flex items-center justify-between shrink-0">
-                         <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2">
-                           <Trophy size={16} className="text-amber-500" /> Kết quả thi tốt nghiệp
+                       <div className="flex items-center justify-between shrink-0 gap-2 flex-wrap">
+                         <h3 className="font-black text-slate-900 text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 min-w-0">
+                           <Trophy size={16} className="text-amber-500 shrink-0" /> <span className="leading-snug">Kết quả thi tốt nghiệp</span>
                          </h3>
                          {(data.student.examProgress || []).some(ep => ep.lockUntil && ep.lockUntil > Date.now()) && (
                            <button onClick={handleUnlockExams} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm transition-all flex items-center gap-1">
@@ -1902,18 +1964,18 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                            </span>
                                         </div>
                                      </div>
-                                     <div className="grid grid-cols-3 gap-3">
-                                        <div className="bg-slate-50 rounded-xl p-3 text-center">
+                                     <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                                        <div className="bg-slate-50 rounded-xl p-2 sm:p-3 text-center min-w-0">
                                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Trắc nghiệm</p>
-                                           <p className={`text-xl font-black ${pct >= 50 ? 'text-emerald-600' : 'text-red-500'}`}>{tn.score || 0}/{tn.total || 15}</p>
+                                           <p className={`text-lg sm:text-xl font-black break-words ${pct >= 50 ? 'text-emerald-600' : 'text-red-500'}`}>{tn.score || 0}/{tn.total || 15}</p>
                                            <p className="text-[9px] text-slate-400 font-bold">{pct}%</p>
                                         </div>
-                                        <div className="bg-slate-50 rounded-xl p-3 text-center">
+                                        <div className="bg-slate-50 rounded-xl p-2 sm:p-3 text-center min-w-0">
                                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Tự luận</p>
                                            <p className="text-sm font-black text-slate-600">{ep.thucHanh === 'da_nop' ? 'Đã nộp' : 'Chưa nộp'}</p>
                                            {ep.essayScore != null && <p className={`text-lg font-black ${ep.essayScore >= 5 ? 'text-emerald-600' : 'text-red-500'}`}>{ep.essayScore}/10</p>}
                                         </div>
-                                        <div className="bg-slate-50 rounded-xl p-3 text-center">
+                                        <div className="bg-slate-50 rounded-xl p-2 sm:p-3 text-center min-w-0">
                                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Khóa đến</p>
                                            {ep.lockUntil && ep.lockUntil > Date.now() ? (
                                              <p className="text-xs font-black text-red-500">{new Date(ep.lockUntil).toLocaleDateString('vi-VN')}</p>
@@ -1932,8 +1994,8 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                     {/* Đánh giá bài tập hàng ngày & Trắc nghiệm GV giao */}
                     <div className="flex flex-col min-h-0 space-y-4">
                        <div className="flex flex-col min-h-0">
-                         <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 shrink-0">
-                           <ClipboardList size={16} className="text-indigo-500" /> Tiến độ bài tập &amp; Điểm danh
+                         <h3 className="font-black text-slate-900 text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 min-w-0 shrink-0">
+                           <ClipboardList size={16} className="text-indigo-500 shrink-0" /> <span className="leading-snug">Tiến độ bài tập &amp; Điểm danh</span>
                          </h3>
                          <div className="flex-1 min-h-0 max-h-[35vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3 mt-2">
                             {(!data.student.grades || data.student.grades.length === 0) ? (
@@ -1961,8 +2023,8 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
 
                        {/* Trắc nghiệm Giảng viên giao */}
                        <div className="flex flex-col min-h-0">
-                         <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2 shrink-0">
-                           <Award size={16} className="text-red-500" /> Trắc nghiệm Giảng viên giao
+                         <h3 className="font-black text-slate-900 text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 min-w-0 shrink-0">
+                           <Award size={16} className="text-red-500 shrink-0" /> <span className="leading-snug">Trắc nghiệm Giảng viên giao</span>
                          </h3>
                          <div className="flex-1 min-h-0 max-h-[35vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3 mt-2">
                            {loadingStudentQuizzes ? (
@@ -2293,6 +2355,36 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
 }
 
 {/* Helper UI Components */}
+function FinanceDoneBadge({ inv, enrollments }) {
+  const pill = (label, tone) => (
+    <span className={`inline-flex items-center justify-center px-2 py-1 rounded-full text-[10px] font-black border ${tone}`}>
+      {label}
+    </span>
+  );
+  const ok = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  if (inv.isRefund || inv.hocPhi < 0) {
+    return pill('Hoàn học phí', 'bg-red-100 text-red-700 border-red-200');
+  }
+  if (!inv.isRefund && Number(inv.hocPhi) > 0) {
+    const enrById = inv.enrollmentId
+      ? (enrollments || []).find((e) => String(e._id || e.enrollmentId || e.id) === String(inv.enrollmentId))
+      : null;
+    if (enrById && (enrById.status === 'completed' || enrById.status === 'Hoàn thành')) {
+      return pill('Hoàn thành', ok);
+    }
+    return pill('Đã thanh toán', ok);
+  }
+  const khoa = String(inv.khoaHoc || '').trim().toLowerCase();
+  const enr = (enrollments || []).find((e) => {
+    const name = String(e.courseName || e.name || '').trim().toLowerCase();
+    return name && name === khoa && e.status !== 'cancelled' && e.status !== 'refunded';
+  });
+  if (enr && (enr.status === 'completed' || enr.status === 'Hoàn thành')) return pill('Hoàn thành', ok);
+  if (enr && isEnrollmentPaid(enr)) return pill('Đã thanh toán', ok);
+  if (!enr && inv.synthetic === false) return pill('Đã thanh toán', ok);
+  return pill('Chưa thanh toán', 'bg-amber-100 text-amber-700 border-amber-200');
+}
+
 function StatBox({ label, value, icon: Icon, color, sub, valueClassName }) {
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-sm relative overflow-hidden min-w-0">

@@ -30,7 +30,7 @@ export const EvaluationView = ({
   const [selectedRateTeacherId, setSelectedRateTeacherId] = useState('');
 
   return (
-    <div className="w-full min-w-0 px-3 sm:px-4 md:px-8 py-4 sm:py-6 space-y-5 sm:space-y-8 animate-in fade-in duration-500">
+    <div className="w-full min-w-0 py-2 sm:py-6 space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       {/* Introduction */}
       <div className="bg-gradient-to-br from-yellow-500 to-orange-600 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 w-32 h-32 sm:w-40 sm:h-40 bg-white/10 rounded-full -mr-16 -mt-16 sm:-mr-20 sm:-mt-20" />

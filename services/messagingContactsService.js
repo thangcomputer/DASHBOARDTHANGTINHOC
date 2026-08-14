@@ -173,20 +173,18 @@ async function loadCandidateDocs(actorUser, { queryBranchId } = {}) {
     const branchFilter = queryBranchId && queryBranchId !== 'all'
       ? { branchId: queryBranchId }
       : {};
-    const [supersRaw, staffDocs, teacherDocs, studentDocs, highs] = await Promise.all([
+    const [supersRaw, staffDocs, teacherDocs, highs] = await Promise.all([
       loadSuperAdminDocs(),
       Teacher.find({ adminRole: { $in: ['STAFF', 'SUPPORT'] }, ...branchFilter }, CONTACT_SELECT).lean(),
       Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] }, ...branchFilter }, CONTACT_SELECT).lean(),
-      Student.find({ ...branchFilter }, CONTACT_SELECT).lean(),
       loadHighAdminDocs(),
     ]);
-    // HIGH_SEES_ALL: keep Teacher SUPER docs; append in-memory root id=admin if missing.
+    // HIGH: GV + admin + staff + support — không load học viên
     const supers = await ensureRootSuperAdminAmongDocs(supersRaw);
     pushTeachers(supers, { elevated: 'SUPER_ADMIN' });
     pushTeachers(highs.filter((h) => String(h._id) !== userId), { elevated: 'HIGH_ADMIN' });
     pushTeachers(staffDocs);
     pushTeachers(teacherDocs);
-    pushStudents(studentDocs);
   } else if (adminRole === 'SUPPORT') {
     const [highs, staffDocs, teacherDocs, studentDocs] = await Promise.all([
       loadHighAdminDocs(),

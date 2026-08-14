@@ -423,12 +423,28 @@ function canDiscoverContacts(actor, target, context = {}) {
   }
 
   if (a.productRole === PRODUCT_ROLES.HIGH_ADMIN) {
+    if (t.productRole === PRODUCT_ROLES.STUDENT) {
+      return decision({
+        allowed: false,
+        reason: 'HIGH_NO_STUDENT_DISCOVER',
+        policy: 'DISCOVER_824B',
+        code: POLICY_CODES.DISCOVER_DENIED,
+        extra: { actorProductRole: a.productRole, targetProductRole: t.productRole },
+      });
+    }
+    const ok = (
+      t.productRole === PRODUCT_ROLES.SUPER_ADMIN
+      || t.productRole === PRODUCT_ROLES.HIGH_ADMIN
+      || t.productRole === PRODUCT_ROLES.STAFF
+      || t.productRole === PRODUCT_ROLES.SUPPORT
+      || t.productRole === PRODUCT_ROLES.TEACHER
+    );
     return decision({
-      allowed: true,
-      reason: 'HIGH_SEES_ALL',
+      allowed: ok,
+      reason: ok ? 'HIGH_DISCOVER_OPS' : 'HIGH_DISCOVER_DENIED',
       policy: 'DISCOVER_824B',
       scope: 'GLOBAL',
-      code: POLICY_CODES.ALLOWED,
+      code: ok ? POLICY_CODES.ALLOWED : POLICY_CODES.DISCOVER_DENIED,
       extra: { actorProductRole: a.productRole, targetProductRole: t.productRole },
     });
   }

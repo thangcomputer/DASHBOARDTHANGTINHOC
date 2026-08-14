@@ -3,7 +3,7 @@ import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
   FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
-import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp } from '../../utils/lmsLessonUi';
+import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getChapterLessonIndex } from '../../utils/lmsLessonUi';
 import LessonSidebarMeta from './LessonSidebarMeta';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
 import { buildMediaDownloadUrl, downloadMediaFile, apiFetch } from '../../services/api';
@@ -27,11 +27,11 @@ function timeAgo(ts) {
 export function LmsTabBar({ courseTab, setCourseTab, className = '' }) {
   return (
     <div
-      className={`overflow-x-auto overscroll-x-contain border-b border-white/[0.08] bg-[#0d1117] ${className}`}
+      className={`border-b border-white/[0.08] bg-[#0d1117] ${className}`}
       role="tablist"
       aria-label="Tab nội dung bài học"
     >
-      <div className="flex items-stretch gap-0 max-w-3xl mx-auto w-full px-2 sm:px-0">
+      <div className="flex flex-wrap items-stretch gap-0 max-w-3xl mx-auto w-full px-1 sm:px-0">
         {LMS_PLAYER_TABS.map((t) => (
           <button
             key={t.key}
@@ -39,7 +39,7 @@ export function LmsTabBar({ courseTab, setCourseTab, className = '' }) {
             role="tab"
             aria-selected={courseTab === t.key}
             onClick={() => setCourseTab(t.key)}
-            className={`shrink-0 px-3.5 sm:px-4 py-3 text-xs sm:text-sm font-bold tracking-wide border-b-2 transition-colors whitespace-nowrap ${
+            className={`min-w-0 flex-1 basis-[30%] sm:flex-none sm:basis-auto px-2 sm:px-4 py-2.5 sm:py-3 text-[11px] sm:text-sm font-bold tracking-wide border-b-2 transition-colors text-center leading-tight ${
               t.mobileOnly ? 'lg:hidden' : ''
             } ${
               courseTab === t.key
@@ -66,7 +66,7 @@ function OverviewPanel({
   if (!currentLesson) {
     return <p className="text-slate-500 text-sm">Chọn một bài giảng để xem tổng quan.</p>;
   }
-  const idx = Math.max(0, lessons.findIndex((l) => String(l._id) === String(currentLesson._id)));
+  const idx = getChapterLessonIndex(lessons, currentLesson);
   const courseDesc = selectedCourse?.description || selectedCourse?.desc || '';
 
   return (
@@ -74,7 +74,7 @@ function OverviewPanel({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="inline-block text-[9px] font-black text-emerald-400/80 uppercase tracking-[0.15em] mb-2">
-            {currentLesson.chapterTitle || selectedCourse?.title || 'Mục lục'}
+            {currentLesson.chapterTitle || selectedCourse?.title || 'Bài giảng'}
           </span>
           <h1 className="text-lg sm:text-xl font-bold text-white leading-snug">
             {formatLessonDisplayTitle(currentLesson.title, idx)}
@@ -532,41 +532,6 @@ function QaPanel({
   );
 }
 
-function AnnouncementsPanel({ notices }) {
-  const list = Array.isArray(notices)
-    ? notices
-    : typeof notices === 'string' && notices.trim()
-      ? [notices]
-      : [];
-
-  if (!list.length) {
-    return (
-      <div className="py-12 text-center text-slate-500 max-w-3xl mx-auto w-full">
-        <p className="text-sm font-semibold">Chưa có thông báo nào cho khóa học này.</p>
-      </div>
-    );
-  }
-
-  return (
-    <ul className="space-y-4 max-w-3xl mx-auto w-full">
-      {list.map((n, i) => {
-        const text = typeof n === 'string' ? n : n?.text || n?.title || n?.message || '';
-        const title = typeof n === 'object' && n?.title ? n.title : `Thông báo ${i + 1}`;
-        const when = typeof n === 'object' && n?.createdAt ? timeAgo(new Date(n.createdAt).getTime()) : null;
-        return (
-          <li key={i} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <p className="text-[11px] text-slate-500 mb-2">
-              Đội ngũ khóa học đã đăng một thông báo{when ? ` · ${when}` : ''}
-            </p>
-            <h3 className="text-sm font-bold text-white mb-2">{title}</h3>
-            <p className="text-[13px] text-slate-300 whitespace-pre-wrap leading-relaxed">{text}</p>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 function ReviewsPanel({ storageKey, userName }) {
   const [items, setItems] = useLmsLocalStore(storageKey, []);
   const [rating, setRating] = useState(5);
@@ -767,8 +732,7 @@ function ListPanel({
               {isExpanded ? <ChevronUp size={13} className="text-slate-600" /> : <ChevronDown size={13} className="text-slate-600" />}
             </button>
             {isExpanded &&
-              chapterLessons.map((lesson) => {
-                const globalIdx = lessons.findIndex((l) => String(l._id) === String(lesson._id));
+              chapterLessons.map((lesson, idx) => {
                 const isCurrent = currentLesson?._id === lesson._id;
                 return (
                   <div
@@ -815,7 +779,7 @@ function ListPanel({
                               : 'text-slate-300 font-semibold'
                         }`}
                       >
-                        {formatLessonDisplayTitle(lesson.title, globalIdx)}
+                        {formatLessonDisplayTitle(lesson.title, idx)}
                       </h4>
                       <LessonSidebarMeta lesson={lesson} isCurrent={isCurrent} />
                     </div>
@@ -862,14 +826,14 @@ export default function LmsPlayerPanels({
   const lessonTitle = currentLesson
     ? formatLessonDisplayTitle(
         currentLesson.title,
-        Math.max(0, lessons.findIndex((l) => String(l._id) === String(currentLesson._id)))
+        getChapterLessonIndex(lessons, currentLesson),
       )
     : '';
 
   const notesKey = lmsStoreKey('notes', userId, courseId);
   const reviewsKey = lmsStoreKey('reviews', userId, courseId);
 
-  if (courseTab === 'overview') {
+  if (courseTab === 'overview' || courseTab === 'announcements') {
     return (
       <OverviewPanel
         currentLesson={currentLesson}
@@ -904,9 +868,6 @@ export default function LmsPlayerPanels({
         highlightQaId={highlightQaId}
       />
     );
-  }
-  if (courseTab === 'announcements') {
-    return <AnnouncementsPanel notices={selectedCourse?.notices} />;
   }
   if (courseTab === 'reviews') {
     return <ReviewsPanel storageKey={reviewsKey} userName={userName} />;

@@ -26,7 +26,7 @@ export default function TeacherScheduleTab({
   }, [mySchedules, currentMonth]);
 
   return (
-    <div className="space-y-4 sm:space-y-6 w-full min-w-0 max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-6 animate-in fade-in duration-500">
+    <div className="space-y-4 sm:space-y-6 w-full min-w-0 py-3 sm:py-6 animate-in fade-in duration-500">
       {/* Top Banner Toolbar & Quick Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">

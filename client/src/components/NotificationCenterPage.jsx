@@ -250,7 +250,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   };
 
   return (
-    <div className="w-full max-w-full space-y-4 pb-28 sm:pb-32 px-2 sm:px-6 min-h-screen overflow-y-auto">
+    <div className="w-full max-w-full space-y-4 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0 pt-2">
         <div className="min-w-0">
           <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">

@@ -17,6 +17,7 @@ import {
   formatLessonDisplayTitle,
   getPlayerCompletionBadgeText,
   LMS_PLAYER_PROGRESS_BADGE_CLASS,
+  normalizeLmsPlayerTab,
 } from '../utils/lmsLessonUi';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
 import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrandedPlayerChrome';
@@ -918,7 +919,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
     const { params } = parseLmsHashQuery();
     if (params.courseId || params.lessonId || params.tab || params.qaId) {
       deepLinkRef.current = params;
-      if (params.tab) setCourseTab(params.tab);
+      if (params.tab) setCourseTab(normalizeLmsPlayerTab(params.tab));
       if (params.qaId) setHighlightQaId(params.qaId);
       setMainTab('courses');
     }
@@ -984,7 +985,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
       const hit = lessons.find((l) => String(l._id) === String(dl.lessonId) && l.isUnlocked);
       if (hit) setCurrentLesson(hit);
     }
-    if (dl.tab) setCourseTab(dl.tab);
+    if (dl.tab) setCourseTab(normalizeLmsPlayerTab(dl.tab));
     if (dl.qaId) setHighlightQaId(dl.qaId);
     deepLinkRef.current = null;
   }, [lessons]);
@@ -1199,9 +1200,9 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
   // ── COURSE LIST VIEW ────────────────────────────────────────────────────────
   if (!selectedCourse) {
     return (
-      <div className="p-4 sm:p-6 md:p-10 animate-in fade-in duration-500 min-h-full">
+      <div className="w-full animate-in fade-in duration-500 min-h-full">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-6">
+        <div className="flex items-start justify-between gap-3 mb-5">
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight leading-tight">
               Trung tâm đào tạo nội bộ
@@ -1230,7 +1231,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         )}
 
         {/* TOP TABS FOR TEACHER */}
-        <div className="grid grid-cols-3 gap-2 border-b border-slate-200 pb-2 mb-6">
+        <div className="grid grid-cols-3 gap-2 border-b border-slate-200 pb-2 mb-6 mt-1">
           {[
             { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0 },
@@ -1607,8 +1608,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                     }
                   </button>
 
-                  {isExpanded && chapterLessons.map((lesson) => {
-                    const globalIdx = lessons.findIndex(l => String(l._id) === String(lesson._id));
+                  {isExpanded && chapterLessons.map((lesson, idx) => {
                     const isCurrent = currentLesson?._id === lesson._id;
                     return (
                       <div
@@ -1650,7 +1650,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                           <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${
                             isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
                           }`}>
-                            {formatLessonDisplayTitle(lesson.title, globalIdx)}
+                            {formatLessonDisplayTitle(lesson.title, idx)}
                           </h4>
                           <LessonSidebarMeta lesson={lesson} isCurrent={isCurrent} />
                         </div>

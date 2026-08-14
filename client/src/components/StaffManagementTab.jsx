@@ -946,15 +946,15 @@ export default function StaffManagementTab() {
         <ResetPasswordModal staff={resetPwStaff} onClose={() => setResetPwStaff(null)} onSaved={handleSaved} />
       )}
 
-      <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between shrink-0">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between shrink-0">
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-slate-900 flex items-start gap-2">
             <span className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
               <ShieldCheck size={16} aria-hidden="true" />
             </span>
-            <span className="truncate">Tài khoản & Phân quyền nội bộ</span>
+            <span className="min-w-0 break-words leading-snug">Tài khoản & Phân quyền nội bộ</span>
           </h3>
-          <p className="text-[12px] text-slate-500 mt-1 pl-11">
+          <p className="text-[12px] text-slate-500 mt-1 md:pl-11 leading-relaxed">
             {isRootSuperAdmin
               ? 'Admin Super — Toàn quyền quản lý toàn bộ hệ thống'
               : isSuperAdmin
@@ -965,7 +965,7 @@ export default function StaffManagementTab() {
         <button
           type="button"
           onClick={() => setModal(null)}
-          className="cms-btn cms-btn-primary cms-btn-sm w-full min-[390px]:w-auto"
+          className="cms-btn cms-btn-primary cms-btn-sm w-full md:w-auto shrink-0"
         >
           <UserPlus size={15} /> Tạo tài khoản
         </button>

@@ -49,20 +49,21 @@ export default function StudentQuizList() {
   }
 
   return (
-    <div className="space-y-4 w-full">
-      <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-        <div>
-          <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Award className="text-red-600" size={20} /> Trắc nghiệm bài học từ Giảng viên
+    <div className="space-y-4 w-full min-w-0 max-w-full overflow-x-hidden">
+      <div className="flex items-start gap-2 bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm sm:text-lg font-bold text-slate-800 flex items-start gap-2">
+            <Award className="text-red-600 shrink-0 mt-0.5" size={18} />
+            <span className="leading-snug break-words">Trắc nghiệm bài học từ Giảng viên</span>
           </h2>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
+          <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
             Danh sách các bài thi trắc nghiệm được giảng viên giao theo từng buổi học.
           </p>
         </div>
         <button
           type="button"
           onClick={fetchQuizzes}
-          className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition"
+          className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition shrink-0"
           title="Tải lại danh sách"
         >
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -91,15 +92,15 @@ export default function StudentQuizList() {
             return (
               <div
                 key={quiz._id}
-                className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between"
+                className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between min-w-0"
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase">
+                <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase break-words min-w-0">
                       {quiz.courseName || 'Bài thi buổi học'}
                     </span>
                     {hasSubmitted && (
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
+                      <span className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
                         isPassed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
                       }`}>
                         {isForfeit ? 'RỚT · THOÁT' : (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT')}
@@ -107,24 +108,31 @@ export default function StudentQuizList() {
                     )}
                   </div>
 
-                  <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug mb-1 line-clamp-2">
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug mb-1 break-words">
                     {quiz.title}
                   </h3>
 
-                  <div className="flex flex-wrap gap-3 text-[11px] font-semibold text-slate-500 my-3">
-                    <span className="flex items-center gap-1"><Clock size={12} /> {quiz.timeLimitMinutes} phút</span>
-                    <span className="flex items-center gap-1"><HelpCircle size={12} /> {quiz.questionsCount} câu hỏi</span>
-                    <span className="flex items-center gap-1"><User size={12} /> GV: {quiz.teacherName}</span>
+                  <div className="grid grid-cols-1 gap-1.5 text-[11px] font-semibold text-slate-500 my-3">
+                    <span className="inline-flex items-center gap-1">
+                      <Clock size={12} className="shrink-0" /> {quiz.timeLimitMinutes} phút
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <HelpCircle size={12} className="shrink-0" /> {quiz.questionsCount} câu hỏi
+                    </span>
+                    <span className="inline-flex items-center gap-1 min-w-0">
+                      <User size={12} className="shrink-0" />
+                      <span className="truncate">GV: {quiz.teacherName}</span>
+                    </span>
                   </div>
 
                   {hasSubmitted && (
-                    <div className={`rounded-xl p-2.5 border flex items-center justify-between text-xs my-1 ${
+                    <div className={`rounded-xl p-2.5 border flex flex-col gap-0.5 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between text-xs my-1 min-w-0 ${
                       isForfeit ? 'bg-red-50/70 border-red-100' : 'bg-emerald-50/60 border-emerald-100'
                     }`}>
                       <span className={`font-semibold ${isForfeit ? 'text-red-800' : 'text-emerald-800'}`}>
                         {isForfeit ? 'Rớt do thoát giữa giờ' : 'Kết quả đã nộp:'}
                       </span>
-                      <span className={`font-black text-sm ${isForfeit ? 'text-red-700' : 'text-emerald-700'}`}>
+                      <span className={`font-black text-sm tabular-nums ${isForfeit ? 'text-red-700' : 'text-emerald-700'}`}>
                         {score}%{!isForfeit ? ` (${quiz.mySubmission.correctCount}/${quiz.mySubmission.totalQuestions} câu)` : ''}
                       </span>
                     </div>

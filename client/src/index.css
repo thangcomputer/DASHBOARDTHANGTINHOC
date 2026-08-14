@@ -329,13 +329,14 @@
     max-width: 100%;
     margin-inline: auto;
     min-width: 0;
-    padding-inline: 1rem;
-    padding-block: 12px 20px;
+    padding-inline: 0;
+    padding-block: 4px 16px;
   }
 
   @media (min-width: 768px) {
     .cms-sd-page {
-      padding-inline: 2rem;
+      padding-inline: 0;
+      padding-block: 8px 20px;
     }
   }
 
@@ -373,13 +374,13 @@
 
   /* Profile: mobile hẹp; desktop rộng như trang học viên */
   .cms-sd-profile {
-    max-width: 42rem;
+    max-width: none;
     margin-inline: auto;
   }
 
   @media (min-width: 1024px) {
     .cms-sd-profile {
-      max-width: 72rem;
+      max-width: none;
     }
   }
 
@@ -490,12 +491,83 @@
     color: #cbd5e1;
   }
 
-  .cms-topbar-glass {
-    position: sticky;
+  .cms-shell-gutter {
+    scrollbar-gutter: stable;
+  }
+
+  .cms-topbar-glass,
+  .cms-topbar {
+    position: relative;
     top: 0;
-    background: rgba(255, 255, 255, 0.86);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    z-index: 40;
+    flex-shrink: 0;
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .cms-topbar.cms-shell-gutter {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .cms-topbar__row {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: var(--header-h, 56px);
+    padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
+    gap: 0.5rem;
+  }
+
+  .cms-topbar__menu {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+  }
+
+  .cms-topbar__title {
+    margin: 0;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 768px) {
+    .cms-topbar__row {
+      display: flex;
+      gap: 0.75rem;
+    }
+    .cms-topbar__menu {
+      display: none;
+    }
+    .cms-topbar__title {
+      text-align: left;
+      font-size: 1.125rem;
+    }
+  }
+
+  .cms-page-gutter {
+    padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
+  }
+
+  .cms-page-gutter-immersive {
+    padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   }
 
   .cms-toolbar {
@@ -517,7 +589,7 @@
 .cms-fab {
     @apply fixed z-[80] rounded-full shadow-2xl transition active:scale-90;
     right: max(0.75rem, env(safe-area-inset-right, 0px));
-    bottom: max(90px, calc(1rem + env(safe-area-inset-bottom, 0px)));
+    bottom: max(1rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)));
   }
   @media (min-width: 768px) {
     .cms-fab {
@@ -792,8 +864,8 @@
     @apply min-w-0 flex-1 basis-full;
   }
 
-  /* Branch full-width; course + paid share a row from ~360px */
-  @media (min-width: 360px) {
+  /* Branch full-width; course + paid share a row from sm */
+  @media (min-width: 640px) {
     .cms-students-filters > *:not(:first-child) {
       flex-basis: calc(50% - 4px);
     }
@@ -830,7 +902,7 @@
   }
 
   .cms-modal-table-scroll {
-    @apply -mx-1 px-1 overflow-x-auto overscroll-x-contain;
+    @apply overflow-x-hidden sm:overflow-x-auto overscroll-x-contain;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -891,7 +963,8 @@
     }
   }
 
-  body.cms-menu-open {
+  body.cms-menu-open,
+  html.cms-menu-open {
     overflow: hidden;
     touch-action: none;
   }
@@ -1096,6 +1169,30 @@
   --cms-shadow-lg: 0 8px 28px rgba(15, 23, 42, 0.12);
   --cms-duration: 180ms;
   --cms-ease: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --page-gutter: 16px;
+  --header-h: 56px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --page-gutter: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --page-gutter: 24px;
+  }
+}
+
+html.cms-app-shell,
+html.cms-app-shell body,
+html.cms-app-shell #root {
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1741,8 +1838,8 @@
 }
 @media (max-width: 767.98px) {
   .cms-chat-shell {
-    border: 0;
-    border-radius: 0;
+    border: 1px solid var(--cms-border);
+    border-radius: 16px;
     box-shadow: none;
     background: #fff;
   }
@@ -1751,14 +1848,18 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: color-mix(in srgb, var(--cms-surface) 92%, transparent);
-  backdrop-filter: blur(8px);
+  background: var(--cms-surface);
   border-bottom: 1px solid var(--cms-border);
-  padding: 12px;
+  padding: 18px 16px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   flex-shrink: 0;
+}
+@media (min-width: 640px) {
+  .cms-chat-search-sticky {
+    padding: 14px 16px 12px;
+  }
 }
 .cms-chip {
   display: inline-flex;
@@ -2703,30 +2804,48 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
 }
 .cms-hr-stat-label { font-size: 12px; color: #94a3b8; margin-top: 4px; line-height: 1.3; }
 .cms-hr-tabs {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
   border-bottom: 1px solid #e2e8f0;
-  padding: 0 4px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  padding: 0;
+  overflow: hidden;
 }
 .cms-hr-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 12px 16px;
-  font-size: 15px;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 8px;
+  font-size: 13px;
   font-weight: 600;
   color: #94a3b8;
   border: 0;
   border-bottom: 3px solid transparent;
   margin-bottom: -1px;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
   background: transparent;
   cursor: pointer;
   transition: color 180ms ease, border-color 180ms ease;
+}
+@media (min-width: 768px) {
+  .cms-hr-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cms-hr-tab {
+    gap: 8px;
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 15px;
+    white-space: nowrap;
+  }
 }
 .cms-hr-tab:active { transform: scale(0.98); }
 .cms-hr-tab.is-active { color: #dc2626; border-bottom-color: #dc2626; }

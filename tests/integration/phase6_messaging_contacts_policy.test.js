@@ -353,6 +353,16 @@ describe('Phase 6 messaging contacts policy', { concurrency: false }, () => {
     assert.equal(ids.has(IDS.superA), false);
   });
 
+  it('matrix: High Admin discovery (no students)', async () => {
+    const contacts = await listDiscoverableContacts(actorFrom(IDS.highA));
+    const ids = idsOf(contacts);
+    assert.equal(ids.has(IDS.studentA), false, `got ${[...ids]}`);
+    assert.equal(ids.has(IDS.teacherA), true);
+    assert.equal(ids.has(IDS.staffA), true);
+    assert.equal(ids.has(IDS.supportA), true);
+    assert.equal(ids.has(IDS.superA), true);
+  });
+
   it('tenant isolation: Student A never discovers Support B', async () => {
     const contacts = await listDiscoverableContacts(actorFrom(IDS.studentA));
     assert.equal(idsOf(contacts).has(IDS.supportB), false);
@@ -367,19 +377,19 @@ describe('Phase 6 messaging contacts policy', { concurrency: false }, () => {
     assert.equal(idsOf(contacts).has(IDS.staffB), false);
   });
 
-  it('DISCOVER ≠ SEND: Student → HIGH / SUPER', async () => {
+  it('DISCOVER ≠ SEND: Student → SUPER still send; Student → HIGH deny', async () => {
     const contacts = await listDiscoverableContacts(actorFrom(IDS.studentA));
     assert.equal(idsOf(contacts).has(IDS.highA), false);
     assert.equal(idsOf(contacts).has(IDS.superA), false);
 
     assert.equal(canDiscoverContacts(actorFrom(IDS.studentA), actorFrom(IDS.highA)).allowed, false);
     assert.equal(canDiscoverContacts(actorFrom(IDS.studentA), actorFrom(IDS.superA)).allowed, false);
-    assert.equal(canSendStructurally(actorFrom(IDS.studentA), actorFrom(IDS.highA)).allowed, true);
+    assert.equal(canSendStructurally(actorFrom(IDS.studentA), actorFrom(IDS.highA)).allowed, false);
     assert.equal(canSendStructurally(actorFrom(IDS.studentA), actorFrom(IDS.superA)).allowed, true);
 
     const sendHigh = await canSendMessage(actorFrom(IDS.studentA), IDS.highA, 'admin');
     const sendSuper = await canSendMessage(actorFrom(IDS.studentA), IDS.superA, 'admin');
-    assert.equal(sendHigh.allowed, true);
+    assert.equal(sendHigh.allowed, false);
     assert.equal(sendSuper.allowed, true);
   });
 

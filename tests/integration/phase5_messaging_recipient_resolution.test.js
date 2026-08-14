@@ -337,7 +337,7 @@ describe('Phase 5 recipient resolution + DM isolation', { concurrency: false }, 
     assert.equal(canDiscoverContacts(actorFromDoc(IDS.studentA), actorFromDoc(IDS.staffA), { sameBranch: true }).allowed, true);
     assert.equal(canSendStructurally(actorFromDoc(IDS.studentA), actorFromDoc(IDS.teacherA)).allowed, true);
     assert.equal(canDiscoverContacts(actorFromDoc(IDS.studentA), actorFromDoc(IDS.highA)).allowed, false);
-    assert.equal(canSendStructurally(actorFromDoc(IDS.studentA), actorFromDoc(IDS.highA)).allowed, true);
+    assert.equal(canSendStructurally(actorFromDoc(IDS.studentA), actorFromDoc(IDS.highA)).allowed, false);
     assert.equal(canDiscoverContacts(actorFromDoc(IDS.studentA), actorFromDoc(IDS.superA)).allowed, false);
     assert.equal(canSendStructurally(actorFromDoc(IDS.studentA), actorFromDoc(IDS.superA)).allowed, true);
     assert.equal(canSendStructurally(actorFromDoc(IDS.teacherA), actorFromDoc(IDS.supportA)).allowed, true);

@@ -287,23 +287,23 @@ export default function EmployeeManagementTab() {
   return (
     <div className="cms-hr cms-viewport-fill">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between shrink-0">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between shrink-0">
         <div className="min-w-0">
-          <h2 className="cms-hr-title flex items-center gap-2">
+          <h2 className="cms-hr-title flex items-start gap-2">
             <span className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
               <Briefcase size={20} aria-hidden="true" />
             </span>
-            <span className="truncate">Quản lý Nhân sự & Lương</span>
+            <span className="min-w-0 break-words">Quản lý Nhân sự & Lương</span>
           </h2>
-          <p className="cms-hr-caption mt-1 pl-12">
+          <p className="cms-hr-caption mt-1 md:pl-12">
             {isSuperAdmin ? 'Toàn bộ chi nhánh' : `Chi nhánh ${sess?.branchCode || ''}`}
           </p>
         </div>
-        <div className="flex flex-wrap items-stretch gap-2 w-full min-[480px]:w-auto">
+        <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto md:flex-none">
           <button
             type="button"
             onClick={() => setShowSalaries(!showSalaries)}
-            className={`cms-hr-btn flex-1 min-[480px]:flex-none ${
+            className={`cms-hr-btn w-full md:w-auto ${
               showSalaries ? 'cms-hr-btn-amber' : 'cms-hr-btn-muted'
             }`}
           >
@@ -314,7 +314,7 @@ export default function EmployeeManagementTab() {
             type="button"
             onClick={fetchAll}
             disabled={loading}
-            className="cms-hr-btn cms-hr-btn-outline flex-1 min-[480px]:flex-none disabled:opacity-50"
+            className="cms-hr-btn cms-hr-btn-outline w-full md:w-auto disabled:opacity-50"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Làm mới
           </button>
@@ -406,7 +406,7 @@ export default function EmployeeManagementTab() {
                 <option key={p.value} value={p.value}>{p.emoji} {p.label}</option>
               ))}
             </CmsSelect>
-            <button type="button" onClick={openAdd} className="cms-hr-btn cms-hr-btn-primary self-center w-auto px-6 md:ml-auto md:self-auto">
+            <button type="button" onClick={openAdd} className="cms-hr-btn cms-hr-btn-primary w-full md:w-auto md:ml-auto">
               <Plus size={16} /> Thêm nhân sự
             </button>
           </div>

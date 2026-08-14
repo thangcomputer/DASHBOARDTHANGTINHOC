@@ -21,6 +21,7 @@ import {
   formatLessonDisplayTitle,
   getPlayerCompletionBadgeText,
   LMS_PLAYER_PROGRESS_BADGE_CLASS,
+  normalizeLmsPlayerTab,
 } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
@@ -928,7 +929,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
     const { params } = parseLmsHashQuery();
     if (params.courseId || params.lessonId || params.tab || params.qaId) {
       deepLinkRef.current = params;
-      if (params.tab) setCourseTab(params.tab);
+      if (params.tab) setCourseTab(normalizeLmsPlayerTab(params.tab));
       if (params.qaId) setHighlightQaId(params.qaId);
       setMainTab('courses');
     }
@@ -1027,7 +1028,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       const hit = lessons.find((l) => String(l._id) === String(dl.lessonId) && l.isUnlocked);
       if (hit) setCurrentLesson(hit);
     }
-    if (dl.tab) setCourseTab(dl.tab);
+    if (dl.tab) setCourseTab(normalizeLmsPlayerTab(dl.tab));
     if (dl.qaId) setHighlightQaId(dl.qaId);
     deepLinkRef.current = null;
   }, [lessons]);
@@ -1953,8 +1954,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                     }
                   </button>
 
-                  {isExpanded && chapterLessons.map((lesson) => {
-                    const globalIdx = lessons.findIndex(l => String(l._id) === String(lesson._id));
+                  {isExpanded && chapterLessons.map((lesson, idx) => {
                     const isCurrent = currentLesson?._id === lesson._id;
                     return (
                       <div
@@ -1996,7 +1996,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                         <div className="flex-1 min-w-0">
                           <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
                             }`}>
-                            {formatLessonDisplayTitle(lesson.title, globalIdx)}
+                            {formatLessonDisplayTitle(lesson.title, idx)}
                           </h4>
                           <LessonSidebarMeta lesson={lesson} isCurrent={isCurrent} />
                         </div>

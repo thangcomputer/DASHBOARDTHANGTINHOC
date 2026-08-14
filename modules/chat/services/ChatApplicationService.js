@@ -114,8 +114,8 @@ class ChatApplicationService {
     let teacherContacts  = [];
     let studentContacts  = [];
 
-    // ══ [2] SUPER_ADMIN: xem toàn hệ thống, có hỗ trợ filter branch ══
-    if (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT' || adminRole === 'SUPPORT_AGENT') {
+    // ══ [2] SUPER_ADMIN / SUPPORT: xem toàn hệ thống (kèm HV) ══
+    if (adminRole === 'SUPER_ADMIN' || adminRole === 'SUPPORT' || adminRole === 'SUPPORT_AGENT') {
       const branchFilter = queryBranchId && queryBranchId !== 'all'
         ? { branchId: queryBranchId }
         : {};
@@ -135,6 +135,26 @@ class ChatApplicationService {
       }));
       teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
       studentContacts = studentDocs.map(d => mapContact(d, 'student'));
+    }
+
+    // ══ [2b] HIGH_ADMIN: GV + staff + support — không học viên ══
+    else if (adminRole === 'HIGH_ADMIN') {
+      const branchFilter = queryBranchId && queryBranchId !== 'all'
+        ? { branchId: queryBranchId }
+        : {};
+
+      const [staffDocs, teacherDocs] = await Promise.all([
+        Teacher.find({ adminRole: { $in: ['STAFF', 'SUPPORT', 'SUPPORT_AGENT'] }, ...branchFilter },
+                     'name adminRole gender phone branchId branchCode avatar').lean(),
+        Teacher.find({ role: 'teacher', ...branchFilter },
+                     'name adminRole gender phone branchId branchCode avatar').lean(),
+      ]);
+
+      staffContacts   = staffDocs.map(d => ({
+        ...mapContact(d, 'staff'),
+        name: staffDisplayName(d.name, d.branchCode),
+      }));
+      teacherContacts = teacherDocs.map(d => mapContact(d, 'teacher'));
     }
 
     // ══ [3] STAFF ADMIN: chỉ thấy dữ liệu cùng branch ══
@@ -517,6 +537,9 @@ class ChatApplicationService {
     const isBroadcast = receiverId === 'ALL_USERS' || receiverId === 'ALL_STUDENTS' || receiverId === 'ALL_TEACHERS';
     if (isBroadcast && !(data.currentUser.role === 'admin' || data.currentUser.role === 'staff')) {
       return { _status: 403, _body: ({ success: false, message: 'Chỉ admin/staff được gửi thông báo broadcast' });
+    }
+    if (isBroadcast && receiverId === 'ALL_STUDENTS' && data.currentUser.adminRole === 'HIGH_ADMIN') {
+      return { _status: 403, _body: ({ success: false, message: 'Admin cấp cao không gửi thông báo tới học viên' });
     }
 
     if (isGroup && groupId) {
@@ -1033,6 +1056,9 @@ class ChatApplicationService {
     // Chỉ Admin hoặc STAFF mới được gửi broadcast
     if (userRole !== 'admin' && userRole !== 'staff') {
       return { _status: 403, _body: ({ success: false, message: 'Không có quyền thực hiện' });
+    }
+    if (adminRole === 'HIGH_ADMIN' && targetRole === 'student') {
+      return { _status: 403, _body: ({ success: false, message: 'Admin cấp cao không gửi thông báo tới học viên' });
     }
 
     if (!['student', 'teacher', 'admin'].includes(targetRole)) {

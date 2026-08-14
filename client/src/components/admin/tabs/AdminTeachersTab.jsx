@@ -176,12 +176,12 @@ export default function AdminTeachersTab() {
       <div className="cms-students-module cms-viewport-module bg-white rounded-2xl lg:rounded-[28px] border border-slate-100 shadow-[0_4px_24px_rgba(15,23,42,0.04)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500" ref={menuRootRef}>
         <div className="px-3 pt-3 pb-2 sm:px-4 lg:px-6 lg:pt-4 space-y-3 shrink-0">
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-            <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2 min-w-0">
+            <h2 className="text-base font-semibold text-slate-900 flex items-start gap-2 min-w-0">
               <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
                 <GraduationCap size={18} aria-hidden="true" />
               </span>
-              <span className="truncate">Quản lý Giảng viên</span>
-              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0">
+              <span className="min-w-0 break-words leading-snug">Quản lý Giảng viên</span>
+              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0 self-center">
                 {teachers.length}
               </span>
             </h2>
@@ -299,25 +299,26 @@ export default function AdminTeachersTab() {
                   </div>
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
-                  <div>
+                <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="flex items-center justify-between sm:block gap-2 min-w-0">
                     <p className="text-[10px] font-semibold text-slate-500 uppercase">Điểm / Sao</p>
-                    <p className={`text-[13px] font-bold mt-0.5 ${passed ? 'text-emerald-700' : 'text-red-600'}`}>
-                      {score == null ? 'Chưa thi' : `${score}/100`}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {rating.count > 0 ? `${rating.avg}/5★` : 'Chưa đánh giá'}
-                    </p>
+                    <div className="text-right sm:text-left min-w-0">
+                      <p className={`text-[13px] font-bold sm:mt-0.5 ${passed ? 'text-emerald-700' : 'text-red-600'}`}>
+                        {score == null ? 'Chưa thi' : `${score}/100`}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {rating.count > 0 ? `${rating.avg}/5★` : 'Chưa đánh giá'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
+                  <div className="flex items-center justify-between sm:block gap-2 min-w-0">
                     <p className="text-[10px] font-semibold text-slate-500 uppercase">Lương/buổi</p>
-                    <p className="text-[13px] font-bold text-slate-800 mt-0.5 tabular-nums">
+                    <p className="text-[13px] font-bold text-slate-800 sm:mt-0.5 tabular-nums">
                       {(Number(t.baseSalaryPerSession) || 0).toLocaleString('vi-VN')}đ
                     </p>
-                    <p className="text-[11px] text-slate-500">/ buổi</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase self-end">Trạng thái</p>
+                  <div className="flex items-center justify-between sm:flex sm:flex-col sm:items-end gap-1 min-w-0">
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Trạng thái</p>
                     <StatusBadge active={active} pending={pending} locked={locked} />
                   </div>
                 </div>

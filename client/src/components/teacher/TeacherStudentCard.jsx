@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import CmsSelect from '../ui/CmsSelect';
 import {
   Calendar, Video, CheckCircle, Save, MessageSquare, FileText,
@@ -26,8 +26,14 @@ import {
   getMakeupSessionSummary,
 } from '../../utils/attendanceMakeupRequest';
 import { useToast } from '../../utils/toast';
-
-const ATTENDANCE_CONFIRM_MS = 30_000;
+import {
+  ATTENDANCE_CONFIRM_MS,
+  attendanceConfirmKey,
+  getAttendanceConfirm,
+  upsertAttendanceConfirm,
+  removeAttendanceConfirm,
+  subscribeAttendanceConfirm,
+} from '../../utils/attendanceConfirmStore';
 
 const getDisplayName = (person) => {
   if (!person) return 'Không rõ';
@@ -134,7 +140,7 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 export const StudentCard = ({
-  student, onAttendance, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam,
+  student, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam,
   isDetailed, attendanceGate, myStudents = [], onCancelSchedule,
 }) => {
   const toast = useToast();
@@ -156,10 +162,14 @@ export const StudentCard = ({
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [sendingMakeup, setSendingMakeup] = useState(false);
-  /** Chờ 30s sau "Xác nhận Điểm danh" — chưa cộng buổi cho đến khi hết giờ */
-  const [pendingAttendance, setPendingAttendance] = useState(null); // { note, grade, endsAt }
+  const confirmKey = attendanceConfirmKey(student);
+  /** Chờ 30s sau "Xác nhận Điểm danh" — persist sessionStorage để đổi tab không mất */
+  const [pendingAttendance, setPendingAttendance] = useState(() => {
+    const stored = getAttendanceConfirm(confirmKey);
+    if (!stored) return null;
+    return { note: stored.note, grade: stored.grade, endsAt: stored.endsAt };
+  });
   const [confirmTick, setConfirmTick] = useState(0);
-  const pendingCommitRef = useRef(false);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [studentQuizzes, setStudentQuizzes] = useState([]);
   const [studentEvals, setStudentEvals] = useState([]);
@@ -304,48 +314,43 @@ export const StudentCard = ({
     ),
   );
 
-  // Đổi HV → hủy pending local (chưa commit server)
+  // Khôi phục đếm ngược khi đổi HV / quay lại tab — không xóa pending của HV khác
   useEffect(() => {
-    setPendingAttendance(null);
-    pendingCommitRef.current = false;
-  }, [student._enrollmentKey, student.id, student._id]);
+    const apply = (map) => {
+      const stored = map ? (map[confirmKey] || null) : getAttendanceConfirm(confirmKey);
+      setPendingAttendance((prev) => {
+        if (!stored) return prev === null ? prev : null;
+        const next = { note: stored.note, grade: stored.grade, endsAt: stored.endsAt };
+        if (prev && prev.endsAt === next.endsAt && prev.note === next.note && prev.grade === next.grade) {
+          return prev;
+        }
+        return next;
+      });
+    };
+    apply();
+    return subscribeAttendanceConfirm(apply);
+  }, [confirmKey]);
 
-  // Đếm ngược + commit khi hết 30s
+  // Chỉ đếm UI; commit thật do attendanceConfirmStore (vẫn chạy khi GV đang ở tab khác)
   useEffect(() => {
     if (!pendingAttendance) return undefined;
-    pendingCommitRef.current = false;
     const tickId = setInterval(() => setConfirmTick((n) => n + 1), 250);
-    const delay = Math.max(0, pendingAttendance.endsAt - Date.now());
-    const commitId = setTimeout(() => {
-      if (pendingCommitRef.current) return;
-      pendingCommitRef.current = true;
-      const payload = pendingAttendance;
-      setPendingAttendance(null);
-      try {
-        onAttendance?.(
-          student._id || student.id,
-          payload.note,
-          Number(payload.grade),
-        );
-      } catch (err) {
-        toast.error(err?.message || 'Điểm danh thất bại');
-        pendingCommitRef.current = false;
-      }
-    }, delay);
-    return () => {
-      clearInterval(tickId);
-      clearTimeout(commitId);
-    };
-  }, [pendingAttendance, onAttendance, student._id, student.id, toast]);
+    return () => clearInterval(tickId);
+  }, [pendingAttendance]);
 
   const beginAttendanceConfirm = useCallback(() => {
     if (alreadyAttendedToday || isPendingConfirm || isCompleted) return;
     setShowAttendanceModal(false);
-    setPendingAttendance({
+    const payload = {
+      studentId: String(student._id || student.id),
+      courseName: student.course || '',
       note: attForm.note || defaultAttendanceNote,
       grade: Number(attForm.grade) || 0,
       endsAt: Date.now() + ATTENDANCE_CONFIRM_MS,
-    });
+      teacherId: String(currentUser?.id || currentUser?._id || ''),
+    };
+    upsertAttendanceConfirm(confirmKey, payload);
+    setPendingAttendance({ note: payload.note, grade: payload.grade, endsAt: payload.endsAt });
     toast.info('Đã ghi nhận — còn 30 giây để hủy điểm danh trước khi tính buổi.');
   }, [
     alreadyAttendedToday,
@@ -355,13 +360,19 @@ export const StudentCard = ({
     attForm.grade,
     defaultAttendanceNote,
     toast,
+    student._id,
+    student.id,
+    student.course,
+    currentUser?.id,
+    currentUser?._id,
+    confirmKey,
   ]);
 
   const cancelPendingAttendance = useCallback(() => {
+    removeAttendanceConfirm(confirmKey);
     setPendingAttendance(null);
-    pendingCommitRef.current = false;
     toast.success('Đã hủy điểm danh — buổi chưa được tính.');
-  }, [toast]);
+  }, [toast, confirmKey]);
 
   const makeupSummary = useMemo(
     () => getMakeupSessionSummary({ student, schedule: attendanceGate?.schedule }),

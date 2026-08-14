@@ -132,18 +132,18 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
     }`}>
       {/* Card header */}
       <div className="p-5 pb-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3">
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className={`w-12 h-12 shrink-0 ${(!isApproved || failedLocked) ? 'bg-gray-200' : meta.bg} rounded-xl flex items-center justify-center shadow-sm transition-colors`}>
               <span className={`font-black leading-none tracking-tight ${initials.length > 2 ? 'text-sm' : 'text-lg'} ${(!isApproved || failedLocked) ? 'text-gray-400' : 'text-white'}`}>
                 {initials}
               </span>
             </div>
-            <div>
-              <h3 className="font-bold text-gray-800 text-base leading-tight">{meta.label}</h3>
+            <div className="min-w-0">
+              <h3 className="font-bold text-gray-800 text-base leading-tight break-words">{meta.label}</h3>
             </div>
           </div>
-          {statusBadge()}
+          <div className="shrink-0">{statusBadge()}</div>
         </div>
 
         {/* Stats — luôn xem được trên mọi thiết bị */}
@@ -545,35 +545,38 @@ const StudentExamRoom = ({ onNavigate, onStartExam }) => {
 
 
   return (
-    <div className="bg-transparent font-sans h-full">
-      {/* Navbar removed - using DashboardLayout header */}
-      <div className="pt-6"></div>
-
-      {/* ── Main Content ── */}
-      <div className="w-full px-2 sm:px-6 py-6 text-left">
-        {/* TAB SWITCHER */}
-        <div className="flex items-center gap-2 mb-6 border-b border-gray-200 pb-3">
+    <div className="bg-transparent font-sans h-full min-w-0 w-full max-w-full overflow-x-hidden">
+      <div className="w-full min-w-0 py-1 sm:py-2 text-left">
+        <div className="grid grid-cols-2 gap-2 mb-4 sm:mb-6">
           <button
             type="button"
             onClick={() => setRoomTab('quiz')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+            className={`min-h-11 px-2 sm:px-4 py-2 rounded-xl font-bold text-[11px] sm:text-sm leading-snug transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-center min-w-0 ${
               roomTab === 'quiz'
                 ? 'bg-red-600 text-white shadow-md'
                 : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
             }`}
           >
-            <Trophy size={16} /> Trắc nghiệm buổi học (Giảng viên)
+            <Trophy size={15} className="shrink-0" />
+            <span className="min-w-0">
+              <span className="sm:hidden">Trắc nghiệm GV</span>
+              <span className="hidden sm:inline">Trắc nghiệm buổi học (Giảng viên)</span>
+            </span>
           </button>
           <button
             type="button"
             onClick={() => setRoomTab('cert')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+            className={`min-h-11 px-2 sm:px-4 py-2 rounded-xl font-bold text-[11px] sm:text-sm leading-snug transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-center min-w-0 ${
               roomTab === 'cert'
                 ? 'bg-red-600 text-white shadow-md'
                 : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
             }`}
           >
-            <Monitor size={16} /> Thi chứng nhận môn học
+            <Monitor size={15} className="shrink-0" />
+            <span className="min-w-0">
+              <span className="sm:hidden">Thi chứng nhận</span>
+              <span className="hidden sm:inline">Thi chứng nhận môn học</span>
+            </span>
           </button>
         </div>
 

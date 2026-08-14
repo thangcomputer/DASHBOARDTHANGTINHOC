@@ -169,6 +169,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     teachers, students, staffs, toggleMessageReaction: ctxToggleReaction,
     softDeleteMessage: ctxDeleteMessage, currentUser, messages: contextMessages,
   } = useData();
+  const isHighAdmin = currentUser?.adminRole === 'HIGH_ADMIN';
 
   const dataContextConvs = useMemo(
     () => getConversations(currentUserId),
@@ -370,6 +371,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     uniqueContacts.forEach((c) => {
       if (String(c.id) === String(currentUserId)) return;
+      if (isHighAdmin && (c.productRole === 'STUDENT' || normalizeRole(c.role) === 'student')) return;
       // Transport role for conversation IDs; product/adminRole for tab presentation (Phase 6).
       const role = c.transportRole || getMessagingRole({
         id: c.id,
@@ -418,6 +420,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         existingPeerIds: activityPeerIds,
       });
       if (gate.allowed) {
+        const seedRole = normalizeRole(seedContact.role);
+        if (isHighAdmin && seedRole === 'student' && seedContact.adminRole !== 'STAFF' && seedContact.adminRole !== 'SUPPORT') {
+          /* High Admin không mở thread học viên */
+        } else {
         const role = getMessagingRole({
           id: seedContact.id,
           role: seedContact.role,
@@ -450,6 +456,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             unread: existingConv?.unread || 0,
           });
         }
+        }
       }
     }
 
@@ -459,6 +466,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (!dc?.id) return;
       const id = String(dc.id);
       if (seenConvIds.has(id)) return;
+      const peerRole = normalizeRole(dc.user?.role);
+      if (isHighAdmin && peerRole === 'student' && dc.user?.adminRole !== 'STAFF' && dc.user?.adminRole !== 'SUPPORT') return;
       const peerId = dc.user?.id != null ? String(dc.user.id) : '';
       const fromContact = peerId
         ? uniqueContacts.find((c) => String(c.id) === peerId)
@@ -480,7 +489,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     // Canonical id merge + newest lastTime first (immutable)
     return mergeConversationsById(entries);
-  }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact]);
+  }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin]);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -1144,10 +1153,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 { id: 'student', label: 'Học viên' },
                 { id: 'teacher', label: 'Giảng viên' },
                 { id: 'admin', label: 'Admin' },
-                { id: 'staff', label: 'Staff' },
-                { id: 'support', label: 'Support' },
+                { id: 'staff', label: 'Tuyển sinh' },
+                { id: 'support', label: 'Hỗ trợ' },
                 { id: 'group', label: 'Nhóm' }
-              ].filter(tab => !(currentUserRole === 'student' && tab.id === 'student')).map(tab => (
+              ].filter(tab => {
+                if (currentUserRole === 'student' && (tab.id === 'student' || tab.id === 'admin')) return false;
+                if (currentUserRole === 'teacher' && tab.id === 'teacher') return false;
+                if (isHighAdmin && tab.id === 'student') return false;
+                return true;
+              }).map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setContactTab(tab.id)}
@@ -1160,7 +1174,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           </div>
 
           {/* Conversation list */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-2 py-3 bg-white space-y-1 overscroll-contain">
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 bg-white space-y-1 overscroll-contain">
             {filteredConvs.map(conv => {
               const isGroup = !!(groups || []).find(g => g._id === conv.user.id);
               return (
@@ -1321,12 +1335,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                          >
                            📢 Gửi toàn bộ Giảng viên
                          </button>
+                         {!isHighAdmin ? (
                          <button 
                            onClick={() => setBroadcastConfig({ targetRole: 'student', label: 'Học viên' })}
                            className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
                          >
                            📢 Gửi toàn bộ Học viên
                          </button>
+                         ) : null}
                       </>
                     ) : (
                       <>

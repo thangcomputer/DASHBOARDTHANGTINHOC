@@ -658,7 +658,7 @@ export default function NewsPage({ session, role = 'admin' }) {
     }
     const thumb = detail.thumbnailUrl ? resolveMediaUrl(detail.thumbnailUrl) : null;
     return (
-      <div className="w-full space-y-6 pb-20 px-2 sm:px-4 text-left">
+      <div className="w-full space-y-6 pb-20 text-left">
         <div className="w-full bg-white rounded-2xl border border-slate-100 p-6 sm:p-8 shadow-sm space-y-6">
 
           <button

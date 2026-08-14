@@ -117,7 +117,7 @@ export default function TeacherOverviewTab({
   }, [mySchedules, students]);
 
   return (
-    <div className="px-4 md:px-8 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0">
+    <div className="py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0">
       
       {/* ── LIVE ONGOING SCHEDULE BANNER (Hiển thị nổi bật khi có lớp đang diễn ra) ── */}
       {ongoingSchedule && (

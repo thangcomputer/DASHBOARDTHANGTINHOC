@@ -82,7 +82,16 @@ function isPairStructurallyAllowed(senderProduct, peerProduct) {
   if (senderProduct === PRODUCT_ROLES.STUDENT && peerProduct === PRODUCT_ROLES.STUDENT) return false;
   if (senderProduct === PRODUCT_ROLES.TEACHER && peerProduct === PRODUCT_ROLES.TEACHER) return false;
 
-  if (isElevatedProduct(senderProduct)) return true;
+  // High Admin không nhắn học viên (cả hai chiều)
+  if (
+    (senderProduct === PRODUCT_ROLES.HIGH_ADMIN && peerProduct === PRODUCT_ROLES.STUDENT)
+    || (senderProduct === PRODUCT_ROLES.STUDENT && peerProduct === PRODUCT_ROLES.HIGH_ADMIN)
+  ) {
+    return false;
+  }
+
+  if (senderProduct === PRODUCT_ROLES.SUPER_ADMIN) return true;
+  if (senderProduct === PRODUCT_ROLES.HIGH_ADMIN) return true;
   if (senderProduct === PRODUCT_ROLES.SUPPORT) return true;
 
   if (senderProduct === PRODUCT_ROLES.STAFF) {

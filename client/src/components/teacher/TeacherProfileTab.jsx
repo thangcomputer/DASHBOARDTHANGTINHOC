@@ -128,7 +128,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
   });
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-5 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 lg:space-y-5">
+    <div className="w-full py-2 sm:py-6 lg:py-8 space-y-4 lg:space-y-5">
       {/* Hero */}
       <section className="rounded-2xl lg:rounded-3xl bg-gradient-to-br from-slate-800 via-slate-900 to-red-950 p-4 sm:p-6 lg:p-8 text-white shadow-[0_8px_28px_rgba(0,0,0,0.1)] relative overflow-hidden">
         <div className="absolute -right-16 -top-16 w-48 h-48 bg-white/5 rounded-full pointer-events-none" aria-hidden="true" />

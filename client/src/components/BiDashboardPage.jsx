@@ -121,36 +121,34 @@ export default function BiDashboardPage() {
             KPI điều hành · so sánh kỳ trước · cache 90s
           </p>
         </div>
-        <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="cms-m-filter-scroll w-full sm:w-auto" role="group" aria-label="Khoảng thời gian">
+        <div className="flex items-center gap-1.5 w-full min-w-0">
+          <div className="cms-m-filter-scroll flex-1 min-w-0 !pb-0" role="group" aria-label="Khoảng thời gian">
             {PERIODS.map((p) => (
               <button
                 key={p.value}
                 type="button"
                 onClick={() => setPeriod(p.value)}
-                className={`cms-m-filter-chip ${period === p.value ? 'is-active' : ''}`}
+                className={`cms-m-filter-chip !min-h-9 !px-2.5 !text-[11px] sm:!min-h-11 sm:!px-3.5 sm:!text-[13px] ${period === p.value ? 'is-active' : ''}`}
               >
                 {p.label}
               </button>
             ))}
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={load}
-              aria-label="Làm mới"
-              className="cms-m-btn bg-slate-50 text-slate-500 border border-slate-200"
-            >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <button
-              type="button"
-              onClick={onExport}
-              className="cms-m-btn flex-1 sm:flex-none bg-red-600 text-white"
-            >
-              <Download size={14} /> CSV
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={load}
+            aria-label="Làm mới"
+            className="cms-m-btn shrink-0 !min-h-9 !min-w-9 !px-0 sm:!min-h-11 sm:!min-w-11 bg-slate-50 text-slate-500 border border-slate-200"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button
+            type="button"
+            onClick={onExport}
+            className="cms-m-btn shrink-0 !min-h-9 !px-2.5 !text-[11px] sm:!min-h-11 sm:!px-3.5 sm:!text-sm bg-red-600 text-white"
+          >
+            <Download size={13} /> CSV
+          </button>
         </div>
       </div>
 

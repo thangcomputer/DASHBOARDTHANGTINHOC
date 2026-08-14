@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, BookOpen, Calendar, MessageSquare,
   Trophy, FileText, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown,
-  GraduationCap, Users, DollarSign, ClipboardList, Menu, X,
+  GraduationCap, Users, DollarSign, ClipboardList, X,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
   HelpCircle, Newspaper,
 } from 'lucide-react';
@@ -153,6 +153,8 @@ const AppSidebar = ({
   teacherPending = false,
   adminRole = null,       // 'SUPER_ADMIN' | 'STAFF' | null
   userPermissions = [],   // ['manage_students', ...]
+  mobileOpen: mobileOpenProp,
+  onMobileOpenChange,
 }) => {
   const SIDEBAR_COLLAPSE_KEY = 'cms_sidebar_collapsed';
   // Tablet / laptop hẹp (< xl 1200px): rail + overlay khi mở rộng
@@ -168,7 +170,14 @@ const AppSidebar = ({
     // Tablet / màn hẹp: mặc định thu gọn để nội dung rộng
     return window.matchMedia(NARROW_DEFAULT_MQ).matches;
   });
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileOpenInternal, setMobileOpenInternal] = useState(false);
+  const isMobileNavControlled = typeof onMobileOpenChange === 'function';
+  const mobileOpen = isMobileNavControlled ? Boolean(mobileOpenProp) : mobileOpenInternal;
+  const setMobileOpen = (next) => {
+    const value = typeof next === 'function' ? next(mobileOpen) : next;
+    if (isMobileNavControlled) onMobileOpenChange(value);
+    else setMobileOpenInternal(value);
+  };
   const [tabletRail, setTabletRail] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia(TABLET_RAIL_MQ).matches
   ));
@@ -354,15 +363,18 @@ const AppSidebar = ({
 
   useEffect(() => {
     if (!mobileOpen) {
+      document.documentElement.classList.remove('cms-menu-open');
       document.body.classList.remove('cms-menu-open');
       return;
     }
+    document.documentElement.classList.add('cms-menu-open');
     document.body.classList.add('cms-menu-open');
     const onKeyDown = (e) => {
       if (e.key === 'Escape') setMobileOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
+      document.documentElement.classList.remove('cms-menu-open');
       document.body.classList.remove('cms-menu-open');
       document.removeEventListener('keydown', onKeyDown);
     };
@@ -715,7 +727,7 @@ const AppSidebar = ({
       </nav>
 
       {/* ── Bottom items ── */}
-      <div className="px-2.5 pb-3 space-y-0.5 border-t border-white/10 pt-2.5">
+      <div className="px-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] space-y-0.5 border-t border-white/10 pt-2.5">
         {config.bottomItems.map(item => {
           const Icon = item.icon;
           const active = !item.isLogout && !item.isHelp && !item.isChangePassword && isActive(item);
@@ -772,36 +784,19 @@ const AppSidebar = ({
       )}
 
       {/* ── Desktop / Tablet Sidebar ── */}
-      <div className={`hidden md:flex flex-col fixed left-0 top-0 h-screen transition-all duration-300
+      <div className={`hidden md:flex flex-col fixed left-0 top-0 h-[100dvh] max-h-[100dvh] transition-all duration-300
         ${collapsed ? 'w-16' : 'w-64'}
         ${overlayExpand ? 'z-[60] shadow-2xl' : 'z-30'}
       `}>
         {renderSidebarContent()}
       </div>
 
-      {/* ── Mobile: Hamburger button (ẩn khi drawer đang mở để không che logo) ── */}
-      {!mobileOpen && (
-        <button
-          type="button"
-          onClick={() => setMobileOpen(true)}
-          className="md:hidden fixed z-[70] w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] bg-white rounded-xl shadow-md border border-gray-100 flex items-center justify-center text-gray-600 active:scale-95 transition-transform duration-200"
-          style={{
-            top: 'calc(env(safe-area-inset-top, 0px) + 0.625rem)',
-            left: 'max(0.75rem, env(safe-area-inset-left, 0px))',
-          }}
-          aria-label="Mở menu điều hướng"
-          aria-expanded={false}
-        >
-          <Menu size={18} />
-        </button>
-      )}
-
-      {/* ── Mobile: Overlay (above header/branch dropdown) ── */}
+      {/* ── Mobile: Overlay drawer (hamburger nằm trong header) ── */}
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
+        <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
           <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-[min(88vw,300px)] max-w-[300px] animate-in slide-in-from-left duration-300 pt-[env(safe-area-inset-top,0px)]">
-            <div className="h-full relative shadow-2xl overflow-hidden">
+          <div className="absolute left-0 top-0 h-[100dvh] max-h-[100dvh] w-[min(85vw,300px)] max-w-[300px] animate-in slide-in-from-left duration-300 shadow-[8px_0_32px_rgba(0,0,0,0.28)] pt-[env(safe-area-inset-top,0px)]">
+            <div className="h-full relative overflow-hidden">
               {renderSidebarContent()}
             </div>
           </div>

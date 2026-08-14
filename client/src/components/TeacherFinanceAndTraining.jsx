@@ -191,7 +191,7 @@ const TeacherFinanceAndTraining = () => {
 
   return (
     <div className="bg-transparent h-full">
-      <div className="px-4 md:px-8 py-6 space-y-6">
+      <div className="space-y-6">
 
         {!isTraining ? (
           /* ════════ TÀI CHÍNH ════════ */

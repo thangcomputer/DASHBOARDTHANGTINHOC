@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
@@ -12,12 +12,13 @@ import { useToast } from '../utils/toast';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
   Bell, LogOut, CheckCircle2, Clock, X, Lock,
-  Calendar, DollarSign, UserPlus, Zap, BookOpen, Award,
+  Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu,
 } from 'lucide-react';
 
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { getMessagingRole } from '../lib/messagingRoles';
 import StudentQuizInviteHost from './student/StudentQuizInviteHost';
+import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -102,10 +103,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { socket } = useSocket() || {};
   const { students, teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead, getConversations } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const myId = String(session?.id || session?._id || '');
+  useAttendanceConfirmFlush({
+    enabled: role === 'teacher',
+    teacherId: myId,
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.add('cms-app-shell');
+    document.body.classList.add('cms-app-shell');
+    return () => {
+      document.documentElement.classList.remove('cms-app-shell');
+      document.body.classList.remove('cms-app-shell');
+    };
+  }, []);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -327,16 +342,28 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         teacherPending={isTeacherPending}
         adminRole={session?.adminRole || null}
         userPermissions={session?.permissions || []}
+        mobileOpen={mobileNavOpen}
+        onMobileOpenChange={setMobileNavOpen}
       />
 
-      <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
-        <header className={`cms-topbar-glass flex flex-col border-b border-slate-100/80 flex-shrink-0 z-40 safe-pad-top ${
+      <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
+        <header className={`cms-topbar flex flex-col ${
+          !isImmersivePage ? 'cms-shell-gutter' : ''
+        } ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="h-14 sm:h-16 flex flex-nowrap items-center gap-1.5 sm:gap-3 pl-[max(5.5rem,calc(env(safe-area-inset-left,0px)+3.75rem))] sm:pl-[max(6rem,calc(env(safe-area-inset-left,0px)+4.25rem))] md:pl-6 lg:pl-6 pr-2 sm:pr-4 min-w-0 overflow-hidden">
-            <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center sm:gap-3 overflow-hidden">
-              <h1 className="text-base sm:text-lg font-semibold text-slate-900 truncate leading-tight">{pageTitle}</h1>
-              {/* Tên user đẩy khỏi nav khi có hamburger (mobile/tablet hẹp); hiện từ md+ */}
+          <div className="cms-topbar__row">
+            <button
+              type="button"
+              className="cms-topbar__menu"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Mở menu điều hướng"
+              aria-expanded={mobileNavOpen}
+            >
+              <Menu size={20} aria-hidden="true" />
+            </button>
+            <div className="min-w-0 flex-1 flex flex-col md:flex-row md:items-center md:gap-3 overflow-hidden">
+              <h1 className="cms-topbar__title">{pageTitle}</h1>
               <p className="hidden md:block text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5 sm:mt-0">
                 <span className="font-medium text-slate-600">{displayName}</span>
                 <span className="text-slate-300 mx-1">·</span>
@@ -398,7 +425,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
           {/* Mobile: branch full-width row (not students — students keeps prior lg-only behavior) */}
           {showAdminBranch && !isStudentsTab && (
-            <div className="md:hidden w-full pl-[max(5.5rem,calc(env(safe-area-inset-left,0px)+3.75rem))] sm:pl-[max(6rem,calc(env(safe-area-inset-left,0px)+4.25rem))] pr-3 pb-2.5">
+            <div className="md:hidden w-full cms-page-gutter pb-2.5">
               <BranchFilterDropdown fullWidth />
             </div>
           )}
@@ -407,13 +434,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <div
           className={
             isInboxPage || isBiPage
-              // Hộp thư / BI: full-height + padding ngang giống Tài chính
-              ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col px-2.5 py-1.5 sm:px-4 sm:py-3 md:px-6 md:py-4 lg:px-8 lg:py-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]'
+              ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col cms-page-gutter py-3 sm:py-3 md:py-4 pb-[env(safe-area-inset-bottom,0px)]'
               : isImmersivePage
                 ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-                : role === 'student'
-                  ? 'flex-1 min-h-0 px-3 py-3 sm:px-4 sm:py-4 md:px-5 md:py-4 lg:px-6 lg:py-5 w-full max-w-full overflow-x-hidden overflow-y-auto pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-6'
-                  : 'flex-1 min-h-0 px-3 py-3 sm:px-4 sm:py-4 md:px-5 md:py-4 lg:px-6 lg:py-5 w-full max-w-full overflow-x-hidden overflow-y-auto pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:pb-6'
+                : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:pb-6'
           }
         >
           <div

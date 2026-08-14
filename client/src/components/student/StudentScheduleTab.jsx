@@ -8,7 +8,7 @@ export default function StudentScheduleTab({
   displayGrades,
 }) {
   return (
-    <div className="w-full min-w-0 px-3 sm:px-6 py-3 sm:py-6 animate-in fade-in duration-500">
+    <div className="w-full min-w-0 py-3 sm:py-6 animate-in fade-in duration-500">
       <ScheduleView
         schedules={mySchedules}
         student={viewStudent}

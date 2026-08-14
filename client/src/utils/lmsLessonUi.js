@@ -227,6 +227,25 @@ export const LMS_DARK_PROGRESS_TRACK_CLASS = 'h-1.5 rounded-full bg-white/25 ove
 export const LMS_DARK_PROGRESS_FILL_CLASS =
   'h-full rounded-full bg-red-500 border border-white/40 shadow-[0_0_6px_rgba(255,255,255,0.25)] transition-all duration-300';
 
+/** Khớp groupedLessons: thiếu chapterTitle → 'Chương 1'. */
+export function lessonChapterKey(lesson) {
+  return String(lesson?.chapterTitle || 'Chương 1');
+}
+
+/** Số thứ tự trong chương (0-based) — tránh nhảy cóc khi dùng index toàn khóa. */
+export function getChapterLessonIndex(lessons, lesson) {
+  if (!lesson) return 0;
+  const key = lessonChapterKey(lesson);
+  const id = String(lesson._id || lesson.id || '');
+  let n = 0;
+  for (const l of lessons || []) {
+    if (lessonChapterKey(l) !== key) continue;
+    if (String(l._id || l.id) === id) return n;
+    n += 1;
+  }
+  return 0;
+}
+
 /**
  * Chuẩn hóa tên bài: "Bài 1: Giới thiệu..." (capitalize, bỏ prefix trùng).
  */
@@ -251,8 +270,13 @@ export const LMS_PLAYER_TABS = [
   { key: 'overview', label: 'Tổng quan', shortLabel: 'Tổng quan' },
   { key: 'qa', label: 'Hỏi đáp', shortLabel: 'Hỏi đáp' },
   { key: 'notes', label: 'Ghi chú', shortLabel: 'Ghi chú' },
-  { key: 'announcements', label: 'Thông báo', shortLabel: 'Thông báo' },
   { key: 'reviews', label: 'Đánh giá', shortLabel: 'Đánh giá' },
   { key: 'resources', label: 'Tài liệu', shortLabel: 'Tài liệu' },
-  { key: 'list', label: 'Mục lục', shortLabel: 'Mục lục', mobileOnly: true },
+  { key: 'list', label: 'Bài giảng', shortLabel: 'Bài giảng', mobileOnly: true },
 ];
+
+export function normalizeLmsPlayerTab(tab) {
+  const allowed = new Set(LMS_PLAYER_TABS.map((t) => t.key));
+  if (tab === 'announcements' || !allowed.has(tab)) return 'overview';
+  return tab;
+}

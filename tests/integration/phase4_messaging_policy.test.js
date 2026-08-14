@@ -104,13 +104,14 @@ describe('Phase 4 MessagingPolicy', { concurrency: false }, () => {
     assert.equal(canDiscoverContacts(actors.support, actors.super).allowed, false);
     assert.equal(canDiscoverContacts(actors.super, actors.high).allowed, true);
     assert.equal(canDiscoverContacts(actors.super, actors.student).allowed, false);
-    assert.equal(canDiscoverContacts(actors.high, actors.student).allowed, true);
+    assert.equal(canDiscoverContacts(actors.high, actors.student).allowed, false);
+    assert.equal(canDiscoverContacts(actors.high, actors.teacher).allowed, true);
     assert.equal(canDiscoverContacts(actors.high, actors.super).allowed, true);
   });
 
-  it('structural send — dual-layer C1/C2 (send allow, discover deny for elevated)', () => {
+  it('structural send — dual-layer C1 (send allow, discover deny SUPER); HIGH↔student deny both', () => {
     assert.equal(canSendStructurally(actors.student, actors.super).allowed, true);
-    assert.equal(canSendStructurally(actors.student, actors.high).allowed, true);
+    assert.equal(canSendStructurally(actors.student, actors.high).allowed, false);
     assert.equal(canDiscoverContacts(actors.student, actors.super).allowed, false);
     assert.equal(canDiscoverContacts(actors.student, actors.high).allowed, false);
   });
@@ -127,7 +128,7 @@ describe('Phase 4 MessagingPolicy', { concurrency: false }, () => {
     assert.equal(canSendStructurally(actors.staff, actors.support).allowed, true);
     assert.equal(canSendStructurally(actors.support, actors.staff).allowed, true);
     assert.equal(canSendStructurally(actors.staff, actors.student).allowed, true);
-    assert.equal(canSendStructurally(actors.high, actors.student).allowed, true);
+    assert.equal(canSendStructurally(actors.high, actors.student).allowed, false);
     assert.equal(canSendStructurally(actors.super, actors.staff).allowed, true);
   });
 
