@@ -13,7 +13,7 @@ import { messagesAPI, resolveMediaUrl } from '../services/api';
 import { displayFileName } from '../utils/validators';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
-import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE, isAliveMessagingPeer } from '../lib/messagingIdentity';
+import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE, isAliveMessagingPeer, isSpecialMessagingPeerId } from '../lib/messagingIdentity';
 import { mergeConversationsById } from '../lib/conversationList';
 import { getMessagingRole } from '../lib/messagingRoles';
 import {
@@ -306,17 +306,31 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
 
-  // Đóng hội thoại nếu peer đã bị xóa khỏi hệ thống
+  // Đóng hội thoại chỉ khi peer chắc chắn ghost (không dùng students/teachers/staffs local —
+  // Admin/Staff thường students=[], GV chỉ có teachers=[self] → trước đây kill nhầm mọi chat).
   useEffect(() => {
     if (!activeConv || activeConv.isGroup) return;
+    if (!contactsLoaded) return;
     const peerId = activeConv.user?.id;
-    const hasDirectoryData = (students?.length || 0) + (teachers?.length || 0) + (staffs?.length || 0) > 0;
-    if (!hasDirectoryData || !peerId) return;
-    if (!isAliveMessagingPeer(peerId, { students, teachers, staffs })) {
-      setActiveConv(null);
-      setMessages([]);
-    }
-  }, [activeConv, students, teachers, staffs]);
+    if (!peerId || isSpecialMessagingPeerId(peerId)) return;
+
+    const alive = isAliveMessagingPeer(peerId, {
+      contacts,
+      students,
+      teachers,
+      staffs,
+    });
+    if (alive) return;
+
+    // Case A: vẫn còn activity tin nhắn → giữ mở (deep-link EXISTING_CONVERSATION)
+    const inActivity = (dataContextConvs || []).some(
+      (dc) => !dc?.isGroup && String(dc?.user?.id) === String(peerId),
+    );
+    if (inActivity) return;
+
+    setActiveConv(null);
+    setMessages([]);
+  }, [activeConv, contactsLoaded, contacts, students, teachers, staffs, dataContextConvs]);
   const [pendingImage, setPendingImage] = useState(null);
 
   const conversations = useMemo(() => {

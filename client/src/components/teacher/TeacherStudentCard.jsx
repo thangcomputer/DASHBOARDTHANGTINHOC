@@ -18,6 +18,7 @@ import { showGlossyAlert } from './TeacherShared';
 import { openSiteChat } from '../FloatingMessenger';
 import TeacherQuizManager from './TeacherQuizManager';
 import { useData } from '../../context/DataContext';
+import { useScheduleContext } from '../../context/ScheduleContext';
 import { buildStudentActivityLogs, ACTIVITY_LOG_META } from '../../utils/studentActivityLogs';
 import {
   buildAttendanceMakeupDraft,
@@ -25,6 +26,8 @@ import {
   getMakeupSessionSummary,
 } from '../../utils/attendanceMakeupRequest';
 import { useToast } from '../../utils/toast';
+
+const ATTENDANCE_CONFIRM_MS = 30_000;
 
 const getDisplayName = (person) => {
   if (!person) return 'Không rõ';
@@ -140,9 +143,10 @@ export const StudentCard = ({
   const {
     privateEvaluations = [],
     schedules: allSchedules = [],
+    triggerBackgroundSync,
     currentUser,
-    cancelSchedule: ctxCancelSchedule,
   } = useData();
+  const { setSchedulesLocal } = useScheduleContext();
   const [linkInput, setLinkInput] = useState(student.linkHoc);
   const [gradeInput, setGradeInput] = useState(student.avgGrade ?? student.lastGrade ?? '');
   const [notesInput, setNotesInput] = useState(student.notes || '');
@@ -152,6 +156,10 @@ export const StudentCard = ({
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [sendingMakeup, setSendingMakeup] = useState(false);
+  /** Chờ 30s sau "Xác nhận Điểm danh" — chưa cộng buổi cho đến khi hết giờ */
+  const [pendingAttendance, setPendingAttendance] = useState(null); // { note, grade, endsAt }
+  const [confirmTick, setConfirmTick] = useState(0);
+  const pendingCommitRef = useRef(false);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [studentQuizzes, setStudentQuizzes] = useState([]);
   const [studentEvals, setStudentEvals] = useState([]);
@@ -279,15 +287,81 @@ export const StudentCard = ({
   const alreadyAttendedToday = Boolean(
     hasAttendedToday || attendanceGate?.status === 'done',
   );
-  const isOverdueMakeup = attendanceGate?.status === 'overdue' && !alreadyAttendedToday && !isCompleted;
+  const isPendingConfirm = Boolean(pendingAttendance);
+  const confirmRemainSec = useMemo(() => {
+    if (!pendingAttendance?.endsAt) return 0;
+    return Math.max(0, Math.ceil((pendingAttendance.endsAt - Date.now()) / 1000));
+  }, [pendingAttendance, confirmTick]);
+
+  const isOverdueMakeup = attendanceGate?.status === 'overdue' && !alreadyAttendedToday && !isPendingConfirm && !isCompleted;
 
   // Có buổi hôm nay (scheduled / overdue / done) → hiện cặp nút điểm danh + hủy
   const showSessionActionRow = Boolean(
     !isCompleted && (
-      alreadyAttendedToday
+      isPendingConfirm
+      || alreadyAttendedToday
       || (attendanceGate && attendanceGate.status !== 'no_schedule')
     ),
   );
+
+  // Đổi HV → hủy pending local (chưa commit server)
+  useEffect(() => {
+    setPendingAttendance(null);
+    pendingCommitRef.current = false;
+  }, [student._enrollmentKey, student.id, student._id]);
+
+  // Đếm ngược + commit khi hết 30s
+  useEffect(() => {
+    if (!pendingAttendance) return undefined;
+    pendingCommitRef.current = false;
+    const tickId = setInterval(() => setConfirmTick((n) => n + 1), 250);
+    const delay = Math.max(0, pendingAttendance.endsAt - Date.now());
+    const commitId = setTimeout(() => {
+      if (pendingCommitRef.current) return;
+      pendingCommitRef.current = true;
+      const payload = pendingAttendance;
+      setPendingAttendance(null);
+      try {
+        onAttendance?.(
+          student._id || student.id,
+          payload.note,
+          Number(payload.grade),
+        );
+      } catch (err) {
+        toast.error(err?.message || 'Điểm danh thất bại');
+        pendingCommitRef.current = false;
+      }
+    }, delay);
+    return () => {
+      clearInterval(tickId);
+      clearTimeout(commitId);
+    };
+  }, [pendingAttendance, onAttendance, student._id, student.id, toast]);
+
+  const beginAttendanceConfirm = useCallback(() => {
+    if (alreadyAttendedToday || isPendingConfirm || isCompleted) return;
+    setShowAttendanceModal(false);
+    setPendingAttendance({
+      note: attForm.note || defaultAttendanceNote,
+      grade: Number(attForm.grade) || 0,
+      endsAt: Date.now() + ATTENDANCE_CONFIRM_MS,
+    });
+    toast.info('Đã ghi nhận — còn 30 giây để hủy điểm danh trước khi tính buổi.');
+  }, [
+    alreadyAttendedToday,
+    isPendingConfirm,
+    isCompleted,
+    attForm.note,
+    attForm.grade,
+    defaultAttendanceNote,
+    toast,
+  ]);
+
+  const cancelPendingAttendance = useCallback(() => {
+    setPendingAttendance(null);
+    pendingCommitRef.current = false;
+    toast.success('Đã hủy điểm danh — buổi chưa được tính.');
+  }, [toast]);
 
   const makeupSummary = useMemo(
     () => getMakeupSessionSummary({ student, schedule: attendanceGate?.schedule }),
@@ -297,6 +371,32 @@ export const StudentCard = ({
   const openMakeupModal = useCallback(() => {
     setShowMakeupModal(true);
   }, []);
+
+  const openAttendanceModal = useCallback(() => {
+    if (isOverdueMakeup) {
+      openMakeupModal();
+      return;
+    }
+    if (alreadyAttendedToday || isPendingConfirm || isCompleted) return;
+    if (!canCheckIn) return;
+    const tGrade = (student.grades || []).find((g) => g.date === todayStr);
+    setAttForm({
+      note: tGrade?.note || defaultAttendanceNote,
+      grade: tGrade?.grade ?? (student.lastGrade || 0),
+    });
+    setShowAttendanceModal(true);
+  }, [
+    isOverdueMakeup,
+    openMakeupModal,
+    alreadyAttendedToday,
+    isPendingConfirm,
+    isCompleted,
+    canCheckIn,
+    student.grades,
+    student.lastGrade,
+    todayStr,
+    defaultAttendanceNote,
+  ]);
 
   const sendMakeupRequestToAdmin = useCallback(async () => {
     setSendingMakeup(true);
@@ -336,17 +436,32 @@ export const StudentCard = ({
     }
   }, [attendanceGate?.schedule, currentUser, student, toast]);
 
-  // Hủy ca (chưa điểm danh) / Hủy điểm danh (= hủy ca đã hoàn thành) — không giới hạn 1 tiếng
-  const canCancelSession = showSessionActionRow;
-  const cancelIsUndoAttendance = alreadyAttendedToday;
-  const cancelButtonLabel = cancelIsUndoAttendance ? 'Hủy điểm danh' : 'Hủy ca';
+  // Pending 30s: hủy điểm danh (local). Đã commit: không hủy nữa. Chưa DD: hủy ca.
+  const canCancelSession = isPendingConfirm
+    || (
+      showSessionActionRow
+      && !alreadyAttendedToday
+      && !isPendingConfirm
+      && Boolean(attendanceGate?.schedule)
+    );
+  const cancelIsUndoAttendance = isPendingConfirm;
+  const cancelButtonLabel = cancelIsUndoAttendance
+    ? (confirmRemainSec > 0 ? `Hủy điểm danh (${confirmRemainSec}s)` : 'Hủy điểm danh')
+    : alreadyAttendedToday
+      ? 'Đã khóa'
+      : 'Hủy ca';
   const cancelButtonTitle = cancelIsUndoAttendance
-    ? 'Hủy điểm danh hôm nay (= hủy ca đã hoàn thành)'
-    : 'Hủy ca lịch học hôm nay';
+    ? `Hủy điểm danh trong ${confirmRemainSec}s — buổi chưa tính`
+    : alreadyAttendedToday
+      ? 'Đã điểm danh — không thể hủy sau khi hết thời gian chờ'
+      : 'Hủy ca lịch học hôm nay';
   const cancelButtonClassActive =
     'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-600/25 active:scale-[0.98] cursor-pointer';
   const cancelButtonClassDisabled =
     'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60';
+
+  const leftAttendanceLocked = alreadyAttendedToday || isPendingConfirm;
+  const leftAttendanceDisabled = isCompleted || leftAttendanceLocked || (!isOverdueMakeup && !canCheckIn);
 
   const fetchStudentAssignments = useCallback(async () => {
     setLoadingAssign(true);
@@ -415,13 +530,17 @@ export const StudentCard = ({
       const key = String(e._id || e.id || `${e.type}_${e.createdAt}_${e.content || ''}`);
       if (!evalMap.has(key)) evalMap.set(key, e);
     });
+    const studentSchedules = (allSchedules || []).filter(
+      (sch) => String(sch.studentId?._id || sch.studentId || '') === sid
+    );
     return buildStudentActivityLogs({
       student,
       assignments: courseAssignments,
       quizzes: studentQuizzes,
       evaluations: [...evalMap.values()],
+      schedules: studentSchedules,
     });
-  }, [student, courseAssignments, studentQuizzes, studentEvals, privateEvaluations]);
+  }, [student, courseAssignments, studentQuizzes, studentEvals, privateEvaluations, allSchedules]);
 
   /** Realtime: học viên nộp bài → cập nhật trạng thái ngay */
   useEffect(() => {
@@ -545,32 +664,18 @@ export const StudentCard = ({
   const handleCancelSession = async () => {
     if (!canCancelSession) return;
 
+    // Trong cửa sổ 30s: hủy pending local — chưa cộng buổi
+    if (isPendingConfirm) {
+      cancelPendingAttendance();
+      return;
+    }
+
     const sid = student._id || student.id;
     const schedule = attendanceGate?.schedule;
     const scheduleId = schedule?._id || schedule?.id;
 
-    if (cancelIsUndoAttendance) {
-      showModal({
-        title: 'Hủy điểm danh',
-        content: `Xác nhận hủy điểm danh hôm nay của "${student.name || sid}"?\nBuổi học sẽ bị hủy (giảm 1 buổi đã học).`,
-        type: 'warning',
-        confirmText: 'XÁC NHẬN HỦY',
-        cancelText: 'Đóng',
-        onConfirm: async () => {
-          try {
-            const res = await api.students.resetTodayAttendance(sid);
-            if (res.success) {
-              window.location.reload();
-            } else {
-              showModal({ title: 'Lỗi', content: res.message || 'Lỗi khi hủy điểm danh', type: 'error', confirmText: 'Đóng' });
-            }
-          } catch (e) {
-            showModal({ title: 'Lỗi', content: 'Lỗi kết nối server', type: 'error', confirmText: 'Đóng' });
-          }
-        },
-      });
-      return;
-    }
+    // Đã commit điểm danh → không cho hủy điểm danh nữa (chỉ hủy ca khi chưa DD)
+    if (alreadyAttendedToday) return;
 
     if (!scheduleId) {
       toast.error('Không tìm thấy lịch để hủy.');
@@ -585,21 +690,21 @@ export const StudentCard = ({
       cancelText: 'Đóng',
       onConfirm: async () => {
         try {
-          const res = await api.schedules.cancel(scheduleId, 'GV hủy ca từ trang học viên');
+          const reason = 'GV hủy ca từ trang học viên';
+          const res = await api.schedules.cancel(scheduleId, reason);
           if (res?.success === false) {
             showModal({ title: 'Lỗi', content: res.message || 'Không hủy được ca', type: 'error', confirmText: 'Đóng' });
             return;
           }
-          const applyLocal = onCancelSchedule || ctxCancelSchedule;
-          if (typeof applyLocal === 'function') {
-            try {
-              await applyLocal(scheduleId, 'GV hủy ca từ trang học viên');
-            } catch {
-              /* local sync optional — server đã hủy */
-            }
-          }
+          // Realtime: cập nhật SWR schedules — không reload, không gọi API lần 2
+          setSchedulesLocal((prev) => (prev || []).map((sch) => {
+            if (String(sch._id || sch.id) !== String(scheduleId)) return sch;
+            return { ...sch, status: 'cancelled', note: reason };
+          }));
           toast.success('Đã hủy ca.');
-          window.location.reload();
+          if (typeof triggerBackgroundSync === 'function') {
+            Promise.resolve(triggerBackgroundSync()).catch(() => {});
+          }
         } catch (e) {
           showModal({ title: 'Lỗi', content: e?.message || 'Lỗi kết nối server', type: 'error', confirmText: 'Đóng' });
         }
@@ -776,30 +881,19 @@ export const StudentCard = ({
                  {/* Actions: Điểm danh | Hủy ca / Hủy điểm danh — ẩn khi không còn lịch */}
                  {showSessionActionRow ? (
                  <div className="grid grid-cols-2 gap-2 mt-4 sm:gap-4 min-w-0">
-                   {attendanceGate?.status === 'not_yet' && !alreadyAttendedToday ? (
+                   {attendanceGate?.status === 'not_yet' && !alreadyAttendedToday && !isPendingConfirm ? (
                      <div className="flex items-center justify-center min-h-10 sm:min-h-[3.25rem] px-2 py-2 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide text-center leading-tight border border-dashed border-slate-300 rounded-xl bg-slate-50">
                         Chưa đến giờ dạy
                      </div>
                    ) : (
                      <button 
                        type="button"
-                       onClick={() => {
-                         if (isOverdueMakeup) {
-                           openMakeupModal();
-                           return;
-                         }
-                         if (!canCheckIn && !isCompleted) return;
-                         const tGrade = (student.grades || []).find(g => g.date === todayStr);
-                         setAttForm({
-                           note: tGrade?.note || defaultAttendanceNote,
-                           grade: tGrade?.grade ?? (student.lastGrade || 0),
-                         });
-                         setShowAttendanceModal(true);
-                       }} 
-                       disabled={isCompleted || (!isOverdueMakeup && !canCheckIn)}
+                       onClick={openAttendanceModal} 
+                       disabled={leftAttendanceDisabled}
                        title={
                          isCompleted ? 'Khóa học đã hoàn thành' :
                          isOverdueMakeup ? 'Quá hạn điểm danh — gửi yêu cầu điểm danh bù tới Admin' :
+                         isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
                          alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                          'Bấm để điểm danh buổi học hôm nay'
                        }
@@ -808,8 +902,8 @@ export const StudentCard = ({
                            ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
                          : isOverdueMakeup
                            ? 'bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] shadow-sm'
-                         : alreadyAttendedToday
-                           ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                         : leftAttendanceLocked
+                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
                        }`}
                      >
@@ -819,9 +913,11 @@ export const StudentCard = ({
                            ? 'Hoàn thành'
                            : isOverdueMakeup
                              ? 'Điểm danh bù'
-                             : alreadyAttendedToday
-                               ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
-                               : 'Điểm danh'}
+                             : isPendingConfirm
+                               ? 'Đang xác nhận'
+                               : alreadyAttendedToday
+                                 ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
+                                 : 'Điểm danh'}
                        </span>
                      </button>
                    )}
@@ -1183,7 +1279,7 @@ export const StudentCard = ({
                         Nhật ký Hoạt động &amp; Lịch sử Học viên
                       </h3>
                       <p className="text-[11px] text-slate-400 font-medium leading-snug">
-                        Điểm danh, bài nộp, cập nhật điểm, trắc nghiệm và đánh giá
+                        Điểm danh, hủy điểm danh / hủy ca, bài nộp, cập nhật điểm, trắc nghiệm và đánh giá
                       </p>
                     </div>
                   </div>
@@ -1205,7 +1301,8 @@ export const StudentCard = ({
                           : log.type === 'homework' ? Clipboard
                             : log.type === 'grade_update' ? Edit3
                               : log.type === 'evaluation' ? Star
-                                : CheckCircle;
+                                : log.type === 'attendance_cancel' || log.type === 'schedule_cancel' ? X
+                                  : CheckCircle;
                       return (
                         <div
                           key={log.id}
@@ -1263,7 +1360,7 @@ export const StudentCard = ({
                       </div>
                       <p className="font-bold text-slate-600">Chưa có nhật ký hoạt động nào</p>
                       <p className="text-[11px] text-slate-400">
-                        Điểm danh, nộp bài, chấm điểm, thi trắc nghiệm và đánh giá sẽ hiện tại đây.
+                        Điểm danh, hủy điểm danh (buổi mấy), hủy ca, nộp bài, chấm điểm, thi trắc nghiệm và đánh giá sẽ hiện tại đây.
                       </p>
                     </div>
                   )}
@@ -1398,10 +1495,7 @@ export const StudentCard = ({
                   </button>
                   <button 
                     type="button"
-                    onClick={() => {
-                      onAttendance((student._id || student.id), attForm.note, Number(attForm.grade));
-                      setShowAttendanceModal(false);
-                    }}
+                    onClick={beginAttendanceConfirm}
                     className="flex-[2] min-h-11 py-3 sm:py-4 px-2 text-white font-black text-xs uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg shadow-green-100 hover:shadow-green-200 transition-all active:scale-95 text-center leading-tight"
                   >
                     Xác nhận Điểm danh
@@ -1505,28 +1599,17 @@ export const StudentCard = ({
             {/* === 2-COLUMN LAYOUT: Điểm danh | Hủy ca / Hủy điểm danh === */}
             {showSessionActionRow ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {attendanceGate?.status === 'not_yet' && !alreadyAttendedToday ? (
+              {attendanceGate?.status === 'not_yet' && !alreadyAttendedToday && !isPendingConfirm ? (
                 <div className="flex items-center justify-center py-4 text-xs font-black text-slate-600 uppercase tracking-widest border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50">
                   Chưa đến giờ
                 </div>
               ) : (
-                <button onClick={() => {
-                    if (isOverdueMakeup) {
-                      openMakeupModal();
-                      return;
-                    }
-                    if (!canCheckIn && !isCompleted) return;
-                    const tGrade = (student.grades || []).find(g => g.date === todayStr);
-                    setAttForm({
-                      note: tGrade?.note || defaultAttendanceNote,
-                      grade: tGrade?.grade ?? (student.lastGrade || 0),
-                    });
-                    setShowAttendanceModal(true);
-                  }} 
-                  disabled={isCompleted || (!isOverdueMakeup && !canCheckIn)}
+                <button onClick={openAttendanceModal} 
+                  disabled={leftAttendanceDisabled}
                   title={
                     isCompleted ? 'Hoàn thành' :
                     isOverdueMakeup ? 'Quá hạn — gửi yêu cầu điểm danh bù tới Admin' :
+                    isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
                     alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                     'Bấm để điểm danh'
                   }
@@ -1535,8 +1618,8 @@ export const StudentCard = ({
                       ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-2 border-gray-300'
                     : isOverdueMakeup
                       ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:shadow-amber-200 shadow-amber-100 active:scale-[0.97] border-2 border-transparent'
-                    : alreadyAttendedToday
-                      ? 'bg-slate-50 text-slate-600 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200'
+                    : leftAttendanceLocked
+                      ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
                       : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
                   }`}>
                   <CheckCircle size={18} />
@@ -1545,9 +1628,11 @@ export const StudentCard = ({
                       ? 'HOÀN THÀNH'
                       : isOverdueMakeup
                         ? <>ĐIỂM DANH<br/>BÙ</>
-                        : alreadyAttendedToday
-                          ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
-                          : 'ĐIỂM DANH'}
+                        : isPendingConfirm
+                          ? <>ĐANG<br/>XÁC NHẬN</>
+                          : alreadyAttendedToday
+                            ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
+                            : 'ĐIỂM DANH'}
                   </span>
                 </button>
               )}
@@ -1564,7 +1649,9 @@ export const StudentCard = ({
               >
                 <X size={18} />
                 <span className="text-xs text-center leading-tight">
-                  {cancelIsUndoAttendance ? <>HỦY<br/>ĐIỂM DANH</> : <>HỦY CA</>}
+                  {cancelIsUndoAttendance
+                    ? <>HỦY ĐIỂM DANH{confirmRemainSec > 0 ? <><br/>{confirmRemainSec}s</> : null}</>
+                    : <>HỦY CA</>}
                 </span>
               </button>
             </div>
@@ -1722,19 +1809,19 @@ export const StudentCard = ({
 
             <div className="bg-slate-50 px-8 py-6 flex gap-4 flex-shrink-0">
               <button 
-                onClick={closeModal}
+                type="button"
+                onClick={() => setShowAttendanceModal(false)}
                 className="flex-[1] py-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition"
-                disabled={submitting}
               >
                 Hủy bỏ
               </button>
               <button 
-                onClick={handleSubmit}
-                disabled={submitting || (attForm._originalData?.status === 'completed' && !activeTab)}
-                className="flex-[2] py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                type="button"
+                onClick={beginAttendanceConfirm}
+                className="flex-[2] py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
               >
-                {submitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                {attForm._originalData?.status === 'completed' ? 'Cập nhật' : 'Xác nhận Điểm danh'}
+                <CheckCircle size={18} />
+                Xác nhận Điểm danh
               </button>
             </div>
           </div>

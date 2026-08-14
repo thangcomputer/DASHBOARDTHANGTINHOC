@@ -181,6 +181,18 @@ const StudentSchema = new mongoose.Schema(
       grade: Number,
       assignmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assignment' },
     }],
+    /** Nhật ký điểm danh / hủy điểm danh / hủy ca — không tính buổi học */
+    activityLog: [{
+      type: { type: String, default: 'attendance' },
+      date: { type: String, default: '' },
+      note: { type: String, default: '' },
+      sessionNumber: { type: Number },
+      at: { type: Date, default: Date.now },
+      byId: { type: String, default: '' },
+      byName: { type: String, default: '' },
+      scheduleId: { type: String },
+      course: { type: String },
+    }],
     completedSessions: {
       type: Number,
       default: 0,

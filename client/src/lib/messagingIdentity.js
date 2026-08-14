@@ -175,12 +175,19 @@ export function isSpecialMessagingPeerId(id) {
 }
 
 /**
- * True when peer still exists in live directories (Student / Teacher / Staff).
- * Used to hide ghost DMs after account delete.
+ * True when peer is still a valid messaging counterpart.
+ * Prefer server `contacts` (GET /api/messages/contacts) — local students/teachers/staffs
+ * are incomplete for teacher/student and often empty for admin/staff until HV page loads.
  */
-export function isAliveMessagingPeer(peerId, { students = [], teachers = [], staffs = [] } = {}) {
+export function isAliveMessagingPeer(peerId, {
+  students = [],
+  teachers = [],
+  staffs = [],
+  contacts = [],
+} = {}) {
   const id = String(peerId || '');
   if (isSpecialMessagingPeerId(id)) return true;
+  if ((contacts || []).some((c) => String(c?.id) === id)) return true;
   if (students.some((s) => String(s?.id || s?._id) === id)) return true;
   if (teachers.some((t) => String(t?.id || t?._id) === id)) return true;
   if (staffs.some((st) => String(st?.id || st?._id) === id)) return true;

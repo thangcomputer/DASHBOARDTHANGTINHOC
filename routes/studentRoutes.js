@@ -27,6 +27,7 @@ const {
 } = require('../services/enrollmentService');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const { generateTempPassword } = require('../utils/tempPassword');
+const { extractSessionNumber, buildActivityEntry } = require('../utils/studentActivityLog');
 const {
   generateStudentCode,
   isCanonical,
@@ -2828,15 +2829,57 @@ router.post('/:id/reset-today-attendance', [
     const todayVN = new Date().toLocaleDateString('vi-VN');
     const scrubToday = (grades) => (grades || []).filter((g) => g && g.date !== todayVN);
     const oldGrades = student.grades || [];
-    const hadRootToday = oldGrades.some((g) => g.date === todayVN);
-    const hadEnrToday = Array.isArray(student.enrollments)
-      && student.enrollments.some((e) => (e.grades || []).some((g) => g && g.date === todayVN));
+    const todayRootGrade = oldGrades.find((g) => g && g.date === todayVN);
+    let todayEnrGrade = null;
+    if (Array.isArray(student.enrollments)) {
+      for (const e of student.enrollments) {
+        const hit = (e.grades || []).find((g) => g && g.date === todayVN);
+        if (hit) {
+          todayEnrGrade = hit;
+          break;
+        }
+      }
+    }
+    const removedGrade = todayRootGrade || todayEnrGrade;
+    const hadRootToday = Boolean(todayRootGrade);
+    const hadEnrToday = Boolean(todayEnrGrade);
 
     if (!hadRootToday && !hadEnrToday) {
       return res.json({ success: true, message: 'Học viên chưa được điểm danh hôm nay.' });
     }
 
     const todayISO = new Date().toISOString().split('T')[0];
+    const sessionNumber = extractSessionNumber(
+      removedGrade?.note,
+      Number(student.completedSessions) || undefined,
+    );
+    const cancelNote = sessionNumber
+      ? `Hủy điểm danh buổi ${sessionNumber} (${todayVN})`
+      : `Hủy điểm danh ngày ${todayVN}`;
+    const activityEntries = [];
+    // Giữ lại dấu vết buổi đã điểm danh (grades bị xóa) để tab Nhật ký vẫn thấy "Buổi X"
+    if (removedGrade) {
+      const attNote = removedGrade.note
+        || (sessionNumber
+          ? `Buổi ${sessionNumber}: Đã điểm danh hoàn thành buổi học`
+          : `Đã điểm danh ngày ${todayVN}`);
+      activityEntries.push(buildActivityEntry({
+        type: 'attendance',
+        date: todayVN,
+        note: attNote,
+        sessionNumber,
+        actor: req.user,
+        course: student.course || '',
+      }));
+    }
+    activityEntries.push(buildActivityEntry({
+      type: 'attendance_cancel',
+      date: todayVN,
+      note: cancelNote,
+      sessionNumber,
+      actor: req.user,
+      course: student.course || '',
+    }));
 
     // Xóa record hôm nay khỏi grades (root + từng enrollment — FE đọc grades enrollment)
     const newGrades = scrubToday(oldGrades);
@@ -2871,7 +2914,10 @@ router.post('/:id/reset-today-attendance', [
       }
     }
 
-    await Student.findByIdAndUpdate(req.params.id, patch);
+    await Student.findByIdAndUpdate(req.params.id, {
+      $set: patch,
+      $push: { activityLog: { $each: activityEntries, $slice: -100 } },
+    });
 
     // Xóa schedule hôm nay nếu có (hủy điểm danh = hủy ca đã hoàn thành)
     await Schedule.deleteMany({

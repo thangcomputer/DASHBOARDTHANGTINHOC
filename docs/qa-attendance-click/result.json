@@ -1,0 +1,60 @@
+{
+  "ok": true,
+  "steps": [
+    {
+      "step": "login",
+      "ok": true,
+      "url": "http://localhost:5173/teacher"
+    },
+    {
+      "step": "students_tab",
+      "ok": true,
+      "url": "http://localhost:5173/teacher#students",
+      "hash": "#students"
+    },
+    {
+      "step": "thang333_labels",
+      "ok": true,
+      "hasHuyDiemDanh": true,
+      "hasDaDiemDanh": true,
+      "snippet": "Bỏ qua đến nội dung chính Đổi ảnh GV THẮNG GIẢNG VIÊN Tổng quan Bảng tin Tin tức Tạo trắc nghiệm & bài tập Quản lý học viên Lịch dạy Tài chính Đào tạo Hộp thư Trợ giúp Hồ sơ Đăng xuất Tắt âm thanh Học viên GV THẮNG·teacher 9+ Đăng xuất LAN KHUÊ KHÓA HỌC TEST Chưa online THẮNG333 KHÓA HỌC TEST Chưa online THẮNG333 khóa học test · 33 tuổi ĐANG HỌC ONLINE TIẾN ĐỘ KHÓA HỌC 1/12 BUỔI (8%) Tiến độ Bài tập Trắc nghiệm Link học Đánh giá Nhật ký ĐÃ HỌC 1 BUỔI CÒN LẠI 11 BUỔI ĐIỂM TB 0 /10 ĐÁNH GIÁ CHUNG "
+    },
+    {
+      "step": "thang333_click_huy_diem_danh",
+      "ok": true,
+      "modalVisible": 1,
+      "confirmCount": 1
+    },
+    {
+      "step": "lankhue_labels",
+      "ok": true,
+      "hasMakeup": true,
+      "hasHuyCa": true,
+      "snippet": "Bỏ qua đến nội dung chính Đổi ảnh GV THẮNG GIẢNG VIÊN Tổng quan Bảng tin Tin tức Tạo trắc nghiệm & bài tập Quản lý học viên Lịch dạy Tài chính Đào tạo Hộp thư Trợ giúp Hồ sơ Đăng xuất Tắt âm thanh Học viên GV THẮNG·teacher 9+ Đăng xuất LAN KHUÊ KHÓA HỌC TEST Chưa online THẮNG333 KHÓA HỌC TEST Chưa online LAN KHUÊ khóa học test · 33 tuổi ĐANG HỌC OFFLINE TIẾN ĐỘ KHÓA HỌC 2/12 BUỔI (17%) Tiến độ Bài tập Trắc nghiệm Link học Đánh giá Nhật ký ĐÃ HỌC 2 BUỔI CÒN LẠI 10 BUỔI ĐIỂM TB 0 /10 ĐÁNH GIÁ CHUN"
+    },
+    {
+      "step": "lankhue_click_diem_danh_bu",
+      "ok": true,
+      "makeupClicked": true,
+      "makeupModal": 1,
+      "hasGui": 1
+    },
+    {
+      "step": "lankhue_click_huy_ca",
+      "ok": true,
+      "confirmCa": 1
+    }
+  ],
+  "consoleErrors": [],
+  "shots": [
+    "01-login-ok.png",
+    "02-students.png",
+    "03-thang333.png",
+    "04-thang333-modal.png",
+    "05-lankhue.png",
+    "06-lankhue-makeup-modal.png",
+    "07-lankhue-huyca-modal.png",
+    "99-error.png",
+    "result.json"
+  ]
+}

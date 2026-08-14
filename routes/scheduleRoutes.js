@@ -10,6 +10,7 @@ const { studentMatchesTeacher } = require('../services/enrollmentService');
 const { emitScheduleEvent, emitDataRefresh } = require('../utils/realtimeEmit');
 const { policyShadowSchedule } = require('../middleware/policyShadowSchedule');
 const { schedulesCutoverGate } = require('../middleware/schedulesCutoverGate');
+const { buildActivityEntry } = require('../utils/studentActivityLog');
 
 /** Phase 7.21: policyShadowSchedule → schedulesCutoverGate */
 function schedulesGuard(action) {
@@ -1158,6 +1159,35 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       schedule.note = reason.trim();
     }
     await schedule.save();
+
+    // Nhật ký HV: hủy ca (để tab Nhật ký GV hiện được)
+    if (schedule.studentId) {
+      try {
+        const d = new Date(schedule.date).toLocaleDateString('vi-VN');
+        const timeRange = [schedule.startTime, schedule.endTime].filter(Boolean).join('–');
+        const reasonBit = (typeof reason === 'string' && reason.trim()) ? ` — ${reason.trim()}` : '';
+        const cancelCaNote = timeRange
+          ? `Hủy ca ngày ${d} · ${timeRange}${reasonBit}`
+          : `Hủy ca ngày ${d}${reasonBit}`;
+        await Student.findByIdAndUpdate(schedule.studentId, {
+          $push: {
+            activityLog: {
+              $each: [buildActivityEntry({
+                type: 'schedule_cancel',
+                date: d,
+                note: cancelCaNote,
+                actor: req.user,
+                scheduleId: schedule._id,
+                course: schedule.course || '',
+              })],
+              $slice: -100,
+            },
+          },
+        });
+      } catch (e) {
+        logger.warn('[SCHEDULE] activityLog cancel append failed:', e?.message || e);
+      }
+    }
 
     const actor = req.user || {};
     await ScheduleHistory.create({

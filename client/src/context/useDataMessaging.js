@@ -4,7 +4,7 @@ import { buildConversationId } from '../utils/chatConversationId';
 import { useSocket } from './SocketContext';
 import { loadState } from './dataStorage';
 import { getMessagingRole } from '../lib/messagingRoles';
-import { resolveMessagingActor, normalizeMessage, isAliveMessagingPeer } from '../lib/messagingIdentity';
+import { resolveMessagingActor, normalizeMessage } from '../lib/messagingIdentity';
 import { sortConversationsByLastMessageAt } from '../lib/conversationList';
 
 /**
@@ -447,15 +447,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         // Bỏ qua hội thoại tự chat với chính mình
         if (String(otherUserId) === String(sId)) return;
 
-        // Ẩn DM với tài khoản đã xóa (chỉ khi danh bạ local đã load)
-        const hasDirectoryData = safeStudents.length + safeTeachers.length + safeStaffs.length > 0;
-        if (hasDirectoryData && !isAliveMessagingPeer(otherUserId, {
-          students: safeStudents,
-          teachers: safeTeachers,
-          staffs: safeStaffs,
-        })) {
-          return;
-        }
+        // Không ẩn DM theo students/teachers/staffs local — directory thiếu theo role
+        // (Admin students=[] đến khi mở tab HV; GV teachers=[self]). Ghost cleanup: purge orphans + Inbox contacts.
 
         // Phase 8.21: resolve by participant ID. NEVER map otherRole==="admin" → SUPER profile.
         const peerHintName = isMeSender ? m.receiverName : m.senderName;

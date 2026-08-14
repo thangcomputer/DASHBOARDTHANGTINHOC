@@ -1,5 +1,5 @@
 /**
- * Gộp nhật ký hoạt động học viên từ nhiều nguồn (điểm danh, BT, TN, đánh giá).
+ * Gộp nhật ký hoạt động học viên từ nhiều nguồn (điểm danh, hủy DD/hủy ca, BT, TN, đánh giá).
  */
 
 function parseDateToMs(dStr) {
@@ -43,11 +43,20 @@ function normCourse(s) {
 
 function classifyGradeNote(note) {
   const noteLower = String(note || '').toLowerCase();
+  if (noteLower.includes('hủy điểm danh')) return 'attendance_cancel';
+  if (noteLower.includes('hủy ca')) return 'schedule_cancel';
   if (noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm')) return 'grade_update';
   if (noteLower.includes('bài nộp')) return 'homework';
   if (noteLower.includes('trắc nghiệm')) return 'quiz';
   if (noteLower.includes('đánh giá')) return 'evaluation';
   return 'attendance';
+}
+
+function normalizeAttendanceNote(note, sessionNumber) {
+  const raw = String(note || '').trim();
+  if (/buổi\s*\d+/i.test(raw)) return raw || 'Đã điểm danh hoàn thành buổi học';
+  if (sessionNumber) return `Buổi ${sessionNumber}: ${raw || 'Đã điểm danh hoàn thành buổi học'}`;
+  return raw || 'Đã điểm danh hoàn thành buổi học';
 }
 
 /**
@@ -58,34 +67,109 @@ export function buildStudentActivityLogs({
   assignments = [],
   quizzes = [],
   evaluations = [],
+  schedules = [],
 } = {}) {
   const logs = [];
   const seen = new Set();
+  /** Tránh trùng hủy ca: activityLog + Schedule.status=cancelled */
+  const seenScheduleCancels = new Set();
   const sid = String(student?.id || student?._id || '');
   const course = normCourse(student?.course);
 
+  const cancelFingerprint = ({ scheduleId, date, note, startTime, endTime }) => {
+    if (scheduleId) return `sid:${String(scheduleId)}`;
+    const d = formatDateVi(date);
+    const range = [startTime, endTime].filter(Boolean).join('–')
+      || (String(note || '').match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/) || []).slice(1, 3).join('–');
+    return `d:${d}|t:${range || String(note || '').slice(0, 80)}`;
+  };
+
   const push = (entry) => {
     if (!entry?.id || seen.has(entry.id)) return;
+    if (entry.type === 'schedule_cancel') {
+      const fp = cancelFingerprint({
+        scheduleId: entry.meta?.scheduleId,
+        date: entry.date,
+        note: entry.note,
+      });
+      if (seenScheduleCancels.has(fp)) return;
+      seenScheduleCancels.add(fp);
+    }
     seen.add(entry.id);
     logs.push(entry);
   };
+
+  // 0) activityLog server (hủy điểm danh / hủy ca / bổ sung)
+  (student?.activityLog || []).forEach((ev, idx) => {
+    if (!ev) return;
+    if (course && ev.course && normCourse(ev.course) !== course) return;
+    const type = ev.type || classifyGradeNote(ev.note);
+    const at = ev.at || ev.date;
+    const sessionNumber = ev.sessionNumber;
+    let note = ev.note || '';
+    if (type === 'attendance') note = normalizeAttendanceNote(note, sessionNumber);
+    else if (type === 'attendance_cancel' && sessionNumber && !/buổi\s*\d+/i.test(note)) {
+      note = `Hủy điểm danh buổi ${sessionNumber}${note ? ` — ${note}` : ''}`;
+    }
+    push({
+      id: `alog_${ev._id || ''}_${type}_${parseDateToMs(at)}_${idx}`,
+      type,
+      date: formatDateVi(ev.date || at),
+      time: formatTimeVi(at),
+      note,
+      grade: null,
+      timestamp: parseDateToMs(at) || Date.now() - idx * 1000,
+      meta: { sessionNumber, scheduleId: ev.scheduleId },
+    });
+  });
 
   // 1) Điểm danh / ghi chú đã sync vào grades (kể cả BT đã chấm)
   (student?.grades || []).forEach((g, idx) => {
     const type = classifyGradeNote(g.note);
     const ts = parseDateToMs(g.date) || Date.now() - idx * 1000;
+    const sessionMatch = /buổi\s*(\d+)/i.exec(String(g.note || ''));
+    const sessionNumber = sessionMatch ? Number(sessionMatch[1]) : null;
     push({
       id: `grade_${g.assignmentId || ''}_${g.date || ''}_${idx}_${(g.note || '').slice(0, 40)}`,
       type,
       date: formatDateVi(g.date),
       time: g.time || '',
-      note: g.note || 'Đã điểm danh hoàn thành buổi học',
+      note: type === 'attendance'
+        ? normalizeAttendanceNote(g.note, sessionNumber)
+        : (g.note || 'Đã điểm danh hoàn thành buổi học'),
       grade: g.grade != null && g.grade !== '' ? Number(g.grade) : null,
       timestamp: ts,
+      meta: { sessionNumber },
     });
   });
 
-  // 2) Bài tập — nộp + lịch sử chấm (bổ sung nếu chưa có trong grades)
+  // 1b) Lịch đã hủy (Schedule) — chỉ bổ sung nếu chưa có trong activityLog
+  (schedules || []).forEach((sch, idx) => {
+    if (!sch || String(sch.status || '').toLowerCase() !== 'cancelled') return;
+    const schSid = String(sch.studentId?._id || sch.studentId || '');
+    if (schSid && schSid !== sid) return;
+    if (course && sch.course && normCourse(sch.course) !== course) return;
+    const schId = String(sch._id || sch.id || '');
+    const at = sch.updatedAt || sch.cancelledAt || sch.date;
+    const d = formatDateVi(sch.date);
+    const timeRange = [sch.startTime, sch.endTime].filter(Boolean).join('–');
+    const reasonBit = sch.note ? ` — ${sch.note}` : '';
+    const note = timeRange
+      ? `Hủy ca ngày ${d} · ${timeRange}${reasonBit}`
+      : `Hủy ca ngày ${d}${reasonBit}`;
+    push({
+      id: `sched_cancel_${schId || idx}`,
+      type: 'schedule_cancel',
+      date: d,
+      time: formatTimeVi(at),
+      note,
+      grade: null,
+      timestamp: parseDateToMs(at) || parseDateToMs(sch.date) || Date.now() - idx * 1000,
+      meta: { scheduleId: schId },
+    });
+  });
+
+  // 2) Bài tập
   (assignments || []).forEach((assign) => {
     const sub = assign.mySubmission
       || (assign.submissions || []).find((s) => String(s.studentId?._id || s.studentId) === sid)
@@ -174,12 +258,9 @@ export function buildStudentActivityLogs({
     });
   });
 
-  // 4) Đánh giá (HV đánh giá GV / milestone)
+  // 4) Đánh giá
   (evaluations || []).forEach((ev, eIdx) => {
     if (String(ev.studentId?._id || ev.studentId || '') !== sid) return;
-    if (course && ev.courseName && normCourse(ev.courseName) !== course) {
-      // vẫn hiển thị nếu cùng HV (đánh giá có thể không gắn course)
-    }
     const at = ev.updatedAt || ev.createdAt || ev.date;
     const kind = ev.type === 'teacher_rating' ? 'HV đánh giá GV' : (ev.milestone ? `Cột mốc: ${ev.milestone}` : 'Đánh giá');
     const score = ev.criteria && typeof ev.criteria === 'object'
@@ -208,6 +289,16 @@ export const ACTIVITY_LOG_META = {
     label: 'Điểm danh',
     badge: 'bg-blue-100 text-blue-800 border-blue-200',
     iconWrap: 'bg-blue-100 text-blue-700',
+  },
+  attendance_cancel: {
+    label: 'Hủy điểm danh',
+    badge: 'bg-rose-100 text-rose-800 border-rose-200',
+    iconWrap: 'bg-rose-100 text-rose-700',
+  },
+  schedule_cancel: {
+    label: 'Hủy ca',
+    badge: 'bg-slate-200 text-slate-800 border-slate-300',
+    iconWrap: 'bg-slate-200 text-slate-700',
   },
   homework: {
     label: 'Bài nộp',

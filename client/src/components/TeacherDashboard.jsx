@@ -40,7 +40,7 @@ const TeacherDashboard = ({ onNavigate }) => {
     getStudentsByTeacher, getTeacherStats,
     markAttendance: ctxMarkAttendance,
     updateStudentLink,
-    notifications, getNotifications,
+    getConversations,
     getSchedulesByTeacher, getTeacherRating, RATING_CRITERIA, getTransactionsByTeacher,
     addSchedule, updateSchedule, cancelSchedule,
     revokeStudentExam, updateStudent, updateTeacher, failStudentExam
@@ -391,7 +391,15 @@ const TeacherDashboard = ({ onNavigate }) => {
   }, [myTransactions]);
 
   const totalMonthlyIncome = monthlyTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-  const myNotifs = getNotifications(TEACHER_ID, 'teacher').filter(n => !n.read).length;
+  // Thẻ "Tin nhắn" → inbox: đếm tin chưa đọc (khớp badge Hộp thư), không dùng thông báo chuông
+  const myNotifs = useMemo(() => {
+    if (!TEACHER_ID || typeof getConversations !== 'function') return 0;
+    try {
+      return (getConversations(TEACHER_ID) || []).reduce((sum, c) => sum + (Number(c?.unread) || 0), 0);
+    } catch {
+      return 0;
+    }
+  }, [TEACHER_ID, getConversations]);
 
   if (!TEACHER_ID) {
     return (
