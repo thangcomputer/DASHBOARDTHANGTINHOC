@@ -101,6 +101,12 @@ const PERMISSIONS = Object.freeze({
    */
   STUDENT_TRAINING_MANAGE: 'student_training:manage',
 
+  /**
+   * LIVE manage_cert_prep — CertPrep MOS/IC3 module.
+   * Distinct from exam:manage and student_training:manage.
+   */
+  CERT_PREP_MANAGE: 'cert_prep:manage',
+
   // Chat & Support capabilities
   MESSAGE_VIEW: 'message:view',
   MESSAGE_CREATE: 'message:create',

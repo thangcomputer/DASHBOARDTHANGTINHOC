@@ -121,7 +121,7 @@ export async function csrfFetch(url, options = {}) {
 }
 
 /** POST FormData (upload) với CSRF + Bearer */
-async function uploadWithAuth(path, formData, roleHint = null) {
+export async function uploadWithAuth(path, formData, roleHint = null) {
   const token = roleHint ? getAccessToken(roleHint) : getAccessToken();
   const csrf = await ensureCsrfToken();
   const res = await fetchWithNetworkRetry(`${API_BASE}${path}`, {

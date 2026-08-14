@@ -24,6 +24,7 @@ const MAPPING_STATUS = Object.freeze({
   manage_students: 'PARTIAL',
   manage_training: 'PARTIAL',
   manage_student_training: 'MATCH',
+  manage_cert_prep: 'MATCH',
   manage_finance: 'PARTIAL',
   manage_staff: 'PARTIAL',
   manage_blog: 'PARTIAL',
@@ -56,6 +57,8 @@ const legacyPermissionMapping = {
   manage_training: [PERMISSIONS.COURSE_UPDATE, PERMISSIONS.EXAM_MANAGE],
   /** DISTINCT from manage_training — dedicated student_training:manage (Phase 8.10) */
   manage_student_training: [PERMISSIONS.STUDENT_TRAINING_MANAGE],
+  /** DISTINCT from exam:manage and student_training:manage */
+  manage_cert_prep: [PERMISSIONS.CERT_PREP_MANAGE],
   manage_staff: [
     PERMISSIONS.USER_MANAGE,
     PERMISSIONS.STAFF_VIEW,
@@ -109,6 +112,7 @@ const legacyPermissionMapping = {
   MANAGE_BLOG: [PERMISSIONS.CMS_PUBLISH],
   MANAGE_TRAINING: [PERMISSIONS.COURSE_UPDATE, PERMISSIONS.EXAM_MANAGE],
   MANAGE_STUDENT_TRAINING: [PERMISSIONS.STUDENT_TRAINING_MANAGE],
+  MANAGE_CERT_PREP: [PERMISSIONS.CERT_PREP_MANAGE],
   MANAGE_STAFF: [
     PERMISSIONS.USER_MANAGE,
     PERMISSIONS.STAFF_VIEW,

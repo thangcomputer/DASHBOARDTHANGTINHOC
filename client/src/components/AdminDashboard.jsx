@@ -12,6 +12,7 @@ import {
   AdminLazyFinanceTab,
   AdminLazyLogsTab,
   AdminLazyStudentTrainingTab,
+  AdminLazyCertPrepTab,
 } from './admin/AdminLazyTabShell';
 import ConfirmDeleteTrainingModal from './admin/shared/ConfirmDeleteTrainingModal';
 import ConfirmDeleteEntityModal from './admin/shared/ConfirmDeleteEntityModal';
@@ -88,6 +89,7 @@ const AdminDashboard = () => {
           {activeTab === 'evaluations' && <AdminLazyEvaluationsTab />}
           {activeTab === 'finance' && <AdminLazyFinanceTab />}
           {activeTab === 'student-training' && <AdminLazyStudentTrainingTab />}
+          {activeTab === 'cert-prep' && <AdminLazyCertPrepTab />}
           {activeTab === 'logs' && <AdminLazyLogsTab />}
           {['settings', 'staff', 'analytics', 'hr'].includes(activeTab) && (
             <AdminLazyExternalTab tab={activeTab} />

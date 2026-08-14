@@ -10,6 +10,7 @@ export const PERMISSIONS = {
   MANAGE_MESSAGES:    'manage_messages',      // ⭐ Hộp thư & Tin nhắn hỗ trợ
   MANAGE_TRAINING:    'manage_training',      // Đào tạo GV: module đào tạo
   MANAGE_STUDENT_TRAINING: 'manage_student_training', // Đào tạo HV: module đào tạo học viên
+  MANAGE_CERT_PREP:   'manage_cert_prep',      // Ôn thi MOS/IC3 (CertPrep)
   MANAGE_STAFF:       'manage_staff',         // Phân quyền NV: chỉ Super Admin
   MANAGE_HR:          'manage_hr',            // ⭐ Nhân sự & Lương: quản lý hồ sơ + trả lương
   MANAGE_BLOG:        'manage_blog',          // Tin tức / Blog trung tâm: đăng bài
@@ -52,6 +53,7 @@ export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.VIEW_BRANCH_REVENUE, label: '📊 Xem Báo cáo doanh thu',  desc: 'Chỉ xem doanh thu chi nhánh (read-only)' },
   { key: PERMISSIONS.MANAGE_TRAINING,     label: 'Đào tạo GV',             desc: 'Module đào tạo giảng viên' },
   { key: PERMISSIONS.MANAGE_STUDENT_TRAINING, label: 'Đào tạo HV',         desc: 'Module đào tạo học viên' },
+  { key: PERMISSIONS.MANAGE_CERT_PREP,    label: 'Ôn thi MOS/IC3',         desc: 'Quản lý ngân hàng ôn thi chứng chỉ MOS/IC3' },
   { key: PERMISSIONS.MANAGE_HR,            label: '👤 Nhân sự & Lương',         desc: 'Quản lý hồ sơ nhân viên, trả lương hàng tháng' },
   { key: PERMISSIONS.MANAGE_BLOG,          label: '📰 Tin tức / Blog',           desc: 'Đăng, sửa, ẩn, xóa bài viết tin tức trung tâm' },
   { key: PERMISSIONS.SYSTEM_SETTINGS,     label: 'Cài đặt hệ thống',          desc: 'Cấu hình ngân hàng, chi nhánh, thông báo' },

@@ -28,6 +28,7 @@ const PAGE_TITLES = {
   finance: 'Tài chính',
   training: 'Đào tạo GV',
   'student-training': 'Đào tạo HV',
+  'cert-prep': 'Ôn thi MOS/IC3',
   staff: 'Phân quyền',
   hr: 'Nhân sự',
   analytics: 'Doanh thu',
@@ -55,6 +56,7 @@ function resolvePageTitle(role, pathname, hash) {
   if (pathname.includes('/builder')) return 'Form & Report';
   if (pathname.includes('/tenants')) return 'Multi-tenant';
   if (pathname.includes('/exam')) return 'Phòng thi';
+  if (pathname.includes('/cert-prep')) return 'Ôn thi MOS/IC3';
   if (pathname.includes('/test')) return 'Bài test';
   if (pathname.includes('/finance')) return 'Tài chính';
   if (role === 'admin') return 'Quản trị';

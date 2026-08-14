@@ -31,6 +31,10 @@ const TenantManagementPage = lazy(() => import('./components/TenantManagementPag
 const PublicPaymentPage = lazy(() => import('./components/PublicPaymentPage'));
 const FeedBoard = lazy(() => import('./components/FeedBoard'));
 const NewsPage = lazy(() => import('./components/NewsPage'));
+const CertPrepCatalogPage = lazy(() => import('./components/student/certPrep/CertPrepCatalogPage'));
+const CertPrepLevelPage = lazy(() => import('./components/student/certPrep/CertPrepLevelPage'));
+const CertPrepStudentPlayer = lazy(() => import('./components/student/certPrep/CertPrepStudentPlayer'));
+const CertPrepResult = lazy(() => import('./components/student/certPrep/CertPrepResult'));
 import DashboardLayout                       from './components/DashboardLayout';
 import StudentLearningAccessGate             from './components/student/StudentLearningAccessGate';
 import api, { clearTokens, getRolePrefix, NetworkOfflineError } from './services/api';
@@ -418,6 +422,21 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         <Route path="/student/news/:slug" element={
           <ErrorBoundary inline><NewsPage session={session} role="student" /></ErrorBoundary>
         } />
+        <Route path="/student/cert-prep" element={
+          <ErrorBoundary inline>
+            <CertPrepCatalogPage />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/cert-prep/levels/:levelId" element={
+          <ErrorBoundary inline>
+            <CertPrepLevelPage />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/cert-prep/result/:sessionId" element={
+          <ErrorBoundary inline>
+            <CertPrepResult />
+          </ErrorBoundary>
+        } />
       </Route>
 
       {/* ═══ Fullscreen Exam (không sidebar) ═══ */}
@@ -426,6 +445,14 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
           <StudentLearningAccessGate session={session} allowHashes={[]}>
             <StudentTestWrapper session={session} />
           </StudentLearningAccessGate>
+        </Guard>
+      } />
+
+      <Route path="/student/cert-prep/play/:sessionId" element={
+        <Guard allowedRoles={['student', 'admin']} session={session}>
+          <ErrorBoundary inline>
+            <CertPrepStudentPlayer />
+          </ErrorBoundary>
         </Guard>
       } />
 

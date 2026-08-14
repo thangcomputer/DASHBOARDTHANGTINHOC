@@ -35,6 +35,7 @@ const MENU_CONFIG = {
       { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',       path: '/student/feed' },
       { key: 'news',       icon: FileText,         label: 'Tin tức',        path: '/student/news' },
       { key: 'exam',       icon: Trophy,           label: 'Phòng Thi',      path: '/student/exam', requiresLearningAccess: true },
+      { key: 'cert-prep',  icon: GraduationCap,    label: 'Ôn thi MOS/IC3', path: '/student/cert-prep' },
       { key: 'schedule',   icon: Calendar,         label: 'Lịch học',       path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials',  icon: BookOpen,          label: 'Tài liệu',      path: '/student', hash: 'materials', requiresLearningAccess: true },
       { key: 'inbox',      icon: MessageSquare,     label: 'Hộp thư',       path: '/student/inbox' },
@@ -100,6 +101,7 @@ const MENU_CONFIG = {
         children: [
           { key: 'training',         icon: BookOpen,      label: 'Đào tạo GV',       path: '/admin', hash: 'training',         permission: PERMISSIONS.MANAGE_TRAINING },
           { key: 'student-training', icon: BookOpen,      label: 'Đào tạo HV',       path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+          { key: 'cert-prep',        icon: Trophy,        label: 'Ôn thi MOS/IC3',   path: '/admin', hash: 'cert-prep',        permission: PERMISSIONS.MANAGE_CERT_PREP },
           { key: 'evaluations',      icon: AlertTriangle, label: 'Đánh giá nội bộ',  path: '/admin', hash: 'evaluations',      permission: PERMISSIONS.VIEW_EVALUATIONS },
         ],
       },
@@ -529,6 +531,11 @@ const AppSidebar = ({
       const onExam = location.pathname === item.path
         || location.pathname.startsWith(`${item.path}/`);
       return onExam && !currentHash;
+    }
+    if (item.path?.endsWith('/cert-prep')) {
+      const onCert = location.pathname === item.path
+        || location.pathname.startsWith(`${item.path}/`);
+      return onCert && !currentHash;
     }
     // Các trang lá khác: khớp path tuyệt đối
     return location.pathname === item.path && !currentHash;

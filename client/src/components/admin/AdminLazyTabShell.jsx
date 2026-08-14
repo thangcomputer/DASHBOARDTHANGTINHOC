@@ -13,6 +13,7 @@ const LazyEvaluationsTab = lazy(() => import('./tabs/AdminEvaluationsTab'));
 const LazyFinanceTab = lazy(() => import('./tabs/AdminFinanceTab'));
 const LazyLogsTab = lazy(() => import('./tabs/AdminLogsTab'));
 const LazyStudentTrainingTab = lazy(() => import('./tabs/AdminStudentTrainingTab'));
+const LazyCertPrepTab = lazy(() => import('./tabs/AdminCertPrepTab'));
 
 function TabFallback() {
   return (
@@ -88,4 +89,8 @@ export function AdminLazyLogsTab() {
 
 export function AdminLazyStudentTrainingTab() {
   return <LazyAdminTab Component={LazyStudentTrainingTab} />;
+}
+
+export function AdminLazyCertPrepTab() {
+  return <LazyAdminTab Component={LazyCertPrepTab} />;
 }

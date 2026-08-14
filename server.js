@@ -880,6 +880,7 @@ const builderRoutes      = require('./routes/builderRoutes');
 const tenantRoutes       = require('./routes/tenantRoutes');
 const feedRoutes         = require('./routes/feedRoutes');
 const blogRoutes         = require('./routes/blogRoutes');
+const certPrepRoutes     = require('./routes/certPrepRoutes');
 const quizRoutes         = require('./routes/quizRoutes');
 
 app.use('/api/auth',         authRoutes);
@@ -916,9 +917,7 @@ app.use('/api/builder',      builderRoutes);
 app.use('/api/tenants',      tenantRoutes);
 app.use('/api/feed',         feedRoutes);
 app.use('/api/blog',         blogRoutes);
-
-
-
+app.use('/api/cert-prep',    certPrepRoutes);
 
 // Route mặc định
 app.get('/', (req, res) => {

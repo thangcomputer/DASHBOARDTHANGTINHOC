@@ -25,6 +25,17 @@ const {
   resolveEnrollmentExamSubjects,
   syncStudentFromPrimaryEnrollment,
 } = require('../services/enrollmentService');
+
+async function syncCertPrepFromEnrollment(student, req) {
+  try {
+    const { safeSyncStudentEnrollments } = require('../services/certPrepEnrollmentService');
+    await safeSyncStudentEnrollments(student, {
+      grantedBy: `enrollment-bridge:${req?.user?.id || ''}`,
+    });
+  } catch (err) {
+    logger.error('[CERT-PREP-ENROLL] isolated: %s', err.message);
+  }
+}
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const { generateTempPassword } = require('../utils/tempPassword');
 const { extractSessionNumber, buildActivityEntry } = require('../utils/studentActivityLog');
@@ -663,6 +674,10 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
 
     const result = await Student.insertMany(studentsToInsert, { ordered: false });
 
+    for (const row of result) {
+      await syncCertPrepFromEnrollment(row, req);
+    }
+
     res.json({
       success: true,
       message: `Đã nhập thành công ${result.length} học viên.`,
@@ -671,6 +686,10 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
   } catch (err) {
     if (err.name === 'BulkWriteError' || err.code === 11000) {
       const inserted = err.result?.nInserted || 0;
+      const docs = err.insertedDocs || [];
+      for (const row of docs) {
+        await syncCertPrepFromEnrollment(row, req);
+      }
       return res.json({
         success: true,
         message: `Đã nhập ${inserted} bản ghi (Một số bản ghi bị trùng SĐT đã được bỏ qua).`,
@@ -966,6 +985,8 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         hocPhi: createdInvoice.hocPhi,
       };
     }
+
+    await syncCertPrepFromEnrollment(student, req);
 
     res.status(201).json({ success: true, data: studentObj });
 
@@ -1542,6 +1563,8 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
       studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
     }
 
+    await syncCertPrepFromEnrollment(student, req);
+
     res.json({
       success: true,
       message: `Đã xác nhận thanh toán ${student.price.toLocaleString('vi-VN')}đ`,
@@ -2029,6 +2052,8 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
 
+    await syncCertPrepFromEnrollment(student, req);
+
     const io = req.app.get('io');
     if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
 
@@ -2212,6 +2237,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
 
     const doc = fresh.toObject();
     await applyEnrollmentStats(doc, fresh._id, Schedule);
+    await syncCertPrepFromEnrollment(fresh, req);
     return res.json({
       success: true,
       message: `Đã xác nhận thanh toán khóa "${claimedEnr.courseName}"${amount ? ` — ${amount.toLocaleString('vi-VN')}đ` : ''}`,

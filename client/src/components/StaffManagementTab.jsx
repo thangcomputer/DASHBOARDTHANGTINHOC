@@ -25,7 +25,7 @@ const PERMISSION_GROUPS = [
   { id: 'teachers', title: 'Giảng viên', icon: '👨‍🏫', keys: ['view_teachers'] },
   { id: 'schedule', title: 'Lịch dạy', icon: '📅', keys: ['manage_schedule'] },
   { id: 'finance', title: 'Tài chính', icon: '💰', keys: ['manage_finance', 'view_branch_revenue'] },
-  { id: 'training', title: 'Đào tạo', icon: '🎓', keys: ['manage_training', 'manage_student_training'] },
+  { id: 'training', title: 'Đào tạo', icon: '🎓', keys: ['manage_training', 'manage_student_training', 'manage_cert_prep'] },
   { id: 'hr', title: 'Nhân sự', icon: '👤', keys: ['manage_hr', 'manage_staff'] },
   { id: 'system', title: 'Hệ thống', icon: '⚙️', keys: ['system_settings', 'view_logs', 'view_evaluations'] },
 ];
