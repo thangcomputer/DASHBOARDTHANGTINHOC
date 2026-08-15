@@ -39,14 +39,14 @@ export default function CertPrepQuestionArea({
         ) : null}
       </div>
 
-      <p className="text-lg sm:text-xl font-bold text-slate-900 leading-snug whitespace-pre-wrap">
+      <p className="text-[16px] font-bold text-slate-900 leading-snug whitespace-pre-wrap">
         {question.questionText}
       </p>
       {question.questionImage ? (
         <img
           src={resolveMediaUrl(question.questionImage)}
           alt="Hình minh họa câu hỏi"
-          className="w-full max-h-72 object-contain rounded-2xl border border-slate-100 bg-slate-50"
+          className="block w-full h-auto max-w-full rounded-2xl border border-slate-100 bg-slate-50"
         />
       ) : null}
 
