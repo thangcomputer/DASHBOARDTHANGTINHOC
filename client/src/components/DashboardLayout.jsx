@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import BranchFilterDropdown from './BranchFilterDropdown';
-import { LmsGuideHost } from './LmsGuideTour';
 import FloatingMessenger from './FloatingMessenger';
 import { FloatingMessengerProvider } from '../context/FloatingMessengerContext';
 import { useData } from '../context/DataContext';
@@ -380,17 +379,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 </div>
               )}
 
-              {(role === 'student' || role === 'teacher') && (
-                <LmsGuideHost
-                  role={role}
-                  userId={session?.id || session?._id || ''}
-                  pathname={location.pathname}
-                  hash={location.hash}
-                  hideButton
-                  isFirstLogin={session?.isFirstLogin === true}
-                />
-              )}
-
               <div className="relative">
                 <button 
                   ref={bellRef}
@@ -617,15 +605,6 @@ const ChangePasswordModal = ({ session, role }) => {
     };
     window.addEventListener('open-change-password-modal', handleOpen);
     return () => window.removeEventListener('open-change-password-modal', handleOpen);
-  }, []);
-
-  // Đang xem hướng dẫn thì không chồng popup đổi MK lên menu
-  React.useEffect(() => {
-    const onGuide = (e) => {
-      if (e?.detail?.open) setIsOpen(false);
-    };
-    window.addEventListener('lms-guide-visibility', onGuide);
-    return () => window.removeEventListener('lms-guide-visibility', onGuide);
   }, []);
 
   if (!isOpen) return null;

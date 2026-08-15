@@ -4,7 +4,7 @@ import {
   Trophy, FileText, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown,
   GraduationCap, Users, DollarSign, ClipboardList, X,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  HelpCircle, Newspaper,
+  Newspaper,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
@@ -42,7 +42,6 @@ const MENU_CONFIG = {
       { key: 'evaluation', icon: Star,              label: 'Đánh giá',      path: '/student', hash: 'evaluation', requiresLearningAccess: true },
     ],
     bottomItems: [
-      { key: 'help', icon: HelpCircle, label: 'Trợ giúp', isHelp: true },
       { key: 'profile',   icon: User,    label: 'Hồ sơ',      path: '/student', hash: 'profile' },
       { key: 'logout',    icon: LogOut,  label: 'Đăng xuất',  isLogout: true },
     ],
@@ -63,7 +62,6 @@ const MENU_CONFIG = {
       { key: 'inbox',       icon: MessageSquare,    label: 'Hộp thư',                  path: '/teacher/inbox' },
     ],
     bottomItems: [
-      { key: 'help', icon: HelpCircle, label: 'Trợ giúp', isHelp: true },
       { key: 'profile', icon: User,   label: 'Hồ sơ', path: '/teacher', hash: 'profile' },
       { key: 'logout',  icon: LogOut, label: 'Đăng xuất',      isLogout: true },
     ],
@@ -196,18 +194,6 @@ const AppSidebar = ({
     setCollapsed(next);
     try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
   };
-
-  // Tour hướng dẫn cần thấy đủ menu (mở mobile / bỏ thu gọn)
-  useEffect(() => {
-    const openForGuide = () => {
-      setCollapsedPersist(false);
-      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
-        setMobileOpen(true);
-      }
-    };
-    window.addEventListener('lms-guide-open-nav', openForGuide);
-    return () => window.removeEventListener('lms-guide-open-nav', openForGuide);
-  }, []);
 
   // Chỉ tablet (rail overlay): bấm nội dung bên phải → thu sidebar.
   // Desktop/laptop (≥ xl): giữ mở cho đến khi user bấm nút ẩn.
@@ -483,13 +469,6 @@ const AppSidebar = ({
 
   const handleClick = (item) => {
     if (item.isLogout) { onLogout?.(); return; }
-    if (item.isHelp) {
-      try {
-        window.dispatchEvent(new CustomEvent('lms-guide-open', { detail: { mode: 'menu' } }));
-      } catch { /* ignore */ }
-      setMobileOpen(false);
-      return;
-    }
     if (item.isChangePassword) { 
       window.dispatchEvent(new CustomEvent('open-change-password-modal'));
       setMobileOpen(false);
@@ -606,7 +585,7 @@ const AppSidebar = ({
 
       {/* ── User info ── */}
       {(!collapsed || mobileOpen) && (
-        <div data-guide-key="welcome" className="px-5 pt-8 pb-6 border-b border-white/10">
+        <div className="px-5 pt-8 pb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
             <EditableAvatar
               avatar={effectiveAvatar}
@@ -650,7 +629,7 @@ const AppSidebar = ({
             const active = isActive(navItem);
             const isLocked = teacherPending && navItem.key !== 'test';
             return (
-              <div key={navItem.key} className="relative group/nav" data-guide-key={navItem.key}>
+              <div key={navItem.key} className="relative group/nav">
                 <button
                   type="button"
                   onClick={() => !isLocked && handleClick(navItem)}
@@ -737,20 +716,17 @@ const AppSidebar = ({
       <div className="px-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] space-y-0.5 border-t border-white/10 pt-2.5">
         {config.bottomItems.map(item => {
           const Icon = item.icon;
-          const active = !item.isLogout && !item.isHelp && !item.isChangePassword && isActive(item);
+          const active = !item.isLogout && !item.isChangePassword && isActive(item);
           return (
             <button
               key={item.key}
               type="button"
-              data-guide-key={item.key}
               onClick={() => handleClick(item)}
               className={`w-full flex items-center gap-3 rounded-xl transition-all min-h-11 box-border
                 ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}
                 ${item.isLogout
                   ? 'text-white/50 hover:text-red-300 hover:bg-red-500/10'
-                  : item.isHelp
-                    ? 'text-amber-200 hover:text-white hover:bg-amber-500/15'
-                    : active ? config.activeClass : 'text-white/65 hover:text-white hover:bg-white/10'}
+                  : active ? config.activeClass : 'text-white/65 hover:text-white hover:bg-white/10'}
               `}
               title={(collapsed && !mobileOpen) ? item.label : undefined}
             >

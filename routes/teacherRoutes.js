@@ -17,7 +17,7 @@ const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const NotificationService = require('../services/NotificationService');
-const { generateTempPassword } = require('../utils/tempPassword');
+const { resolveDefaultAccountPassword } = require('../utils/tempPassword');
 const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
@@ -163,9 +163,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       ? [...new Set(subjectIds.map((id) => String(id).trim()).filter(Boolean))]
       : [];
 
-    const plainPassword = password && String(password).trim()
-      ? String(password).trim()
-      : generateTempPassword(8);
+    const plainPassword = resolveDefaultAccountPassword({ password, phone });
     const teacherCode = await generateTeacherCode();
     const teacher = await Teacher.create({
       name,
@@ -179,7 +177,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       status:    status || 'inactive',
       testStatus: null,
       role: 'teacher',
-      isFirstLogin: true,
+      isFirstLogin: false,
       branchId:   finalBranchId,
       branchCode: finalBranchCode,
       baseSalaryPerSession: Math.max(0, Number(baseSalaryPerSession) || 0),

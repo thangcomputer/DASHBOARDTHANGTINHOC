@@ -39,9 +39,10 @@ class TeacherApplicationService {
       ? [...new Set(subjectIds.map((id) => String(id).trim()).filter(Boolean))]
       : [];
 
-    const plainPassword = password && String(password).trim()
-      ? String(password).trim()
-      : require('../../../utils/tempPassword').generateTempPassword(8);
+    const plainPassword = require('../../../utils/tempPassword').resolveDefaultAccountPassword({
+      password,
+      phone,
+    });
       
     const teacher = await require('../repositories').teacherRepository.create({
       name,
@@ -55,7 +56,7 @@ class TeacherApplicationService {
       status:    status || 'inactive',
       testStatus: null,
       role: 'teacher',
-      isFirstLogin: true,
+      isFirstLogin: false,
       branchId:   finalBranchId,
       branchCode: finalBranchCode,
       gender:     gender || 'male',

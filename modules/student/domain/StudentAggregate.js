@@ -17,7 +17,7 @@ class StudentAggregate {
       branchId,
       enrollments: payload.enrollments || [],
       paid: payload.paid || false,
-      isFirstLogin: payload.isFirstLogin !== undefined ? payload.isFirstLogin : true
+      isFirstLogin: payload.isFirstLogin !== undefined ? payload.isFirstLogin : false
     });
 
     student.addDomainEvent({

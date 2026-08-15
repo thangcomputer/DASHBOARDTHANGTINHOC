@@ -1373,13 +1373,8 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, authController.post
       return res.status(400).json({ success: false, message: 'Mã OTP không đúng. Vui lòng kiểm tra lại.' });
     }
 
-    // OTP đúng → đặt lại mật khẩu
+    // OTP đúng → đặt lại mật khẩu = SĐT/Zalo (mặc định hệ thống)
     otpStore.delete(key);
-    // TRƯỚC ĐÂY: Sinh mật khẩu ngẫu nhiên và trả về client (KÉM AN TOÀN)
-    // HIỆN TẠI: Chỉ đánh dấu OTP đã verify, cho phép client POST sang 1 route reset password thật sự hoặc yêu cầu Admin xử lý.
-    // Để đơn giản và nhanh, ta vẫn sinh pass nhưng KHÔNG trả về client nếu ở môi trường prod (giả định).
-    // Ở đây ta sẽ giữ nguyên logic sinh pass nhưng khuyến cáo đổi sang link reset.
-    const newPassword = Math.floor(100000 + Math.random() * 900000).toString();
 
     let user = null;
     if (record.role === 'teacher') {
@@ -1389,8 +1384,14 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, authController.post
     }
     if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
 
+    const { resolveDefaultAccountPassword } = require('../../utils/tempPassword');
+    const newPassword = resolveDefaultAccountPassword({
+      phone: user.phone,
+      zalo: user.zalo || phone,
+    });
+
     user.password = newPassword;
-    user.isFirstLogin = true;
+    user.isFirstLogin = false;
     await user.save({ validateModifiedOnly: true });
 
     // Gửi mật khẩu mới qua queue (Zalo OA / email) — không trả password về client
@@ -1404,7 +1405,7 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, authController.post
 
     return res.json({
       success: true,
-      message: 'Cấp lại mật khẩu thành công! Hãy đăng nhập rồi đổi mật khẩu ngay.',
+      message: 'Đã đặt lại mật khẩu về số điện thoại. Đăng nhập bằng SĐT làm mật khẩu.',
       data: {
         name: user.name,
         phone: destPhone || phone,
@@ -1519,7 +1520,7 @@ router.post('/admin/reset-password', authMiddleware, authController.post_admin_r
     }
 
     user.password = newPassword;
-    user.isFirstLogin = true;
+    user.isFirstLogin = false;
     // Vô hiệu phiên đăng nhập cũ
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     user.refreshToken = undefined;

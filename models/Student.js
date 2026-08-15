@@ -262,7 +262,7 @@ const StudentSchema = new mongoose.Schema(
     },
     isFirstLogin: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login
     refreshToken: { type: String, select: false }, // Refresh token rotation (server-side)
