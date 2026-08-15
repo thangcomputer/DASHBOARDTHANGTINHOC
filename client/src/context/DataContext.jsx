@@ -95,7 +95,8 @@ export const DataProvider = ({ children, user, onLogout }) => {
     studentExamMinutes, updateStudentExamMinutes,
     studentEssayExamMinutes, updateStudentEssayExamMinutes,
     studentExamFiles, setStudentExamFile,
-    examSubjectsCatalog, addCustomExamSubject,
+    examWarningSoundUrl, setExamWarningSoundUrl,
+    examSubjectsCatalog, addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
     applyStudentExamConfigFromServer,
     addStudentTrainingItem, updateStudentTrainingItem, removeStudentTrainingItem,
     addTrainingItem, updateTrainingItem, removeTrainingItem,
@@ -195,6 +196,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     studentExamMinutes,
     studentEssayExamMinutes,
     studentExamFiles,
+    examWarningSoundUrl,
     examSubjectsCatalog,
     systemLogs,
     isRefetching,
@@ -207,7 +209,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     trainingData, studentTrainingData, questions,
     teacherExamTimeLimitMinutes, teacherExamMinutes, teacherEssayExamMinutes,
     studentQuestions, studentExamMinutes, studentEssayExamMinutes,
-    studentExamFiles, examSubjectsCatalog, systemLogs, isRefetching, RATING_CRITERIA,
+    studentExamFiles, examWarningSoundUrl, examSubjectsCatalog, systemLogs, isRefetching, RATING_CRITERIA,
   ]);
 
   const actionsValue = useMemo(() => ({
@@ -237,8 +239,9 @@ export const DataProvider = ({ children, user, onLogout }) => {
     updateStudentQuestion, removeStudentQuestion, resetStudentQuestions,
     copyTeacherQuestionBankToStudents,
     updateStudentExamMinutes, updateStudentEssayExamMinutes,
-    setStudentExamFile, addCustomExamSubject,
-    addSystemLog, triggerBackgroundSync, toggleMessageReaction,
+    setStudentExamFile, setExamWarningSoundUrl,
+    addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
+    addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
   }), [
     setCurrentUser,
     addExamResult, updateExamResult, removeExamResult,
@@ -266,7 +269,8 @@ export const DataProvider = ({ children, user, onLogout }) => {
     updateStudentQuestion, removeStudentQuestion, resetStudentQuestions,
     copyTeacherQuestionBankToStudents,
     updateStudentExamMinutes, updateStudentEssayExamMinutes,
-    setStudentExamFile, addCustomExamSubject,
+    setStudentExamFile, setExamWarningSoundUrl,
+    addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
     addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
   ]);
 

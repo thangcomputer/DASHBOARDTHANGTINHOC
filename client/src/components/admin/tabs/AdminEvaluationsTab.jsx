@@ -48,7 +48,12 @@ export default function AdminEvaluationsTab() {
                     <span className={`text-[12px] font-bold px-2.5 py-1 rounded-full ${
                       ev.milestone === 'lesson_1' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
                     }`}>
-                      {ev.milestone === 'lesson_1' ? 'BUỔI ĐẦU TIÊN' : ev.milestone === 'manual_feedback' ? 'PHẢN HỒI TỰ NGUYỆN' : 'MỐC 50% KHÓA'}
+                      {ev.milestone === 'lesson_1' ? 'BUỔI ĐẦU TIÊN'
+                        : ev.milestone === 'course_end_center' ? 'CUỐI KHÓA · TRUNG TÂM'
+                          : ev.milestone === 'course_end_teacher' ? 'CUỐI KHÓA · GIẢNG VIÊN'
+                            : ev.milestone === 'manual_feedback' ? 'PHẢN HỒI TỰ NGUYỆN'
+                              : ev.milestone === 'mid_course' ? 'MỐC 50% KHÓA'
+                                : String(ev.milestone || 'ĐÁNH GIÁ')}
                     </span>
                     <span className="cms-m-caption">{ev.date}</span>
                   </div>

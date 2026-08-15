@@ -64,3 +64,56 @@ export const playNotifySound = () => {
   playTone(880.00, 'triangle', 0.1, 0.2);
   setTimeout(() => playTone(1174.66, 'triangle', 0.2, 0.2), 150);
 };
+
+const playExamWarningBeep = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.14);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.14);
+    setTimeout(() => {
+      try {
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'square';
+        osc2.frequency.setValueAtTime(660, ctx.currentTime);
+        gain2.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start();
+        osc2.stop(ctx.currentTime + 0.18);
+      } catch { /* ignore */ }
+    }, 120);
+  } catch {
+    playTone(880, 'square', 0.14, 0.35);
+  }
+};
+
+/** Cảnh báo phòng thi: file Admin tải lên; không có thì beep. */
+export const playExamWarningSound = (customUrl = '') => {
+  unlockAudio();
+  if (muted) return;
+
+  const url = String(customUrl || '').trim();
+  if (url) {
+    try {
+      const audio = new Audio(url);
+      audio.volume = 0.7;
+      void audio.play().catch(() => {
+        playExamWarningBeep();
+      });
+      return;
+    } catch {
+      /* fall through to beep */
+    }
+  }
+  playExamWarningBeep();
+};

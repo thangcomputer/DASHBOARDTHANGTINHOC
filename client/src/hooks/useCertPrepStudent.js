@@ -48,12 +48,12 @@ export default function useCertPrepStudent() {
     }
   }, []);
 
-  const startSession = useCallback(async (testId) => {
+  const startSession = useCallback(async (testId, options = {}) => {
     if (startingRef.current) return null;
     startingRef.current = true;
     setStarting(true);
     try {
-      const res = await certPrepApi.student.startSession(testId);
+      const res = await certPrepApi.student.startSession(testId, options);
       return res.data || null;
     } finally {
       startingRef.current = false;

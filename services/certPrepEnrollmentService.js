@@ -10,10 +10,8 @@ const { CertPrepError, isOid, requireOid } = require('./certPrepService');
 
 function isQualifyingEnrollment(enr) {
   if (!enr) return false;
-  const status = String(enr.status || 'active');
-  if (['cancelled', 'refunded', 'paused', 'pending_payment'].includes(status)) return false;
-  if (enr.learningAccess === false) return false;
-  return true;
+  // Align with student learning gate SoT: status === 'active'
+  return String(enr.status || '').toLowerCase() === 'active';
 }
 
 function enrollmentsOf(student) {
@@ -93,10 +91,9 @@ async function upsertMapping(body, actorId) {
   if (!cert) throw new CertPrepError(404, 'Không tìm thấy khóa ôn thi CertPrep');
   const actor = String(actorId || '');
   const doc = await CertPrepEnrollmentMapping.findOneAndUpdate(
-    { courseId },
+    { courseId, certPrepCourseId },
     {
       $set: {
-        certPrepCourseId,
         isActive: body.isActive !== false,
         updatedBy: actor,
       },
@@ -152,12 +149,17 @@ async function upsertAccess({ studentId, certPrepCourseId, grantedBy, enrollment
   return existing.toObject();
 }
 
-async function findActiveMapping(courseId) {
-  if (!courseId || !isOid(courseId)) return null;
-  return CertPrepEnrollmentMapping.findOne({
+async function findActiveMappings(courseId) {
+  if (!courseId || !isOid(courseId)) return [];
+  return CertPrepEnrollmentMapping.find({
     courseId,
     isActive: true,
   }).lean();
+}
+
+async function findActiveMapping(courseId) {
+  const rows = await findActiveMappings(courseId);
+  return rows[0] || null;
 }
 
 async function syncEnrollmentToCertPrepAccess({
@@ -170,18 +172,28 @@ async function syncEnrollmentToCertPrepAccess({
   let catalogId = courseId ? String(courseId) : null;
   if (!catalogId && enrollment) catalogId = await resolveCatalogCourseId(enrollment);
   if (!catalogId) return { action: 'noop', reason: 'no-course' };
-  const mapping = await findActiveMapping(catalogId);
-  if (!mapping) return { action: 'noop', reason: 'no-mapping' };
-  if (!isQualifyingEnrollment(enrollment || { status: 'active', learningAccess: true })) {
+  if (!isQualifyingEnrollment(enrollment || { status: 'active' })) {
     return { action: 'noop', reason: 'not-qualifying' };
   }
-  const access = await upsertAccess({
-    studentId: sid,
-    certPrepCourseId: mapping.certPrepCourseId,
-    grantedBy,
-    enrollmentExpiresAt: null,
-  });
-  return { action: 'upserted', access, certPrepCourseId: String(mapping.certPrepCourseId) };
+  const mappings = await findActiveMappings(catalogId);
+  if (!mappings.length) return { action: 'noop', reason: 'no-mapping' };
+  const accesses = [];
+  for (const mapping of mappings) {
+    // eslint-disable-next-line no-await-in-loop
+    const access = await upsertAccess({
+      studentId: sid,
+      certPrepCourseId: mapping.certPrepCourseId,
+      grantedBy,
+      enrollmentExpiresAt: null,
+    });
+    accesses.push(access);
+  }
+  return {
+    action: 'upserted',
+    access: accesses[0],
+    accesses,
+    certPrepCourseIds: mappings.map((m) => String(m.certPrepCourseId)),
+  };
 }
 
 async function syncStudentEnrollments(student, { grantedBy } = {}) {
@@ -189,25 +201,33 @@ async function syncStudentEnrollments(student, { grantedBy } = {}) {
   if (!sid) return { granted: 0, skipped: 'no-student' };
   const mappings = await CertPrepEnrollmentMapping.find({ isActive: true }).lean();
   if (!mappings.length) return { granted: 0, skipped: 'no-mapping' };
-  const byCourse = new Map(mappings.map((m) => [String(m.courseId), m]));
+  const byCourse = new Map();
+  for (const m of mappings) {
+    const key = String(m.courseId);
+    if (!byCourse.has(key)) byCourse.set(key, []);
+    byCourse.get(key).push(m);
+  }
   const seen = new Set();
   let granted = 0;
   for (const enr of enrollmentsOf(student)) {
     if (!isQualifyingEnrollment(enr)) continue;
+    // eslint-disable-next-line no-await-in-loop
     const catalogId = await resolveCatalogCourseId(enr);
     if (!catalogId) continue;
-    const mapping = byCourse.get(String(catalogId));
-    if (!mapping) continue;
-    const key = String(mapping.certPrepCourseId);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    await upsertAccess({
-      studentId: sid,
-      certPrepCourseId: mapping.certPrepCourseId,
-      grantedBy,
-      enrollmentExpiresAt: null,
-    });
-    granted += 1;
+    const courseMaps = byCourse.get(String(catalogId)) || [];
+    for (const mapping of courseMaps) {
+      const key = String(mapping.certPrepCourseId);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // eslint-disable-next-line no-await-in-loop
+      await upsertAccess({
+        studentId: sid,
+        certPrepCourseId: mapping.certPrepCourseId,
+        grantedBy,
+        enrollmentExpiresAt: null,
+      });
+      granted += 1;
+    }
   }
   return { granted };
 }
@@ -242,6 +262,98 @@ async function syncExistingEnrollments({ studentId, grantedBy } = {}) {
   return { scanned, granted };
 }
 
+async function softDeactivateAccess(studentId, certPrepCourseId) {
+  const existing = await StudentCertPrepAccess.findOne({
+    studentId,
+    courseId: certPrepCourseId,
+  });
+  if (!existing || existing.isActive === false) {
+    return { action: 'noop', reason: 'already-inactive' };
+  }
+  existing.isActive = false;
+  await existing.save();
+  return { action: 'deactivated', access: existing.toObject() };
+}
+
+/** Access gắn mapping LMS → chỉ giữ khi còn enrollment qualifying map tới CertPrep đó. */
+async function studentStillQualifiesForCertPrep(student, certPrepCourseId) {
+  const maps = await CertPrepEnrollmentMapping.find({
+    certPrepCourseId,
+  }).select('courseId').lean();
+  if (!maps.length) return null; // null = không phải enrollment-linked
+  const courseIds = new Set(maps.map((m) => String(m.courseId)));
+  for (const enr of enrollmentsOf(student)) {
+    if (!isQualifyingEnrollment(enr)) continue;
+    const catalogId = await resolveCatalogCourseId(enr);
+    if (catalogId && courseIds.has(String(catalogId))) return true;
+  }
+  return false;
+}
+
+async function revokeCertPrepAccessForEnrollment(student, enrollment) {
+  const sid = student?._id || student?.id;
+  if (!sid) return { action: 'noop', reason: 'no-student' };
+  const catalogId = enrollment
+    ? await resolveCatalogCourseId(enrollment)
+    : null;
+  if (!catalogId) return { action: 'noop', reason: 'no-course' };
+  const mappings = await CertPrepEnrollmentMapping.find({ courseId: catalogId }).lean();
+  if (!mappings.length) return { action: 'noop', reason: 'no-mapping' };
+  let deactivated = 0;
+  for (const mapping of mappings) {
+    // eslint-disable-next-line no-await-in-loop
+    const still = await studentStillQualifiesForCertPrep(student, mapping.certPrepCourseId);
+    if (still !== false) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const out = await softDeactivateAccess(sid, mapping.certPrepCourseId);
+    if (out.action === 'deactivated') deactivated += 1;
+  }
+  if (!deactivated) return { action: 'noop', reason: 'still-qualifying-or-inactive' };
+  return { action: 'deactivated', deactivated };
+}
+
+async function reconcileStudentCertPrepAccess(student) {
+  const sid = student?._id || student?.id;
+  if (!sid) return { deactivated: 0, skipped: 'no-student' };
+  const accesses = await StudentCertPrepAccess.find({ studentId: sid, isActive: true }).lean();
+  let deactivated = 0;
+  for (const row of accesses) {
+    const still = await studentStillQualifiesForCertPrep(student, row.courseId);
+    if (still === false) {
+      const out = await softDeactivateAccess(sid, row.courseId);
+      if (out.action === 'deactivated') deactivated += 1;
+    }
+  }
+  return { deactivated };
+}
+
+async function safeRevokeCertPrepAccessForEnrollment(student, enrollment) {
+  try {
+    const result = await revokeCertPrepAccessForEnrollment(student, enrollment);
+    return { ok: true, ...result };
+  } catch (err) {
+    logger.error('[CERT-PREP-ENROLL] revoke failed: %s', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+async function safeReconcileStudentCertPrepAccess(student) {
+  try {
+    let doc = student;
+    const hasEnrollmentShape = Array.isArray(student?.enrollments) || student?.course != null;
+    if (!hasEnrollmentShape) {
+      const id = typeof student === 'string' ? student : (student?._id || student?.id || student);
+      doc = id ? await Student.findById(id) : null;
+    }
+    if (!doc) return { ok: true, skipped: 'no-student' };
+    const result = await reconcileStudentCertPrepAccess(doc);
+    return { ok: true, ...result };
+  } catch (err) {
+    logger.error('[CERT-PREP-ENROLL] reconcile failed: %s', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   isQualifyingEnrollment,
   enrollmentsOf,
@@ -252,8 +364,15 @@ module.exports = {
   setMappingActive,
   upsertAccess,
   findActiveMapping,
+  findActiveMappings,
   syncEnrollmentToCertPrepAccess,
   syncStudentEnrollments,
   safeSyncStudentEnrollments,
   syncExistingEnrollments,
+  softDeactivateAccess,
+  studentStillQualifiesForCertPrep,
+  revokeCertPrepAccessForEnrollment,
+  reconcileStudentCertPrepAccess,
+  safeRevokeCertPrepAccessForEnrollment,
+  safeReconcileStudentCertPrepAccess,
 };

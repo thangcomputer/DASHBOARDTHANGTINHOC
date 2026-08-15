@@ -424,22 +424,30 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         } />
         <Route path="/student/cert-prep" element={
           <ErrorBoundary inline>
-            <CertPrepCatalogPage />
+            <StudentLearningAccessGate session={session} allowHashes={[]}>
+              <CertPrepCatalogPage />
+            </StudentLearningAccessGate>
           </ErrorBoundary>
         } />
         <Route path="/student/cert-prep/levels/:levelId" element={
           <ErrorBoundary inline>
-            <CertPrepLevelPage />
+            <StudentLearningAccessGate session={session} allowHashes={[]}>
+              <CertPrepLevelPage />
+            </StudentLearningAccessGate>
           </ErrorBoundary>
         } />
         <Route path="/student/cert-prep/result/:sessionId" element={
           <ErrorBoundary inline>
-            <CertPrepResult />
+            <StudentLearningAccessGate session={session} allowHashes={[]}>
+              <CertPrepResult />
+            </StudentLearningAccessGate>
           </ErrorBoundary>
         } />
       </Route>
 
-      {/* ═══ Fullscreen Exam (không sidebar) ═══ */}
+      {/* ═══ Fullscreen Exam (chỉ khi vào làm bài) ═══ */}
+      <Route path="/student/exam/quiz" element={<Navigate to="/student/exam" replace />} />
+      <Route path="/student/exam/cert" element={<Navigate to="/student/exam" replace />} />
       <Route path="/student/exam/:subjectId" element={
         <Guard allowedRoles={['student', 'admin']} session={session}>
           <StudentLearningAccessGate session={session} allowHashes={[]}>
@@ -450,9 +458,11 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
 
       <Route path="/student/cert-prep/play/:sessionId" element={
         <Guard allowedRoles={['student', 'admin']} session={session}>
-          <ErrorBoundary inline>
-            <CertPrepStudentPlayer />
-          </ErrorBoundary>
+          <StudentLearningAccessGate session={session} allowHashes={[]}>
+            <ErrorBoundary inline>
+              <CertPrepStudentPlayer />
+            </ErrorBoundary>
+          </StudentLearningAccessGate>
         </Guard>
       } />
 

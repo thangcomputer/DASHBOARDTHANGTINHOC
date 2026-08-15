@@ -1,6 +1,6 @@
 import { formatRemaining } from '../../../hooks/useCertPrepSession';
 
-export default function CertPrepTimer({ remainingSeconds }) {
+export default function CertPrepTimer({ remainingSeconds, light = false }) {
   const n = Math.max(0, Number(remainingSeconds) || 0);
   const warning = n > 0 && n <= 5 * 60;
   const critical = n > 0 && n <= 60;
@@ -10,12 +10,14 @@ export default function CertPrepTimer({ remainingSeconds }) {
   else if (n === 60) liveText = 'Còn 1 phút';
   else if (n === 5 * 60) liveText = 'Còn 5 phút';
 
+  const color = light
+    ? (critical ? 'text-red-300' : warning ? 'text-amber-200' : 'text-white')
+    : (critical ? 'text-red-600' : warning ? 'text-amber-700' : 'text-slate-900');
+
   return (
-    <div className="text-right">
+    <div className={light ? 'text-left' : 'text-right'}>
       <p
-        className={`text-lg sm:text-xl font-black tabular-nums ${
-          critical ? 'text-red-600' : warning ? 'text-amber-700' : 'text-slate-900'
-        }`}
+        className={`text-xl sm:text-2xl font-black tabular-nums leading-none ${color}`}
         aria-hidden="true"
       >
         {label}

@@ -35,7 +35,7 @@ const MENU_CONFIG = {
       { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',       path: '/student/feed' },
       { key: 'news',       icon: FileText,         label: 'Tin tức',        path: '/student/news' },
       { key: 'exam',       icon: Trophy,           label: 'Phòng Thi',      path: '/student/exam', requiresLearningAccess: true },
-      { key: 'cert-prep',  icon: GraduationCap,    label: 'Ôn thi MOS/IC3', path: '/student/cert-prep' },
+      { key: 'cert-prep',  icon: GraduationCap,    label: 'Ôn thi MOS/IC3', path: '/student/cert-prep', requiresLearningAccess: true },
       { key: 'schedule',   icon: Calendar,         label: 'Lịch học',       path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials',  icon: BookOpen,          label: 'Tài liệu',      path: '/student', hash: 'materials', requiresLearningAccess: true },
       { key: 'inbox',      icon: MessageSquare,     label: 'Hộp thư',       path: '/student/inbox' },
@@ -406,7 +406,7 @@ const AppSidebar = ({
   const studentHasLearningAccess = (() => {
     if (role !== 'student') return true;
     const sid = session?.id || session?._id;
-    if (!sid || !Array.isArray(students)) return true;
+    if (!sid || !Array.isArray(students)) return false;
     const me = students.find((s) => String(s?.id || s?._id) === String(sid));
     return hasLearningAccessEnrollment(me);
   })();

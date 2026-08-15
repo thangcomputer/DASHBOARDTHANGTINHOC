@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Loader2, List } from 'lucide-react';
 import useCertPrepSession from '../../../hooks/useCertPrepSession';
+import { isImmediateFeedback } from '../../../utils/certPrepGrade';
 import CertPrepPlayerHeader from './CertPrepPlayerHeader';
 import CertPrepQuestionArea from './CertPrepQuestionArea';
 import CertPrepQuestionNavigator from './CertPrepQuestionNavigator';
@@ -16,6 +17,33 @@ export default function CertPrepStudentPlayer() {
   const player = useCertPrepSession(sessionId);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [revealedIds, setRevealedIds] = useState({});
+  const keysReloadTried = useRef(false);
+
+  const immediate = isImmediateFeedback(player.session);
+
+  useEffect(() => {
+    setRevealedIds({});
+    keysReloadTried.current = false;
+  }, [sessionId]);
+
+  // Phiên immediate nhưng câu hỏi chưa có đáp án (session cũ) → tải lại 1 lần
+  useEffect(() => {
+    if (!immediate || player.loading || !player.questions.length || keysReloadTried.current) return;
+    const sample = player.questions[0];
+    const missingKeys = sample?.type === 'single_choice'
+      ? sample.correctAnswer === undefined
+      : sample?.type === 'multiple_choice'
+        ? !Array.isArray(sample.correctIndices)
+        : sample?.type === 'matching'
+          ? !Array.isArray(sample.matchingPairs)
+          : false;
+    if (missingKeys) {
+      keysReloadTried.current = true;
+      player.loadSession();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [immediate, player.loading, player.questions, sessionId]);
 
   useEffect(() => {
     if (player.loading) return;
@@ -23,6 +51,36 @@ export default function CertPrepStudentPlayer() {
       navigate(`/student/cert-prep/result/${sessionId}`, { replace: true });
     }
   }, [player.loading, player.session?.status, sessionId, navigate]);
+
+  const q = player.currentQuestion;
+  const qid = q?.id ? String(q.id) : '';
+  const currentRevealed = Boolean(qid && revealedIds[qid]);
+  const answerLocked = player.locked || (immediate && currentRevealed);
+
+  const handleNext = useCallback(() => {
+    if (!q || player.locked) return;
+    if (immediate && !revealedIds[q.id]) {
+      setRevealedIds((prev) => ({ ...prev, [q.id]: true }));
+      return;
+    }
+    player.next();
+  }, [immediate, revealedIds, q, player]);
+
+  const nextMeta = useMemo(() => {
+    const last = player.currentIndex >= player.questions.length - 1;
+    if (immediate && q && !revealedIds[q.id]) {
+      return {
+        label: 'Hiển thị đáp án',
+        disabled: false,
+        primary: true,
+      };
+    }
+    return {
+      label: 'Câu tiếp theo',
+      disabled: last,
+      primary: false,
+    };
+  }, [immediate, q, revealedIds, player.currentIndex, player.questions.length]);
 
   const back = (
     <button
@@ -36,7 +94,7 @@ export default function CertPrepStudentPlayer() {
 
   if (player.loading || player.uiStatus === 'loading') {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-100">
         {back}
         <div className="cms-card mx-4 sm:mx-6 mt-4 flex items-center justify-center py-16 text-slate-400" role="status">
           <Loader2 className="animate-spin mr-2" size={20} aria-hidden="true" /> Đang tải bài thi...
@@ -47,7 +105,7 @@ export default function CertPrepStudentPlayer() {
 
   if (player.uiStatus === 'forbidden') {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-100">
         {back}
         <div className="p-4 sm:p-6">
           <CertPrepPlayerError message="Bạn không có quyền truy cập phiên làm bài này." />
@@ -58,7 +116,7 @@ export default function CertPrepStudentPlayer() {
 
   if (player.uiStatus === 'not-found') {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-100">
         {back}
         <div className="p-4 sm:p-6">
           <CertPrepPlayerError message={player.error || 'Không tìm thấy phiên làm bài.'} onRetry={player.loadSession} />
@@ -69,7 +127,7 @@ export default function CertPrepStudentPlayer() {
 
   if (player.uiStatus === 'error') {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-100">
         {back}
         <div className="p-4 sm:p-6">
           <CertPrepPlayerError message={player.error} onRetry={player.loadSession} />
@@ -80,7 +138,7 @@ export default function CertPrepStudentPlayer() {
 
   if (player.justSubmitted || player.uiStatus === 'submitted' || player.session?.status === 'submitted') {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-100">
         {back}
         <div className="cms-card mx-4 sm:mx-6 mt-4 flex items-center justify-center py-16 text-slate-400" role="status">
           <Loader2 className="animate-spin mr-2" size={20} aria-hidden="true" /> Đang chuyển đến kết quả...
@@ -91,7 +149,7 @@ export default function CertPrepStudentPlayer() {
 
   if (player.uiStatus === 'expired' || player.session?.status === 'abandoned') {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-100">
         {back}
         <div className="p-4 sm:p-6">
           <CertPrepSessionExpired />
@@ -100,10 +158,8 @@ export default function CertPrepStudentPlayer() {
     );
   }
 
-  const q = player.currentQuestion;
-
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] flex flex-col">
       <CertPrepPlayerHeader
         session={player.session}
         currentIndex={player.currentIndex}
@@ -116,8 +172,8 @@ export default function CertPrepStudentPlayer() {
         </p>
       ) : null}
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4 p-4 sm:p-6">
-        <div className="cms-card p-4 sm:p-6">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4 p-4 sm:p-6 max-w-6xl w-full mx-auto">
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-7 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)]">
           {q ? (
             <CertPrepQuestionArea
               key={q.id}
@@ -125,7 +181,8 @@ export default function CertPrepStudentPlayer() {
               index={player.currentIndex}
               total={player.questions.length}
               value={player.answers[q.id]}
-              disabled={player.locked}
+              disabled={answerLocked}
+              showFeedback={immediate && currentRevealed}
               onChange={(value) => player.selectAnswer(q.id, value)}
             />
           ) : (
@@ -146,6 +203,8 @@ export default function CertPrepStudentPlayer() {
               answers={player.answers}
               currentIndex={player.currentIndex}
               onSelect={player.goToQuestion}
+              revealedIds={revealedIds}
+              showResultColors={immediate}
             />
           </div>
         </aside>
@@ -155,9 +214,12 @@ export default function CertPrepStudentPlayer() {
         currentIndex={player.currentIndex}
         total={player.questions.length}
         onPrevious={player.previous}
-        onNext={player.next}
+        onNext={handleNext}
         onSubmit={() => setConfirmOpen(true)}
         submitDisabled={player.locked || player.submitting}
+        nextLabel={nextMeta.label}
+        nextDisabled={nextMeta.disabled || player.locked}
+        nextPrimary={nextMeta.primary}
       />
 
       <CertPrepSubmitDialog

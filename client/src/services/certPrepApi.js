@@ -93,9 +93,12 @@ export const certPrepApi = {
   student: {
     getCatalog: async () => parse(await apiFetch('/cert-prep/my-catalog')),
     getTests: async (levelId) => parse(await apiFetch(`/cert-prep/levels/${levelId}/tests`)),
-    startSession: async (testId) => parse(await apiFetch('/cert-prep/sessions', {
+    startSession: async (testId, options = {}) => parse(await apiFetch('/cert-prep/sessions', {
       method: 'POST',
-      body: JSON.stringify({ testId }),
+      body: JSON.stringify({
+        testId,
+        feedbackMode: options.feedbackMode === 'after_submit' ? 'after_submit' : 'immediate',
+      }),
     })),
     getSession: async (sessionId) => parse(await apiFetch(`/cert-prep/sessions/${sessionId}`)),
     saveAnswers: async (sessionId, answers) => parse(await apiFetch(`/cert-prep/sessions/${sessionId}`, {

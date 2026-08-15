@@ -47,6 +47,8 @@ function CourseModal({
   otherCourses = [],
   examSubjectsCatalog,
   addCustomExamSubject,
+  updateCustomExamSubject,
+  removeCustomExamSubject,
   onClose,
   onSaved,
 }) {
@@ -70,6 +72,10 @@ function CourseModal({
   const [newSubjectLabel, setNewSubjectLabel] = useState('');
   const [newSubjectId, setNewSubjectId] = useState('');
   const [addingSubject, setAddingSubject] = useState(false);
+  const [deletingSubjectId, setDeletingSubjectId] = useState(null);
+  const [subjectDialog, setSubjectDialog] = useState(null); // { mode: 'delete'|'edit', id, label }
+  const [editLabel, setEditLabel] = useState('');
+  const [savingSubject, setSavingSubject] = useState(false);
 
   const examOptions = getExamSubjectOptions(examSubjectsCatalog);
   const groupedExamOptions = examOptions.reduce((acc, item) => {
@@ -96,6 +102,63 @@ function CourseModal({
     });
     toast.success(`Đã gộp ${ids.length} môn từ "${sourceCourse.name}"`);
     setImportCourseId('');
+  };
+
+  const openDeleteSubject = (id, label) => {
+    if (typeof removeCustomExamSubject !== 'function') {
+      toast.error('Chưa kết nối API xóa môn thi');
+      return;
+    }
+    setSubjectDialog({ mode: 'delete', id, label });
+  };
+
+  const openEditSubject = (id, label) => {
+    if (typeof updateCustomExamSubject !== 'function') {
+      toast.error('Chưa kết nối API sửa môn thi');
+      return;
+    }
+    setEditLabel(label);
+    setSubjectDialog({ mode: 'edit', id, label });
+  };
+
+  const confirmDeleteSubject = async () => {
+    if (!subjectDialog || subjectDialog.mode !== 'delete') return;
+    const { id, label } = subjectDialog;
+    setDeletingSubjectId(id);
+    setSavingSubject(true);
+    try {
+      await removeCustomExamSubject(id);
+      setForm((f) => {
+        const current = Array.isArray(f.examSubjects) ? f.examSubjects : [];
+        return { ...f, examSubjects: current.filter((x) => x !== id) };
+      });
+      setSubjectDialog(null);
+      toast.success(`Đã xóa môn "${label}"`);
+    } catch (err) {
+      toast.error(err?.message || 'Không xóa được môn thi');
+    } finally {
+      setDeletingSubjectId(null);
+      setSavingSubject(false);
+    }
+  };
+
+  const confirmEditSubject = async () => {
+    if (!subjectDialog || subjectDialog.mode !== 'edit') return;
+    const label = editLabel.trim();
+    if (label.length < 2) {
+      toast.error('Tên môn thi quá ngắn');
+      return;
+    }
+    setSavingSubject(true);
+    try {
+      const subject = await updateCustomExamSubject(subjectDialog.id, { label });
+      setSubjectDialog(null);
+      toast.success(`Đã đổi tên thành "${subject?.label || label}"`);
+    } catch (err) {
+      toast.error(err?.message || 'Không sửa được môn thi');
+    } finally {
+      setSavingSubject(false);
+    }
   };
 
   const handleAddNewExamSubject = async () => {
@@ -173,7 +236,7 @@ function CourseModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9980] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[min(92vh,920px)]">
@@ -321,10 +384,11 @@ function CourseModal({
                       {items.map(({ id, label }) => {
                         const selected = Array.isArray(form.examSubjects) ? form.examSubjects : [];
                         const checked = selected.includes(id);
+                        const isCustom = !!examSubjectsCatalog?.[id]?.custom;
                         return (
                           <label
                             key={id}
-                            className={`flex items-center gap-2 border-2 rounded-2xl px-3 py-2.5 cursor-pointer transition ${
+                            className={`group relative flex items-center gap-2 border-2 rounded-2xl px-3 py-2.5 cursor-pointer transition ${
                               checked ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
                             }`}
                           >
@@ -342,9 +406,42 @@ function CourseModal({
                               }}
                               className="rounded border-gray-300 text-blue-600"
                             />
-                            <span className="text-sm font-semibold text-gray-700">{label}</span>
-                            {examSubjectsCatalog?.[id]?.custom && (
-                              <span className="ml-auto text-[9px] font-black uppercase text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Mới</span>
+                            <span className="text-sm font-semibold text-gray-700 min-w-0 flex-1 truncate">{label}</span>
+                            {isCustom && (
+                              <>
+                                <span className="text-[9px] font-black uppercase text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded group-hover:opacity-0 transition-opacity">Mới</span>
+                                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 flex items-center gap-0.5">
+                                  <button
+                                    type="button"
+                                    title={`Sửa tên "${label}"`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openEditSubject(id, label);
+                                    }}
+                                    className="w-8 h-8 inline-flex items-center justify-center rounded-xl text-slate-600 hover:bg-white hover:text-blue-600 transition"
+                                  >
+                                    <Edit2 size={14} aria-hidden="true" />
+                                    <span className="sr-only">Sửa môn {label}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title={`Xóa môn "${label}" khỏi hệ thống`}
+                                    disabled={deletingSubjectId === id}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openDeleteSubject(id, label);
+                                    }}
+                                    className="w-8 h-8 inline-flex items-center justify-center rounded-xl text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                                  >
+                                    {deletingSubjectId === id
+                                      ? <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                                      : <Trash2 size={14} aria-hidden="true" />}
+                                    <span className="sr-only">Xóa môn {label}</span>
+                                  </button>
+                                </div>
+                              </>
                             )}
                           </label>
                         );
@@ -487,6 +584,69 @@ function CourseModal({
           </div>
         </div>
       </div>
+
+      {subjectDialog ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/50">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="subject-dialog-title"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4"
+          >
+            <h4 id="subject-dialog-title" className="text-base font-black text-slate-900">
+              {subjectDialog.mode === 'delete' ? 'Xóa môn thi?' : 'Sửa tên môn thi'}
+            </h4>
+            {subjectDialog.mode === 'delete' ? (
+              <p className="text-sm text-slate-600">
+                Xóa <strong>{subjectDialog.label}</strong> khỏi danh mục hệ thống? Các khóa đang gắn môn này sẽ cần chọn lại khi sửa.
+              </p>
+            ) : (
+              <label className="block space-y-1.5">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tên môn</span>
+                <input
+                  autoFocus
+                  value={editLabel}
+                  onChange={(e) => setEditLabel(e.target.value)}
+                  className="w-full border-2 border-slate-100 focus:border-blue-500 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none"
+                  placeholder="Tên môn thi"
+                />
+                <span className="text-[11px] text-slate-400">Mã môn giữ nguyên: <strong>{subjectDialog.id}</strong></span>
+              </label>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                disabled={savingSubject}
+                onClick={() => setSubjectDialog(null)}
+                className="min-h-10 px-4 rounded-xl text-sm font-bold text-slate-600 border border-slate-200 hover:bg-slate-50"
+              >
+                Hủy
+              </button>
+              {subjectDialog.mode === 'delete' ? (
+                <button
+                  type="button"
+                  disabled={savingSubject}
+                  onClick={confirmDeleteSubject}
+                  className="min-h-10 px-4 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {savingSubject ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Xóa môn
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={savingSubject}
+                  onClick={confirmEditSubject}
+                  className="min-h-10 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {savingSubject ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Lưu tên
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -495,7 +655,7 @@ function CourseModal({
 export default function CoursePricingTab() {
   const toast = useToast();
   const { showModal } = useModal();
-  const { examSubjectsCatalog, addCustomExamSubject } = useData();
+  const { examSubjectsCatalog, addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject } = useData();
   const [courses, setCourses]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [modalCourse, setModalCourse] = useState(undefined); // undefined=closed, null=add, obj=edit
@@ -563,6 +723,8 @@ export default function CoursePricingTab() {
           otherCourses={courses.filter((c) => !modalCourse?._id || c._id !== modalCourse._id)}
           examSubjectsCatalog={examSubjectsCatalog}
           addCustomExamSubject={addCustomExamSubject}
+          updateCustomExamSubject={updateCustomExamSubject}
+          removeCustomExamSubject={removeCustomExamSubject}
           onClose={() => setModalCourse(undefined)}
           onSaved={handleSaved}
         />

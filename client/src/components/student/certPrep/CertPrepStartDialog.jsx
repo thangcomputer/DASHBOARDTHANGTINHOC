@@ -7,10 +7,13 @@ export default function CertPrepStartDialog({
   courseName,
   levelTitle,
   starting,
+  feedbackMode = 'immediate',
+  onFeedbackModeChange,
   onCancel,
   onConfirm,
 }) {
   if (!open || !test) return null;
+  const immediate = feedbackMode !== 'after_submit';
   return (
     <div className="cms-modal-shell" role="presentation">
       <div
@@ -25,14 +28,43 @@ export default function CertPrepStartDialog({
             <X size={18} />
           </button>
         </div>
-        <div className="px-5 py-4 text-sm text-slate-600 space-y-2">
+        <div className="px-5 py-4 text-sm text-slate-600 space-y-3">
           <p className="font-bold text-slate-900">
             {[courseName, levelTitle].filter(Boolean).join(' — ')}
           </p>
           <p>{test.name} · {localeLabel(test.locale)}</p>
-          <p>{test.questionCount} câu</p>
-          <p>{test.timeLimitMinutes} phút</p>
-          <p>Điểm đạt: {test.passingScore}</p>
+          <p>{test.questionCount} câu · {test.timeLimitMinutes} phút · Điểm đạt: {test.passingScore}</p>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900">Hiện đáp án đúng / sai khi làm bài</p>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  {immediate
+                    ? 'Nút «Hiển thị đáp án» → xem đúng/sai, rồi đổi thành «Câu tiếp theo» để sang câu khác.'
+                    : 'Nút luôn là «Câu tiếp theo». Chỉ xem đúng/sai sau khi nộp bài.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={immediate}
+                aria-label="Hiện đáp án đúng sai khi làm bài"
+                disabled={starting}
+                onClick={() => onFeedbackModeChange?.(immediate ? 'after_submit' : 'immediate')}
+                className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${
+                  immediate ? 'bg-red-600' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                    immediate ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           <p className="text-amber-700 font-semibold">Sau khi bắt đầu, thời gian sẽ được tính.</p>
         </div>
         <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">

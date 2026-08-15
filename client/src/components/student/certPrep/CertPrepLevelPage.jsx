@@ -18,6 +18,7 @@ export default function CertPrepLevelPage() {
   const student = useCertPrepStudent();
   const [error, setError] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [feedbackMode, setFeedbackMode] = useState('immediate');
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +49,7 @@ export default function CertPrepLevelPage() {
   const start = async () => {
     if (!test || student.starting) return;
     try {
-      const session = await student.startSession(test.id);
+      const session = await student.startSession(test.id, { feedbackMode });
       const sid = session?.id || session?._id;
       if (!sid) throw new Error('Không nhận được phiên làm bài từ máy chủ.');
       setConfirmOpen(false);
@@ -111,7 +112,10 @@ export default function CertPrepLevelPage() {
           expiresAt={payload?.expiresAt}
           expired={expired}
           starting={student.starting}
-          onStart={() => setConfirmOpen(true)}
+          onStart={() => {
+            setFeedbackMode('immediate');
+            setConfirmOpen(true);
+          }}
         />
         <CertPrepStartDialog
           open={confirmOpen}
@@ -119,6 +123,8 @@ export default function CertPrepLevelPage() {
           courseName={courseName}
           levelTitle={levelTitle}
           starting={student.starting}
+          feedbackMode={feedbackMode}
+          onFeedbackModeChange={setFeedbackMode}
           onCancel={() => setConfirmOpen(false)}
           onConfirm={start}
         />

@@ -6,12 +6,15 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useToast } from '../../utils/toast';
+import { useData } from '../../context/DataContext';
+import ExamClickOutsideGuard from '../exam/ExamClickOutsideGuard';
 
 /** Lớp phủ toàn app — che sidebar/header/messenger */
 function ExamOverlay({ children }) {
   if (typeof document === 'undefined') return children;
   return createPortal(
     <div
+      data-exam-surface
       className="fixed inset-0 z-[99999] h-[100dvh] w-screen max-w-[100vw] bg-[#0b1018] text-white flex flex-col overflow-hidden font-sans"
       style={{ isolation: 'isolate' }}
       role="dialog"
@@ -43,6 +46,7 @@ async function leaveBrowserFullscreen() {
 
 export default function StudentQuizExamRoom({ quizId, onBack }) {
   const toast = useToast();
+  const { examWarningSoundUrl = '' } = useData() || {};
   const [loading, setLoading] = useState(true);
   const [quizData, setQuizData] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -433,7 +437,12 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
   // ── 5. MÀN HÌNH THI TRẮC NGHIỆM (TOÀN MÀN HÌNH) ─────────────────────────────
   return (
     <ExamOverlay>
-    <div className="flex-1 min-h-0 flex flex-col select-none overflow-x-hidden">
+    <ExamClickOutsideGuard
+      enabled={!resultData && !loading && !!quizData}
+      soundUrl={examWarningSoundUrl}
+      watchVisibility
+      className="flex-1 min-h-0 flex flex-col select-none overflow-x-hidden"
+    >
       {/* ── TOPBAR PHÒNG THI ── */}
       <header className="h-14 bg-[#0e1420] border-b border-white/10 px-4 sm:px-6 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -588,7 +597,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
 
       {/* ── MODAL XÁC NHẬN NỘP BÀI ── */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div data-exam-modal className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#161d2a] border border-white/10 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
               <AlertTriangle className="text-amber-400" size={20} /> Xác nhận nộp bài?
@@ -619,7 +628,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
 
       {/* ── MODAL THOÁT = RỚT ── */}
       {showExitModal && (
-        <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div data-exam-modal className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#161d2a] border border-red-500/30 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
               <AlertTriangle className="text-red-400" size={20} /> Thoát sẽ bị RỚT
@@ -647,7 +656,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
           </div>
         </div>
       )}
-    </div>
+    </ExamClickOutsideGuard>
     </ExamOverlay>
   );
 }

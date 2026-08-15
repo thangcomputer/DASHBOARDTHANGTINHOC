@@ -60,6 +60,9 @@ const systemSettingsSchema = new mongoose.Schema({
   /** Đề thực hành / tự luận theo môn: { [subjectId]: { fileUrl, fileName, fileType } } */
   studentExamFilesRaw: { type: mongoose.Schema.Types.Mixed, default: {} },
 
+  /** URL âm thanh cảnh báo phòng thi TN (click ngoài / chuyển tab). Trống = beep mặc định. */
+  examWarningSoundUrl: { type: String, default: '' },
+
   // ── Ngân hàng câu hỏi thi Giảng viên (Admin CRUD) — đồng bộ GV mọi máy ───
   teacherExamBankRawData: { type: mongoose.Schema.Types.Mixed },
   /** Tổng thời gian làm bài test trắc nghiệm GV (phút). null = client tự tính theo số câu */

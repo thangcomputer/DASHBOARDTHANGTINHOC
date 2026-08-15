@@ -92,7 +92,17 @@ router.post('/upload', ...requireCertPrepAdmin, certPrepUploadMiddleware, async 
 // ── Student catalog / sessions (before parameterized admin twins where needed)
 router.get('/my-catalog', ...requireStudent, async (req, res) => {
   try {
-    const data = await service.getMyCatalog(studentIdFromAuth(req));
+    const sid = studentIdFromAuth(req);
+    // Catch-up: enrollment đã active nhưng access CertPrep chưa được cấp (mapping mới / re-enroll)
+    try {
+      const enroll = require('../services/certPrepEnrollmentService');
+      await enroll.safeSyncStudentEnrollments(sid, {
+        grantedBy: `catalog-sync:${sid}`,
+      });
+    } catch (syncErr) {
+      logger.error('[CERT-PREP] catalog sync isolated: %s', syncErr.message);
+    }
+    const data = await service.getMyCatalog(sid);
     return res.json({ success: true, data });
   } catch (err) {
     return sendError(res, err);
@@ -355,6 +365,13 @@ router.post('/enrollment-mappings', ...requireCertPrepAdmin, async (req, res) =>
   try {
     const enroll = require('../services/certPrepEnrollmentService');
     const data = await enroll.upsertMapping(req.body || {}, studentIdFromAuth(req));
+    try {
+      await enroll.syncExistingEnrollments({
+        grantedBy: `mapping-save:${studentIdFromAuth(req)}`,
+      });
+    } catch (syncErr) {
+      logger.error('[CERT-PREP] mapping save sync isolated: %s', syncErr.message);
+    }
     return res.status(201).json({ success: true, data });
   } catch (err) {
     return sendError(res, err);

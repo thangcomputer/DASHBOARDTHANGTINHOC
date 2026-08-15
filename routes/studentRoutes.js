@@ -36,6 +36,24 @@ async function syncCertPrepFromEnrollment(student, req) {
     logger.error('[CERT-PREP-ENROLL] isolated: %s', err.message);
   }
 }
+
+async function revokeCertPrepAfterEnrollmentCancel(student, cancelledEnrollment) {
+  try {
+    const { safeRevokeCertPrepAccessForEnrollment } = require('../services/certPrepEnrollmentService');
+    await safeRevokeCertPrepAccessForEnrollment(student, cancelledEnrollment);
+  } catch (err) {
+    logger.error('[CERT-PREP-ENROLL] revoke isolated: %s', err.message);
+  }
+}
+
+async function reconcileCertPrepAfterRefund(student) {
+  try {
+    const { safeReconcileStudentCertPrepAccess } = require('../services/certPrepEnrollmentService');
+    await safeReconcileStudentCertPrepAccess(student);
+  } catch (err) {
+    logger.error('[CERT-PREP-ENROLL] reconcile isolated: %s', err.message);
+  }
+}
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const { generateTempPassword } = require('../utils/tempPassword');
 const { extractSessionNumber, buildActivityEntry } = require('../utils/studentActivityLog');
@@ -1626,6 +1644,7 @@ router.put('/:id/refund', [authMiddleware, branchFilter, policyShadowStudentMuta
     const o = student.toObject ? student.toObject() : student;
     delete o.password;
     delete o.refreshToken;
+    await reconcileCertPrepAfterRefund(student);
     return res.json({
       success: true,
       message: result.idempotent
@@ -2405,6 +2424,7 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
 
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
+    await revokeCertPrepAfterEnrollmentCancel(student, list[idx]);
     return res.json({
       success: true,
       message: `Đã hủy khóa "${courseName}".${refundMsg}`,

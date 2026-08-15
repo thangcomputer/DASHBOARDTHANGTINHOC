@@ -72,6 +72,7 @@ test('CASE 14: mapping routes are admin-gated, not student catalog routes', () =
   const block = src.slice(src.indexOf("router.get('/enrollment-mappings'"));
   assert.ok(block.includes('requireCertPrepAdmin'));
   assert.ok(src.includes("router.get('/my-catalog'"));
+  assert.ok(src.includes('safeSyncStudentEnrollments'));
   const catalogIdx = src.indexOf("router.get('/my-catalog'");
   const mapIdx = src.indexOf("router.get('/enrollment-mappings'");
   assert.ok(mapIdx > catalogIdx);
@@ -80,6 +81,8 @@ test('CASE 14: mapping routes are admin-gated, not student catalog routes', () =
 test('student LIVE enrollment hooks stay isolated and do not call /api/students for grant', () => {
   const src = fs.readFileSync(path.join(__dirname, '../../routes/studentRoutes.js'), 'utf8');
   assert.ok(src.includes('syncCertPrepFromEnrollment'));
+  assert.ok(src.includes('revokeCertPrepAfterEnrollmentCancel'));
+  assert.ok(src.includes('reconcileCertPrepAfterRefund'));
   assert.ok(src.includes('certPrepEnrollmentService'));
   assert.equal(src.includes("apiFetch('/students'"), false);
   assert.equal(src.includes('grantAccess('), false);
@@ -90,6 +93,8 @@ test('no Course/ExamResult/StudentTest edits required by mapping model', () => {
   assert.ok(mapping.includes("ref: 'Course'"));
   assert.ok(mapping.includes("ref: 'CertPrepCourse'"));
   assert.ok(mapping.includes('unique: true'));
+  assert.ok(mapping.includes('courseId: 1, certPrepCourseId: 1')
+    || mapping.includes('courseId: 1, certPrepCourseId: 1'));
 });
 
 test('CASE 9: POST /access grant remains independent of enrollment mapping', () => {

@@ -72,7 +72,7 @@ export function StudentsProvider({ user, children }) {
     setAdminQuery(null);
   }, [user?.id, user?.role]);
 
-  const { data, mutate, isValidating } = useSWR(
+  const { data, mutate, isValidating, isLoading } = useSWR(
     key,
     fetchStudents,
     { revalidateOnFocus: false, dedupingInterval: 30_000 }
@@ -80,6 +80,8 @@ export function StudentsProvider({ user, children }) {
 
   const students = data?.students ?? [];
   const studentsPagination = data?.pagination ?? EMPTY_PAGINATION;
+  // First fetch for this key: block learning gate until settled
+  const isStudentsLoading = Boolean(key) && (isLoading || (data == null && isValidating));
 
   const fetchStudentsPaginated = useCallback(async (params = {}) => {
     const q = {
@@ -166,8 +168,8 @@ export function StudentsProvider({ user, children }) {
     refreshStudents,
     patchStudent,
     setStudentsLocal,
-    isStudentsLoading: isValidating,
-  }), [students, studentsPagination, fetchStudentsPaginated, refreshStudents, patchStudent, setStudentsLocal, isValidating]);
+    isStudentsLoading,
+  }), [students, studentsPagination, fetchStudentsPaginated, refreshStudents, patchStudent, setStudentsLocal, isStudentsLoading]);
 
   return (
     <StudentsContext.Provider value={value}>

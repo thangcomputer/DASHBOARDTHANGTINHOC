@@ -50,6 +50,12 @@ const certPrepSessionSchema = new mongoose.Schema({
     courseName: { type: String, default: '' },
     levelId: { type: String, default: '' },
     levelTitle: { type: String, default: '' },
+    /** immediate = hiện đáp án khi làm; after_submit = chỉ sau nộp */
+    feedbackMode: {
+      type: String,
+      enum: ['immediate', 'after_submit'],
+      default: 'immediate',
+    },
   },
   /** Frozen question+key copy at finalize. Review must use this, never live questions. */
   questionSnapshot: { type: Array, default: undefined },

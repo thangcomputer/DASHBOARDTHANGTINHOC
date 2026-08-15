@@ -430,6 +430,7 @@ router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only')
           ? sanitizeStudentEssayExamMinutesPayload(essayMinsRaw)
           : undefined,
         studentExamFiles: hasExamFilesOnServer ? sanitizeStudentExamFilesPayload(filesRaw) : {},
+        examWarningSoundUrl: String(settings.examWarningSoundUrl || '').trim(),
         examSubjectsCustom: catalog.custom,
         examSubjectsMerged: catalog.merged,
       },
@@ -653,6 +654,51 @@ router.post('/exam-subjects', authMiddleware, ...settingsGuard('system_write'), 
   }
 });
 
+// ── PUT /api/settings/exam-subjects/:id ── Admin doi ten mon tuy chinh (giu ma id)
+router.put('/exam-subjects/:id', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id || BUILTIN_EXAM_SUBJECT_IDS.includes(id)) {
+      return res.status(400).json({ success: false, message: 'Khong the sua mon mac dinh' });
+    }
+    const label = String(req.body?.label || '').trim();
+    if (label.length < 2) {
+      return res.status(400).json({ success: false, message: 'Tên môn thi không hợp lệ (ít nhất 2 ký tự)' });
+    }
+    const settings = await getSettings();
+    const custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
+    const idx = custom.findIndex((c) => c.id === id);
+    if (idx < 0) {
+      return res.status(404).json({ success: false, message: 'Khong tim thay mon thi' });
+    }
+    const updated = sanitizeCustomExamSubjectEntry({
+      ...custom[idx],
+      id,
+      label,
+      short: req.body?.short,
+      minutes: req.body?.minutes ?? custom[idx].minutes,
+      bg: req.body?.bg || custom[idx].bg,
+      group: custom[idx].group || 'admin',
+    });
+    if (!updated) {
+      return res.status(400).json({ success: false, message: 'Tên môn thi không hợp lệ' });
+    }
+    // Giữ nguyên id (không đổi slug theo tên mới) để khóa học / ngân hàng đề không gãy
+    updated.id = id;
+    custom[idx] = updated;
+    await updateMainSettings({ $set: { examSubjectsCustomRaw: custom } });
+    const io = req.app.get('io');
+    if (io) emitSettingsRefresh(io);
+    return res.json({
+      success: true,
+      message: `Da doi ten mon thanh "${updated.label}"`,
+      data: { subject: updated, merged: getMergedExamCatalog(custom) },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── DELETE /api/settings/exam-subjects/:id ── Admin xoa mon tuy chinh
 router.delete('/exam-subjects/:id', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
@@ -674,7 +720,7 @@ router.delete('/exam-subjects/:id', authMiddleware, ...settingsGuard('system_wri
 // ── PUT /api/settings/student-exam-config ── Admin/Staff lưu ngân hàng + thời gian thi HV
 router.put('/student-exam-config', authMiddleware, ...settingsGuard('student_training_write'), async (req, res) => {
   try {
-    const { studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles } = req.body || {};
+    const { studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, examWarningSoundUrl } = req.body || {};
     const updates = {};
     if (studentQuestions !== undefined) {
       if (!Array.isArray(studentQuestions)) {
@@ -690,6 +736,13 @@ router.put('/student-exam-config', authMiddleware, ...settingsGuard('student_tra
     }
     if (studentExamFiles !== undefined) {
       updates.studentExamFilesRaw = sanitizeStudentExamFilesPayload(studentExamFiles);
+    }
+    if (examWarningSoundUrl !== undefined) {
+      const url = String(examWarningSoundUrl || '').trim();
+      if (url && !/^https?:\/\//i.test(url) && !url.startsWith('/')) {
+        return res.status(400).json({ success: false, message: 'URL âm thanh cảnh báo không hợp lệ' });
+      }
+      updates.examWarningSoundUrl = url.slice(0, 500);
     }
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ success: false, message: 'Không có dữ liệu để lưu' });
@@ -776,6 +829,73 @@ router.post('/upload-training-file', authMiddleware, ...settingsGuard('training_
       fileOriginalName: req.file.originalname || req.file.filename,
       message: 'Tải tài liệu thành công',
     });
+  });
+});
+
+// ── POST /api/settings/upload-exam-warning-sound ── Âm thanh cảnh báo phòng thi TN
+const examSoundDir = path.join(__dirname, '..', 'uploads', 'exam-sounds');
+if (!fs.existsSync(examSoundDir)) fs.mkdirSync(examSoundDir, { recursive: true });
+
+const EXAM_SOUND_MIME = {
+  'audio/mpeg': '.mp3',
+  'audio/mp3': '.mp3',
+  'audio/wav': '.wav',
+  'audio/wave': '.wav',
+  'audio/x-wav': '.wav',
+  'audio/ogg': '.ogg',
+  'audio/webm': '.webm',
+  'audio/mp4': '.m4a',
+  'audio/aac': '.aac',
+  'audio/x-m4a': '.m4a',
+};
+
+const uploadExamSound = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, examSoundDir),
+    filename: (req, file, cb) => {
+      const fromMime = EXAM_SOUND_MIME[String(file.mimetype || '').toLowerCase()];
+      const fromName = path.extname(file.originalname || '').toLowerCase();
+      const ext = fromMime || (['.mp3', '.wav', '.ogg', '.webm', '.m4a', '.aac'].includes(fromName) ? fromName : '.mp3');
+      cb(null, `exam-warn-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const mime = String(file.mimetype || '').toLowerCase();
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (EXAM_SOUND_MIME[mime] || ['.mp3', '.wav', '.ogg', '.webm', '.m4a', '.aac'].includes(ext)) {
+      return cb(null, true);
+    }
+    return cb(new Error('Chỉ cho phép file âm thanh (MP3, WAV, OGG, M4A, AAC, WEBM).'));
+  },
+});
+
+router.post('/upload-exam-warning-sound', authMiddleware, ...settingsGuard('student_training_write'), (req, res) => {
+  uploadExamSound.single('sound')(req, res, async (err) => {
+    try {
+      if (err) {
+        if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ success: false, message: 'File quá lớn (tối đa 5MB).' });
+        }
+        return res.status(400).json({ success: false, message: err.message || 'Lỗi upload' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'Chưa chọn file âm thanh' });
+      }
+      normalizeMulterFile(req.file);
+      const examWarningSoundUrl = `/uploads/exam-sounds/${req.file.filename}`;
+      await updateMainSettings({ $set: { examWarningSoundUrl } });
+      const io = req.app.get('io');
+      if (io) emitSettingsRefresh(io);
+      return res.json({
+        success: true,
+        examWarningSoundUrl,
+        fileOriginalName: req.file.originalname || req.file.filename,
+        message: 'Đã tải âm thanh cảnh báo',
+      });
+    } catch (e) {
+      return res.status(500).json({ success: false, message: e.message || 'Lỗi server' });
+    }
   });
 });
 

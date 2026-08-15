@@ -1421,10 +1421,28 @@ export const settingsAPI = {
     });
     return res.json();
   },
+  updateExamSubject: async (id, payload) => {
+    const res = await apiFetch(`/settings/exam-subjects/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload || {}),
+    });
+    return res.json();
+  },
+  deleteExamSubject: async (id) => {
+    const res = await apiFetch(`/settings/exam-subjects/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    return res.json();
+  },
   uploadTrainingFile: async (file) => {
     const fd = new FormData();
     fd.append('file', file);
     return uploadWithAuth('/settings/upload-training-file', fd);
+  },
+  uploadExamWarningSound: async (file) => {
+    const fd = new FormData();
+    fd.append('sound', file);
+    return uploadWithAuth('/settings/upload-exam-warning-sound', fd);
   },
 };
 

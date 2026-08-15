@@ -2,15 +2,20 @@
 
 /**
  * Unit tests for Student Learning Access Gate SoT.
- * Mirrors client/src/utils/enrollments.js:
- *   hasLearningAccessEnrollment = getClientEnrollments(student).some(e => e.status === 'active')
- * (getActiveClientEnrollments still includes completed — intentionally different.)
+ * Mirrors client/src/utils/enrollments.js learning helpers:
+ *   hasLearningAccessEnrollment = structured enrollments/courses with status === 'active'
+ *   (never invent from root student.course — e.g. "(Đã hủy)" / "Chưa xếp lớp")
  */
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+
+function isPlaceholderCourseName(name) {
+  const n = String(name || '').trim().toLowerCase();
+  return !n || n === '(đã hủy)' || n === 'chưa xếp lớp';
+}
 
 function getClientEnrollments(student) {
   if (!student) return [];
@@ -19,6 +24,8 @@ function getClientEnrollments(student) {
       ...c,
       status: c.status || 'active',
       enrollmentId: c.enrollmentId || c.id || `course-${idx}`,
+      courseName: c.courseName || c.name,
+      name: c.name || c.courseName,
     }));
   }
   if (Array.isArray(student.enrollments) && student.enrollments.length > 0) {
@@ -26,6 +33,8 @@ function getClientEnrollments(student) {
       ...e,
       status: e.status || 'active',
       enrollmentId: e._id ? String(e._id) : `enr-${idx}`,
+      courseName: e.courseName || e.course,
+      name: e.courseName || e.course,
     }));
   }
   if (student.course && String(student.course).trim()) {
@@ -33,7 +42,19 @@ function getClientEnrollments(student) {
       status: student.status === 'Hoàn thành' ? 'completed' : 'active',
       enrollmentId: 'main',
       courseName: student.course,
+      name: student.course,
     }];
+  }
+  return [];
+}
+
+function getStructuredClientEnrollments(student) {
+  if (!student) return [];
+  if (Array.isArray(student.courses) && student.courses.length > 0) {
+    return getClientEnrollments({ ...student, course: undefined });
+  }
+  if (Array.isArray(student.enrollments) && student.enrollments.length > 0) {
+    return getClientEnrollments({ ...student, courses: undefined, course: undefined });
   }
   return [];
 }
@@ -45,9 +66,10 @@ function getActiveClientEnrollments(student) {
 }
 
 function getLearningAccessEnrollments(student) {
-  return getClientEnrollments(student).filter(
-    (e) => String(e?.status || '').toLowerCase() === 'active',
-  );
+  return getStructuredClientEnrollments(student).filter((e) => {
+    if (String(e?.status || '').toLowerCase() !== 'active') return false;
+    return !isPlaceholderCourseName(e?.courseName || e?.name || '');
+  });
 }
 
 function hasLearningAccessEnrollment(student) {
@@ -102,6 +124,34 @@ describe('hasLearningAccessEnrollment SoT (status === active)', () => {
       courses: [{ name: 'X', status: 'active' }],
     }), true);
   });
+
+  it('does NOT invent access from root course after cancel / placeholder', () => {
+    assert.equal(hasLearningAccessEnrollment({
+      course: '(Đã hủy)',
+      enrollments: [],
+    }), false);
+    assert.equal(hasLearningAccessEnrollment({
+      course: 'Chưa xếp lớp',
+    }), false);
+    assert.equal(hasLearningAccessEnrollment({
+      course: 'IC3 SPARK',
+      enrollments: [],
+      courses: [],
+    }), false);
+  });
+
+  it('blocks placeholder course name even if status active', () => {
+    assert.equal(hasLearningAccessEnrollment({
+      courses: [{ name: '(Đã hủy)', status: 'active' }],
+    }), false);
+  });
+
+  it('blocks cancelled enrollments even when root course still set', () => {
+    assert.equal(hasLearningAccessEnrollment({
+      course: '(Đã hủy)',
+      enrollments: [{ courseName: 'IC3', status: 'cancelled' }],
+    }), false);
+  });
 });
 
 describe('static: student learning routes gated vs ungated', () => {
@@ -109,10 +159,15 @@ describe('static: student learning routes gated vs ungated', () => {
   const appSrc = fs.readFileSync(path.join(root, 'client', 'src', 'App.jsx'), 'utf8');
   const sidebarSrc = fs.readFileSync(path.join(root, 'client', 'src', 'components', 'AppSidebar.jsx'), 'utf8');
   const enrollmentsSrc = fs.readFileSync(path.join(root, 'client', 'src', 'utils', 'enrollments.js'), 'utf8');
+  const gateSrc = fs.readFileSync(
+    path.join(root, 'client', 'src', 'components', 'student', 'StudentLearningAccessGate.jsx'),
+    'utf8',
+  );
 
-  it('exports hasLearningAccessEnrollment helper', () => {
+  it('exports hasLearningAccessEnrollment helper without root-course invent for learning', () => {
     assert.match(enrollmentsSrc, /export function hasLearningAccessEnrollment/);
-    assert.match(enrollmentsSrc, /status === 'active'/);
+    assert.match(enrollmentsSrc, /getStructuredClientEnrollments/);
+    assert.match(enrollmentsSrc, /isPlaceholderCourseName/);
   });
 
   it('gates /student and exam routes; leaves inbox/feed/news ungated', () => {
@@ -121,7 +176,6 @@ describe('static: student learning routes gated vs ungated', () => {
     assert.match(appSrc, /path="\/student\/exam"/);
     assert.match(appSrc, /path="\/student\/exam\/:subjectId"/);
 
-    // Ungated surfaces must not be wrapped by Gate in the same element tree as learning-only
     const inboxBlock = appSrc.slice(appSrc.indexOf('path="/student/inbox"'), appSrc.indexOf('path="/student/feed"'));
     assert.doesNotMatch(inboxBlock, /StudentLearningAccessGate/);
 
@@ -132,5 +186,11 @@ describe('static: student learning routes gated vs ungated', () => {
   it('sidebar marks learning items requiresLearningAccess', () => {
     assert.match(sidebarSrc, /requiresLearningAccess:\s*true/);
     assert.match(sidebarSrc, /hasLearningAccessEnrollment/);
+  });
+
+  it('gate fail-closes for student role after load', () => {
+    assert.match(gateSrc, /isStudentsLoading/);
+    assert.match(gateSrc, /StudentNoActiveCoursePage/);
+    assert.match(gateSrc, /!student \|\| !hasAccess/);
   });
 });

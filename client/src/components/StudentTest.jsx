@@ -5,6 +5,7 @@ import {
   LayoutGrid, Shield, Clock,
 } from 'lucide-react';
 import ExamMonitor, { CameraHeaderPanel } from './ExamMonitor';
+import ExamClickOutsideGuard from './exam/ExamClickOutsideGuard';
 import { useSocket } from '../context/SocketContext';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments } from '../utils/enrollments';
@@ -21,7 +22,6 @@ import {
 } from '../utils/studentCertificationExam';
 import { EXAM_CAMERA_PERMISSION_LABEL } from '../utils/examUi';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../services/api';
-import StudentQuizList from './student/StudentQuizList';
 
 const SUBJECT_META = {
   coban:       { label: 'Máy vi tính (Cơ bản)', short: 'Cơ bản',     examFile: 'De_thi_Co_ban.docx', time: 90 * 60 },
@@ -49,7 +49,7 @@ function ExamBrandLogo({ resolvedUrl, className }) {
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
 const ConfirmModal = ({ title, message, boldText, onConfirm, onCancel, confirmLabel = 'Nộp bài', cancelLabel = 'Làm tiếp' }) => (
-  <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+  <div data-exam-modal className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
       <h3 className="font-bold text-gray-800 text-base mb-2">{title}</h3>
       <p className="text-gray-600 text-sm mb-1">
@@ -75,13 +75,14 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   }
   const STUDENT_ID = session.id || session._id || null;
   const punishKey = STUDENT_ID ? `punish_student_exam:${STUDENT_ID}` : 'punish_student_exam';
-  const { students, studentQuestions, setStudentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, updateStudent, addNotification, examSubjectsCatalog } = useData() || {
+  const { students, studentQuestions, setStudentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, examWarningSoundUrl = '', updateStudent, addNotification, examSubjectsCatalog } = useData() || {
     students: [],
     studentQuestions: [],
     setStudentQuestions: () => {},
     studentExamMinutes: { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90 },
     studentEssayExamMinutes: { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60 },
     studentExamFiles: {},
+    examWarningSoundUrl: '',
     updateStudent: () => {},
     addNotification: () => {},
   };
@@ -702,9 +703,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const secs   = timeLeft % 60;
 
   // ══════════════════════════════════════════════════════
-  // HARDWARE CHECK / MODE SELECTOR
+  // HARDWARE CHECK (thi chứng nhận)
   // ══════════════════════════════════════════════════════
-  const [examMode, setExamMode] = useState('lesson_quiz'); // 'lesson_quiz' | 'cert'
   const canStartExam = cameraReady && bankTotal > 0 && !questionsLoading;
 
   if (!STUDENT_ID) {
@@ -721,51 +721,20 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     );
   }
 
-  // ── Chọn chế độ Thi Trắc Nghệm Buổi Học (Do GV Tạo) hoặc Thi Chứng Chỉ Môn Học ──
   if (phase === 'hardware_check') return (
     <div className="min-h-screen w-full bg-slate-900 flex flex-col p-4 sm:p-6 lg:p-8 space-y-4">
-      {/* Top mode switcher */}
-      <div className="w-full flex items-center justify-between gap-3 bg-slate-800/80 p-2 rounded-2xl border border-slate-700">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setExamMode('lesson_quiz')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
-              examMode === 'lesson_quiz'
-                ? 'bg-red-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
-          >
-            <Shield size={16} /> Trắc nghiệm buổi học (Giảng viên)
-          </button>
-          <button
-            type="button"
-            onClick={() => setExamMode('cert')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
-              examMode === 'cert'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
-          >
-            <Monitor size={16} /> Thi chứng nhận môn học
-          </button>
-        </div>
+      <div className="w-full flex items-center gap-3">
         {onBack && (
           <button
             type="button"
             onClick={onBack}
-            className="px-3 py-1.5 rounded-xl bg-slate-700 text-slate-300 hover:text-white text-xs font-bold"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-200 hover:text-white hover:bg-slate-700 text-xs font-bold border border-slate-600"
           >
-            Quay lại
+            ← Quay lại
           </button>
         )}
       </div>
 
-      {examMode === 'lesson_quiz' ? (
-        <div className="w-full">
-          <StudentQuizList />
-        </div>
-      ) : (
         <div className="flex-1 flex items-center justify-center relative overflow-hidden">
           <div className="absolute inset-0 border-[12px] border-blue-500/30 pointer-events-none rounded-[32px] m-4 animate-pulse" />
           <div className="bg-white rounded-[28px] p-5 max-w-[320px] w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-blue-600 animate-in zoom-in duration-500 overflow-y-auto max-h-[90vh] no-scrollbar">
@@ -867,9 +836,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
          </button>
        </div>
       </div>
-      )}
     </div>
-  );
+  );;
 
   // ══════════════════════════════════════════════════════
   // BANNED
@@ -994,7 +962,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const unanswered     = TOTAL - answeredCount;
 
   return (
-    <div className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-slate-100 font-sans text-slate-900">
+    <ExamClickOutsideGuard
+      enabled={phase === 'test' && tab !== 'tu_luan'}
+      soundUrl={examWarningSoundUrl}
+      className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-slate-100 font-sans text-slate-900"
+    >
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.35]"
         style={{
@@ -1411,7 +1383,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       </div>
 
       {/* ExamMonitor (logic only) */}
-      <ExamMonitor ref={monitorRef} isActive={phase === 'test'} onViolate={handleViolation} onResetExam={handleResetExam} requireWebcam={requireWebcam} enableTabGuard={tab !== 'tu_luan'} />
+      <ExamMonitor ref={monitorRef} isActive={phase === 'test'} onViolate={handleViolation} onResetExam={handleResetExam} requireWebcam={requireWebcam} enableTabGuard={tab !== 'tu_luan'} warningSoundUrl={examWarningSoundUrl} />
 
       {/* ══════════ MODALS ══════════ */}
       {showSubmitConfirm && (
@@ -1441,7 +1413,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           onCancel={() => setShowNoFileConfirm(false)}
         />
       )}
-    </div>
+    </ExamClickOutsideGuard>
   );
 };
 

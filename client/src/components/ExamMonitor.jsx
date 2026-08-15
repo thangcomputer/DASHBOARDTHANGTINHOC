@@ -26,7 +26,8 @@ import {
 } from '../utils/proctor/cameraHealth.js';
 import { createRiskEngine, createConfirmTracker } from '../utils/proctor/riskEngine.js';
 import { createProctorEventLog, resolveProctorUiStatus } from '../utils/proctor/eventLog.js';
-import { proctorAPI } from '../services/api.js';
+import { playExamWarningSound, unlockAudio } from '../utils/sound';
+import { proctorAPI, resolveMediaUrl } from '../services/api.js';
 
 function readStoredFaceViolations(persistKey, initialCount = 0) {
   let fromLs = 0;
@@ -58,6 +59,7 @@ const ExamMonitor = forwardRef(({
   onViolate,
   requireWebcam = true,
   enableTabGuard = true,
+  warningSoundUrl = '',
   persistKey = null,
   initialFaceViolations = 0,
   onFaceViolationChange = null,
@@ -149,14 +151,9 @@ const ExamMonitor = forwardRef(({
   }, [isTerminated, logEvent]);
 
   const playWarningBeep = useCallback(() => {
-    try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      oscillator.connect(audioCtx.destination);
-      oscillator.start();
-      oscillator.stop(audioCtx.currentTime + 0.12);
-    } catch { /* ignore */ }
-  }, []);
+    unlockAudio();
+    playExamWarningSound(resolveMediaUrl(warningSoundUrl) || warningSoundUrl);
+  }, [warningSoundUrl]);
 
   const registerHardViolation = useCallback((kind, overlay) => {
     const now = Date.now();
@@ -635,7 +632,7 @@ const ExamMonitor = forwardRef(({
   if (!isActive && !warningOverlay) return null;
 
   const warningPortal = warningOverlay ? createPortal(
-    <div className="fixed inset-0 z-[200000] flex items-center justify-center bg-red-950/90 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-300">
+    <div data-exam-warning-overlay className="fixed inset-0 z-[200000] flex items-center justify-center bg-red-950/90 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-300">
       <div className={`bg-white rounded-[40px] shadow-[0_32px_120px_-15px_rgba(220,38,38,0.5)] w-full max-w-sm overflow-hidden border-t-[12px] ${warningOverlay.soft ? 'border-amber-500' : 'border-red-600'} animate-in zoom-in duration-500 scale-100`}>
         <div className="p-10 text-center space-y-6">
           <div className={`w-24 h-24 rounded-[35%] flex items-center justify-center mx-auto shadow-2xl ${warningOverlay.type === 'tab' ? 'bg-orange-100 text-orange-600' : warningOverlay.soft ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'} animate-bounce`}>

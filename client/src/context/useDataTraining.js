@@ -48,6 +48,7 @@ export function useDataTraining(currentUser) {
   const [studentExamMinutes, setStudentExamMinutes] = useState(loadInitialStudentExamMinutes);
   const [studentEssayExamMinutes, setStudentEssayExamMinutes] = useState(loadInitialStudentEssayExamMinutes);
   const [studentExamFiles, setStudentExamFiles] = useState(() => loadState(STUDENT_EXAM_FILES_KEY, {}));
+  const [examWarningSoundUrl, setExamWarningSoundUrl] = useState('');
   const [studentExamBankHydrated, setStudentExamBankHydrated] = useState(false);
   const [examSubjectsCatalog, setExamSubjectsCatalog] = useState(BUILTIN_EXAM_SUBJECTS);
 
@@ -94,6 +95,9 @@ export function useDataTraining(currentUser) {
     }
     if (d.studentExamFiles && typeof d.studentExamFiles === 'object') {
       setStudentExamFiles(d.studentExamFiles);
+    }
+    if (typeof d.examWarningSoundUrl === 'string') {
+      setExamWarningSoundUrl(d.examWarningSoundUrl.trim());
     }
   }, [applyExamCatalogFromServer]);
 
@@ -245,11 +249,12 @@ export function useDataTraining(currentUser) {
           studentExamMinutes,
           studentEssayExamMinutes,
           studentExamFiles,
+          examWarningSoundUrl,
         })
         .catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, currentUser?.role, studentExamBankHydrated]);
+  }, [studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, examWarningSoundUrl, currentUser?.role, studentExamBankHydrated]);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'teacher') return;
@@ -536,6 +541,61 @@ export function useDataTraining(currentUser) {
     return subject;
   }, []);
 
+  const removeCustomExamSubject = useCallback(async (subjectId) => {
+    const id = String(subjectId || '').trim();
+    if (!id) throw new Error('Ma mon thi khong hop le');
+    const res = await api.settings.deleteExamSubject(id);
+    if (!res?.success) {
+      throw new Error(res?.message || 'Khong xoa duoc mon thi');
+    }
+    if (Array.isArray(res.data?.merged)) {
+      setExamSubjectsCatalog(mergedArrayToCatalog(res.data.merged));
+    } else {
+      setExamSubjectsCatalog((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+    setStudentExamMinutes((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setStudentEssayExamMinutes((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    return true;
+  }, []);
+
+  const updateCustomExamSubject = useCallback(async (subjectId, payload) => {
+    const id = String(subjectId || '').trim();
+    if (!id) throw new Error('Ma mon thi khong hop le');
+    const res = await api.settings.updateExamSubject(id, payload);
+    if (!res?.success) {
+      throw new Error(res?.message || 'Khong sua duoc mon thi');
+    }
+    const subject = res.data?.subject;
+    if (Array.isArray(res.data?.merged)) {
+      setExamSubjectsCatalog(mergedArrayToCatalog(res.data.merged));
+    } else if (subject) {
+      setExamSubjectsCatalog((prev) => ({
+        ...prev,
+        [id]: {
+          ...(prev[id] || {}),
+          ...subject,
+          id,
+          custom: true,
+        },
+      }));
+    }
+    return subject;
+  }, []);
+
   const updateStudentExamMinutes = useCallback((patch) => {
     if (!patch || typeof patch !== 'object') return;
     setStudentExamMinutes((prev) => {
@@ -610,8 +670,12 @@ export function useDataTraining(currentUser) {
     updateStudentEssayExamMinutes,
     studentExamFiles,
     setStudentExamFile,
+    examWarningSoundUrl,
+    setExamWarningSoundUrl,
     examSubjectsCatalog,
     addCustomExamSubject,
+    updateCustomExamSubject,
+    removeCustomExamSubject,
     applyStudentExamConfigFromServer,
     addStudentTrainingItem,
     updateStudentTrainingItem,

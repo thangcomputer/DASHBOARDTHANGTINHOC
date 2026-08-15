@@ -1,5 +1,6 @@
 'use strict';
 
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const CertPrepCourse = require('../models/CertPrepCourse');
 const CertPrepLevel = require('../models/CertPrepLevel');
@@ -313,6 +314,8 @@ function sessionTiming(session, now = new Date()) {
 function toStudentSession(session, questions = [], extra = {}) {
   const snap = session.configSnapshot || {};
   const timing = sessionTiming(session, extra.now || new Date());
+  const feedbackMode = snap.feedbackMode === 'after_submit' ? 'after_submit' : 'immediate';
+  const reveal = feedbackMode === 'immediate' && session.status === 'in_progress';
   return {
     id: String(session._id || session.id),
     testId: String(session.testId || ''),
@@ -324,12 +327,13 @@ function toStudentSession(session, questions = [], extra = {}) {
       name: snap.name || '',
       timeLimitMinutes: snap.timeLimitMinutes,
       questionCount: snap.questionCount,
+      feedbackMode,
     },
     answers: (session.answers || []).map((a) => ({
       questionId: String(a.questionId),
       value: a.value,
     })),
-    questions: (questions || []).map((q) => stripAnswerKeys(q, { reveal: false })),
+    questions: (questions || []).map((q) => stripAnswerKeys(q, { reveal })),
     remainingSeconds: timing.remainingSeconds,
     serverNow: timing.serverNow,
     deadlineAt: timing.deadlineAt,
@@ -675,8 +679,10 @@ async function createQuestion(testId, body) {
   const id = requireOid(testId, 'testId');
   const test = await CertPrepTest.findById(id).lean();
   if (!test) throw new CertPrepError(404, 'Không tìm thấy bài kiểm tra');
+  const activeBefore = await countActiveQuestions(test);
   const payload = normalizeQuestionPayload(body, test);
   const doc = await CertPrepQuestion.create(payload);
+  await maybeGrowQuestionCount(id, activeBefore);
   return doc.toObject();
 }
 
@@ -895,16 +901,80 @@ async function countActiveQuestions(test) {
   });
 }
 
+/** Số câu lấy vào phiên: min(cấu hình, ngân hàng thực tế). */
+function resolveDrawCount(test, availableCount) {
+  const available = Math.max(0, Number(availableCount) || 0);
+  if (available <= 0) return 0;
+  const want = Number(test.questionCount);
+  if (!Number.isInteger(want) || want <= 0) return available;
+  return Math.min(want, available);
+}
+
 async function selectQuestionIds(test) {
   const questions = await CertPrepQuestion.find({
     testId: test._id,
     locale: test.locale,
     isActive: true,
   }).sort({ sortOrder: 1, createdAt: 1 }).select('_id').lean();
-  if (questions.length < test.questionCount) {
-    throw new CertPrepError(400, 'Bài kiểm tra chưa đủ số lượng câu hỏi.');
+  if (!questions.length) {
+    throw new CertPrepError(400, 'Bài kiểm tra chưa có câu hỏi.');
   }
-  return questions.slice(0, test.questionCount).map((q) => q._id);
+  const take = resolveDrawCount(test, questions.length);
+  return questions.slice(0, take).map((q) => q._id);
+}
+
+/** Phiên đang làm: bổ sung câu mới nếu admin thêm câu / tăng số câu lấy. */
+async function expandSessionQuestionsIfNeeded(session, test) {
+  if (!session || session.status !== 'in_progress' || !test) return session;
+  const available = await CertPrepQuestion.find({
+    testId: test._id,
+    locale: test.locale,
+    isActive: true,
+  }).sort({ sortOrder: 1, createdAt: 1 }).select('_id').lean();
+  if (!available.length) return session;
+
+  const current = (session.questionIds || []).map((id) => String(id));
+  let want = Number(test.questionCount) || 0;
+  // Đề đang lấy đúng số câu cấu hình, admin vừa thêm vài câu → tự bắt kịp ngân hàng
+  if (
+    available.length > want
+    && current.length === want
+    && (available.length - want) <= 10
+  ) {
+    want = available.length;
+    await CertPrepTest.updateOne({ _id: test._id }, { $set: { questionCount: want } });
+  }
+
+  const take = Math.min(want > 0 ? want : available.length, available.length);
+  if (current.length >= take) return session;
+
+  const have = new Set(current);
+  const extras = available.filter((q) => !have.has(String(q._id))).slice(0, take - current.length);
+  if (!extras.length) return session;
+  session.questionIds = [...(session.questionIds || []), ...extras.map((q) => q._id)];
+  const snap = session.configSnapshot?.toObject
+    ? session.configSnapshot.toObject()
+    : { ...(session.configSnapshot || {}) };
+  session.set('configSnapshot', {
+    ...snap,
+    questionCount: session.questionIds.length,
+  });
+  session.markModified('questionIds');
+  await session.save();
+  return session;
+}
+
+/** Khi ngân hàng = đúng số câu đang cấu hình, thêm câu → tự tăng số câu lấy. */
+async function maybeGrowQuestionCount(testId, activeBefore) {
+  const test = await CertPrepTest.findById(testId);
+  if (!test) return;
+  const activeAfter = await countActiveQuestions(test);
+  if (activeAfter <= 0) return;
+  const configured = Number(test.questionCount) || 0;
+  if (configured === activeBefore || configured < activeAfter && configured <= 1) {
+    test.questionCount = activeAfter;
+    await test.save();
+  }
 }
 
 async function startSession(studentId, body) {
@@ -920,8 +990,15 @@ async function startSession(studentId, body) {
     testId: test._id,
     status: 'in_progress',
   });
+  const feedbackMode = body.feedbackMode === 'after_submit' ? 'after_submit' : 'immediate';
   if (existing) {
     if (!isSessionExpired(existing, existing.configSnapshot?.timeLimitMinutes || test.timeLimitMinutes)) {
+      const snap = existing.configSnapshot?.toObject
+        ? existing.configSnapshot.toObject()
+        : { ...(existing.configSnapshot || {}) };
+      existing.set('configSnapshot', { ...snap, feedbackMode });
+      await existing.save();
+      await expandSessionQuestionsIfNeeded(existing, test);
       return toStudentSession(existing, []);
     }
     await finalizeSession(existing, { auto: true });
@@ -954,6 +1031,7 @@ async function startSession(studentId, body) {
       courseName: course.name || '',
       levelId: String(level._id),
       levelTitle: level.title || '',
+      feedbackMode,
     },
   });
   return toStudentSession(session, []);
@@ -1022,6 +1100,12 @@ async function getSession(studentId, sessionId) {
   const session = await CertPrepSession.findById(id);
   if (!session) throw new CertPrepError(404, 'Không tìm thấy phiên làm bài');
   assertSessionOwner(session, sid);
+  try {
+    const { test } = await loadTestChain(session.testId);
+    await expandSessionQuestionsIfNeeded(session, test);
+  } catch {
+    /* keep session as-is if test chain missing */
+  }
   const limit = session.configSnapshot?.timeLimitMinutes;
   let autoSubmitted = false;
   if (session.status === 'in_progress' && isSessionExpired(session, limit)) {

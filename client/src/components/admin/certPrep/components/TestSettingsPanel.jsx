@@ -42,7 +42,7 @@ export default function TestSettingsPanel({ value, onChange, disabled = false })
         />
       </label>
       <label className="block space-y-1">
-        <span className="text-xs font-bold text-slate-600">Số câu</span>
+        <span className="text-xs font-bold text-slate-600">Số câu lấy mỗi lần thi</span>
         <input
           type="number"
           min={1}
@@ -51,6 +51,9 @@ export default function TestSettingsPanel({ value, onChange, disabled = false })
           onChange={(e) => set({ questionCount: e.target.value })}
           className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold"
         />
+        <span className="text-[11px] text-slate-400 font-medium">
+          Phải ≥ số câu muốn HV làm. Có 2 câu trong ngân hàng thì đặt 2 (không đặt 1).
+        </span>
       </label>
       <label className="block space-y-1">
         <span className="text-xs font-bold text-slate-600">Điểm đạt (/1000)</span>

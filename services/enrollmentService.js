@@ -53,6 +53,11 @@ async function resolveEnrollmentExamSubjects({ courseName, courseId }) {
   return resolveExamSubjectsForCourse(course || { name: courseName }, custom);
 }
 
+function isPlaceholderCourseName(name) {
+  const n = String(name || '').trim().toLowerCase();
+  return !n || n === '(đã hủy)' || n === 'chưa xếp lớp';
+}
+
 function getEnrollmentsFromStudent(student) {
   const doc = student.toObject ? student.toObject() : { ...student };
   if (Array.isArray(doc.enrollments) && doc.enrollments.length > 0) {
@@ -63,7 +68,10 @@ function getEnrollmentsFromStudent(student) {
       teacherName: e.teacherName || e.teacherId?.name || '',
     }));
   }
-  if (doc.course) return [legacyEnrollmentFromStudent(doc)];
+  // Không invent enrollment active từ placeholder sau hủy / chưa xếp lớp
+  if (doc.course && !isPlaceholderCourseName(doc.course)) {
+    return [legacyEnrollmentFromStudent(doc)];
+  }
   return [];
 }
 
@@ -288,7 +296,9 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
         || '',
       completedSessions: completed,
       remainingSessions: Math.max(0, total - completed),
-      status: completed >= total ? 'completed' : (e.status || 'active'),
+      status: (e.status === 'cancelled' || e.status === 'refunded')
+        ? e.status
+        : (completed >= total ? 'completed' : (e.status || 'active')),
       grades: enrGrades,
       requireWebcam: inheritWebcamOff ? false : (e.requireWebcam !== false),
       examUnlocked: e.examUnlocked === true || inheritUnlock,

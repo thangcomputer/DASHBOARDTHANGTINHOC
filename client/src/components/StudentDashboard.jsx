@@ -526,16 +526,25 @@ const StudentDashboard = ({ onNavigate }) => {
   useEffect(() => {
     if (!viewStudent?.id || !viewStudent?.teacherId) return;
 
-    const milestones = [];
-    if (viewStudent.completedSessions === 1) milestones.push('lesson_1');
-    if (viewStudent.completedSessions >= viewStudent.totalSessions / 2 && viewStudent.completedSessions < (viewStudent.totalSessions / 2) + 1) milestones.push('mid_course');
+    const done = (m) => privateEvaluations.some(
+      (e) => String(e.studentId) === String(viewStudent.id) && e.milestone === m,
+    );
 
-    for (const m of milestones) {
-      const alreadyDone = privateEvaluations.some(e => e.studentId === viewStudent.id && e.milestone === m);
-      if (!alreadyDone) {
-        setTimeout(() => setActiveMilestone(m), 2000);
-        break;
-      }
+    const milestones = [];
+    // Buổi đầu: đánh giá GV 1 lần
+    if (Number(viewStudent.completedSessions) === 1 && !done('lesson_1')) {
+      milestones.push('lesson_1');
+    }
+    // Hết khóa: trung tâm → GV
+    const total = Number(viewStudent.totalSessions) || 12;
+    const completed = Number(viewStudent.completedSessions) || 0;
+    if (completed > 0 && completed >= total) {
+      if (!done('course_end_center')) milestones.push('course_end');
+      else if (!done('course_end_teacher')) milestones.push('course_end_teacher');
+    }
+
+    if (milestones.length) {
+      setTimeout(() => setActiveMilestone(milestones[0]), 2000);
     }
   }, [viewStudent?.completedSessions, viewStudent?.id, viewStudent?.totalSessions, viewStudent?.teacherId, privateEvaluations]);
 

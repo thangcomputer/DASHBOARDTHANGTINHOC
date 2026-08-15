@@ -16,7 +16,9 @@ const certPrepEnrollmentMappingSchema = new mongoose.Schema({
   updatedBy: { type: String, default: '' },
 }, { timestamps: true });
 
-certPrepEnrollmentMappingSchema.index({ courseId: 1 }, { unique: true });
+// 1 LMS course → nhiều chương trình CertPrep (vd. IC3 → SPARK + GS6)
+certPrepEnrollmentMappingSchema.index({ courseId: 1, certPrepCourseId: 1 }, { unique: true });
+certPrepEnrollmentMappingSchema.index({ courseId: 1, isActive: 1 });
 certPrepEnrollmentMappingSchema.index({ certPrepCourseId: 1, isActive: 1 });
 
 module.exports = mongoose.model('CertPrepEnrollmentMapping', certPrepEnrollmentMappingSchema);

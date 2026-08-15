@@ -109,11 +109,12 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
 
   return (
     <>
-      <div className="cms-sheet-backdrop" onClick={onCancel} aria-hidden="true" />
+      <div className="cms-sheet-backdrop" data-app-modal onClick={onCancel} aria-hidden="true" />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        data-app-modal
         aria-label={modal.title || 'Thông báo'}
         tabIndex={-1}
         className={`cms-sheet w-full ${sizeClass}`.trim()}

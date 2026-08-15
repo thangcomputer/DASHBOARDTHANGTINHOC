@@ -355,20 +355,17 @@ export function LmsGuideHost({ role, userId, pathname, hash, hideButton = false,
   const enabled = role === 'student' || role === 'teacher';
 
   useEffect(() => {
-    if (!enabled || !userId) return;
-    // Chỉ tự mở trợ giúp với tài khoản mới (lần đăng nhập đầu).
-    // Không còn auto mở popup đổi mật khẩu — HV/GV đổi MK thủ công ở Hồ sơ / menu.
-    if (!isFirstLogin) return undefined;
-
-    const seen = hasSeenLmsGuide(role, userId);
-    if (seen) return undefined;
+    if (!enabled || !userId) return undefined;
+    // Chỉ tự mở 1 lần / tài khoản (localStorage). Không phụ thuộc isFirstLogin
+    // vì flag server có thể còn true dù HV đã xem hướng dẫn.
+    if (hasSeenLmsGuide(role, userId)) return undefined;
 
     const t = setTimeout(() => {
       setMode('tour');
       setOpen(true);
     }, 600);
     return () => clearTimeout(t);
-  }, [enabled, role, userId, isFirstLogin]);
+  }, [enabled, role, userId]);
 
   useEffect(() => {
     if (!enabled) return undefined;

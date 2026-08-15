@@ -4,9 +4,10 @@ import { useAdminTab } from '../AdminTabContext';
 import { useData } from '../../../context/DataContext';
 import {
   Clock, Trash2, Plus, Download, FileSpreadsheet, Upload, Loader2, FileText,
-  Edit3, X, Save, Search, HelpCircle, CheckCircle2, ImageIcon, ListChecks, PenLine,
+  Edit3, X, Save, Search, HelpCircle, CheckCircle2, ImageIcon, ListChecks, PenLine, Volume2,
 } from 'lucide-react';
 import { downloadStudentQuestionsExcelTemplate } from '../../../utils/studentQuestionsExcel';
+import { playExamWarningSound, unlockAudio } from '../../../utils/sound';
 import {
   getStudentMcQuestionsForExam,
   getStudentEssayQuestionsForExam,
@@ -88,6 +89,8 @@ export default function StudentQuestionBankPanel() {
     studentEssayExamMinutes,
     updateStudentEssayExamMinutes,
     studentExamFiles,
+    examWarningSoundUrl = '',
+    setExamWarningSoundUrl,
     addStudentQuestion,
     updateStudentQuestion,
     removeStudentQuestion,
@@ -108,6 +111,7 @@ export default function StudentQuestionBankPanel() {
 
   const [mcSearch, setMcSearch] = React.useState('');
   const [tlSearch, setTlSearch] = React.useState('');
+  const [soundUploading, setSoundUploading] = React.useState(false);
   const [imageUploading, setImageUploading] = React.useState(false);
   const [pdfUploading, setPdfUploading] = React.useState(false);
 
@@ -148,6 +152,23 @@ export default function StudentQuestionBankPanel() {
       toast.error(err.message || 'Không tải được file');
     } finally {
       setPdfUploading(false);
+    }
+  };
+
+  const handleExamWarningSoundUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setSoundUploading(true);
+    try {
+      const data = await api.settings.uploadExamWarningSound(file);
+      if (!data.success) throw new Error(data.message || 'Upload thất bại');
+      setExamWarningSoundUrl?.(data.examWarningSoundUrl || '');
+      toast.success('Đã tải âm thanh cảnh báo');
+    } catch (err) {
+      toast.error(err.message || 'Không tải được âm thanh');
+    } finally {
+      setSoundUploading(false);
     }
   };
 
@@ -265,6 +286,7 @@ export default function StudentQuestionBankPanel() {
         studentExamMinutes,
         studentEssayExamMinutes,
         studentExamFiles,
+        examWarningSoundUrl,
       });
       toast.success(sqForm.id ? 'Đã cập nhật!' : 'Đã thêm câu hỏi!');
       setSqForm(null);
@@ -345,6 +367,72 @@ export default function StudentQuestionBankPanel() {
               <Trash2 size={14} /> Xóa toàn bộ
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[14rem]">
+            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
+              Âm thanh cảnh báo phòng thi (TN)
+            </label>
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <Volume2 size={16} className="text-slate-500 shrink-0" />
+              {examWarningSoundUrl ? (
+                <span className="truncate text-emerald-700">
+                  Đã có file — {String(examWarningSoundUrl).split('/').pop()}
+                </span>
+              ) : (
+                <span className="text-slate-400">Chưa tải — dùng beep mặc định</span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
+              MP3 / WAV / OGG / M4A · tối đa 5MB. Chỉ trắc nghiệm; tự luận không chặn.
+            </p>
+          </div>
+          <label className="px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer inline-flex items-center gap-1.5">
+            {soundUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            {soundUploading ? 'Đang tải...' : 'Tải âm thanh lên'}
+            <input
+              type="file"
+              accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.webm"
+              className="hidden"
+              disabled={soundUploading}
+              onChange={handleExamWarningSoundUpload}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              unlockAudio();
+              playExamWarningSound(resolveMediaUrl(examWarningSoundUrl) || examWarningSoundUrl);
+            }}
+            className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50"
+          >
+            Nghe thử
+          </button>
+          {examWarningSoundUrl ? (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  setExamWarningSoundUrl?.('');
+                  await api.settings.updateStudentExamConfig({
+                    studentExamMinutes,
+                    studentEssayExamMinutes,
+                    studentExamFiles,
+                    examWarningSoundUrl: '',
+                  });
+                  toast.success('Đã gỡ âm thanh — dùng beep mặc định');
+                } catch (err) {
+                  toast.error(err.message || 'Gỡ thất bại');
+                }
+              }}
+              className="px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100"
+            >
+              Gỡ file
+            </button>
+          ) : null}
         </div>
       </div>
 

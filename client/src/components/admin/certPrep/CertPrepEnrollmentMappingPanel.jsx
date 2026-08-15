@@ -87,7 +87,8 @@ export default function CertPrepEnrollmentMappingPanel({ certPrepCourses, toast 
       <div className="cms-card p-4 sm:p-5 space-y-3">
         <h3 className="text-base font-bold text-slate-900">Liên kết khóa học</h3>
         <p className="text-sm text-slate-500">
-          Map khóa học đăng ký hiện tại với chương trình ôn thi. Học viên được thêm/gán khóa đã map sẽ tự được cấp quyền CertPrep.
+          Map khóa học đăng ký với chương trình ôn thi (một khóa LMS có thể liên kết nhiều CertPrep, ví dụ IC3 → SPARK + GS6).
+          Học viên có enrollment active sẽ được cấp quyền tự động; bấm Đồng bộ để cập nhật HV cũ.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="text-sm font-bold text-slate-600">
