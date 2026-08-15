@@ -37,7 +37,9 @@ export default function CertPrepStudentPlayer() {
         ? !Array.isArray(sample.correctIndices)
         : sample?.type === 'matching'
           ? !Array.isArray(sample.matchingPairs)
-          : false;
+          : sample?.type === 'true_false_grid'
+            ? !(Array.isArray(sample.statements) && sample.statements.some((s) => typeof s?.correct === 'boolean'))
+            : false;
     if (missingKeys) {
       keysReloadTried.current = true;
       player.loadSession();

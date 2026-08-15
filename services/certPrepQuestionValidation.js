@@ -1,6 +1,11 @@
 'use strict';
 
-const QUESTION_TYPES = Object.freeze(['single_choice', 'multiple_choice', 'matching']);
+const QUESTION_TYPES = Object.freeze([
+  'single_choice',
+  'multiple_choice',
+  'matching',
+  'true_false_grid',
+]);
 const LOCALES = Object.freeze(['vi', 'en']);
 
 function fail(message) {
@@ -126,6 +131,28 @@ function validateMatchingQuestion(payload) {
   return ok();
 }
 
+function validateTrueFalseGridQuestion(payload) {
+  const statements = asArray(payload.statements);
+  if (statements.length < 1) {
+    return fail('Cần ít nhất 1 nhận định Đúng/Sai');
+  }
+  const ids = [];
+  for (const row of statements) {
+    const id = String(row?.id || '').trim();
+    const text = String(row?.text || '').trim();
+    if (!id) return fail('Mỗi nhận định cần có id');
+    if (!text) return fail('Mỗi nhận định cần có nội dung');
+    if (typeof row.correct !== 'boolean') {
+      return fail('Mỗi nhận định cần chọn Đúng hoặc Sai');
+    }
+    ids.push(id);
+  }
+  if (new Set(ids).size !== ids.length) {
+    return fail('Id nhận định không được trùng');
+  }
+  return ok();
+}
+
 function validateQuestion(payload) {
   if (!payload || typeof payload !== 'object') {
     return fail('Dữ liệu câu hỏi không hợp lệ');
@@ -142,6 +169,7 @@ function validateQuestion(payload) {
   if (payload.type === 'single_choice') return validateSingleChoiceQuestion(payload);
   if (payload.type === 'multiple_choice') return validateMultipleChoiceQuestion(payload);
   if (payload.type === 'matching') return validateMatchingQuestion(payload);
+  if (payload.type === 'true_false_grid') return validateTrueFalseGridQuestion(payload);
   return fail('Loại câu hỏi không hợp lệ');
 }
 
@@ -152,4 +180,5 @@ module.exports = {
   validateSingleChoiceQuestion,
   validateMultipleChoiceQuestion,
   validateMatchingQuestion,
+  validateTrueFalseGridQuestion,
 };

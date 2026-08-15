@@ -2,6 +2,7 @@ import { resolveMediaUrl } from '../../../services/api';
 import CertPrepReviewSingleChoice from './CertPrepReviewSingleChoice';
 import CertPrepReviewMultipleChoice from './CertPrepReviewMultipleChoice';
 import CertPrepReviewMatching from './CertPrepReviewMatching';
+import CertPrepReviewTrueFalseGrid from './CertPrepReviewTrueFalseGrid';
 
 function optionLetter(i) {
   return String.fromCharCode(65 + i);
@@ -62,8 +63,9 @@ export default function CertPrepReviewQuestion({ question, total }) {
       {question.type === 'single_choice' ? <CertPrepReviewSingleChoice question={question} /> : null}
       {question.type === 'multiple_choice' ? <CertPrepReviewMultipleChoice question={question} /> : null}
       {question.type === 'matching' ? <CertPrepReviewMatching question={question} /> : null}
+      {question.type === 'true_false_grid' ? <CertPrepReviewTrueFalseGrid question={question} /> : null}
 
-      {question.type !== 'matching' ? (
+      {question.type !== 'matching' && question.type !== 'true_false_grid' ? (
         <div className="text-sm space-y-1">
           <p><span className="font-bold text-slate-600">Bạn chọn:</span> {studentChoiceLabel(question)}</p>
           <p><span className="font-bold text-slate-600">Đáp án đúng:</span> {correctChoiceLabel(question)}</p>

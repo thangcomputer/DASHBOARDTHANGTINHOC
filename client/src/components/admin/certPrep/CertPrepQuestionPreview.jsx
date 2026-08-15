@@ -62,6 +62,33 @@ export default function CertPrepQuestionPreview({ question, showAnswers = true }
         </div>
       )}
 
+      {q.type === 'true_false_grid' && (
+        <div className="overflow-x-auto rounded-xl border border-slate-100">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 text-xs font-black uppercase text-slate-500">
+                <th className="px-3 py-2 text-left">Nhận định</th>
+                <th className="px-3 py-2 text-center w-24">Yes</th>
+                <th className="px-3 py-2 text-center w-24">No</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(q.statements || []).map((row, i) => (
+                <tr key={row.id || i} className="border-t border-slate-100">
+                  <td className="px-3 py-2">{row.text || '(trống)'}</td>
+                  <td className="px-3 py-2 text-center">
+                    {showAnswers && row.correct === true ? '●' : '○'}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    {showAnswers && row.correct === false ? '●' : '○'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {showAnswers && (q.hint || q.hintImage) ? (
         <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-sm">
           <p className="font-bold text-amber-800 text-xs mb-1">Gợi ý</p>

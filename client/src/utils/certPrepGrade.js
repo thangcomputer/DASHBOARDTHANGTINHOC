@@ -32,6 +32,20 @@ export function gradeCertPrepQuestion(question, value) {
     }
     return true;
   }
+  if (question.type === 'true_false_grid') {
+    const statements = Array.isArray(question.statements) ? question.statements : [];
+    if (!statements.length) return false;
+    const byId = new Map(
+      (Array.isArray(value) ? value : []).map((row) => [String(row?.id), row?.value]),
+    );
+    return statements.every((s) => {
+      const id = String(s.id);
+      if (!byId.has(id)) return false;
+      const v = byId.get(id);
+      if (typeof v !== 'boolean') return false;
+      return v === Boolean(s.correct);
+    });
+  }
   return false;
 }
 

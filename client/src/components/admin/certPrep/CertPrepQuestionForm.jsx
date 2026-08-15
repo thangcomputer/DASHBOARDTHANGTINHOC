@@ -4,6 +4,7 @@ import QuestionTypeSelector from './components/QuestionTypeSelector';
 import ChoiceEditor from './components/ChoiceEditor';
 import MultipleChoiceEditor from './components/MultipleChoiceEditor';
 import MatchingEditor from './components/MatchingEditor';
+import TrueFalseGridEditor from './components/TrueFalseGridEditor';
 import HintEditor from './components/HintEditor';
 import CertPrepImageUploader from './CertPrepImageUploader';
 import CertPrepQuestionPreview from './CertPrepQuestionPreview';
@@ -21,6 +22,7 @@ function blankQuestion(type = 'single_choice') {
     matchingItems: [{ id: 'i1', text: '', imageUrl: '' }],
     matchingTargets: [{ id: 't1', text: '', imageUrl: '' }],
     matchingPairs: [],
+    statements: [{ id: 's1', text: '', correct: true }],
     hint: '',
     hintImage: '',
     explanation: '',
@@ -32,10 +34,12 @@ function blankQuestion(type = 'single_choice') {
 
 function fromDoc(doc) {
   if (!doc) return blankQuestion();
+  const base = blankQuestion(doc.type);
   return {
-    ...blankQuestion(doc.type),
+    ...base,
     ...doc,
-    options: Array.isArray(doc.options) && doc.options.length ? doc.options : blankQuestion().options,
+    options: Array.isArray(doc.options) && doc.options.length ? doc.options : base.options,
+    statements: Array.isArray(doc.statements) && doc.statements.length ? doc.statements : base.statements,
   };
 }
 
@@ -73,6 +77,12 @@ function validateLocal(form) {
     if (!(form.matchingItems || []).length || !(form.matchingTargets || []).length) return 'Cần đủ hai cột';
     if (!(form.matchingPairs || []).length) return 'Cần ghép ít nhất 1 cặp';
   }
+  if (form.type === 'true_false_grid') {
+    const statements = form.statements || [];
+    if (!statements.length) return 'Cần ít nhất 1 nhận định';
+    if (statements.some((s) => !String(s?.text || '').trim())) return 'Mỗi nhận định cần có nội dung';
+    if (statements.some((s) => typeof s?.correct !== 'boolean')) return 'Mỗi nhận định cần chọn Đúng hoặc Sai';
+  }
   return '';
 }
 
@@ -106,6 +116,7 @@ export default function CertPrepQuestionForm({
     matchingItems: form.matchingItems,
     matchingTargets: form.matchingTargets,
     matchingPairs: form.matchingPairs,
+    statements: form.statements,
     hint: form.hint,
     hintImage: form.hintImage,
     explanation: form.explanation,
@@ -208,6 +219,13 @@ export default function CertPrepQuestionForm({
               matchingPairs={form.matchingPairs}
               disabled={saving}
               onChange={(next) => patch(next)}
+            />
+          )}
+          {form.type === 'true_false_grid' && (
+            <TrueFalseGridEditor
+              statements={form.statements}
+              disabled={saving}
+              onChange={(statements) => patch({ statements })}
             />
           )}
 

@@ -34,6 +34,12 @@ export function isQuestionAnswered(question, value) {
     const byItem = new Map(value.map((p) => [String(p.itemId), p.targetId]));
     return items.every((item) => Boolean(byItem.get(String(item.id))));
   }
+  if (question.type === 'true_false_grid') {
+    const statements = question.statements || [];
+    if (!statements.length || !Array.isArray(value)) return false;
+    const byId = new Map(value.map((row) => [String(row?.id), row?.value]));
+    return statements.every((s) => typeof byId.get(String(s.id)) === 'boolean');
+  }
   return false;
 }
 

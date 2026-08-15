@@ -91,6 +91,20 @@ function gradeQuestion(question, value) {
     }
     return true;
   }
+  if (question.type === 'true_false_grid') {
+    const statements = Array.isArray(question.statements) ? question.statements : [];
+    if (!statements.length) return false;
+    const byId = new Map(
+      (Array.isArray(value) ? value : []).map((row) => [String(row?.id), row?.value]),
+    );
+    return statements.every((s) => {
+      const id = String(s.id);
+      if (!byId.has(id)) return false;
+      const v = byId.get(id);
+      if (typeof v !== 'boolean') return false;
+      return v === Boolean(s.correct);
+    });
+  }
   return false;
 }
 
@@ -253,6 +267,10 @@ async function assertStudentCanAccessTest(studentId, testId) {
 }
 
 function stripAnswerKeys(question, { reveal = false } = {}) {
+  const statementsPublic = (question.statements || []).map((s) => ({
+    id: String(s.id),
+    text: s.text || '',
+  }));
   const base = {
     id: String(question._id),
     testId: String(question.testId),
@@ -263,6 +281,7 @@ function stripAnswerKeys(question, { reveal = false } = {}) {
     options: question.options || [],
     matchingItems: question.matchingItems || [],
     matchingTargets: question.matchingTargets || [],
+    statements: statementsPublic,
     hint: question.hint || '',
     hintImage: question.hintImage || '',
     sortOrder: question.sortOrder,
@@ -273,6 +292,11 @@ function stripAnswerKeys(question, { reveal = false } = {}) {
     correctAnswer: question.correctAnswer,
     correctIndices: question.correctIndices,
     matchingPairs: question.matchingPairs,
+    statements: (question.statements || []).map((s) => ({
+      id: String(s.id),
+      text: s.text || '',
+      correct: Boolean(s.correct),
+    })),
     explanation: question.explanation || '',
     explanationImage: question.explanationImage || '',
     minSelect: question.minSelect,
@@ -368,6 +392,11 @@ function freezeQuestion(question) {
       itemId: String(p.itemId),
       targetId: String(p.targetId),
     })),
+    statements: (question.statements || []).map((s) => ({
+      id: String(s.id),
+      text: s.text || '',
+      correct: Boolean(s.correct),
+    })),
     hint: question.hint || '',
     hintImage: question.hintImage || '',
     explanation: question.explanation || '',
@@ -375,7 +404,7 @@ function freezeQuestion(question) {
   };
 }
 
-function isStudentAnswered(type, value) {
+function isStudentAnswered(type, value, question = null) {
   if (type === 'single_choice') {
     return value !== undefined && value !== null && value !== '' && Number.isInteger(Number(value));
   }
@@ -384,6 +413,12 @@ function isStudentAnswered(type, value) {
   }
   if (type === 'matching') {
     return Array.isArray(value) && value.some((p) => p && p.itemId && p.targetId);
+  }
+  if (type === 'true_false_grid') {
+    const statements = question?.statements || [];
+    if (!statements.length || !Array.isArray(value)) return false;
+    const byId = new Map(value.map((row) => [String(row?.id), row?.value]));
+    return statements.every((s) => typeof byId.get(String(s.id)) === 'boolean');
   }
   return value != null && value !== '';
 }
@@ -404,7 +439,7 @@ function buildReviewItems(session, questions) {
   return (questions || []).map((q, index) => {
     const questionId = String(q._id || q.id);
     const studentAnswer = answersByQ.has(questionId) ? answersByQ.get(questionId) : null;
-    const answered = isStudentAnswered(q.type, studentAnswer);
+    const answered = isStudentAnswered(q.type, studentAnswer, q);
     const isCorrect = gradeQuestion(q, studentAnswer);
     return {
       questionId,
@@ -415,6 +450,7 @@ function buildReviewItems(session, questions) {
       options: q.options || [],
       matchingItems: q.matchingItems || [],
       matchingTargets: q.matchingTargets || [],
+      statements: q.statements || [],
       hint: q.hint || '',
       hintImage: q.hintImage || '',
       explanation: q.explanation || '',
@@ -644,6 +680,13 @@ function normalizeQuestionPayload(body, test) {
     matchingItems: body.matchingItems,
     matchingTargets: body.matchingTargets,
     matchingPairs: body.matchingPairs,
+    statements: Array.isArray(body.statements)
+      ? body.statements.map((s, i) => ({
+        id: String(s?.id || `s${i + 1}`).trim(),
+        text: String(s?.text || '').trim(),
+        correct: Boolean(s?.correct),
+      }))
+      : [],
     hint: body.hint || '',
     hintImage: body.hintImage || '',
     explanation: body.explanation || '',
@@ -704,6 +747,7 @@ async function updateQuestion(id, body) {
     matchingItems: body.matchingItems !== undefined ? body.matchingItems : question.matchingItems,
     matchingTargets: body.matchingTargets !== undefined ? body.matchingTargets : question.matchingTargets,
     matchingPairs: body.matchingPairs !== undefined ? body.matchingPairs : question.matchingPairs,
+    statements: body.statements !== undefined ? body.statements : question.statements,
     hint: body.hint !== undefined ? body.hint : question.hint,
     hintImage: body.hintImage !== undefined ? body.hintImage : question.hintImage,
     explanation: body.explanation !== undefined ? body.explanation : question.explanation,

@@ -16,6 +16,13 @@ const matchingPairSchema = new mongoose.Schema({
   targetId: { type: String, required: true },
 }, { _id: false });
 
+/** Dòng nhận định Đúng/Sai trong bảng */
+const trueFalseStatementSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  text: { type: String, default: '' },
+  correct: { type: Boolean, required: true },
+}, { _id: false });
+
 const certPrepQuestionSchema = new mongoose.Schema({
   testId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -30,7 +37,7 @@ const certPrepQuestionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['single_choice', 'multiple_choice', 'matching'],
+    enum: ['single_choice', 'multiple_choice', 'matching', 'true_false_grid'],
     required: true,
   },
   questionText: { type: String, required: true, trim: true },
@@ -42,6 +49,7 @@ const certPrepQuestionSchema = new mongoose.Schema({
   matchingItems: { type: [matchingItemSchema], default: [] },
   matchingTargets: { type: [matchingItemSchema], default: [] },
   matchingPairs: { type: [matchingPairSchema], default: [] },
+  statements: { type: [trueFalseStatementSchema], default: [] },
   hint: { type: String, default: '' },
   hintImage: { type: String, default: '' },
   explanation: { type: String, default: '' },

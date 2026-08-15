@@ -5,6 +5,7 @@ import { gradeCertPrepQuestion } from '../../../utils/certPrepGrade';
 import CertPrepSingleChoice from './CertPrepSingleChoice';
 import CertPrepMultipleChoice from './CertPrepMultipleChoice';
 import CertPrepMatching from './CertPrepMatching';
+import CertPrepTrueFalseGrid from './CertPrepTrueFalseGrid';
 
 export default function CertPrepQuestionArea({
   question,
@@ -69,6 +70,15 @@ export default function CertPrepQuestionArea({
       ) : null}
       {question.type === 'matching' ? (
         <CertPrepMatching
+          question={question}
+          value={value}
+          disabled={disabled}
+          onChange={onChange}
+          showFeedback={showFeedback}
+        />
+      ) : null}
+      {question.type === 'true_false_grid' ? (
+        <CertPrepTrueFalseGrid
           question={question}
           value={value}
           disabled={disabled}
