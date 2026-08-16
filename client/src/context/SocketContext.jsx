@@ -230,8 +230,8 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       setNotifications((prev) => [{ ...data, id: data._id || Date.now(), read: false }, ...prev]);
     };
 
+    // Legacy signal: chỉ refresh danh sách unread — KHÔNG kêu (tránh double beep + beep nhầm cho Admin)
     const onNewNotification = () => {
-      playNotifySound();
       triggerRefresh({ type: 'notifications' });
       apiFetch('/notifications/unread')
         .then((res) => res.json())

@@ -51,23 +51,25 @@ class NotificationService {
           io.to('ALL_SUPPORT').emit('RECEIVE_NOTIFICATION', socketData);
           io.to('ALL_TEACHER').emit('RECEIVE_NOTIFICATION', socketData);
           io.to('ALL_ADMIN').emit('data:refresh', { type: 'global' });
+          io.to('ALL_ADMIN').emit('new-notification');
+          io.to('ALL_STAFF').emit('new-notification');
+          io.to('ALL_SUPPORT').emit('new-notification');
+          io.to('ALL_TEACHER').emit('new-notification');
         } else {
+          const refreshRooms = new Set();
           receiversArr.forEach((receiver) => {
+            if (!receiver) return;
             // Emit to specific user room OR role room (e.g., 'ALL_ADMIN')
             io.to(receiver).emit('RECEIVE_NOTIFICATION', { ...socketData, userId: receiver });
             io.to(receiver).emit('data:refresh', { type: 'notification', receiver });
-          });
-        }
-
-        // Legacy refresh — scoped to role rooms (không io.emit toàn cục)
-        io.to('ALL_ADMIN').emit('new-notification');
-        io.to('ALL_STAFF').emit('new-notification');
-        io.to('ALL_SUPPORT').emit('new-notification');
-        receiversArr.forEach((receiver) => {
-          if (receiver && receiver !== 'GLOBAL' && !String(receiver).startsWith('ALL_')) {
             io.to(String(receiver)).emit('new-notification');
+            refreshRooms.add(String(receiver));
+          });
+          // Super admin mailbox when targeting branch admin rooms
+          if ([...refreshRooms].some((r) => r.startsWith('ALL_ADMIN_'))) {
+            io.to('ALL_SUPER_ADMIN').emit('new-notification');
           }
-        });
+        }
       }
 
       return newNotification;

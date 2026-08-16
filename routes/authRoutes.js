@@ -1509,8 +1509,14 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, policyShadowAuth('
         receivers: ['ALL_ADMIN'], // Chỉ admin nhận được
         payload: { userId: user._id, role: role, action: 'RESET_PASSWORD', userName: user.name }
       });
-      // Phát sự kiện socket nếu cần (tùy thuộc vào implement socket hiện tại, thường frontend sẽ poll hoặc dùng socket io global)
       if (global.io) {
+        global.io.to('ALL_ADMIN').emit('RECEIVE_NOTIFICATION', {
+          type: 'system',
+          title: 'Yêu cầu cấp lại mật khẩu',
+          message: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${phone}) đang yêu cầu cấp lại mật khẩu.`,
+          time: new Date(),
+          read: false,
+        });
         global.io.to('ALL_ADMIN').emit('new-notification');
       }
     } catch (err) {

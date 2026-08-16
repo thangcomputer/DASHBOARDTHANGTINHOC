@@ -51,6 +51,7 @@ const playTone = (frequency = 440, type = 'sine', duration = 0.1, volume = 0.5) 
 };
 
 let lastMessageSoundAt = 0;
+let lastNotifySoundAt = 0;
 
 export const playMessageSound = () => {
   const now = Date.now();
@@ -61,6 +62,9 @@ export const playMessageSound = () => {
 };
 
 export const playNotifySound = () => {
+  const now = Date.now();
+  if (now - lastNotifySoundAt < 1200) return;
+  lastNotifySoundAt = now;
   playTone(880.00, 'triangle', 0.1, 0.2);
   setTimeout(() => playTone(1174.66, 'triangle', 0.2, 0.2), 150);
 };

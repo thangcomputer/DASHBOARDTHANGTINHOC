@@ -1331,7 +1331,14 @@ router.post('/forgot-password/request', sensitiveFlowLimiter, authController.pos
       });
       // Phát sự kiện socket nếu cần (tùy thuộc vào implement socket hiện tại, thường frontend sẽ poll hoặc dùng socket io global)
       if (global.io) {
-        global.io.emit('new-notification');
+        global.io.to('ALL_ADMIN').emit('RECEIVE_NOTIFICATION', {
+          type: 'system',
+          title: 'Yêu cầu cấp lại mật khẩu',
+          message: `${role === 'teacher' ? 'Giảng viên' : 'Học viên'} ${user.name} (${phone}) đang yêu cầu cấp lại mật khẩu.`,
+          time: new Date(),
+          read: false,
+        });
+        global.io.to('ALL_ADMIN').emit('new-notification');
       }
     } catch (err) {
       logger.warn('[AUTH] Cannot create notification:', err.message);
