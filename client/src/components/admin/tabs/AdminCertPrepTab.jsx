@@ -95,8 +95,13 @@ export default function AdminCertPrepTab() {
     try {
       const slug = String(c.slug || c.name || 'course').replace(/[^\w-]+/g, '-');
       const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      await certPrepApi.courses.exportQuestions(cid, `certprep-${slug}-questions-${day}.xlsx`);
-      toast.success(`Đã xuất Excel câu hỏi «${c.name}»`);
+      const res = await certPrepApi.courses.exportQuestions(cid, `certprep-${slug}-questions-${day}.xlsx`);
+      const n = res?.data?.questionCount;
+      toast.success(
+        typeof n === 'number'
+          ? `Đã tải Excel «${c.name}» (${n} câu)`
+          : `Đã tải Excel câu hỏi «${c.name}»`,
+      );
     } catch (err) {
       handleError(err);
     } finally {

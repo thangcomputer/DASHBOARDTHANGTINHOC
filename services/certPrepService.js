@@ -1302,7 +1302,13 @@ async function exportCourseQuestionsWorkbook(courseId) {
   const {
     questionToRow,
     buildWorkbookBuffer,
-  } = require('./certPrepQuestionsExcel');
+  } = (() => {
+    try {
+      return require('./certPrepQuestionsExcel');
+    } catch (err) {
+      throw new CertPrepError(503, 'Thiếu thư viện Excel trên server (xlsx). Chạy npm install rồi restart.');
+    }
+  })();
 
   const rows = questions.map((q) => {
     const test = testById.get(String(q.testId));
@@ -1314,7 +1320,15 @@ async function exportCourseQuestionsWorkbook(courseId) {
     });
   });
 
-  const buffer = buildWorkbookBuffer(rows);
+  let buffer;
+  try {
+    buffer = buildWorkbookBuffer(rows);
+  } catch (err) {
+    throw new CertPrepError(500, err.message || 'Không tạo được file Excel');
+  }
+  if (!Buffer.isBuffer(buffer)) {
+    buffer = Buffer.from(buffer);
+  }
   const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const slug = String(course.slug || course.name || 'course').replace(/[^\w-]+/g, '-');
   return {
@@ -1390,7 +1404,13 @@ async function importCourseQuestionsFromWorkbook(courseId, buffer, { replace = f
   const course = await CertPrepCourse.findById(id).lean();
   if (!course) throw new CertPrepError(404, 'Không tìm thấy khóa ôn thi');
 
-  const { parseWorkbookBuffer } = require('./certPrepQuestionsExcel');
+  const { parseWorkbookBuffer } = (() => {
+    try {
+      return require('./certPrepQuestionsExcel');
+    } catch (err) {
+      throw new CertPrepError(503, 'Thiếu thư viện Excel trên server (xlsx). Chạy npm install rồi restart.');
+    }
+  })();
   const { rows, errors } = parseWorkbookBuffer(buffer);
 
   let deactivated = 0;

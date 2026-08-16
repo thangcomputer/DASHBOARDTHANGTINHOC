@@ -228,7 +228,8 @@ router.get('/courses/:id/questions/export', ...requireCertPrepAdmin, async (req,
     const { buffer, filename } = await service.exportCourseQuestionsWorkbook(req.params.id);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    return res.send(buffer);
+    res.setHeader('Content-Length', String(buffer.length));
+    return res.end(buffer);
   } catch (err) {
     return sendError(res, err);
   }

@@ -63,9 +63,30 @@ export const certPrepApi = {
     update: async (id, body) => parse(await apiFetch(`/cert-prep/courses/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
     remove: async (id) => parse(await apiFetch(`/cert-prep/courses/${id}`, { method: 'DELETE' })),
     exportQuestions: async (id, filename) => {
-      const { downloadFileFromAPI } = await import('../utils/exportExcel');
-      const name = filename || `certprep-questions-${id}.xlsx`;
-      await downloadFileFromAPI(`/cert-prep/courses/${id}/questions/export`, name);
+      // Client-side export (tránh 500 khi server chưa có package xlsx)
+      const { questionToExcelRow, downloadCertPrepQuestionsExcel } = await import('../utils/certPrepQuestionsExcel');
+      const levelsRes = await parse(await apiFetch(`/cert-prep/courses/${id}/levels`));
+      const levels = Array.isArray(levelsRes.data) ? levelsRes.data : [];
+      const rows = [];
+      for (const level of levels) {
+        const lid = level._id || level.id;
+        const testsRes = await parse(await apiFetch(`/cert-prep/levels/${lid}/tests`));
+        const tests = Array.isArray(testsRes.data) ? testsRes.data : [];
+        for (const test of tests) {
+          const tid = test._id || test.id;
+          const qsRes = await parse(await apiFetch(`/cert-prep/tests/${tid}/questions`));
+          const questions = Array.isArray(qsRes.data) ? qsRes.data : [];
+          for (const q of questions) {
+            rows.push(questionToExcelRow({
+              levelTitle: level.title || '',
+              testName: test.name || '',
+              question: q,
+            }));
+          }
+        }
+      }
+      await downloadCertPrepQuestionsExcel(rows, filename || `certprep-questions-${id}.xlsx`);
+      return { success: true, data: { questionCount: rows.length } };
     },
     importQuestions: async (id, file, { replace = false } = {}) => {
       const fd = new FormData();
