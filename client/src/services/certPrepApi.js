@@ -111,7 +111,14 @@ export const certPrepApi = {
     list: async (testId, params = {}) => parse(await apiFetch(`/cert-prep/tests/${testId}/questions${qs(params)}`)),
     create: async (testId, body) => parse(await apiFetch(`/cert-prep/tests/${testId}/questions`, { method: 'POST', body: JSON.stringify(body) })),
     update: async (id, body) => parse(await apiFetch(`/cert-prep/questions/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
-    remove: async (id) => parse(await apiFetch(`/cert-prep/questions/${id}`, { method: 'DELETE' })),
+    remove: async (id, { permanent = true } = {}) => parse(await apiFetch(
+      `/cert-prep/questions/${id}${permanent ? '?permanent=1' : ''}`,
+      { method: 'DELETE' },
+    )),
+    removeAllForTest: async (testId, { permanent = true } = {}) => parse(await apiFetch(
+      `/cert-prep/tests/${testId}/questions${permanent ? '?permanent=1' : ''}`,
+      { method: 'DELETE' },
+    )),
     reorder: async (items) => parse(await apiFetch('/cert-prep/questions/reorder', { method: 'PATCH', body: JSON.stringify({ items }) })),
   },
   access: {

@@ -348,6 +348,16 @@ router.post('/tests/:id/questions', ...requireCertPrepAdmin, async (req, res) =>
   }
 });
 
+router.delete('/tests/:id/questions', ...requireCertPrepAdmin, async (req, res) => {
+  try {
+    const permanent = req.query?.permanent === '1' || req.query?.permanent === 'true';
+    const data = await service.deleteQuestionsByTest(req.params.id, { permanent });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
 router.put('/tests/:id', ...requireCertPrepAdmin, async (req, res) => {
   try {
     const data = await service.updateTest(req.params.id, req.body || {});
@@ -386,7 +396,8 @@ router.put('/questions/:id', ...requireCertPrepAdmin, async (req, res) => {
 
 router.delete('/questions/:id', ...requireCertPrepAdmin, async (req, res) => {
   try {
-    const data = await service.deleteQuestion(req.params.id);
+    const permanent = req.query?.permanent === '1' || req.query?.permanent === 'true';
+    const data = await service.deleteQuestion(req.params.id, { permanent });
     return res.json({ success: true, data });
   } catch (err) {
     return sendError(res, err);

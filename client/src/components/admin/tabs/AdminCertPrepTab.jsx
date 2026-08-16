@@ -115,11 +115,16 @@ export default function AdminCertPrepTab() {
     try {
       const res = await certPrepApi.courses.importQuestions(cid, file, { replace });
       const data = res?.data || {};
-      const errN = Array.isArray(data.errors) ? data.errors.length : Number(data.skipped) || 0;
+      const errN = Array.isArray(data.errors) ? data.errors.length : 0;
+      const dupN = Number(data.skippedDuplicates) || 0;
       const msg = replace
         ? `Ghi đè xong: thêm ${data.created || 0} câu${data.deactivated ? ` (vô hiệu ${data.deactivated} cũ)` : ''}`
         : `Đã thêm ${data.created || 0} câu hỏi`;
-      if (errN > 0) toast.error(`${msg}. ${errN} dòng lỗi.`);
+      const extra = [
+        dupN > 0 ? `bỏ trùng ${dupN}` : '',
+        errN > 0 ? `${errN} dòng lỗi` : '',
+      ].filter(Boolean).join(', ');
+      if (extra) toast.error(`${msg}. ${extra}.`);
       else toast.success(msg);
       await admin.loadCourses();
     } catch (err) {
@@ -174,20 +179,59 @@ export default function AdminCertPrepTab() {
 
   const toggleActive = (kind, doc) => {
     setConfirm({
+      action: 'toggle',
       kind,
       doc,
       title: doc.isActive === false ? 'Bật lại?' : 'Vô hiệu hóa?',
       message: doc.isActive === false
         ? 'Mục này sẽ hiện lại cho quản trị và học viên (nếu còn quyền).'
         : 'Sẽ vô hiệu hóa. Lịch sử phiên làm bài không bị xóa.',
+      confirmText: doc.isActive === false ? 'Bật' : 'Vô hiệu hóa',
     });
   };
 
-  const applyToggle = async () => {
-    const { kind, doc } = confirm;
-    const next = { isActive: doc.isActive === false };
+  const askDeleteQuestion = (q) => {
+    setConfirm({
+      action: 'deleteQuestion',
+      doc: q,
+      title: 'Xóa câu hỏi?',
+      message: 'Câu hỏi sẽ bị xóa vĩnh viễn khỏi đề. Lịch sử phiên làm bài cũ vẫn giữ nguyên.',
+      confirmText: 'Xóa',
+    });
+  };
+
+  const askDeleteAllQuestions = () => {
+    const count = admin.questions?.length || 0;
+    if (!count || !test) return;
+    setConfirm({
+      action: 'deleteAllQuestions',
+      title: 'Xóa tất cả câu hỏi?',
+      message: `Sẽ xóa vĩnh viễn ${count} câu hỏi trong đề «${test.name || 'không tên'}». Không thể hoàn tác.`,
+      confirmText: 'Xóa tất cả',
+    });
+  };
+
+  const applyConfirm = async () => {
+    const current = confirm;
+    if (!current) return;
     setConfirm(null);
     try {
+      if (current.action === 'deleteQuestion') {
+        const doc = current.doc;
+        await certPrepApi.questions.remove(doc._id || doc.id, { permanent: true });
+        await admin.loadQuestions(test._id || test.id);
+        toast.success('Đã xóa câu hỏi');
+        return;
+      }
+      if (current.action === 'deleteAllQuestions') {
+        const tid = test._id || test.id;
+        const res = await certPrepApi.questions.removeAllForTest(tid, { permanent: true });
+        await admin.loadQuestions(tid);
+        toast.success(`Đã xóa ${res?.data?.deleted ?? 0} câu hỏi`);
+        return;
+      }
+      const { kind, doc } = current;
+      const next = { isActive: doc.isActive === false };
       if (kind === 'course') {
         await certPrepApi.courses.update(doc._id || doc.id, next);
         await admin.loadCourses();
@@ -361,6 +405,8 @@ export default function AdminCertPrepTab() {
           onEdit={setQuestionForm}
           onPreview={setPreviewQ}
           onToggle={(q) => toggleActive('question', q)}
+          onDelete={askDeleteQuestion}
+          onDeleteAll={askDeleteAllQuestions}
           onMove={moveQuestion}
         />
       )}
@@ -451,9 +497,9 @@ export default function AdminCertPrepTab() {
         open={!!confirm}
         title={confirm?.title}
         message={confirm?.message}
-        confirmText={confirm?.doc?.isActive === false ? 'Bật' : 'Vô hiệu hóa'}
+        confirmText={confirm?.confirmText || 'Xác nhận'}
         onCancel={() => setConfirm(null)}
-        onConfirm={applyToggle}
+        onConfirm={applyConfirm}
       />
 
       {admin.saving ? (

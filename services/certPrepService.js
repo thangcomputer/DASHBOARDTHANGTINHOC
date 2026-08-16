@@ -761,13 +761,32 @@ async function updateQuestion(id, body) {
   return question.toObject();
 }
 
-async function deleteQuestion(id) {
+async function deleteQuestion(id, { permanent = false } = {}) {
   const questionId = requireOid(id, 'questionId');
   const question = await CertPrepQuestion.findById(questionId);
   if (!question) throw new CertPrepError(404, 'Không tìm thấy câu hỏi');
+  if (permanent) {
+    await CertPrepQuestion.deleteOne({ _id: questionId });
+    return { id: String(questionId), hardDeleted: true };
+  }
   question.isActive = false;
   await question.save();
   return { id: String(question._id), isActive: false, softDeleted: true };
+}
+
+async function deleteQuestionsByTest(testId, { permanent = true } = {}) {
+  const id = requireOid(testId, 'testId');
+  const test = await CertPrepTest.findById(id).lean();
+  if (!test) throw new CertPrepError(404, 'Không tìm thấy bài kiểm tra');
+  if (permanent) {
+    const result = await CertPrepQuestion.deleteMany({ testId: id });
+    return { deleted: result.deletedCount || 0, hardDeleted: true };
+  }
+  const result = await CertPrepQuestion.updateMany(
+    { testId: id, isActive: { $ne: false } },
+    { $set: { isActive: false } },
+  );
+  return { deleted: result.modifiedCount || 0, softDeleted: true };
 }
 
 async function reorderQuestions(items) {
@@ -954,30 +973,69 @@ function resolveDrawCount(test, availableCount) {
   return Math.min(want, available);
 }
 
+function normalizeQuestionText(text) {
+  return String(text || '')
+    .normalize('NFC')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/** Key trùng nội dung: cùng loại + cùng đề bài (trong 1 test). */
+function questionDedupeKey(q) {
+  const type = String(q?.type || '').trim();
+  const text = normalizeQuestionText(q?.questionText);
+  return `${type}::${text}`;
+}
+
+function dedupeQuestionsByContent(questions) {
+  const seen = new Set();
+  const out = [];
+  for (const q of questions || []) {
+    const key = questionDedupeKey(q);
+    if (!key || key === '::') {
+      out.push(q);
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(q);
+  }
+  return out;
+}
+
 async function selectQuestionIds(test) {
   const questions = await CertPrepQuestion.find({
     testId: test._id,
     locale: test.locale,
     isActive: true,
-  }).sort({ sortOrder: 1, createdAt: 1 }).select('_id').lean();
-  if (!questions.length) {
+  }).sort({ sortOrder: 1, createdAt: 1 }).select('_id type questionText').lean();
+  const unique = dedupeQuestionsByContent(questions);
+  if (!unique.length) {
     throw new CertPrepError(400, 'Bài kiểm tra chưa có câu hỏi.');
   }
-  const take = resolveDrawCount(test, questions.length);
-  return questions.slice(0, take).map((q) => q._id);
+  const take = resolveDrawCount(test, unique.length);
+  return unique.slice(0, take).map((q) => q._id);
 }
 
 /** Phiên đang làm: bổ sung câu mới nếu admin thêm câu / tăng số câu lấy. */
 async function expandSessionQuestionsIfNeeded(session, test) {
   if (!session || session.status !== 'in_progress' || !test) return session;
-  const available = await CertPrepQuestion.find({
+  const availableRaw = await CertPrepQuestion.find({
     testId: test._id,
     locale: test.locale,
     isActive: true,
-  }).sort({ sortOrder: 1, createdAt: 1 }).select('_id').lean();
+  }).sort({ sortOrder: 1, createdAt: 1 }).select('_id type questionText').lean();
+  const available = dedupeQuestionsByContent(availableRaw);
   if (!available.length) return session;
 
-  const current = (session.questionIds || []).map((id) => String(id));
+  const current = [...new Set((session.questionIds || []).map((id) => String(id)))];
+  // Tránh nhân đôi nếu session đã lưu trùng id
+  if (current.length !== (session.questionIds || []).length) {
+    session.questionIds = current;
+    session.markModified('questionIds');
+  }
+
   let want = Number(test.questionCount) || 0;
   // Đề đang lấy đúng số câu cấu hình, admin vừa thêm vài câu → tự bắt kịp ngân hàng
   if (
@@ -990,12 +1048,27 @@ async function expandSessionQuestionsIfNeeded(session, test) {
   }
 
   const take = Math.min(want > 0 ? want : available.length, available.length);
-  if (current.length >= take) return session;
+  if (current.length >= take) {
+    if (session.isModified?.('questionIds')) await session.save();
+    return session;
+  }
 
-  const have = new Set(current);
-  const extras = available.filter((q) => !have.has(String(q._id))).slice(0, take - current.length);
-  if (!extras.length) return session;
-  session.questionIds = [...(session.questionIds || []), ...extras.map((q) => q._id)];
+  const haveIds = new Set(current);
+  const currentDocs = availableRaw.filter((q) => haveIds.has(String(q._id)));
+  const haveContent = new Set(currentDocs.map(questionDedupeKey).filter((k) => k && k !== '::'));
+
+  const extras = available.filter((q) => {
+    if (haveIds.has(String(q._id))) return false;
+    const key = questionDedupeKey(q);
+    if (key && key !== '::' && haveContent.has(key)) return false;
+    return true;
+  }).slice(0, take - current.length);
+
+  if (!extras.length) {
+    if (session.isModified?.('questionIds')) await session.save();
+    return session;
+  }
+  session.questionIds = [...current, ...extras.map((q) => q._id)];
   const snap = session.configSnapshot?.toObject
     ? session.configSnapshot.toObject()
     : { ...(session.configSnapshot || {}) };
@@ -1097,10 +1170,11 @@ function mergeAnswers(session, incoming) {
 }
 
 async function loadSessionQuestions(session) {
-  const ids = session.questionIds || [];
+  const ids = [...new Set((session.questionIds || []).map((id) => String(id)))];
   const docs = await CertPrepQuestion.find({ _id: { $in: ids } }).lean();
   const byId = new Map(docs.map((d) => [String(d._id), d]));
-  return ids.map((id) => byId.get(String(id))).filter(Boolean);
+  const ordered = ids.map((id) => byId.get(String(id))).filter(Boolean);
+  return dedupeQuestionsByContent(ordered);
 }
 
 async function scoreAndClose(session, questions, now = new Date()) {
@@ -1418,8 +1492,9 @@ async function importCourseQuestionsFromWorkbook(courseId, buffer, { replace = f
     deactivated = await softDeleteCourseQuestions(id);
   }
 
-  const cache = { levels: new Map(), tests: new Map() };
+  const cache = { levels: new Map(), tests: new Map(), contentKeys: new Map() };
   let created = 0;
+  let skippedDup = 0;
   const importErrors = [...errors];
 
   for (const row of rows) {
@@ -1436,7 +1511,27 @@ async function importCourseQuestionsFromWorkbook(courseId, buffer, { replace = f
       delete body.testName;
       // locale on question must match test
       body.locale = test.locale;
+
+      const tid = String(test._id);
+      if (!cache.contentKeys.has(tid)) {
+        const existing = await CertPrepQuestion.find({
+          testId: test._id,
+          isActive: true,
+        }).select('type questionText').lean();
+        cache.contentKeys.set(
+          tid,
+          new Set(existing.map(questionDedupeKey).filter((k) => k && k !== '::')),
+        );
+      }
+      const keySet = cache.contentKeys.get(tid);
+      const key = questionDedupeKey(body);
+      if (key && key !== '::' && keySet.has(key)) {
+        skippedDup += 1;
+        continue;
+      }
+
       await createQuestion(test._id, body);
+      if (key && key !== '::') keySet.add(key);
       created += 1;
     } catch (err) {
       importErrors.push({
@@ -1448,7 +1543,8 @@ async function importCourseQuestionsFromWorkbook(courseId, buffer, { replace = f
 
   return {
     created,
-    skipped: importErrors.length,
+    skipped: importErrors.length + skippedDup,
+    skippedDuplicates: skippedDup,
     deactivated,
     errors: importErrors.slice(0, 50),
     totalRows: rows.length + errors.length,
@@ -1490,6 +1586,7 @@ module.exports = {
   createQuestion,
   updateQuestion,
   deleteQuestion,
+  deleteQuestionsByTest,
   reorderQuestions,
   exportCourseQuestionsWorkbook,
   importCourseQuestionsFromWorkbook,
