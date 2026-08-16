@@ -1281,6 +1281,160 @@ async function listStudentAttempts(studentId, testId) {
   }));
 }
 
+async function exportCourseQuestionsWorkbook(courseId) {
+  const id = requireOid(courseId, 'courseId');
+  const course = await CertPrepCourse.findById(id).lean();
+  if (!course) throw new CertPrepError(404, 'Không tìm thấy khóa ôn thi');
+
+  const levels = await CertPrepLevel.find({ courseId: id }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+  const levelIds = levels.map((l) => l._id);
+  const tests = levelIds.length
+    ? await CertPrepTest.find({ levelId: { $in: levelIds } }).sort({ sortOrder: 1, createdAt: 1 }).lean()
+    : [];
+  const testIds = tests.map((t) => t._id);
+  const questions = testIds.length
+    ? await CertPrepQuestion.find({ testId: { $in: testIds } }).sort({ sortOrder: 1, createdAt: 1 }).lean()
+    : [];
+
+  const levelById = new Map(levels.map((l) => [String(l._id), l]));
+  const testById = new Map(tests.map((t) => [String(t._id), t]));
+
+  const {
+    questionToRow,
+    buildWorkbookBuffer,
+  } = require('./certPrepQuestionsExcel');
+
+  const rows = questions.map((q) => {
+    const test = testById.get(String(q.testId));
+    const level = test ? levelById.get(String(test.levelId)) : null;
+    return questionToRow({
+      levelTitle: level?.title || '',
+      testName: test?.name || '',
+      question: q,
+    });
+  });
+
+  const buffer = buildWorkbookBuffer(rows);
+  const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const slug = String(course.slug || course.name || 'course').replace(/[^\w-]+/g, '-');
+  return {
+    buffer,
+    filename: `certprep-${slug}-questions-${day}.xlsx`,
+    questionCount: rows.length,
+  };
+}
+
+async function resolveLevelForImport(courseId, levelTitle, cache) {
+  const key = String(levelTitle || '').trim().toLowerCase();
+  if (cache.levels.has(key)) return cache.levels.get(key);
+  let level = await CertPrepLevel.findOne({
+    courseId,
+    title: new RegExp(`^${String(levelTitle).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+  });
+  if (!level) {
+    level = await CertPrepLevel.create({
+      courseId,
+      title: String(levelTitle).trim(),
+      subtitle: '',
+      logoUrl: '',
+      sortOrder: cache.levels.size,
+      isActive: true,
+    });
+  }
+  cache.levels.set(key, level);
+  return level;
+}
+
+async function resolveTestForImport(levelId, testName, locale, cache) {
+  const key = `${String(levelId)}::${String(testName).trim().toLowerCase()}::${locale}`;
+  if (cache.tests.has(key)) return cache.tests.get(key);
+  let test = await CertPrepTest.findOne({
+    levelId,
+    locale,
+    name: new RegExp(`^${String(testName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+  });
+  if (!test) {
+    test = await CertPrepTest.create({
+      levelId,
+      name: String(testName).trim(),
+      locale: locale === 'en' ? 'en' : 'vi',
+      timeLimitMinutes: 50,
+      questionCount: 45,
+      passingScore: 700,
+      allowRetake: true,
+      maxAttempts: null,
+      sortOrder: cache.tests.size,
+      isActive: true,
+    });
+  }
+  cache.tests.set(key, test);
+  return test;
+}
+
+async function softDeleteCourseQuestions(courseId) {
+  const levels = await CertPrepLevel.find({ courseId }).select('_id').lean();
+  const levelIds = levels.map((l) => l._id);
+  if (!levelIds.length) return 0;
+  const tests = await CertPrepTest.find({ levelId: { $in: levelIds } }).select('_id').lean();
+  const testIds = tests.map((t) => t._id);
+  if (!testIds.length) return 0;
+  const result = await CertPrepQuestion.updateMany(
+    { testId: { $in: testIds }, isActive: { $ne: false } },
+    { $set: { isActive: false } },
+  );
+  return result.modifiedCount || 0;
+}
+
+async function importCourseQuestionsFromWorkbook(courseId, buffer, { replace = false } = {}) {
+  const id = requireOid(courseId, 'courseId');
+  const course = await CertPrepCourse.findById(id).lean();
+  if (!course) throw new CertPrepError(404, 'Không tìm thấy khóa ôn thi');
+
+  const { parseWorkbookBuffer } = require('./certPrepQuestionsExcel');
+  const { rows, errors } = parseWorkbookBuffer(buffer);
+
+  let deactivated = 0;
+  if (replace) {
+    deactivated = await softDeleteCourseQuestions(id);
+  }
+
+  const cache = { levels: new Map(), tests: new Map() };
+  let created = 0;
+  const importErrors = [...errors];
+
+  for (const row of rows) {
+    try {
+      const level = await resolveLevelForImport(id, row.payload.levelTitle, cache);
+      const test = await resolveTestForImport(
+        level._id,
+        row.payload.testName,
+        row.payload.locale,
+        cache,
+      );
+      const body = { ...row.payload };
+      delete body.levelTitle;
+      delete body.testName;
+      // locale on question must match test
+      body.locale = test.locale;
+      await createQuestion(test._id, body);
+      created += 1;
+    } catch (err) {
+      importErrors.push({
+        rowIndex: row.rowIndex,
+        message: err.message || 'Không thể tạo câu hỏi',
+      });
+    }
+  }
+
+  return {
+    created,
+    skipped: importErrors.length,
+    deactivated,
+    errors: importErrors.slice(0, 50),
+    totalRows: rows.length + errors.length,
+  };
+}
+
 module.exports = {
   CertPrepError,
   isOid,
@@ -1317,6 +1471,8 @@ module.exports = {
   updateQuestion,
   deleteQuestion,
   reorderQuestions,
+  exportCourseQuestionsWorkbook,
+  importCourseQuestionsFromWorkbook,
   listAccess,
   searchStudents,
   grantAccess,

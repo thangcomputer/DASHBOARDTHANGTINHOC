@@ -62,6 +62,17 @@ export const certPrepApi = {
     create: async (body) => parse(await apiFetch('/cert-prep/courses', { method: 'POST', body: JSON.stringify(body) })),
     update: async (id, body) => parse(await apiFetch(`/cert-prep/courses/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
     remove: async (id) => parse(await apiFetch(`/cert-prep/courses/${id}`, { method: 'DELETE' })),
+    exportQuestions: async (id, filename) => {
+      const { downloadFileFromAPI } = await import('../utils/exportExcel');
+      const name = filename || `certprep-questions-${id}.xlsx`;
+      await downloadFileFromAPI(`/cert-prep/courses/${id}/questions/export`, name);
+    },
+    importQuestions: async (id, file, { replace = false } = {}) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('replace', replace ? 'true' : 'false');
+      return uploadWithAuth(`/cert-prep/courses/${id}/questions/import`, fd);
+    },
   },
   levels: {
     list: async (courseId) => parse(await apiFetch(`/cert-prep/courses/${courseId}/levels`)),

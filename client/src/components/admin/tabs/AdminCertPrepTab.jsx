@@ -41,6 +41,7 @@ export default function AdminCertPrepTab() {
   const [previewQ, setPreviewQ] = useState(null);
   const [previewTestQs, setPreviewTestQs] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  const [excelBusyCourseId, setExcelBusyCourseId] = useState(null);
 
   useEffect(() => {
     admin.loadCourses().catch((err) => toast.error(certPrepErrorMessage(err)));
@@ -87,6 +88,41 @@ export default function AdminCertPrepTab() {
   };
 
   const handleError = (err) => toast.error(certPrepErrorMessage(err));
+
+  const exportCourseQuestions = async (c) => {
+    const cid = c._id || c.id;
+    setExcelBusyCourseId(cid);
+    try {
+      const slug = String(c.slug || c.name || 'course').replace(/[^\w-]+/g, '-');
+      const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      await certPrepApi.courses.exportQuestions(cid, `certprep-${slug}-questions-${day}.xlsx`);
+      toast.success(`Đã xuất Excel câu hỏi «${c.name}»`);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setExcelBusyCourseId(null);
+    }
+  };
+
+  const importCourseQuestions = async (c, file, { replace = false } = {}) => {
+    const cid = c._id || c.id;
+    setExcelBusyCourseId(cid);
+    try {
+      const res = await certPrepApi.courses.importQuestions(cid, file, { replace });
+      const data = res?.data || {};
+      const errN = Array.isArray(data.errors) ? data.errors.length : Number(data.skipped) || 0;
+      const msg = replace
+        ? `Ghi đè xong: thêm ${data.created || 0} câu${data.deactivated ? ` (vô hiệu ${data.deactivated} cũ)` : ''}`
+        : `Đã thêm ${data.created || 0} câu hỏi`;
+      if (errN > 0) toast.error(`${msg}. ${errN} dòng lỗi.`);
+      else toast.success(msg);
+      await admin.loadCourses();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setExcelBusyCourseId(null);
+    }
+  };
 
   const saveCourse = (body) => admin.runSave(async () => {
     try {
@@ -284,6 +320,9 @@ export default function AdminCertPrepTab() {
             onEdit={setCourseForm}
             onToggle={(c) => toggleActive('course', c)}
             onOpen={openCourse}
+            onExport={exportCourseQuestions}
+            onImport={importCourseQuestions}
+            busyCourseId={excelBusyCourseId}
           />
         </>
       )}

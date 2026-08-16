@@ -60,6 +60,29 @@ function certPrepUploadMiddleware(req, res, next) {
   });
 }
 
+function certPrepExcelUploadMiddleware(req, res, next) {
+  const uploader = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 15 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const name = String(file.originalname || '');
+      const ok = /\.(xlsx|xls)$/i.test(name)
+        || /sheet|excel|spreadsheet/i.test(String(file.mimetype || ''));
+      if (!ok) return cb(new Error('Chỉ nhận file Excel (.xlsx / .xls)'));
+      return cb(null, true);
+    },
+  }).single('file');
+  uploader(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ success: false, message: 'File quá lớn (tối đa 15MB)' });
+      }
+      return res.status(400).json({ success: false, message: err.message || 'Lỗi upload Excel' });
+    }
+    return next();
+  });
+}
+
 router.post('/upload', ...requireCertPrepAdmin, certPrepUploadMiddleware, async (req, res) => {
   try {
     if (!req.file) {
@@ -199,6 +222,43 @@ router.get('/courses/:id/levels', ...requireCertPrepAdmin, async (req, res) => {
     return sendError(res, err);
   }
 });
+
+router.get('/courses/:id/questions/export', ...requireCertPrepAdmin, async (req, res) => {
+  try {
+    const { buffer, filename } = await service.exportCourseQuestionsWorkbook(req.params.id);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(buffer);
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+router.post(
+  '/courses/:id/questions/import',
+  ...requireCertPrepAdmin,
+  certPrepExcelUploadMiddleware,
+  async (req, res) => {
+    try {
+      if (!req.file?.buffer) {
+        return res.status(400).json({ success: false, message: 'Chưa chọn file Excel' });
+      }
+      const replace = String(req.body?.replace || '').toLowerCase() === 'true'
+        || req.body?.replace === true
+        || req.body?.replace === '1';
+      const data = await service.importCourseQuestionsFromWorkbook(req.params.id, req.file.buffer, { replace });
+      return res.json({
+        success: true,
+        message: replace
+          ? `Đã ghi đè: thêm ${data.created} câu (vô hiệu ${data.deactivated} câu cũ)`
+          : `Đã thêm ${data.created} câu hỏi`,
+        data,
+      });
+    } catch (err) {
+      return sendError(res, err);
+    }
+  },
+);
 
 router.post('/courses/:id/levels', ...requireCertPrepAdmin, async (req, res) => {
   try {
