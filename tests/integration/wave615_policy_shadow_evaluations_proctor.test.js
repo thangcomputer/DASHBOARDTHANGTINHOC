@@ -105,6 +105,15 @@ test('Wave6.15 EVAL: teacher_ratings auth-only — any role ALLOW (weak Legacy)'
   assert.equal(assertEval('t', teacher, 'teacher_ratings').legacy.decision, 'ALLOW');
 });
 
+test('Wave6.15 EVAL: student_mine student ALLOW; teacher/staff DENY', () => {
+  const student = evalSub({ id: STUDENT_A, role: 'student' });
+  const teacher = evalSub({ id: TEACHER_A, role: 'teacher', adminRole: null });
+  const staff = evalSub({ role: 'staff' });
+  assert.equal(assertEval('s', student, 'student_mine').legacy.decision, 'ALLOW');
+  assert.equal(assertEval('t', teacher, 'student_mine').legacy.decision, 'DENY');
+  assert.equal(assertEval('st', staff, 'student_mine').legacy.decision, 'DENY');
+});
+
 test('Wave6.15 EVAL: create student self ALLOW; other student DENY; staff unscoped ALLOW', () => {
   const student = evalSub({ id: STUDENT_A, role: 'student' });
   const staff = evalSub({ role: 'staff', permissions: [] });
@@ -319,6 +328,10 @@ test('Wave6.15 static: Legacy handler gates remain; Policy shadow-only; CQRS OFF
   assert.ok(
     evals.includes("policyShadowEvaluation('teacher_ratings')")
     || evals.includes("evaluationsGuard('teacher_ratings')"),
+  );
+  assert.ok(
+    evals.includes("policyShadowEvaluation('student_mine')")
+    || evals.includes("evaluationsGuard('student_mine')"),
   );
   assert.ok(
     evals.includes("policyShadowEvaluation('create')")

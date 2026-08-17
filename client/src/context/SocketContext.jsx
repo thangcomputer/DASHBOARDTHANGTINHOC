@@ -34,6 +34,24 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   const dataRefreshCallbacksRef = useRef(new Set());
   const contactListUpdatedCallbackRef = useRef(null);
   const readAckCallbackRef = useRef(new Set());
+  const typingCallbacksRef = useRef(new Set());
+
+  const onTypingChange = useCallback((callback) => {
+    typingCallbacksRef.current.add(callback);
+    return () => typingCallbacksRef.current.delete(callback);
+  }, []);
+
+  const emitTypingStart = useCallback((conversationId, userName) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('typing:start', { conversationId, userName });
+    }
+  }, []);
+
+  const emitTypingStop = useCallback((conversationId) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('typing:stop', { conversationId });
+    }
+  }, []);
 
   const onMessageReceive = useCallback((callback) => {
     messageCallbacksRef.current.add(callback);
@@ -204,6 +222,13 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       readAckCallbackRef.current.forEach((cb) => cb(data));
     };
 
+    const onTypingShow = (data) => {
+      typingCallbacksRef.current.forEach((cb) => cb({ ...data, show: true }));
+    };
+    const onTypingHide = (data) => {
+      typingCallbacksRef.current.forEach((cb) => cb({ ...data, show: false }));
+    };
+
     const onGroupNewEvt = (data) => {
       if (groupNewCallbackRef.current) groupNewCallbackRef.current(data);
     };
@@ -293,6 +318,8 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     newSocket.on('message:reaction', onMessageReaction);
     newSocket.on('message:recall', onMessageRecall);
     newSocket.on('message:read_ack', onMessageReadAck);
+    newSocket.on('typing:show', onTypingShow);
+    newSocket.on('typing:hide', onTypingHide);
     newSocket.on('group:new', onGroupNewEvt);
     newSocket.on('data:refresh', triggerRefresh);
     newSocket.on('student:updated', triggerRefresh);
@@ -343,6 +370,8 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       newSocket.off('message:reaction', onMessageReaction);
       newSocket.off('message:recall', onMessageRecall);
       newSocket.off('message:read_ack', onMessageReadAck);
+      newSocket.off('typing:show', onTypingShow);
+      newSocket.off('typing:hide', onTypingHide);
       newSocket.off('group:new', onGroupNewEvt);
       newSocket.off('data:refresh', triggerRefresh);
       newSocket.off('student:updated', triggerRefresh);
@@ -400,6 +429,9 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     onDataRefresh,
     onContactListUpdated,
     onReadAck,
+    onTypingChange,
+    emitTypingStart,
+    emitTypingStop,
     joinGroupChat,
   };
 

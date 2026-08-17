@@ -19,6 +19,10 @@ function localDateISO(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+function scheduleStudentId(sch) {
+  return String(sch?.studentId?._id || sch?.studentId?.id || sch?.studentId || '');
+}
+
 /**
  * Schedule mutations and attendance (schedules list owned by ScheduleContext / SWR).
  */
@@ -105,6 +109,7 @@ export function useDataSchedule({
           status: displayStatus,
           can_check_in: false,
           remaining_cooldown_hours: 12,
+          last_attendance_at: new Date().toISOString(),
         };
         if (courseName && Array.isArray(s.enrollments) && s.enrollments.length) {
           return {
@@ -127,7 +132,7 @@ export function useDataSchedule({
         return { ...s, ...patch };
       }));
 
-      // Check if schedule exists today (or use explicit scheduleId from popup)
+      // Check if schedule exists today (or use explicit scheduleId from confirm/popup)
       let existSch = scheduleId
         ? schedules.find((sch) => String(sch._id || sch.id) === String(scheduleId))
         : null;
@@ -135,7 +140,8 @@ export function useDataSchedule({
         existSch = schedules.find((sch) => {
           const schDate = normalizeScheduleDate(sch.date);
           const courseOk = !courseName || !sch.course || sch.course === courseName;
-          return String(sch.studentId) === String(studentId) && schDate === todayISO && sch.status !== 'cancelled' && courseOk;
+          const sidOk = scheduleStudentId(sch) === String(studentId);
+          return sidOk && schDate === todayISO && sch.status !== 'cancelled' && courseOk;
         });
       }
 

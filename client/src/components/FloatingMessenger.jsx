@@ -4,10 +4,10 @@
  * - Mỗi người = 1 chat-head tròn; bấm head → mở cửa sổ, người trước thu thành head
  * - Gửi text / link / ảnh (không thay Inbox)
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
-  ImagePlus, Link2, Loader2, MoreVertical, RotateCcw,
+  ImagePlus, Link2, Loader2, MoreVertical, RotateCcw, Bot, UserRound, Check,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
@@ -16,14 +16,25 @@ import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { normalizeChatRole } from '../utils/chatConversationId';
 import { getMessagingRole } from '../lib/messagingRoles';
-import { messagesAPI, resolveMediaUrl } from '../services/api';
+import { messagesAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
 import { useToast } from '../utils/toast';
 import {
   isSuperAdminViewer,
   isElevatedPresenceDirectoryViewer,
   buildSupportDirectory,
 } from '../utils/supportPresence';
+import {
+  AI_SUPPORT_PEER,
+  isAiSupportPeer,
+  canOfferHumanEscalation,
+  lastMeaningfulAiReplyId,
+  isAiSupportConversationId,
+  buildAiSupportConversationId,
+  AI_SUPPORT_STATUS,
+  isHumanSupportSender,
+} from '../utils/aiSupport';
 import SupportMascot from './SupportMascot';
+import { MessageRichText } from '../utils/messageRichText';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
@@ -37,8 +48,18 @@ const ROLE_LABEL = {
   LEGACY_ROOT: 'Super Admin',
 };
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i;
-const URL_RE = /(https?:\/\/[^\s<]+[^.,;:!?\s<])/gi;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
+
+function TypingIndicator({ label = 'Đang gõ' }) {
+  return (
+    <div className="cms-fm-typing justify-start">
+      <span className="text-[11px] text-slate-500 font-medium">{label}</span>
+      <span className="cms-fm-typing__dots" aria-hidden="true">
+        <span /><span /><span />
+      </span>
+    </div>
+  );
+}
 
 function isImageMessage(m) {
   if (!m || m.isRecalled) return false;
@@ -49,82 +70,100 @@ function isImageMessage(m) {
   return false;
 }
 
-function TextWithLinks({ text, mine }) {
-  const raw = String(text || '');
-  const nodes = [];
-  let last = 0;
-  let match;
-  const re = new RegExp(URL_RE.source, 'gi');
-  // eslint-disable-next-line no-cond-assign
-  while ((match = re.exec(raw)) !== null) {
-    if (match.index > last) nodes.push(raw.slice(last, match.index));
-    const url = match[0];
-    nodes.push(
-      <a
-        key={`${match.index}-${url}`}
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className={mine ? 'cms-fm-link is-mine' : 'cms-fm-link'}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {url}
-      </a>,
-    );
-    last = match.index + url.length;
-  }
-  if (last < raw.length) nodes.push(raw.slice(last));
-  return <>{nodes.length ? nodes : raw}</>;
+function isAssistantSender(m) {
+  const sid = String(m?.senderId || '');
+  if (sid === AI_SUPPORT_PEER.id || sid === 'system') return true;
+  return String(m?.senderRole || '').toLowerCase() === 'system';
 }
 
-function MessageBubble({ m, mine }) {
+function isOutgoingMessengerMessage(m, meId) {
+  const sid = String(m?.senderId || '');
+  const me = String(meId || '');
+  if (!sid || !me || isAssistantSender(m)) return false;
+  return sid === me;
+}
+
+function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '' }) {
   if (m.isRecalled) {
     return (
-      <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'} opacity-70 italic`}>
+      <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'} opacity-70 italic w-fit max-w-[88%]`}>
         Tin nhắn đã thu hồi
       </div>
     );
   }
 
+  if (m.messageType === 'system') {
+    return (
+      <p className="w-full text-[11px] text-center text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 font-semibold leading-snug">
+        {m.content}
+      </p>
+    );
+  }
+
+  const nameLabel = senderLabel || (!mine && isHumanSupportSender(m)
+    ? (m.senderName || 'Nhân viên hỗ trợ')
+    : null);
+  const nameLabelClass = senderLabel
+    ? 'text-[10px] font-bold text-violet-700 mb-0.5 px-1'
+    : 'text-[10px] font-bold text-emerald-700 mb-0.5 px-1';
+
   if (isImageMessage(m) && m.fileUrl) {
     return (
-      <div className={`cms-fm-bubble cms-fm-bubble--media ${mine ? 'is-mine' : 'is-theirs'}`}>
-        <a href={resolveMediaUrl(m.fileUrl)} target="_blank" rel="noreferrer" className="block">
-          <img
-            src={resolveMediaUrl(m.fileUrl)}
-            alt={m.fileName || 'Hình ảnh'}
-            className="cms-fm-img"
-          />
-        </a>
-        {m.content && m.content !== '[Hình ảnh]' && (
-          <p className="mt-1.5 whitespace-pre-wrap break-words px-0.5">
-            <TextWithLinks text={m.content} mine={mine} />
+      <div className="w-fit max-w-[88%]">
+        {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
+        <div className={`cms-fm-bubble cms-fm-bubble--media ${mine ? 'is-mine' : 'is-theirs'}`}>
+          <a href={resolveMediaUrl(m.fileUrl)} target="_blank" rel="noreferrer" className="block">
+            <img
+              src={resolveMediaUrl(m.fileUrl)}
+              alt={m.fileName || 'Hình ảnh'}
+              className="cms-fm-img"
+            />
+          </a>
+          {m.content && m.content !== '[Hình ảnh]' && (
+            <p className="mt-1.5 whitespace-pre-wrap break-words px-0.5">
+              <MessageRichText text={m.content} mine={mine} />
+            </p>
+          )}
+        </div>
+        {showAiImageQuota && m.aiImageRemaining != null && Number.isFinite(Number(m.aiImageRemaining)) ? (
+          <p className={`mt-1 px-1 text-[10px] font-semibold ${
+            Number(m.aiImageRemaining) <= 0 ? 'text-amber-700' : 'text-slate-500'
+          }`}>
+            {Number(m.aiImageRemaining) <= 0
+              ? 'Hết 5 ảnh hôm nay — ngày mai gửi tiếp nhé.'
+              : `Còn ${Number(m.aiImageRemaining)}/5 ảnh hôm nay`}
           </p>
-        )}
+        ) : null}
       </div>
     );
   }
 
   if (m.messageType === 'file' && m.fileUrl) {
     return (
-      <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
-        <a
-          href={resolveMediaUrl(m.fileUrl)}
-          target="_blank"
-          rel="noreferrer"
-          className={`cms-fm-file ${mine ? 'is-mine' : ''}`}
-        >
-          <span className="truncate">{m.fileName || 'Tệp đính kèm'}</span>
-        </a>
+      <div className="w-fit max-w-[88%]">
+        {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
+        <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
+          <a
+            href={resolveMediaUrl(m.fileUrl)}
+            target="_blank"
+            rel="noreferrer"
+            className={`cms-fm-file ${mine ? 'is-mine' : ''}`}
+          >
+            <span className="truncate">{m.fileName || 'Tệp đính kèm'}</span>
+          </a>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
-      <p className="whitespace-pre-wrap break-words">
-        <TextWithLinks text={m.content} mine={mine} />
-      </p>
+    <div className="w-fit max-w-[88%]">
+      {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
+      <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
+        <p className="whitespace-pre-wrap">
+          <MessageRichText text={m.content} mine={mine} />
+        </p>
+      </div>
     </div>
   );
 }
@@ -165,14 +204,24 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
 
 function ChatWindow({
   tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendLink, onRecall, onlineUsers = [], isSuper = false,
+  peerTyping = false, isAiPeer = false, aiStatus = AI_SUPPORT_STATUS.AI_ACTIVE,
+  canShowEscalate = false, feedbackPhase = '', supportOnline = false,
+  onEscalate, onResetAi, onAgree, onDisagree, onMoreYes, onMoreNo,
+  escalating = false, resettingAi = false,
+  onTypingStart, onTypingStop,
+  imageQuota = { remaining: 5, limit: 5, used: 0 },
 }) {
   const toast = useToast();
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [pendingImage, setPendingImage] = useState(null);
+  const pendingUrlRef = useRef('');
   const [activeMsgOptions, setActiveMsgOptions] = useState(null);
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const imageRef = useRef(null);
+  const typingTimerRef = useRef(null);
+  const typingActiveRef = useRef(false);
 
   const isOnline = useMemo(() => {
     if (tab.user.online !== undefined) return Boolean(tab.user.online);
@@ -190,13 +239,53 @@ function ChatWindow({
     return tab.user.name || 'Hỗ trợ viên';
   }, [tab.user.name]);
 
+  const [statusFlash, setStatusFlash] = useState('');
+  const prevAiStatusRef = useRef(aiStatus);
+
+  useEffect(() => {
+    if (!isAiPeer) return undefined;
+    if (prevAiStatusRef.current === aiStatus) return undefined;
+    prevAiStatusRef.current = aiStatus;
+    let text = '';
+    if (aiStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE) {
+      text = 'Đã kết nối nhân viên hỗ trợ';
+    } else if (aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT) {
+      text = supportOnline
+        ? 'Đã gửi yêu cầu hỗ trợ — nhân viên sẽ tiếp nhận tại đây.'
+        : 'Đã gửi yêu cầu. Chưa có nhân viên trực tuyến — bạn cứ nhắn tiếp.';
+    }
+    if (!text) {
+      setStatusFlash('');
+      return undefined;
+    }
+    setStatusFlash(text);
+    const timer = setTimeout(() => setStatusFlash(''), 4500);
+    return () => clearTimeout(timer);
+  }, [aiStatus, isAiPeer, supportOnline]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, tab.id]);
+  }, [messages.length, tab.id, peerTyping]);
 
   useEffect(() => {
     inputRef.current?.focus();
+    return () => {
+      if (typingActiveRef.current && onTypingStop) onTypingStop(tab.id);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    };
+  }, [tab.id, onTypingStop]);
+
+  useEffect(() => {
+    setPendingImage(null);
+    if (pendingUrlRef.current) {
+      URL.revokeObjectURL(pendingUrlRef.current);
+      pendingUrlRef.current = '';
+    }
   }, [tab.id]);
+
+  useEffect(() => () => {
+    if (pendingUrlRef.current) URL.revokeObjectURL(pendingUrlRef.current);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = () => setActiveMsgOptions(null);
@@ -215,24 +304,94 @@ function ChatWindow({
     }
   };
 
-  const submit = (e) => {
+  const talkingToHuman = isAiPeer && (
+    aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
+    || aiStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE
+  );
+  const aiImageLimited = Boolean(isAiPeer && !talkingToHuman);
+  const aiImageLeft = Number(imageQuota?.remaining);
+  const imageBlocked = aiImageLimited && !(aiImageLeft > 0);
+  const canAttachImage = !isAiPeer || talkingToHuman || (aiImageLimited && !imageBlocked);
+
+  const clearPendingImage = () => {
+    if (pendingUrlRef.current) {
+      URL.revokeObjectURL(pendingUrlRef.current);
+      pendingUrlRef.current = '';
+    }
+    setPendingImage(null);
+  };
+
+  const stageImage = (file) => {
+    if (!file || uploading || imageBlocked) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Chỉ đính kèm ảnh.');
+      return;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      toast.error('Ảnh quá lớn (tối đa 5MB)');
+      return;
+    }
+    if (pendingUrlRef.current) URL.revokeObjectURL(pendingUrlRef.current);
+    const url = URL.createObjectURL(file);
+    pendingUrlRef.current = url;
+    setPendingImage({ file, url, name: file.name });
+    inputRef.current?.focus();
+  };
+
+  const submit = async (e) => {
     e?.preventDefault?.();
     const body = text.trim();
-    if (!body || uploading) return;
+    if (uploading) return;
+    if (!body && !pendingImage) return;
+    if (typingActiveRef.current && onTypingStop) {
+      typingActiveRef.current = false;
+      onTypingStop(tab.id);
+    }
+    if (pendingImage?.file) {
+      setUploading(true);
+      try {
+        const ok = await onSendFile(tab, pendingImage.file, body);
+        if (ok !== false) {
+          setText('');
+          clearPendingImage();
+        }
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
     onSend(tab, body);
     setText('');
   };
 
-  const pickImage = async (e) => {
+  const handleInputChange = (e) => {
+    setText(e.target.value);
+    if (!onTypingStart) return;
+    if (!typingActiveRef.current) {
+      typingActiveRef.current = true;
+      onTypingStart(tab.id);
+    }
+  };
+
+  const handleInputFocus = () => {
+    if (!onTypingStart || typingActiveRef.current) return;
+    typingActiveRef.current = true;
+    onTypingStart(tab.id);
+  };
+
+  const handleInputBlur = () => {
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    if (typingActiveRef.current && onTypingStop) {
+      typingActiveRef.current = false;
+      onTypingStop(tab.id);
+    }
+  };
+
+  const pickImage = (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || uploading) return;
-    setUploading(true);
-    try {
-      await onSendFile(tab, file);
-    } finally {
-      setUploading(false);
-    }
+    if (!file) return;
+    stageImage(file);
   };
 
   const insertLink = () => {
@@ -243,7 +402,8 @@ function ChatWindow({
     onSendLink(tab, link);
   };
 
-  const handlePaste = async (e) => {
+  const handlePaste = (e) => {
+    if (isAiPeer && imageBlocked) return;
     const items = e.clipboardData?.items;
     if (!items) return;
     let imageFile = null;
@@ -255,14 +415,7 @@ function ChatWindow({
     }
     if (!imageFile || uploading) return;
     e.preventDefault();
-    setUploading(true);
-    try {
-      await onSendFile(tab, imageFile);
-    } catch {
-      /* ignore */
-    } finally {
-      setUploading(false);
-    }
+    stageImage(imageFile);
   };
 
   return (
@@ -279,8 +432,16 @@ function ChatWindow({
           </span>
           <div className="min-w-0">
             <p className="text-[13px] font-bold text-slate-900 truncate leading-tight">{displayName}</p>
-            <p className={`text-[10px] font-semibold ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
-              {displayRoleLabel} · {isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}
+            <p className={`text-[10px] font-semibold ${isOnline || isAiPeer ? 'text-emerald-600' : 'text-slate-400'}`}>
+              {isAiPeer
+                ? (aiStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE
+                  ? 'Nhân viên hỗ trợ · Đã kết nối'
+                  : aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
+                    ? 'Đang kết nối nhân viên hỗ trợ'
+                    : aiStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
+                      ? 'Đã xử lý'
+                      : 'Trợ lý AI · Luôn sẵn sàng')
+                : `${displayRoleLabel} · ${isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}`}
             </p>
           </div>
         </div>
@@ -293,22 +454,42 @@ function ChatWindow({
           </button>
         </div>
       </div>
+      {isAiPeer && statusFlash ? (
+        <p className={`shrink-0 px-3 py-1.5 text-[10px] font-semibold text-center leading-snug border-b animate-in fade-in duration-200 ${
+          aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
+            ? 'border-amber-100 bg-amber-50 text-amber-800'
+            : 'border-emerald-100 bg-emerald-50 text-emerald-800'
+        }`}>
+          {statusFlash}
+        </p>
+      ) : null}
 
       <div className="cms-fm-window__body">
         {messages.length === 0 ? (
           <p className="text-center text-[12px] text-slate-400 py-8 px-3 font-medium">
-            Chat với {tab.user.name}. Có thể gửi ảnh, dán ảnh màn hình hoặc dán link.
+            {isAiPeer
+              ? 'Hỏi Trợ lý AI về tin học, Office, MOS, LMS…'
+              : `Chat với ${tab.user.name}. Có thể gửi ảnh, dán ảnh màn hình hoặc dán link.`}
           </p>
         ) : (
           messages.map((m, idx) => {
-            const mine = String(m.senderId) === String(meId);
+            const sentByMe = isOutgoingMessengerMessage(m, meId);
+            const alignEnd = sentByMe && !(isAiPeer && isImageMessage(m));
             const msgId = m.id || m._id;
             const showOptions = activeMsgOptions === msgId;
             const isNearTop = idx < 3 || idx < messages.length / 2;
+            const prev = idx > 0 ? messages[idx - 1] : null;
+            if (
+              m.messageType === 'system'
+              && prev?.messageType === 'system'
+              && String(prev.content || '').trim() === String(m.content || '').trim()
+            ) {
+              return null;
+            }
 
             return (
-              <div key={msgId} className={`group relative flex items-center gap-1 ${mine ? 'justify-end' : 'justify-start'}`}>
-                {mine && !m.isRecalled && (
+              <div key={msgId} className={`group relative flex w-full items-center gap-1 ${m.messageType === 'system' ? 'justify-center' : (alignEnd ? 'justify-end' : 'justify-start')}`}>
+                {sentByMe && !m.isRecalled && (
                   <div className="relative shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                     <button
                       type="button"
@@ -351,55 +532,201 @@ function ChatWindow({
                     </div>
                   </div>
                 )}
-                <MessageBubble m={m} mine={mine} />
+                <MessageBubble
+                  m={m}
+                  mine={alignEnd}
+                  showAiImageQuota={sentByMe && isAiPeer && isImageMessage(m)}
+                  senderLabel={isAiPeer && sentByMe && isImageMessage(m) && !alignEnd ? 'Bạn gửi' : ''}
+                />
               </div>
             );
           })
         )}
+        {peerTyping ? <TypingIndicator label={isAiPeer && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE ? 'Trợ lý AI đang trả lời' : 'Đang gõ'} /> : null}
+        {isAiPeer ? (
+          <div className="px-2 pb-1 space-y-2">
+            {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && canShowEscalate && (
+              !feedbackPhase
+              || feedbackPhase === 'agree'
+              || feedbackPhase === 'staff'
+              || feedbackPhase === 'more'
+              || feedbackPhase === 'invite'
+              || feedbackPhase === 'ended'
+            ) ? (
+              <div className="space-y-1.5">
+                {(!feedbackPhase || feedbackPhase === 'agree') && canShowEscalate ? (
+                  <>
+                    <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn đồng ý câu trả lời này không?</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onAgree?.(tab)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors"
+                      >
+                        <Check size={14} />
+                        Có
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDisagree?.(tab)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors"
+                      >
+                        <X size={14} />
+                        Không
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+                {feedbackPhase === 'staff' ? (
+                  <button
+                    type="button"
+                    disabled={escalating}
+                    onClick={() => onEscalate?.(tab)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black uppercase tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                  >
+                    {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
+                    Cần nhân viên hỗ trợ
+                  </button>
+                ) : null}
+                {feedbackPhase === 'more' ? (
+                  <>
+                    <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn cần hỗ trợ thêm câu hỏi nào nữa không?</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onMoreYes?.(tab)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors"
+                      >
+                        <Check size={14} />
+                        Có
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoreNo?.(tab)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors"
+                      >
+                        <X size={14} />
+                        Không
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+                {feedbackPhase === 'invite' ? (
+                  <p className="text-[11px] text-violet-800 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
+                    Mời bạn đặt câu hỏi.
+                  </p>
+                ) : null}
+                {feedbackPhase === 'ended' ? (
+                  <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
+                    Xin chào, hẹn gặp lại bạn.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {aiStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
+              || aiStatus === AI_SUPPORT_STATUS.CLOSED
+              || aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT ? (
+              <button
+                type="button"
+                disabled={resettingAi}
+                onClick={() => onResetAi?.(tab)}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-900 text-[10px] font-black uppercase tracking-wide hover:bg-violet-100 disabled:opacity-50 transition-colors"
+              >
+                {resettingAi ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
+                Hỏi Trợ lý AI
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div ref={endRef} />
       </div>
 
       <form className="cms-fm-window__foot" onSubmit={submit}>
-        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
-        <button
-          type="button"
-          className="cms-fm-attach"
-          disabled={uploading}
-          onClick={() => imageRef.current?.click()}
-          title="Gửi ảnh"
-          aria-label="Gửi ảnh"
-        >
-          <ImagePlus size={16} />
-        </button>
-        <button
-          type="button"
-          className="cms-fm-attach"
-          disabled={uploading}
-          onClick={insertLink}
-          title="Gửi link"
-          aria-label="Gửi link"
-        >
-          <Link2 size={16} />
-        </button>
-        <input
-          ref={inputRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              submit(e);
+        {pendingImage ? (
+          <div className="cms-fm-pending">
+            <img src={pendingImage.url} alt="" className="cms-fm-pending__thumb" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-slate-800 truncate">Ảnh đã chọn</p>
+              <p className="text-[10px] text-slate-500 truncate">{pendingImage.name || 'ảnh'}</p>
+            </div>
+            <button
+              type="button"
+              className="cms-fm-pending__remove"
+              onClick={clearPendingImage}
+              disabled={uploading}
+              title="Bỏ ảnh"
+              aria-label="Bỏ ảnh"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : null}
+        <div className="cms-fm-window__compose">
+          {(canAttachImage || imageBlocked) ? (
+            <>
+              <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
+              <button
+                type="button"
+                className="cms-fm-attach"
+                disabled={uploading || imageBlocked}
+                onClick={() => {
+                  if (imageBlocked) return;
+                  imageRef.current?.click();
+                }}
+                title={imageBlocked ? 'Hết 5 ảnh hôm nay — ngày mai gửi tiếp' : 'Đính kèm ảnh'}
+                aria-label={imageBlocked ? 'Hết lượt gửi ảnh hôm nay' : 'Đính kèm ảnh'}
+              >
+                <ImagePlus size={16} />
+              </button>
+              {!isAiPeer ? (
+                <button
+                  type="button"
+                  className="cms-fm-attach"
+                  disabled={uploading}
+                  onClick={insertLink}
+                  title="Gửi link"
+                  aria-label="Gửi link"
+                >
+                  <Link2 size={16} />
+                </button>
+              ) : null}
+            </>
+          ) : null}
+          <input
+            ref={inputRef}
+            value={text}
+            onChange={handleInputChange}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit(e);
+              }
+            }}
+            onPaste={canAttachImage ? handlePaste : undefined}
+            placeholder={
+              uploading
+                ? 'Đang gửi ảnh…'
+                : pendingImage
+                  ? (isAiPeer ? 'Nhập câu hỏi rồi nhấn Gửi…' : 'Nhập lời nhắn rồi nhấn Gửi…')
+                  : (isAiPeer ? 'Hỏi tin học, Office, MOS, LMS…' : 'Aa (Dán ảnh Ctrl+V)')
             }
-          }}
-          onPaste={handlePaste}
-          placeholder={uploading ? 'Đang gửi ảnh…' : 'Aa (Dán ảnh Ctrl+V)'}
-          disabled={uploading}
-          className="cms-fm-input"
-        />
-        <button type="submit" disabled={!text.trim() || uploading} className="cms-fm-send" aria-label="Gửi">
-          {uploading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-        </button>
+            disabled={uploading}
+            className="cms-fm-input"
+          />
+          <button type="submit" disabled={(!text.trim() && !pendingImage) || uploading} className="cms-fm-send" aria-label="Gửi">
+            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+          </button>
+        </div>
       </form>
+      {aiImageLimited ? (
+        <p className={`px-3 pb-2 text-[10px] font-semibold ${imageBlocked ? 'text-amber-700' : 'text-slate-500'}`}>
+          {imageBlocked
+            ? 'Bạn đã gửi đủ 5 ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.'
+            : `Ảnh gửi Trợ lý AI: còn ${Number.isFinite(aiImageLeft) ? aiImageLeft : 5}/5 lượt hôm nay`}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -408,16 +735,29 @@ export default function FloatingMessenger({ session, role }) {
   const location = useLocation();
   const isInbox = location.pathname.includes('/inbox');
   const toast = useToast();
-  const { onlineUsers, onMessageReceive, onContactListUpdated } = useSocket() || {};
-  const { sendMessage, getMessages, getConversations, markMessagesRead, recallMessage } = useData();
+  const {
+    onlineUsers, onMessageReceive, onContactListUpdated,
+    onTypingChange, emitTypingStart, emitTypingStop, socket,
+  } = useSocket() || {};
+  const { sendMessage, getMessages, getConversations, markMessagesRead, recallMessage, syncMessages } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
     openChat, closeChat, minimizeChat, focusChat,
   } = useFloatingMessenger();
 
+  const [aiSupportEnabled, setAiSupportEnabled] = useState(false);
+  const [aiOpening, setAiOpening] = useState(false);
+  const [escalatingId, setEscalatingId] = useState(null);
+  const [resettingAiId, setResettingAiId] = useState(null);
+  const [aiStatusMap, setAiStatusMap] = useState({});
+  const [aiFeedback, setAiFeedback] = useState({});
+  const [peerTypingMap, setPeerTypingMap] = useState({});
+  const [aiImageQuota, setAiImageQuota] = useState({ remaining: 5, limit: 5, used: 0 });
+
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';
   const meRole = normalizeChatRole(getMessagingRole(session) || role || session?.role || 'student');
+  const canUseAiSupport = aiSupportEnabled && (meRole === 'student' || meRole === 'teacher');
   // UI: staff/admin hide student quick-support chrome
   const isSuper = isSuperAdminViewer(session);
   // Directory: only SUPER/HIGH may browse presence; others use GET /contacts
@@ -465,25 +805,205 @@ export default function FloatingMessenger({ session, role }) {
   const effectiveStaffs = fmContacts;
 
   const directory = useMemo(
-    () => buildSupportDirectory({ session, onlineUsers, meId, staffs: effectiveStaffs }),
-    [session, onlineUsers, meId, effectiveStaffs],
+    () => buildSupportDirectory({
+      session,
+      onlineUsers,
+      meId,
+      staffs: effectiveStaffs,
+      supportAgentsOnly: canUseAiSupport,
+    }),
+    [session, onlineUsers, meId, effectiveStaffs, canUseAiSupport],
   );
+
+  /** HV/GV dùng AI-first: không mở danh bạ. Nhân viên nhắn tới thì hiện chat-head. */
+  const showHumanSupportPanel = supportOpen && !canUseAiSupport;
 
   const unreadConversations = useMemo(() => {
     const list = conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup);
     if (usePresenceDirectory) return list.slice(0, 8);
-    // Non-elevated: nhận tin từ Hỗ trợ viên (staff transport / SUPPORT product)
+    // Non-elevated: nhận tin từ chuyên viên SUPPORT (không staff chi nhánh)
     return list.filter((c) => {
+      const ar = String(c.user?.adminRole || c.user?.productRole || '').toUpperCase();
+      if (canUseAiSupport) return ar === 'SUPPORT';
       const r = String(c.user?.role || '').toLowerCase();
-      const ar = String(c.user?.adminRole || '').toUpperCase();
       return r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT';
     }).slice(0, 8);
-  }, [conversations, usePresenceDirectory]);
+  }, [conversations, usePresenceDirectory, canUseAiSupport]);
 
-  const openWindow = tabs.find((t) => !t.minimized) || null;
+  const openWindowRaw = tabs.find((t) => !t.minimized) || null;
+  const openWindow = openWindowRaw && isAiSupportPeer(openWindowRaw.user)
+    ? {
+      ...openWindowRaw,
+      id: buildAiSupportConversationId(meRole, meId),
+      user: { ...AI_SUPPORT_PEER },
+    }
+    : openWindowRaw;
   const heads = tabs.filter((t) => t.minimized);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
+
+  useEffect(() => {
+    if (!meId || isInbox) return;
+    aiSupportAPI.status().then((res) => {
+      if (res?.success) setAiSupportEnabled(!!res.data?.enabled);
+    }).catch(() => setAiSupportEnabled(false));
+  }, [meId, isInbox]);
+
+  useEffect(() => {
+    if (!canUseAiSupport || !meId || isInbox) return undefined;
+    let tokenTail = '';
+    try {
+      tokenTail = String(
+        localStorage.getItem('student_access_token')
+        || localStorage.getItem('teacher_access_token')
+        || '',
+      ).slice(-16);
+    } catch { /* ignore */ }
+    const key = `cms_ai_hist_reset_${meId}_${tokenTail}`;
+    try {
+      if (sessionStorage.getItem(key) === '1') return undefined;
+      sessionStorage.setItem(key, '1');
+    } catch { /* ignore */ }
+    let cancelled = false;
+    (async () => {
+      try {
+        await aiSupportAPI.clearHistory();
+        if (!cancelled) await syncMessages?.(meId);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [canUseAiSupport, meId, isInbox, syncMessages]);
+
+  useEffect(() => {
+    if (!onTypingChange) return undefined;
+    return onTypingChange(({ conversationId, userId, show }) => {
+      const cid = String(conversationId || '');
+      if (!cid) return;
+      if (String(userId) === String(meId)) return;
+      setPeerTypingMap((prev) => {
+        const next = { ...prev };
+        if (show) next[cid] = true;
+        else delete next[cid];
+        return next;
+      });
+    });
+  }, [onTypingChange, meId]);
+
+  const handleTypingStart = useCallback((conversationId) => {
+    emitTypingStart?.(conversationId, meName);
+  }, [emitTypingStart, meName]);
+
+  const handleTypingStop = useCallback((conversationId) => {
+    emitTypingStop?.(conversationId);
+  }, [emitTypingStop]);
+
+  const handleOpenAiSupport = useCallback(async () => {
+    if (!canUseAiSupport || aiOpening) return;
+    setAiOpening(true);
+    try {
+      const res = await aiSupportAPI.open();
+      if (!res?.success) throw new Error(res?.message || 'Không mở được Trợ lý AI');
+      const convId = res.data?.conversationId;
+      if (convId) {
+        const status = res.data?.session?.status
+          || (res.data?.session?.escalated ? AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT : AI_SUPPORT_STATUS.AI_ACTIVE);
+        setAiStatusMap((prev) => ({ ...prev, [convId]: status }));
+        const q = res.data?.session?.imageQuota;
+        if (q) {
+          setAiImageQuota({
+            remaining: Number(q.remaining ?? 5),
+            limit: Number(q.limit ?? 5),
+            used: Number(q.used ?? 0),
+          });
+        }
+      }
+      await syncMessages?.(meId);
+      openChat(AI_SUPPORT_PEER, { expand: true });
+      setSupportOpen(false);
+    } catch (err) {
+      toast.error(err.message || 'Trợ lý AI chưa sẵn sàng');
+    } finally {
+      setAiOpening(false);
+    }
+  }, [canUseAiSupport, aiOpening, syncMessages, meId, openChat, setSupportOpen, toast]);
+
+  const handleSupportFabClick = useCallback(() => {
+    if (canUseAiSupport) {
+      handleOpenAiSupport();
+      return;
+    }
+    setSupportOpen((v) => !v);
+  }, [canUseAiSupport, setSupportOpen, handleOpenAiSupport]);
+
+  const handleEscalate = useCallback(async (tab) => {
+    if (!tab?.id || escalatingId) return;
+    setEscalatingId(tab.id);
+    try {
+      const res = await aiSupportAPI.escalate(tab.id);
+      if (!res?.success) throw new Error(res?.message || 'Không chuyển được');
+      setAiStatusMap((prev) => ({
+        ...prev,
+        [tab.id]: res.data?.session?.status || AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT,
+      }));
+      setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'idle' } }));
+      if (!res.data?.alreadyEscalated) {
+        await syncMessages?.(meId);
+      }
+      toast.success('Đã chuyển tới nhân viên hỗ trợ. Bạn cứ nhắn tiếp trong cuộc trò chuyện này.');
+      setSupportOpen(false);
+    } catch (err) {
+      toast.error(err.message || 'Không chuyển được yêu cầu');
+    } finally {
+      setEscalatingId(null);
+    }
+  }, [escalatingId, syncMessages, meId, toast, setSupportOpen]);
+
+  const handleResetAi = useCallback(async (tab) => {
+    if (!tab?.id || resettingAiId) return;
+    setResettingAiId(tab.id);
+    try {
+      const res = await aiSupportAPI.reset(tab.id);
+      if (!res?.success) throw new Error(res?.message || 'Không bật lại được Trợ lý AI');
+      setAiStatusMap((prev) => ({ ...prev, [tab.id]: AI_SUPPORT_STATUS.AI_ACTIVE }));
+      setAiFeedback((prev) => ({ ...prev, [tab.id]: { phase: 'idle', replyId: prev[tab.id]?.replyId || '' } }));
+      toast.success('Trợ lý AI đã sẵn sàng — bạn có thể hỏi tiếp');
+    } catch (err) {
+      toast.error(err.message || 'Không bật lại được Trợ lý AI');
+    } finally {
+      setResettingAiId(null);
+    }
+  }, [resettingAiId, toast]);
+
+  useEffect(() => {
+    const aiTab = tabs.find((t) => isAiSupportPeer(t.user));
+    if (!aiTab?.id) return;
+    aiSupportAPI.open().then((res) => {
+      if (res?.success && res.data?.conversationId === aiTab.id) {
+        const status = res.data?.session?.status
+          || (res.data?.session?.escalated ? AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT : AI_SUPPORT_STATUS.AI_ACTIVE);
+        setAiStatusMap((prev) => ({ ...prev, [aiTab.id]: status }));
+        const q = res.data?.session?.imageQuota;
+        if (q) {
+          setAiImageQuota({
+            remaining: Number(q.remaining ?? 5),
+            limit: Number(q.limit ?? 5),
+            used: Number(q.used ?? 0),
+          });
+        }
+      }
+    }).catch(() => {});
+  }, [tabs, activeTabId]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onStatus = (payload) => {
+      const cid = String(payload?.conversationId || '');
+      if (!cid || !payload?.status) return;
+      setAiStatusMap((prev) => ({ ...prev, [cid]: payload.status }));
+    };
+    socket.on('ai-support:status', onStatus);
+    return () => socket.off('ai-support:status', onStatus);
+  }, [socket]);
 
   // Tin đến → chat-head + badge (không cướp cửa sổ đang mở); tách khỏi Inbox
   useEffect(() => {
@@ -496,13 +1016,36 @@ export default function FloatingMessenger({ session, role }) {
         || (meRole === 'support' && String(data.receiverId) === 'support');
       if (!forMe && !data.isGroup) return;
 
-      const peer = {
-        id: String(data.senderId),
-        name: data.sender?.displayName || data.senderName || 'Người dùng',
-        role: normalizeChatRole(data.senderRole || 'student'),
-        adminRole: data.sender?.adminRole || null,
-        avatar: data.sender?.avatar || data.senderAvatar || '',
-      };
+      const peer = String(data.senderId) === 'ai_support'
+        ? { ...AI_SUPPORT_PEER }
+        : {
+          id: String(data.senderId),
+          name: data.sender?.displayName || data.senderName || 'Người dùng',
+          role: normalizeChatRole(data.senderRole || 'student'),
+          adminRole: data.sender?.adminRole || null,
+          avatar: data.sender?.avatar || data.senderAvatar || '',
+        };
+
+      if (String(data.senderId) === 'ai_support' && data.conversationId) {
+        setPeerTypingMap((prev) => {
+          const next = { ...prev };
+          delete next[String(data.conversationId)];
+          return next;
+        });
+      }
+
+      if (isAiSupportConversationId(data.conversationId)) {
+        const aiOpen = tabsRef.current.some((t) => !t.minimized && isAiSupportPeer(t.user));
+        if (!aiOpen) openChat(AI_SUPPORT_PEER, { expand: true });
+        return;
+      }
+
+      const peerRole = String(peer.role || '').toLowerCase();
+      const peerAdminRole = String(peer.adminRole || data.sender?.productRole || '').toUpperCase();
+      const isHumanSupport = peerRole === 'staff'
+        || peerAdminRole === 'SUPPORT'
+        || peerAdminRole === 'STAFF';
+      if (isHumanSupport) setSupportOpen(false);
 
       const current = tabsRef.current;
       const alreadyThis = current.some((t) => (
@@ -510,17 +1053,9 @@ export default function FloatingMessenger({ session, role }) {
         && t.user.id === peer.id
         && normalizeChatRole(t.user.role) === peer.role
       ));
-      // Đang xem đúng người → giữ cửa sổ; ngược lại chỉ hiện head tròn
       openChat(peer, { expand: alreadyThis });
-
-      const preview = data.messageType === 'image'
-        ? 'Đã gửi một hình ảnh'
-        : data.messageType === 'file'
-          ? `File: ${data.fileName || 'đính kèm'}`
-          : String(data.content || '').slice(0, 80);
-      toast.info(`${peer.name}: ${preview || 'Tin nhắn mới'}`);
     });
-  }, [onMessageReceive, meId, meRole, isInbox, openChat, toast]);
+  }, [onMessageReceive, meId, meRole, isInbox, openChat, setSupportOpen]);
 
   useEffect(() => {
     if (!meId || !activeTabId) return;
@@ -530,18 +1065,79 @@ export default function FloatingMessenger({ session, role }) {
     if (unread > 0) markMessagesRead?.(activeTabId, meId);
   }, [activeTabId, tabs, conversations, meId, markMessagesRead]);
 
+  const handleAgree = useCallback((tab) => {
+    if (!tab?.id) return;
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'more' } }));
+  }, []);
+
+  const handleDisagree = useCallback((tab) => {
+    if (!tab?.id) return;
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'staff' } }));
+  }, []);
+
+  const handleMoreYes = useCallback((tab) => {
+    if (!tab?.id) return;
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'invite' } }));
+  }, []);
+
+  const handleMoreNo = useCallback((tab) => {
+    if (!tab?.id) return;
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'ended' } }));
+  }, []);
+
+  const handleFocus = useCallback((convId) => {
+    focusChat(convId);
+    if (meId) markMessagesRead?.(convId, meId);
+  }, [focusChat, meId, markMessagesRead]);
+
+  const openWindowMessages = openWindow ? (getMessages(openWindow.id) || []) : [];
+  const openWindowStatus = openWindow
+    ? (aiStatusMap[openWindow.id] || AI_SUPPORT_STATUS.AI_ACTIVE)
+    : AI_SUPPORT_STATUS.AI_ACTIVE;
+  const openWindowId = openWindow?.id || '';
+  const latestAiReplyId = (openWindow && isAiSupportPeer(openWindow.user))
+    ? lastMeaningfulAiReplyId(openWindowMessages, meId)
+    : '';
+
+  const clearAiFeedbackPrompt = useCallback((tab) => {
+    if (!tab?.id || !isAiSupportPeer(tab.user)) return;
+    setAiFeedback((prev) => {
+      const cur = prev[tab.id];
+      if (!cur?.phase || cur.phase === 'idle') return prev;
+      return { ...prev, [tab.id]: { ...cur, phase: 'idle' } };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!openWindowId || !latestAiReplyId) return;
+    if (openWindowStatus !== AI_SUPPORT_STATUS.AI_ACTIVE) return;
+    setAiFeedback((prev) => {
+      const cur = prev[openWindowId];
+      if (cur?.replyId === latestAiReplyId) return prev;
+      return { ...prev, [openWindowId]: { phase: 'agree', replyId: latestAiReplyId } };
+    });
+  }, [openWindowId, openWindowStatus, latestAiReplyId]);
+
   if (isInbox || !meId) return null;
 
   const handleSend = async (tab, content) => {
+    const body = String(content || '').trim();
+    if (!body) return;
+
+    const isAi = isAiSupportPeer(tab.user);
+    if (isAi) {
+      clearAiFeedbackPrompt(tab);
+    }
+
     await sendMessage({
-      conversationId: tab.id,
+      conversationId: isAi ? buildAiSupportConversationId(meRole, meId) : tab.id,
       senderId: meId,
       senderName: meName,
       senderRole: meRole,
-      receiverId: tab.user.id,
-      receiverName: tab.user.name,
-      receiverRole: tab.user.role,
-      content,
+      receiverId: isAi ? AI_SUPPORT_PEER.id : tab.user.id,
+      receiverName: isAi ? AI_SUPPORT_PEER.name : tab.user.name,
+      receiverRole: isAi ? AI_SUPPORT_PEER.role : tab.user.role,
+      content: body,
       messageType: 'text',
       isGroup: false,
     });
@@ -551,46 +1147,88 @@ export default function FloatingMessenger({ session, role }) {
     await handleSend(tab, link);
   };
 
-  const handleSendFile = async (tab, file) => {
-    if (!file) return;
+  const handleSendFile = async (tab, file, caption = '') => {
+    if (!file) return false;
     if (!file.type.startsWith('image/')) {
       toast.error('Chỉ gửi ảnh tại chat nổi. File khác dùng Inbox.');
-      return;
+      return false;
     }
     if (file.size > MAX_FILE_BYTES) {
       toast.error('Ảnh quá lớn (tối đa 5MB)');
-      return;
+      return false;
     }
+    const isAi = isAiSupportPeer(tab.user);
+    const status = aiStatusMap[tab.id] || AI_SUPPORT_STATUS.AI_ACTIVE;
+    const quotaApplies = isAi && status === AI_SUPPORT_STATUS.AI_ACTIVE;
+    if (quotaApplies && Number(aiImageQuota.remaining) <= 0) {
+      toast.error('Bạn đã gửi đủ 5 ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.');
+      return false;
+    }
+    const content = String(caption || '').trim() || '[Hình ảnh]';
     try {
       const uploadRes = await messagesAPI.uploadMessageFile(file);
       if (!uploadRes?.success) throw new Error(uploadRes?.message || 'Upload thất bại');
-      await sendMessage({
-        conversationId: tab.id,
+      if (isAi) clearAiFeedbackPrompt(tab);
+      const sent = await sendMessage({
+        conversationId: isAi ? buildAiSupportConversationId(meRole, meId) : tab.id,
         senderId: meId,
         senderName: meName,
         senderRole: meRole,
-        receiverId: tab.user.id,
-        receiverName: tab.user.name,
-        receiverRole: tab.user.role,
-        content: '[Hình ảnh]',
+        receiverId: isAi ? AI_SUPPORT_PEER.id : tab.user.id,
+        receiverName: isAi ? AI_SUPPORT_PEER.name : tab.user.name,
+        receiverRole: isAi ? AI_SUPPORT_PEER.role : tab.user.role,
+        content,
         messageType: 'image',
         fileUrl: uploadRes.url,
         fileName: file.name,
         isGroup: false,
       });
+      if (sent?.failed) {
+        const reason = String(sent.failReason || '');
+        if (/5 ảnh hôm nay|AI_IMAGE_QUOTA/i.test(reason)) {
+          setAiImageQuota((prev) => ({ ...prev, remaining: 0, used: prev.limit || 5 }));
+        }
+        toast.error(sent.failReason || 'Gửi ảnh thất bại');
+        return false;
+      }
+      if (quotaApplies) {
+        setAiImageQuota((prev) => {
+          const remaining = Math.max(0, Number(prev.remaining) - 1);
+          return {
+            ...prev,
+            remaining,
+            used: Number(prev.limit || 5) - remaining,
+          };
+        });
+      }
+      return true;
     } catch (err) {
+      if (err?.code === 'AI_IMAGE_QUOTA' || err?.data?.code === 'AI_IMAGE_QUOTA') {
+        setAiImageQuota((prev) => ({ ...prev, remaining: 0, used: prev.limit || 5 }));
+      }
       toast.error(err.message || 'Gửi ảnh thất bại');
+      return false;
     }
   };
 
-  const handleFocus = (convId) => {
-    focusChat(convId);
-    if (meId) markMessagesRead?.(convId, meId);
-  };
-
-  const isFeedPage = location.pathname.includes('/feed');
   const badgeCount = unreadTotal > 0 ? unreadTotal : 0;
   const badgeLabel = badgeCount > 99 ? '99+' : String(badgeCount);
+
+  const openWindowCanEscalate = Boolean(
+    openWindow
+    && isAiSupportPeer(openWindow.user)
+    && openWindowStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+    && canOfferHumanEscalation(openWindowMessages, meId),
+  );
+  const openWindowFeedback = openWindow ? (aiFeedback[openWindow.id]?.phase || '') : '';
+
+  const supportOnline = Array.isArray(onlineUsers) && onlineUsers.some((u) => {
+    const ar = String(u.adminRole || u.productRole || '').toUpperCase();
+    return ar === 'SUPPORT';
+  });
+
+  const fabLabel = canUseAiSupport ? 'Trợ lý AI 24/7' : 'Hỗ trợ viên 24/7';
+  const fabExpanded = canUseAiSupport ? showHumanSupportPanel : supportOpen;
 
   return (
     <div className="cms-fm-root" aria-live="polite">
@@ -603,26 +1241,43 @@ export default function FloatingMessenger({ session, role }) {
             meId={meId}
             onlineUsers={onlineUsers}
             isSuper={isSuper}
-            messages={getMessages(openWindow.id) || []}
+            messages={openWindowMessages}
             onClose={closeChat}
             onMinimize={minimizeChat}
             onSend={handleSend}
             onSendFile={handleSendFile}
             onSendLink={handleSendLink}
             onRecall={recallMessage}
+            peerTyping={!!peerTypingMap[openWindow.id]}
+            isAiPeer={isAiSupportPeer(openWindow.user)}
+            aiStatus={openWindowStatus}
+            canShowEscalate={openWindowCanEscalate}
+            feedbackPhase={openWindowFeedback}
+            supportOnline={supportOnline}
+            onEscalate={handleEscalate}
+            onResetAi={handleResetAi}
+            onAgree={handleAgree}
+            onDisagree={handleDisagree}
+            onMoreYes={handleMoreYes}
+            onMoreNo={handleMoreNo}
+            escalating={escalatingId === openWindow.id}
+            resettingAi={resettingAiId === openWindow.id}
+            onTypingStart={handleTypingStart}
+            onTypingStop={handleTypingStop}
+            imageQuota={aiImageQuota}
           />
         </div>
       )}
 
       <div className="cms-fm-dock">
-        {/* Panel danh bạ nhắn tin — hiển thị khi bấm Hỗ trợ viên */}
-        {supportOpen ? (
+        {/* Panel danh bạ nhân viên — HV/GV chỉ sau escalate AI */}
+        {showHumanSupportPanel ? (
           <div className="cms-fm-support">
             <div className="cms-fm-support__head">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-slate-800 flex items-center gap-2">
                   <Headphones size={15} className="text-emerald-600 shrink-0" />
-                  {usePresenceDirectory ? 'Đang hoạt động' : 'Hỗ trợ viên'}
+                  {usePresenceDirectory ? 'Đang hoạt động' : (canUseAiSupport ? 'Chuyên viên hỗ trợ' : 'Hỗ trợ viên')}
                   {unreadTotal > 0 && (
                     <span className="cms-fm-unread-pill">{badgeLabel} mới</span>
                   )}
@@ -630,7 +1285,9 @@ export default function FloatingMessenger({ session, role }) {
                 <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
                   {usePresenceDirectory
                     ? 'Học viên, giảng viên, admin chi nhánh đang online'
-                    : 'Gửi tin nhắn trực tiếp tới bộ phận Hỗ trợ viên'}
+                    : (canUseAiSupport
+                      ? 'Chọn chuyên viên hỗ trợ trực tiếp (sau khi Trợ lý AI chuyển tiếp)'
+                      : 'Gửi tin nhắn trực tiếp tới bộ phận Hỗ trợ viên')}
                 </p>
               </div>
               <button
@@ -683,7 +1340,7 @@ export default function FloatingMessenger({ session, role }) {
               {directory.groups.length === 0 ? (
                 <div className="px-3 py-8 text-center text-xs text-slate-400 font-medium">
                   <Circle size={28} className="mx-auto mb-2 text-slate-200" />
-                  Chưa có ai đang online
+                  {canUseAiSupport ? 'Chưa có chuyên viên hỗ trợ online' : 'Chưa có ai đang online'}
                 </div>
               ) : (
                 directory.groups.map((group) => (
@@ -717,7 +1374,7 @@ export default function FloatingMessenger({ session, role }) {
                                   {p.name}
                                 </span>
                                 <span className="block text-[11px] text-slate-500 font-medium">
-                                  {ROLE_LABEL[p.displayRole] || ROLE_LABEL[p.role] || p.role}
+                                  {ROLE_LABEL[p.adminRole] || ROLE_LABEL[p.displayRole] || ROLE_LABEL[p.role] || p.role}
                                   {' · '}
                                   {online ? 'Trực tuyến' : 'Ngoại tuyến'}
                                 </span>
@@ -759,31 +1416,33 @@ export default function FloatingMessenger({ session, role }) {
           </div>
         )}
 
-        {/* FAB Nhân vật vẫy tay Hỗ trợ viên góc dưới màn hình — ẩn với admin super */}
+        {/* FAB — HV/GV: mở Trợ lý AI trước; sau escalate mới mở danh bạ SUPPORT */}
         {!isSuper && (meRole === 'student' || meRole === 'teacher' || meRole === 'staff') && (
           <div className="relative flex items-center gap-2 group">
-            {!supportOpen && (
+            {!fabExpanded && (
               <div
-                onClick={() => setSupportOpen(true)}
+                onClick={handleSupportFabClick}
                 className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl shadow-slate-900/10 cursor-pointer hover:scale-105 hover:border-red-200 transition-all duration-200"
               >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="text-xs font-black text-slate-800 tracking-tight">Hỗ trợ viên 24/7</span>
+                <span className="text-xs font-black text-slate-800 tracking-tight">{fabLabel}</span>
               </div>
             )}
 
             <button
               type="button"
-              onClick={() => setSupportOpen((v) => !v)}
+              onClick={handleSupportFabClick}
               className="cms-fm-fab cms-fm-fab--mascot"
-              title={supportOpen ? 'Đóng danh bạ Hỗ trợ' : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : 'Liên hệ Hỗ trợ viên')}
-              aria-label={supportOpen ? 'Đóng danh bạ Hỗ trợ' : 'Mở Hỗ trợ viên'}
-              aria-expanded={supportOpen}
+              title={fabExpanded
+                ? 'Đóng'
+                : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Liên hệ Hỗ trợ viên'))}
+              aria-label={fabExpanded ? 'Đóng' : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Mở Hỗ trợ viên')}
+              aria-expanded={fabExpanded}
             >
-              {supportOpen ? (
+              {fabExpanded ? (
                 <X size={24} className="text-white shrink-0" />
               ) : (
                 <div className="relative flex items-center justify-center w-full h-full overflow-visible">
@@ -791,7 +1450,7 @@ export default function FloatingMessenger({ session, role }) {
                   <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-sm" title="Hoạt động" />
                 </div>
               )}
-              {!supportOpen && unreadTotal > 0 && (
+              {!fabExpanded && unreadTotal > 0 && (
                 <span className="cms-fm-fab__badge is-unread">{badgeLabel}</span>
               )}
             </button>

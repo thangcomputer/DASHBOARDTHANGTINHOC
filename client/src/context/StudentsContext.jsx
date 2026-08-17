@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
+import { createContext, useContext, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import api from '../services/api';
 import { mapStudent } from '../lib/entityMaps';
@@ -65,8 +65,13 @@ async function fetchStudents([, scope, arg]) {
 
 export function StudentsProvider({ user, children }) {
   const [adminQuery, setAdminQuery] = useState(null);
+  const adminQueryRef = useRef(null);
   const key = studentsKey(user, adminQuery);
   const { socket } = useSocket();
+
+  useEffect(() => {
+    adminQueryRef.current = adminQuery;
+  }, [adminQuery]);
 
   useEffect(() => {
     setAdminQuery(null);
@@ -75,7 +80,12 @@ export function StudentsProvider({ user, children }) {
   const { data, mutate, isValidating, isLoading } = useSWR(
     key,
     fetchStudents,
-    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30_000,
+      // Đổi filter/page không được flash danh sách rỗng trong lúc chờ API
+      keepPreviousData: true,
+    }
   );
 
   const students = data?.students ?? [];
@@ -84,16 +94,21 @@ export function StudentsProvider({ user, children }) {
   const isStudentsLoading = Boolean(key) && (isLoading || (data == null && isValidating));
 
   const fetchStudentsPaginated = useCallback(async (params = {}) => {
+    const prev = adminQueryRef.current;
+    // Merge với query hiện tại — gọi chỉ { page } không được xóa branch/filter
     const q = {
-      page: params.page || 1,
-      limit: params.limit || 10,
-      search: params.search || '',
-      paid: params.paid,
-      course: params.course,
-      branch_id: params.branch_id,
-      forceBranchIdAll: !!params.forceBranchIdAll,
+      page: params.page != null ? params.page : (prev?.page || 1),
+      limit: params.limit != null ? params.limit : (prev?.limit || 10),
+      search: params.search !== undefined ? params.search : (prev?.search || ''),
+      paid: params.paid !== undefined ? params.paid : prev?.paid,
+      course: params.course !== undefined ? params.course : prev?.course,
+      branch_id: params.branch_id !== undefined ? params.branch_id : prev?.branch_id,
+      forceBranchIdAll: params.forceBranchIdAll !== undefined
+        ? !!params.forceBranchIdAll
+        : !!prev?.forceBranchIdAll,
     };
     setAdminQuery(q);
+    adminQueryRef.current = q;
     const paidParam = q.paid !== undefined && q.paid !== 'all'
       ? (q.paid === 'paid' || q.paid === true || q.paid === 'true'
         ? 'paid'

@@ -84,7 +84,7 @@ export function useAdminTeachers({
 
   const handlePayTeacher = async (teacher) => {
     const teacherId = String(teacher.id || teacher._id);
-    const rating = typeof getTeacherRating === 'function' ? getTeacherRating(teacherId) : null;
+    const rating = typeof getTeacherRating === 'function' ? getTeacherRating(teacherId, teacher) : null;
     const ratingLabel = rating?.count > 0
       ? `Đánh giá HV: ${rating.avg}/5 · ${rating.count} lượt`
       : '';

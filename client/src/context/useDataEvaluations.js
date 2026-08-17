@@ -54,7 +54,7 @@ export function useDataEvaluations({ students, teachers, triggerBackgroundSync, 
     try {
       const res = await api.evaluations?.submit(evalData);
       if (res && res.success === false) throw new Error(res.message);
-      addNotification(null, 'admin', `📢 Đánh giá RIÊNG mới từ HV ${student?.name || 'Học viên'}`);
+      addNotification(null, 'admin', `📢 Đánh giá RIÊNG mới từ HV ${student?.name || 'Học viên'}`, 'EVALUATION', '/admin#evaluations');
       triggerBackgroundSync();
     } catch (err) {
       setPrivateEvaluations(previousEvals);

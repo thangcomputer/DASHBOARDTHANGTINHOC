@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import { useData } from '../../../context/DataContext';
@@ -88,6 +88,8 @@ export default function StudentQuestionBankPanel() {
     updateStudentExamMinutes,
     studentEssayExamMinutes,
     updateStudentEssayExamMinutes,
+    studentEssayRequired,
+    updateStudentEssayRequired,
     studentExamFiles,
     examWarningSoundUrl = '',
     setExamWarningSoundUrl,
@@ -285,6 +287,7 @@ export default function StudentQuestionBankPanel() {
         studentQuestions: nextQuestions,
         studentExamMinutes,
         studentEssayExamMinutes,
+        studentEssayRequired,
         studentExamFiles,
         examWarningSoundUrl,
       });
@@ -334,17 +337,42 @@ export default function StudentQuestionBankPanel() {
             <label className="text-[11px] font-bold uppercase tracking-wide text-violet-700 block mb-1.5">
               Phút TL
             </label>
-            <div className="flex items-center gap-1.5 border-2 border-violet-200 bg-red-50/80 rounded-xl px-2.5 py-2">
+            <div className={`flex items-center gap-1.5 border-2 rounded-xl px-2.5 py-2 ${
+              studentEssayRequired?.[sqSection] === false
+                ? 'border-slate-200 bg-slate-50 opacity-60'
+                : 'border-violet-200 bg-red-50/80'
+            }`}>
               <Clock size={14} className="text-violet-700 shrink-0" />
               <input
                 type="number"
                 min={1}
                 max={600}
+                disabled={studentEssayRequired?.[sqSection] === false}
                 value={studentEssayExamMinutes?.[sqSection] ?? 60}
                 onChange={(e) => updateStudentEssayExamMinutes({ [sqSection]: e.target.value })}
-                className="w-full bg-transparent text-sm font-black text-slate-800 outline-none text-center"
+                className="w-full bg-transparent text-sm font-black text-slate-800 outline-none text-center disabled:cursor-not-allowed"
               />
             </div>
+          </div>
+          <div className="min-w-[9.5rem]">
+            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-600 block mb-1.5">
+              Bắt buộc TL
+            </label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={studentEssayRequired?.[sqSection] !== false}
+              onClick={() => updateStudentEssayRequired({
+                [sqSection]: studentEssayRequired?.[sqSection] === false,
+              })}
+              className={`w-full min-h-[42px] px-3 rounded-xl border-2 text-xs font-black transition ${
+                studentEssayRequired?.[sqSection] === false
+                  ? 'border-slate-200 bg-slate-50 text-slate-500'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              }`}
+            >
+              {studentEssayRequired?.[sqSection] === false ? 'Tắt — chỉ TN' : 'Bật — TN + TL'}
+            </button>
           </div>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-xs font-bold text-slate-500 hidden sm:inline">
@@ -420,6 +448,7 @@ export default function StudentQuestionBankPanel() {
                   await api.settings.updateStudentExamConfig({
                     studentExamMinutes,
                     studentEssayExamMinutes,
+                    studentEssayRequired,
                     studentExamFiles,
                     examWarningSoundUrl: '',
                   });

@@ -13,7 +13,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../utils/Modal.jsx';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
-import { isScheduleOngoingNow } from '../../utils/scheduleTime';
+import { formatLocalDateKey, isScheduleOngoingNow, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
 import { openSiteChat } from '../FloatingMessenger';
 import TeacherQuizManager from './TeacherQuizManager';
@@ -25,6 +25,13 @@ import {
   pickAdminContactForMakeup,
   getMakeupSessionSummary,
 } from '../../utils/attendanceMakeupRequest';
+import {
+  makeupPendingKey,
+  getMakeupPending,
+  markMakeupPending,
+  clearMakeupPending,
+  subscribeMakeupPending,
+} from '../../utils/attendanceMakeupPendingStore';
 import { useToast } from '../../utils/toast';
 import {
   ATTENDANCE_CONFIRM_MS,
@@ -167,7 +174,12 @@ export const StudentCard = ({
   const [pendingAttendance, setPendingAttendance] = useState(() => {
     const stored = getAttendanceConfirm(confirmKey);
     if (!stored) return null;
-    return { note: stored.note, grade: stored.grade, endsAt: stored.endsAt };
+    return {
+      note: stored.note,
+      grade: stored.grade,
+      endsAt: stored.endsAt,
+      committing: Boolean(stored.committing),
+    };
   });
   const [confirmTick, setConfirmTick] = useState(0);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
@@ -293,23 +305,94 @@ export const StudentCard = ({
     ? false
     : (student.can_check_in !== undefined ? student.can_check_in : !hasAttendedToday);
 
-  // Đã điểm danh hôm nay — KHÔNG dùng !canCheckIn (cooldown cũng làm canCheckIn=false)
+  // Hoàn tất lịch hôm nay (SoT) — tránh UI "ĐIỂM DANH + HỦY CA" khi cooldown đã bật nhưng gate/grades lệch
+  const hasCompletedScheduleToday = useMemo(() => {
+    const sid = String(student._id || student.id || '');
+    const course = String(student.course || '').trim();
+    const todayKey = formatLocalDateKey(new Date());
+    return (allSchedules || []).some((sch) => {
+      if (String(sch.status || '') !== 'completed') return false;
+      const schSid = String(sch.studentId?._id || sch.studentId?.id || sch.studentId || '');
+      if (schSid !== sid) return false;
+      if (course && sch.course && String(sch.course) !== course) return false;
+      return normalizeScheduleDate(sch.date) === todayKey;
+    });
+  }, [allSchedules, student._id, student.id, student.course, attendanceTick]);
+
+  const hasLastAttendanceToday = useMemo(() => {
+    if (!student.last_attendance_at) return false;
+    const d = new Date(student.last_attendance_at);
+    if (Number.isNaN(d.getTime())) return false;
+    return formatLocalDateKey(d) === formatLocalDateKey(new Date());
+  }, [student.last_attendance_at, attendanceTick]);
+
+  // Đã điểm danh hôm nay — KHÔNG dùng !canCheckIn (cooldown 12h có thể từ hôm trước)
   const alreadyAttendedToday = Boolean(
-    hasAttendedToday || attendanceGate?.status === 'done',
+    hasAttendedToday
+    || attendanceGate?.status === 'done'
+    || hasCompletedScheduleToday
+    || hasLastAttendanceToday,
   );
   const isPendingConfirm = Boolean(pendingAttendance);
+  const isCommittingAttendance = Boolean(pendingAttendance?.committing);
   const confirmRemainSec = useMemo(() => {
     if (!pendingAttendance?.endsAt) return 0;
     return Math.max(0, Math.ceil((pendingAttendance.endsAt - Date.now()) / 1000));
   }, [pendingAttendance, confirmTick]);
 
-  const isOverdueMakeup = attendanceGate?.status === 'overdue' && !alreadyAttendedToday && !isPendingConfirm && !isCompleted;
+  const makeupKey = useMemo(() => {
+    const sch = attendanceGate?.schedule;
+    return makeupPendingKey({
+      scheduleId: sch?._id || sch?.id,
+      studentId: student._id || student.id,
+      date: normalizeScheduleDate(sch?.date) || formatLocalDateKey(new Date()),
+      course: student.course,
+    });
+  }, [attendanceGate?.schedule, student._id, student.id, student.course]);
+
+  const [makeupPending, setMakeupPending] = useState(() => Boolean(getMakeupPending(makeupKey)));
+
+  useEffect(() => {
+    const sync = () => setMakeupPending(Boolean(getMakeupPending(makeupKey)));
+    sync();
+    return subscribeMakeupPending(sync);
+  }, [makeupKey]);
+
+  // Admin đã duyệt / buổi đã completed → nút về trạng thái đã điểm danh mặc định
+  useEffect(() => {
+    if (!makeupKey || !getMakeupPending(makeupKey)) return;
+    const pending = getMakeupPending(makeupKey);
+    const pendingSchId = String(pending?.scheduleId || '');
+    const gateSchId = String(attendanceGate?.schedule?._id || attendanceGate?.schedule?.id || '');
+    const scheduleDone = (allSchedules || []).some((s) => {
+      const id = String(s._id || s.id || '');
+      if (!id || String(s.status || '') !== 'completed') return false;
+      if (pendingSchId && id === pendingSchId) return true;
+      if (gateSchId && id === gateSchId) return true;
+      return false;
+    });
+    if (
+      alreadyAttendedToday
+      || attendanceGate?.status === 'done'
+      || scheduleDone
+    ) {
+      clearMakeupPending(makeupKey);
+      setMakeupPending(false);
+    }
+  }, [alreadyAttendedToday, makeupKey, attendanceGate?.status, attendanceGate?.schedule, allSchedules]);
+
+  const isOverdueMakeup = attendanceGate?.status === 'overdue'
+    && !alreadyAttendedToday
+    && !isPendingConfirm
+    && !isCompleted
+    && !makeupPending;
 
   // Có buổi hôm nay (scheduled / overdue / done) → hiện cặp nút điểm danh + hủy
   const showSessionActionRow = Boolean(
     !isCompleted && (
       isPendingConfirm
       || alreadyAttendedToday
+      || makeupPending
       || (attendanceGate && attendanceGate.status !== 'no_schedule')
     ),
   );
@@ -320,8 +403,19 @@ export const StudentCard = ({
       const stored = map ? (map[confirmKey] || null) : getAttendanceConfirm(confirmKey);
       setPendingAttendance((prev) => {
         if (!stored) return prev === null ? prev : null;
-        const next = { note: stored.note, grade: stored.grade, endsAt: stored.endsAt };
-        if (prev && prev.endsAt === next.endsAt && prev.note === next.note && prev.grade === next.grade) {
+        const next = {
+          note: stored.note,
+          grade: stored.grade,
+          endsAt: stored.endsAt,
+          committing: Boolean(stored.committing),
+        };
+        if (
+          prev
+          && prev.endsAt === next.endsAt
+          && prev.note === next.note
+          && prev.grade === next.grade
+          && Boolean(prev.committing) === next.committing
+        ) {
           return prev;
         }
         return next;
@@ -341,16 +435,24 @@ export const StudentCard = ({
   const beginAttendanceConfirm = useCallback(() => {
     if (alreadyAttendedToday || isPendingConfirm || isCompleted) return;
     setShowAttendanceModal(false);
+    const gateSchedule = attendanceGate?.schedule;
+    const scheduleId = gateSchedule?._id || gateSchedule?.id || '';
     const payload = {
       studentId: String(student._id || student.id),
       courseName: student.course || '',
+      scheduleId: scheduleId ? String(scheduleId) : '',
       note: attForm.note || defaultAttendanceNote,
       grade: Number(attForm.grade) || 0,
       endsAt: Date.now() + ATTENDANCE_CONFIRM_MS,
       teacherId: String(currentUser?.id || currentUser?._id || ''),
     };
     upsertAttendanceConfirm(confirmKey, payload);
-    setPendingAttendance({ note: payload.note, grade: payload.grade, endsAt: payload.endsAt });
+    setPendingAttendance({
+      note: payload.note,
+      grade: payload.grade,
+      endsAt: payload.endsAt,
+      committing: false,
+    });
     toast.info('Đã ghi nhận — còn 30 giây để hủy điểm danh trước khi tính buổi.');
   }, [
     alreadyAttendedToday,
@@ -366,9 +468,14 @@ export const StudentCard = ({
     currentUser?.id,
     currentUser?._id,
     confirmKey,
+    attendanceGate?.schedule,
   ]);
 
   const cancelPendingAttendance = useCallback(() => {
+    if (getAttendanceConfirm(confirmKey)?.committing) {
+      toast.info('Đang ghi nhận điểm danh — không thể hủy lúc này.');
+      return;
+    }
     removeAttendanceConfirm(confirmKey);
     setPendingAttendance(null);
     toast.success('Đã hủy điểm danh — buổi chưa được tính.');
@@ -380,10 +487,12 @@ export const StudentCard = ({
   );
 
   const openMakeupModal = useCallback(() => {
+    if (makeupPending || alreadyAttendedToday) return;
     setShowMakeupModal(true);
-  }, []);
+  }, [makeupPending, alreadyAttendedToday]);
 
   const openAttendanceModal = useCallback(() => {
+    if (makeupPending) return;
     if (isOverdueMakeup) {
       openMakeupModal();
       return;
@@ -397,6 +506,7 @@ export const StudentCard = ({
     });
     setShowAttendanceModal(true);
   }, [
+    makeupPending,
     isOverdueMakeup,
     openMakeupModal,
     alreadyAttendedToday,
@@ -410,13 +520,15 @@ export const StudentCard = ({
   ]);
 
   const sendMakeupRequestToAdmin = useCallback(async () => {
+    if (makeupPending) return;
     setSendingMakeup(true);
     try {
       const teacherName = currentUser?.name || 'Giảng viên';
       const teacherId = String(currentUser?.id || currentUser?._id || '');
+      const sch = attendanceGate?.schedule;
       const draft = buildAttendanceMakeupDraft({
         student,
-        schedule: attendanceGate?.schedule,
+        schedule: sch,
         teacherName,
       });
       let peer = { id: 'admin', name: 'Admin', role: 'admin', adminRole: 'SUPER_ADMIN' };
@@ -438,6 +550,13 @@ export const StudentCard = ({
         content: draft,
         messageType: 'text',
       });
+      if (makeupKey) {
+        markMakeupPending(makeupKey, {
+          scheduleId: String(sch?._id || sch?.id || ''),
+          studentId: String(student._id || student.id || ''),
+        });
+        setMakeupPending(true);
+      }
       setShowMakeupModal(false);
       toast.success('Đã gửi yêu cầu điểm danh bù tới Admin.');
     } catch (err) {
@@ -445,34 +564,38 @@ export const StudentCard = ({
     } finally {
       setSendingMakeup(false);
     }
-  }, [attendanceGate?.schedule, currentUser, student, toast]);
+  }, [attendanceGate?.schedule, currentUser, student, toast, makeupKey, makeupPending]);
 
-  // Pending 30s: hủy điểm danh (local). Đã commit: không hủy nữa. Chưa DD: hủy ca.
-  const canCancelSession = isPendingConfirm
+  // Pending 30s: hủy điểm danh (local). Đang commit / đã điểm danh: không hủy. Chưa DD: hủy ca.
+  const canCancelSession = (isPendingConfirm && !isCommittingAttendance)
     || (
       showSessionActionRow
       && !alreadyAttendedToday
       && !isPendingConfirm
       && Boolean(attendanceGate?.schedule)
     );
-  const cancelIsUndoAttendance = isPendingConfirm;
-  const cancelButtonLabel = cancelIsUndoAttendance
-    ? (confirmRemainSec > 0 ? `Hủy điểm danh (${confirmRemainSec}s)` : 'Hủy điểm danh')
-    : alreadyAttendedToday
-      ? 'Đã khóa'
-      : 'Hủy ca';
-  const cancelButtonTitle = cancelIsUndoAttendance
-    ? `Hủy điểm danh trong ${confirmRemainSec}s — buổi chưa tính`
-    : alreadyAttendedToday
-      ? 'Đã điểm danh — không thể hủy sau khi hết thời gian chờ'
-      : 'Hủy ca lịch học hôm nay';
+  const cancelIsUndoAttendance = isPendingConfirm && !isCommittingAttendance;
+  const cancelButtonLabel = isCommittingAttendance
+    ? 'Đang ghi nhận'
+    : cancelIsUndoAttendance
+      ? (confirmRemainSec > 0 ? `Hủy điểm danh (${confirmRemainSec}s)` : 'Hủy điểm danh')
+      : alreadyAttendedToday
+        ? 'Đã khóa'
+        : 'Hủy ca';
+  const cancelButtonTitle = isCommittingAttendance
+    ? 'Đang ghi nhận điểm danh lên hệ thống'
+    : cancelIsUndoAttendance
+      ? `Hủy điểm danh trong ${confirmRemainSec}s — buổi chưa tính`
+      : alreadyAttendedToday
+        ? 'Đã điểm danh — không thể hủy sau khi hết thời gian chờ'
+        : 'Hủy ca lịch học hôm nay';
   const cancelButtonClassActive =
     'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-600/25 active:scale-[0.98] cursor-pointer';
   const cancelButtonClassDisabled =
     'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60';
 
-  const leftAttendanceLocked = alreadyAttendedToday || isPendingConfirm;
-  const leftAttendanceDisabled = isCompleted || leftAttendanceLocked || (!isOverdueMakeup && !canCheckIn);
+  const leftAttendanceLocked = alreadyAttendedToday || isPendingConfirm || makeupPending;
+  const leftAttendanceDisabled = isCompleted || leftAttendanceLocked || (!isOverdueMakeup && !canCheckIn && !makeupPending);
 
   const fetchStudentAssignments = useCallback(async () => {
     setLoadingAssign(true);
@@ -903,7 +1026,9 @@ export const StudentCard = ({
                        disabled={leftAttendanceDisabled}
                        title={
                          isCompleted ? 'Khóa học đã hoàn thành' :
+                         makeupPending ? 'Đã gửi yêu cầu — chờ Admin xét duyệt điểm danh bù' :
                          isOverdueMakeup ? 'Quá hạn điểm danh — gửi yêu cầu điểm danh bù tới Admin' :
+                         isCommittingAttendance ? 'Đang ghi nhận điểm danh lên hệ thống' :
                          isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
                          alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                          'Bấm để điểm danh buổi học hôm nay'
@@ -911,6 +1036,8 @@ export const StudentCard = ({
                        className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
                          isCompleted 
                            ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                         : makeupPending
+                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
                          : isOverdueMakeup
                            ? 'bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] shadow-sm'
                          : leftAttendanceLocked
@@ -922,8 +1049,12 @@ export const StudentCard = ({
                        <span className="min-w-0 text-center leading-tight whitespace-normal">
                          {isCompleted 
                            ? 'Hoàn thành'
+                           : makeupPending
+                             ? 'Đang xét duyệt'
                            : isOverdueMakeup
                              ? 'Điểm danh bù'
+                             : isCommittingAttendance
+                               ? 'Đang ghi nhận'
                              : isPendingConfirm
                                ? 'Đang xác nhận'
                                : alreadyAttendedToday
@@ -1290,7 +1421,7 @@ export const StudentCard = ({
                         Nhật ký Hoạt động &amp; Lịch sử Học viên
                       </h3>
                       <p className="text-[11px] text-slate-400 font-medium leading-snug">
-                        Điểm danh, hủy điểm danh / hủy ca, bài nộp, cập nhật điểm, trắc nghiệm và đánh giá
+                        Trái: ngày buổi học · Phải: giờ thao tác thực tế (điểm danh / hủy / nộp bài…)
                       </p>
                     </div>
                   </div>
@@ -1338,7 +1469,15 @@ export const StudentCard = ({
                             </div>
                           </div>
 
-                          <div className="text-right shrink-0">
+                          <div className="text-right shrink-0 flex flex-col items-end gap-1 min-w-[7.5rem]">
+                            {log.actedAtLabel ? (
+                              <span
+                                className="text-[10px] sm:text-[11px] font-bold text-slate-500 tabular-nums whitespace-nowrap"
+                                title="Thời điểm thao tác"
+                              >
+                                {log.actedAtLabel}
+                              </span>
+                            ) : null}
                             {(log.type === 'quiz' && log.rawScore != null) ? (
                               <div className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs inline-flex items-baseline gap-0.5">
                                 <span className={`text-sm font-black tabular-nums ${
@@ -1357,9 +1496,9 @@ export const StudentCard = ({
                                 </span>
                                 <span className="text-[10px] text-slate-400 font-bold">/10</span>
                               </div>
-                            ) : (
+                            ) : !log.actedAtLabel ? (
                               <span className="text-xs text-slate-400 font-bold italic">--</span>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       );
@@ -1393,8 +1532,17 @@ export const StudentCard = ({
 
         {/* Makeup modal — phải có trong isDetailed (tab Học viên) */}
         {showMakeupModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
+            role="presentation"
+            onClick={() => !sendingMakeup && setShowMakeupModal(false)}
+          >
+            <div
+              className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
                 <div>
                   <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh bù</h3>
@@ -1453,8 +1601,17 @@ export const StudentCard = ({
 
         {/* Attendance Modal - Added to Detailed View */}
         {showAttendanceModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
+            role="presentation"
+            onClick={() => setShowAttendanceModal(false)}
+          >
+            <div
+              className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="bg-gradient-to-r from-emerald-600 to-green-500 p-8 text-white flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -1619,7 +1776,9 @@ export const StudentCard = ({
                   disabled={leftAttendanceDisabled}
                   title={
                     isCompleted ? 'Hoàn thành' :
+                    makeupPending ? 'Đã gửi yêu cầu — chờ Admin xét duyệt điểm danh bù' :
                     isOverdueMakeup ? 'Quá hạn — gửi yêu cầu điểm danh bù tới Admin' :
+                    isCommittingAttendance ? 'Đang ghi nhận điểm danh lên hệ thống' :
                     isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
                     alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                     'Bấm để điểm danh'
@@ -1627,6 +1786,8 @@ export const StudentCard = ({
                   className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${
                     isCompleted 
                       ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-2 border-gray-300'
+                    : makeupPending
+                      ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
                     : isOverdueMakeup
                       ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:shadow-amber-200 shadow-amber-100 active:scale-[0.97] border-2 border-transparent'
                     : leftAttendanceLocked
@@ -1637,8 +1798,12 @@ export const StudentCard = ({
                   <span className="text-xs text-center leading-tight">
                     {isCompleted 
                       ? 'HOÀN THÀNH'
+                      : makeupPending
+                        ? <>ĐANG<br/>XÉT DUYỆT</>
                       : isOverdueMakeup
                         ? <>ĐIỂM DANH<br/>BÙ</>
+                        : isCommittingAttendance
+                          ? <>ĐANG<br/>GHI NHẬN</>
                         : isPendingConfirm
                           ? <>ĐANG<br/>XÁC NHẬN</>
                           : alreadyAttendedToday
@@ -1660,9 +1825,13 @@ export const StudentCard = ({
               >
                 <X size={18} />
                 <span className="text-xs text-center leading-tight">
-                  {cancelIsUndoAttendance
-                    ? <>HỦY ĐIỂM DANH{confirmRemainSec > 0 ? <><br/>{confirmRemainSec}s</> : null}</>
-                    : <>HỦY CA</>}
+                  {isCommittingAttendance
+                    ? <>ĐANG<br/>GHI NHẬN</>
+                    : cancelIsUndoAttendance
+                      ? <>HỦY ĐIỂM DANH{confirmRemainSec > 0 ? <><br/>{confirmRemainSec}s</> : null}</>
+                      : alreadyAttendedToday
+                        ? <>ĐÃ KHÓA</>
+                        : <>HỦY CA</>}
                 </span>
               </button>
             </div>
@@ -1714,9 +1883,17 @@ export const StudentCard = ({
 
       {/* === MODAL ĐIỂM DANH BÙ → gửi thẳng Admin === */}
       {showMakeupModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
-            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
+          role="presentation"
+          onClick={() => !sendingMakeup && setShowMakeupModal(false)}
+        >
+          <div
+            className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
               <div>
                 <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh bù</h3>
                 <p className="text-amber-50 text-xs font-bold mt-1">Quá hạn cửa sổ điểm danh 1 giờ</p>
@@ -1774,9 +1951,17 @@ export const StudentCard = ({
 
       {/* === DUY NHẤT 1 MODAL ĐIỂM DANH (dùng chung cho cả 2 view) === */}
       {showAttendanceModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
-            <div className="bg-gradient-to-r from-emerald-600 to-green-500 p-8 text-white flex justify-between items-center">
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
+          role="presentation"
+          onClick={() => setShowAttendanceModal(false)}
+        >
+          <div
+            className="bg-white rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >            <div className="bg-gradient-to-r from-emerald-600 to-green-500 p-8 text-white flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                   <CheckCircle size={22} />

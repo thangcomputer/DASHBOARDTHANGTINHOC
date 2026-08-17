@@ -75,16 +75,18 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   }
   const STUDENT_ID = session.id || session._id || null;
   const punishKey = STUDENT_ID ? `punish_student_exam:${STUDENT_ID}` : 'punish_student_exam';
-  const { students, studentQuestions, setStudentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, examWarningSoundUrl = '', updateStudent, addNotification, examSubjectsCatalog } = useData() || {
+  const { students, studentQuestions, setStudentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, studentExamFiles, examWarningSoundUrl = '', updateStudent, addNotification, examSubjectsCatalog, applyStudentExamConfigFromServer } = useData() || {
     students: [],
     studentQuestions: [],
     setStudentQuestions: () => {},
     studentExamMinutes: { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90 },
     studentEssayExamMinutes: { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60 },
+    studentEssayRequired: { coban: true, word: true, excel: true, powerpoint: true, canva: true },
     studentExamFiles: {},
     examWarningSoundUrl: '',
     updateStudent: () => {},
     addNotification: () => {},
+    applyStudentExamConfigFromServer: null,
   };
 
   const [cameraReady, setCameraReady] = useState(false);
@@ -119,10 +121,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       examFileUrl,
       practiceFiles,
       hasPracticeFile: practiceFiles.length > 0,
+      essayRequired: studentEssayRequired?.[subjectId] !== false,
       time: mcSecs,
       essayTime: essaySecs,
     };
-  }, [subjectId, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, studentQuestions, examSubjectsCatalog]);
+  }, [subjectId, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, studentExamFiles, studentQuestions, examSubjectsCatalog]);
 
   const examQuestionBank = useMemo(() => {
     const ctx = Array.isArray(studentQuestions) ? studentQuestions : [];
@@ -376,6 +379,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       try {
         const res = await api.settings.getStudentExamConfig();
         if (!cancelled && res?.success && res.data) {
+          if (typeof applyStudentExamConfigFromServer === 'function') {
+            applyStudentExamConfigFromServer(res.data);
+          }
           const bank = res.data.hasStudentExamBank && Array.isArray(res.data.studentQuestions)
             ? res.data.studentQuestions
             : [];
@@ -388,7 +394,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       if (!cancelled) setQuestionsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [subjectId, setStudentQuestions]);
+  }, [subjectId, setStudentQuestions, applyStudentExamConfigFromServer]);
 
   // Cập nhật đề khi admin lưu ngân hàng (socket data:refresh)
   useEffect(() => {
@@ -396,7 +402,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     const refreshBank = async () => {
       try {
         const res = await api.settings.getStudentExamConfig();
-        if (!res?.success || !res.data?.hasStudentExamBank) return;
+        if (!res?.success || !res.data) return;
+        if (typeof applyStudentExamConfigFromServer === 'function') {
+          applyStudentExamConfigFromServer(res.data);
+        }
+        if (!res.data.hasStudentExamBank) return;
         const bank = Array.isArray(res.data.studentQuestions) ? res.data.studentQuestions : [];
         if (bank.length === 0) return;
         setFetchedExamBank(bank);
@@ -405,7 +415,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     };
     socket.on('data:refresh', refreshBank);
     return () => { socket.off('data:refresh', refreshBank); };
-  }, [socket, setStudentQuestions]);
+  }, [socket, setStudentQuestions, applyStudentExamConfigFromServer]);
 
   // ── YÊU CẦU CAMERA Ở BƯỚC HARDWARE CHECK TRƯỚC KHI VÀO THI ──
   useEffect(() => {
@@ -604,6 +614,18 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       }, { revertOnFail: true });
       setPhase('result');
       addNotification(null, 'admin', `❌ Học viên ${studentName} rớt trắc nghiệm môn ${meta.label}: ${finalScore}/${TOTAL} (${finalPct}%)`);
+    } else if (!meta.essayRequired) {
+      // Chỉ TN — không bắt tự luận
+      clearInterval(timerRef.current);
+      clearCertificationAttempt(attemptKey);
+      void updateExamProgress({
+        tracNghiem: { score: finalScore, total: TOTAL },
+        thucHanh: 'chua_nop',
+        status: 'dat',
+        lockUntil: null,
+      }, { revertOnFail: true });
+      setPhase('result');
+      addNotification(null, 'admin', `✅ Học viên ${studentName} đạt môn ${meta.label} (chỉ trắc nghiệm): ${finalScore}/${TOTAL} (${finalPct}%).`);
     } else {
       void updateExamProgress({
         tracNghiem: { score: finalScore, total: TOTAL },
@@ -904,8 +926,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           })}
         </div>
 
-        {/* Nếu đậu trắc nghiệm thì hiện upload thực hành */}
-        {passed && (
+        {/* Nếu đậu trắc nghiệm và còn bắt TL thì hiện upload (fallback UI) */}
+        {passed && meta.essayRequired && (
           <div className="bg-white rounded-2xl border p-5">
             <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm"><Paperclip size={15}/> Nộp bài tự luận</h3>
             {uploadDone ? (
@@ -929,6 +951,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                 </button>
               </>
             )}
+          </div>
+        )}
+        {passed && !meta.essayRequired && (
+          <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-5 text-center">
+            <p className="text-emerald-800 font-bold text-sm">Môn này chỉ yêu cầu trắc nghiệm — bạn đã hoàn thành.</p>
           </div>
         )}
         {/* Nếu rớt: thông báo khóa 7 ngày */}
@@ -1080,20 +1107,24 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                   onClick={() => {
                     if (isTracNghiemSubmitted) setTab('tu_luan');
                   }}
-                  disabled={!isTracNghiemSubmitted}
+                  disabled={!isTracNghiemSubmitted || !meta.essayRequired}
                   className={`relative flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold transition md:py-3 ${
-                    !isTracNghiemSubmitted
+                    !isTracNghiemSubmitted || !meta.essayRequired
                       ? 'cursor-not-allowed text-slate-300'
                       : tab === 'tu_luan'
                         ? 'text-indigo-900'
                         : 'text-slate-400 hover:text-slate-600'
                   }`}
                 >
-                  {tab === 'tu_luan' && isTracNghiemSubmitted && (
+                  {tab === 'tu_luan' && isTracNghiemSubmitted && meta.essayRequired && (
                     <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-red-600" />
                   )}
                   Thực hành / Tự luận
-                  {!isTracNghiemSubmitted && <span className="text-xs font-semibold text-slate-400">(Khoá)</span>}
+                  {!meta.essayRequired
+                    ? <span className="text-xs font-semibold text-slate-400">(Không bắt)</span>
+                    : !isTracNghiemSubmitted
+                      ? <span className="text-xs font-semibold text-slate-400">(Khoá)</span>
+                      : null}
                 </button>
               </div>
               <div className="h-1 shrink-0 bg-slate-100">

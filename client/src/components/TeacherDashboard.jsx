@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Calendar, CheckCircle, Clock, BookOpen, ChevronRight,
 } from 'lucide-react';
@@ -285,7 +285,28 @@ const TeacherDashboard = ({ onNavigate }) => {
   const hashQuery = hashRaw.includes('?') ? hashRaw.slice(hashRaw.indexOf('?') + 1) : '';
   const [selectedEnrollmentKey, setSelectedEnrollmentKey] = useState(null);
 
-  // Auto-select from URL (#students?studentId=&enrollmentKey=) or first student
+  const selectEnrollment = useCallback((studentOrKey) => {
+    const student = studentOrKey && typeof studentOrKey === 'object'
+      ? studentOrKey
+      : students.find((s) => String(s._enrollmentKey || s._id || s.id) === String(studentOrKey));
+    const rowKey = student
+      ? (student._enrollmentKey || student._id || student.id)
+      : studentOrKey;
+    if (!rowKey) return;
+    setSelectedEnrollmentKey(rowKey);
+    const sid = student?._id || student?.id || '';
+    const course = student?.course || '';
+    const q = new URLSearchParams();
+    q.set('enrollmentKey', String(rowKey));
+    if (sid) q.set('studentId', String(sid));
+    if (course) q.set('course', String(course));
+    navigate(
+      { pathname: location.pathname || '/teacher', hash: `students?${q.toString()}` },
+      { replace: true },
+    );
+  }, [students, navigate, location.pathname]);
+
+  // Deep-link / mặc đầu: chỉ theo hash + danh sách HV — không đè khi GV vừa chọn tay
   useEffect(() => {
     const params = new URLSearchParams(hashQuery);
     const enrollmentKeyParam = params.get('enrollmentKey');
@@ -298,11 +319,10 @@ const TeacherDashboard = ({ onNavigate }) => {
       );
       if (byKey) {
         const key = byKey._enrollmentKey || byKey._id || byKey.id;
-        if (key && String(selectedEnrollmentKey) !== String(key)) {
-          setSelectedEnrollmentKey(key);
-        }
+        setSelectedEnrollmentKey((prev) => (String(prev) === String(key) ? prev : key));
         return;
       }
+      if (students.length === 0) return;
     }
 
     if (studentId) {
@@ -315,17 +335,25 @@ const TeacherDashboard = ({ onNavigate }) => {
       }
       if (match) {
         const key = match._enrollmentKey || match._id || match.id;
-        if (key && String(selectedEnrollmentKey) !== String(key)) {
-          setSelectedEnrollmentKey(key);
-        }
+        setSelectedEnrollmentKey((prev) => (String(prev) === String(key) ? prev : key));
         return;
       }
+      if (students.length === 0) return;
     }
 
-    if (!selectedEnrollmentKey && students.length > 0) {
-      setSelectedEnrollmentKey(students[0]._enrollmentKey || students[0]._id || students[0].id);
-    }
-  }, [students, selectedEnrollmentKey, hashQuery]);
+    setSelectedEnrollmentKey((prev) => {
+      if (prev) {
+        const stillThere = students.some(
+          (s) => String(s._enrollmentKey || s._id || s.id) === String(prev),
+        );
+        if (stillThere) return prev;
+      }
+      if (students.length > 0) {
+        return students[0]._enrollmentKey || students[0]._id || students[0].id;
+      }
+      return prev;
+    });
+  }, [students, hashQuery]);
 
   const markAttendance = async (id, noteParam, gradeParam, courseName) => {
     const note = noteParam || noteInputs[id] || 'Đã điểm danh';
@@ -555,7 +583,7 @@ const TeacherDashboard = ({ onNavigate }) => {
             lastSeenUsers={lastSeenUsers}
             timeAgo={timeAgo}
             selectedEnrollmentKey={selectedEnrollmentKey}
-            setSelectedEnrollmentKey={setSelectedEnrollmentKey}
+            setSelectedEnrollmentKey={selectEnrollment}
             navigate={navigate}
             mySchedules={mySchedules}
             markAttendance={markAttendance}

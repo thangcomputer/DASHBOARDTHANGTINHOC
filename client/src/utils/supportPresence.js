@@ -77,9 +77,10 @@ function personFromAuthorizedContact(st, online) {
 }
 
 /**
+ * @param {{ supportAgentsOnly?: boolean }} opts — true = chỉ SUPPORT org-wide (bỏ STAFF chi nhánh)
  * @returns {{ mode: 'directory'|'support_only', groups: Array<{ key: string, label: string, people: object[] }> }}
  */
-export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] }) {
+export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [], supportAgentsOnly = false }) {
   const me = String(meId || session?.id || session?._id || '');
   const users = Array.isArray(onlineUsers) ? onlineUsers : [];
 
@@ -91,7 +92,9 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
     users.forEach((u) => {
       const r = String(u.role || '').toLowerCase();
       const ar = String(u.adminRole || '').toUpperCase();
-      if (r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT') {
+      const isSupport = ar === 'SUPPORT';
+      const isOps = supportAgentsOnly ? isSupport : (r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT');
+      if (isOps) {
         const uid = String(u.userId || u.id || '');
         if (uid) onlineIds.add(uid);
       }
@@ -107,9 +110,12 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
         // Presentation filter on already-authorized contacts (from /contacts).
         // Prefer productRole when present — never map transport staff → product STAFF.
         const product = String(st.productRole || '').toUpperCase();
-        const isOps = product === 'SUPPORT' || product === 'STAFF'
-          || r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT'
-          || st.permissions?.includes?.('manage_messages');
+        const isSupportAgent = product === 'SUPPORT' || ar === 'SUPPORT';
+        const isOps = supportAgentsOnly
+          ? isSupportAgent
+          : (product === 'SUPPORT' || product === 'STAFF'
+            || r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT'
+            || st.permissions?.includes?.('manage_messages'));
         if (!isOps) return;
         const stId = String(st.id || st._id || '');
         if (stId && stId !== me && !seenIds.has(stId)) {
@@ -136,7 +142,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [] 
       mode: 'support_only',
       groups: [{
         key: 'support',
-        label: 'Hỗ trợ viên',
+        label: supportAgentsOnly ? 'Chuyên viên hỗ trợ' : 'Hỗ trợ viên',
         people: peopleList,
       }],
     };

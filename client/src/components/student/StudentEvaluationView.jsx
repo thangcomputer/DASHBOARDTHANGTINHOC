@@ -1,6 +1,26 @@
-import React, { useState } from 'react';
-import { Star, ChevronRight, CheckCircle, AlertCircle, User, BookOpen, Settings } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Star, ChevronRight, CheckCircle, AlertCircle, User, BookOpen } from 'lucide-react';
 import { useModal } from '../../utils/Modal.jsx';
+
+function normCourseName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function isTeacherRatingLocked({ studentId, teacherId, courseName, privateEvaluations, mineEvals }) {
+  const sid = String(studentId || '');
+  const tid = String(teacherId || '');
+  const courseKey = normCourseName(courseName);
+  const pool = [...(privateEvaluations || []), ...(mineEvals || [])];
+  return pool.some((e) => {
+    if (String(e?.studentId || '') !== sid) return false;
+    if (e.milestone !== 'course_end_teacher') return false;
+    const eTeacher = String(e.targetTeacherId || e.teacherId || '');
+    if (tid && eTeacher && eTeacher === tid) return true;
+    const saved = normCourseName(e.courseName);
+    if (!courseKey || !saved) return true;
+    return saved === courseKey;
+  });
+}
 
 export const EvaluationView = ({ 
   studentData, 
@@ -22,12 +42,30 @@ export const EvaluationView = ({
   privateEvaluations,
   teacherRatingData,
   setTeacherRatingData,
-  api
+  api,
+  milestoneEvals = [],
 }) => {
   const { showModal } = useModal();
   const [privateForm, setPrivateForm] = useState({ satisfied: 'yes', lessonClear: 'yes', comment: '' });
   const [activeTab, setActiveTab] = useState('admin'); // 'admin' | 'teacher'
   const [selectedRateTeacherId, setSelectedRateTeacherId] = useState('');
+  const [mineEvals, setMineEvals] = useState(() => (Array.isArray(milestoneEvals) ? milestoneEvals : []));
+
+  useEffect(() => {
+    if (Array.isArray(milestoneEvals) && milestoneEvals.length) {
+      setMineEvals(milestoneEvals);
+    }
+  }, [milestoneEvals]);
+
+  useEffect(() => {
+    if (!api?.evaluations?.getMine) return undefined;
+    let cancelled = false;
+    api.evaluations.getMine().then((res) => {
+      if (cancelled || !res?.success || !Array.isArray(res.data)) return;
+      setMineEvals(res.data);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [api]);
 
   return (
     <div className="w-full min-w-0 py-2 sm:py-6 space-y-5 sm:space-y-8 animate-in fade-in duration-500">
@@ -262,10 +300,31 @@ export const EvaluationView = ({
                 ? activeTeacher.name
                 : `Thầy ${activeTeacher.name}`;
               const teacherInitial = (activeTeacher.name.split(/\s+/).filter(Boolean).pop()?.[0] || 'G').toUpperCase();
-              const existingRating = teacherRatingData.ratings.find(r => String(r.studentId) === String(STUDENT_ID));
-              const hasRated = existingRating || ratingSubmitted;
-              const isEditing = isEditingRating;
-              const showForm = !hasRated || isEditing;
+              const existingRating = (teacherRatingData?.ratings || []).find(
+                (r) => String(r.studentId) === String(STUDENT_ID),
+              );
+              const hasRated = Boolean(existingRating || ratingSubmitted);
+              const courseKey = String(activeTeacher.courseName || studentData?.course || '').trim();
+              const ratingLocked = isTeacherRatingLocked({
+                studentId: STUDENT_ID,
+                teacherId: activeTeacher.id,
+                courseName: courseKey,
+                privateEvaluations,
+                mineEvals,
+              });
+              // Trong khóa: sửa được; sau popup cuối khóa (course_end_teacher): khóa vĩnh viễn
+              const showForm = (!hasRated || isEditingRating) && !ratingLocked;
+
+              const startEditRating = () => {
+                const src = existingRating?.criteria || {};
+                const next = {};
+                Object.keys(RATING_CRITERIA || {}).forEach((k) => {
+                  if (src[k]) next[k] = src[k];
+                });
+                setRatingCriteria(next);
+                setRatingComment(existingRating?.comment || existingRating?.content || '');
+                setIsEditingRating(true);
+              };
 
               return (
                 <div className="bg-white rounded-2xl sm:rounded-[32px] p-4 sm:p-6 md:p-8 border border-slate-100 shadow-xl space-y-5 sm:space-y-6">
@@ -320,7 +379,7 @@ export const EvaluationView = ({
                     </div>
                   </div>
 
-                  {hasRated && !isEditing ? (
+                  {hasRated && !showForm ? (
                     <div className="bg-yellow-50/50 rounded-2xl sm:rounded-[32px] p-6 sm:p-8 border border-yellow-100 space-y-5 text-center">
                        <div className="flex flex-col items-center gap-2">
                           <span className="text-4xl sm:text-5xl font-black text-yellow-600 tracking-tighter">{existingRating?.criteria?.stars || 5}</span>
@@ -339,9 +398,19 @@ export const EvaluationView = ({
                            <p className="text-sm text-slate-600 leading-relaxed">"{existingRating.comment || existingRating.content}"</p>
                          </div>
                        )}
-                       <button onClick={() => setIsEditingRating(true)} className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-white border-2 border-slate-100 rounded-2xl text-xs font-black text-slate-400 hover:text-slate-600 hover:border-yellow-200 uppercase tracking-widest flex items-center justify-center gap-2 mx-auto transition-all">
-                         <Settings size={14} /> Cập nhật lại đánh giá
-                       </button>
+                       {ratingLocked ? (
+                         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                           Đã khóa sau đánh giá cuối khóa · không thể sửa
+                         </p>
+                       ) : (
+                         <button
+                           type="button"
+                           onClick={startEditRating}
+                           className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide bg-white border border-yellow-200 text-yellow-800 hover:bg-yellow-50 transition-all"
+                         >
+                           Cập nhật lại đánh giá
+                         </button>
+                       )}
                     </div>
                   ) : showForm ? (
                     <div className="space-y-4 sm:space-y-5">
@@ -407,7 +476,13 @@ export const EvaluationView = ({
 
                             const targetTeacherId = activeTeacher.id;
                             if (targetTeacherId) {
-                              await rateTeacher(targetTeacherId, STUDENT_ID, ratingCriteria, ratingComment);
+                              await rateTeacher(
+                                targetTeacherId,
+                                STUDENT_ID,
+                                ratingCriteria,
+                                ratingComment,
+                                { courseName: activeTeacher.courseName || studentData?.course || '' },
+                              );
                               api.evaluations.getByTeacher(targetTeacherId).then(res => {
                                 if (res.success && res.data) {
                                   const validRatings = res.data.filter(r => r.criteria && r.criteria.stars);
@@ -419,6 +494,27 @@ export const EvaluationView = ({
                             }
                           } catch (err) {
                             console.error('Submit Evaluation Logic Crash:', err);
+                            const locked = err?.code === 'TEACHER_RATING_LOCKED'
+                              || /hoàn tất đánh giá cuối khóa/i.test(String(err?.message || ''));
+                            if (locked) {
+                              setIsEditingRating(false);
+                              setRatingSubmitted(true);
+                              setMineEvals((prev) => ([
+                                ...(prev || []),
+                                {
+                                  studentId: STUDENT_ID,
+                                  milestone: 'course_end_teacher',
+                                  courseName: courseKey,
+                                  targetTeacherId: activeTeacher.id,
+                                },
+                              ]));
+                            } else {
+                              setRatingSubmitted(false);
+                            }
+                            const msg = locked
+                              ? (err.message || 'Bạn đã hoàn tất đánh giá cuối khóa. Không thể sửa.')
+                              : 'Không gửi được đánh giá. Thử lại nhé.';
+                            showModal({ title: 'Không gửi được', content: msg, type: 'error' });
                           }
                         }}
                         className={`w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-[0.2em] transition-all ${
@@ -427,8 +523,19 @@ export const EvaluationView = ({
                             : 'bg-gradient-to-r from-orange-400 to-yellow-500 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.98]'
                         }`}
                       >
-                        {Object.keys(RATING_CRITERIA || {}).some(k => !ratingCriteria[k]) ? 'CHỌN ĐỦ TIÊU CHÍ ĐỂ GỬI' : 'GỬI ĐÁNH GIÁ CÔNG KHAI'}
+                        {Object.keys(RATING_CRITERIA || {}).some(k => !ratingCriteria[k])
+                          ? 'CHỌN ĐỦ TIÊU CHÍ ĐỂ GỬI'
+                          : (isEditingRating ? 'CẬP NHẬT ĐÁNH GIÁ' : 'GỬI ĐÁNH GIÁ CÔNG KHAI')}
                       </button>
+                      {isEditingRating ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingRating(false)}
+                          className="w-full py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide text-slate-500 hover:text-slate-700"
+                        >
+                          Hủy
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

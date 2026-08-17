@@ -6,6 +6,7 @@ import { loadState } from './dataStorage';
 import { getMessagingRole } from '../lib/messagingRoles';
 import { resolveMessagingActor, normalizeMessage } from '../lib/messagingIdentity';
 import { sortConversationsByLastMessageAt } from '../lib/conversationList';
+import { isAiSupportConversationId } from '../utils/aiSupport';
 
 /**
  * Messages / groups state, socket listeners, and messaging API for DataProvider.
@@ -64,6 +65,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         fileName: n.fileName,
         fileUrl: n.fileUrl,
         fileExpired: n.fileExpired,
+        aiImageRemaining: n.aiImageRemaining,
         reactions: n.reactions,
       };
 
@@ -229,6 +231,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
                   messageType: n.messageType || m.messageType,
                   fileUrl: n.fileUrl || m.fileUrl,
                   fileName: n.fileName || m.fileName,
+                  aiImageRemaining: n.aiImageRemaining ?? m.aiImageRemaining,
                   time: n.time instanceof Date ? n.time : new Date(n.time || m.time),
                   read: n.read ?? m.read,
                 }
@@ -293,6 +296,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             fileUrl: n.fileUrl,
             fileName: n.fileName,
             fileExpired: n.fileExpired,
+            aiImageRemaining: n.aiImageRemaining,
             time: n.time instanceof Date ? n.time : new Date(m.createdAt || Date.now()),
             read: n.read,
             isRecalled: n.isRecalled,
@@ -432,6 +436,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
 
     // 1. Add existing conversations from messages
     userMsgs.forEach(m => {
+      if (isAiSupportConversationId(m.convId)) return;
       const mTime = new Date(m.time).getTime();
       const existing = convMap[m.convId];
       const existingTime = existing ? new Date(existing.lastTime).getTime() : 0;
@@ -444,8 +449,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         const otherUserId = isMeSender ? m.receiverId : m.senderId;
         const otherRole = isMeSender ? m.receiverRole : m.senderRole;
 
-        // Bỏ qua hội thoại tự chat với chính mình
-        if (String(otherUserId) === String(sId)) return;
+        // Bỏ qua hội thoại tự chat với chính mình / peer ảo AI
+        if (String(otherUserId) === String(sId) || String(otherUserId) === 'ai_support') return;
 
         // Không ẩn DM theo students/teachers/staffs local — directory thiếu theo role
         // (Admin students=[] đến khi mở tab HV; GV teachers=[self]). Ghost cleanup: purge orphans + Inbox contacts.
@@ -557,7 +562,10 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
   }, [messages, students, teachers, staffs, groups, currentUser]);
 
   const getMessages = useCallback((convId) => {
-    return messages.filter(m => m && m.convId === convId).sort((a, b) => a.time - b.time);
+    const id = String(convId || '');
+    return messages
+      .filter((m) => m && (String(m.convId || '') === id || String(m.conversationId || '') === id))
+      .sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0));
   }, [messages]);
 
   return {

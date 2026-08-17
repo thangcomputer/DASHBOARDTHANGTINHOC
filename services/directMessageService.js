@@ -164,6 +164,8 @@ async function sendCanonicalMessageInner({
     if (rid === 'admin') {
       rBranch = 'HỆ THỐNG';
       if (!resolvedReceiverName) resolvedReceiverName = 'Admin';
+    } else if (rid === 'ai_support') {
+      if (!resolvedReceiverName) resolvedReceiverName = 'Trợ lý Thắng Tin Học';
     } else if (!rBranch && mongoose.Types.ObjectId.isValid(rid)) {
       if (rRole === 'student') {
         const s = await Student.findById(rid).select('branchCode name').lean();
@@ -194,7 +196,10 @@ async function sendCanonicalMessageInner({
   let finalReceiverName = isGroup ? 'Group' : resolvedReceiverName;
   let finalReceiverRole = isGroup ? 'admin' : rRole;
 
-  // Student → generic admin contact: deliver to legacy root id "admin"
+  if (!isGroup && rid === 'ai_support') {
+    finalReceiverRole = 'system';
+  }
+
   if (
     !isGroup
     && senderRole === 'student'
@@ -207,7 +212,37 @@ async function sendCanonicalMessageInner({
     }
   }
 
-  const message = await Message.create({
+  let aiImageRemaining = null;
+  const isAiImage = !isGroup
+    && String(finalReceiverId) === 'ai_support'
+    && String(messageType || '') === 'image'
+    && String(fileUrl || '').trim();
+  if (isAiImage) {
+    const {
+      ensureSession,
+      consumeAiImageQuota,
+    } = require('./aiSupportService');
+    const sessionDoc = await ensureSession({
+      conversationId,
+      userId: senderId,
+      userRole: senderRole,
+      branchId: sender.branchId || '',
+    });
+    const quota = await consumeAiImageQuota(sessionDoc);
+    if (quota.blocked) {
+      return {
+        ok: false,
+        status: 403,
+        code: 'AI_IMAGE_QUOTA',
+        message: 'Bạn đã gửi đủ 5 ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.',
+        remaining: 0,
+        limit: quota.limit,
+      };
+    }
+    if (quota.applies) aiImageRemaining = quota.remaining;
+  }
+
+  const messagePayload = {
     conversationId,
     senderId,
     senderName,
@@ -223,7 +258,10 @@ async function sendCanonicalMessageInner({
     fileName: fileName || '',
     isGroup: Boolean(isGroup),
     groupId: isGroup ? groupId : null,
-  });
+  };
+  if (aiImageRemaining != null) messagePayload.aiImageRemaining = aiImageRemaining;
+
+  const message = await Message.create(messagePayload);
 
   logPersisted({
     messageId: message._id,
@@ -259,6 +297,29 @@ async function sendCanonicalMessageInner({
     } else {
       notifyUser(finalReceiverRole, finalReceiverId, 'message:receive', clientMessage);
       notifyUser(senderRole, senderId, 'message:sent', clientMessage);
+    }
+  }
+
+  // Trợ lý AI — hook riêng, không ảnh hưởng luồng tin nhắn thường
+  if (
+    !isGroup
+    && String(finalReceiverId) === 'ai_support'
+    && process.env.AI_SUPPORT_ENABLED === '1'
+    && (String(content || '').trim() || isAiImage)
+  ) {
+    try {
+      const { scheduleAiSupportReply } = require('./aiSupportService');
+      scheduleAiSupportReply({
+        conversationId,
+        sender,
+        userText: String(content || '').trim(),
+        imageFileUrl: isAiImage ? String(fileUrl || '') : '',
+        io,
+        notifyUser,
+      });
+    } catch (hookErr) {
+      const logger = require('../config/logger');
+      logger.warn({ err: hookErr?.message }, '[AI Support] post-send hook');
     }
   }
 

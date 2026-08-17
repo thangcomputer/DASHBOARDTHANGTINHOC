@@ -2,6 +2,8 @@
  * Draft + peer resolution for teacher → admin makeup attendance request.
  */
 
+import { buildChatDeepLinkToken } from './messageRichText';
+
 export function formatScheduleDateLabel(dateRaw) {
   const s = String(dateRaw || '').slice(0, 10) || '—';
   try {
@@ -47,14 +49,21 @@ export function getMakeupSessionSummary({ student, schedule } = {}) {
 export function buildAttendanceMakeupDraft({ student, schedule, teacherName } = {}) {
   const s = getMakeupSessionSummary({ student, schedule });
   const gv = teacherName || 'Giảng viên';
+  const studentId = student?._id || student?.id || '';
+  // Token deep-link: Admin bấm tên HV → mở chat với HV đó
+  const hvLabel = studentId
+    ? buildChatDeepLinkToken({ role: 'student', id: studentId, name: s.name })
+    : s.name;
 
   return [
     '[Yêu cầu điểm danh bù]',
     `GV gửi yêu cầu: ${gv}`,
-    `HV: ${s.name}`,
+    `HV: ${hvLabel}`,
     s.course ? `Khóa: ${s.course}` : null,
     s.total > 0 ? `Buổi: ${s.sessionNo}/${s.total}` : `Buổi tiếp theo (đã học ${s.done})`,
     `Lịch: ${s.dateLabel} · ${s.timeRange}`,
+    '',
+    '→ Bấm tên học viên ở dòng HV để nhắn tin xác nhận nhanh.',
     '',
     'Nội dung xác nhận:',
     '- Giảng viên chịu trách nhiệm về buổi học này.',

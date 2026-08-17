@@ -37,8 +37,73 @@ function formatTimeVi(raw) {
   return new Date(ms).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Nhãn ngày giờ thao tác: "14:32 · 16/8/2026" (không bịa 00:00 khi chỉ có ngày) */
+function formatActedAtLabel(raw, fallbackTime = '') {
+  const t = String(fallbackTime || '').trim();
+  const rawStr = String(raw || '').trim();
+  const dateOnlyPattern = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+  if (dateOnlyPattern.test(rawStr) && !t) {
+    return rawStr;
+  }
+  const ms = parseDateToMs(raw);
+  if (ms) {
+    const d = new Date(ms);
+    const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const date = d.toLocaleDateString('vi-VN');
+    if (t) return `${t} · ${date}`;
+    // Date-only ISO midnight → chỉ hiện ngày
+    if (
+      !rawStr.includes('T')
+      && !(raw instanceof Date)
+      && typeof raw !== 'number'
+      && (time === '00:00' || time === '0:00')
+    ) {
+      return date;
+    }
+    return `${time} · ${date}`;
+  }
+  const dateOnly = formatDateVi(raw);
+  if (t && dateOnly) return `${t} · ${dateOnly}`;
+  if (t) return t;
+  return dateOnly || '';
+}
+
 function normCourse(s) {
   return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** Lấy timestamp thao tác từ grade / note / lịch completed cùng ngày */
+function resolveGradeActedAt(g, schedules = [], sid = '', course = '') {
+  if (g?.at) return g.at;
+  if (g?.actedAt) return g.actedAt;
+  if (g?.createdAt) return g.createdAt;
+  const note = String(g?.note || '');
+  const isoInNote = note.match(/@\s*(\d{4}-\d{2}-\d{2}T[\d:.+-]+Z?)/);
+  if (isoInNote?.[1]) return isoInNote[1];
+  const dateVi = formatDateVi(g?.date);
+  if (dateVi && Array.isArray(schedules) && schedules.length) {
+    const match = schedules.find((sch) => {
+      if (!sch || String(sch.status || '').toLowerCase() !== 'completed') return false;
+      const schSid = String(sch.studentId?._id || sch.studentId || '');
+      if (sid && schSid && schSid !== sid) return false;
+      if (course && sch.course && normCourse(sch.course) !== course) return false;
+      return formatDateVi(sch.date) === dateVi;
+    });
+    if (match?.updatedAt) return match.updatedAt;
+    if (match?.completedAt) return match.completedAt;
+  }
+  if (g?.time && g?.date) {
+    const parts = String(g.date).split('/');
+    if (parts.length === 3) {
+      const [dd, mm, yyyy] = parts.map((x) => parseInt(x, 10));
+      const tm = String(g.time).match(/(\d{1,2}):(\d{2})/);
+      if (tm && Number.isFinite(dd) && Number.isFinite(mm) && Number.isFinite(yyyy)) {
+        const dt = new Date(yyyy, mm - 1, dd, Number(tm[1]), Number(tm[2]));
+        if (!Number.isNaN(dt.getTime())) return dt;
+      }
+    }
+  }
+  return null;
 }
 
 function classifyGradeNote(note) {
@@ -60,7 +125,7 @@ function normalizeAttendanceNote(note, sessionNumber) {
 }
 
 /**
- * @returns {Array<{ id, type, date, time, note, grade, timestamp, meta? }>}
+ * @returns {Array<{ id, type, date, time, note, grade, timestamp, actedAt, actedAtLabel, meta? }>}
  */
 export function buildStudentActivityLogs({
   student,
@@ -95,8 +160,15 @@ export function buildStudentActivityLogs({
       if (seenScheduleCancels.has(fp)) return;
       seenScheduleCancels.add(fp);
     }
+    const actedRaw = entry.actedAt || entry.timestamp;
+    const actedAtLabel = entry.actedAtLabel
+      || formatActedAtLabel(actedRaw, entry.time);
     seen.add(entry.id);
-    logs.push(entry);
+    logs.push({
+      ...entry,
+      actedAt: actedRaw || null,
+      actedAtLabel: actedAtLabel || '',
+    });
   };
 
   // 0) activityLog server (hủy điểm danh / hủy ca / bổ sung)
@@ -119,6 +191,7 @@ export function buildStudentActivityLogs({
       note,
       grade: null,
       timestamp: parseDateToMs(at) || Date.now() - idx * 1000,
+      actedAt: at,
       meta: { sessionNumber, scheduleId: ev.scheduleId },
     });
   });
@@ -126,19 +199,21 @@ export function buildStudentActivityLogs({
   // 1) Điểm danh / ghi chú đã sync vào grades (kể cả BT đã chấm)
   (student?.grades || []).forEach((g, idx) => {
     const type = classifyGradeNote(g.note);
-    const ts = parseDateToMs(g.date) || Date.now() - idx * 1000;
+    const actedAt = resolveGradeActedAt(g, schedules, sid, course);
+    const ts = parseDateToMs(actedAt) || parseDateToMs(g.date) || Date.now() - idx * 1000;
     const sessionMatch = /buổi\s*(\d+)/i.exec(String(g.note || ''));
     const sessionNumber = sessionMatch ? Number(sessionMatch[1]) : null;
     push({
       id: `grade_${g.assignmentId || ''}_${g.date || ''}_${idx}_${(g.note || '').slice(0, 40)}`,
       type,
       date: formatDateVi(g.date),
-      time: g.time || '',
+      time: g.time || formatTimeVi(actedAt) || '',
       note: type === 'attendance'
         ? normalizeAttendanceNote(g.note, sessionNumber)
         : (g.note || 'Đã điểm danh hoàn thành buổi học'),
       grade: g.grade != null && g.grade !== '' ? Number(g.grade) : null,
       timestamp: ts,
+      actedAt: actedAt || g.date,
       meta: { sessionNumber },
     });
   });
@@ -165,6 +240,7 @@ export function buildStudentActivityLogs({
       note,
       grade: null,
       timestamp: parseDateToMs(at) || parseDateToMs(sch.date) || Date.now() - idx * 1000,
+      actedAt: at,
       meta: { scheduleId: schId },
     });
   });
@@ -194,6 +270,7 @@ export function buildStudentActivityLogs({
         note: `Bài nộp: ${title}`,
         grade: null,
         timestamp: parseDateToMs(submittedAt),
+        actedAt: submittedAt,
       });
     }
 
@@ -212,6 +289,7 @@ export function buildStudentActivityLogs({
             : `Chấm điểm: ${title}${h.note ? ` - ${h.note}` : ''}`,
           grade: h.newGrade != null ? Number(h.newGrade) : null,
           timestamp: parseDateToMs(at) || Date.now(),
+          actedAt: at,
         });
       });
     } else if (!alreadyInGrades && sub.status === 'graded' && sub.grade != null) {
@@ -224,6 +302,7 @@ export function buildStudentActivityLogs({
         note: `Chấm điểm: ${title}${sub.teacherFeedback ? ` - ${sub.teacherFeedback}` : ''}`,
         grade: Number(sub.grade),
         timestamp: parseDateToMs(at) || Date.now(),
+        actedAt: at,
       });
     }
   });
@@ -254,6 +333,7 @@ export function buildStudentActivityLogs({
       grade: score10,
       rawScore: scorePct,
       timestamp: parseDateToMs(at) || Date.now() - qIdx * 1000,
+      actedAt: at,
       meta: { isPassed: !forfeit && (sub.status === 'passed' || (scorePct != null && scorePct >= 70)), forfeit },
     });
   });
@@ -278,6 +358,7 @@ export function buildStudentActivityLogs({
       note: `${kind}${ev.content ? ` — ${ev.content}` : ''}${ev.courseName ? ` (${ev.courseName})` : ''}`,
       grade: score,
       timestamp: parseDateToMs(at) || Date.now() - eIdx * 1000,
+      actedAt: at,
     });
   });
 

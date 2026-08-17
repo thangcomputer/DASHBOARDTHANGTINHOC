@@ -46,7 +46,7 @@ export default function EditTeacherModal({
 
   const rating = useMemo(() => {
     if (!editTeacher || typeof getTeacherRating !== 'function') return null;
-    return getTeacherRating(editTeacher.id || editTeacher._id);
+    return getTeacherRating(editTeacher.id || editTeacher._id, editTeacher);
   }, [editTeacher, getTeacherRating]);
 
   if (!editTeacher) return null;

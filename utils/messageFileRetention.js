@@ -105,6 +105,7 @@ module.exports = {
   RETENTION_DAYS,
   RETENTION_MS,
   buildExpiredNotice,
+  resolveDiskPath,
   sanitizeMessageDoc,
   sanitizeMessages,
   purgeExpiredMessageFiles,

@@ -14,7 +14,8 @@ function readStudentSessionId() {
 }
 
 /**
- * Blocks Student Learning shell when no enrollment.status === 'active'.
+ * Blocks Student Learning shell when no usable enrollment (active/completed/paused).
+ * Cancelled / refunded / unpaid-pending → StudentNoActiveCoursePage.
  * Allows #profile (and optional allowHashes) without unlocking learning tabs.
  * Student role: fail-closed after load. Admin/staff preview: bypass.
  */

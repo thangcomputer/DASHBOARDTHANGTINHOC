@@ -5,11 +5,16 @@ import {
   Bell, CheckCheck, ChevronLeft, ChevronRight, Filter, Loader2,
   Trash2, Megaphone, RefreshCw, X, ExternalLink,
 } from 'lucide-react';
-import { notificationsAPI, apiFetch } from '../services/api';
+import api, { notificationsAPI, apiFetch } from '../services/api';
 import { useData } from '../context/DataContext';
 import { useToast } from '../utils/toast';
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { useSearchParams } from 'react-router-dom';
+import TeacherRatingDetailModal, {
+  getEvaluationIdFromNotif,
+  isTeacherRatingNotif,
+} from './teacher/TeacherRatingDetailModal';
+import { RATING_CRITERIA } from '../context/useDataRatings';
 
 const TYPES = [
   { value: '', label: 'Tất cả' },
@@ -21,6 +26,27 @@ const TYPES = [
   { value: 'EVALUATION', label: 'Đánh giá' },
   { value: 'MESSAGE', label: 'Tin nhắn' },
 ];
+
+const TYPE_LABELS = {
+  SYSTEM: 'Hệ thống',
+  COURSE: 'Khóa học',
+  STUDENT: 'Khóa học',
+  FINANCE: 'Tài chính',
+  SCHEDULE: 'Lịch dạy',
+  EXAM: 'Thi',
+  EVALUATION: 'Đánh giá',
+  GRADE: 'Đánh giá',
+  MESSAGE: 'Tin nhắn',
+  ADMIN: 'Admin',
+  NEWS: 'Tin tức',
+  TRAINING: 'Đào tạo',
+};
+
+function typeLabelVi(type) {
+  const key = String(type || '').trim().toUpperCase();
+  if (!key) return 'Thông báo';
+  return TYPE_LABELS[key] || TYPES.find((t) => t.value === key)?.label || 'Thông báo';
+}
 
 const RECEIVER_OPTS = [
   { value: 'ALL_ADMIN', label: 'Tất cả Admin/Staff' },
@@ -79,6 +105,9 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   const [qaDetail, setQaDetail] = useState(null);
   const [qaAnswer, setQaAnswer] = useState('');
   const [qaSaving, setQaSaving] = useState(false);
+  const [ratingDetail, setRatingDetail] = useState(null);
+  const [ratingDetailLoading, setRatingDetailLoading] = useState(false);
+  const [ratingDetailError, setRatingDetailError] = useState('');
 
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [bcTitle, setBcTitle] = useState('');
@@ -196,6 +225,32 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
     }
   };
 
+  const openTeacherRatingDetail = useCallback(async (n) => {
+    const teacherId = session?.id || session?._id;
+    if (!teacherId) {
+      setRatingDetailError('Phiên giảng viên không hợp lệ.');
+      return;
+    }
+    const evaluationId = getEvaluationIdFromNotif(n);
+    const studentId = n?.payload?.studentId;
+    setRatingDetailLoading(true);
+    setRatingDetailError('');
+    setRatingDetail(null);
+    try {
+      const res = await api.evaluations.getByTeacher(teacherId);
+      const list = (res?.success && Array.isArray(res.data)) ? res.data : [];
+      const found = list.find((e) => String(e.id || e._id) === String(evaluationId))
+        || list.find((e) => studentId && String(e.studentId) === String(studentId))
+        || (list.length === 1 ? list[0] : null);
+      if (!found) setRatingDetailError('Không tìm thấy nội dung đánh giá.');
+      else setRatingDetail(found);
+    } catch {
+      setRatingDetailError('Không tải được đánh giá. Thử lại sau.');
+    } finally {
+      setRatingDetailLoading(false);
+    }
+  }, [session?.id, session?._id]);
+
   const onOpen = async (n) => {
     const id = n.id || n._id;
     if (!n.read) await onMarkRead(id);
@@ -211,7 +266,23 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       await openQaById(n.payload.qaId);
       return;
     }
+    if (role === 'teacher' && isTeacherRatingNotif(n)) {
+      await openTeacherRatingDetail(n);
+      return;
+    }
+    if (
+      (role === 'admin' || role === 'staff')
+      && (n.payload?.kind === 'admin_feedback'
+        || String(n.type || '').toUpperCase() === 'EVALUATION')
+    ) {
+      navigate('/admin#evaluations');
+      return;
+    }
     const path = resolveNavPath(n.path);
+    if (path && role === 'teacher' && String(path).includes('evaluationId=')) {
+      await openTeacherRatingDetail(n);
+      return;
+    }
     if (path && !n.payload?.kind) {
       navigate(path);
     } else {
@@ -291,7 +362,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
 
       {broadcastOpen && isAdmin && (
         <div className="bg-white border border-red-100 rounded-2xl p-4 space-y-3 shadow-sm">
-          <p className="text-xs font-black text-red-600 uppercase tracking-wide">Broadcast hệ thống</p>
+          <p className="text-xs font-black text-red-600 uppercase tracking-wide">Thông báo hệ thống</p>
           <input
             value={bcTitle}
             onChange={(e) => setBcTitle(e.target.value)}
@@ -367,7 +438,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                 >
                   <div className="flex-1 text-left min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-red-600">{n.type}</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-red-600">{typeLabelVi(n.type)}</span>
                       <span className="text-[10px] text-gray-400 font-bold">{formatTime(n.time || n.createdAt)}</span>
                     </div>
                     <h3 className={`text-sm truncate ${!n.read ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
@@ -441,7 +512,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded-md inline-block mb-1">
-                  {selectedNotif.type || 'HỆ THỐNG'}
+                  {typeLabelVi(selectedNotif.type)}
                 </span>
                 <h2 className="text-base font-black text-slate-900 leading-snug">
                   {selectedNotif.title}
@@ -526,6 +597,21 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
           </div>
         </div>
       )}
+
+      {(ratingDetailLoading || ratingDetail || ratingDetailError) && role === 'teacher' ? (
+        <TeacherRatingDetailModal
+          rating={ratingDetail}
+          loading={ratingDetailLoading}
+          error={ratingDetailError}
+          students={students}
+          criteriaConfig={RATING_CRITERIA}
+          onClose={() => {
+            setRatingDetail(null);
+            setRatingDetailError('');
+            setRatingDetailLoading(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

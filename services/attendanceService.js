@@ -9,7 +9,13 @@ const Schedule = require('../models/Schedule');
 const Student = require('../models/Student');
 const Notification = require('../models/Notification');
 const logger = require('../config/logger');
-const { applyEnrollmentStats, recordAttendanceGrade } = require('./enrollmentService');
+const {
+  applyEnrollmentStats,
+  recordAttendanceGrade,
+  normCourseName,
+  syncStudentFromPrimaryEnrollment,
+  toClientCourse,
+} = require('./enrollmentService');
 const { mapEnrollmentStatusToRoot } = require('../utils/studentStatusMap');
 const {
   resolveAttendanceState,
@@ -46,7 +52,56 @@ async function syncEnrollmentProgressAfterAttendance(studentId, {
   const student = await Student.findById(studentId);
   if (!student) return null;
 
+  const courseKey = normCourseName(courseName || '');
+  let prevCompleted = Number(student.completedSessions) || 0;
+  if (courseKey && Array.isArray(student.enrollments) && student.enrollments.length) {
+    const enr = student.enrollments.find(
+      (e) => normCourseName(e.courseName || e.course) === courseKey,
+    );
+    if (enr) prevCompleted = Number(enr.completedSessions) || 0;
+  }
+
   await applyEnrollmentStats(student, studentId, Schedule);
+
+  // Sau điểm danh (GV / admin bù): luôn tăng ít nhất +1 so với trước sync.
+  // Math.max(schedule, stored) trong applyEnrollmentStats không tăng khi
+  // "đã học" nhập tay > số lịch completed (migration / bù tay).
+  if (Array.isArray(student.enrollments) && student.enrollments.length) {
+    let idx = courseKey
+      ? student.enrollments.findIndex(
+        (e) => normCourseName(e.courseName || e.course) === courseKey,
+      )
+      : -1;
+    if (idx < 0) {
+      idx = student.enrollments.findIndex(
+        (e) => !['cancelled', 'refunded'].includes(String(e.status || '').toLowerCase()),
+      );
+    }
+    if (idx >= 0) {
+      const enr = student.enrollments[idx];
+      const total = Number(enr.totalSessions) > 0 ? Number(enr.totalSessions) : 12;
+      let completed = Number(enr.completedSessions) || 0;
+      if (completed <= prevCompleted) {
+        completed = Math.min(total, prevCompleted + 1);
+        student.enrollments[idx].completedSessions = completed;
+        student.enrollments[idx].remainingSessions = Math.max(0, total - completed);
+        const st = String(enr.status || '').toLowerCase();
+        if (!['cancelled', 'refunded'].includes(st) && completed >= total) {
+          student.enrollments[idx].status = 'completed';
+        }
+        if (typeof student.markModified === 'function') {
+          student.markModified('enrollments');
+        }
+        student.courses = student.enrollments.map(toClientCourse);
+        syncStudentFromPrimaryEnrollment(student);
+      }
+    }
+  } else if (completedRootNeedsBump(student, prevCompleted)) {
+    const total = Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12;
+    const completed = Math.min(total, prevCompleted + 1);
+    student.completedSessions = completed;
+    student.remainingSessions = Math.max(0, total - completed);
+  }
 
   if (logNote) {
     recordAttendanceGrade(student, {
@@ -54,6 +109,7 @@ async function syncEnrollmentProgressAfterAttendance(studentId, {
       note: logNote,
       grade: 0,
       date: logDate || new Date(),
+      actedAt: new Date(),
     });
   }
 
@@ -72,6 +128,10 @@ async function syncEnrollmentProgressAfterAttendance(studentId, {
 
   await student.save();
   return student;
+}
+
+function completedRootNeedsBump(student, prevCompleted) {
+  return (Number(student.completedSessions) || 0) <= prevCompleted;
 }
 
 /**
@@ -185,10 +245,10 @@ async function completeScheduleAttendance({
       .select('enrollments course status totalSessions')
       .lean();
     if (studentForEnr) {
-      const courseKey = String(schedule.course || '').trim().toLowerCase();
+      const courseKey = normCourseName(schedule.course);
       const enrs = Array.isArray(studentForEnr.enrollments) ? studentForEnr.enrollments : [];
       const enr = courseKey
-        ? enrs.find((e) => String(e.courseName || e.course || '').trim().toLowerCase() === courseKey)
+        ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
         : enrs.find((e) => String(e.status || '').toLowerCase() === 'active') || enrs[0];
       const enrStatus = String(enr?.status || '').toLowerCase();
       if (enr && ['cancelled', 'refunded', 'completed'].includes(enrStatus)) {
@@ -202,7 +262,7 @@ async function completeScheduleAttendance({
       const completedCount = await Schedule.countDocuments({
         studentId: schedule.studentId,
         status: 'completed',
-        ...(courseKey ? { course: schedule.course } : {}),
+        ...(schedule.course ? { course: schedule.course } : {}),
       });
       if (completedCount >= total) {
         throw attendanceError(

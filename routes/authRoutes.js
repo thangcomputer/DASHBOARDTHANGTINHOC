@@ -707,12 +707,14 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
             specialty:       user.specialty,
             subjectIds:      Array.isArray(user.subjectIds) ? user.subjectIds : [],
             isFirstLogin:    !!user.isFirstLogin,
+            showWelcomeCelebration: user.welcomeCelebrationSeen === false,
           }
         : {
             course:            user.course,
             remainingSessions: user.remainingSessions,
             grade:             user.grade,
             isFirstLogin:      !!user.isFirstLogin,
+            showWelcomeCelebration: user.welcomeCelebrationSeen === false,
           }),
     };
 
@@ -852,6 +854,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
           course: user.course,
           remainingSessions: user.remainingSessions,
           isFirstLogin: !!user.isFirstLogin,
+          showWelcomeCelebration: userRole === 'student' && user.welcomeCelebrationSeen === false,
           avatar: user.avatar || '',
           gender: user.gender || '',
         },
@@ -1367,6 +1370,74 @@ router.post('/change-password', authMiddleware, policyShadowAuth('change_passwor
   }
 });
 
+// ─── POST /api/auth/welcome-celebration/seen ──────────────────────────────────
+/**
+ * Đánh dấu đã xem pháo hoa chào mừng lần đầu (HV/GV).
+ * Không đụng isFirstLogin / mật khẩu.
+ */
+router.post('/welcome-celebration/seen', authMiddleware, async (req, res) => {
+  try {
+    const role = req.user?.role;
+    const userId = req.user?.id || req.user?._id;
+    if (role !== 'student' && role !== 'teacher') {
+      return res.status(403).json({ success: false, message: 'Chỉ học viên / giảng viên' });
+    }
+    if (!userId || userId === 'admin') {
+      return res.status(400).json({ success: false, message: 'Không xác định được tài khoản' });
+    }
+    const Model = role === 'student' ? Student : Teacher;
+    await Model.updateOne(
+      { _id: userId },
+      { $set: { welcomeCelebrationSeen: true } },
+    );
+    return res.json({ success: true, message: 'Đã ghi nhận' });
+  } catch (error) {
+    logger.error('[AUTH] welcome-celebration/seen:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+/** Đánh dấu đã xem pháo hoa hoàn thành khóa (HV). */
+router.post('/course-celebration/seen', authMiddleware, async (req, res) => {
+  try {
+    if (req.user?.role !== 'student') {
+      return res.status(403).json({ success: false, message: 'Chỉ học viên' });
+    }
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(400).json({ success: false, message: 'Không xác định được tài khoản' });
+    const enrollmentId = req.body?.enrollmentId ? String(req.body.enrollmentId).trim() : '';
+    const courseName = String(req.body?.courseName || req.body?.course || '').trim();
+
+    const student = await Student.findById(userId);
+    if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+
+    let updated = false;
+    if (Array.isArray(student.enrollments) && student.enrollments.length) {
+      for (let i = 0; i < student.enrollments.length; i += 1) {
+        const enr = student.enrollments[i];
+        const idMatch = enrollmentId && String(enr._id) === enrollmentId;
+        const nameMatch = courseName
+          && String(enr.courseName || '').trim().toLowerCase() === courseName.toLowerCase();
+        if (idMatch || nameMatch || (!enrollmentId && !courseName && enr.courseCelebrationSeen === false)) {
+          student.enrollments[i].courseCelebrationSeen = true;
+          updated = true;
+          if (idMatch || nameMatch) break;
+        }
+      }
+      if (updated) student.markModified('enrollments');
+    }
+    if (student.courseCelebrationSeen === false) {
+      student.courseCelebrationSeen = true;
+      updated = true;
+    }
+    if (updated) await student.save({ validateModifiedOnly: true });
+    return res.json({ success: true, message: 'Đã ghi nhận' });
+  } catch (error) {
+    logger.error('[AUTH] course-celebration/seen:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
 /**
  * @route   GET /api/auth/me
@@ -1414,6 +1485,16 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
       return res.status(401).json({ success: false, message: 'Phiên đăng nhập đã hết hạn (đã đăng nhập ở máy khác hoặc đổi mật khẩu)' });
     }
 
+    let pendingCourseCelebration = null;
+    if (decoded.role === 'student') {
+      try {
+        const { buildPendingCourseCelebration } = require('../services/courseCelebration');
+        pendingCourseCelebration = await buildPendingCourseCelebration(user);
+      } catch (e) {
+        logger.warn('[AUTH] /me pendingCourseCelebration:', e.message);
+      }
+    }
+
     return res.json({
       success: true,
       data: {
@@ -1430,6 +1511,9 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
         avatar:      user.avatar || '',
         gender:      user.gender || '',
         isFirstLogin: !!user.isFirstLogin,
+        showWelcomeCelebration:
+          (decoded.role === 'student' || decoded.role === 'teacher')
+          && user.welcomeCelebrationSeen === false,
         ...(decoded.role === 'teacher' || decoded.role === 'admin' || decoded.role === 'staff' ? {
           testScore:       user.testScore,
           testStatus:      user.testStatus,
@@ -1443,6 +1527,7 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
           remainingSessions:   user.remainingSessions,
           studentExamUnlocked: user.studentExamUnlocked,
           grade:               user.grade,
+          pendingCourseCelebration,
         } : {}),
       },
     });

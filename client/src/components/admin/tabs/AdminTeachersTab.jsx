@@ -250,7 +250,7 @@ export default function AdminTeachersTab() {
           ) : rows.map((t) => {
             const score = t.testScore;
             const passed = (score || 0) >= 80;
-            const rating = getTeacherRating(t.id);
+            const rating = getTeacherRating(t.id, t);
             const active = ['Active', 'active'].includes(t.status);
             const pending = ['Pending', 'pending'].includes(t.status);
             const locked = String(t.status).toLowerCase() === 'locked';
@@ -375,7 +375,7 @@ export default function AdminTeachersTab() {
               ) : rows.map((t) => {
                 const score = t.testScore;
                 const passed = (score || 0) >= 80;
-                const rating = getTeacherRating(t.id);
+                const rating = getTeacherRating(t.id, t);
                 const active = ['Active', 'active'].includes(t.status);
                 const pending = ['Pending', 'pending'].includes(t.status);
                 const locked = String(t.status).toLowerCase() === 'locked';

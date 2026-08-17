@@ -233,6 +233,11 @@ const AdminDashboard = () => {
           onClose={() => setEditStudent(null)}
           onResetPassword={(id, name) => handleOpenResetPw(id, name, 'student')}
           onSave={async (updatedForm) => {
+            const total = Number(updatedForm.totalSessions) > 0 ? Number(updatedForm.totalSessions) : 12;
+            const completed = Math.max(0, Math.min(total, Number(updatedForm.completedSessions) || 0));
+            const remaining = updatedForm.remainingSessions != null && updatedForm.remainingSessions !== ''
+              ? Math.max(0, Math.min(total, Number(updatedForm.remainingSessions) || 0))
+              : Math.max(0, total - completed);
             const payload = {
               name: updatedForm.name,
               age: updatedForm.age,
@@ -241,10 +246,9 @@ const AdminDashboard = () => {
               courseId: updatedForm.courseId,
               course: updatedForm.course,
               price: updatedForm.price,
-              totalSessions: Number(updatedForm.totalSessions) > 0 ? Number(updatedForm.totalSessions) : 12,
-              remainingSessions: Number(updatedForm.remainingSessions) >= 0
-                ? Number(updatedForm.remainingSessions)
-                : Math.max(0, (Number(updatedForm.totalSessions) || 12) - (Number(editStudent.completedSessions) || 0)),
+              totalSessions: total,
+              completedSessions: completed,
+              remainingSessions: remaining,
               paid: updatedForm.paid,
               studentExamUnlocked: updatedForm.studentExamUnlocked,
               teacherId: updatedForm.teacherId || null,

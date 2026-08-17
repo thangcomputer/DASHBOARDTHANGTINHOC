@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminTab } from '../AdminTabContext';
 import { AlertTriangle, ShieldAlert, MessageSquare, CheckCircle2, MessageCircle } from 'lucide-react';
+import { RATING_CRITERIA } from '../../../context/useDataRatings';
 
 export default function AdminEvaluationsTab() {
   const {
@@ -65,20 +66,7 @@ export default function AdminEvaluationsTab() {
                       <span className="line-clamp-2">📚 {ev.courseName}</span>
                     </span>
                   )}
-                  <div className="flex flex-wrap gap-2">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-100 rounded-xl shadow-sm min-h-11">
-                      <span className="text-[12px] font-semibold text-slate-400 uppercase">Hài lòng:</span>
-                      <span className={`text-[13px] font-bold ${ev.criteria?.satisfied === 'yes' ? 'text-sky-700' : 'text-red-600'}`}>
-                        {ev.criteria?.satisfied === 'yes' ? 'CÓ' : 'KHÔNG'}
-                      </span>
-                    </div>
-                    <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-100 rounded-xl shadow-sm min-h-11">
-                      <span className="text-[12px] font-semibold text-slate-400 uppercase">Dễ hiểu:</span>
-                      <span className={`text-[13px] font-bold ${ev.criteria?.lessonClear === 'yes' ? 'text-sky-700' : 'text-orange-600'}`}>
-                        {ev.criteria?.lessonClear === 'yes' ? 'HIỂU' : 'HƠI KHÓ'}
-                      </span>
-                    </div>
-                  </div>
+                  <CriteriaChips criteria={ev.criteria} />
                   <div className="bg-white p-3 sm:p-5 rounded-2xl border border-red-50 relative mt-1 shadow-sm min-h-[72px] flex items-center">
                     <div className="absolute -left-2 -top-2 bg-red-100 rounded-full p-2 border-4 border-white shadow-sm">
                       <MessageSquare size={16} className="text-red-500" aria-hidden="true" />
@@ -113,6 +101,60 @@ export default function AdminEvaluationsTab() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function Chip({ label, value, tone = 'sky' }) {
+  const toneClass = tone === 'red' ? 'text-red-600' : tone === 'orange' ? 'text-orange-600' : 'text-sky-700';
+  return (
+    <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-100 rounded-xl shadow-sm min-h-11">
+      <span className="text-[12px] font-semibold text-slate-400 uppercase">{label}:</span>
+      <span className={`text-[13px] font-bold ${toneClass}`}>{value}</span>
+    </div>
+  );
+}
+
+function CriteriaChips({ criteria = {} }) {
+  if (criteria.teaching || criteria.voice || criteria.guidance || criteria.support) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(RATING_CRITERIA).map(([key, cat]) => {
+          const opt = cat.options.find((o) => o.key === criteria[key]);
+          if (!opt) return null;
+          return <Chip key={key} label={cat.label} value={opt.label} />;
+        })}
+      </div>
+    );
+  }
+  if (criteria.centerSupport || criteria.centerFacility) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Chip
+          label="Hỗ trợ"
+          value={criteria.centerSupport === 'yes' ? 'TỐT' : 'CHƯA TỐT'}
+          tone={criteria.centerSupport === 'yes' ? 'sky' : 'red'}
+        />
+        <Chip
+          label="Cơ sở"
+          value={criteria.centerFacility === 'yes' ? 'HÀI LÒNG' : 'CHƯA'}
+          tone={criteria.centerFacility === 'yes' ? 'sky' : 'orange'}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Chip
+        label="Hài lòng"
+        value={criteria.satisfied === 'yes' ? 'CÓ' : 'KHÔNG'}
+        tone={criteria.satisfied === 'yes' ? 'sky' : 'red'}
+      />
+      <Chip
+        label="Dễ hiểu"
+        value={criteria.lessonClear === 'yes' ? 'HIỂU' : 'HƠI KHÓ'}
+        tone={criteria.lessonClear === 'yes' ? 'sky' : 'orange'}
+      />
     </div>
   );
 }

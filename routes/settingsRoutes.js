@@ -331,6 +331,7 @@ router.put('/student-training-data', authMiddleware, ...settingsGuard('student_t
 
 const DEFAULT_EXAM_MINUTES_SERVER = { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90 };
 const DEFAULT_ESSAY_EXAM_MINUTES_SERVER = { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60 };
+const DEFAULT_ESSAY_REQUIRED_SERVER = { coban: true, word: true, excel: true, powerpoint: true, canva: true };
 
 function sanitizeStudentExamMinutesPayload(body) {
   const out = { ...DEFAULT_EXAM_MINUTES_SERVER };
@@ -348,6 +349,20 @@ function sanitizeStudentEssayExamMinutesPayload(body) {
   for (const k of Object.keys(body)) {
     const n = Number(body[k]);
     if (Number.isFinite(n) && n >= 1 && n <= 600) out[k] = Math.round(n);
+  }
+  return out;
+}
+
+function sanitizeStudentEssayRequiredPayload(body) {
+  const out = { ...DEFAULT_ESSAY_REQUIRED_SERVER };
+  if (!body || typeof body !== 'object') return out;
+  for (const k of Object.keys(body)) {
+    const sid = String(k).trim().slice(0, 40);
+    if (!sid) continue;
+    const v = body[k];
+    if (v === true || v === false) out[sid] = v;
+    else if (v === 1 || v === '1' || String(v).toLowerCase() === 'true') out[sid] = true;
+    else if (v === 0 || v === '0' || String(v).toLowerCase() === 'false') out[sid] = false;
   }
   return out;
 }
@@ -417,6 +432,8 @@ router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only')
     const hasMinutesOnServer = minsRaw != null && typeof minsRaw === 'object';
     const essayMinsRaw = settings.studentEssayExamMinutesRaw;
     const hasEssayMinutesOnServer = essayMinsRaw != null && typeof essayMinsRaw === 'object';
+    const essayRequiredRaw = settings.studentEssayRequiredRaw;
+    const hasEssayRequiredOnServer = essayRequiredRaw != null && typeof essayRequiredRaw === 'object';
     const filesRaw = settings.studentExamFilesRaw;
     const hasExamFilesOnServer = filesRaw != null && typeof filesRaw === 'object';
     const catalog = await examCatalogPayload(settings);
@@ -428,6 +445,9 @@ router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only')
         studentExamMinutes: hasMinutesOnServer ? sanitizeStudentExamMinutesPayload(minsRaw) : undefined,
         studentEssayExamMinutes: hasEssayMinutesOnServer
           ? sanitizeStudentEssayExamMinutesPayload(essayMinsRaw)
+          : undefined,
+        studentEssayRequired: hasEssayRequiredOnServer
+          ? sanitizeStudentEssayRequiredPayload(essayRequiredRaw)
           : undefined,
         studentExamFiles: hasExamFilesOnServer ? sanitizeStudentExamFilesPayload(filesRaw) : {},
         examWarningSoundUrl: String(settings.examWarningSoundUrl || '').trim(),
@@ -720,7 +740,14 @@ router.delete('/exam-subjects/:id', authMiddleware, ...settingsGuard('system_wri
 // ── PUT /api/settings/student-exam-config ── Admin/Staff lưu ngân hàng + thời gian thi HV
 router.put('/student-exam-config', authMiddleware, ...settingsGuard('student_training_write'), async (req, res) => {
   try {
-    const { studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, examWarningSoundUrl } = req.body || {};
+    const {
+      studentQuestions,
+      studentExamMinutes,
+      studentEssayExamMinutes,
+      studentEssayRequired,
+      studentExamFiles,
+      examWarningSoundUrl,
+    } = req.body || {};
     const updates = {};
     if (studentQuestions !== undefined) {
       if (!Array.isArray(studentQuestions)) {
@@ -733,6 +760,9 @@ router.put('/student-exam-config', authMiddleware, ...settingsGuard('student_tra
     }
     if (studentEssayExamMinutes !== undefined) {
       updates.studentEssayExamMinutesRaw = sanitizeStudentEssayExamMinutesPayload(studentEssayExamMinutes);
+    }
+    if (studentEssayRequired !== undefined) {
+      updates.studentEssayRequiredRaw = sanitizeStudentEssayRequiredPayload(studentEssayRequired);
     }
     if (studentExamFiles !== undefined) {
       updates.studentExamFilesRaw = sanitizeStudentExamFilesPayload(studentExamFiles);

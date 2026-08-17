@@ -140,19 +140,26 @@ function recordAttendanceGrade(studentDoc, {
   note,
   grade = 0,
   date = new Date(),
+  actedAt = null,
 } = {}) {
   if (!studentDoc) return false;
-  const dateObj = date instanceof Date ? date : new Date(date);
-  const dateVN = Number.isNaN(dateObj.getTime())
-    ? new Date().toLocaleDateString('vi-VN')
-    : dateObj.toLocaleDateString('vi-VN');
+  const sessionDate = date instanceof Date ? date : new Date(date);
+  const actionAt = actedAt
+    ? (actedAt instanceof Date ? actedAt : new Date(actedAt))
+    : new Date();
+  const safeSession = Number.isNaN(sessionDate.getTime()) ? new Date() : sessionDate;
+  const safeAction = Number.isNaN(actionAt.getTime()) ? new Date() : actionAt;
+  const dateVN = safeSession.toLocaleDateString('vi-VN');
+  const timeVN = safeAction.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   const gradeNum = Number(grade);
   const entry = {
     date: dateVN,
+    time: timeVN,
+    at: safeAction,
     note: note || 'Đã điểm danh hoàn thành buổi học',
     grade: Number.isFinite(gradeNum) ? gradeNum : 0,
   };
-  const entryKeys = new Set(gradeDateKeys(dateVN).concat(gradeDateKeys(dateObj)));
+  const entryKeys = new Set(gradeDateKeys(dateVN).concat(gradeDateKeys(safeSession)));
 
   const upsertGrades = (grades) => {
     const list = Array.isArray(grades) ? [...grades] : [];
@@ -164,10 +171,21 @@ function recordAttendanceGrade(studentDoc, {
       const prev = list[idx];
       const nextGrade = Number.isFinite(gradeNum) ? gradeNum : (Number(prev.grade) || 0);
       const nextNote = note || prev.note || entry.note;
-      if (Number(prev.grade) === nextGrade && String(prev.note || '') === String(nextNote)) {
+      if (
+        Number(prev.grade) === nextGrade
+        && String(prev.note || '') === String(nextNote)
+        && prev.at
+      ) {
         return { list, changed: false };
       }
-      list[idx] = { ...prev, grade: nextGrade, note: nextNote, date: prev.date || dateVN };
+      list[idx] = {
+        ...prev,
+        grade: nextGrade,
+        note: nextNote,
+        date: prev.date || dateVN,
+        time: timeVN,
+        at: safeAction,
+      };
       return { list, changed: true };
     }
     list.unshift(entry);
@@ -243,7 +261,14 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
       { $match: { studentId: sid, status: 'completed' } },
       { $group: { _id: '$course', completed: { $sum: 1 } } },
     ]);
-    sessionByCourse = Object.fromEntries(rows.map((r) => [r._id, r.completed]));
+    // Gom theo tên khóa đã chuẩn hóa (trim / hoa thường / bỏ dấu) — tránh lệch
+    // "khóa học test" vs "Khóa học test" làm điểm danh bù không tăng tiến độ.
+    sessionByCourse = {};
+    rows.forEach((r) => {
+      const key = normCourseName(r._id);
+      if (!key) return;
+      sessionByCourse[key] = (sessionByCourse[key] || 0) + (Number(r.completed) || 0);
+    });
   }
 
   for (let i = 0; i < enrollments.length; i++) {
@@ -280,7 +305,14 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
 
   doc.enrollments = enrollments.map((e, idx) => {
     const courseName = e.courseName || e.course;
-    const completed = sessionByCourse[courseName] ?? e.completedSessions ?? 0;
+    // SoT tiến độ: tối đa giữa (1) số lịch completed theo khóa và (2) giá trị lưu trên enrollment.
+    // → Điểm danh vẫn tăng tiến độ; Admin nhập tay "đã học" (migration / bù) không bị tụt về 0 khi chưa có lịch.
+    const courseKey = normCourseName(courseName);
+    const fromSchedule = courseKey ? sessionByCourse[courseKey] : undefined;
+    const fromStored = Number(e.completedSessions) || 0;
+    const completed = fromSchedule != null
+      ? Math.max(Number(fromSchedule) || 0, fromStored)
+      : fromStored;
     const total = e.totalSessions || 12;
     const enrGrades = (e.grades && e.grades.length)
       ? e.grades

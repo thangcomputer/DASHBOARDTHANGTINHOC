@@ -60,7 +60,13 @@ export default function TeacherStudentsTab({
                
                <div className="flex-1 min-h-0 overflow-visible xl:overflow-y-auto p-2 space-y-1">
                   {students
-                    .filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.course?.toLowerCase().includes(studentSearch.toLowerCase()))
+                    .filter((s) => {
+                      const q = String(studentSearch || '').toLowerCase();
+                      if (!q) return true;
+                      const name = String(s.name || '').toLowerCase();
+                      const course = String(s.course || '').toLowerCase();
+                      return name.includes(q) || course.includes(q);
+                    })
                     .map(s => {
                       const sId = s._id || s.id;
                       const rowKey = s._enrollmentKey || String(sId);
@@ -69,7 +75,7 @@ export default function TeacherStudentsTab({
                       return (
                         <div
                           key={rowKey}
-                          onClick={() => setSelectedEnrollmentKey(rowKey)}
+                          onClick={() => setSelectedEnrollmentKey(s)}
                           role="button"
                           tabIndex={0}
                           className={`w-full flex items-center gap-3 p-2.5 sm:p-3 rounded-xl transition-all group cursor-pointer border ${
@@ -77,7 +83,12 @@ export default function TeacherStudentsTab({
                               ? 'bg-blue-50/60 border-blue-200 border-l-4 border-l-blue-600 shadow-sm'
                               : 'border-transparent hover:bg-slate-50 text-slate-700'
                           }`}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setSelectedEnrollmentKey(rowKey); } }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setSelectedEnrollmentKey(s);
+                            }
+                          }}
                         >
                           <div className="relative shrink-0">
                             <div className="w-10 h-10 rounded-full overflow-hidden shadow-sm bg-white border border-slate-100">

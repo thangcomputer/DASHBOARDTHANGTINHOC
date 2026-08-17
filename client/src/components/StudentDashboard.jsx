@@ -114,7 +114,14 @@ const StudentDashboard = ({ onNavigate }) => {
       teacherZalo: extractedTeacherPhone,
       attendanceHistory: student.grades || [],
       courses,
-      completedSessions: student.sessionsCompleted || (student.totalSessions - student.remainingSessions) || 0,
+      completedSessions: Number(student.completedSessions) >= 0
+        ? Number(student.completedSessions)
+        : (student.sessionsCompleted
+          || Math.max(0, (student.totalSessions || 12) - (Number(student.remainingSessions) || 0))
+          || 0),
+      remainingSessions: Number(student.remainingSessions) >= 0
+        ? Number(student.remainingSessions)
+        : Math.max(0, (student.totalSessions || 12) - (Number(student.completedSessions) || 0)),
       totalSessions: student.totalSessions || 12,
     };
   }, [student, teachers, session?.gender, session?.avatar]);
@@ -521,33 +528,103 @@ const StudentDashboard = ({ onNavigate }) => {
   const isNew = viewStudent?.completedSessions === 0;
 
   const [activeMilestone, setActiveMilestone] = useState(null);
+  const [serverMilestoneEvals, setServerMilestoneEvals] = useState([]);
+  const [milestoneEvalsReady, setMilestoneEvalsReady] = useState(false);
 
-  // Check for milestone evaluations
   useEffect(() => {
-    if (!viewStudent?.id || !viewStudent?.teacherId) return;
+    if (!STUDENT_ID) {
+      setMilestoneEvalsReady(true);
+      return undefined;
+    }
+    let cancelled = false;
+    api.evaluations.getMine().then((res) => {
+      if (cancelled) return;
+      if (res?.success && Array.isArray(res.data)) {
+        setServerMilestoneEvals(res.data);
+      }
+    }).catch(() => {}).finally(() => {
+      if (!cancelled) setMilestoneEvalsReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [STUDENT_ID]);
 
-    const done = (m) => privateEvaluations.some(
-      (e) => String(e.studentId) === String(viewStudent.id) && e.milestone === m,
+  // Popup đánh giá mốc: buổi 1 (GV) | hết khóa (trung tâm → GV trong MỘT modal)
+  useEffect(() => {
+    if (!milestoneEvalsReady) return undefined;
+    if (!viewStudent?.id || !viewStudent?.teacherId) return undefined;
+    // Đang mở modal — không schedule mở thêm (tránh popup GV trùng sau khi gửi bước trung tâm)
+    if (activeMilestone) return undefined;
+
+    const studentId = String(viewStudent.id);
+    const courseName = String(viewStudent.course || '').trim();
+    const idSet = new Set(
+      [viewStudent.id, viewStudent._id, STUDENT_ID].filter(Boolean).map((v) => String(v)),
     );
-
-    const milestones = [];
-    // Buổi đầu: đánh giá GV 1 lần
+    const matchesStudent = (e) => idSet.has(String(e?.studentId || ''));
+    const matchesCourse = (e) => {
+      const saved = String(e?.courseName || '').trim();
+      if (!courseName || !saved) return true;
+      return saved === courseName;
+    };
+    const pool = [...(privateEvaluations || []), ...serverMilestoneEvals];
+    const done = (m) => pool.some(
+      (e) => matchesStudent(e) && e.milestone === m && matchesCourse(e),
+    );
+    let next = null;
     if (Number(viewStudent.completedSessions) === 1 && !done('lesson_1')) {
-      milestones.push('lesson_1');
-    }
-    // Hết khóa: trung tâm → GV
-    const total = Number(viewStudent.totalSessions) || 12;
-    const completed = Number(viewStudent.completedSessions) || 0;
-    if (completed > 0 && completed >= total) {
-      if (!done('course_end_center')) milestones.push('course_end');
-      else if (!done('course_end_teacher')) milestones.push('course_end_teacher');
+      next = 'lesson_1';
+    } else {
+      const total = Number(viewStudent.totalSessions) || 12;
+      const completed = Number(viewStudent.completedSessions) || 0;
+      if (completed > 0 && completed >= total) {
+        const centerDone = done('course_end_center');
+        const teacherDone = done('course_end_teacher');
+        if (!centerDone || !teacherDone) {
+          next = 'course_end';
+        }
+      }
     }
 
-    if (milestones.length) {
-      setTimeout(() => setActiveMilestone(milestones[0]), 2000);
-    }
-  }, [viewStudent?.completedSessions, viewStudent?.id, viewStudent?.totalSessions, viewStudent?.teacherId, privateEvaluations]);
+    if (!next) return undefined;
+    const timer = setTimeout(() => setActiveMilestone(next), 2000);
+    return () => clearTimeout(timer);
+  }, [
+    activeMilestone,
+    milestoneEvalsReady,
+    viewStudent?.completedSessions,
+    viewStudent?.id,
+    viewStudent?._id,
+    viewStudent?.totalSessions,
+    viewStudent?.teacherId,
+    viewStudent?.course,
+    privateEvaluations,
+    serverMilestoneEvals,
+    STUDENT_ID,
+  ]);
 
+  const existingPublicRating = (teacherRatingData?.ratings || []).find(
+    (r) => String(r.studentId) === String(STUDENT_ID) && (r.criteria?.stars || r.criteria?.teaching),
+  ) || null;
+  const courseEndStartStep = (() => {
+    if (activeMilestone !== 'course_end' || !viewStudent?.id) return 'center';
+    const sid = String(viewStudent.id);
+    const idSet = new Set(
+      [viewStudent.id, viewStudent._id, STUDENT_ID].filter(Boolean).map((v) => String(v)),
+    );
+    const courseName = String(viewStudent.course || '').trim();
+    const pool = [...(privateEvaluations || []), ...serverMilestoneEvals];
+    const hasMilestone = (m) => pool.some((e) => {
+      if (!idSet.has(String(e?.studentId || '')) && String(e?.studentId || '') !== sid) return false;
+      if (e.milestone !== m) return false;
+      const saved = String(e?.courseName || '').trim();
+      if (!courseName || !saved) return true;
+      return saved === courseName;
+    });
+    const centerDone = hasMilestone('course_end_center');
+    const teacherDone = hasMilestone('course_end_teacher');
+    if (centerDone && !teacherDone) return 'teacher';
+    return 'center';
+  })();
   const myNotifs = getNotifications(STUDENT_ID, 'student').filter(n => !n.read).length;
   const myUnreadMsgs = (() => {
     try {
@@ -727,6 +804,7 @@ const StudentDashboard = ({ onNavigate }) => {
             RATING_CRITERIA={RATING_CRITERIA}
             rateTeacher={rateTeacher}
             privateEvaluations={privateEvaluations}
+            milestoneEvals={serverMilestoneEvals}
             teacherRatingData={teacherRatingData}
             setTeacherRatingData={setTeacherRatingData}
             api={api}
@@ -761,12 +839,50 @@ const StudentDashboard = ({ onNavigate }) => {
 
       {activeMilestone && (
         <MilestoneEvaluationModal
+          key={activeMilestone}
           milestone={activeMilestone}
+          startStep={activeMilestone === 'course_end' ? courseEndStartStep : undefined}
           studentId={STUDENT_ID}
           teacherId={studentData.teacherId}
+          teacherName={studentData.teacher}
           courseName={studentData.course}
           onClose={() => setActiveMilestone(null)}
-          onSubmit={submitPrivateEvaluation}
+          onSubmit={async (payload) => {
+            await submitPrivateEvaluation(payload);
+            setServerMilestoneEvals((prev) => {
+              const rest = (prev || []).filter((e) => !(
+                String(e.studentId) === String(payload.studentId)
+                && e.milestone === payload.milestone
+                && String(e.courseName || '') === String(payload.courseName || '')
+              ));
+              return [...rest, {
+                ...payload,
+                studentId: String(payload.studentId),
+                comment: payload.comment || '',
+              }];
+            });
+          }}
+          rateTeacher={rateTeacher}
+          RATING_CRITERIA={RATING_CRITERIA}
+          existingPublicRating={existingPublicRating}
+          onPublicRated={(criteria, comment) => {
+            setRatingSubmitted(true);
+            setIsEditingRating(false);
+            setRatingCriteria((prev) => ({ ...prev, ...criteria }));
+            setRatingComment(comment || '');
+            const targetTeacherId = studentData.teacherId;
+            if (!targetTeacherId || !api?.evaluations?.getByTeacher) return;
+            api.evaluations.getByTeacher(targetTeacherId).then((res) => {
+              if (res.success && res.data) {
+                const validRatings = res.data.filter((r) => r.criteria && r.criteria.stars);
+                const count = validRatings.length;
+                const avg = count > 0
+                  ? (Math.round((validRatings.reduce((s, r) => s + r.criteria.stars, 0) / count) * 10) / 10)
+                  : 0;
+                setTeacherRatingData({ avg, count, ratings: res.data });
+              }
+            }).catch(() => {});
+          }}
         />
       )}
     </div>

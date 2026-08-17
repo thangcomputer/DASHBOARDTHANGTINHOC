@@ -151,7 +151,14 @@ async function evaluateSend(subject, ctx) {
     }
     return { decision: 'DENY', reason: 'not_group_member', statusHint: 403 };
   }
-  // DM: reuse live contacts matrix
+  // DM: reuse live contacts matrix (Trợ lý AI — HV/GV only)
+  if (
+    receiverId === 'ai_support'
+    && process.env.AI_SUPPORT_ENABLED === '1'
+    && (subject.role === 'student' || subject.role === 'teacher')
+  ) {
+    return { decision: 'ALLOW', reason: 'ai_support_dm', statusHint: 200 };
+  }
   const access = ctx.dmAccess != null
     ? ctx.dmAccess
     : await assertCanDirectMessage(subject, receiverId, ctx.receiverRole);

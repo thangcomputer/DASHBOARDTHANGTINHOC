@@ -150,7 +150,8 @@ async function enrichActorIdentity(actor = {}) {
 function isOrgWideMessagingProduct(productRole) {
   return productRole === PRODUCT_ROLES.SUPPORT
     || productRole === PRODUCT_ROLES.HIGH_ADMIN
-    || productRole === PRODUCT_ROLES.SUPER_ADMIN;
+    || productRole === PRODUCT_ROLES.SUPER_ADMIN
+    || productRole === PRODUCT_ROLES.AI_SUPPORT;
 }
 
 function isSyntheticTenantKey(tenantId) {
@@ -858,8 +859,12 @@ async function canSendMessage(actor, recipientIdOrUser, clientReceiverRoleHint =
     });
   }
 
+  // Phase AI: Trợ lý ảo — không có tenant/branch; pairing đã kiểm tra HV/GV
+  const isAiSupportRecipient = resolved.recipient?.productRole === PRODUCT_ROLES.AI_SUPPORT
+    || String(resolved.recipient?.id || receiverId || '') === 'ai_support';
+
   // Phase 5.1: Tenant Policy before Branch / Pairing (private DM only)
-  if (!resolved.isBroadcast) {
+  if (!resolved.isBroadcast && !isAiSupportRecipient) {
     const actorTenantId = await resolveAuthoritativeTenantId(actorN);
     const recipientTenantId = resolved.recipient?.tenantId
       || await resolveAuthoritativeTenantId(resolved.recipient || {});

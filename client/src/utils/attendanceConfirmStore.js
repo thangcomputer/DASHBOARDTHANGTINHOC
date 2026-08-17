@@ -10,6 +10,8 @@ const listeners = new Set();
 let timeoutId = null;
 let commitHandler = null;
 let handlerTeacherId = '';
+/** Tránh flush trùng khi commit đang chạy */
+const inFlightKeys = new Set();
 
 export function attendanceConfirmKey(student) {
   return String(student?._enrollmentKey || student?._id || student?.id || '');
@@ -88,7 +90,8 @@ function scheduleNext() {
   }
   if (!commitHandler) return;
   let earliestAt = Infinity;
-  for (const item of Object.values(readMap())) {
+  for (const [key, item] of Object.entries(readMap())) {
+    if (inFlightKeys.has(key) || item?.committing) continue;
     const at = Number(item?.endsAt) || 0;
     if (at > 0 && at < earliestAt) earliestAt = at;
   }
@@ -103,9 +106,15 @@ export function flushDueAttendanceConfirms() {
   if (!commitHandler) return;
   const now = Date.now();
   const dueKeys = Object.entries(readMap())
-    .filter(([, item]) => {
+    .filter(([key, item]) => {
       if (!item || Number(item.endsAt) > now) return false;
-      if (handlerTeacherId && item.teacherId && String(item.teacherId) !== handlerTeacherId) {
+      if (inFlightKeys.has(key) || item.committing) return false;
+      // Chỉ bỏ qua nếu chắc chắn là GV khác (cùng browser đăng nhập nhiều tài khoản)
+      if (
+        handlerTeacherId
+        && item.teacherId
+        && String(item.teacherId) !== handlerTeacherId
+      ) {
         return false;
       }
       return true;
@@ -113,9 +122,24 @@ export function flushDueAttendanceConfirms() {
     .map(([key]) => key);
 
   dueKeys.forEach((key) => {
-    const taken = takeAttendanceConfirm(key);
-    if (!taken) return;
-    Promise.resolve(commitHandler(taken)).catch(() => {});
+    const item = getAttendanceConfirm(key);
+    if (!item || inFlightKeys.has(key)) return;
+    inFlightKeys.add(key);
+    // Giữ pending trong UI tới khi commit xong (tránh hiện lại ĐIỂM DANH + HỦY CA giữa chừng)
+    upsertAttendanceConfirm(key, { ...item, committing: true });
+
+    Promise.resolve(commitHandler({ ...item, committing: true, _confirmKey: key }))
+      .then(() => {
+        removeAttendanceConfirm(key);
+      })
+      .catch(() => {
+        // Fail → xóa pending để GV bấm lại Điểm danh
+        removeAttendanceConfirm(key);
+      })
+      .finally(() => {
+        inFlightKeys.delete(key);
+        scheduleNext();
+      });
   });
 }
 
@@ -162,6 +186,7 @@ export function useAttendanceConfirmFlush({ enabled, teacherId }) {
           entry.note,
           Number(entry.grade),
           entry.courseName,
+          entry.scheduleId || undefined,
         );
         toastRef.current.success('Đã điểm danh thành công!');
       } catch (err) {
@@ -170,6 +195,7 @@ export function useAttendanceConfirmFlush({ enabled, teacherId }) {
         } else {
           toastRef.current.error(err?.message || 'Lỗi khi điểm danh. Vui lòng thử lại.');
         }
+        throw err;
       }
     }, teacherId);
   }, [enabled, teacherId]);

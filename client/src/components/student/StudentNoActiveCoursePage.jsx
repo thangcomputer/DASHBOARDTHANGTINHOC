@@ -3,8 +3,8 @@ import { BookOpen, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 /**
- * Shown when student account is valid but has zero enrollment.status === 'active'.
- * Does NOT imply account disabled / banned.
+ * Shown when student account is valid but has no usable course
+ * (chỉ còn hủy / hoàn tiền / chưa thanh toán — không gồm đã hoàn thành khóa).
  */
 export default function StudentNoActiveCoursePage() {
   const navigate = useNavigate();
@@ -17,10 +17,10 @@ export default function StudentNoActiveCoursePage() {
         </div>
         <div className="space-y-2">
           <h1 className="text-xl font-black text-slate-800">
-            Bạn hiện không có khóa học đang học
+            Bạn hiện không có khóa học để tiếp tục
           </h1>
           <p className="text-sm text-slate-500 leading-relaxed">
-            Khóa học trước của bạn đã được hủy hoặc hoàn tất.
+            Khóa học trước của bạn đã được hủy hoặc hoàn tiền.
             Bạn có thể đăng ký khóa học mới để tiếp tục học.
             Tài khoản của bạn vẫn còn hiệu lực.
           </p>

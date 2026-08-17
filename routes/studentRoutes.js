@@ -550,6 +550,37 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter, policyShadowStuden
     studentDoc.requireWebcam = studentDoc.requireWebcam !== false;
     await applyEnrollmentStats(studentDoc, req.params.id, Schedule);
 
+    // Heal: nếu số lịch completed > số buổi lưu (điểm danh bù cũ bị kẹt) → ghi DB cho khớp mọi màn hình
+    try {
+      const { normCourseName } = require('../services/enrollmentService');
+      let needsPersist = false;
+      const dbEnrs = Array.isArray(student.enrollments) ? student.enrollments : [];
+      const docEnrs = Array.isArray(studentDoc.enrollments) ? studentDoc.enrollments : [];
+      docEnrs.forEach((de) => {
+        const key = normCourseName(de.courseName || de.course);
+        const dbEnr = dbEnrs.find((e) => normCourseName(e.courseName || e.course) === key);
+        const nextDone = Number(de.completedSessions) || 0;
+        const prevDone = Number(dbEnr?.completedSessions ?? student.completedSessions) || 0;
+        if (nextDone > prevDone) needsPersist = true;
+      });
+      if (needsPersist && (isAdminOrStaff || isMyTeacher)) {
+        student.enrollments = docEnrs;
+        student.courses = studentDoc.courses;
+        student.completedSessions = studentDoc.completedSessions;
+        student.remainingSessions = studentDoc.remainingSessions;
+        student.totalSessions = studentDoc.totalSessions;
+        if (studentDoc.course) student.course = studentDoc.course;
+        student.markModified('enrollments');
+        await student.save();
+      }
+    } catch (healErr) {
+      // Không chặn đọc hồ sơ nếu heal lỗi
+      try {
+        const logger = require('../config/logger');
+        logger.warn('[students/full-detail] progress heal:', healErr.message);
+      } catch (_) { /* ignore */ }
+    }
+
     res.json({
       success: true,
       data: {
@@ -1200,6 +1231,8 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     if (isStaffOrAdmin) {
       const touchCourse =
         safeBody.totalSessions != null
+        || safeBody.completedSessions != null
+        || safeBody.remainingSessions != null
         || safeBody.course != null
         || safeBody.courseId != null
         || safeBody.price != null
@@ -1221,14 +1254,44 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
           if (safeBody.teacherId !== undefined) {
             enr.teacherId = safeBody.teacherId || null;
           }
-          if (safeBody.totalSessions != null) {
-            const ts = Number(safeBody.totalSessions) > 0 ? Number(safeBody.totalSessions) : 12;
-            const completed = Number(enr.completedSessions) || Number(student.completedSessions) || 0;
-            enr.totalSessions = ts;
-            enr.remainingSessions = Math.max(0, ts - completed);
-            student.totalSessions = ts;
-            student.remainingSessions = Math.max(0, ts - completed);
+
+          const ts = Number(
+            safeBody.totalSessions != null ? safeBody.totalSessions : (enr.totalSessions || student.totalSessions || 12)
+          ) > 0
+            ? Number(safeBody.totalSessions != null ? safeBody.totalSessions : (enr.totalSessions || student.totalSessions || 12))
+            : 12;
+
+          let completed = Number(
+            safeBody.completedSessions != null
+              ? safeBody.completedSessions
+              : (enr.completedSessions ?? student.completedSessions ?? 0)
+          ) || 0;
+          completed = Math.max(0, Math.min(ts, completed));
+
+          let remaining;
+          if (safeBody.remainingSessions != null) {
+            remaining = Math.max(0, Math.min(ts, Number(safeBody.remainingSessions) || 0));
+            // Nếu admin gửi cả completed + remaining, ưu tiên khớp remaining = total - completed
+            if (safeBody.completedSessions != null) {
+              remaining = Math.max(0, ts - completed);
+            } else {
+              completed = Math.max(0, ts - remaining);
+            }
+          } else {
+            remaining = Math.max(0, ts - completed);
           }
+
+          if (safeBody.totalSessions != null
+            || safeBody.completedSessions != null
+            || safeBody.remainingSessions != null) {
+            enr.totalSessions = ts;
+            enr.completedSessions = completed;
+            enr.remainingSessions = remaining;
+            student.totalSessions = ts;
+            student.completedSessions = completed;
+            student.remainingSessions = remaining;
+          }
+
           student.markModified('enrollments');
           await student.save();
         }
@@ -2089,7 +2152,7 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
 });
 
 // ─── PUT /api/students/:id/enrollments/:enrollmentId/settings ─────────────────
-// Cập nhật quyền theo khóa: requireWebcam, examUnlocked
+// Cập nhật quyền theo khóa + (tuỳ chọn) số buổi khóa đó
 router.put('/:id/enrollments/:enrollmentId/settings', [
   authMiddleware,
   branchFilter,
@@ -2111,12 +2174,49 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
     }
 
-    const { requireWebcam, examUnlocked } = req.body || {};
+    const {
+      requireWebcam,
+      examUnlocked,
+      totalSessions,
+      completedSessions,
+      remainingSessions,
+    } = req.body || {};
     if (typeof requireWebcam === 'boolean') {
       student.enrollments[idx].requireWebcam = requireWebcam;
     }
     if (typeof examUnlocked === 'boolean') {
       student.enrollments[idx].examUnlocked = examUnlocked;
+    }
+
+    const touchSessions =
+      totalSessions != null || completedSessions != null || remainingSessions != null;
+    if (touchSessions) {
+      const enr = student.enrollments[idx];
+      const ts = Number(totalSessions != null ? totalSessions : (enr.totalSessions || 12)) > 0
+        ? Number(totalSessions != null ? totalSessions : (enr.totalSessions || 12))
+        : 12;
+      let completed = Number(
+        completedSessions != null ? completedSessions : (enr.completedSessions ?? 0)
+      ) || 0;
+      completed = Math.max(0, Math.min(ts, completed));
+      let remaining;
+      if (remainingSessions != null && completedSessions == null) {
+        remaining = Math.max(0, Math.min(ts, Number(remainingSessions) || 0));
+        completed = Math.max(0, ts - remaining);
+      } else {
+        remaining = Math.max(0, ts - completed);
+      }
+      enr.totalSessions = ts;
+      enr.completedSessions = completed;
+      enr.remainingSessions = remaining;
+
+      // Khóa chính → đồng bộ root student (list / legacy)
+      if (enr.isPrimary || student.enrollments.length === 1) {
+        student.totalSessions = ts;
+        student.completedSessions = completed;
+        student.remainingSessions = remaining;
+        if (enr.courseName) student.course = enr.courseName;
+      }
     }
 
     // Đồng bộ flag root để tương thích API cũ / danh sách
@@ -2136,7 +2236,7 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
 
     return res.json({
       success: true,
-      message: 'Đã cập nhật quyền khóa học',
+      message: touchSessions ? 'Đã cập nhật số buổi khóa học' : 'Đã cập nhật quyền khóa học',
       data: doc,
     });
   } catch (error) {

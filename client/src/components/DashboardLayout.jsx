@@ -11,13 +11,19 @@ import { useToast } from '../utils/toast';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
   Bell, LogOut, CheckCircle2, Clock, X, Lock,
-  Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu,
+  Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
 } from 'lucide-react';
 
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { getMessagingRole } from '../lib/messagingRoles';
 import StudentQuizInviteHost from './student/StudentQuizInviteHost';
+import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
+import TeacherRatingDetailModal, {
+  getEvaluationIdFromNotif,
+  isTeacherRatingNotif,
+} from './teacher/TeacherRatingDetailModal';
+import { RATING_CRITERIA } from '../context/useDataRatings';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -64,18 +70,29 @@ function resolvePageTitle(role, pathname, hash) {
 }
 
 const getNotifStyle = (type) => {
-  switch (type) {
-    case 'finance':  return { icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'Tài chính' };
-    case 'student':  
-    case 'COURSE':   return { icon: UserPlus,   color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-100',    label: 'Khóa học' };
+  switch (String(type || '').toUpperCase()) {
+    case 'FINANCE':
+      return { icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'Tài chính' };
+    case 'STUDENT':
+    case 'COURSE':
+      return { icon: UserPlus, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', label: 'Khóa học' };
     case 'SCHEDULE':
-    case 'schedule': return { icon: Calendar,   color: 'text-orange-600',  bg: 'bg-orange-50',  border: 'border-orange-100',  label: 'Lịch dạy' };
-    case 'EXAM':     return { icon: Award,      color: 'text-purple-600',  bg: 'bg-purple-50',  border: 'border-purple-100',  label: 'Thi' };
-    case 'admin':    return { icon: Zap,        color: 'text-red-600',     bg: 'bg-red-50',     border: 'border-red-100',     label: 'Admin' };
-    case 'news':     return { icon: Bell,       color: 'text-rose-600',    bg: 'bg-rose-50',    border: 'border-rose-100',    label: 'Tin tức' };
-    case 'training': return { icon: BookOpen,   color: 'text-indigo-600',  bg: 'bg-indigo-50',  border: 'border-indigo-100',  label: 'Đào tạo' };
-    case 'grade':    return { icon: Award,      color: 'text-purple-600',  bg: 'bg-purple-50',  border: 'border-purple-100',  label: 'Đánh giá' };
-    default:         return { icon: Bell,       color: 'text-gray-600',    bg: 'bg-gray-50',    border: 'border-gray-100',    label: 'Thông báo' };
+      return { icon: Calendar, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', label: 'Lịch dạy' };
+    case 'EXAM':
+      return { icon: Award, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100', label: 'Thi' };
+    case 'EVALUATION':
+    case 'GRADE':
+      return { icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', label: 'Đánh giá' };
+    case 'ADMIN':
+      return { icon: Zap, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100', label: 'Admin' };
+    case 'SYSTEM':
+      return { icon: Zap, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100', label: 'Hệ thống' };
+    case 'NEWS':
+      return { icon: Bell, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', label: 'Tin tức' };
+    case 'TRAINING':
+      return { icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100', label: 'Đào tạo' };
+    default:
+      return { icon: Bell, color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-100', label: 'Thông báo' };
   }
 };
 
@@ -105,6 +122,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const location = useLocation();
   const toast = useToast();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [ratingDetail, setRatingDetail] = useState(null);
+  const [ratingDetailLoading, setRatingDetailLoading] = useState(false);
+  const [ratingDetailError, setRatingDetailError] = useState('');
   const { socket } = useSocket() || {};
   const { students, teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead, getConversations } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
@@ -113,6 +133,57 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     enabled: role === 'teacher',
     teacherId: myId,
   });
+
+  const openTeacherRatingDetail = async (notifOrIds = {}) => {
+    const evaluationId = notifOrIds.evaluationId
+      || getEvaluationIdFromNotif(notifOrIds)
+      || null;
+    const studentId = notifOrIds.studentId || notifOrIds.payload?.studentId || null;
+    const teacherId = myId;
+    if (!teacherId) return;
+
+    setRatingDetailLoading(true);
+    setRatingDetailError('');
+    setRatingDetail(null);
+    try {
+      const res = await api.evaluations.getByTeacher(teacherId);
+      const list = (res?.success && Array.isArray(res.data)) ? res.data : [];
+      const found = list.find((e) => String(e.id || e._id) === String(evaluationId))
+        || list.find((e) => studentId && String(e.studentId) === String(studentId))
+        || (list.length === 1 ? list[0] : null);
+      if (!found) {
+        setRatingDetailError('Không tìm thấy nội dung đánh giá.');
+      } else {
+        setRatingDetail(found);
+      }
+    } catch {
+      setRatingDetailError('Không tải được đánh giá. Thử lại sau.');
+    } finally {
+      setRatingDetailLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const onOpen = (e) => {
+      openTeacherRatingDetail(e.detail || {});
+    };
+    window.addEventListener('open-teacher-rating', onOpen);
+    return () => window.removeEventListener('open-teacher-rating', onOpen);
+  }, [myId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Deep-link ?evaluationId= từ thông báo
+  useEffect(() => {
+    if (role !== 'teacher' || !myId) return;
+    try {
+      const params = new URLSearchParams(location.search || '');
+      const evaluationId = params.get('evaluationId');
+      if (!evaluationId) return;
+      openTeacherRatingDetail({ evaluationId });
+      params.delete('evaluationId');
+      const next = params.toString();
+      navigate({ pathname: location.pathname, search: next ? `?${next}` : '', hash: location.hash }, { replace: true });
+    } catch { /* ignore */ }
+  }, [role, myId, location.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     document.documentElement.classList.add('cms-app-shell');
@@ -229,6 +300,94 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }, 500);
     return () => clearTimeout(timer);
   }, [session?.isFirstLogin, role]);
+
+  const [showWelcomeCelebration, setShowWelcomeCelebration] = useState(false);
+  const welcomeMarkedRef = React.useRef(false);
+  const [courseCelebration, setCourseCelebration] = useState(null);
+  const courseCelebrationTimerRef = React.useRef(null);
+
+  const queueCourseCelebration = React.useCallback((raw) => {
+    if (!raw) return;
+    if (courseCelebrationTimerRef.current) {
+      clearTimeout(courseCelebrationTimerRef.current);
+      courseCelebrationTimerRef.current = null;
+    }
+    const payload = {
+      courseName: raw.courseName || raw.course || 'khóa học',
+      enrollmentId: raw.enrollmentId || null,
+      completedSessions: raw.completedSessions,
+      totalRequired: raw.totalRequired,
+      showAfter: raw.showAfter || null,
+    };
+    const afterMs = payload.showAfter ? new Date(payload.showAfter).getTime() : 0;
+    const delay = Number.isFinite(afterMs) ? Math.max(0, afterMs - Date.now()) : 0;
+    if (delay <= 0) {
+      setCourseCelebration(payload);
+      return;
+    }
+    courseCelebrationTimerRef.current = setTimeout(() => {
+      courseCelebrationTimerRef.current = null;
+      setCourseCelebration(payload);
+    }, delay);
+  }, []);
+
+  useEffect(() => () => {
+    if (courseCelebrationTimerRef.current) clearTimeout(courseCelebrationTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (role !== 'student' && role !== 'teacher') return;
+    if (session?.showWelcomeCelebration !== true) return;
+    setShowWelcomeCelebration(true);
+  }, [role, session?.showWelcomeCelebration, session?.id, session?._id]);
+
+  useEffect(() => {
+    if (role !== 'student') return;
+    const pending = session?.pendingCourseCelebration;
+    if (!pending?.courseName && !pending?.enrollmentId) return;
+    if (showWelcomeCelebration) return;
+    queueCourseCelebration(pending);
+  }, [role, session?.pendingCourseCelebration, showWelcomeCelebration, session?.id, session?._id, queueCourseCelebration]);
+
+  useEffect(() => {
+    if (!socket || role !== 'student') return undefined;
+    const onCourseCelebration = (payload) => {
+      if (!payload) return;
+      if (String(payload.studentId || '') && myId && String(payload.studentId) !== myId) return;
+      queueCourseCelebration(payload);
+    };
+    socket.on('course:celebration', onCourseCelebration);
+    return () => { socket.off('course:celebration', onCourseCelebration); };
+  }, [socket, role, myId, queueCourseCelebration]);
+
+  const dismissWelcomeCelebration = React.useCallback(async () => {
+    setShowWelcomeCelebration(false);
+    if (welcomeMarkedRef.current) return;
+    welcomeMarkedRef.current = true;
+    try {
+      await api.auth.markWelcomeCelebrationSeen();
+      const key = role === 'staff' ? 'staff' : role;
+      const stored = JSON.parse(localStorage.getItem(`${key}_user`) || '{}');
+      localStorage.setItem(`${key}_user`, JSON.stringify({ ...stored, showWelcomeCelebration: false }));
+    } catch {
+      welcomeMarkedRef.current = false;
+    }
+  }, [role]);
+
+  const dismissCourseCelebration = React.useCallback(async () => {
+    const current = courseCelebration;
+    setCourseCelebration(null);
+    if (!current) return;
+    try {
+      await api.auth.markCourseCelebrationSeen({
+        enrollmentId: current?.enrollmentId,
+        courseName: current?.courseName,
+      });
+      const key = 'student';
+      const stored = JSON.parse(localStorage.getItem(`${key}_user`) || '{}');
+      localStorage.setItem(`${key}_user`, JSON.stringify({ ...stored, pendingCourseCelebration: null }));
+    } catch { /* lần sau /me sẽ hiện lại nếu chưa lưu */ }
+  }, [courseCelebration]);
 
   const handleLogout = () => onLogout?.();
 
@@ -446,6 +605,22 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
       {role === 'student' ? <StudentQuizInviteHost /> : null}
 
+      <WelcomeCelebrationOverlay
+        open={showWelcomeCelebration}
+        role={role}
+        name={displayName || session?.name || ''}
+        variant="welcome"
+        onClose={dismissWelcomeCelebration}
+      />
+      <WelcomeCelebrationOverlay
+        open={!showWelcomeCelebration && !!courseCelebration}
+        role="student"
+        name={displayName || session?.name || ''}
+        variant="course_complete"
+        courseName={courseCelebration?.courseName || ''}
+        onClose={dismissCourseCelebration}
+      />
+
       {showNotif && typeof document !== 'undefined' && createPortal(
         <>
           <div
@@ -511,6 +686,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               const p = n.path || `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`;
                               navigate(p.includes('#') ? p : `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`);
                             }
+                          } else if (role === 'teacher' && isTeacherRatingNotif(n)) {
+                            openTeacherRatingDetail({
+                              evaluationId: getEvaluationIdFromNotif(n),
+                              studentId: n.payload?.studentId,
+                              ...n,
+                            });
+                          } else if (
+                            (role === 'admin' || role === 'staff')
+                            && (n.payload?.kind === 'admin_feedback'
+                              || String(n.type || '').toUpperCase() === 'EVALUATION')
+                          ) {
+                            navigate('/admin#evaluations');
                           } else if (n.path) {
                             let targetPath = n.path;
 
@@ -529,7 +716,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
                             }
 
-                            navigate(targetPath);
+                            // /teacher?evaluationId=… → mở popup thay vì chỉ về trang chủ
+                            if (role === 'teacher' && String(targetPath).includes('evaluationId=')) {
+                              openTeacherRatingDetail({ path: targetPath, payload: n.payload });
+                            } else {
+                              navigate(targetPath);
+                            }
                           }
                           setShowNotif(false);
                         }}
@@ -577,6 +769,21 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       )}
 
       <ChangePasswordModal session={session} role={role} />
+
+      {(ratingDetailLoading || ratingDetail || ratingDetailError) && role === 'teacher' ? (
+        <TeacherRatingDetailModal
+          rating={ratingDetail}
+          loading={ratingDetailLoading}
+          error={ratingDetailError}
+          students={students}
+          criteriaConfig={RATING_CRITERIA}
+          onClose={() => {
+            setRatingDetail(null);
+            setRatingDetailError('');
+            setRatingDetailLoading(false);
+          }}
+        />
+      ) : null}
 
       {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
       <FloatingMessenger session={session} role={role} />

@@ -749,6 +749,19 @@ export const authAPI = {
     return res.json();
   },
 
+  markWelcomeCelebrationSeen: async () => {
+    const res = await apiFetch('/auth/welcome-celebration/seen', { method: 'POST' });
+    return res.json();
+  },
+
+  markCourseCelebrationSeen: async ({ enrollmentId, courseName } = {}) => {
+    const res = await apiFetch('/auth/course-celebration/seen', {
+      method: 'POST',
+      body: JSON.stringify({ enrollmentId, courseName }),
+    });
+    return res.json();
+  },
+
   resetPasswordRequest: async (phone, zalo, role) => {
     const res = await apiFetch('/auth/reset-password-request', {
       method: 'POST',
@@ -1037,6 +1050,74 @@ export const staffAPI = {
   },
 };
 
+// ─── AI SUPPORT API ─────────────────────────────────────────────────────────
+export const aiSupportAPI = {
+  status: async () => {
+    const res = await apiFetch('/ai-support/status');
+    return res.json();
+  },
+  open: async () => {
+    const res = await apiFetch('/ai-support/open', { method: 'POST', body: '{}' });
+    return res.json();
+  },
+  escalate: async (conversationId) => {
+    const res = await apiFetch('/ai-support/escalate', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId }),
+    });
+    return res.json();
+  },
+  reset: async (conversationId) => {
+    const res = await apiFetch('/ai-support/reset', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId }),
+    });
+    return res.json();
+  },
+  clearHistory: async () => {
+    const res = await apiFetch('/ai-support/clear-history', { method: 'POST', body: '{}' });
+    return res.json();
+  },
+  queue: async () => {
+    const res = await apiFetch('/ai-support/queue');
+    return res.json();
+  },
+  thread: async (conversationId) => {
+    const res = await apiFetch(`/ai-support/thread/${encodeURIComponent(conversationId)}`);
+    return res.json();
+  },
+  claim: async (conversationId) => {
+    const res = await apiFetch('/ai-support/claim', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId }),
+    });
+    return res.json();
+  },
+  resolve: async (conversationId) => {
+    const res = await apiFetch('/ai-support/resolve', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId }),
+    });
+    return res.json();
+  },
+  reply: async (conversationId, contentOrOpts) => {
+    const opts = typeof contentOrOpts === 'string'
+      ? { content: contentOrOpts }
+      : (contentOrOpts || {});
+    const res = await apiFetch('/ai-support/reply', {
+      method: 'POST',
+      body: JSON.stringify({
+        conversationId,
+        content: opts.content || '',
+        fileUrl: opts.fileUrl || '',
+        fileName: opts.fileName || '',
+        messageType: opts.messageType || 'text',
+      }),
+    });
+    return res.json();
+  },
+};
+
 // ─── MESSAGE API ────────────────────────────────────────────────────────────
 export const messagesAPI = {
   getContacts: async () => {
@@ -1186,6 +1267,10 @@ export const evaluationsAPI = {
   },
   getByTeacher: async (teacherId) => {
     const res = await apiFetch(`/evaluations/teacher/${encodeURIComponent(teacherId)}`);
+    return res.json();
+  },
+  getMine: async () => {
+    const res = await apiFetch('/evaluations/mine');
     return res.json();
   },
   submit: async (data) => {
@@ -2107,6 +2192,7 @@ export default {
   backups:       backupsAPI,
   monitoring:    monitoringAPI,
   ai:            aiAPI,
+  aiSupport:     aiSupportAPI,
   bi:            biAPI,
   finance:       financeAPI,
   workflows:     workflowsAPI,

@@ -57,6 +57,9 @@ const systemSettingsSchema = new mongoose.Schema({
   /** Thời gian làm bài tự luận / thực hành theo môn (phút) */
   studentEssayExamMinutesRaw: { type: mongoose.Schema.Types.Mixed },
 
+  /** Bắt buộc phần tự luận theo môn: { [subjectId]: true|false }. Mặc định true. */
+  studentEssayRequiredRaw: { type: mongoose.Schema.Types.Mixed },
+
   /** Đề thực hành / tự luận theo môn: { [subjectId]: { fileUrl, fileName, fileType } } */
   studentExamFilesRaw: { type: mongoose.Schema.Types.Mixed, default: {} },
 

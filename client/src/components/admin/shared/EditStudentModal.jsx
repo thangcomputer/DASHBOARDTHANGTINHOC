@@ -32,10 +32,34 @@ const blockWheelOnNumber = (e) => {
   e.stopPropagation();
 };
 
+function clampSessions(total, completed, remaining) {
+  const t = Math.max(0, Number(total) || 0);
+  let c = Math.max(0, Number(completed) || 0);
+  let r = remaining;
+  if (r == null || r === '') {
+    r = Math.max(0, t - c);
+  } else {
+    r = Math.max(0, Number(r) || 0);
+  }
+  if (t > 0 && c > t) c = t;
+  if (t > 0 && r > t) r = t;
+  if (t > 0 && c + r !== t) {
+    // Prefer completed as source of truth when both conflict
+    r = Math.max(0, t - c);
+  }
+  return { totalSessions: t || 12, completedSessions: c, remainingSessions: r };
+}
+
 export default function EditStudentModal({ student, onSave, onClose, teachers, onResetPassword }) {
   const toast = useToast();
   const API = import.meta.env.VITE_API_URL || '';
   const { isSuperAdmin, branches } = useBranch();
+
+  const initialTotal = Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12;
+  const initialCompleted = Math.max(0, Number(student.completedSessions) || 0);
+  const initialRemaining = student.remainingSessions != null && student.remainingSessions !== ''
+    ? Math.max(0, Number(student.remainingSessions) || 0)
+    : Math.max(0, initialTotal - initialCompleted);
 
   const [dbCourses, setDbCourses] = useState([]);
   const [form, setForm] = useState(() => ({
@@ -46,7 +70,9 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
     courseId: student.courseId ? String(student.courseId._id || student.courseId) : '',
     course: student.course || '',
     price: student.price || 0,
-    totalSessions: student.totalSessions || 12,
+    totalSessions: initialTotal,
+    completedSessions: initialCompleted,
+    remainingSessions: initialRemaining,
     paid: !!student.paid,
     teacherId: normalizeTeacherId(student.teacherId),
     learningMode: student.learningMode || 'OFFLINE',
@@ -57,13 +83,22 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
 
   const applyCourse = useCallback((c, syncSessions = true) => {
     if (!c) return;
-    setForm((f) => ({
-      ...f,
-      courseId: String(c._id),
-      course: c.name,
-      price: courseEffectivePrice(c),
-      ...(syncSessions ? { totalSessions: courseDefaultSessions(c) } : {}),
-    }));
+    setForm((f) => {
+      const next = {
+        ...f,
+        courseId: String(c._id),
+        course: c.name,
+        price: courseEffectivePrice(c),
+      };
+      if (syncSessions) {
+        const total = courseDefaultSessions(c);
+        const completed = Math.min(Number(f.completedSessions) || 0, total);
+        next.totalSessions = total;
+        next.completedSessions = completed;
+        next.remainingSessions = Math.max(0, total - completed);
+      }
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -75,13 +110,12 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
         setForm((f) => {
           const matched = findCourse(res.data, f.courseId || f.course);
           if (!matched) return f;
-          // Đồng bộ học phí + số buổi theo catalog khi mở form (tránh giữ 12 buổi cũ)
+          // Chỉ gắn courseId/name — giữ số buổi thủ công đã có trên HV
           return {
             ...f,
             courseId: String(matched._id),
-            course: matched.name,
-            price: courseEffectivePrice(matched),
-            totalSessions: courseDefaultSessions(matched),
+            course: matched.name || f.course,
+            price: f.price || courseEffectivePrice(matched),
           };
         });
       })
@@ -91,6 +125,44 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
   const handleCourseSelect = (e) => {
     const c = findCourse(dbCourses, e.target.value);
     if (c) applyCourse(c, true);
+  };
+
+  const setSessionField = (field, rawDigits) => {
+    const num = rawDigits === '' ? '' : Number(rawDigits);
+    setForm((f) => {
+      if (num === '') {
+        return { ...f, [field]: '' };
+      }
+      if (field === 'remainingSessions') {
+        const t = Math.max(1, Number(f.totalSessions) || 12);
+        const r = Math.max(0, Math.min(t, Number(num) || 0));
+        return {
+          ...f,
+          totalSessions: t,
+          remainingSessions: r,
+          completedSessions: Math.max(0, t - r),
+        };
+      }
+      if (field === 'completedSessions') {
+        const t = Math.max(1, Number(f.totalSessions) || 12);
+        const c = Math.max(0, Math.min(t, Number(num) || 0));
+        return {
+          ...f,
+          totalSessions: t,
+          completedSessions: c,
+          remainingSessions: Math.max(0, t - c),
+        };
+      }
+      // totalSessions
+      const t = Math.max(1, Number(num) || 12);
+      const c = Math.max(0, Math.min(t, Number(f.completedSessions) || 0));
+      return {
+        ...f,
+        totalSessions: t,
+        completedSessions: c,
+        remainingSessions: Math.max(0, t - c),
+      };
+    });
   };
 
   const handleChange = (e) => {
@@ -110,9 +182,14 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
       return;
     }
 
-    if (name === 'age' || name === 'price' || name === 'totalSessions') {
+    if (name === 'age' || name === 'price') {
       const digits = value.replace(/\D/g, '');
       setForm((f) => ({ ...f, [name]: digits === '' ? '' : Number(digits) }));
+      return;
+    }
+
+    if (name === 'totalSessions' || name === 'completedSessions' || name === 'remainingSessions') {
+      setSessionField(name, value.replace(/\D/g, ''));
       return;
     }
 
@@ -125,14 +202,11 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
       toast.error('Vui lòng nhập họ tên và số điện thoại!');
       return;
     }
+    const sessions = clampSessions(form.totalSessions, form.completedSessions, form.remainingSessions);
     onSave({
       ...student,
       ...form,
-      totalSessions: Number(form.totalSessions) || 12,
-      remainingSessions: Math.max(
-        0,
-        (Number(form.totalSessions) || 12) - (Number(student.completedSessions) || 0)
-      ),
+      ...sessions,
       price: Number(form.price) || 0,
       studentExamUnlocked,
     });
@@ -294,6 +368,36 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
                   )}
                 </div>
               </div>
+
+              <div className="cms-form-row mt-3">
+                <div>
+                  <label className="cms-label">Đã học (buổi)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    name="completedSessions"
+                    value={form.completedSessions}
+                    onChange={handleChange}
+                    onWheel={blockWheelOnNumber}
+                    className="cms-input font-mono text-amber-700"
+                  />
+                </div>
+                <div>
+                  <label className="cms-label">Còn lại (buổi)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    name="remainingSessions"
+                    value={form.remainingSessions}
+                    onChange={handleChange}
+                    onWheel={blockWheelOnNumber}
+                    className="cms-input font-mono text-emerald-700"
+                  />
+                </div>
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                Sửa thủ công tiến độ: đổi “Đã học” hoặc “Còn lại” sẽ tự khớp với tổng số buổi.
+              </p>
             </div>
 
             <div>

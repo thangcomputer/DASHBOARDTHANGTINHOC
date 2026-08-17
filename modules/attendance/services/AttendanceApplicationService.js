@@ -141,29 +141,45 @@ async function notifyAttendanceTaken(io, {
   );
   return { completedSessions, totalRequired, courseLabel, name };
 }
-/** Thông báo HV hoàn thành khóa (HV + Admin). */
+/** Thông báo HV hoàn thành khóa (HV + Admin) + socket pháo hoa. */
 async function notifyCourseCompleted(io, {
-  studentId, studentName, courseName, completedSessions, totalRequired,
+  studentId, studentName, courseName, completedSessions, totalRequired, enrollmentId,
 }) {
   if (!io || !studentId) return;
+  const NotificationService = require('../../notification/services/NotificationService');
+  const {
+    resolveCelebrationShowAfter,
+    emitCourseCelebrationSocket,
+  } = require('../../../services/courseCelebration');
   const name = studentName || 'Học viên';
   const course = courseName || 'khóa học';
   const progress = `${completedSessions}/${totalRequired}`;
+  const showAfter = await resolveCelebrationShowAfter(studentId, course);
+  const payload = {
+    studentId: String(studentId),
+    course,
+    courseName: course,
+    completedSessions,
+    totalRequired,
+    enrollmentId: enrollmentId ? String(enrollmentId) : null,
+    showAfter,
+  };
   await NotificationService.send(io, {
     type: 'COURSE',
     title: '🎓 Hoàn thành khóa học',
     content: `Chúc mừng! Bạn đã hoàn thành khóa ${course} (${progress} buổi).`,
     receivers: String(studentId),
-    payload: { studentId: String(studentId), course, completedSessions, totalRequired },
+    payload,
     link: '/student',
   });
   await NotificationService.notifyAdmins(
     io,
     '🎓 Học viên hoàn thành khóa',
     `HV ${name} đã hoàn thành khóa ${course} (${progress} buổi).`,
-    { studentId: String(studentId), course, completedSessions, totalRequired },
+    payload,
     '/admin/students',
   );
+  emitCourseCelebrationSocket(io, payload);
 }
 // ─── Helper: Kiểm tra và tự động Unlock Thi cho Học Viên ─────────────────────
 // Workflow 2: Đếm buổi hoàn thành theo từng khóa → set enrollment.examUnlocked
@@ -189,7 +205,10 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
       if (!justUnlocked && !justCompleted) return;
       const statusPatch = {};
       if (justUnlocked) statusPatch.studentExamUnlocked = true;
-      if (justCompleted) statusPatch.status = 'Hoàn thành';
+      if (justCompleted) {
+        statusPatch.status = 'Hoàn thành';
+        statusPatch.courseCelebrationSeen = false;
+      }
       if (Object.keys(statusPatch).length) {
         await Student.findByIdAndUpdate(studentId, statusPatch);
       }
@@ -246,8 +265,14 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
       }
       if (!wasCompleted) {
         student.enrollments[i].status = 'completed';
+        student.enrollments[i].courseCelebrationSeen = false;
         changed = true;
-        completedCourses.push({ courseName, completedSessions, totalRequired });
+        completedCourses.push({
+          courseName,
+          completedSessions,
+          totalRequired,
+          enrollmentId: student.enrollments[i]._id,
+        });
       }
       logger.info(`✅ [SCHEDULE] Unlock thi khóa "${courseName}" cho HV: ${student.name} (${completedSessions}/${totalRequired} buổi)`);
     }
@@ -282,6 +307,7 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
           courseName: c.courseName || student.course,
           completedSessions: c.completedSessions,
           totalRequired: c.totalRequired,
+          enrollmentId: c.enrollmentId,
         });
       }
       io.emit('data:refresh', { type: 'student', id: student._id });

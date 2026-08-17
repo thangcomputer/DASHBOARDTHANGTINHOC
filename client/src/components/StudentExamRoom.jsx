@@ -92,6 +92,9 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
   };
 
   const thucHanhDisplay = () => {
+    if (subject.status === 'dat' && subject.thucHanh !== 'da_nop') {
+      return <span className="text-sm text-slate-400">Không yêu cầu</span>;
+    }
     if (subject.thucHanh === 'da_nop') {
       if (subject.essayScore !== null && subject.essayScore !== undefined) {
         return (

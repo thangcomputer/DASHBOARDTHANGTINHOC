@@ -9,7 +9,7 @@ class EvaluationApplicationService {
   async get_admin(data) {
   try {
     if (data.currentUser.role !== 'admin' && data.currentUser.role !== 'staff') {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền truy cập' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền truy cập' } };
     }
 
     const evals = await evaluationRepository.findMany({ type: 'admin_feedback' }).sort({ updatedAt: -1, createdAt: -1 });
@@ -28,9 +28,9 @@ class EvaluationApplicationService {
       id: e._id,
       date: new Date(e.createdAt || e.updatedAt).toLocaleDateString('vi-VN')
     }));
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: 'Lỗi server' } };
   }
 }
 
@@ -52,29 +52,53 @@ class EvaluationApplicationService {
       id: e._id,
       date: new Date(e.createdAt || e.updatedAt).toLocaleDateString('vi-VN')
     }));
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: 'Lỗi server' } };
   }
 }
 
   async post_root(data) {
   try {
-    const { studentId, targetTeacherId, courseId, type, criteria, content, studentName, teacherName, courseName, milestone } = data.body;
+    const { studentId, targetTeacherId, courseId, type, criteria, content, studentName, teacherName, courseName, milestone, finalizeCourseEnd } = data.body;
     
     // Authorization: Học viên chỉ gửi đánh giá cho chính mình
     if (data.currentUser.role === 'student' && String(data.currentUser.id) !== String(studentId)) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền gửi đánh giá thay người khác' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền gửi đánh giá thay người khác' } };
     }
 
     let evalDoc = null;
+    let isUpdate = false;
     if (type === 'teacher_rating') {
       evalDoc = await evaluationRepository.findOne({ studentId, targetTeacherId, type: 'teacher_rating' });
+      // Khóa sau lần gửi cuối khóa. Popup cuối khóa gửi finalizeCourseEnd = lần sửa cuối được phép.
+      const allowFinalEdit = Boolean(finalizeCourseEnd);
+      if (!allowFinalEdit) {
+        const finalQ = {
+          studentId,
+          type: 'admin_feedback',
+          milestone: 'course_end_teacher',
+        };
+        if (courseName) finalQ.courseName = courseName;
+        const finalized = await evaluationRepository.findOne(finalQ);
+        if (finalized) {
+          return {
+            _status: 409,
+            _body: {
+              success: false,
+              code: 'TEACHER_RATING_LOCKED',
+              message: 'Bạn đã hoàn tất đánh giá cuối khóa. Không thể sửa hoặc gửi lại đánh giá giảng viên.',
+              data: evalDoc || null,
+            },
+          };
+        }
+      }
     } else if (type === 'admin_feedback') {
       evalDoc = await evaluationRepository.findOne({ studentId, courseName, milestone, type: 'admin_feedback' });
     }
 
     if (evalDoc) {
+      isUpdate = true;
       if (criteria !== undefined) evalDoc.criteria = criteria;
       if (content !== undefined) evalDoc.content = content;
       if (studentName !== undefined) evalDoc.studentName = studentName;
@@ -129,46 +153,60 @@ class EvaluationApplicationService {
         // Notify Teacher
         if (targetTeacherId && targetTeacherId !== 'current') {
            const NotificationService = require('../../notification/services/NotificationService');
+           const evalId = String(evalDoc._id || evalDoc.id);
+           const stars = evalDoc?.criteria?.stars;
+           const hvLabel = studentInfo?.name || 'Vô danh';
+           const starsBit = stars != null ? ` ${stars}/5 sao` : '';
            await NotificationService.send(io, {
              type: 'EVALUATION',
-             title: '⭐ Đánh giá mới từ học viên',
-             content: `Học viên ${studentInfo?.name || 'Vô danh'} đã đánh giá bạn.`,
+             title: isUpdate
+               ? '⭐ Học viên cập nhật lại đánh giá'
+               : '⭐ Đánh giá mới từ học viên',
+             content: isUpdate
+               ? `Học viên ${hvLabel} đã cập nhật lại đánh giá${starsBit}.`
+               : `Học viên ${hvLabel} đã đánh giá bạn${starsBit}.`,
              receivers: targetTeacherId.toString(),
-             payload: { evaluationId: evalDoc._id },
-             link: '/teacher'
+             payload: {
+               kind: 'teacher_rating',
+               evaluationId: evalId,
+               studentId: String(studentId),
+               stars: stars ?? null,
+               isUpdate: !!isUpdate,
+             },
+             link: `/teacher?evaluationId=${encodeURIComponent(evalId)}`,
            });
            
            io.emit('data:refresh', { type: 'evaluation', targetId: targetTeacherId });
         }
       }
     }
-    return { _status: 200, _body: ({ success: true, data: evalDoc });
+    return { _status: 200, _body: { success: true, data: evalDoc, meta: { isUpdate: !!isUpdate } } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: 'Lỗi server' } };
   }
 }
 
   async post_id_read(data) {
   try {
     if (data.currentUser.role !== 'admin' && data.currentUser.role !== 'staff' && data.currentUser.role !== 'teacher') {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền' } };
     }
 
     const ev = await evaluationRepository.findById(data.id);
-    if (!ev) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy đánh giá' });
+    if (!ev) return { _status: 404, _body: { success: false, message: 'Không tìm thấy đánh giá' } };
     
     // Authorization: GV chỉ được đánh dấu đã đọc đánh giá của mình
     if (data.currentUser.role === 'teacher' && String(ev.targetTeacherId) !== String(data.currentUser.id)) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền' } };
     }
 
     ev.read = true;
     ev.isReadByAdmin = (data.currentUser.role === 'admin' || data.currentUser.role === 'staff');
     await ev.save();
     
-    return { _status: 200, _body: ({ success: true, message: 'Đã đánh dấu đã xem' });
+    return { _status: 200, _body: { success: true, message: 'Đã đánh dấu đã xem' } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: 'Lỗi server' } };
   }
 }
 

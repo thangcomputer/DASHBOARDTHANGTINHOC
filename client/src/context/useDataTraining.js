@@ -6,17 +6,20 @@ import {
   loadInitialStudentQuestions,
   loadInitialStudentExamMinutes,
   loadInitialStudentEssayExamMinutes,
+  loadInitialStudentEssayRequired,
   INITIAL_TRAINING,
   STUDENT_QUESTIONS_KEY,
   HV_QUESTIONS_LEGACY_SEED,
   STUDENT_EXAM_MINUTES_KEY,
   STUDENT_ESSAY_EXAM_MINUTES_KEY,
+  STUDENT_ESSAY_REQUIRED_KEY,
   STUDENT_EXAM_FILES_KEY,
   TEACHER_EXAM_TIME_LIMIT_KEY,
   TEACHER_EXAM_MINUTES_KEY,
   TEACHER_ESSAY_EXAM_MINUTES_KEY,
   DEFAULT_STUDENT_EXAM_MINUTES,
   DEFAULT_STUDENT_ESSAY_EXAM_MINUTES,
+  DEFAULT_STUDENT_ESSAY_REQUIRED,
   DEFAULT_TEACHER_EXAM_MINUTES,
   DEFAULT_TEACHER_ESSAY_EXAM_MINUTES,
   loadInitialTeacherExamMinutes,
@@ -47,6 +50,7 @@ export function useDataTraining(currentUser) {
   const [studentQuestions, setStudentQuestions] = useState([]);
   const [studentExamMinutes, setStudentExamMinutes] = useState(loadInitialStudentExamMinutes);
   const [studentEssayExamMinutes, setStudentEssayExamMinutes] = useState(loadInitialStudentEssayExamMinutes);
+  const [studentEssayRequired, setStudentEssayRequired] = useState(loadInitialStudentEssayRequired);
   const [studentExamFiles, setStudentExamFiles] = useState(() => loadState(STUDENT_EXAM_FILES_KEY, {}));
   const [examWarningSoundUrl, setExamWarningSoundUrl] = useState('');
   const [studentExamBankHydrated, setStudentExamBankHydrated] = useState(false);
@@ -89,6 +93,18 @@ export function useDataTraining(currentUser) {
         for (const k of Object.keys(d.studentEssayExamMinutes)) {
           const n = Number(d.studentEssayExamMinutes[k]);
           if (Number.isFinite(n) && n >= 1 && n <= 600) next[k] = Math.round(n);
+        }
+        return next;
+      });
+    }
+    if (d.studentEssayRequired && typeof d.studentEssayRequired === 'object') {
+      setStudentEssayRequired(() => {
+        const next = { ...DEFAULT_STUDENT_ESSAY_REQUIRED };
+        for (const k of Object.keys(d.studentEssayRequired)) {
+          const v = d.studentEssayRequired[k];
+          if (v === true || v === false) next[k] = v;
+          else if (v === 1 || v === '1' || String(v).toLowerCase() === 'true') next[k] = true;
+          else if (v === 0 || v === '0' || String(v).toLowerCase() === 'false') next[k] = false;
         }
         return next;
       });
@@ -248,13 +264,14 @@ export function useDataTraining(currentUser) {
           studentQuestions,
           studentExamMinutes,
           studentEssayExamMinutes,
+          studentEssayRequired,
           studentExamFiles,
           examWarningSoundUrl,
         })
         .catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentExamFiles, examWarningSoundUrl, currentUser?.role, studentExamBankHydrated]);
+  }, [studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, studentExamFiles, examWarningSoundUrl, currentUser?.role, studentExamBankHydrated]);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'teacher') return;
@@ -320,6 +337,9 @@ export function useDataTraining(currentUser) {
   useEffect(() => {
     localStorage.setItem(STUDENT_ESSAY_EXAM_MINUTES_KEY, JSON.stringify(studentEssayExamMinutes));
   }, [studentEssayExamMinutes]);
+  useEffect(() => {
+    localStorage.setItem(STUDENT_ESSAY_REQUIRED_KEY, JSON.stringify(studentEssayRequired));
+  }, [studentEssayRequired]);
   useEffect(() => { localStorage.setItem(STUDENT_EXAM_FILES_KEY, JSON.stringify(studentExamFiles)); }, [studentExamFiles]);
 
   const addStudentTrainingItem = useCallback((category, item) => {
@@ -620,6 +640,19 @@ export function useDataTraining(currentUser) {
     });
   }, []);
 
+  const updateStudentEssayRequired = useCallback((patch) => {
+    if (!patch || typeof patch !== 'object') return;
+    setStudentEssayRequired((prev) => {
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === true || v === false) next[k] = v;
+        else if (v === 1 || v === '1' || String(v).toLowerCase() === 'true') next[k] = true;
+        else if (v === 0 || v === '0' || String(v).toLowerCase() === 'false') next[k] = false;
+      }
+      return next;
+    });
+  }, []);
+
   const setStudentExamFile = useCallback((subjectId, fileMeta) => {
     const sid = String(subjectId || '').trim();
     if (!sid) return;
@@ -668,6 +701,8 @@ export function useDataTraining(currentUser) {
     updateStudentExamMinutes,
     studentEssayExamMinutes,
     updateStudentEssayExamMinutes,
+    studentEssayRequired,
+    updateStudentEssayRequired,
     studentExamFiles,
     setStudentExamFile,
     examWarningSoundUrl,

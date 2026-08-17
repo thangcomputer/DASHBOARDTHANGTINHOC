@@ -10,7 +10,7 @@ import { expandStudentsForTeacher, sumClientPaidTuition } from '../utils/enrollm
 export function useDataAdminCrud({
   students, setStudents, teachers, setTeachers, transactions, setTransactions,
   triggerBackgroundSync, addNotification,
-  fetchStudentsPaginated, studentsPagination, currentUser,
+  refreshStudents,
 }) {
   const [examResults, setExamResults] = useState(() => loadState('thvp_examResults', []));
 
@@ -177,6 +177,11 @@ export function useDataAdminCrud({
     // 1. Unassign logic
     if (!teacherId || teacherId === '') {
       const previousStudents = [...students];
+      const enrIdMatch = (e) => {
+        if (!enrollmentId) return false;
+        const id = String(enrollmentId);
+        return [e._id, e.id, e.enrollmentId].some((x) => x != null && String(x) === id);
+      };
       setStudents(prev => prev.map(s => {
         if (String(s.id) !== String(studentId) && String(s._id) !== String(studentId)) return s;
         const next = { ...s, teacherId: null, teacherName: '' };
@@ -185,9 +190,9 @@ export function useDataAdminCrud({
         if (Array.isArray(s.enrollments) && s.enrollments.length) {
           if (enrollmentId) {
             next.enrollments = s.enrollments.map((e) =>
-              String(e._id) === String(enrollmentId) ? clearEnr(e) : e
+              enrIdMatch(e) ? clearEnr(e) : e
             );
-            const target = s.enrollments.find((e) => String(e._id) === String(enrollmentId));
+            const target = s.enrollments.find((e) => enrIdMatch(e));
             const isPrimary = target?.isPrimary || s.enrollments.length === 1;
             if (isPrimary) {
               next.teacherId = null;
@@ -202,7 +207,7 @@ export function useDataAdminCrud({
         if (Array.isArray(s.courses) && s.courses.length) {
           if (enrollmentId) {
             next.courses = s.courses.map((c) =>
-              String(c._id || c.id || c.enrollmentId) === String(enrollmentId) ? clearEnr(c) : c
+              enrIdMatch(c) ? clearEnr(c) : c
             );
           } else {
             next.courses = s.courses.map((c, i) => (i === 0 || c.isPrimary ? clearEnr(c) : c));
@@ -216,9 +221,11 @@ export function useDataAdminCrud({
           setStudents(previousStudents);
           throw new Error(res?.message || 'Không bỏ phân công được');
         }
-        triggerBackgroundSync();
-        if (currentUser?.role === 'admin' || currentUser?.role === 'staff') {
-          fetchStudentsPaginated({ page: studentsPagination.currentPage });
+        // Giữ danh sách hiện tại — chỉ revalidate cùng filter/branch (không refetch page-only làm mất data)
+        if (typeof refreshStudents === 'function') {
+          Promise.resolve(refreshStudents()).catch(() => {});
+        } else {
+          triggerBackgroundSync();
         }
         return res;
       } catch (err) {
@@ -233,17 +240,27 @@ export function useDataAdminCrud({
     const teacherName = teacher ? teacher.name : 'Giảng viên';
 
     const previousStudents = [...students];
+    const enrIdMatch = (e) => {
+      if (!enrollmentId) return false;
+      const id = String(enrollmentId);
+      return [e._id, e.id, e.enrollmentId].some((x) => x != null && String(x) === id);
+    };
     setStudents(prev => prev.filter(Boolean).map(s => {
       if (String(s.id) !== String(studentId) && String(s._id) !== String(studentId)) return s;
       const next = { ...s, teacherId, teacherName, status: 'Đang học' };
       if (enrollmentId && Array.isArray(s.enrollments)) {
         next.enrollments = s.enrollments.map((e) =>
-          String(e._id) === String(enrollmentId) ? { ...e, teacherId, teacherName } : e
+          enrIdMatch(e) ? { ...e, teacherId, teacherName } : e
         );
       } else if (Array.isArray(s.enrollments) && s.enrollments.length) {
         const primaryIdx = s.enrollments.findIndex((e) => e.isPrimary);
         const idx = primaryIdx >= 0 ? primaryIdx : 0;
         next.enrollments = s.enrollments.map((e, i) => (i === idx ? { ...e, teacherId, teacherName } : e));
+      }
+      if (enrollmentId && Array.isArray(s.courses) && s.courses.length) {
+        next.courses = s.courses.map((c) =>
+          enrIdMatch(c) ? { ...c, teacherId, teacherName } : c
+        );
       }
       return next;
     }));
@@ -251,9 +268,10 @@ export function useDataAdminCrud({
     try {
       const res = await api.students?.assignTeacher(studentId, teacherId, enrollmentId);
       if (res?.success) {
-        triggerBackgroundSync();
-        if (currentUser?.role === 'admin' || currentUser?.role === 'staff') {
-          fetchStudentsPaginated({ page: studentsPagination.currentPage });
+        if (typeof refreshStudents === 'function') {
+          Promise.resolve(refreshStudents()).catch(() => {});
+        } else {
+          triggerBackgroundSync();
         }
         const student = students.find(s => String(s.id) === String(studentId) || String(s._id) === String(studentId));
         addNotification(teacherId, 'teacher', `Admin phân công học viên ${student?.name || 'mới'} cho bạn`);
@@ -268,7 +286,7 @@ export function useDataAdminCrud({
       setStudents(previousStudents);
       throw err;
     }
-  }, [teachers, students, setStudents, triggerBackgroundSync, fetchStudentsPaginated, studentsPagination.currentPage, currentUser, addNotification]);
+  }, [teachers, students, setStudents, triggerBackgroundSync, refreshStudents, addNotification]);
 
   const approveTeacher = useCallback(async (teacherId) => {
     const previousTeachers = [...teachers];

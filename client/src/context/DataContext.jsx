@@ -66,9 +66,10 @@ export const DataProvider = ({ children, user, onLogout }) => {
     students,
     studentsPagination,
     fetchStudentsPaginated,
+    refreshStudents,
     setStudentsLocal: setStudents,
   } = useStudentsContext();
-  const { teachers, setTeachersLocal: setTeachers } = useTeachersContext();
+  const { teachers, setTeachersLocal: setTeachers, refreshTeachers } = useTeachersContext();
   const { schedules, setSchedulesLocal: setSchedules } = useScheduleContext();
   const { transactions, setTransactionsLocal: setTransactions } = useFinanceContext();
 
@@ -94,6 +95,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     studentQuestions, setStudentQuestions,
     studentExamMinutes, updateStudentExamMinutes,
     studentEssayExamMinutes, updateStudentEssayExamMinutes,
+    studentEssayRequired, updateStudentEssayRequired,
     studentExamFiles, setStudentExamFile,
     examWarningSoundUrl, setExamWarningSoundUrl,
     examSubjectsCatalog, addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
@@ -130,6 +132,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     students, teachers, setTeachers,
     triggerBackgroundSync: triggerBackgroundSyncProxy,
     addNotification,
+    refreshTeachers,
   });
 
   const {
@@ -174,7 +177,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
   } = useDataAdminCrud({
     students, setStudents, teachers, setTeachers, transactions, setTransactions,
     triggerBackgroundSync, addNotification,
-    fetchStudentsPaginated, studentsPagination, currentUser,
+    refreshStudents,
   });
   setExamResultsRef.current = setExamResults;
 
@@ -195,6 +198,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     studentQuestions,
     studentExamMinutes,
     studentEssayExamMinutes,
+    studentEssayRequired,
     studentExamFiles,
     examWarningSoundUrl,
     examSubjectsCatalog,
@@ -208,7 +212,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     currentUser, studentsPagination, privateEvaluations,
     trainingData, studentTrainingData, questions,
     teacherExamTimeLimitMinutes, teacherExamMinutes, teacherEssayExamMinutes,
-    studentQuestions, studentExamMinutes, studentEssayExamMinutes,
+    studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired,
     studentExamFiles, examWarningSoundUrl, examSubjectsCatalog, systemLogs, isRefetching, RATING_CRITERIA,
   ]);
 
@@ -238,8 +242,9 @@ export const DataProvider = ({ children, user, onLogout }) => {
     addStudentQuestion, addStudentQuestionsBulk, replaceStudentQuestionsForSubject,
     updateStudentQuestion, removeStudentQuestion, resetStudentQuestions,
     copyTeacherQuestionBankToStudents,
-    updateStudentExamMinutes, updateStudentEssayExamMinutes,
+    updateStudentExamMinutes, updateStudentEssayExamMinutes, updateStudentEssayRequired,
     setStudentExamFile, setExamWarningSoundUrl,
+    applyStudentExamConfigFromServer,
     addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
     addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
   }), [
@@ -268,8 +273,9 @@ export const DataProvider = ({ children, user, onLogout }) => {
     addStudentQuestion, addStudentQuestionsBulk, replaceStudentQuestionsForSubject,
     updateStudentQuestion, removeStudentQuestion, resetStudentQuestions,
     copyTeacherQuestionBankToStudents,
-    updateStudentExamMinutes, updateStudentEssayExamMinutes,
+    updateStudentExamMinutes, updateStudentEssayExamMinutes, updateStudentEssayRequired,
     setStudentExamFile, setExamWarningSoundUrl,
+    applyStudentExamConfigFromServer,
     addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
     addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
   ]);

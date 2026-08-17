@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import {
   X, CheckCircle2, CreditCard, AlertCircle, MapPin, Loader2,
-  Plus, Share2, DollarSign, UserPlus,
+  Plus, Share2, UserPlus,
 } from 'lucide-react';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
@@ -648,16 +648,51 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
                 ) : (
                   <div className="cms-input flex items-center text-slate-400">Đang tải dữ liệu khóa học...</div>
                 )}
-                {form.price > 0 && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-100 text-[11px] font-bold">
-                      <DollarSign size={11} /> {form.price.toLocaleString('vi-VN')}đ
-                    </span>
-                    <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-0.5 rounded-lg border border-sky-100 text-[11px] font-bold">
-                      {form.totalSessions} buổi
-                    </span>
+                <div className="cms-form-row mt-3">
+                  <div>
+                    <label className="cms-label">Học phí (VNĐ)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      name="price"
+                      value={form.price}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '');
+                        setForm((f) => ({ ...f, price: digits === '' ? '' : Number(digits) }));
+                      }}
+                      className="cms-input font-mono text-emerald-700"
+                    />
                   </div>
-                )}
+                  <div>
+                    <label className="cms-label">Tổng số buổi</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      name="totalSessions"
+                      value={form.totalSessions}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '');
+                        setForm((f) => ({ ...f, totalSessions: digits === '' ? '' : Number(digits) }));
+                      }}
+                      className="cms-input font-mono text-sky-700"
+                    />
+                    {form.courseId && (
+                      <button
+                        type="button"
+                        className="mt-1.5 text-[11px] font-semibold text-sky-600 hover:underline text-left"
+                        onClick={() => {
+                          const c = dbCourses.find((x) => String(x._id) === String(form.courseId));
+                          if (!c) return;
+                          const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
+                          const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
+                          setForm((f) => ({ ...f, totalSessions: sessions, price: ep }));
+                        }}
+                      >
+                        Đồng bộ từ khóa học
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div>

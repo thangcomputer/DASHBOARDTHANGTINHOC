@@ -161,22 +161,36 @@ async function notifyAttendanceTaken(io, {
   return { completedSessions, totalRequired, courseLabel, name };
 }
 
-/** Thông báo HV hoàn thành khóa (HV + Admin). */
+/** Thông báo HV hoàn thành khóa (HV + Admin) + socket pháo hoa (sau hết giờ lịch). */
 async function notifyCourseCompleted(io, {
-  studentId, studentName, courseName, completedSessions, totalRequired,
+  studentId, studentName, courseName, completedSessions, totalRequired, enrollmentId,
 }) {
   if (!io || !studentId) return;
   const NotificationService = require('../../notification/services/NotificationService');
+  const {
+    resolveCelebrationShowAfter,
+    emitCourseCelebrationSocket,
+  } = require('../../../services/courseCelebration');
   const name = studentName || 'Học viên';
   const course = courseName || 'khóa học';
   const progress = `${completedSessions}/${totalRequired}`;
+  const showAfter = await resolveCelebrationShowAfter(studentId, course);
+  const payload = {
+    studentId: String(studentId),
+    course,
+    courseName: course,
+    completedSessions,
+    totalRequired,
+    enrollmentId: enrollmentId ? String(enrollmentId) : null,
+    showAfter,
+  };
 
   await NotificationService.send(io, {
     type: 'COURSE',
     title: '🎓 Hoàn thành khóa học',
     content: `Chúc mừng! Bạn đã hoàn thành khóa ${course} (${progress} buổi).`,
     receivers: String(studentId),
-    payload: { studentId: String(studentId), course, completedSessions, totalRequired },
+    payload,
     link: '/student',
   });
 
@@ -184,9 +198,10 @@ async function notifyCourseCompleted(io, {
     io,
     '🎓 Học viên hoàn thành khóa',
     `HV ${name} đã hoàn thành khóa ${course} (${progress} buổi).`,
-    { studentId: String(studentId), course, completedSessions, totalRequired },
+    payload,
     '/admin/students',
   );
+  emitCourseCelebrationSocket(io, payload);
 }
 
 // ─── Helper: Kiểm tra và tự động Unlock Thi cho Học Viên ─────────────────────

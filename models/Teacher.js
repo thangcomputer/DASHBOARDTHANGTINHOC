@@ -123,6 +123,8 @@ const TeacherSchema = new mongoose.Schema(
     // ── Thống kê ─────────────────────────────────────────────────
     totalSessionsTaught: { type: Number, default: 0 },
     averageRating: { type: Number, min: 0, max: 5, default: 0 },
+    /** Số lượt đánh giá công khai (HV → GV) — đồng bộ khi submit teacher_rating */
+    ratingCount: { type: Number, min: 0, default: 0 },
 
     // Lương cứng / buổi dạy (không phụ thuộc sao)
     baseSalaryPerSession: { type: Number, default: 0, min: 0 },
@@ -164,6 +166,8 @@ const TeacherSchema = new mongoose.Schema(
     refreshToken: { type: String, select: false },
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login → vô hiệu token cũ
     isFirstLogin: { type: Boolean, default: false },
+    /** Đã xem pháo hoa chào mừng lần đầu. Tài khoản cũ thiếu field = coi như đã xem. */
+    welcomeCelebrationSeen: { type: Boolean, default: false },
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập
 
     // ── MFA (TOTP) — dành cho tài khoản nội bộ admin/staff ────────

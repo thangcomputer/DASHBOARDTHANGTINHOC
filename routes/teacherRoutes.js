@@ -288,10 +288,10 @@ router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], as
         .lean(),
       Teacher.countDocuments(filter),
       Evaluation.aggregate([
-        { $match: { type: 'teacher_rating' } },
+        { $match: { type: 'teacher_rating', targetTeacherId: { $ne: null } } },
         {
           $group: {
-            _id: '$targetTeacherId',
+            _id: { $toString: '$targetTeacherId' },
             ratings: { $push: '$$ROOT' },
             count: { $sum: 1 },
           },
@@ -308,7 +308,34 @@ router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], as
       const subjectIds = Array.isArray(t.subjectIds) && t.subjectIds.length
         ? t.subjectIds.filter(Boolean)
         : resolveTeacherSubjectIds(t);
-      return { ...t, subjectIds, ratings: myRatings, id: t._id };
+      // Dedup theo HV + tính avg từ criteria.stars
+      const seen = new Set();
+      const unique = [];
+      for (const r of myRatings) {
+        const sid = String(r.studentId?._id || r.studentId || r._id || '');
+        if (seen.has(sid)) continue;
+        seen.add(sid);
+        unique.push(r);
+      }
+      let avgFromRatings = Number(t.averageRating) || 0;
+      if (unique.length) {
+        const sum = unique.reduce((s, r) => {
+          const stars = Number(r?.criteria?.stars);
+          return s + (Number.isFinite(stars) ? stars : 0);
+        }, 0);
+        const withStars = unique.filter((r) => Number.isFinite(Number(r?.criteria?.stars)));
+        if (withStars.length) {
+          avgFromRatings = Math.round((sum / withStars.length) * 10) / 10;
+        }
+      }
+      return {
+        ...t,
+        subjectIds,
+        ratings: unique,
+        averageRating: avgFromRatings,
+        ratingCount: unique.length,
+        id: t._id,
+      };
     });
 
     return res.json({
@@ -384,9 +411,29 @@ router.get('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('get_one'
       ? obj.subjectIds.filter(Boolean)
       : resolveTeacherSubjectIds(obj);
 
+    const Evaluation = require('../models/Evaluation');
+    const ratingDocs = await Evaluation.find({
+      type: 'teacher_rating',
+      targetTeacherId: req.params.id,
+    }).sort({ updatedAt: -1, createdAt: -1 }).lean();
+    const seen = new Set();
+    const ratings = [];
+    for (const r of ratingDocs) {
+      const sid = String(r.studentId?._id || r.studentId || '');
+      if (seen.has(sid)) continue;
+      seen.add(sid);
+      ratings.push(r);
+    }
+
     return res.json({
       success: true,
-      data: { ...obj, subjectIds, completedSessionsFromDB: completedSessions },
+      data: {
+        ...obj,
+        subjectIds,
+        ratings,
+        ratingCount: ratings.length,
+        completedSessionsFromDB: completedSessions,
+      },
     });
   } catch (error) {
     logger.error('[TEACHERS] Get by ID error:', error);

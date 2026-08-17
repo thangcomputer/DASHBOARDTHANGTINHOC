@@ -873,6 +873,7 @@ const backupRoutes       = require('./routes/backupRoutes');
 const monitoringRoutes   = require('./routes/monitoringRoutes');
 const proctorRoutes      = require('./routes/proctorRoutes');
 const aiRoutes           = require('./routes/aiRoutes');
+const aiSupportRoutes    = require('./routes/aiSupportRoutes');
 const biRoutes           = require('./routes/biRoutes');
 const financeRoutes      = require('./routes/financeRoutes');
 const workflowRoutes     = require('./routes/workflowRoutes');
@@ -910,6 +911,7 @@ app.use('/api/backups',      backupRoutes);
 app.use('/api/monitoring',  monitoringRoutes);
 app.use('/api/proctor',      proctorRoutes);
 app.use('/api/ai',           aiRoutes);
+app.use('/api/ai-support',   aiSupportRoutes);
 app.use('/api/bi',           biRoutes);
 app.use('/api/finance',      financeRoutes);
 app.use('/api/workflows',    workflowRoutes);
@@ -1132,6 +1134,12 @@ const { initJobQueue, closeJobQueue } = require('./services/queue/jobQueue');
   server.listen(PORT, '::', () => {
     logger.info({ port: PORT, env: process.env.NODE_ENV || 'development', host: '::' }, 'dashboardthangtinhoc server listening');
     initJobQueue().catch((err) => logger.warn({ err: err.message }, 'initJobQueue failed'));
+    try {
+      const { startAiIdleWatcher } = require('./services/aiSupportService');
+      startAiIdleWatcher(io, app.notifyUser);
+    } catch (idleErr) {
+      logger.warn({ err: idleErr.message }, 'startAiIdleWatcher failed');
+    }
   });
 })().catch((err) => {
   logger.error({ err: err.message }, 'Server boot failed');
@@ -1142,6 +1150,10 @@ async function shutdown(signal) {
   logger.info({ signal }, 'Shutting down');
   try {
     try { outboxWorker.stop(); } catch (_) { /* ignore */ }
+    try {
+      const { stopAiIdleWatcher } = require('./services/aiSupportService');
+      stopAiIdleWatcher();
+    } catch (_) { /* ignore */ }
     await new Promise((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     });

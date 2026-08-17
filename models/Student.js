@@ -64,6 +64,10 @@ const StudentSchema = new mongoose.Schema(
         date: String,
         note: String,
         grade: Number,
+        /** Giờ thao tác (HH:mm) — khi điểm danh / cập nhật */
+        time: { type: String, default: '' },
+        /** Timestamp thao tác thực tế */
+        at: { type: Date },
         assignmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assignment' },
       }],
       linkHoc: { type: String, default: '' },
@@ -81,6 +85,8 @@ const StudentSchema = new mongoose.Schema(
       // Quyền theo từng khóa (môn cần camera / mở khóa thi riêng)
       requireWebcam: { type: Boolean, default: true },
       examUnlocked: { type: Boolean, default: false },
+      /** Đã xem pháo hoa hoàn thành khóa. false = vừa hoàn thành chưa xem. thiếu field = đã cũ, không hiện. */
+      courseCelebrationSeen: { type: Boolean },
       // Soft-cancel enrollment
       cancelledAt: { type: Date, default: null },
       cancelReason: { type: String, default: '' },
@@ -179,6 +185,10 @@ const StudentSchema = new mongoose.Schema(
       date: String,
       note: String,
       grade: Number,
+      /** Giờ thao tác (HH:mm) — khi điểm danh / cập nhật */
+      time: { type: String, default: '' },
+      /** Timestamp thao tác thực tế */
+      at: { type: Date },
       assignmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assignment' },
     }],
     /** Nhật ký điểm danh / hủy điểm danh / hủy ca — không tính buổi học */
@@ -264,6 +274,13 @@ const StudentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /** Đã xem pháo hoa chào mừng lần đầu (HV/GV). Tài khoản cũ thiếu field = coi như đã xem. */
+    welcomeCelebrationSeen: {
+      type: Boolean,
+      default: false,
+    },
+    /** Pháo hoa hoàn thành khóa (legacy 1 khóa, không enrollment). false = chờ xem. */
+    courseCelebrationSeen: { type: Boolean },
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login
     refreshToken: { type: String, select: false }, // Refresh token rotation (server-side)
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập

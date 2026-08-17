@@ -20,7 +20,7 @@ const messageSchema = new mongoose.Schema({
   },
   senderRole: {
     type: String,
-    enum: ['admin', 'teacher', 'student', 'staff'],
+    enum: ['admin', 'teacher', 'student', 'staff', 'system'],
     required: true,
   },
   senderBranchCode: {
@@ -51,7 +51,7 @@ const messageSchema = new mongoose.Schema({
   content: {
     type: String,
     required: [true, 'Nội dung tin nhắn không được trống'],
-    maxlength: 2000,
+    maxlength: 6000,
   },
   messageType: {
     type: String,
@@ -62,6 +62,8 @@ const messageSchema = new mongoose.Schema({
   fileName: { type: String, default: '' },
   fileExpired: { type: Boolean, default: false },
   fileExpiredAt: { type: Date },
+  /** Số lượt ảnh AI còn lại sau tin này (chỉ tin ảnh gửi Trợ lý AI). */
+  aiImageRemaining: { type: Number, default: null },
 
   // Trạng thái Read & Recall
   isRead:     { type: Boolean, default: false },

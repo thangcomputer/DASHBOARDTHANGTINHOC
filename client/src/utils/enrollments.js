@@ -136,12 +136,27 @@ function getStructuredClientEnrollments(student) {
 }
 
 /**
- * Learning Dashboard access SoT: ≥1 enrollment/course status === 'active' đang đăng ký.
- * Không dùng root student.course / placeholder "(Đã hủy)" / "Chưa xếp lớp".
+ * Learning Dashboard access SoT:
+ * ≥1 enrollment/course còn quyền học: active | completed | paused.
+ * Chặn: cancelled / refunded / pending_payment / learningAccess === false / placeholder.
+ * HV hoàn thành hết khóa vẫn vào learning (ôn / thi / tài liệu).
  */
 export function getLearningAccessEnrollments(student) {
-  return getStructuredClientEnrollments(student).filter((e) => {
-    if (String(e?.status || '').toLowerCase() !== 'active') return false;
+  if (!student) return [];
+  let list = getStructuredClientEnrollments(student);
+  // Legacy: chỉ có root course (không enrollments/courses[]) — vẫn xét, nhưng không mở cho placeholder hủy.
+  if (!list.length) {
+    const hasStruct = (Array.isArray(student.enrollments) && student.enrollments.length > 0)
+      || (Array.isArray(student.courses) && student.courses.length > 0);
+    if (!hasStruct) {
+      list = getClientEnrollments(student);
+    }
+  }
+  return list.filter((e) => {
+    if (e?.learningAccess === false) return false;
+    const st = String(e?.status || 'active').toLowerCase();
+    if (st === 'cancelled' || st === 'refunded' || st === 'pending_payment') return false;
+    if (st !== 'active' && st !== 'completed' && st !== 'paused' && st !== 'hoàn thành') return false;
     const label = e?.courseName || e?.name || '';
     return !isPlaceholderCourseName(label);
   });

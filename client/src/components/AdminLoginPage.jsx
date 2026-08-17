@@ -220,7 +220,7 @@ const AdminLoginPage = ({ onLogin }) => {
 
             <div className="space-y-4">
                <h1 className="text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-none tracking-tighter break-anywhere">
-                CMS <br />
+                LMS <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-800">CENTRAL</span>
               </h1>
               <p className="text-slate-400 text-lg lg:text-xl font-medium max-w-xl leading-relaxed">

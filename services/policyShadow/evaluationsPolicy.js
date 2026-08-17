@@ -6,6 +6,7 @@
 const ACTIONS = new Set([
   'admin_list',
   'teacher_ratings',
+  'student_mine',
   'create',
   'mark_read',
 ]);
@@ -46,6 +47,17 @@ function evaluateAdminList(subject) {
  */
 function evaluateTeacherRatings(subject) {
   return evaluateAuthOnly(subject);
+}
+
+/** GET /mine — học viên đọc đánh giá mốc của chính mình. */
+function evaluateStudentMine(subject) {
+  const auth = evaluateAuthOnly(subject);
+  if (auth.decision === 'DENY') return auth;
+  const role = String(subject.role || '').toLowerCase();
+  if (role === 'student') {
+    return { decision: 'ALLOW', reason: 'student_self', statusHint: 200 };
+  }
+  return { decision: 'DENY', reason: 'not_student', statusHint: 403 };
 }
 
 /**
@@ -93,6 +105,8 @@ function evaluateLegacyEvaluation(subject, action, ctx = {}) {
       return evaluateAdminList(subject);
     case 'teacher_ratings':
       return evaluateTeacherRatings(subject);
+    case 'student_mine':
+      return evaluateStudentMine(subject);
     case 'create':
       return evaluateCreate(subject, ctx);
     case 'mark_read':

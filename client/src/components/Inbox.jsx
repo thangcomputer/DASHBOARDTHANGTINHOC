@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
   User, Circle, Image, Paperclip, Smile, Download,
-  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn
+  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
 import { useLocation } from 'react-router-dom';
 import { useToast } from '../utils/toast';
-import { messagesAPI, resolveMediaUrl } from '../services/api';
+import { messagesAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
 import { displayFileName } from '../utils/validators';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
@@ -20,6 +20,9 @@ import {
   resolveMessagingDeepLink,
   existingPeerIdsFromConversations,
 } from '../utils/messagingDeepLink';
+import { MessageRichText } from '../utils/messageRichText';
+import SupportAiHandoffPanel from './support/SupportAiHandoffPanel';
+import { isAiSupportConversationId, AI_ESCALATE_MARKER } from '../utils/aiSupport';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 const formatTime = (date) => {
@@ -31,6 +34,24 @@ const formatTime = (date) => {
   if (diffMs < 86400000) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 };
+
+function splitHandoffSummary(text) {
+  const raw = String(text || '');
+  const marker = 'Hội thoại gần nhất:';
+  const i = raw.indexOf(marker);
+  if (i < 0) return { head: raw.trim(), transcript: '', footer: '' };
+  const head = raw.slice(0, i).trim();
+  const rest = raw.slice(i + marker.length).trim();
+  const footerIdx = rest.search(/Cần Support xem lại/i);
+  if (footerIdx >= 0) {
+    return {
+      head,
+      transcript: rest.slice(0, footerIdx).trim(),
+      footer: rest.slice(footerIdx).trim(),
+    };
+  }
+  return { head, transcript: rest, footer: '' };
+}
 
 // Keep contact/messaging roles canonical — do NOT collapse staff→admin (splits threads).
 const normalizeRole = (role) => (role === 'support' ? 'staff' : role);
@@ -46,6 +67,13 @@ const isImageMessage = (msg) => {
   if (msg.messageType === 'image') return true;
   return IMAGE_EXT_RE.test(`${msg.fileName || ''} ${msg.fileUrl || ''}`);
 };
+
+function attachmentCaption(msg) {
+  const t = String(msg?.content || '').trim();
+  if (!t || t === '[Hình ảnh]') return '';
+  if (msg?.messageType === 'file' && t.startsWith('Đã gửi tệp:')) return '';
+  return t;
+}
 
 function ImageLightbox({ preview, onClose, onDownload }) {
   if (!preview || typeof document === 'undefined') return null;
@@ -162,7 +190,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const location = useLocation();
   const toast = useToast();
   const socketCtx = useSocket();
-  const { sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onContactListUpdated, socket } = socketCtx;
+  const { sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
   const {
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, groups,
@@ -170,6 +198,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     softDeleteMessage: ctxDeleteMessage, currentUser, messages: contextMessages,
   } = useData();
   const isHighAdmin = currentUser?.adminRole === 'HIGH_ADMIN';
+  const isSupportAgent = currentUser?.adminRole === 'SUPPORT';
+  const [aiHandoffSession, setAiHandoffSession] = useState(null);
+  const [showPriorAiThread, setShowPriorAiThread] = useState(false);
+  const [handoffQueue, setHandoffQueue] = useState([]);
+  const handoffUserIds = useMemo(
+    () => new Set((handoffQueue || []).map((item) => String(item.userId || '')).filter(Boolean)),
+    [handoffQueue],
+  );
 
   const dataContextConvs = useMemo(
     () => getConversations(currentUserId),
@@ -310,7 +346,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   // Đóng hội thoại chỉ khi peer chắc chắn ghost (không dùng students/teachers/staffs local —
   // Admin/Staff thường students=[], GV chỉ có teachers=[self] → trước đây kill nhầm mọi chat).
   useEffect(() => {
-    if (!activeConv || activeConv.isGroup) return;
+    if (!activeConv || activeConv.isGroup || activeConv.isAiHandoff) return;
     if (!contactsLoaded) return;
     const peerId = activeConv.user?.id;
     if (!peerId || isSpecialMessagingPeerId(peerId)) return;
@@ -352,7 +388,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     const activityById = new Map();
     const activityByPeer = new Map();
     (dataContextConvs || []).forEach((dc) => {
-      if (!dc?.id) return;
+      if (!dc?.id || isAiSupportConversationId(dc.id)) return;
       const id = String(dc.id);
       activityById.set(id, dc);
       if (!dc.isGroup && dc.user?.id != null) {
@@ -370,8 +406,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     };
 
     uniqueContacts.forEach((c) => {
-      if (String(c.id) === String(currentUserId)) return;
+      if (String(c.id) === String(currentUserId) || String(c.id) === 'ai_support') return;
       if (isHighAdmin && (c.productRole === 'STUDENT' || normalizeRole(c.role) === 'student')) return;
+      if (isSupportAgent && handoffUserIds.has(String(c.id))) return;
       // Transport role for conversation IDs; product/adminRole for tab presentation (Phase 6).
       const role = c.transportRole || getMessagingRole({
         id: c.id,
@@ -386,8 +423,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
       // Prefer exact conversationId; fallback peer id (role mismatch must not hide contact)
       const existingConv = activityById.get(builtId) || activityByPeer.get(String(c.id));
-      const canonicalId = existingConv?.id ? String(existingConv.id) : builtId;
-      if (seenConvIds.has(canonicalId)) return;
+      const canonicalId = existingConv?.id && !isAiSupportConversationId(existingConv.id)
+        ? String(existingConv.id)
+        : builtId;
+      if (isAiSupportConversationId(canonicalId) || seenConvIds.has(canonicalId)) return;
 
       pushEntry({
         id: canonicalId,
@@ -432,8 +471,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
         const builtId = String(buildConversationId(myRole, currentUserId, role, seedContact.id));
         const existingConv = activityById.get(builtId) || activityByPeer.get(String(seedContact.id));
-        const canonicalId = existingConv?.id ? String(existingConv.id) : builtId;
-        if (!seenConvIds.has(canonicalId)) {
+        const canonicalId = existingConv?.id && !isAiSupportConversationId(existingConv.id)
+          ? String(existingConv.id)
+          : builtId;
+        if (
+          isAiSupportConversationId(canonicalId)
+          || (isSupportAgent && handoffUserIds.has(String(seedContact.id)))
+          || seenConvIds.has(canonicalId)
+        ) {
+          /* skip AI handoff / queue peers */
+        } else {
           // Prefer contact row metadata when peer is discoverable
           const fromContact = uniqueContacts.find((c) => String(c.id) === String(seedContact.id));
           pushEntry({
@@ -465,10 +512,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     (dataContextConvs || []).forEach((dc) => {
       if (!dc?.id) return;
       const id = String(dc.id);
-      if (seenConvIds.has(id)) return;
+      if (isAiSupportConversationId(id) || seenConvIds.has(id)) return;
       const peerRole = normalizeRole(dc.user?.role);
       if (isHighAdmin && peerRole === 'student' && dc.user?.adminRole !== 'STAFF' && dc.user?.adminRole !== 'SUPPORT') return;
       const peerId = dc.user?.id != null ? String(dc.user.id) : '';
+      if (isSupportAgent && peerId && handoffUserIds.has(peerId)) return;
       const fromContact = peerId
         ? uniqueContacts.find((c) => String(c.id) === peerId)
         : null;
@@ -489,7 +537,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     // Canonical id merge + newest lastTime first (immutable)
     return mergeConversationsById(entries);
-  }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin]);
+  }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin, isSupportAgent, handoffUserIds]);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -505,6 +553,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [isUploading, setIsUploading] = useState(false);
   // Trạng thái recall đang xử lý
   const [recallingId, setRecallingId] = useState(null);
+  const [peerTyping, setPeerTyping] = useState(false);
+  const typingActiveRef = useRef(false);
 
   // Broadcast states
   const [broadcastConfig, setBroadcastConfig] = useState(null); // { targetRole: 'student', label: 'Học viên' }
@@ -638,11 +688,62 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setMessages((prev) => (prev.length === 0 ? prev : []));
       return;
     }
+    if (activeConv?.isAiHandoff) return;
     const msgs = ctxGetMessages(activeConvId);
     setMessages(msgs.map(mapContextMsg));
-    // Chỉ sync khi đổi hội thoại / nội dung tin — tránh loop vì identity callback đổi mỗi render
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fingerprint deps
-  }, [activeConvId, activeConvMsgKey]);
+  }, [activeConvId, activeConvMsgKey, activeConv?.isAiHandoff]);
+
+  useEffect(() => {
+    if (!activeConv?.isAiHandoff || !activeConvId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await aiSupportAPI.thread(activeConvId);
+        if (cancelled || !res?.success) return;
+        setAiHandoffSession(res.data?.session || null);
+        const rows = (res.data?.messages || []).map((m) => ({
+          id: String(m._id || m.id),
+          senderId: m.senderId,
+          senderName: m.senderName,
+          senderRole: m.senderRole,
+          content: m.content,
+          time: m.createdAt || m.time,
+          isRead: m.isRead,
+          isRecalled: m.isRecalled || false,
+          messageType: m.messageType || 'text',
+          fileName: m.fileName,
+          fileUrl: m.fileUrl,
+        }));
+        setMessages(rows);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeConv?.isAiHandoff, activeConvId]);
+
+  useEffect(() => {
+    setShowPriorAiThread(false);
+  }, [activeConvId]);
+
+  const handoffSummaryParts = useMemo(
+    () => splitHandoffSummary(aiHandoffSession?.handoffSummary),
+    [aiHandoffSession?.handoffSummary],
+  );
+
+  const aiHistorySplit = useMemo(() => {
+    if (!activeConv?.isAiHandoff) {
+      return { hiddenCount: 0, visible: messages };
+    }
+    const idx = messages.findIndex((m) => String(m.content || '').includes(AI_ESCALATE_MARKER));
+    if (idx <= 0) return { hiddenCount: 0, visible: messages };
+    return { hiddenCount: idx, visible: messages.slice(idx) };
+  }, [activeConv?.isAiHandoff, messages]);
+
+  const messagesToRender = (activeConv?.isAiHandoff && !showPriorAiThread)
+    ? aiHistorySplit.visible
+    : messages;
 
   const markedReadConvRef = useRef('');
   useEffect(() => {
@@ -714,6 +815,28 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (unsubReaction) unsubReaction();
     };
   }, [activeConv, onMessageReceive, onRecallReceive, onReactionReceive, currentUserId, currentUserRole, markMessagesRead, resolveSenderName, resolveSenderMeta]);
+
+  useEffect(() => {
+    if (!socket || !activeConv?.isAiHandoff) return undefined;
+    const onUserMsg = (payload) => {
+      if (String(payload?.conversationId) !== String(activeConv.id)) return;
+      setMessages((prev) => {
+        const key = `${payload.userId}:${payload.content}:${payload.conversationId}`;
+        if (prev.some((m) => `${m.senderId}:${m.content}:${activeConv.id}` === key)) return prev;
+        return [...prev, {
+          id: `handoff_${Date.now()}`,
+          senderId: payload.userId,
+          senderName: payload.userName || 'Người dùng',
+          senderRole: payload.userRole || 'student',
+          content: payload.content,
+          time: new Date(),
+          messageType: 'text',
+        }];
+      });
+    };
+    socket.on('ai-support:user-message', onUserMsg);
+    return () => socket.off('ai-support:user-message', onUserMsg);
+  }, [socket, activeConv?.isAiHandoff, activeConv?.id]);
 
   // ─── Thu hồi tin nhắn ────────────────────────────────────────────────────────
   const handleRecall = useCallback(async (msgId) => {
@@ -841,9 +964,70 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   };
 
+  const startInboxTyping = () => {
+    if (!activeConvId || !emitTypingStart || typingActiveRef.current) return;
+    typingActiveRef.current = true;
+    emitTypingStart(activeConvId, currentUserName);
+  };
+
+  const stopInboxTyping = () => {
+    if (!typingActiveRef.current) return;
+    typingActiveRef.current = false;
+    if (activeConvId) emitTypingStop?.(activeConvId);
+  };
+
+  const appendHandoffMessage = (m) => {
+    if (!m) return;
+    const id = String(m._id || m.id || '');
+    setMessages((prev) => {
+      if (id && prev.some((x) => String(x.id) === id)) return prev;
+      return [...prev, {
+        id: id || String(Date.now()),
+        senderId: m.senderId,
+        senderName: m.senderName,
+        senderRole: m.senderRole,
+        content: m.content,
+        time: m.createdAt || new Date(),
+        messageType: m.messageType || 'text',
+        fileUrl: m.fileUrl || '',
+        fileName: m.fileName || '',
+      }];
+    });
+  };
+
+  const sendHandoffReply = async ({ content = '', fileUrl = '', fileName = '', messageType = 'text' }) => {
+    const res = await aiSupportAPI.reply(activeConv.id, {
+      content,
+      fileUrl,
+      fileName,
+      messageType,
+    });
+    if (!res?.success) throw new Error(res?.message || 'Không gửi được');
+    appendHandoffMessage(res.data?.message);
+    if (res.data?.session) setAiHandoffSession(res.data.session);
+  };
+
   const handleSend = async () => {
     if ((!newMsg.trim() && !pendingImage) || !activeConv) return;
+    stopInboxTyping();
     const contentText = newMsg.trim();
+
+    if (activeConv.isAiHandoff) {
+      if (!contentText && !pendingImage) return;
+      try {
+        await sendHandoffReply({
+          content: contentText,
+          fileUrl: pendingImage?.url || '',
+          fileName: pendingImage?.fileName || '',
+          messageType: pendingImage ? 'image' : 'text',
+        });
+        setNewMsg('');
+        setPendingImage(null);
+      } catch (err) {
+        toast.error(err.message || 'Không gửi được');
+      }
+      return;
+    }
 
     if (pendingImage) {
       const msgData = {
@@ -914,6 +1098,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       const uploadRes = await messagesAPI.uploadMessageFile(file);
       if (!uploadRes.success) throw new Error(uploadRes.message || 'Lỗi hệ thống lưu trữ');
 
+      if (activeConv.isAiHandoff) {
+        await sendHandoffReply({
+          content: '',
+          fileUrl: uploadRes.url,
+          fileName: file.name,
+          messageType: isImage ? 'image' : 'file',
+        });
+        return;
+      }
+
       const msgData = {
         conversationId: activeConv.id,
         senderId: currentUserId,
@@ -949,6 +1143,25 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    setPeerTyping(false);
+    return () => {
+      if (typingActiveRef.current) {
+        typingActiveRef.current = false;
+        emitTypingStop?.(activeConvId);
+      }
+    };
+  }, [activeConvId, emitTypingStop]);
+
+  useEffect(() => {
+    if (!onTypingChange || !activeConvId) return undefined;
+    return onTypingChange(({ conversationId, userId, show }) => {
+      if (String(conversationId) !== String(activeConvId)) return;
+      if (String(userId) === String(currentUserId)) return;
+      setPeerTyping(!!show);
+    });
+  }, [onTypingChange, activeConvId, currentUserId]);
 
   const handleDownload = useCallback(async (url, fileName) => {
     const safeName = showFileName(fileName);
@@ -1004,6 +1217,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   };
 
   const filteredConvs = conversations.filter(c => {
+    if (isAiSupportConversationId(c.id)) return false;
+    if (isSupportAgent && handoffUserIds.has(String(c.user?.id || ''))) return false;
     const isSearching = search.trim().length > 0;
     if (!isSearching && c.isHidden) return false;
 
@@ -1175,6 +1390,29 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
           {/* Conversation list */}
           <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 bg-white space-y-1 overscroll-contain">
+            {isSupportAgent ? (
+              <SupportAiHandoffPanel
+                onQueueChange={setHandoffQueue}
+                onOpen={async (item) => {
+                  setActiveConv({
+                    id: item.conversationId,
+                    isAiHandoff: true,
+                    user: {
+                      id: item.userId,
+                      name: item.userName || 'Người dùng',
+                      role: item.userRole || 'student',
+                    },
+                  });
+                  setAiHandoffSession(item);
+                  try {
+                    const res = await aiSupportAPI.claim(item.conversationId);
+                    if (res?.success && res.data?.session) setAiHandoffSession(res.data.session);
+                  } catch {
+                    /* queue still opens thread */
+                  }
+                }}
+              />
+            ) : null}
             {filteredConvs.map(conv => {
               const isGroup = !!(groups || []).find(g => g._id === conv.user.id);
               return (
@@ -1427,11 +1665,74 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <Trash2 size={16} />
                   </button>
                 )}
+                {activeConv.isAiHandoff ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await aiSupportAPI.resolve(activeConv.id);
+                        if (!res?.success) throw new Error(res?.message || 'Không đóng được');
+                        setAiHandoffSession(res.data?.session || null);
+                        toast.success('Đã đánh dấu xử lý xong');
+                      } catch (err) {
+                        toast.error(err.message || 'Không đóng được yêu cầu');
+                      }
+                    }}
+                    className="flex shrink-0 items-center justify-center px-3 h-9 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-wide"
+                    title="Đánh dấu đã xử lý"
+                  >
+                    Đã xử lý
+                  </button>
+                ) : null}
               </div>
+
+              {activeConv.isAiHandoff && aiHandoffSession?.handoffSummary ? (
+                <div className="mx-3 mt-2 mb-0 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-950 leading-snug">
+                  <p className="font-black uppercase tracking-wide text-amber-800 mb-1">Tóm tắt cho Support (nội bộ)</p>
+                  {handoffSummaryParts.head ? (
+                    <p className="whitespace-pre-wrap">{handoffSummaryParts.head}</p>
+                  ) : null}
+                  {handoffSummaryParts.transcript || aiHistorySplit.hiddenCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowPriorAiThread((v) => !v)}
+                      className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-amber-800 hover:text-amber-950"
+                    >
+                      <ChevronDown size={14} className={`transition-transform ${showPriorAiThread ? 'rotate-180' : ''}`} />
+                      {showPriorAiThread ? 'Thu gọn' : 'Hiển thị thêm'}
+                      {!showPriorAiThread && aiHistorySplit.hiddenCount > 0
+                        ? ` (${aiHistorySplit.hiddenCount} tin với Trợ lý AI)`
+                        : ''}
+                    </button>
+                  ) : null}
+                  {showPriorAiThread && handoffSummaryParts.transcript ? (
+                    <p className="mt-1.5 whitespace-pre-wrap border-t border-amber-100 pt-1.5">
+                      <span className="font-bold">Hội thoại gần nhất:</span>
+                      {'\n'}
+                      {handoffSummaryParts.transcript}
+                    </p>
+                  ) : null}
+                  {handoffSummaryParts.footer ? (
+                    <p className="mt-1.5 text-amber-800/80 italic">{handoffSummaryParts.footer}</p>
+                  ) : null}
+                </div>
+              ) : null}
 
               {/* Messages */}
               <div className="cms-chat-messages">
-                {messages.map(msg => {
+                {activeConv.isAiHandoff && aiHistorySplit.hiddenCount > 0 && !aiHandoffSession?.handoffSummary ? (
+                  <div className="flex justify-center py-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPriorAiThread((v) => !v)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-100 text-[11px] font-bold text-slate-600 hover:bg-slate-200"
+                    >
+                      <ChevronDown size={14} className={`transition-transform ${showPriorAiThread ? 'rotate-180' : ''}`} />
+                      {showPriorAiThread ? 'Thu gọn lịch sử AI' : `Hiển thị thêm ${aiHistorySplit.hiddenCount} tin nhắn với Trợ lý AI`}
+                    </button>
+                  </div>
+                ) : null}
+                {messagesToRender.map(msg => {
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
                   const role = normalizeRole(msg.senderRole);
                   const badgeLabel = msg.senderDisplayRole
@@ -1490,6 +1791,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 <span>{msg.content || 'Tệp đính kèm đã hết hạn lưu trữ (10 ngày) và không còn được lưu trên hệ thống.'}</span>
                               </p>
                             ) : isImageMessage(msg) ? (
+                              <div className="space-y-1.5">
                                   <div
                                     role="button"
                                     tabIndex={0}
@@ -1516,7 +1818,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                       <ZoomIn size={12} /> Phóng to
                                     </span>
                                   </div>
+                                  {attachmentCaption(msg) ? (
+                                    <p className="whitespace-pre-wrap break-words px-0.5">
+                                      <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
+                                    </p>
+                                  ) : null}
+                              </div>
                                 ) : msg.messageType === 'file' ? (
+                                  <div className="space-y-1.5">
                                   <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-700'}`}>
                                     <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-red-500 text-white'}`}>
                                       <Paperclip size={18} />
@@ -1526,7 +1835,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                       <span className="text-[10px] font-medium opacity-50">Tài liệu đính kèm</span>
                                     </div>
                                   </a>
-                                ) : msg.content}
+                                  {attachmentCaption(msg) ? (
+                                    <p className="whitespace-pre-wrap break-words px-0.5">
+                                      <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
+                                    </p>
+                                  ) : null}
+                                  </div>
+                                ) : (
+                                  <span className="whitespace-pre-wrap break-words">
+                                    <MessageRichText text={msg.content} mine={isMine} />
+                                  </span>
+                                )}
 
                             {/* Reaction badge */}
                             {!msg.isRecalled && (heartCount > 0 || likeCount > 0) && (
@@ -1629,6 +1948,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </div>
                   );
                 })}
+                {peerTyping ? (
+                  <div className="flex justify-start px-1 py-1">
+                    <p className="text-[12px] text-slate-500 font-medium">Đang gõ •••</p>
+                  </div>
+                ) : null}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -1698,7 +2022,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       <input
                         ref={inputRef}
                         value={newMsg}
-                        onChange={e => setNewMsg(e.target.value)}
+                        onChange={e => {
+                          setNewMsg(e.target.value);
+                          startInboxTyping();
+                        }}
+                        onFocus={startInboxTyping}
+                        onBlur={stopInboxTyping}
                         onKeyDown={handleKeyPress}
                         onPaste={handlePaste}
                         className="cms-input pl-4 pr-10 w-full"

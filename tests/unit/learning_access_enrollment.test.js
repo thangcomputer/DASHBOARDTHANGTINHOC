@@ -3,8 +3,8 @@
 /**
  * Unit tests for Student Learning Access Gate SoT.
  * Mirrors client/src/utils/enrollments.js learning helpers:
- *   hasLearningAccessEnrollment = structured enrollments/courses with status === 'active'
- *   (never invent from root student.course — e.g. "(Đã hủy)" / "Chưa xếp lớp")
+ *   hasLearningAccessEnrollment = structured enrollments/courses with
+ *   status active|completed|paused (not cancelled/refunded/pending_payment)
  */
 
 const { describe, it } = require('node:test');
@@ -66,8 +66,20 @@ function getActiveClientEnrollments(student) {
 }
 
 function getLearningAccessEnrollments(student) {
-  return getStructuredClientEnrollments(student).filter((e) => {
-    if (String(e?.status || '').toLowerCase() !== 'active') return false;
+  if (!student) return [];
+  let list = getStructuredClientEnrollments(student);
+  if (!list.length) {
+    const hasStruct = (Array.isArray(student.enrollments) && student.enrollments.length > 0)
+      || (Array.isArray(student.courses) && student.courses.length > 0);
+    if (!hasStruct) {
+      list = getClientEnrollments(student);
+    }
+  }
+  return list.filter((e) => {
+    if (e?.learningAccess === false) return false;
+    const st = String(e?.status || 'active').toLowerCase();
+    if (st === 'cancelled' || st === 'refunded' || st === 'pending_payment') return false;
+    if (st !== 'active' && st !== 'completed' && st !== 'paused' && st !== 'hoàn thành') return false;
     return !isPlaceholderCourseName(e?.courseName || e?.name || '');
   });
 }
@@ -76,10 +88,22 @@ function hasLearningAccessEnrollment(student) {
   return getLearningAccessEnrollments(student).length > 0;
 }
 
-describe('hasLearningAccessEnrollment SoT (status === active)', () => {
+describe('hasLearningAccessEnrollment SoT (active|completed|paused)', () => {
   it('allows when ≥1 enrollment is active', () => {
     assert.equal(hasLearningAccessEnrollment({
       enrollments: [{ courseName: 'A', status: 'active' }],
+    }), true);
+  });
+
+  it('allows completed-only (HV học xong vẫn vào learning)', () => {
+    const student = { enrollments: [{ courseName: 'A', status: 'completed' }] };
+    assert.equal(hasLearningAccessEnrollment(student), true);
+    assert.equal(getActiveClientEnrollments(student).length, 1);
+  });
+
+  it('allows paused', () => {
+    assert.equal(hasLearningAccessEnrollment({
+      enrollments: [{ courseName: 'A', status: 'paused' }],
     }), true);
   });
 
@@ -95,10 +119,10 @@ describe('hasLearningAccessEnrollment SoT (status === active)', () => {
     }), false);
   });
 
-  it('blocks completed-only (unlike getActiveClientEnrollments)', () => {
-    const student = { enrollments: [{ courseName: 'A', status: 'completed' }] };
-    assert.equal(hasLearningAccessEnrollment(student), false);
-    assert.equal(getActiveClientEnrollments(student).length, 1);
+  it('blocks learningAccess false even if completed', () => {
+    assert.equal(hasLearningAccessEnrollment({
+      enrollments: [{ courseName: 'A', status: 'completed', learningAccess: false }],
+    }), false);
   });
 
   it('allows multi-course when one remains active after cancel', () => {
@@ -123,9 +147,12 @@ describe('hasLearningAccessEnrollment SoT (status === active)', () => {
     assert.equal(hasLearningAccessEnrollment({
       courses: [{ name: 'X', status: 'active' }],
     }), true);
+    assert.equal(hasLearningAccessEnrollment({
+      courses: [{ name: 'X', status: 'completed' }],
+    }), true);
   });
 
-  it('does NOT invent access from root course after cancel / placeholder', () => {
+  it('does NOT invent access from placeholder root course', () => {
     assert.equal(hasLearningAccessEnrollment({
       course: '(Đã hủy)',
       enrollments: [],
@@ -133,11 +160,21 @@ describe('hasLearningAccessEnrollment SoT (status === active)', () => {
     assert.equal(hasLearningAccessEnrollment({
       course: 'Chưa xếp lớp',
     }), false);
+  });
+
+  it('allows legacy root course when completed / đang học', () => {
     assert.equal(hasLearningAccessEnrollment({
       course: 'IC3 SPARK',
+      status: 'Hoàn thành',
       enrollments: [],
       courses: [],
-    }), false);
+    }), true);
+    assert.equal(hasLearningAccessEnrollment({
+      course: 'IC3 SPARK',
+      status: 'Đang học',
+      enrollments: [],
+      courses: [],
+    }), true);
   });
 
   it('blocks placeholder course name even if status active', () => {
@@ -164,10 +201,11 @@ describe('static: student learning routes gated vs ungated', () => {
     'utf8',
   );
 
-  it('exports hasLearningAccessEnrollment helper without root-course invent for learning', () => {
+  it('exports hasLearningAccessEnrollment helper without inventing cancel placeholders', () => {
     assert.match(enrollmentsSrc, /export function hasLearningAccessEnrollment/);
     assert.match(enrollmentsSrc, /getStructuredClientEnrollments/);
     assert.match(enrollmentsSrc, /isPlaceholderCourseName/);
+    assert.match(enrollmentsSrc, /completed/);
   });
 
   it('gates /student and exam routes; leaves inbox/feed/news ungated', () => {

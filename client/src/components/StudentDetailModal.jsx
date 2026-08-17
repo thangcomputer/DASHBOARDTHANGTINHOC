@@ -192,6 +192,14 @@ const summarizeEnrollments = (list) => {
   };
 };
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
+const fmtScheduleTimeRange = (sch) => {
+  const start = String(sch?.startTime || '').trim();
+  const end = String(sch?.endTime || '').trim();
+  if (start && end) return `${start}–${end}`;
+  if (start) return start;
+  if (end) return end;
+  return '';
+};
 const fmtDateTimeVN = (input) => {
   if (!input) return '';
   const d = new Date(input);
@@ -218,9 +226,11 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
   const [editForm, setEditForm] = useState({
     name: '', email: '', phone: '', age: '', zalo: '', password: '', gender: 'male',
   });
+  /** { [enrollmentId]: { totalSessions, completedSessions, remainingSessions, courseName, isPrimary, status } } */
+  const [enrollmentSessionForms, setEnrollmentSessionForms] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const { updateStudent, assignTeacher, teachers } = useData() || {};
+  const { updateStudent, assignTeacher, teachers, triggerBackgroundSync } = useData() || {};
   const [showAddEnrollment, setShowAddEnrollment] = useState(false);
 
   useEffect(() => {
@@ -250,7 +260,24 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             return;
           }
           toast.success('Đã điểm danh bù — buổi học hoàn thành');
+          // Cập nhật số buổi trên danh sách Admin/GV ngay (không chờ socket)
+          if (res.student && typeof updateStudent === 'function') {
+            try {
+              const patch = {
+                completedSessions: res.student.completedSessions,
+                remainingSessions: res.student.remainingSessions,
+                totalSessions: res.student.totalSessions,
+                enrollments: res.student.enrollments,
+                courses: res.student.courses,
+                status: res.student.status,
+              };
+              await updateStudent(res.student._id || studentId, patch, { localOnly: true });
+            } catch (_) { /* sync bên dưới sẽ bù */ }
+          }
           reloadProfile();
+          if (typeof triggerBackgroundSync === 'function') {
+            Promise.resolve(triggerBackgroundSync()).catch(() => {});
+          }
         } catch (e) {
           toast.error(e?.message || 'Lỗi kết nối');
         } finally {
@@ -271,8 +298,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
 
   useEffect(() => {
     if (!data?.student) return;
-    if (!hasLearningAccessEnrollment(data.student)
-      && (activeTab === 'assignments' || activeTab === 'edit')) {
+    if (!hasLearningAccessEnrollment(data.student) && activeTab === 'assignments') {
       setActiveTab('summary');
     }
   }, [data?.student, activeTab]);
@@ -289,7 +315,85 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
       password: '',
       gender: s.gender || 'male',
     });
-  }, [data?.student?._id, data?.student?.name, data?.student?.email, data?.student?.phone, data?.student?.age, data?.student?.zalo, data?.student?.gender]);
+    const list = getClientEnrollments(s);
+    const next = {};
+    if (list.length) {
+      list.forEach((enr, idx) => {
+        const id = String(enr.enrollmentId || enr._id || enr.id || `enr-${idx}`);
+        const total = Number(enr.totalSessions) > 0 ? Number(enr.totalSessions) : 12;
+        const completed = Math.max(0, Number(enr.completedSessions) || 0);
+        const remaining = enr.remainingSessions != null && enr.remainingSessions !== ''
+          ? Math.max(0, Number(enr.remainingSessions) || 0)
+          : Math.max(0, total - completed);
+        next[id] = {
+          totalSessions: total,
+          completedSessions: completed,
+          remainingSessions: remaining,
+          courseName: enr.courseName || enr.name || `Khóa ${idx + 1}`,
+          isPrimary: !!enr.isPrimary,
+          status: enr.status || '',
+        };
+      });
+    } else {
+      const total = Number(s.totalSessions) > 0 ? Number(s.totalSessions) : 12;
+      const completed = Math.max(0, Number(s.completedSessions) || 0);
+      const remaining = s.remainingSessions != null && s.remainingSessions !== ''
+        ? Math.max(0, Number(s.remainingSessions) || 0)
+        : Math.max(0, total - completed);
+      next.main = {
+        totalSessions: total,
+        completedSessions: completed,
+        remainingSessions: remaining,
+        courseName: s.course || 'Khóa học',
+        isPrimary: true,
+        status: s.status || '',
+      };
+    }
+    setEnrollmentSessionForms(next);
+  }, [
+    data?.student?._id,
+    data?.student?.name,
+    data?.student?.email,
+    data?.student?.phone,
+    data?.student?.age,
+    data?.student?.zalo,
+    data?.student?.gender,
+    data?.student?.totalSessions,
+    data?.student?.completedSessions,
+    data?.student?.remainingSessions,
+    data?.student?.enrollments,
+    data?.student?.course,
+  ]);
+
+  const setEnrollmentSessionField = (enrId, field, rawDigits) => {
+    const num = rawDigits === '' ? '' : Number(rawDigits);
+    setEnrollmentSessionForms((prev) => {
+      const cur = prev[enrId] || { totalSessions: 12, completedSessions: 0, remainingSessions: 12 };
+      if (num === '') return { ...prev, [enrId]: { ...cur, [field]: '' } };
+      if (field === 'remainingSessions') {
+        const t = Math.max(1, Number(cur.totalSessions) || 12);
+        const r = Math.max(0, Math.min(t, Number(num) || 0));
+        return {
+          ...prev,
+          [enrId]: { ...cur, totalSessions: t, remainingSessions: r, completedSessions: Math.max(0, t - r) },
+        };
+      }
+      if (field === 'completedSessions') {
+        const t = Math.max(1, Number(cur.totalSessions) || 12);
+        const c = Math.max(0, Math.min(t, Number(num) || 0));
+        return {
+          ...prev,
+          [enrId]: { ...cur, totalSessions: t, completedSessions: c, remainingSessions: Math.max(0, t - c) },
+        };
+      }
+      const t = Math.max(1, Number(num) || 12);
+      const c = Math.max(0, Math.min(t, Number(cur.completedSessions) || 0));
+      return {
+        ...prev,
+        [enrId]: { ...cur, totalSessions: t, completedSessions: c, remainingSessions: Math.max(0, t - c) },
+      };
+    });
+  };
 
   const reloadProfile = () => {
     if (!studentId) return;
@@ -317,6 +421,18 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     if (String(editForm.password || '').trim()) {
       payload.password = String(editForm.password).trim();
     }
+
+    const sessionEntries = Object.entries(enrollmentSessionForms || {});
+    const onlyMain = sessionEntries.length === 1 && sessionEntries[0][0] === 'main';
+    if (onlyMain) {
+      const sess = sessionEntries[0][1];
+      const total = Number(sess.totalSessions) > 0 ? Number(sess.totalSessions) : 12;
+      const completed = Math.max(0, Math.min(total, Number(sess.completedSessions) || 0));
+      payload.totalSessions = total;
+      payload.completedSessions = completed;
+      payload.remainingSessions = Math.max(0, total - completed);
+    }
+
     setSavingEdit(true);
     try {
       const res = await api.students.update(sid, payload);
@@ -324,6 +440,27 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
         toast.error(res?.message || 'Không cập nhật được');
         return;
       }
+
+      if (!onlyMain) {
+        for (const [enrId, sess] of sessionEntries) {
+          if (!enrId || enrId === 'main') continue;
+          const st = String(sess.status || '').toLowerCase();
+          if (st === 'cancelled' || st === 'refunded') continue;
+          const total = Number(sess.totalSessions) > 0 ? Number(sess.totalSessions) : 12;
+          const completed = Math.max(0, Math.min(total, Number(sess.completedSessions) || 0));
+          const remaining = Math.max(0, total - completed);
+          const enrRes = await api.students.updateEnrollmentSettings(sid, enrId, {
+            totalSessions: total,
+            completedSessions: completed,
+            remainingSessions: remaining,
+          });
+          if (enrRes?.success === false) {
+            toast.error(enrRes?.message || `Không cập nhật được khóa ${sess.courseName || enrId}`);
+            return;
+          }
+        }
+      }
+
       toast.success('Đã cập nhật thông tin học viên');
       setEditForm((f) => ({ ...f, password: '' }));
       reloadProfile();
@@ -1137,7 +1274,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                   { id: 'assignments', label: 'Bài tập', icon: BookOpen, requiresLearning: true },
                   { id: 'finance', label: 'Tài chính', icon: CreditCard },
                   { id: 'academic', label: 'Điểm số', icon: Trophy },
-                  { id: 'edit', label: 'Sửa thông tin', icon: Edit3, requiresLearning: true },
+                  { id: 'edit', label: 'Sửa thông tin', icon: Edit3 },
                 ].map((tab) => {
                   const locked = !!(tab.requiresLearning && learningTabsLocked);
                   return (
@@ -1455,6 +1592,9 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                               <div className="min-w-0">
                                 <p className="text-[10px] font-black text-emerald-400 uppercase leading-none mb-1">
                                   {fmtDate(sch.date)}
+                                  {fmtScheduleTimeRange(sch) ? (
+                                    <span className="text-emerald-300/80 font-bold normal-case tracking-normal"> · {fmtScheduleTimeRange(sch)}</span>
+                                  ) : null}
                                 </p>
                                 <p className="text-xs text-slate-300 font-medium truncate">
                                   {sch.title || sch.course}
@@ -1501,6 +1641,11 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                   <p className="text-xs font-bold text-slate-800">{fmtDate(sch.date)}</p>
+                                  {fmtScheduleTimeRange(sch) ? (
+                                    <p className="text-[11px] font-black text-indigo-600 mt-0.5 tabular-nums">
+                                      {fmtScheduleTimeRange(sch)}
+                                    </p>
+                                  ) : null}
                                   <p className="text-[11px] font-semibold text-slate-600 mt-0.5">{sch.teacherName || '—'}</p>
                                   {showCourse ? (
                                     <p className="text-[11px] font-semibold text-blue-600 truncate">{sch.course || '—'}</p>
@@ -1529,7 +1674,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                         <table className="w-full text-left">
                           <thead>
                             <tr className="bg-slate-50">
-                              <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày học</th>
+                              <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày / giờ học</th>
                               {(getClientEnrollments(data.student).length > 1) && (
                                 <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Khóa học</th>
                               )}
@@ -1550,7 +1695,16 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                 key={sch._id}
                                 className={`hover:bg-slate-50/50 transition ${highlighted ? 'bg-amber-50/80 ring-1 ring-amber-200' : ''}`}
                               >
-                                <td className="px-4 sm:px-6 py-3.5 text-xs font-bold text-slate-700 whitespace-nowrap">{fmtDate(sch.date)}</td>
+                                <td className="px-4 sm:px-6 py-3.5 text-xs font-bold text-slate-700 whitespace-nowrap">
+                                  <div className="leading-tight">
+                                    <div>{fmtDate(sch.date)}</div>
+                                    {fmtScheduleTimeRange(sch) ? (
+                                      <div className="text-[11px] font-black text-indigo-600 mt-0.5 tabular-nums">
+                                        {fmtScheduleTimeRange(sch)}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </td>
                                 {(getClientEnrollments(data.student).length > 1) && (
                                   <td className="px-3 sm:px-4 py-3.5 text-xs font-bold text-blue-600">{sch.course || '—'}</td>
                                 )}
@@ -2080,7 +2234,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                     <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2">
                       <Edit3 size={16} className="text-indigo-500" /> Sửa thông tin học viên
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1">Chỉ cập nhật thông tin cá nhân. Để trống mật khẩu nếu không đổi.</p>
+                    <p className="text-xs text-slate-500 mt-1">Cập nhật hồ sơ và số buổi. Để trống mật khẩu nếu không đổi.</p>
                   </div>
                   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 sm:p-6 space-y-4">
                     <div>
@@ -2163,6 +2317,76 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                         placeholder="Số Zalo (nếu khác SĐT)"
                       />
                     </div>
+
+                    <div className="space-y-3">
+                      <p className="text-[11px] font-black text-sky-800 uppercase tracking-wide">
+                        Số buổi theo từng khóa học
+                      </p>
+                      {Object.keys(enrollmentSessionForms).length === 0 ? (
+                        <p className="text-xs text-slate-400">Chưa có khóa học để chỉnh số buổi.</p>
+                      ) : (
+                        Object.entries(enrollmentSessionForms).map(([enrId, sess]) => {
+                          const cancelled = ['cancelled', 'refunded'].includes(String(sess.status || '').toLowerCase());
+                          return (
+                            <div
+                              key={enrId}
+                              className={`rounded-2xl border p-4 space-y-3 ${
+                                cancelled
+                                  ? 'border-red-100 bg-red-50/50 opacity-70'
+                                  : 'border-sky-100 bg-sky-50/60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-black text-slate-800">{sess.courseName}</p>
+                                {sess.isPrimary && (
+                                  <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Chính</span>
+                                )}
+                                {cancelled && (
+                                  <span className="text-[9px] font-black uppercase text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Đã hủy</span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Tổng buổi</label>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    disabled={cancelled}
+                                    value={sess.totalSessions}
+                                    onChange={(e) => setEnrollmentSessionField(enrId, 'totalSessions', e.target.value.replace(/\D/g, ''))}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono text-sky-700 outline-none focus:ring-2 focus:ring-sky-200 bg-white disabled:bg-slate-100"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Đã học</label>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    disabled={cancelled}
+                                    value={sess.completedSessions}
+                                    onChange={(e) => setEnrollmentSessionField(enrId, 'completedSessions', e.target.value.replace(/\D/g, ''))}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono text-amber-700 outline-none focus:ring-2 focus:ring-amber-200 bg-white disabled:bg-slate-100"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Còn lại</label>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    disabled={cancelled}
+                                    value={sess.remainingSessions}
+                                    onChange={(e) => setEnrollmentSessionField(enrId, 'remainingSessions', e.target.value.replace(/\D/g, ''))}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-200 bg-white disabled:bg-slate-100"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                      <p className="text-[11px] text-slate-500">Mỗi khóa chỉnh riêng. Đổi một ô sẽ tự khớp hai ô còn lại trong cùng khóa.</p>
+                    </div>
+
                     <div>
                       <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Mật khẩu mới</label>
                       <input

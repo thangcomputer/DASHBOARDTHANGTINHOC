@@ -22,6 +22,7 @@ const PRODUCT_ROLES = Object.freeze({
   SUPPORT: 'SUPPORT',
   TEACHER: 'TEACHER',
   STUDENT: 'STUDENT',
+  AI_SUPPORT: 'AI_SUPPORT',
 });
 
 function resolveProductRole(user = {}) {
@@ -104,6 +105,7 @@ function isPairStructurallyAllowed(senderProduct, peerProduct) {
       || peerProduct === PRODUCT_ROLES.STAFF
       || peerProduct === PRODUCT_ROLES.SUPPORT
       || peerProduct === PRODUCT_ROLES.STUDENT
+      || peerProduct === PRODUCT_ROLES.AI_SUPPORT
     );
   }
 
@@ -113,6 +115,7 @@ function isPairStructurallyAllowed(senderProduct, peerProduct) {
       || peerProduct === PRODUCT_ROLES.STAFF
       || peerProduct === PRODUCT_ROLES.SUPPORT
       || peerProduct === PRODUCT_ROLES.TEACHER
+      || peerProduct === PRODUCT_ROLES.AI_SUPPORT
     );
   }
 
@@ -146,6 +149,19 @@ async function resolveCanonicalPeer(receiverId, clientReceiverRoleHint = '') {
       productRole: PRODUCT_ROLES.SUPER_ADMIN,
       transportRole: 'admin',
       finalReceiverId: 'admin',
+    };
+  }
+
+  if (rid === 'ai_support') {
+    if (process.env.AI_SUPPORT_ENABLED !== '1') {
+      return { ok: false, message: 'Trợ lý AI chưa được bật' };
+    }
+    return {
+      ok: true,
+      peer: { id: 'ai_support', role: 'system', name: 'Trợ lý Thắng Tin Học' },
+      productRole: PRODUCT_ROLES.AI_SUPPORT,
+      transportRole: 'system',
+      finalReceiverId: 'ai_support',
     };
   }
 
@@ -238,6 +254,9 @@ async function assertPairScope(sender, senderProduct, peer, peerProduct) {
   }
 
   if (senderProduct === PRODUCT_ROLES.TEACHER) {
+    if (peerProduct === PRODUCT_ROLES.AI_SUPPORT) {
+      return { ok: true };
+    }
     if (peerProduct === PRODUCT_ROLES.STUDENT) {
       if (studentMatchesTeacher(peer, sender.id)) return { ok: true };
       const st = await Student.findById(peer.id || peer._id)
@@ -257,6 +276,9 @@ async function assertPairScope(sender, senderProduct, peer, peerProduct) {
   }
 
   if (senderProduct === PRODUCT_ROLES.STUDENT) {
+    if (peerProduct === PRODUCT_ROLES.AI_SUPPORT) {
+      return { ok: true };
+    }
     if (peerProduct === PRODUCT_ROLES.TEACHER) {
       const st = await Student.findById(sender.id).select('teacherId enrollments').lean();
       if (!st) return { ok: false, message: 'Khong tim thay hoc vien' };

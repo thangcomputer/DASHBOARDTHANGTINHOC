@@ -34,6 +34,12 @@ function denyEvaluations(res, statusHint, reason) {
       message: 'Không có quyền truy cập',
     });
   }
+  if (r === 'not_student' || r === 'policy_not_student') {
+    return res.status(403).json({
+      success: false,
+      message: 'Không có quyền',
+    });
+  }
   if (r === 'student_not_self' || r === 'policy_student_not_self') {
     return res.status(403).json({
       success: false,
