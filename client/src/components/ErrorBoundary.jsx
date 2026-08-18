@@ -77,7 +77,7 @@ class ErrorBoundary extends React.Component {
           alignItems:  'center',
           justifyContent: 'center',
           padding:     '2rem',
-          fontFamily:  'Inter, system-ui, sans-serif',
+          fontFamily:  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif',
         }}>
           <div style={{
             background:   '#1e293b',

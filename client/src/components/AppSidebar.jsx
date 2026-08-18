@@ -159,16 +159,22 @@ const AppSidebar = ({
   const SIDEBAR_COLLAPSE_KEY = 'cms_sidebar_collapsed';
   // Tablet / laptop hẹp (< xl 1200px): rail + overlay khi mở rộng
   const TABLET_RAIL_MQ = '(min-width: 768px) and (max-width: 1199.98px)';
-  const NARROW_DEFAULT_MQ = '(max-width: 1199.98px)';
+  const DESKTOP_MQ = '(min-width: 1200px)';
 
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false;
+  const readDesktopCollapsedPreference = () => {
     try {
       const saved = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
       if (saved === '1' || saved === '0') return saved === '1';
     } catch { /* ignore */ }
-    // Tablet / màn hẹp: mặc định thu gọn để nội dung rộng
-    return window.matchMedia(NARROW_DEFAULT_MQ).matches;
+    return false;
+  };
+
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    if (window.matchMedia(DESKTOP_MQ).matches) {
+      return readDesktopCollapsedPreference();
+    }
+    return true;
   });
   const [mobileOpenInternal, setMobileOpenInternal] = useState(false);
   const isMobileNavControlled = typeof onMobileOpenChange === 'function';
@@ -190,9 +196,25 @@ const AppSidebar = ({
     return () => mq.removeEventListener('change', sync);
   }, []);
 
+  // Desktop ↔ tablet: desktop mặc định giãn (hoặc theo localStorage); tablet mặc định thu rail
+  useEffect(() => {
+    const desktopMq = window.matchMedia(DESKTOP_MQ);
+    const syncViewport = () => {
+      if (desktopMq.matches) {
+        setCollapsed(readDesktopCollapsedPreference());
+      } else if (window.matchMedia(TABLET_RAIL_MQ).matches) {
+        setCollapsed(true);
+      }
+    };
+    desktopMq.addEventListener('change', syncViewport);
+    return () => desktopMq.removeEventListener('change', syncViewport);
+  }, []);
+
   const setCollapsedPersist = (next) => {
     setCollapsed(next);
-    try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    if (typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches) {
+      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    }
   };
 
   // Chỉ tablet (rail overlay): bấm nội dung bên phải → thu sidebar.
@@ -203,7 +225,7 @@ const AppSidebar = ({
     const collapseOnContentInteract = () => {
       if (typeof window === 'undefined') return;
       if (!window.matchMedia(TABLET_RAIL_MQ).matches) return;
-      setCollapsedPersist(true);
+      setCollapsed(true);
     };
     main.addEventListener('pointerdown', collapseOnContentInteract);
     return () => main.removeEventListener('pointerdown', collapseOnContentInteract);
@@ -212,11 +234,11 @@ const AppSidebar = ({
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Đổi trang trên tablet/laptop hẹp → thu sidebar
+  // Đổi trang trên tablet → thu sidebar (không ghi localStorage — tránh ảnh hưởng desktop)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!window.matchMedia(TABLET_RAIL_MQ).matches) return;
-    setCollapsedPersist(true);
+    setCollapsed(true);
   }, [location.pathname, location.hash]);
 
   const [openGroups, setOpenGroups] = useState(() => {

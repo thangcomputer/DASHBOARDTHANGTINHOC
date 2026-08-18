@@ -446,26 +446,23 @@ export default function FeedBoard({ session, role }) {
     isAdminLike(meRole, meId) || String(c.authorId) === meId || String(post.authorId) === meId;
 
   return (
-    <div className="w-full space-y-4 pb-8">
+    <div className="cms-feed-column pb-8 space-y-4">
       <div className="flex items-start justify-between gap-3 shrink-0">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
-            <Newspaper size={22} className="text-red-600 md:w-6 md:h-6 shrink-0" />
+          <h2 className="cms-feed-page-title flex items-center gap-2">
+            <Newspaper size={20} className="text-red-600 shrink-0" />
             Bảng tin hỏi bài
           </h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium">
+          <p className="cms-feed-page-desc mt-1">
             Đăng câu hỏi, chia sẻ ảnh bài tập — mọi người cùng xem và trả lời.
           </p>
         </div>
-        <button type="button" onClick={() => load(1, false)} className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 flex items-center justify-center" title="Tải lại">
+        <button type="button" onClick={() => load(1, false)} className="w-9 h-9 shrink-0 rounded-lg bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 flex items-center justify-center" title="Tải lại">
           <RefreshCw size={16} />
         </button>
       </div>
 
-
-
-      <div className="space-y-4 w-full min-w-0">
-        <div className="space-y-3 md:space-y-4 min-w-0">
+      <div className="space-y-3 md:space-y-4 min-w-0">
       <div className="cms-feed-composer">
         <div className="cms-feed-composer__row">
           <img
@@ -527,8 +524,8 @@ export default function FeedBoard({ session, role }) {
       ) : posts.length === 0 ? (
         <div className="py-16 text-center bg-white rounded-2xl border border-dashed border-slate-200">
           <Newspaper className="mx-auto text-slate-300 mb-2" size={36} />
-          <p className="text-sm font-bold text-slate-500">Chưa có bài nào</p>
-          <p className="text-xs text-slate-400 mt-1">Hãy là người đầu tiên đặt câu hỏi!</p>
+          <p className="text-sm font-semibold text-slate-500">Chưa có bài nào</p>
+          <p className="cms-feed-page-desc mt-1">Hãy là người đầu tiên đặt câu hỏi!</p>
         </div>
       ) : (
         <div className="cms-feed-list">
@@ -553,15 +550,15 @@ export default function FeedBoard({ session, role }) {
                   <button type="button" onClick={() => handleDelete(post.id)} disabled={busyId === post.id} className="text-slate-300 hover:text-red-500 p-1 shrink-0" title="Xóa bài"><Trash2 size={16} /></button>
                 ) : null}
               </div>
-              {post.content ? <p className="cms-feed-card__body px-3.5 pb-2">{post.content}</p> : null}
+              {post.content ? <p className="cms-feed-card__body">{post.content}</p> : null}
 
               {post.images?.length > 0 ? (
-                <div className={'grid gap-1 px-4 pb-2 ' + (post.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
+                <div className={'cms-feed-card__media ' + (post.images.length === 1 ? 'cms-feed-card__media--single' : 'cms-feed-card__media--multi')}>
                   {post.images.map((url) => {
                     const src = resolveMediaUrl(url) || url;
                     return (
-                      <button key={url} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightbox(src); }} className="rounded-xl overflow-hidden bg-slate-50 max-h-72">
-                        <img src={src} alt="" className="w-full h-full object-cover max-h-72" />
+                      <button key={url} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightbox(src); }} className="cms-feed-card__media-btn">
+                        <img src={src} alt="" className="cms-feed-card__media-img" />
                       </button>
                     );
                   })}
@@ -630,14 +627,14 @@ export default function FeedBoard({ session, role }) {
                               alt=""
                               className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                             />
-                            <span className="text-xs font-black text-slate-800">{c.authorName}</span>
-                            <span className={'text-[8px] font-black px-1 py-0.5 rounded ' + (ROLE_BADGE[c.authorRole] || '')}>{ROLE_LABEL[c.authorRole] || ''}</span>
-                            <span className="text-[10px] text-slate-400">{formatTime(c.createdAt)}</span>
+                            <span className="cms-feed-comment__author">{c.authorName}</span>
+                            <span className={'cms-feed-comment__role ' + (ROLE_BADGE[c.authorRole] || '')}>{ROLE_LABEL[c.authorRole] || ''}</span>
+                            <span className="cms-feed-comment__time">{formatTime(c.createdAt)}</span>
                             {canDeleteComment(post, c) ? (
                               <button type="button" onClick={() => handleDeleteComment(post.id, c.id)} className="ml-auto text-slate-300 hover:text-red-500" title="Xóa bình luận"><Trash2 size={12} /></button>
                             ) : null}
                           </div>
-                          {c.content ? <p className="text-xs text-slate-600 mt-0.5 whitespace-pre-wrap">{c.content}</p> : null}
+                          {c.content ? <p className="cms-feed-comment__body">{c.content}</p> : null}
                           {(c.images || []).length > 0 ? (
                             <div className="flex flex-wrap gap-1.5 mt-1.5">
                               {c.images.map((url) => {
@@ -652,16 +649,16 @@ export default function FeedBoard({ session, role }) {
                           <button
                             type="button"
                             onClick={() => setReplyTo((d) => ({ ...d, [post.id]: { id: c.id, name: c.authorName, focusId: c.id } }))}
-                            className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                            className="cms-feed-comment__reply mt-1"
                           >
-                            <Reply size={11} /> Trả lời
+                            <Reply size={12} /> Trả lời
                           </button>
                         </div>
                       </div>
 
                       {replyTo[post.id]?.focusId === c.id ? (
                         <div className="pt-2 space-y-1.5">
-                          <div className="flex items-center gap-2 text-[11px] text-indigo-600 font-semibold px-1">
+                          <div className="cms-feed-comment__replying px-1">
                             <Reply size={12} />
                             Đang trả lời {replyTo[post.id].name}
                             <button type="button" onClick={() => setReplyTo((d) => ({ ...d, [post.id]: null }))} className="text-slate-400 hover:text-slate-600 ml-1" title="Hủy"><X size={12} /></button>
@@ -693,7 +690,7 @@ export default function FeedBoard({ session, role }) {
                               onPaste={(e) => handlePasteComment(post.id, e)}
                               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComment(post.id); } }}
                               placeholder={'Trả lời ' + replyTo[post.id]?.name + '...'}
-                              className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-100"
+                              className="cms-feed-comment__input flex-1"
                             />
                             <label
                               className="cursor-pointer text-slate-400 hover:text-indigo-600 p-1.5"
@@ -734,14 +731,14 @@ export default function FeedBoard({ session, role }) {
                                   alt=""
                                   className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                                 />
-                                <span className="text-xs font-black text-slate-800">{r.authorName}</span>
-                                <span className={'text-[8px] font-black px-1 py-0.5 rounded ' + (ROLE_BADGE[r.authorRole] || '')}>{ROLE_LABEL[r.authorRole] || ''}</span>
-                                <span className="text-[10px] text-slate-400">{formatTime(r.createdAt)}</span>
+                                <span className="cms-feed-comment__author">{r.authorName}</span>
+                                <span className={'cms-feed-comment__role ' + (ROLE_BADGE[r.authorRole] || '')}>{ROLE_LABEL[r.authorRole] || ''}</span>
+                                <span className="cms-feed-comment__time">{formatTime(r.createdAt)}</span>
                                 {canDeleteComment(post, r) ? (
                                   <button type="button" onClick={() => handleDeleteComment(post.id, r.id)} className="ml-auto text-slate-300 hover:text-red-500" title="Xóa"><Trash2 size={12} /></button>
                                 ) : null}
                               </div>
-                              {r.content ? <p className="text-xs text-slate-600 mt-0.5 whitespace-pre-wrap">{r.content}</p> : null}
+                              {r.content ? <p className="cms-feed-comment__body">{r.content}</p> : null}
                               {(r.images || []).length > 0 ? (
                                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                                   {r.images.map((url) => {
@@ -756,16 +753,16 @@ export default function FeedBoard({ session, role }) {
                               <button
                                 type="button"
                                 onClick={() => setReplyTo((d) => ({ ...d, [post.id]: { id: c.id, name: r.authorName, focusId: r.id } }))}
-                                className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                                className="cms-feed-comment__reply mt-1"
                               >
-                                <Reply size={11} /> Trả lời
+                                <Reply size={12} /> Trả lời
                               </button>
                             </div>
                           </div>
 
                           {replyTo[post.id]?.focusId === r.id ? (
                             <div className="pl-6 pt-1 space-y-1.5">
-                              <div className="flex items-center gap-2 text-[11px] text-indigo-600 font-semibold px-1">
+                              <div className="cms-feed-comment__replying px-1">
                                 <Reply size={12} />
                                 Đang trả lời {replyTo[post.id].name}
                                 <button type="button" onClick={() => setReplyTo((d) => ({ ...d, [post.id]: null }))} className="text-slate-400 hover:text-slate-600 ml-1" title="Hủy"><X size={12} /></button>
@@ -795,7 +792,7 @@ export default function FeedBoard({ session, role }) {
                                   onChange={(e) => setCommentDrafts((d) => ({ ...d, [post.id]: e.target.value }))}
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComment(post.id); } }}
                                   placeholder={'Trả lời ' + replyTo[post.id]?.name + '...'}
-                                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-100"
+                                  className="cms-feed-comment__input flex-1"
                                 />
                                 <label className="cursor-pointer text-slate-400 hover:text-indigo-600 p-1.5" title="Thêm ảnh">
                                   <ImagePlus size={16} />
@@ -847,7 +844,7 @@ export default function FeedBoard({ session, role }) {
                         onChange={(e) => setCommentDrafts((d) => ({ ...d, [post.id]: e.target.value }))}
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComment(post.id); } }}
                         placeholder="Viết bình luận..."
-                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-100"
+                        className="cms-feed-comment__input flex-1"
                       />
                       <label className="cursor-pointer text-slate-400 hover:text-indigo-600 p-1.5" title="Thêm ảnh">
                         <ImagePlus size={16} />
@@ -877,7 +874,6 @@ export default function FeedBoard({ session, role }) {
           ) : null}
         </div>
       )}
-        </div>
       </div>
 
       {lightbox ? createPortal(
