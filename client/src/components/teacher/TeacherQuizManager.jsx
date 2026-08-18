@@ -5,6 +5,11 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useToast } from '../../utils/toast';
+import {
+  downloadTeacherQuestionsExcelTemplate,
+  parseQuestionBankExcel,
+  STUDENT_QUESTIONS_TEMPLATE_HEADERS,
+} from '../../utils/studentQuestionsExcel';
 
 const EMPTY_QUESTION = {
   questionText: '',
@@ -35,6 +40,7 @@ export default function TeacherQuizManager({
   const [targetStudentIds, setTargetStudentIds] = useState(
     presetStudentId ? [String(presetStudentId)] : []
   );
+  const [studentSearch, setStudentSearch] = useState('');
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(15);
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
   const [deadline, setDeadline] = useState('');
@@ -44,6 +50,7 @@ export default function TeacherQuizManager({
   const [aiGenerating, setAiGenerating] = useState(false);
   const [promptError, setPromptError] = useState(false);
   const titleInputRef = useRef(null);
+  const questionsExcelInputRef = useRef(null);
 
   const [questions, setQuestions] = useState([]);
 
@@ -61,6 +68,43 @@ export default function TeacherQuizManager({
       setLoading(false);
     }
   };
+
+  const openTeacherQuizDetailByNotification = useCallback(async (detail = {}) => {
+    const quizId = detail?.quizId || detail?.payload?.quizId || null;
+    const studentId = detail?.studentId || detail?.payload?.studentId || null;
+    if (!quizId && !studentId) return;
+    setSelectedDetailQuiz(null);
+    setLoading(true);
+    try {
+      const res = await api.quizzes.getTeacherQuizzes();
+      if (!res?.success) {
+        toast.error(res?.message || 'Không tải được bài trắc nghiệm');
+        return;
+      }
+      const list = Array.isArray(res.data) ? res.data : [];
+      setQuizzes(list);
+      const found = quizId
+        ? list.find((q) => String(q.id || q._id) === String(quizId))
+        : list.find((q) => (q.submissions || []).some((s) => String(s.studentId || s.student_id || s._id) === String(studentId)));
+      if (!found) {
+        toast.error('Không tìm thấy kết quả bài trắc nghiệm.');
+        return;
+      }
+      setSelectedDetailQuiz(found);
+    } catch {
+      toast.error('Không tải được kết quả bài trắc nghiệm. Thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    const onOpen = (e) => {
+      openTeacherQuizDetailByNotification(e?.detail || {});
+    };
+    window.addEventListener('open-teacher-quiz-detail', onOpen);
+    return () => window.removeEventListener('open-teacher-quiz-detail', onOpen);
+  }, [openTeacherQuizDetailByNotification]);
 
   useEffect(() => {
     if (!createOnly) fetchQuizzes();
@@ -101,8 +145,15 @@ export default function TeacherQuizManager({
       }
       if (course && !existing.courses.includes(course)) existing.courses.push(course);
     });
-    return [...map.values()];
-  }, [myStudents, courseName]);
+    const list = [...map.values()];
+    if (!studentSearch.trim()) return list;
+    const q = studentSearch.trim().toLowerCase();
+    return list.filter((s) => {
+      const n = String(s.name || '').toLowerCase();
+      const cs = (s.courses || []).join(',').toLowerCase();
+      return n.includes(q) || cs.includes(q);
+    });
+  }, [myStudents, courseName, studentSearch]);
 
   const toggleTargetStudent = (id) => {
     const sid = String(id);
@@ -173,6 +224,83 @@ export default function TeacherQuizManager({
       ]);
     }
     toast.success(`Đã thêm mẫu câu hỏi ${type.toUpperCase()}`);
+  };
+
+  const diffLabel = useMemo(() => {
+    const d = String(aiDifficulty || '').toLowerCase();
+    if (d === 'dễ') return 'Cơ bản';
+    if (d === 'khó') return 'Nâng cao';
+    return 'Trung bình';
+  }, [aiDifficulty]);
+
+  const handleImportQuestionsExcel = async (file) => {
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+
+      const parsed = await parseQuestionBankExcel(binary);
+      const parsedQs = Array.isArray(parsed?.questions) ? parsed.questions : [];
+      const errors = Array.isArray(parsed?.errors) ? parsed.errors : [];
+
+      if (!parsedQs.length) {
+        toast.error(errors[0] || 'Không có dữ liệu hợp lệ trong file Excel');
+        return;
+      }
+
+      const next = parsedQs
+        .filter((q) => String(q.type).toLowerCase() === 'multiple')
+        .slice(0, 200)
+        .map((q) => ({
+          questionText: q.q || '',
+          options: Array.isArray(q.options) ? q.options.slice(0, 4).map((x) => String(x ?? '')) : ['', '', '', ''],
+          correctAnswer: Number(q.correct ?? 0),
+          explanation: q.sampleAnswer || '',
+        }));
+
+      if (!next.length) {
+        toast.error('File không có câu hỏi trắc nghiệm (multiple choice).');
+        return;
+      }
+      setQuestions(next);
+      if (errors.length > 0) toast.info(`Lưu ý: ${errors.slice(0, 2).join(' · ')}`);
+      toast.success(`Đã nhập ${next.length} câu từ Excel`);
+    } catch {
+      toast.error('Không đọc được file Excel. Kiểm tra lại định dạng.');
+    }
+  };
+
+  const handleExportQuestionsExcel = async () => {
+    if (!questions.length) {
+      toast.error('Chưa có câu hỏi để xuất Excel');
+      return;
+    }
+    try {
+      const XLSX = (await import('xlsx')).default || (await import('xlsx'));
+      const letter = (idx) => ['A', 'B', 'C', 'D'][Math.max(0, Math.min(3, Number(idx) || 0))] || 'A';
+      const rows = questions.map((q) => ({
+        Loại: 'Trắc nghiệm',
+        'Phần thi': courseName || 'Excel',
+        'Độ khó': diffLabel,
+        'Câu hỏi': q.questionText || '',
+        'Đáp án A': q.options?.[0] || '',
+        'Đáp án B': q.options?.[1] || '',
+        'Đáp án C': q.options?.[2] || '',
+        'Đáp án D': q.options?.[3] || '',
+        'Đáp án đúng': letter(q.correctAnswer),
+        'Gợi ý trả lời (tự luận)': q.explanation || '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows, { header: STUDENT_QUESTIONS_TEMPLATE_HEADERS });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Cau hoi');
+      const safe = String(courseName || 'Quiz').replace(/[^\w\u00C0-\u024F]+/g, '_').slice(0, 30);
+      XLSX.writeFile(wb, `Quiz_TracNghiem_${safe}.xlsx`);
+      toast.success('Đã xuất file Excel');
+    } catch {
+      toast.error('Xuất Excel thất bại');
+    }
   };
 
   const handleGenerateAi = async () => {
@@ -441,6 +569,15 @@ export default function TeacherQuizManager({
                     ))}
                   </select>
                   <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/80 max-h-40 overflow-y-auto">
+                    <div className="px-2.5 pt-2 pb-1 border-b border-slate-200/60">
+                      <input
+                        type="text"
+                        value={studentSearch}
+                        onChange={(e) => setStudentSearch(e.target.value)}
+                        placeholder="Tìm học viên..."
+                        className="w-full px-2 py-1.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold bg-white"
+                      />
+                    </div>
                     <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2.5 py-1.5 bg-slate-50/95 border-b border-slate-200">
                       <span className="text-[10px] text-slate-500 font-bold">
                         {targetStudentIds.length > 0
@@ -499,9 +636,9 @@ export default function TeacherQuizManager({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1">Thời gian làm bài (Phút)</label>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-[220px] flex-1">
+                  <label className="block text-slate-600 mb-1 text-[11px]">Thời gian (phút)</label>
                   <input
                     type="number"
                     min={1}
@@ -511,8 +648,8 @@ export default function TeacherQuizManager({
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-600 mb-1">Hạn chót làm bài (Không bắt buộc)</label>
+                <div className="min-w-[260px] flex-1">
+                  <label className="block text-slate-600 mb-1 text-[11px]">Hạn chót (tuỳ chọn)</label>
                   <input
                     type="datetime-local"
                     value={deadline}
@@ -522,23 +659,40 @@ export default function TeacherQuizManager({
                 </div>
               </div>
 
-              {/* Mẫu nhanh + AI */}
+              {/* Nhập / Mẫu / Xuất + AI */}
               <div className="pt-2 border-t border-slate-100 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-slate-500 text-[11px]">Nạp mẫu nhanh:</span>
+                  <input
+                    ref={questionsExcelInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      handleImportQuestionsExcel(f);
+                    }}
+                  />
                   <button
                     type="button"
-                    onClick={() => loadTemplateQuestions('word')}
-                    className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold"
+                    onClick={() => questionsExcelInputRef.current?.click()}
+                    className="px-2.5 py-1 bg-white text-slate-800 border border-slate-200 rounded-lg text-[11px] font-bold hover:bg-slate-50 transition"
                   >
-                    Mẫu Word (3 câu)
+                    Nhập câu hỏi
                   </button>
                   <button
                     type="button"
-                    onClick={() => loadTemplateQuestions('excel')}
-                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[11px] font-bold"
+                    onClick={() => downloadTeacherQuestionsExcelTemplate('excel', 'Excel', 'multiple')}
+                    className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold hover:bg-indigo-100 transition"
                   >
-                    Mẫu Excel (2 câu)
+                    Mẫu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportQuestionsExcel}
+                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[11px] font-bold hover:bg-emerald-100 transition"
+                  >
+                    Xuất
                   </button>
                 </div>
                 <div className="flex flex-wrap items-end gap-2 rounded-xl border border-violet-100 bg-violet-50/60 p-2.5">
@@ -598,7 +752,7 @@ export default function TeacherQuizManager({
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
                     <p className="text-sm font-bold text-slate-600">Chưa có câu hỏi</p>
                     <p className="text-[11px] text-slate-400 mt-1 font-medium">
-                      Thêm câu mới, nạp mẫu Word/Excel, hoặc dùng AI trước khi tạo bài.
+                      Nhập câu hỏi từ Excel, hoặc dùng AI trước khi tạo bài.
                     </p>
                   </div>
                 )}

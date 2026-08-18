@@ -692,6 +692,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               studentId: n.payload?.studentId,
                               ...n,
                             });
+                      } else if (role === 'teacher' && n.payload?.quizId) {
+                        // Popup chi tiết kết quả trắc nghiệm (đúng/sai, thời điểm làm, số câu đúng/sai...)
+                        navigate('/teacher#students');
+                        window.setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('open-teacher-quiz-detail', {
+                            detail: {
+                              quizId: n.payload?.quizId,
+                              studentId: n.payload?.studentId,
+                              payload: n.payload,
+                            },
+                          }));
+                        }, 250);
                           } else if (
                             (role === 'admin' || role === 'staff')
                             && (n.payload?.kind === 'admin_feedback'

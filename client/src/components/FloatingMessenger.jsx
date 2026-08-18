@@ -971,6 +971,10 @@ export default function FloatingMessenger({ session, role }) {
   const meName = session?.name || 'Tôi';
   const meRole = normalizeChatRole(getMessagingRole(session) || role || session?.role || 'student');
   const canUseAiSupport = aiSupportEnabled && (meRole === 'student' || meRole === 'teacher');
+
+  // HV/GV: không tự mở cửa sổ chat ngay khi login.
+  // Chỉ hiển thị khi người dùng đã bấm (FAB hoặc chat-head).
+  const [userOpenedChat, setUserOpenedChat] = useState(false);
   // UI: staff/admin hide student quick-support chrome
   const isSuper = isSuperAdminViewer(session);
   // Directory: only SUPER/HIGH may browse presence; others use GET /contacts
@@ -1043,7 +1047,12 @@ export default function FloatingMessenger({ session, role }) {
     }).slice(0, 8);
   }, [conversations, usePresenceDirectory, canUseAiSupport]);
 
-  const openWindowRaw = tabs.find((t) => !t.minimized) || null;
+  const shouldForceMinimize = !userOpenedChat && (meRole === 'student' || meRole === 'teacher');
+  const uiTabs = shouldForceMinimize
+    ? (Array.isArray(tabs) ? tabs.map((t) => ({ ...t, minimized: true })) : [])
+    : tabs;
+
+  const openWindowRaw = uiTabs.find((t) => !t.minimized) || null;
   const openWindow = openWindowRaw && isAiSupportPeer(openWindowRaw.user)
     ? {
       ...openWindowRaw,
@@ -1051,7 +1060,7 @@ export default function FloatingMessenger({ session, role }) {
       user: { ...AI_SUPPORT_PEER },
     }
     : openWindowRaw;
-  const heads = tabs.filter((t) => t.minimized);
+  const heads = uiTabs.filter((t) => t.minimized);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
@@ -1112,6 +1121,7 @@ export default function FloatingMessenger({ session, role }) {
 
   const handleOpenAiSupport = useCallback(async () => {
     if (!canUseAiSupport || aiOpening) return;
+    setUserOpenedChat(true);
     setAiOpening(true);
     try {
       const res = await aiSupportAPI.open();
@@ -1282,7 +1292,8 @@ export default function FloatingMessenger({ session, role }) {
 
       if (isAiSupportConversationId(data.conversationId)) {
         const aiOpen = tabsRef.current.some((t) => !t.minimized && isAiSupportPeer(t.user));
-        if (!aiOpen) openChat(AI_SUPPORT_PEER, { expand: true });
+        // HV/GV: chỉ mở chat-head + badge, không tự bung cửa sổ.
+        if (!aiOpen) openChat(AI_SUPPORT_PEER, { expand: false });
         return;
       }
 
@@ -1332,6 +1343,7 @@ export default function FloatingMessenger({ session, role }) {
   }, []);
 
   const handleFocus = useCallback((convId) => {
+    setUserOpenedChat(true);
     focusChat(convId);
     if (meId) markMessagesRead?.(convId, meId);
   }, [focusChat, meId, markMessagesRead]);
@@ -1689,7 +1701,7 @@ export default function FloatingMessenger({ session, role }) {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="text-xs font-black text-slate-800 tracking-tight">{fabLabel}</span>
+                <span className="text-sm font-black text-slate-800 tracking-tight">{fabLabel}</span>
               </div>
             )}
 
@@ -1707,7 +1719,7 @@ export default function FloatingMessenger({ session, role }) {
                 <X size={24} className="text-white shrink-0" />
               ) : (
                 <div className="relative flex items-center justify-center w-full h-full overflow-visible">
-                  <SupportMascot size={52} waving={true} className="cms-support-mascot--fab" />
+                  <SupportMascot size={60} waving={true} className="cms-support-mascot--fab" />
                   <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-sm" title="Hoạt động" />
                 </div>
               )}
