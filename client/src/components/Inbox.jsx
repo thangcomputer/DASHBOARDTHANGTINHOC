@@ -22,7 +22,15 @@ import {
 } from '../utils/messagingDeepLink';
 import { MessageRichText } from '../utils/messageRichText';
 import SupportAiHandoffPanel from './support/SupportAiHandoffPanel';
-import { isAiSupportConversationId, AI_ESCALATE_MARKER } from '../utils/aiSupport';
+import {
+  isAiSupportConversationId,
+  AI_ESCALATE_MARKER,
+  AI_SUPPORT_PEER,
+  isAiWelcomeReply,
+  isAiIdlePing,
+  isAiIdleEnd,
+  isAiIdleStill,
+} from '../utils/aiSupport';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 const formatTime = (date) => {
@@ -34,6 +42,25 @@ const formatTime = (date) => {
   if (diffMs < 86400000) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 };
+
+function findCurrentAiSessionStartIndex(messages, escalateIdx) {
+  const end = escalateIdx >= 0 ? escalateIdx : messages.length;
+  let start = 0;
+  for (let i = 0; i < end; i += 1) {
+    if (isAiWelcomeReply(messages[i]?.content)) start = i;
+  }
+  return start;
+}
+
+function isHandoffMetaMessage(m) {
+  const content = String(m?.content || '');
+  if (isAiWelcomeReply(content)) return true;
+  if (isAiIdlePing(content)) return true;
+  if (isAiIdleEnd(content)) return true;
+  if (isAiIdleStill(content)) return true;
+  if (content.includes(AI_ESCALATE_MARKER)) return true;
+  return false;
+}
 
 function splitHandoffSummary(text) {
   const raw = String(text || '');
@@ -734,16 +761,41 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const aiHistorySplit = useMemo(() => {
     if (!activeConv?.isAiHandoff) {
-      return { hiddenCount: 0, visible: messages };
+      return { hiddenCount: 0, visible: messages, sessionStart: 0, escalateIdx: -1 };
     }
-    const idx = messages.findIndex((m) => String(m.content || '').includes(AI_ESCALATE_MARKER));
-    if (idx <= 0) return { hiddenCount: 0, visible: messages };
-    return { hiddenCount: idx, visible: messages.slice(idx) };
+    const escalateIdx = messages.findIndex((m) => String(m.content || '').includes(AI_ESCALATE_MARKER));
+    if (escalateIdx <= 0) {
+      return { hiddenCount: 0, visible: messages, sessionStart: 0, escalateIdx };
+    }
+    const sessionStart = findCurrentAiSessionStartIndex(messages, escalateIdx);
+    return {
+      sessionStart,
+      escalateIdx,
+      hiddenCount: escalateIdx - sessionStart,
+      visible: messages.slice(escalateIdx),
+    };
   }, [activeConv?.isAiHandoff, messages]);
 
-  const messagesToRender = (activeConv?.isAiHandoff && !showPriorAiThread)
+  const priorAiMessages = useMemo(() => {
+    if (!activeConv?.isAiHandoff || aiHistorySplit.escalateIdx <= 0) return [];
+    const { sessionStart, escalateIdx } = aiHistorySplit;
+    return messages.slice(sessionStart, escalateIdx).filter((m) => {
+      if (m.isRecalled) return false;
+      if (String(m.messageType || 'text') === 'system') return false;
+      if (isHandoffMetaMessage(m)) return false;
+      return Boolean(String(m.content || '').trim());
+    });
+  }, [activeConv?.isAiHandoff, aiHistorySplit, messages]);
+
+  const showHandoffSummaryPanel = Boolean(
+    activeConv?.isAiHandoff && (aiHandoffSession?.handoffSummary || priorAiMessages.length > 0),
+  );
+
+  const messagesToRender = showHandoffSummaryPanel
     ? aiHistorySplit.visible
-    : messages;
+    : ((activeConv?.isAiHandoff && !showPriorAiThread)
+      ? aiHistorySplit.visible
+      : messages);
 
   const markedReadConvRef = useRef('');
   useEffect(() => {
@@ -1686,41 +1738,62 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 ) : null}
               </div>
 
-              {activeConv.isAiHandoff && aiHandoffSession?.handoffSummary ? (
+              {showHandoffSummaryPanel ? (
                 <div className="mx-3 mt-2 mb-0 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-950 leading-snug">
                   <p className="font-black uppercase tracking-wide text-amber-800 mb-1">Tóm tắt cho Support (nội bộ)</p>
                   {handoffSummaryParts.head ? (
                     <p className="whitespace-pre-wrap">{handoffSummaryParts.head}</p>
                   ) : null}
-                  {handoffSummaryParts.transcript || aiHistorySplit.hiddenCount > 0 ? (
+                  {priorAiMessages.length > 0 || handoffSummaryParts.transcript ? (
                     <button
                       type="button"
                       onClick={() => setShowPriorAiThread((v) => !v)}
                       className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-amber-800 hover:text-amber-950"
                     >
                       <ChevronDown size={14} className={`transition-transform ${showPriorAiThread ? 'rotate-180' : ''}`} />
-                      {showPriorAiThread ? 'Thu gọn' : 'Hiển thị thêm'}
-                      {!showPriorAiThread && aiHistorySplit.hiddenCount > 0
-                        ? ` (${aiHistorySplit.hiddenCount} tin với Trợ lý AI)`
+                      {showPriorAiThread ? 'Thu gọn' : 'Xem lịch sử AI'}
+                      {!showPriorAiThread && priorAiMessages.length > 0
+                        ? ` (${priorAiMessages.length} tin với Trợ lý AI)`
                         : ''}
                     </button>
                   ) : null}
-                  {showPriorAiThread && handoffSummaryParts.transcript ? (
-                    <p className="mt-1.5 whitespace-pre-wrap border-t border-amber-100 pt-1.5">
-                      <span className="font-bold">Hội thoại gần nhất:</span>
-                      {'\n'}
-                      {handoffSummaryParts.transcript}
-                    </p>
+                  {showPriorAiThread && (priorAiMessages.length > 0 || handoffSummaryParts.transcript) ? (
+                    <div className="cms-handoff-transcript mt-1.5 border-t border-amber-100 pt-1.5">
+                      <p className="font-bold mb-1.5">Hội thoại với Trợ lý AI:</p>
+                      {priorAiMessages.length > 0 ? (
+                        <ul className="space-y-2">
+                          {priorAiMessages.map((msg) => {
+                            const isAi = String(msg.senderId) === AI_SUPPORT_PEER.id;
+                            return (
+                              <li key={msg.id} className="rounded-lg bg-white/60 border border-amber-100/80 px-2 py-1.5">
+                                <p className="text-[10px] font-black uppercase tracking-wide text-amber-800 mb-0.5">
+                                  {isAi ? 'Trợ lý AI' : (msg.senderName || 'Học viên / Giảng viên')}
+                                </p>
+                                <div className="whitespace-pre-wrap break-words text-[11px] leading-snug">
+                                  <MessageRichText text={msg.content} mine={false} />
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{handoffSummaryParts.transcript}</p>
+                      )}
+                    </div>
                   ) : null}
                   {handoffSummaryParts.footer ? (
                     <p className="mt-1.5 text-amber-800/80 italic">{handoffSummaryParts.footer}</p>
-                  ) : null}
+                  ) : (
+                    <p className="mt-1.5 text-amber-800/80 italic">
+                      Cần Support xem lại lịch sử trên và tiếp tục hỗ trợ, không hỏi lại từ đầu.
+                    </p>
+                  )}
                 </div>
               ) : null}
 
               {/* Messages */}
               <div className="cms-chat-messages">
-                {activeConv.isAiHandoff && aiHistorySplit.hiddenCount > 0 && !aiHandoffSession?.handoffSummary ? (
+                {activeConv.isAiHandoff && aiHistorySplit.hiddenCount > 0 && !showHandoffSummaryPanel ? (
                   <div className="flex justify-center py-2">
                     <button
                       type="button"

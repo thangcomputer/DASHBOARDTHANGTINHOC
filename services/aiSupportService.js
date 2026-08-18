@@ -348,6 +348,31 @@ function isWelcomeMessage(m) {
     && /hỗ trợ Word, Excel, PowerPoint, MOS, LMS/i.test(t);
 }
 
+/** Phiên đã có lời chào hoặc đang trao đổi — không chào lại trong tin Gemini. */
+function isOngoingConversation(history) {
+  return (history || []).some((m) => {
+    const t = String(m?.messageType || 'text');
+    if (t === 'system') return false;
+    if (isEscalationMessage(m) || isIdlePingMessage(m) || isIdleEndMessage(m) || isIdleStillHereMessage(m)) return false;
+    if (!String(m?.content || '').trim()) return false;
+    if (String(m?.senderId || '') === AI_PEER_ID && isWelcomeMessage(m)) return true;
+    return true;
+  });
+}
+
+const LEADING_GREETING_RE = /^(?:\s*(?:Dạ\s+)?(?:Em|Mình)\s+)?(?:Xin\s+chào|Chào(?:\s+Thầy\/Cô|\s+bạn|\s+em)?)\s+[^!\n]+[!….]?\s*(?:\n+)?/i;
+
+function stripLeadingGreeting(text) {
+  let t = String(text || '').trim();
+  if (!t) return t;
+  for (let i = 0; i < 2; i += 1) {
+    const next = t.replace(LEADING_GREETING_RE, '').trim();
+    if (next === t) break;
+    t = next;
+  }
+  return t;
+}
+
 function isIdleDecline(text) {
   const t = String(text || '').trim().toLowerCase().replace(/[.!?…,-]+$/g, '').trim();
   return /^(không|ko|k|khong|no|thôi|thoi|hết rồi|het roi|không cần)$/i.test(t);
@@ -511,14 +536,18 @@ function buildWelcomeMessage(userRole, userName) {
   return `Xin chào ${who}! Mình là Trợ lý AI Tin Học của Thắng Tin Học. Mình hỗ trợ Word, Excel, PowerPoint, MOS, LMS và học tập. Bạn hỏi gì về tin học cũng được nhé!`;
 }
 
-function buildSupportSystemPrompt(userRole, userName) {
+function buildSupportSystemPrompt(userRole, userName, { ongoing = false } = {}) {
   const isTeacher = isTeacherRole(userRole);
   const roleLabel = isTeacher ? 'Giảng viên' : 'Học viên';
   const name = String(userName || '').trim() || (isTeacher ? 'Thầy/Cô' : 'Học viên');
   const address = isTeacher ? 'Thầy/Cô' : 'bạn';
+  const greetingRule = ongoing
+    ? 'ĐANG TRONG PHIÊN CHAT: đã chào ở tin đầu phiên. KHÔNG chào lại, KHÔNG viết "Xin chào/Chào [tên]", vào thẳng nội dung trả lời.'
+    : 'Chỉ chào một lần duy nhất ở tin đầu phiên; các tin sau không chào lại.';
   return [
     `Bạn là giáo viên tin học văn phòng của Trung tâm Thắng Tin Học. Trả lời bằng tiếng Việt, xưng hô: ${address}.`,
     `Người đang chat ĐÃ ĐĂNG NHẬP: ${roleLabel} tên "${name}". Không hỏi vai trò, không hỏi chọn học viên/giảng viên.`,
+    greetingRule,
     'Phạm vi: Word, Excel, PowerPoint, MOS, máy tính cơ bản, in ấn/mạng cơ bản, LMS Thắng Tin Học (đăng nhập, lịch, điểm danh, tài liệu, thi, bài tập), học phí hướng dẫn chung.',
     `Ngoài phạm vi (luật, y tế, nấu ăn, chính trị, chuyện không liên quan tin học/LMS): trả đúng câu "${OUT_OF_SCOPE_REPLY}" rồi dừng.`,
     'Không hứa hoàn tiền, không đổi điểm, không tiết lộ mật khẩu.',
@@ -540,7 +569,8 @@ function buildSupportSystemPrompt(userRole, userName) {
 
 /** Chat messages cho Gemini — tách system / user / assistant, không nhét prompt admin. */
 function buildSupportMessages(history, userRole, userName) {
-  const messages = [{ role: 'system', content: buildSupportSystemPrompt(userRole, userName) }];
+  const ongoing = isOngoingConversation(history);
+  const messages = [{ role: 'system', content: buildSupportSystemPrompt(userRole, userName, { ongoing }) }];
   const rows = (history || [])
     .filter((m) => {
       const t = String(m.messageType || 'text');
@@ -585,10 +615,11 @@ function isBotLeakText(t) {
 }
 
 /** Loại bỏ output lỗi (echo prompt / mẫu thông báo local fallback cũ). */
-function sanitizeSupportReply(raw) {
-  const t = String(raw || '').trim();
+function sanitizeSupportReply(raw, { stripGreeting = false } = {}) {
+  let t = String(raw || '').trim();
   if (!t) return '';
   if (isBotLeakText(t)) return '';
+  if (stripGreeting) t = stripLeadingGreeting(t);
   if (t.length > 5500) return t.slice(0, 5500).trim();
   return t;
 }
@@ -852,6 +883,7 @@ async function replyToUserMessage({
   try {
     const history = await loadThreadMessages(conversationId);
     const messages = buildSupportMessages(history, humanRole, humanName);
+    const ongoing = isOngoingConversation(history);
     const images = [];
     if (imageFileUrl) {
       const inline = loadInlineImage(imageFileUrl);
@@ -865,7 +897,7 @@ async function replyToUserMessage({
       }
     }
     const result = await callSupportLlm(messages, { images });
-    const text = sanitizeSupportReply(result?.content) || EMPTY_REPLY;
+    const text = sanitizeSupportReply(result?.content, { stripGreeting: ongoing }) || EMPTY_REPLY;
     if (isHumanHandoffButtonHallucination(text)) {
       const handoff = await escalateToHuman({
         conversationId,
@@ -1126,12 +1158,24 @@ async function sendWelcomeIfEmpty({ conversationId, sender, io, notifyUser }) {
 
 const ESCALATE_TEXT = 'Đã chuyển yêu cầu tới nhân viên hỗ trợ. Bạn có thể tiếp tục nhắn trong cuộc trò chuyện này — nhân viên sẽ nhận toàn bộ nội dung đã trao đổi.';
 
+function currentSessionMessages(history) {
+  const rows = (history || []).filter((m) => !isEscalationMessage(m));
+  let start = 0;
+  for (let i = 0; i < rows.length; i += 1) {
+    if (isWelcomeMessage(rows[i])) start = i;
+  }
+  return rows.slice(start).filter((m) => {
+    if (isWelcomeMessage(m)) return false;
+    if (isIdlePingMessage(m) || isIdleEndMessage(m) || isIdleStillHereMessage(m)) return false;
+    if (String(m.messageType || 'text') === 'system') return false;
+    return Boolean(String(m.content || '').trim());
+  });
+}
+
 function buildLocalHandoffSummary({ history, user, reason }) {
   const role = getMessagingRole(user) === 'teacher' ? 'Teacher' : 'Student';
-  const lines = (history || [])
-    .filter((m) => !isEscalationMessage(m))
-    .slice(-8)
-    .map((m) => {
+  const sessionMsgs = currentSessionMessages(history);
+  const lines = sessionMsgs.slice(-20).map((m) => {
       const who = String(m.senderId) === AI_PEER_ID ? 'AI' : 'User';
       return `${who}: ${String(m.content || '').slice(0, 180)}`;
     });

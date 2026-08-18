@@ -2020,6 +2020,23 @@ html.cms-app-shell #root {
   border-bottom: 1px solid var(--cms-border);
   flex-shrink: 0;
 }
+.cms-handoff-transcript {
+  max-height: 18rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(180, 83, 9, 0.35) transparent;
+}
+.cms-handoff-transcript::-webkit-scrollbar {
+  width: 6px;
+}
+.cms-handoff-transcript::-webkit-scrollbar-thumb {
+  background: rgba(180, 83, 9, 0.35);
+  border-radius: 999px;
+}
 .cms-chat-messages {
   flex: 1 1 auto;
   min-height: 0;
