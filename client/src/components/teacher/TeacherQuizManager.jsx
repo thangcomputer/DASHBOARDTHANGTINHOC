@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Plus, Trash2, Clock, Calendar, Users, Award, BookOpen, CheckCircle,
   X, HelpCircle, Eye, AlertCircle, RefreshCw, Send, Check, Sparkles
@@ -568,7 +568,7 @@ export default function TeacherQuizManager({
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
-                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/80 max-h-40 overflow-y-auto">
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/80">
                     <div className="px-2.5 pt-2 pb-1 border-b border-slate-200/60">
                       <input
                         type="text"
@@ -578,7 +578,7 @@ export default function TeacherQuizManager({
                         className="w-full px-2 py-1.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 font-bold bg-white"
                       />
                     </div>
-                    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2.5 py-1.5 bg-slate-50/95 border-b border-slate-200">
+                    <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-slate-50/95 border-b border-slate-200">
                       <span className="text-[10px] text-slate-500 font-bold">
                         {targetStudentIds.length > 0
                           ? `Đã chọn ${targetStudentIds.length}/${pickerStudents.length} HV`
@@ -608,29 +608,27 @@ export default function TeacherQuizManager({
                         Chưa có học viên trong bộ lọc này.
                       </p>
                     ) : (
-                      <ul className="py-1">
-                        {pickerStudents.map((s) => {
-                          const checked = targetStudentIds.map(String).includes(s.id);
-                          return (
-                            <li key={s.id}>
-                              <label className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-white cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleTargetStudent(s.id)}
-                                  className="rounded border-slate-300 text-red-600 focus:ring-red-500"
-                                />
-                                <span className="font-bold text-slate-800 truncate">{s.name}</span>
-                                {s.courses.length > 0 && (
-                                  <span className="ml-auto text-[10px] text-slate-400 font-semibold truncate max-w-[45%]">
-                                    {s.courses.join(', ')}
-                                  </span>
-                                )}
-                              </label>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      <div className="max-h-[6rem] overflow-y-auto py-1">
+                        {/* Hiển thị 2 cột để gọn không gian ngang */}
+                        <ul className="grid grid-cols-2 gap-x-2 gap-y-0.5 px-2">
+                          {pickerStudents.map((s) => {
+                            const checked = targetStudentIds.map(String).includes(s.id);
+                            return (
+                              <li key={s.id} className="min-w-0">
+                                <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-white cursor-pointer rounded-md">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleTargetStudent(s.id)}
+                                    className="rounded border-slate-300 text-red-600 focus:ring-red-500 shrink-0"
+                                  />
+                                  <span className="font-bold text-slate-800 truncate">{s.name}</span>
+                                </label>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 </div>
