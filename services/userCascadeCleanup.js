@@ -167,22 +167,33 @@ async function purgeCancelledOnlyStudents(opts = {}) {
   return { dryRun: false, deleted, cascade, names: targets.slice(0, 50).map((s) => s.name) };
 }
 
+function isSpecialMessagingPeerId(id) {
+  const s = String(id || '');
+  return !s
+    || s === 'admin'
+    || s === 'ai_support'
+    || s.startsWith('ALL_')
+    || s.startsWith('group_');
+}
+
 /**
- * Dọn message / visibility orphan (sender/receiver không còn Student|Teacher).
+ * Dọn message orphan (sender/receiver không còn Student|Teacher).
  */
 async function purgeOrphanMessages() {
-  const messages = await Message.find({}).select('senderId receiverId').lean();
-  const userIds = new Set();
-  for (const m of messages) {
-    const sId = m.senderId ? String(m.senderId) : '';
-    const rId = m.receiverId ? String(m.receiverId) : '';
-    if (sId && sId !== 'admin') userIds.add(sId);
-    if (rId && rId !== 'admin' && !rId.startsWith('ALL_') && !rId.startsWith('group_')) {
-      userIds.add(rId);
-    }
-  }
+  const rows = await Message.aggregate([
+    { $project: { ids: ['$senderId', '$receiverId'] } },
+    { $unwind: '$ids' },
+    { $match: { ids: { $nin: [null, ''] } } },
+    { $group: { _id: '$ids' } },
+  ]);
 
-  const ids = [...userIds].filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const ids = [...new Set(
+    rows
+      .map((r) => String(r._id || ''))
+      .filter((id) => !isSpecialMessagingPeerId(id) && mongoose.Types.ObjectId.isValid(id)),
+  )];
+  if (ids.length === 0) return { deletedMessages: 0, deadPeerIds: 0 };
+
   const [teachers, students] = await Promise.all([
     Teacher.find({ _id: { $in: ids } }).select('_id').lean(),
     Student.find({ _id: { $in: ids } }).select('_id').lean(),
@@ -192,20 +203,20 @@ async function purgeOrphanMessages() {
     ...students.map((s) => String(s._id)),
   ]);
 
-  let deletedMessages = 0;
-  for (const m of messages) {
-    const sId = m.senderId ? String(m.senderId) : null;
-    const rId = m.receiverId ? String(m.receiverId) : null;
-    const senderMissing = sId && sId !== 'admin' && !existing.has(sId);
-    const isSpecialReceiver = rId && (rId === 'admin' || rId.startsWith('ALL_') || rId.startsWith('group_'));
-    const receiverMissing = rId && !isSpecialReceiver && !existing.has(rId);
-    if (senderMissing || receiverMissing) {
-      await Message.findByIdAndDelete(m._id);
-      deletedMessages += 1;
-    }
-  }
+  const deadIds = ids.filter((id) => !existing.has(id));
+  if (deadIds.length === 0) return { deletedMessages: 0, deadPeerIds: 0 };
 
-  return { deletedMessages };
+  const res = await Message.deleteMany({
+    $or: [
+      { senderId: { $in: deadIds } },
+      { receiverId: { $in: deadIds } },
+    ],
+  });
+
+  return {
+    deletedMessages: res.deletedCount || 0,
+    deadPeerIds: deadIds.length,
+  };
 }
 
 module.exports = {

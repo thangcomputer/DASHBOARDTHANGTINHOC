@@ -298,28 +298,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     })();
   }, []);
 
-  // Dọn tin nhắn orphan trên server (user đã xóa) rồi sync lại hộp thư
-  useEffect(() => {
-    const elevated = currentUserRole === 'admin'
-      || currentUser?.adminRole === 'SUPER_ADMIN'
-      || currentUser?.adminRole === 'HIGH_ADMIN';
-    if (!elevated || !currentUserId) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await messagesAPI.purgeOrphans();
-        if (cancelled) return;
-        if (res?.success && Number(res?.data?.deletedMessages || 0) > 0) {
-          await syncMessages?.(currentUserId);
-          toast.info(`Đã dọn ${res.data.deletedMessages} tin nhắn từ tài khoản đã xóa`);
-        }
-      } catch {
-        /* ignore — client filter vẫn ẩn ghost */
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [currentUserId, currentUserRole]);
-
   const refreshHiddenList = useCallback(async () => {
     try {
       const hiddenRes = await messagesAPI.getHiddenConversations();
@@ -339,6 +317,30 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setContactsLoaded(true);
     }
   }, []);
+
+  // Dọn tin nhắn orphan trên server (user đã xóa) rồi sync lại hộp thư
+  useEffect(() => {
+    const elevated = currentUserRole === 'admin'
+      || currentUser?.adminRole === 'SUPER_ADMIN'
+      || currentUser?.adminRole === 'HIGH_ADMIN';
+    if (!elevated || !currentUserId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await messagesAPI.purgeOrphans();
+        if (cancelled) return;
+        const deleted = Number(res?.data?.deletedMessages || 0);
+        if (res?.success && deleted > 0) {
+          await syncMessages?.(currentUserId);
+          await refreshContacts();
+          toast.info(`Đã dọn ${deleted} tin nhắn từ tài khoản đã xóa`);
+        }
+      } catch {
+        /* ignore — client filter vẫn ẩn ghost */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUserId, currentUserRole, refreshContacts, syncMessages]);
 
   useEffect(() => {
     if (!onContactListUpdated) return;
@@ -386,15 +388,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     });
     if (alive) return;
 
-    // Case A: vẫn còn activity tin nhắn → giữ mở (deep-link EXISTING_CONVERSATION)
-    const inActivity = (dataContextConvs || []).some(
-      (dc) => !dc?.isGroup && String(dc?.user?.id) === String(peerId),
-    );
-    if (inActivity) return;
-
     setActiveConv(null);
     setMessages([]);
-  }, [activeConv, contactsLoaded, contacts, students, teachers, staffs, dataContextConvs]);
+  }, [activeConv, contactsLoaded, contacts, students, teachers, staffs]);
   const [pendingImage, setPendingImage] = useState(null);
 
   const conversations = useMemo(() => {
@@ -424,9 +420,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     });
 
     const seenConvIds = new Set();
+    const contactIdSet = new Set(uniqueContacts.map((c) => String(c.id)));
+    const isListedPeer = (peerId) => {
+      const id = String(peerId || '');
+      if (!id || isSpecialMessagingPeerId(id)) return true;
+      if (!contactsLoaded) return true;
+      return contactIdSet.has(id);
+    };
     const pushEntry = (entry) => {
       const id = String(entry?.id || '');
       if (!id || seenConvIds.has(id)) return false;
+      if (!entry?.isGroup && entry?.user?.id && !isListedPeer(entry.user.id)) return false;
       seenConvIds.add(id);
       entries.push(entry);
       return true;
@@ -543,6 +547,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       const peerRole = normalizeRole(dc.user?.role);
       if (isHighAdmin && peerRole === 'student' && dc.user?.adminRole !== 'STAFF' && dc.user?.adminRole !== 'SUPPORT') return;
       const peerId = dc.user?.id != null ? String(dc.user.id) : '';
+      if (!dc.isGroup && peerId && !isListedPeer(peerId)) return;
       if (isSupportAgent && peerId && handoffUserIds.has(peerId)) return;
       const fromContact = peerId
         ? uniqueContacts.find((c) => String(c.id) === peerId)
@@ -564,7 +569,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     // Canonical id merge + newest lastTime first (immutable)
     return mergeConversationsById(entries);
-  }, [contacts, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin, isSupportAgent, handoffUserIds]);
+  }, [contacts, contactsLoaded, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin, isSupportAgent, handoffUserIds]);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
