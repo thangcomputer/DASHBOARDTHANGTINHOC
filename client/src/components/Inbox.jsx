@@ -1819,9 +1819,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                     </span>
                                   </div>
                                   {attachmentCaption(msg) ? (
-                                    <p className="whitespace-pre-wrap break-words px-0.5">
+                                    <div className="whitespace-pre-wrap break-words px-0.5">
                                       <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
-                                    </p>
+                                    </div>
                                   ) : null}
                               </div>
                                 ) : msg.messageType === 'file' ? (
@@ -1836,15 +1836,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                     </div>
                                   </a>
                                   {attachmentCaption(msg) ? (
-                                    <p className="whitespace-pre-wrap break-words px-0.5">
+                                    <div className="whitespace-pre-wrap break-words px-0.5">
                                       <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
-                                    </p>
+                                    </div>
                                   ) : null}
                                   </div>
                                 ) : (
-                                  <span className="whitespace-pre-wrap break-words">
+                                  <div className="whitespace-pre-wrap break-words">
                                     <MessageRichText text={msg.content} mine={isMine} />
-                                  </span>
+                                  </div>
                                 )}
 
                             {/* Reaction badge */}

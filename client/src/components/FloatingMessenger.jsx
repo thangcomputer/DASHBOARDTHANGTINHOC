@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
   ImagePlus, Link2, Loader2, MoreVertical, RotateCcw, Bot, UserRound, Check,
+  Copy, Scaling,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
@@ -32,9 +33,14 @@ import {
   buildAiSupportConversationId,
   AI_SUPPORT_STATUS,
   isHumanSupportSender,
+  isAiWelcomeReply,
+  isAiQuestionLimitReply,
+  isAiFaqChipLabel,
+  TEACHER_WELCOME_CHIPS,
+  STUDENT_WELCOME_CHIPS,
 } from '../utils/aiSupport';
 import SupportMascot from './SupportMascot';
-import { MessageRichText } from '../utils/messageRichText';
+import { MessageRichText, copyableTextFromMessage } from '../utils/messageRichText';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
@@ -49,6 +55,74 @@ const ROLE_LABEL = {
 };
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const FM_SIZE_KEY = 'cms_fm_win_size';
+const FM_SIZE_DEFAULT = { w: 400, h: 480 };
+
+function readFmSize() {
+  try {
+    const raw = localStorage.getItem(FM_SIZE_KEY);
+    if (!raw) return { ...FM_SIZE_DEFAULT };
+    const parsed = JSON.parse(raw);
+    const w = Number(parsed.w);
+    const h = Number(parsed.h);
+    if (!Number.isFinite(w) || !Number.isFinite(h)) return { ...FM_SIZE_DEFAULT };
+    return clampFmSize(w, h);
+  } catch {
+    return { ...FM_SIZE_DEFAULT };
+  }
+}
+
+function clampFmSize(w, h) {
+  const maxW = Math.max(320, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 24);
+  const maxH = Math.max(360, (typeof window !== 'undefined' ? window.innerHeight : 800) - 72);
+  return {
+    w: Math.min(Math.max(320, Math.round(w)), Math.min(760, maxW)),
+    h: Math.min(Math.max(380, Math.round(h)), Math.min(860, maxH)),
+  };
+}
+
+function persistFmSize(size) {
+  try { localStorage.setItem(FM_SIZE_KEY, JSON.stringify(size)); } catch { /* ignore */ }
+}
+
+async function copyMessageToClipboard(text) {
+  const plain = copyableTextFromMessage(text);
+  if (!plain) return false;
+  try {
+    await navigator.clipboard.writeText(plain);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function CopyHoverButton({ text }) {
+  const toast = useToast();
+  const [copied, setCopied] = useState(false);
+  if (!String(text || '').trim() || text === '[Hình ảnh]') return null;
+  return (
+    <button
+      type="button"
+      className="cms-fm-copy shrink-0"
+      title="Sao chép"
+      aria-label="Sao chép tin nhắn"
+      onClick={async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const ok = await copyMessageToClipboard(text);
+        if (!ok) {
+          toast.error('Không sao chép được');
+          return;
+        }
+        setCopied(true);
+        toast.success('Đã sao chép');
+        window.setTimeout(() => setCopied(false), 1200);
+      }}
+    >
+      {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+    </button>
+  );
+}
 
 function TypingIndicator({ label = 'Đang gõ' }) {
   return (
@@ -83,7 +157,7 @@ function isOutgoingMessengerMessage(m, meId) {
   return sid === me;
 }
 
-function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '' }) {
+function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '', chips = null, onChip }) {
   if (m.isRecalled) {
     return (
       <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'} opacity-70 italic w-fit max-w-[88%]`}>
@@ -120,9 +194,9 @@ function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '' }) 
             />
           </a>
           {m.content && m.content !== '[Hình ảnh]' && (
-            <p className="mt-1.5 whitespace-pre-wrap break-words px-0.5">
+            <div className="mt-1.5 whitespace-pre-wrap break-words px-0.5">
               <MessageRichText text={m.content} mine={mine} />
-            </p>
+            </div>
           )}
         </div>
         {showAiImageQuota && m.aiImageRemaining != null && Number.isFinite(Number(m.aiImageRemaining)) ? (
@@ -160,9 +234,23 @@ function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '' }) 
     <div className="w-fit max-w-[88%]">
       {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
       <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
-        <p className="whitespace-pre-wrap">
+        <div className="whitespace-pre-wrap">
           <MessageRichText text={m.content} mine={mine} />
-        </p>
+        </div>
+        {Array.isArray(chips) && chips.length > 0 ? (
+          <div className="mt-2 flex flex-col gap-1.5">
+            {chips.map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => onChip?.(chip)}
+                className="w-full text-left text-[12px] font-semibold leading-snug px-3 py-2 rounded-lg border border-emerald-200 bg-[#d4edda] text-emerald-900 hover:bg-emerald-100"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -210,6 +298,8 @@ function ChatWindow({
   escalating = false, resettingAi = false,
   onTypingStart, onTypingStop,
   imageQuota = { remaining: 5, limit: 5, used: 0 },
+  questionQuota = { applies: false, remaining: null, limit: 15, used: 0 },
+  viewerRole = 'student',
 }) {
   const toast = useToast();
   const [text, setText] = useState('');
@@ -222,6 +312,8 @@ function ChatWindow({
   const imageRef = useRef(null);
   const typingTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
+  const [winSize, setWinSize] = useState(readFmSize);
+  const resizeRef = useRef({ active: false, x: 0, y: 0, w: 0, h: 0 });
 
   const isOnline = useMemo(() => {
     if (tab.user.online !== undefined) return Boolean(tab.user.online);
@@ -238,6 +330,27 @@ function ChatWindow({
   const displayName = useMemo(() => {
     return tab.user.name || 'Hỗ trợ viên';
   }, [tab.user.name]);
+
+  const lastWelcomeIdx = useMemo(() => {
+    if (!isAiPeer) return -1;
+    return messages.reduce((acc, x, i) => (isAiWelcomeReply(x.content) ? i : acc), -1);
+  }, [isAiPeer, messages]);
+
+  const welcomeChips = viewerRole === 'teacher'
+    ? TEACHER_WELCOME_CHIPS
+    : viewerRole === 'student'
+      ? STUDENT_WELCOME_CHIPS
+      : null;
+
+  const showWelcomeChips = useMemo(() => {
+    if (!welcomeChips || lastWelcomeIdx < 0) return false;
+    if (aiStatus !== AI_SUPPORT_STATUS.AI_ACTIVE) return false;
+    return !messages.slice(lastWelcomeIdx + 1).some((x) => (
+      x.messageType !== 'system'
+      && String(x.senderId || '') !== 'ai_support'
+      && !x.isRecalled
+    ));
+  }, [welcomeChips, lastWelcomeIdx, aiStatus, messages]);
 
   const [statusFlash, setStatusFlash] = useState('');
   const prevAiStatusRef = useRef(aiStatus);
@@ -312,6 +425,46 @@ function ChatWindow({
   const aiImageLeft = Number(imageQuota?.remaining);
   const imageBlocked = aiImageLimited && !(aiImageLeft > 0);
   const canAttachImage = !isAiPeer || talkingToHuman || (aiImageLimited && !imageBlocked);
+  const questionLimited = Boolean(isAiPeer && !talkingToHuman && questionQuota?.applies);
+  const questionLeft = Number(questionQuota?.remaining);
+  const questionLimit = Number(questionQuota?.limit) || (viewerRole === 'teacher' ? 25 : 15);
+  const questionBlocked = questionLimited && !(questionLeft > 0);
+
+  const applyWinSize = useCallback((next) => {
+    const clamped = clampFmSize(next.w, next.h);
+    setWinSize(clamped);
+    persistFmSize(clamped);
+  }, []);
+
+  const startResize = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizeRef.current = {
+      active: true,
+      x: e.clientX,
+      y: e.clientY,
+      w: winSize.w,
+      h: winSize.h,
+    };
+    const onMove = (ev) => {
+      if (!resizeRef.current.active) return;
+      const dw = resizeRef.current.x - ev.clientX;
+      const dh = resizeRef.current.y - ev.clientY;
+      applyWinSize({ w: resizeRef.current.w + dw, h: resizeRef.current.h + dh });
+    };
+    const onUp = () => {
+      resizeRef.current.active = false;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [winSize, applyWinSize]);
+
+  const toggleWide = useCallback(() => {
+    const wide = winSize.w >= 560;
+    applyWinSize(wide ? FM_SIZE_DEFAULT : { w: 640, h: Math.max(winSize.h, 560) });
+  }, [winSize, applyWinSize]);
 
   const clearPendingImage = () => {
     if (pendingUrlRef.current) {
@@ -342,6 +495,10 @@ function ChatWindow({
     e?.preventDefault?.();
     const body = text.trim();
     if (uploading) return;
+    if (questionBlocked) {
+      toast.error(`Hết ${questionLimit} lượt hỏi AI hôm nay. Bấm Cần nhân viên hỗ trợ nếu vẫn cần giúp.`);
+      return;
+    }
     if (!body && !pendingImage) return;
     if (typingActiveRef.current && onTypingStop) {
       typingActiveRef.current = false;
@@ -419,7 +576,20 @@ function ChatWindow({
   };
 
   return (
-    <div className="cms-fm-window is-active">
+    <div
+      className="cms-fm-window is-active"
+      style={{ width: winSize.w, height: winSize.h, maxWidth: 'calc(100vw - 1rem)', maxHeight: 'calc(100dvh - 5rem)' }}
+    >
+      <button
+        type="button"
+        className="cms-fm-resize"
+        title="Kéo góc để phóng to / thu nhỏ"
+        aria-label="Kéo để đổi kích thước khung chat"
+        onPointerDown={startResize}
+        onDoubleClick={() => applyWinSize(FM_SIZE_DEFAULT)}
+      >
+        <Scaling size={14} />
+      </button>
       <div className="cms-fm-window__head">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="relative shrink-0">
@@ -446,6 +616,15 @@ function ChatWindow({
           </div>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            type="button"
+            className="cms-fm-icon-btn"
+            onClick={toggleWide}
+            title={winSize.w >= 560 ? 'Thu về kích thước mặc định' : 'Phóng rộng khung chat'}
+            aria-label={winSize.w >= 560 ? 'Thu nhỏ khung' : 'Phóng rộng khung chat'}
+          >
+            <Scaling size={14} />
+          </button>
           <button type="button" className="cms-fm-icon-btn" onClick={() => onMinimize(tab.id)} aria-label="Thu nhỏ thành biểu tượng">
             <Minus size={14} />
           </button>
@@ -537,15 +716,37 @@ function ChatWindow({
                   mine={alignEnd}
                   showAiImageQuota={sentByMe && isAiPeer && isImageMessage(m)}
                   senderLabel={isAiPeer && sentByMe && isImageMessage(m) && !alignEnd ? 'Bạn gửi' : ''}
+                  chips={
+                    isAiPeer && showWelcomeChips && idx === lastWelcomeIdx
+                      ? welcomeChips
+                      : null
+                  }
+                  onChip={(chip) => onSend(tab, chip.label)}
                 />
+                {!m.isRecalled && m.messageType !== 'system' ? (
+                  <CopyHoverButton text={m.content} />
+                ) : null}
               </div>
             );
           })
         )}
         {peerTyping ? <TypingIndicator label={isAiPeer && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE ? 'Trợ lý AI đang trả lời' : 'Đang gõ'} /> : null}
+        {isAiPeer && questionBlocked && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping ? (
+          <div className="px-2 pb-1">
+            <button
+              type="button"
+              disabled={escalating}
+              onClick={() => onEscalate?.(tab)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black uppercase tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors"
+            >
+              {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
+              Cần nhân viên hỗ trợ
+            </button>
+          </div>
+        ) : null}
         {isAiPeer ? (
           <div className="px-2 pb-1 space-y-2">
-            {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && canShowEscalate && (
+            {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && !questionBlocked && canShowEscalate && (
               !feedbackPhase
               || feedbackPhase === 'agree'
               || feedbackPhase === 'staff'
@@ -668,7 +869,7 @@ function ChatWindow({
               <button
                 type="button"
                 className="cms-fm-attach"
-                disabled={uploading || imageBlocked}
+                disabled={uploading || imageBlocked || questionBlocked}
                 onClick={() => {
                   if (imageBlocked) return;
                   imageRef.current?.click();
@@ -708,18 +909,27 @@ function ChatWindow({
             placeholder={
               uploading
                 ? 'Đang gửi ảnh…'
-                : pendingImage
-                  ? (isAiPeer ? 'Nhập câu hỏi rồi nhấn Gửi…' : 'Nhập lời nhắn rồi nhấn Gửi…')
-                  : (isAiPeer ? 'Hỏi tin học, Office, MOS, LMS…' : 'Aa (Dán ảnh Ctrl+V)')
+                : questionBlocked
+                  ? `Hết ${questionLimit} lượt hỏi AI hôm nay`
+                  : pendingImage
+                    ? (isAiPeer ? 'Nhập câu hỏi rồi nhấn Gửi…' : 'Nhập lời nhắn rồi nhấn Gửi…')
+                    : (isAiPeer ? 'Hỏi tin học, Office, MOS, LMS…' : 'Aa (Dán ảnh Ctrl+V)')
             }
-            disabled={uploading}
+            disabled={uploading || questionBlocked}
             className="cms-fm-input"
           />
-          <button type="submit" disabled={(!text.trim() && !pendingImage) || uploading} className="cms-fm-send" aria-label="Gửi">
+          <button type="submit" disabled={(!text.trim() && !pendingImage) || uploading || questionBlocked} className="cms-fm-send" aria-label="Gửi">
             {uploading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>
         </div>
       </form>
+      {questionLimited ? (
+        <p className={`px-3 pb-1 text-[10px] font-semibold ${questionBlocked ? 'text-amber-700' : 'text-slate-500'}`}>
+          {questionBlocked
+            ? `Hết ${questionLimit} lượt hôm nay. Bấm Cần nhân viên hỗ trợ nếu vẫn cần giúp.`
+            : `Câu hỏi Trợ lý AI: còn ${Number.isFinite(questionLeft) ? questionLeft : questionLimit}/${questionLimit} hôm nay`}
+        </p>
+      ) : null}
       {aiImageLimited ? (
         <p className={`px-3 pb-2 text-[10px] font-semibold ${imageBlocked ? 'text-amber-700' : 'text-slate-500'}`}>
           {imageBlocked
@@ -753,6 +963,9 @@ export default function FloatingMessenger({ session, role }) {
   const [aiFeedback, setAiFeedback] = useState({});
   const [peerTypingMap, setPeerTypingMap] = useState({});
   const [aiImageQuota, setAiImageQuota] = useState({ remaining: 5, limit: 5, used: 0 });
+  const [aiQuestionQuota, setAiQuestionQuota] = useState({
+    applies: false, remaining: 15, limit: 15, used: 0,
+  });
 
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';
@@ -916,6 +1129,15 @@ export default function FloatingMessenger({ session, role }) {
             used: Number(q.used ?? 0),
           });
         }
+        const qq = res.data?.session?.questionQuota;
+        if (qq) {
+          setAiQuestionQuota({
+            applies: Boolean(qq.applies),
+            remaining: qq.remaining == null ? null : Number(qq.remaining),
+            limit: Number(qq.limit ?? 15),
+            used: Number(qq.used ?? 0),
+          });
+        }
       }
       await syncMessages?.(meId);
       openChat(AI_SUPPORT_PEER, { expand: true });
@@ -990,6 +1212,15 @@ export default function FloatingMessenger({ session, role }) {
             used: Number(q.used ?? 0),
           });
         }
+        const qq = res.data?.session?.questionQuota;
+        if (qq) {
+          setAiQuestionQuota({
+            applies: Boolean(qq.applies),
+            remaining: qq.remaining == null ? null : Number(qq.remaining),
+            limit: Number(qq.limit ?? 15),
+            used: Number(qq.used ?? 0),
+          });
+        }
       }
     }).catch(() => {});
   }, [tabs, activeTabId]);
@@ -1000,6 +1231,21 @@ export default function FloatingMessenger({ session, role }) {
       const cid = String(payload?.conversationId || '');
       if (!cid || !payload?.status) return;
       setAiStatusMap((prev) => ({ ...prev, [cid]: payload.status }));
+      if (payload.imageQuota) {
+        setAiImageQuota({
+          remaining: Number(payload.imageQuota.remaining ?? 5),
+          limit: Number(payload.imageQuota.limit ?? 5),
+          used: Number(payload.imageQuota.used ?? 0),
+        });
+      }
+      if (payload.questionQuota) {
+        setAiQuestionQuota({
+          applies: Boolean(payload.questionQuota.applies),
+          remaining: payload.questionQuota.remaining == null ? null : Number(payload.questionQuota.remaining),
+          limit: Number(payload.questionQuota.limit ?? 15),
+          used: Number(payload.questionQuota.used ?? 0),
+        });
+      }
     };
     socket.on('ai-support:status', onStatus);
     return () => socket.off('ai-support:status', onStatus);
@@ -1125,6 +1371,14 @@ export default function FloatingMessenger({ session, role }) {
     if (!body) return;
 
     const isAi = isAiSupportPeer(tab.user);
+    if (isAi && aiQuestionQuota.applies && !(Number(aiQuestionQuota.remaining) > 0)) {
+      const status = aiStatusMap[tab.id] || AI_SUPPORT_STATUS.AI_ACTIVE;
+      if (status === AI_SUPPORT_STATUS.AI_ACTIVE && !isAiFaqChipLabel(body, meRole)) {
+        const lim = Number(aiQuestionQuota.limit) || (meRole === 'teacher' ? 25 : 15);
+        toast.error(`Hết ${lim} lượt hỏi AI hôm nay. Bấm Cần nhân viên hỗ trợ nếu vẫn cần giúp.`);
+        return;
+      }
+    }
     if (isAi) {
       clearAiFeedbackPrompt(tab);
     }
@@ -1160,6 +1414,11 @@ export default function FloatingMessenger({ session, role }) {
     const isAi = isAiSupportPeer(tab.user);
     const status = aiStatusMap[tab.id] || AI_SUPPORT_STATUS.AI_ACTIVE;
     const quotaApplies = isAi && status === AI_SUPPORT_STATUS.AI_ACTIVE;
+    if (quotaApplies && aiQuestionQuota.applies && !(Number(aiQuestionQuota.remaining) > 0)) {
+      const lim = Number(aiQuestionQuota.limit) || (meRole === 'teacher' ? 25 : 15);
+      toast.error(`Hết ${lim} lượt hỏi AI hôm nay. Bấm Cần nhân viên hỗ trợ nếu vẫn cần giúp.`);
+      return false;
+    }
     if (quotaApplies && Number(aiImageQuota.remaining) <= 0) {
       toast.error('Bạn đã gửi đủ 5 ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.');
       return false;
@@ -1265,6 +1524,8 @@ export default function FloatingMessenger({ session, role }) {
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
             imageQuota={aiImageQuota}
+            questionQuota={aiQuestionQuota}
+            viewerRole={meRole}
           />
         </div>
       )}

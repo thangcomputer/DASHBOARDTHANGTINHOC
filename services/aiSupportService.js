@@ -16,6 +16,8 @@ const AI_PEER_ID = 'ai_support';
 const AI_PEER_NAME = 'Trợ lý Thắng Tin Học';
 const TYPING_MS = 900;
 const AI_IMAGE_DAILY_LIMIT = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT) || 5);
+const AI_QUESTION_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT) || 15);
+const AI_QUESTION_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_TEACHER) || 25);
 const IDLE_PING_MS = Math.max(30_000, Number(process.env.AI_SUPPORT_IDLE_PING_MS) || 5 * 60 * 1000);
 const IDLE_END_MS = Math.max(15_000, Number(process.env.AI_SUPPORT_IDLE_END_MS) || 5 * 60 * 1000);
 const IDLE_SWEEP_MS = Math.max(10_000, Number(process.env.AI_SUPPORT_IDLE_SWEEP_MS) || 30_000);
@@ -23,6 +25,13 @@ const ESCALATE_MARKER = 'Đã chuyển yêu cầu tới nhân viên hỗ trợ';
 const BUSY_REPLY = 'Trợ lý AI đang bận. Bạn chọn "Cần nhân viên hỗ trợ" bên dưới nếu muốn gặp người thật.';
 const EMPTY_REPLY = 'Xin lỗi, mình chưa trả lời được lúc này. Bạn thử hỏi lại giúp mình nhé.';
 const OUT_OF_SCOPE_REPLY = 'Em là Trợ lý AI Tin Học của Thắng Tin Học. Câu hỏi này nằm ngoài phạm vi em hỗ trợ.';
+const QUESTION_LIMIT_MARKER = 'lượt hỏi Trợ lý AI hôm nay';
+function questionLimitReply(limit) {
+  const n = Number(limit) || 0;
+  return `Bạn đã hết ${n} ${QUESTION_LIMIT_MARKER}. Cần hỗ trợ tiếp thì bấm **Cần nhân viên hỗ trợ** bên dưới, hoặc ngày mai hỏi AI tiếp.`;
+}
+const IMAGE_GEN_REFUSE = 'Em không tạo hình ảnh. Bạn gửi ảnh màn hình Word, Excel hoặc PowerPoint nếu cần em xem giúp.';
+const GHOSTWRITE_REFUSE = 'Em chỉ hướng dẫn cách làm (dàn ý, thao tác Word). Em không viết hộ tiểu luận, báo cáo hay văn bản hành chính.';
 const IDLE_PING_TEXT = 'Bạn có còn đó không, cần hỗ trợ gì nữa không?';
 const IDLE_END_TEXT = 'Phiên hỗ trợ đã kết thúc.';
 const IDLE_STILL_HERE = 'Mình vẫn ở đây. Bạn hỏi gì ạ?';
@@ -110,6 +119,7 @@ function sessionToClient(session) {
     claimedAt: session.claimedAt || null,
     resolvedAt: session.resolvedAt || null,
     imageQuota: peekImageQuota(session),
+    questionQuota: peekQuestionQuota(session),
   };
 }
 
@@ -125,6 +135,61 @@ function vietnamDateKey(d = new Date()) {
     month: '2-digit',
     day: '2-digit',
   }).format(d);
+}
+
+function questionDailyLimit(userRole) {
+  const role = String(userRole || '');
+  if (role === 'teacher') return AI_QUESTION_DAILY_LIMIT_TEACHER;
+  if (role === 'student') return AI_QUESTION_DAILY_LIMIT_STUDENT;
+  return 0;
+}
+
+function peekQuestionQuota(session) {
+  const limit = questionDailyLimit(session?.userRole);
+  if (!limit) {
+    return { applies: false, used: 0, remaining: null, limit: 0 };
+  }
+  const today = vietnamDateKey();
+  const used = session && String(session.questionDate || '') === today
+    ? Number(session.questionCount || 0)
+    : 0;
+  return {
+    applies: true,
+    used,
+    remaining: Math.max(0, limit - used),
+    limit,
+    date: today,
+  };
+}
+
+/**
+ * Đếm 1 câu hỏi Gemini (HV/GV). FAQ / chào không gọi hàm này.
+ */
+async function consumeAiQuestionQuota(sessionDoc) {
+  const limit = questionDailyLimit(sessionDoc?.userRole);
+  if (!sessionDoc || !limit) {
+    return { applies: false, blocked: false, remaining: null, used: 0, limit };
+  }
+  if (aiPaused(effectiveStatus(sessionDoc))) {
+    return { applies: false, blocked: false, remaining: null, used: 0, limit };
+  }
+  const today = vietnamDateKey();
+  const used = String(sessionDoc.questionDate || '') === today
+    ? Number(sessionDoc.questionCount || 0)
+    : 0;
+  if (used >= limit) {
+    return { applies: true, blocked: true, remaining: 0, used, limit };
+  }
+  sessionDoc.questionDate = today;
+  sessionDoc.questionCount = used + 1;
+  await sessionDoc.save();
+  return {
+    applies: true,
+    blocked: false,
+    remaining: limit - used - 1,
+    used: used + 1,
+    limit,
+  };
 }
 
 function peekImageQuota(session) {
@@ -297,6 +362,145 @@ function isTeacherRole(userRole) {
   return String(userRole || '') === 'teacher';
 }
 
+function isStudentRole(userRole) {
+  return String(userRole || '') === 'student';
+}
+
+function normalizeFaqKey(text) {
+  return String(text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function teacherFaqReply(userRole, userText) {
+  if (!isTeacherRole(userRole)) return null;
+  const t = normalizeFaqKey(userText);
+  if (t === 'hướng dẫn sử dụng lms') {
+    return [
+      'Thầy/Cô dùng **LMS Thắng Tin Học** như sau:',
+      '**Bước 1:** Mở *menu bên trái*: **Tổng quan**, **Quản lý học viên**, **Lịch dạy**, **Tài chính**, **Đào tạo**, **Hộp thư**.',
+      '**Bước 2:** **Tổng quan** — xem lịch sắp tới, học viên, thông báo nhanh. ⟦go:/teacher|Mở Tổng quan⟧',
+      '**Bước 3:** **Quản lý học viên** — mở thẻ từng em để *điểm danh*, nhận xét, giao bài. ⟦go:/teacher#students|Mở Quản lý học viên⟧',
+      '**Bước 4:** **Đào tạo** — video/tài liệu nội bộ cho giảng viên. ⟦go:/teacher#training|Mở Đào tạo⟧',
+      '**Bước 5:** **Bảng tin** — đăng câu hỏi, chia sẻ ảnh bài tập. ⟦go:/teacher/feed|Mở Bảng tin⟧',
+      '**Bước 6:** **Tạo trắc nghiệm & bài tập** — soạn đề giao học viên. ⟦go:/teacher#assignments|Mở giao bài⟧',
+      'Thầy/Cô cần bước nào *chi tiết hơn* ạ?',
+    ].join('\n');
+  }
+  if (t === 'hướng dẫn tạo lịch dạy cho học viên') {
+    return [
+      'Tạo **lịch dạy** cho học viên:',
+      '**Bước 1:** Vào menu **Lịch dạy** (hoặc **Tổng quan**).',
+      '**Bước 2:** Bấm **Xếp lịch dạy mới**.',
+      '**Bước 3:** Chọn *học viên*, *ngày*, *giờ*, nội dung buổi học rồi bấm **Lưu**.',
+      '**Bước 4:** Buổi hiện trên *lịch tháng*. Tới giờ dạy thì **điểm danh** trên lịch hoặc thẻ học viên.',
+      '**Bước 5:** Có thể *sửa/hủy* buổi *chưa dạy* nếu xếp nhầm.',
+      '⟦go:/teacher#schedule|Mở Lịch dạy ngay⟧',
+      'Thầy/Cô đang kẹt ở bước chọn *học viên* hay chọn *giờ* ạ?',
+    ].join('\n');
+  }
+  if (t === 'xem tài chính') {
+    return [
+      'Xem **tài chính** giảng viên:',
+      '**Bước 1:** Vào menu **Tài chính** trên sidebar (hoặc nút Tài chính ở **Tổng quan**).',
+      '**Bước 2:** Trang này hiện buổi đã dạy, *đã thanh toán* và còn *tạm tính*.',
+      '**Bước 3:** Có thể **xuất bảng kê** nếu cần đối chiếu.',
+      '**Bước 4:** Học phí từng học viên nằm ở *hồ sơ học viên / giáo vụ* — **không sửa số tiền** trên trang này.',
+      '⟦go:/teacher/finance|Mở trang Tài chính⟧',
+      'Thầy/Cô muốn xem buổi *chưa thanh toán* hay bảng kê *tháng này* ạ?',
+    ].join('\n');
+  }
+  return null;
+}
+
+function isImageGenRequest(text) {
+  const t = String(text || '').toLowerCase();
+  if (!t) return false;
+  if (/(màn hình|screenshot|chụp ảnh|xem ảnh|gửi ảnh)/i.test(t) && !/(tạo ảnh|vẽ ảnh|sinh ảnh)/i.test(t)) {
+    return false;
+  }
+  return /(tạo ảnh|vẽ ảnh|sinh ảnh|generate image|tạo hình ảnh|ai vẽ|dall-?e|midjourney|tạo poster|tạo banner|tạo logo)/i.test(t);
+}
+
+function isGhostwriteRequest(text) {
+  const t = String(text || '').toLowerCase();
+  if (!t) return false;
+  const howTo = /(cách viết|hướng dẫn viết|dàn ý|cấu trúc|làm thế nào để viết|trình bày)/i.test(t);
+  const doForMe = /(viết hộ|soạn hộ|làm hộ|viết giúp|soạn giúp|làm giúp|viết luôn|viết đầy đủ|viết hoàn chỉnh|soạn luôn|viết cho mình|nội dung hoàn chỉnh|toàn bộ bài)/i.test(t);
+  if (howTo && !doForMe) return false;
+  const doc = /(tiểu luận|bài luận|luận văn|báo cáo thực tập|báo cáo môn|công văn|văn bản hành chính|đơn xin|biên bản họp|tờ trình|bài thu hoạch)/i.test(t);
+  if (!doc) return false;
+  return doForMe || /(viết|soạn)\s+\d+\s*(chữ|từ|trang)/i.test(t) || /(viết|soạn)\s+(một|1)\s*(bài|bản)/i.test(t);
+}
+
+function studentFaqReply(userRole, userText) {
+  if (!isStudentRole(userRole)) return null;
+  const t = normalizeFaqKey(userText);
+  if (t === 'lịch học') {
+    return [
+      'Xem **lịch học** trên LMS:',
+      '**Bước 1:** Mở menu **Lịch học** (hoặc **Tổng quan** → tab Lịch học).',
+      '**Bước 2:** Xem *ngày*, *giờ*, *giảng viên* của từng buổi.',
+      '**Bước 3:** Tới giờ thì vào học theo lịch; *vắng mặt* thì liên hệ **GV/giáo vụ**.',
+      '⟦go:/student#schedule|Mở Lịch học ngay⟧',
+      'Bạn đang không thấy buổi nào trên lịch à?',
+    ].join('\n');
+  }
+  if (t === 'học video') {
+    return [
+      'Học **video** trên LMS:',
+      '**Bước 1:** Vào menu **Tài liệu**.',
+      '**Bước 2:** Chọn tab **Video học**, mở bài theo *khóa đang học*.',
+      '**Bước 3:** Xem *lần lượt*; bài *khóa* thì học hết bài trước.',
+      '⟦go:/student#materials|Mở Video học ngay⟧',
+      'Bạn không thấy bài nào à?',
+    ].join('\n');
+  }
+  if (t === 'cách sử dụng hàm sumif, sumifs') {
+    return [
+      'Cách dùng **SUMIF** và **SUMIFS**:',
+      '',
+      'Giả sử bảng bán hàng *A1:C5* như sau:',
+      '| Chi nhánh | Sản phẩm | Doanh thu |',
+      '| --- | --- | --- |',
+      '| Hà Nội | Bút | 100 |',
+      '| Hải Phòng | Vở | 200 |',
+      '| Hà Nội | Thước | 150 |',
+      '| Đà Nẵng | Bút | 300 |',
+      '',
+      '**SUMIF** — cộng theo *một* điều kiện.',
+      '**Bước 1:** Viết `SUMIF`(range; tiêu_chí; [sum_range]).',
+      '**Bước 2:** *Ví dụ* cộng doanh thu chi nhánh **Hà Nội** → `SUMIF(A2:A5; "Hà Nội"; C2:C5)` = **250**.',
+      '',
+      '**SUMIFS** — cộng theo *nhiều* điều kiện.',
+      '**Bước 1:** Viết `SUMIFS`(sum_range; criteria_range1; criteria1; ...).',
+      '**Bước 2:** *Ví dụ* **Hà Nội** và sản phẩm **Bút** → `SUMIFS(C2:C5; A2:A5; "Hà Nội"; B2:B5; "Bút")` = **100**.',
+      '',
+      'Muốn xem thêm bài trên LMS: ⟦go:/student#materials|Mở Video học⟧',
+      'Bạn đang làm công thức trên cột nào?',
+    ].join('\n');
+  }
+  if (t === 'cách sử dụng hàm vlookup') {
+    return [
+      '**VLOOKUP** tìm giá trị theo cột khóa *bên trái* bảng.',
+      '**Bước 1:** Viết `VLOOKUP`(giá_trị_cần_tìm; bảng; số_cột; FALSE).',
+      '**Bước 2:** *Ví dụ:* `VLOOKUP(E2; A2:C20; 3; FALSE)`.',
+      '**Bước 3:** **FALSE** = khớp *chính xác*. Lỗi `#N/A` là *không thấy mã*.',
+      'Muốn xem thêm bài trên LMS: ⟦go:/student#materials|Mở Video học⟧',
+      'Bạn đang dò mã ở cột nào?',
+    ].join('\n');
+  }
+  if (t === 'cách sử dụng hàm if') {
+    return [
+      '**IF** trả kết quả theo điều kiện *Đúng* / *Sai*.',
+      '**Bước 1:** Viết `IF`(điều_kiện; nếu_đúng; nếu_sai).',
+      '**Bước 2:** *Ví dụ:* `IF(B2>=5; "Đạt"; "Chưa đạt")`.',
+      '**Bước 3:** Lồng nhiều điều kiện thì dùng `IFS` hoặc `IF` *lồng nhau*.',
+      'Muốn xem thêm bài trên LMS: ⟦go:/student#materials|Mở Video học⟧',
+      'Bạn đang chấm đạt/không đạt theo cột nào?',
+    ].join('\n');
+  }
+  return null;
+}
+
 function buildWelcomeMessage(userRole, userName) {
   const name = String(userName || '').trim();
   if (isTeacherRole(userRole)) {
@@ -318,10 +522,14 @@ function buildSupportSystemPrompt(userRole, userName) {
     'Phạm vi: Word, Excel, PowerPoint, MOS, máy tính cơ bản, in ấn/mạng cơ bản, LMS Thắng Tin Học (đăng nhập, lịch, điểm danh, tài liệu, thi, bài tập), học phí hướng dẫn chung.',
     `Ngoài phạm vi (luật, y tế, nấu ăn, chính trị, chuyện không liên quan tin học/LMS): trả đúng câu "${OUT_OF_SCOPE_REPLY}" rồi dừng.`,
     'Không hứa hoàn tiền, không đổi điểm, không tiết lộ mật khẩu.',
+    'Không tạo, không vẽ, không sinh hình ảnh; không nhắc công cụ AI tạo ảnh. Chỉ xem ảnh người dùng gửi (màn hình Office). Nếu họ yêu cầu tạo ảnh: trả đúng câu "' + IMAGE_GEN_REFUSE + '" rồi dừng.',
+    'Không viết hộ tiểu luận, báo cáo, công văn, văn bản hành chính. Nếu họ yêu cầu viết hộ những loại đó: trả đúng câu "' + GHOSTWRITE_REFUSE + '" rồi dừng.',
+    'Học viên mới: làm hộ thao tác tin học được — công thức Excel điền sẵn, từng bước Word/PowerPoint/LMS, sửa lỗi trên ảnh màn hình.',
     'Không nhắc, không mô tả, không bảo bấm nút (Gặp nhân viên, Cần nhân viên, biểu tượng hỗ trợ). Không in chữ "Lịch sử" hay "Câu hỏi mới".',
     'CÁCH TRẢ LỜI: đầy đủ, dạy được luôn. Không sơ sài, không cắt giữa danh sách. Câu hỏi dạng "học những gì / hàm nào / thao tác nào" thì liệt kê HẾT nhóm phổ biến, mỗi mục 1–2 dòng.',
-    'Mỗi mục: tên + cú pháp hoặc vị trí Ribbon (thẻ > nhóm > lệnh) + ví dụ ngắn. How-to nêu từng bước. Kết thúc trọn ý, có thể thêm 1 mẹo cuối.',
-    'Không dùng markdown (** ##). Dùng danh sách đánh số 1. 2. 3. và xuống dòng.',
+    'Mỗi mục: tên + cú pháp hoặc vị trí Ribbon (thẻ > nhóm > lệnh) + ví dụ ngắn. Kết thúc trọn ý, có thể thêm 1 mẹo cuối.',
+    'PHÂN BIỆT DANH SÁCH: Hướng dẫn THAO TÁC (một luồng làm tuần tự: cách dùng hàm, cách xếp lịch, cách vào menu) → **Bước 1:** **Bước 2:** … Không viết 1. 2. 3. Liệt kê MỤC / PHƯƠNG ÁN / LỘ TRÌNH / GIẢI THÍCH (nhiều hàm, nhiều cách, lộ trình học) → dùng 1. 2. 3. Không viết "Bước". Ví dụ how-to: "**Bước 1:** Vào tab Data...". Ví dụ liệt kê: "1. COUNT — đếm số. 2. COUNTA — đếm ô không trống."',
+    'Không dùng markdown heading (##). Đậm/nghiêng/hàm: **đậm** cho bước và từ khóa (menu, nút, kết quả), *nghiêng* cho ghi chú/cảnh báo, `SUMIF` cho tên hàm. Bảng dữ liệu Excel: markdown table | cột | cột |, có dòng | --- | --- |. Không viết "Dòng 1: A | B".',
     'KIẾN THỨC NỀN — Excel: COUNT, COUNTA, COUNTBLANK, COUNTIF, COUNTIFS, SUM, SUMIF, SUMIFS, AVERAGE, AVERAGEIF, AVERAGEIFS, MAX, MIN, MEDIAN, MODE, LARGE, SMALL, RANK, STDEV.S; IF, IFS, AND, OR, IFERROR; VLOOKUP, XLOOKUP, INDEX, MATCH; tham chiếu A1 vs $A$1; bảng Excel (Ctrl+T); PivotTable; biểu đồ; lọc/sắp xếp; Data Validation; Conditional Formatting; Text to Columns.',
     'KIẾN THỨC NỀN — Word: Styles (Heading 1/2/3), mục lục, ngắt trang/section, Header/Footer, số trang, lề/khổ giấy, mail merge, bảng, bọc chữ ảnh, Find/Replace, Track Changes.',
     'KIẾN THỨC NỀN — PowerPoint: layout, theme, Slide Master, transition, animation, SmartArt, biểu đồ, Presenter View, Notes, xuất PDF.',
@@ -563,6 +771,64 @@ async function replyToUserMessage({
       humanRole,
       humanName,
       content: buildWelcomeMessage(humanRole, humanName),
+      io,
+      notifyUser,
+    });
+  }
+
+  if (isImageGenRequest(userText)) {
+    sessionDoc.consecutiveAiFailures = 0;
+    await sessionDoc.save();
+    return persistBotReply({
+      conversationId,
+      humanUserId,
+      humanRole,
+      humanName,
+      content: IMAGE_GEN_REFUSE,
+      io,
+      notifyUser,
+    });
+  }
+
+  if (isGhostwriteRequest(userText)) {
+    sessionDoc.consecutiveAiFailures = 0;
+    await sessionDoc.save();
+    return persistBotReply({
+      conversationId,
+      humanUserId,
+      humanRole,
+      humanName,
+      content: GHOSTWRITE_REFUSE,
+      io,
+      notifyUser,
+    });
+  }
+
+  const faq = teacherFaqReply(humanRole, userText)
+    || studentFaqReply(humanRole, userText);
+  if (faq && !imageFileUrl) {
+    sessionDoc.consecutiveAiFailures = 0;
+    await sessionDoc.save();
+    return persistBotReply({
+      conversationId,
+      humanUserId,
+      humanRole,
+      humanName,
+      content: faq,
+      io,
+      notifyUser,
+    });
+  }
+
+  const q = await consumeAiQuestionQuota(sessionDoc);
+  if (q.applies) emitStatus(io, sessionDoc, humanUserId);
+  if (q.blocked) {
+    return persistBotReply({
+      conversationId,
+      humanUserId,
+      humanRole,
+      humanName,
+      content: questionLimitReply(q.limit),
       io,
       notifyUser,
     });
@@ -1228,6 +1494,8 @@ module.exports = {
   sendWelcomeIfEmpty,
   consumeAiImageQuota,
   peekImageQuota,
+  consumeAiQuestionQuota,
+  peekQuestionQuota,
   escalateToHuman,
   resetAiSession,
   replyToUserMessage,

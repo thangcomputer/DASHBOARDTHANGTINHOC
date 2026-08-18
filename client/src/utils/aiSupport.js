@@ -70,6 +70,32 @@ export function isAiWelcomeReply(content) {
     && /hỗ trợ Word, Excel, PowerPoint, MOS, LMS/i.test(t);
 }
 
+/** Nút câu hỏi sẵn dưới lời chào AI. Gửi đúng `label` để backend FAQ không gọi Gemini. */
+export const TEACHER_WELCOME_CHIPS = Object.freeze([
+  { id: 'lms', label: 'Hướng dẫn sử dụng LMS' },
+  { id: 'schedule', label: 'Hướng dẫn tạo lịch dạy cho học viên' },
+  { id: 'finance', label: 'Xem tài chính' },
+]);
+
+export const STUDENT_WELCOME_CHIPS = Object.freeze([
+  { id: 'schedule', label: 'Lịch học' },
+  { id: 'video', label: 'Học video' },
+  { id: 'sumif', label: 'Cách sử dụng hàm SUMIF, SUMIFS' },
+  { id: 'vlookup', label: 'Cách sử dụng hàm VLOOKUP' },
+  { id: 'if', label: 'Cách sử dụng hàm IF' },
+]);
+
+export function isAiQuestionLimitReply(content) {
+  return /lượt hỏi Trợ lý AI hôm nay/i.test(String(content || ''));
+}
+
+export function isAiFaqChipLabel(text, role) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  const chips = role === 'teacher' ? TEACHER_WELCOME_CHIPS : STUDENT_WELCOME_CHIPS;
+  return chips.some((c) => c.label === t);
+}
+
 export function isAiIdlePing(content) {
   return String(content || '').includes('Bạn có còn đó không');
 }
@@ -93,6 +119,7 @@ export function hasMeaningfulAiReply(messages) {
     && !isAiIdlePing(m.content)
     && !isAiIdleEnd(m.content)
     && !isAiIdleStill(m.content)
+    && !isAiQuestionLimitReply(m.content)
   ));
 }
 
@@ -108,7 +135,7 @@ export function lastMeaningfulAiReplyId(messages, meId) {
     const m = msgs[i];
     if (!m || m.isRecalled || m.messageType === 'system') continue;
     if (String(m.senderId || '') !== AI_SUPPORT_PEER.id) return '';
-    if (isAiEscalationMessage(m) || isAiWelcomeReply(m.content) || isAiIdlePing(m.content) || isAiIdleEnd(m.content) || isAiIdleStill(m.content)) return '';
+    if (isAiEscalationMessage(m) || isAiWelcomeReply(m.content) || isAiIdlePing(m.content) || isAiIdleEnd(m.content) || isAiIdleStill(m.content) || isAiQuestionLimitReply(m.content)) return '';
 
     let userContent = '';
     for (let j = i - 1; j >= 0; j -= 1) {

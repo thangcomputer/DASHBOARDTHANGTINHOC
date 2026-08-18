@@ -26,6 +26,9 @@ const aiSupportSessionSchema = new mongoose.Schema({
   /** Số ảnh gửi cho AI trong ngày (Asia/Ho_Chi_Minh). Chat nhân viên không đếm. */
   imageUploadDate: { type: String, default: '' },
   imageUploadCount: { type: Number, default: 0 },
+  /** Số câu hỏi HV gửi AI trong ngày. */
+  questionDate: { type: String, default: '' },
+  questionCount: { type: Number, default: 0 },
   /** Tin user gần nhất — dùng idle 5 phút. */
   lastUserMessageAt: { type: Date, default: null },
   /** Đã hỏi “còn đó không” — chờ phản hồi rồi kết thúc phiên. */

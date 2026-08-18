@@ -840,14 +840,23 @@
   .cms-fm-window {
     width: min(400px, calc(100vw - 5.5rem));
     height: min(480px, calc(100dvh - 6rem));
-    @apply bg-white rounded-2xl border border-slate-200 shadow-[0_12px_40px_rgba(15,23,42,0.18)] flex flex-col overflow-hidden shrink-0;
+    @apply bg-white rounded-2xl border border-slate-200 shadow-[0_12px_40px_rgba(15,23,42,0.18)] flex flex-col overflow-hidden shrink-0 relative;
   }
   .cms-fm-window.is-active {
     box-shadow: 0 16px 48px rgba(220, 38, 38, 0.18);
     border-color: color-mix(in srgb, #dc2626 35%, #e2e8f0);
   }
+  .cms-fm-resize {
+    @apply absolute z-20 w-4 h-4 text-slate-400 hover:text-red-600;
+    left: 4px;
+    top: 4px;
+    cursor: nw-resize;
+  }
+  .cms-fm-copy {
+    @apply w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100;
+  }
   .cms-fm-window__head {
-    @apply flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 bg-white shrink-0;
+    @apply flex items-center gap-2 pl-7 pr-3 py-2.5 border-b border-slate-100 bg-white shrink-0;
   }
   .cms-fm-window__body {
     @apply flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2.5 space-y-1.5 bg-slate-50/60;
