@@ -63,6 +63,7 @@ router.post('/create', [authMiddleware, ...quizzesGuard('create')], async (req, 
     scheduleQuizAssignedNotify({
       quiz,
       notifyUser: typeof req.app.notifyUser === 'function' ? req.app.notifyUser.bind(req.app) : null,
+      io: req.app.get('io'),
     });
 
     return res.json({ success: true, data: quiz, message: 'Tạo bài trắc nghiệm thành công' });

@@ -4,7 +4,9 @@ import { htmlToPlainText } from '../../utils/htmlContent';
 import StudentQuizList from './StudentQuizList';
 
 export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSelectAssignment }) => {
-  const [activeTab, setActiveTab] = useState('videos');
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem('pending_quiz_start') ? 'quizzes' : 'videos';
+  });
   const [searchQuery, setSearchQuery] = useState('');
 
   const formatVNDateTime = (input) => {

@@ -747,6 +747,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                             if (role === 'teacher' && String(targetPath).includes('evaluationId=')) {
                               openTeacherRatingDetail({ path: targetPath, payload: n.payload });
                             } else {
+                              if (role === 'student' && n.type === 'exam' && n.payload?.quizId) {
+                                sessionStorage.setItem('pending_quiz_start', n.payload.quizId);
+                              }
                               navigate(targetPath);
                             }
                           }
