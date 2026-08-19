@@ -258,14 +258,30 @@ export default function TeacherOverviewTab({
               label: 'Điểm danh',
               sub: `${mySchedules.filter((s) => s.status === 'scheduled' && new Date(s.date).toDateString() === new Date().toDateString()).length} buổi hôm nay`,
               tint: 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-400/20',
-              action: () => navigate('/teacher#students'),
+              action: () => {
+                const todaySchedules = mySchedules.filter((s) => s.status === 'scheduled' && new Date(s.date).toDateString() === new Date().toDateString());
+                if (todaySchedules.length > 0) {
+                  // Chọn lịch cũ nhất trong ngày (nếu có 2 cái)
+                  const oldest = todaySchedules.sort((a, b) => {
+                    const timeA = a.startTime ? a.startTime.replace(':', '') : '0000';
+                    const timeB = b.startTime ? b.startTime.replace(':', '') : '0000';
+                    return Number(timeA) - Number(timeB);
+                  })[0];
+                  const stId = oldest.studentId?._id || oldest.studentId?.id || oldest.studentId;
+                  if (stId) {
+                    navigate(`/teacher#students?studentId=${stId}&course=${encodeURIComponent(oldest.course || oldest.courseName || '')}`);
+                    return;
+                  }
+                }
+                navigate('/teacher#students');
+              },
             },
             {
               icon: Clipboard,
               label: 'Chấm điểm',
               sub: `${students.filter((s) => !s.lastGrade || s.lastGrade === 0).length} HV chưa có điểm`,
               tint: 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-400/20',
-              action: () => navigate('/teacher#students'),
+              action: () => navigate('/teacher#assignments'),
             },
             {
               icon: MessageSquare,
