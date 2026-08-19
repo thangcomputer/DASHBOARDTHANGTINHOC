@@ -101,7 +101,7 @@ export default function TeacherOverviewTab({
     // 3. From students with grades
     (students || []).filter(s => s.lastGrade > 0).forEach(s => {
       list.push({
-        id: 'grade-' + s.id,
+        id: 'grade-' + s.id + '-' + (s.courseId || s.course || ''),
         type: 'grade',
         title: `Ghi nhận điểm số ${s.lastGrade}/10 cho học viên ${s.name}`,
         desc: `Khóa học: ${s.course}`,
@@ -486,7 +486,7 @@ export default function TeacherOverviewTab({
               </p>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {attentionStudents.map((st) => (
-                  <span key={st.id} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 shadow-2xs">
+                  <span key={`${st.id}_${st.courseId || st.course || ''}`} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 shadow-2xs">
                     👤 {st.name} ({st.course})
                   </span>
                 ))}

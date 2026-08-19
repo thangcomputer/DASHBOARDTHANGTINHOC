@@ -199,7 +199,7 @@ export function useAdminDashboardState() {
     const sid = params.get('studentId');
     if (!sid) return undefined;
     setShowStudentDetailId(sid);
-    setStudentDetailTab(params.get('tab') || 'attendance');
+    setStudentDetailTab(params.get('tab') || 'summary');
     setStudentDetailScheduleId(params.get('scheduleId') || null);
     return undefined;
   }, [activeTab, hashQuery, setShowStudentDetailId]);
@@ -332,7 +332,6 @@ export function useAdminDashboardState() {
     };
 
     const onStudentNew = (data) => {
-      toast.success(`📋 Học viên mới: ${data?.name || 'N/A'} — ${data?.course || ''}`);
       bumpAdminViews();
     };
 
@@ -380,7 +379,7 @@ export function useAdminDashboardState() {
     const handleOpenStudentDetail = (e) => {
       const { id, tab, scheduleId } = e.detail || {};
       if (id) {
-        setStudentDetailTab(tab || 'info');
+        setStudentDetailTab(tab || 'summary');
         setStudentDetailScheduleId(scheduleId || null);
         setShowStudentDetailId(id);
       }

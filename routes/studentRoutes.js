@@ -987,7 +987,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
       NotificationService.notifyBranchAdmins(io, {
         branchId: student.branchId,
         title: '🆕 Học viên mới đăng ký',
-        content: `Học viên ${student.name} đã đăng ký khóa học ${student.course}.`,
+        content: `Học viên ⟦student_detail:${student._id}:profile|${student.name}⟧ đã đăng ký khóa học ${student.course}.`,
         payload: { studentId: student._id },
         link: '/admin/students',
       });

@@ -18,6 +18,26 @@ export function formatNotificationStudentMask(text, students = []) {
   
   let formatted = text;
 
+  // 0. Strip ⟦student_detail:ID:tab|NAME⟧ tokens → hiển thị tên đã mask
+  // Token format: ⟦student_detail:ID:tab|DisplayName⟧
+  formatted = formatted.replace(
+    /⟦student_detail:[^|⟧]+\|([^⟧]+)⟧/g,
+    (match, displayName) => {
+      if (!displayName) return '09****';
+      // Tìm student trong danh sách để lấy số điện thoại
+      const st = Array.isArray(students)
+        ? students.find((s) => s?.name?.trim() === displayName.trim())
+        : null;
+      if (st) return maskStudentPhone(st.phone || st.zalo);
+      // Không tìm thấy → mask tên: giữ ký tự đầu + ****
+      const parts = displayName.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        return parts[0] + ' ' + parts[parts.length - 1][0] + '****';
+      }
+      return displayName[0] + '****';
+    }
+  );
+
   // 1. Replace exact student names if matched in students array
   if (Array.isArray(students) && students.length > 0) {
     students.forEach((s) => {

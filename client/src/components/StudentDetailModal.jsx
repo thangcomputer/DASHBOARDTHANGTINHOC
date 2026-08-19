@@ -200,6 +200,22 @@ const fmtScheduleTimeRange = (sch) => {
   if (end) return end;
   return '';
 };
+/** Parse và format ghi chú điểm danh thành text đẹp */
+const formatScheduleNote = (note) => {
+  if (!note) return null;
+  const raw = String(note);
+  // [ADMIN_MAKEUP] Tên @ ISO_DATE
+  const makeupMatch = raw.match(/^\[ADMIN_MAKEUP\]\s*(.+?)\s*@\s*(.+)$/);
+  if (makeupMatch) {
+    const who = makeupMatch[1].trim();
+    const when = new Date(makeupMatch[2].trim());
+    const whenFmt = Number.isNaN(when.getTime()) ? makeupMatch[2] : when.toLocaleString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric',
+    });
+    return `Điểm danh bù bởi ${who} lúc ${whenFmt}`;
+  }
+  return raw;
+};
 const fmtDateTimeVN = (input) => {
   if (!input) return '';
   const d = new Date(input);
@@ -1721,7 +1737,9 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                   <td className="px-3 sm:px-4 py-3.5 text-xs font-bold text-blue-600">{sch.course || '—'}</td>
                                 )}
                                 <td className="px-3 sm:px-4 py-3.5 text-xs font-semibold text-slate-600">{sch.teacherName || '—'}</td>
-                                <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-400 max-w-[160px] break-words">{sch.note || sch.subject || 'Dạy thực tế'}</td>
+                                <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-500 max-w-[180px] break-words">
+                                  {formatScheduleNote(sch.note) || sch.subject || 'Dạy thực tế'}
+                                </td>
                                 <td className="px-3 sm:px-4 py-3.5 text-center">
                                   <div className="inline-flex flex-col items-center gap-1.5">
                                     <span className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${attendanceToneClass(action.tone)}`}>

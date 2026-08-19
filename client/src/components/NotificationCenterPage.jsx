@@ -15,6 +15,7 @@ import TeacherRatingDetailModal, {
   isTeacherRatingNotif,
 } from './teacher/TeacherRatingDetailModal';
 import { RATING_CRITERIA } from '../context/useDataRatings';
+import StudentDetailModal from './StudentDetailModal';
 
 const TYPES = [
   { value: '', label: 'Tất cả' },
@@ -114,6 +115,9 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   const [bcContent, setBcContent] = useState('');
   const [bcReceivers, setBcReceivers] = useState('ALL_ADMIN');
   const [bcSending, setBcSending] = useState(false);
+  const [quickPopup, setQuickPopup] = useState(null); // { type: 'register'|'attendance', notif, student }
+  const [studentDetailId, setStudentDetailId] = useState(null);
+  const [studentDetailTab, setStudentDetailTab] = useState('summary');
 
   const load = useCallback(async (p = page) => {
     setLoading(true);
@@ -277,6 +281,25 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
     ) {
       navigate('/admin#evaluations');
       return;
+    }
+    // Popup nhanh cho "Học viên mới đăng ký" và "Điểm danh buổi học"
+    if ((role === 'admin' || role === 'staff') && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
+      const tab = n.title?.includes('Điểm danh') ? 'attendance' : 'summary';
+      const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+      if (st) {
+        setQuickPopup({
+          type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
+          notif: n,
+          student: st,
+        });
+        return;
+      }
+      // Chưa có trong cache → mở StudentDetailModal trực tiếp
+      if (n.payload?.studentId) {
+        setStudentDetailTab(tab);
+        setStudentDetailId(String(n.payload.studentId));
+        return;
+      }
     }
     const path = resolveNavPath(n.path);
     if (path && role === 'teacher' && String(path).includes('evaluationId=')) {
@@ -505,6 +528,107 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         </div>
       )}
 
+      {/* ── Quick Popup: Học viên mới đăng ký / Điểm danh ── */}
+      {quickPopup && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{quickPopup.type === 'register' ? '📋' : '✅'}</span>
+                <span className="font-black text-slate-800 text-base">
+                  {quickPopup.type === 'register' ? 'Học viên mới đăng ký' : 'Điểm danh buổi học'}
+                </span>
+              </div>
+              <button type="button" onClick={() => setQuickPopup(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100">
+                <X size={18} />
+              </button>
+            </div>
+            {/* Body */}
+            <div className="px-5 py-4 space-y-3 text-sm">
+              {quickPopup.type === 'register' ? (
+                <>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Chi nhánh:</span>
+                    <span className="font-black text-slate-800">{quickPopup.student.branchCode || 'Không rõ'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Học viên:</span>
+                    <span className="font-bold text-slate-800">{quickPopup.student.name}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Môn học:</span>
+                    <span className="font-bold text-blue-700">{quickPopup.student.course}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Thời gian:</span>
+                    <span className="font-bold text-slate-800">{formatTime(quickPopup.notif.time || quickPopup.notif.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Thanh toán:</span>
+                    <span className="font-bold text-emerald-600">{quickPopup.student.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">SĐT:</span>
+                    <span className="font-bold text-slate-800">{quickPopup.student.phone || quickPopup.student.zalo || 'Không có'}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Học viên:</span>
+                    <span className="font-bold text-slate-800">{quickPopup.student.name}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Môn học:</span>
+                    <span className="font-bold text-blue-700">{quickPopup.notif.payload?.course || quickPopup.student.course}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Giảng viên:</span>
+                    <span className="font-bold text-slate-800">{quickPopup.notif.payload?.teacherName || 'Không rõ'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Tiến độ:</span>
+                    <span className="font-black text-emerald-600">Buổi {quickPopup.notif.payload?.completedSessions || '?'} / {quickPopup.notif.payload?.totalRequired || '?'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Thời gian:</span>
+                    <span className="font-bold text-slate-800">{formatTime(quickPopup.notif.time || quickPopup.notif.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">SĐT Học viên:</span>
+                    <span className="font-bold text-slate-800">{quickPopup.student.phone || quickPopup.student.zalo || 'Không có'}</span>
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setQuickPopup(null)}
+                className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const sid = quickPopup.student._id || quickPopup.student.id;
+                  const tab = quickPopup.type === 'register' ? 'summary' : 'attendance';
+                  setQuickPopup(null);
+                  setStudentDetailTab(tab);
+                  setStudentDetailId(String(sid));
+                }}
+                className="flex-1 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition"
+              >
+                Xem chi tiết
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal Chi tiết Thông báo ── */}
       {selectedNotif && (
         <div className="fixed inset-0 bg-slate-900/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -612,6 +736,15 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
           }}
         />
       ) : null}
+
+      {/* ── StudentDetailModal — mở trực tiếp từ thông báo ── */}
+      {studentDetailId && (
+        <StudentDetailModal
+          studentId={studentDetailId}
+          initialTab={studentDetailTab}
+          onClose={() => { setStudentDetailId(null); setStudentDetailTab('summary'); }}
+        />
+      )}
     </div>
   );
 }

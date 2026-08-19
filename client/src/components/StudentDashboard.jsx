@@ -673,11 +673,11 @@ const StudentDashboard = ({ onNavigate }) => {
                           setActiveAssignment(null);
                           setSubmissionLink('');
                         } else {
-                          window.alert?.(res.message || 'Nộp bài thất bại');
+                          window.cmsAlert?.(res.message || 'Nộp bài thất bại', 'error');
                         }
                       }).catch(() => {
                         setIsSubmitting(false);
-                        window.alert?.('Lỗi kết nối khi nộp bài. Vui lòng thử lại.');
+                        window.cmsAlert?.('Lỗi kết nối khi nộp bài. Vui lòng thử lại.', 'error');
                       });
                   }}
                   className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg shadow-red-200 transition-all active:scale-[0.98] mt-4"

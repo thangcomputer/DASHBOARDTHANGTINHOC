@@ -5,13 +5,13 @@ import { CheckCircle2, Clock, Loader2, XCircle, CreditCard, Landmark, ShieldChec
 const PublicPaymentPage = () => {
   const { sessionId } = useParams();
   const API = import.meta.env.VITE_API_URL || "";
-  
+
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   const [bankInfo, setBankInfo] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [status, setStatus] = useState('pending'); // 'pending' | 'paid' | 'expired' | 'not_found'
-  
+
   const timerRef = useRef(null);
   const pollRef = useRef(null);
 
@@ -25,7 +25,7 @@ const PublicPaymentPage = () => {
           setSession(sRes);
           setTimeLeft(sRes.remaining || 0);
           setStatus(sRes.status);
-          
+
           // Fetch bank info
           const bRes = await fetch(`${API}/api/settings/bank`).then(r => r.json());
           if (bRes.success) setBankInfo(bRes.data);
@@ -68,7 +68,7 @@ const PublicPaymentPage = () => {
           clearInterval(pollRef.current);
           setStatus('expired');
         }
-      } catch {}
+      } catch { }
     }, 3000);
 
     return () => {
@@ -77,7 +77,7 @@ const PublicPaymentPage = () => {
     };
   }, [status, sessionId, API]);
 
-  const formatTime = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   if (loading) {
     return (
@@ -151,18 +151,18 @@ const PublicPaymentPage = () => {
   return (
     <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 md:p-8">
       <div className="w-full max-w-md bg-white rounded-[48px] shadow-[0_20px_70px_rgba(0,0,0,0.08)] overflow-hidden relative border border-white">
-        
+
         {/* Header Decor */}
         <div className="bg-gradient-to-br from-red-600 via-red-600 to-rose-700 px-8 py-10 text-white text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl" />
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-10 -mb-10 blur-xl" />
-          
+
           <div className="relative z-10 flex flex-col items-center gap-3">
-             <div className="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-1">
-                Trung Tâm Thắng Tin Học
-             </div>
-             <h1 className="text-2xl font-black tracking-tight leading-tight">Thanh Toán Học Phí</h1>
-             <p className="text-white/80 text-xs font-bold uppercase tracking-widest">{session?.studentName} — {session?.courseName?.slice(0,30)}</p>
+            <div className="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+              Trung Tâm Thắng Tin Học
+            </div>
+            <h1 className="text-2xl font-black tracking-tight leading-tight">Thanh Toán Học Phí</h1>
+            <p className="text-white/80 text-xs font-bold uppercase tracking-widest">{session?.studentName} — {session?.courseName?.slice(0, 30)}</p>
           </div>
         </div>
 
@@ -185,10 +185,10 @@ const PublicPaymentPage = () => {
                     <Loader2 size={32} className="animate-spin" />
                   </div>
                 )}
-                
+
                 {/* Logo Overlays */}
                 <div className="absolute -top-3 -right-3 w-12 h-12 bg-white rounded-2xl shadow-lg flex items-center justify-center p-2 border border-slate-50">
-                   <img src="https://img.vietqr.io/image/logo-vietqr.png" alt="VietQR Logo" className="object-contain" />
+                  <img src="https://img.vietqr.io/image/logo-vietqr.png" alt="VietQR Logo" className="object-contain" />
                 </div>
               </div>
             </div>
@@ -197,17 +197,17 @@ const PublicPaymentPage = () => {
             <div className="w-full space-y-3">
               <div className="flex justify-between items-end px-2">
                 <div className="flex items-center gap-2">
-                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                   <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Thời gian còn lại</span>
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Thời gian còn lại</span>
                 </div>
                 <span className={`text-xl font-mono font-black ${timeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-slate-800'}`}>
                   {formatTime(timeLeft)}
                 </span>
               </div>
               <div className="h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-50">
-                <div 
-                  className={`h-full rounded-full transition-all duration-1000 ${timeLeft < 60 ? 'bg-gradient-to-r from-red-500 to-rose-600' : 'bg-gradient-to-r from-emerald-500 to-teal-600'}`} 
-                  style={{ width: `${(timeLeft / 900) * 100}%` }} 
+                <div
+                  className={`h-full rounded-full transition-all duration-1000 ${timeLeft < 60 ? 'bg-gradient-to-r from-red-500 to-rose-600' : 'bg-gradient-to-r from-emerald-500 to-teal-600'}`}
+                  style={{ width: `${(timeLeft / 900) * 100}%` }}
                 />
               </div>
             </div>
@@ -215,55 +215,55 @@ const PublicPaymentPage = () => {
 
           {/* Info Rows */}
           <div className="space-y-3 pt-4">
-             <div className="bg-slate-50 rounded-3xl p-4 flex items-center justify-between border border-slate-100">
-                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-blue-600">
-                      <Landmark size={20} />
-                   </div>
-                   <div>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tài khoản nhận</p>
-                      <p className="text-sm font-black text-slate-700">{bankInfo?.centerBankAccountNumber}</p>
-                   </div>
+            <div className="bg-slate-50 rounded-3xl p-4 flex items-center justify-between border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-blue-600">
+                  <Landmark size={20} />
                 </div>
-                <div className="text-right">
-                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ngân hàng</p>
-                   <p className="text-sm font-black text-slate-700 uppercase">{bankInfo?.centerBankCode}</p>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tài khoản nhận</p>
+                  <p className="text-sm font-black text-slate-700">{bankInfo?.centerBankAccountNumber}</p>
                 </div>
-             </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ngân hàng</p>
+                <p className="text-sm font-black text-slate-700 uppercase">{bankInfo?.centerBankCode}</p>
+              </div>
+            </div>
 
-             <div className="bg-slate-50 rounded-3xl p-4 flex items-center justify-between border border-slate-100">
-                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-emerald-600">
-                      <CreditCard size={20} />
-                   </div>
-                   <div className="flex-1">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Nội dung chuyển khoản</p>
-                      <p className="text-sm font-mono font-black text-slate-700">{session?.ref}</p>
-                   </div>
+            <div className="bg-slate-50 rounded-3xl p-4 flex items-center justify-between border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-emerald-600">
+                  <CreditCard size={20} />
                 </div>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(session?.ref || '');
-                    window.cmsAlert('Đã copy nội dung chuyển khoản!', 'success');
-                  }}
-                  className="p-2 bg-white rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all border border-slate-100"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                </button>
-             </div>
+                <div className="flex-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Nội dung chuyển khoản</p>
+                  <p className="text-sm font-mono font-black text-slate-700">{session?.ref}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(session?.ref || '');
+                  window.cmsAlert('Đã copy nội dung chuyển khoản!', 'success');
+                }}
+                className="p-2 bg-white rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all border border-slate-100"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+              </button>
+            </div>
           </div>
 
           {/* Footer Security Note */}
           <div className="flex items-center justify-center gap-2 pt-4 opacity-50">
-             <ShieldCheck size={14} className="text-emerald-600" />
-             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hệ thống thanh toán bảo mật 256-bit</span>
+            <ShieldCheck size={14} className="text-emerald-600" />
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hệ thống thanh toán bảo mật 256-bit</span>
           </div>
         </div>
 
         {/* Polling Label Floating */}
         <div className="bg-slate-900 py-3 text-center flex items-center justify-center gap-3">
-           <Loader2 size={14} className="animate-spin text-emerald-400" />
-           <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">Đang kiểm tra giao dịch tự động...</span>
+          <Loader2 size={14} className="animate-spin text-emerald-400" />
+          <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">Đang kiểm tra giao dịch tự động...</span>
         </div>
       </div>
     </div>

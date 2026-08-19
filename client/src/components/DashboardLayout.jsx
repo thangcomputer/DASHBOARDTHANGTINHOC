@@ -664,12 +664,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-50">
-                  {myNotifications.slice(0, notifLimit).map(n => {
+                  {myNotifications.slice(0, notifLimit).map((n, idx) => {
                     const style = getNotifStyle(n.type);
                     const Icon = style.icon;
                     return (
                       <div
-                        key={n.id || n._id}
+                        key={`${n.id || n._id}-${idx}`}
                         onClick={() => {
                           markNotificationRead(n.id || n._id);
                           if (n.payload?.action === 'RESET_PASSWORD') {
@@ -722,6 +722,20 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                                 notif: n,
                                 student: st,
                               });
+                            } else if (n.payload?.studentId) {
+                              // Không tìm thấy trong cache → dispatch open-student-detail
+                              setShowNotif(false);
+                              const dispatchOpen = () => {
+                                window.dispatchEvent(new CustomEvent('open-student-detail', {
+                                  detail: { id: String(n.payload.studentId), tab: n.title?.includes('Điểm danh') ? 'attendance' : 'summary' }
+                                }));
+                              };
+                              if (!window.location.pathname.startsWith('/admin')) {
+                                navigate('/admin');
+                                setTimeout(dispatchOpen, 400);
+                              } else {
+                                dispatchOpen();
+                              }
                             } else if (n.path) {
                               navigate(n.path);
                             }
