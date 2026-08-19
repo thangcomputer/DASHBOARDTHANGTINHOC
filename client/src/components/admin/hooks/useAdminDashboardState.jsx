@@ -376,8 +376,23 @@ export function useAdminDashboardState() {
         handleOpenResetPw(userId, userName || 'Người dùng', role);
       }
     };
+    
+    const handleOpenStudentDetail = (e) => {
+      const { id, tab, scheduleId } = e.detail || {};
+      if (id) {
+        setStudentDetailTab(tab || 'info');
+        setStudentDetailScheduleId(scheduleId || null);
+        setShowStudentDetailId(id);
+      }
+    };
+
     window.addEventListener('open-reset-pw', handleResetEvent);
-    return () => window.removeEventListener('open-reset-pw', handleResetEvent);
+    window.addEventListener('open-student-detail', handleOpenStudentDetail);
+    
+    return () => {
+      window.removeEventListener('open-reset-pw', handleResetEvent);
+      window.removeEventListener('open-student-detail', handleOpenStudentDetail);
+    };
   }, []);
 
   // Training management state

@@ -2,7 +2,7 @@
  * Draft + peer resolution for teacher → admin makeup attendance request.
  */
 
-import { buildChatDeepLinkToken } from './messageRichText';
+import { buildChatDeepLinkToken, buildStudentDetailDeepLinkToken } from './messageRichText';
 
 export function formatScheduleDateLabel(dateRaw) {
   const s = String(dateRaw || '').slice(0, 10) || '—';
@@ -50,9 +50,9 @@ export function buildAttendanceMakeupDraft({ student, schedule, teacherName } = 
   const s = getMakeupSessionSummary({ student, schedule });
   const gv = teacherName || 'Giảng viên';
   const studentId = student?._id || student?.id || '';
-  // Token deep-link: Admin bấm tên HV → mở chat với HV đó
+  // Token deep-link: Admin bấm tên HV → mở modal hồ sơ HV (tab điểm danh)
   const hvLabel = studentId
-    ? buildChatDeepLinkToken({ role: 'student', id: studentId, name: s.name })
+    ? buildStudentDetailDeepLinkToken({ id: studentId, name: s.name, tab: 'attendance', scheduleId: schedule?._id })
     : s.name;
 
   return [
@@ -63,7 +63,7 @@ export function buildAttendanceMakeupDraft({ student, schedule, teacherName } = 
     s.total > 0 ? `Buổi: ${s.sessionNo}/${s.total}` : `Buổi tiếp theo (đã học ${s.done})`,
     `Lịch: ${s.dateLabel} · ${s.timeRange}`,
     '',
-    '→ Bấm tên học viên ở dòng HV để nhắn tin xác nhận nhanh.',
+    '→ Bấm tên học viên ở dòng HV để mở hồ sơ và điểm danh bù.',
     '',
     'Nội dung xác nhận:',
     '- Giảng viên chịu trách nhiệm về buổi học này.',

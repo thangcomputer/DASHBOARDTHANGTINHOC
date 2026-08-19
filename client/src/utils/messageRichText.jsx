@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 export const CHAT_DEEP_LINK_RE = /⟦chat:(student|teacher|admin|staff):([^|⟧]+)\|([^⟧]+)⟧/g;
 /** In-app LMS link: ⟦go:/student#materials|Học video⟧ */
 export const GO_LINK_RE = /⟦go:(\/[^|⟧]+)\|([^⟧]+)⟧/g;
-const EMBED_RE = /⟦chat:(student|teacher|admin|staff):([^|⟧]+)\|([^⟧]+)⟧|⟦go:(\/[^|⟧]+)\|([^⟧]+)⟧/g;
+const EMBED_RE = /⟦chat:(student|teacher|admin|staff):([^|⟧]+)\|([^⟧]+)⟧|⟦go:(\/[^|⟧]+)\|([^⟧]+)⟧|⟦student_detail:([^|⟧:]+)(?::([^|⟧:]+))?(?::([^|⟧]+))?\|([^⟧]+)⟧/g;
 const URL_RE = /(https?:\/\/[^\s<]+[^.,;:!?\s<])/gi;
 const MARK_RE = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
 const GO_PATH_RE = /^\/(student|teacher)(\/|#|\?|$)/i;
@@ -18,6 +18,21 @@ export function buildChatDeepLinkToken({ role = 'student', id, name } = {}) {
   return `⟦chat:${safeRole}:${rid}|${safeName}⟧`;
 }
 
+export function buildStudentDetailDeepLinkToken({ id, name, tab = 'attendance', scheduleId = '' }) {
+  const rid = String(id || '').trim();
+  if (!rid) return String(name || 'Học viên');
+  const safeName = String(name || 'Học viên').replace(/[|⟦⟧]/g, ' ').trim() || 'Học viên';
+  const safeTab = String(tab || '').replace(/[|⟦⟧:]/g, '').trim();
+  const safeScheduleId = String(scheduleId || '').replace(/[|⟦⟧:]/g, '').trim();
+  let token = `⟦student_detail:${rid}`;
+  if (safeTab) {
+    token += `:${safeTab}`;
+    if (safeScheduleId) token += `:${safeScheduleId}`;
+  }
+  token += `|${safeName}⟧`;
+  return token;
+}
+
 export function buildGoLinkToken(path, label) {
   const p = String(path || '').trim();
   const l = String(label || p).replace(/[|⟦⟧]/g, ' ').trim() || p;
@@ -27,6 +42,10 @@ export function buildGoLinkToken(path, label) {
 
 function openChatFromToken(person) {
   window.dispatchEvent(new CustomEvent('cms:open-chat', { detail: person }));
+}
+
+function openStudentDetailFromToken(id, tab, scheduleId) {
+  window.dispatchEvent(new CustomEvent('open-student-detail', { detail: { id, tab, scheduleId } }));
 }
 
 function linkClass(mine) {
@@ -265,12 +284,21 @@ export function MessageRichText({ text, mine = false }) {
         name: match[3],
         key: `chat-${match.index}`,
       });
-    } else {
+    } else if (match[4]) {
       segments.push({
         type: 'go',
         path: match[4],
         label: match[5],
         key: `go-${match.index}`,
+      });
+    } else if (match[6]) {
+      segments.push({
+        type: 'student_detail',
+        id: match[6],
+        tab: match[7],
+        scheduleId: match[8],
+        name: match[9],
+        key: `student_detail-${match.index}`,
       });
     }
     last = match.index + match[0].length;
@@ -294,6 +322,24 @@ export function MessageRichText({ text, mine = false }) {
               name: seg.name,
               role: seg.role,
             });
+          }}
+        >
+          {seg.name}
+        </button>,
+      );
+      return;
+    }
+    if (seg.type === 'student_detail') {
+      nodes.push(
+        <button
+          key={seg.key}
+          type="button"
+          className={`${linkClass(mine)} bg-transparent border-0 p-0 cursor-pointer inline`}
+          title={`Xem hồ sơ: ${seg.name}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openStudentDetailFromToken(seg.id, seg.tab, seg.scheduleId);
           }}
         >
           {seg.name}
