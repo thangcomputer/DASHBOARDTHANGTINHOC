@@ -8,6 +8,24 @@ export default function StudentQuizList() {
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeQuizId, setActiveQuizId] = useState(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatCountdown = (ms) => {
+    if (ms <= 0) return 'Đã hết hạn';
+    const diffSec = Math.floor(ms / 1000);
+    if (diffSec < 60) return `${diffSec} giây`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} phút ${diffSec % 60} giây`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour} giờ ${diffMin % 60} phút`;
+    const diffDay = Math.floor(diffHour / 24);
+    return `${diffDay} ngày ${diffHour % 24} giờ`;
+  };
 
   const fetchQuizzes = async () => {
     setLoading(true);
@@ -89,6 +107,22 @@ export default function StudentQuizList() {
             const score = quiz.mySubmission?.score;
             const isPassed = !isForfeit && (quiz.mySubmission?.status === 'passed' || (score != null && score >= 70));
 
+            let isExpired = false;
+            let deadlineText = '';
+            let isWarning = false;
+            if (quiz.deadline) {
+              const deadlineTime = new Date(quiz.deadline).getTime();
+              const diffMs = deadlineTime - now;
+              if (diffMs <= 0) {
+                isExpired = true;
+                deadlineText = 'Đã hết hạn';
+              } else {
+                deadlineText = `Hết hạn sau: ${formatCountdown(diffMs)}`;
+                // Cảnh báo nếu còn dưới 1 giờ
+                if (diffMs < 3600000) isWarning = true;
+              }
+            }
+
             return (
               <div
                 key={quiz._id}
@@ -123,6 +157,12 @@ export default function StudentQuizList() {
                       <User size={12} className="shrink-0" />
                       <span className="truncate">GV: {quiz.teacherName}</span>
                     </span>
+                    {quiz.deadline && (
+                      <span className={`inline-flex items-center gap-1 ${isExpired ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-blue-600'}`}>
+                        <AlertCircle size={12} className="shrink-0" />
+                        <span>{deadlineText}</span>
+                      </span>
+                    )}
                   </div>
 
                   {hasSubmitted && (
@@ -142,9 +182,12 @@ export default function StudentQuizList() {
                 <button
                   type="button"
                   onClick={() => setActiveQuizId(quiz._id)}
+                  disabled={!hasSubmitted && isExpired}
                   className={`mt-4 w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm ${
                     hasSubmitted
                       ? 'bg-slate-800 hover:bg-slate-900 text-white'
+                      : isExpired
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                       : 'bg-red-600 hover:bg-red-700 text-white'
                   }`}
                 >
