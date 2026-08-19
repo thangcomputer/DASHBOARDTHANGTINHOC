@@ -1710,9 +1710,7 @@ export default function FloatingMessenger({ session, role }) {
               type="button"
               onClick={handleSupportFabClick}
               className="cms-fm-fab cms-fm-fab--mascot"
-              title={fabExpanded
-                ? 'Đóng'
-                : (unreadTotal > 0 ? `${unreadTotal} tin chưa đọc` : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Liên hệ Hỗ trợ viên'))}
+              title={fabExpanded ? 'Đóng' : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Liên hệ Hỗ trợ viên')}
               aria-label={fabExpanded ? 'Đóng' : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Mở Hỗ trợ viên')}
               aria-expanded={fabExpanded}
             >
@@ -1721,11 +1719,7 @@ export default function FloatingMessenger({ session, role }) {
               ) : (
                 <div className="relative flex items-center justify-center w-full h-full overflow-visible">
                   <SupportMascot size={60} waving={true} className="cms-support-mascot--fab" />
-                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-sm" title="Hoạt động" />
                 </div>
-              )}
-              {!fabExpanded && unreadTotal > 0 && (
-                <span className="cms-fm-fab__badge is-unread">{badgeLabel}</span>
               )}
             </button>
           </div>
