@@ -15,9 +15,10 @@ const logger = require('../config/logger');
 const AI_PEER_ID = 'ai_support';
 const AI_PEER_NAME = 'Trợ lý Thắng Tin Học';
 const TYPING_MS = 900;
-const AI_IMAGE_DAILY_LIMIT = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT) || 5);
+const AI_IMAGE_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT) || 5);
+const AI_IMAGE_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_IMAGE_DAILY_LIMIT_TEACHER) || 10);
 const AI_QUESTION_DAILY_LIMIT_STUDENT = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_STUDENT || process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT) || 15);
-const AI_QUESTION_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_TEACHER) || 25);
+const AI_QUESTION_DAILY_LIMIT_TEACHER = Math.max(1, Number(process.env.AI_SUPPORT_QUESTION_DAILY_LIMIT_TEACHER) || 30);
 const IDLE_PING_MS = Math.max(30_000, Number(process.env.AI_SUPPORT_IDLE_PING_MS) || 5 * 60 * 1000);
 const IDLE_END_MS = Math.max(15_000, Number(process.env.AI_SUPPORT_IDLE_END_MS) || 5 * 60 * 1000);
 const IDLE_SWEEP_MS = Math.max(10_000, Number(process.env.AI_SUPPORT_IDLE_SWEEP_MS) || 30_000);
@@ -137,8 +138,13 @@ function vietnamDateKey(d = new Date()) {
   }).format(d);
 }
 
-function questionDailyLimit(userRole) {
-  const role = String(userRole || '');
+function imageDailyLimit(role) {
+  if (role === 'teacher') return AI_IMAGE_DAILY_LIMIT_TEACHER;
+  if (role === 'student') return AI_IMAGE_DAILY_LIMIT_STUDENT;
+  return 0;
+}
+
+function questionDailyLimit(role) {
   if (role === 'teacher') return AI_QUESTION_DAILY_LIMIT_TEACHER;
   if (role === 'student') return AI_QUESTION_DAILY_LIMIT_STUDENT;
   return 0;
@@ -193,11 +199,11 @@ async function consumeAiQuestionQuota(sessionDoc) {
 }
 
 function peekImageQuota(session) {
+  const limit = imageDailyLimit(session?.userRole);
   const today = vietnamDateKey();
   const used = session && String(session.imageUploadDate || '') === today
     ? Number(session.imageUploadCount || 0)
     : 0;
-  const limit = AI_IMAGE_DAILY_LIMIT;
   return {
     used,
     remaining: Math.max(0, limit - used),
@@ -211,23 +217,24 @@ function peekImageQuota(session) {
  * @returns {{ applies: boolean, blocked: boolean, remaining: number|null, used: number, limit: number }}
  */
 async function consumeAiImageQuota(sessionDoc) {
-  if (!sessionDoc) {
-    return { applies: false, blocked: false, remaining: null, used: 0, limit: AI_IMAGE_DAILY_LIMIT };
+  const limit = imageDailyLimit(sessionDoc?.userRole);
+  if (!sessionDoc || !limit) {
+    return { applies: false, blocked: false, remaining: null, used: 0, limit };
   }
   if (aiPaused(effectiveStatus(sessionDoc))) {
-    return { applies: false, blocked: false, remaining: null, used: 0, limit: AI_IMAGE_DAILY_LIMIT };
+    return { applies: false, blocked: false, remaining: null, used: 0, limit };
   }
   const today = vietnamDateKey();
   const used = String(sessionDoc.imageUploadDate || '') === today
     ? Number(sessionDoc.imageUploadCount || 0)
     : 0;
-  if (used >= AI_IMAGE_DAILY_LIMIT) {
+  if (used >= limit) {
     return {
       applies: true,
       blocked: true,
       remaining: 0,
       used,
-      limit: AI_IMAGE_DAILY_LIMIT,
+      limit,
     };
   }
   sessionDoc.imageUploadDate = today;
