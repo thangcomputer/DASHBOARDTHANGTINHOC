@@ -101,23 +101,44 @@ const playExamWarningBeep = () => {
   }
 };
 
+let currentWarningAudio = null;
+
 /** Cảnh báo phòng thi: file Admin tải lên; không có thì beep. */
 export const playExamWarningSound = (customUrl = '') => {
   unlockAudio();
   if (muted) return;
+  
+  if (currentWarningAudio) {
+    try {
+      currentWarningAudio.pause();
+      currentWarningAudio.currentTime = 0;
+    } catch { /* ignore */ }
+  }
 
   const url = String(customUrl || '').trim();
   if (url) {
     try {
-      const audio = new Audio(url);
-      audio.volume = 0.7;
-      void audio.play().catch(() => {
+      currentWarningAudio = new Audio(url);
+      currentWarningAudio.volume = 0.7;
+      void currentWarningAudio.play().catch(() => {
+        currentWarningAudio = null;
         playExamWarningBeep();
       });
       return;
     } catch {
+      currentWarningAudio = null;
       /* fall through to beep */
     }
   }
   playExamWarningBeep();
+};
+
+export const stopExamWarningSound = () => {
+  if (currentWarningAudio) {
+    try {
+      currentWarningAudio.pause();
+      currentWarningAudio.currentTime = 0;
+    } catch { /* ignore */ }
+    currentWarningAudio = null;
+  }
 };

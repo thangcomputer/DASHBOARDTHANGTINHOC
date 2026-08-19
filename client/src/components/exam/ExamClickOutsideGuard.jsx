@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
-import { playExamWarningSound, unlockAudio } from '../../utils/sound';
+import { playExamWarningSound, stopExamWarningSound, unlockAudio } from '../../utils/sound';
 import { resolveMediaUrl } from '../../services/api';
 
 const IGNORE_SELECTOR = [
@@ -82,6 +82,7 @@ export default function ExamClickOutsideGuard({
 
   const dismiss = () => {
     unlockAudio();
+    stopExamWarningSound();
     setOpen(false);
     cooldownRef.current = Date.now();
   };
