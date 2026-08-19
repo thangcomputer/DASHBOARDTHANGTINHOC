@@ -39,7 +39,7 @@ const messageSchema = new mongoose.Schema({
   },
   receiverRole: {
     type: String,
-    enum: ['admin', 'teacher', 'student', 'staff', 'system'],
+    enum: ['admin', 'teacher', 'student', 'staff', 'system', 'group'],
     required: true,
   },
   receiverBranchCode: {

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
   User, Circle, Image, Paperclip, Smile, Download,
-  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy
+  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -217,10 +217,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const location = useLocation();
   const toast = useToast();
   const socketCtx = useSocket();
-  const { sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
+  const { isConnected, sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
   const {
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
-    markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, groups,
+    markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers, groups,
     teachers, students, staffs, toggleMessageReaction: ctxToggleReaction,
     softDeleteMessage: ctxDeleteMessage, currentUser, messages: contextMessages,
   } = useData();
@@ -302,7 +302,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     try {
       const hiddenRes = await messagesAPI.getHiddenConversations();
       if (hiddenRes?.success) setHiddenList(hiddenRes.data);
-    } catch (err) {}
+    } catch (err) { }
   }, []);
 
   // 📡 Re-fetch danh bạ khi server thông báo CONTACT_LIST_UPDATED (sau xếp lớp)
@@ -494,46 +494,46 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         if (isHighAdmin && seedRole === 'student' && seedContact.adminRole !== 'STAFF' && seedContact.adminRole !== 'SUPPORT') {
           /* High Admin không mở thread học viên */
         } else {
-        const role = getMessagingRole({
-          id: seedContact.id,
-          role: seedContact.role,
-          adminRole: seedContact.adminRole,
-        }) || normalizeRole(seedContact.role);
-        const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
-        const builtId = String(buildConversationId(myRole, currentUserId, role, seedContact.id));
-        const existingConv = activityById.get(builtId) || activityByPeer.get(String(seedContact.id));
-        const canonicalId = existingConv?.id && !isAiSupportConversationId(existingConv.id)
-          ? String(existingConv.id)
-          : builtId;
-        if (
-          isAiSupportConversationId(canonicalId)
-          || (isSupportAgent && handoffUserIds.has(String(seedContact.id)))
-          || seenConvIds.has(canonicalId)
-        ) {
-          /* skip AI handoff / queue peers */
-        } else {
-          // Prefer contact row metadata when peer is discoverable
-          const fromContact = uniqueContacts.find((c) => String(c.id) === String(seedContact.id));
-          pushEntry({
-            id: canonicalId,
-            isGroup: false,
-            isHidden: false,
-            user: {
-              id: seedContact.id,
-              name: fromContact?.name || seedContact.name,
-              role: fromContact?.transportRole || role,
-              adminRole: fromContact?.adminRole || seedContact.adminRole || null,
-              productRole: fromContact?.productRole || null,
-              avatar: fromContact?.avatar || seedContact.avatar,
-              gender: fromContact?.gender || seedContact.gender,
-              phone: fromContact?.phone || seedContact.phone || '',
-              online: isUserOnline(seedContact.id),
-            },
-            lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
-            lastTime: existingConv?.lastTime || (gate.mode === 'AUTHORIZED_CONTACT' ? new Date(0) : new Date()),
-            unread: existingConv?.unread || 0,
-          });
-        }
+          const role = getMessagingRole({
+            id: seedContact.id,
+            role: seedContact.role,
+            adminRole: seedContact.adminRole,
+          }) || normalizeRole(seedContact.role);
+          const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
+          const builtId = String(buildConversationId(myRole, currentUserId, role, seedContact.id));
+          const existingConv = activityById.get(builtId) || activityByPeer.get(String(seedContact.id));
+          const canonicalId = existingConv?.id && !isAiSupportConversationId(existingConv.id)
+            ? String(existingConv.id)
+            : builtId;
+          if (
+            isAiSupportConversationId(canonicalId)
+            || (isSupportAgent && handoffUserIds.has(String(seedContact.id)))
+            || seenConvIds.has(canonicalId)
+          ) {
+            /* skip AI handoff / queue peers */
+          } else {
+            // Prefer contact row metadata when peer is discoverable
+            const fromContact = uniqueContacts.find((c) => String(c.id) === String(seedContact.id));
+            pushEntry({
+              id: canonicalId,
+              isGroup: false,
+              isHidden: false,
+              user: {
+                id: seedContact.id,
+                name: fromContact?.name || seedContact.name,
+                role: fromContact?.transportRole || role,
+                adminRole: fromContact?.adminRole || seedContact.adminRole || null,
+                productRole: fromContact?.productRole || null,
+                avatar: fromContact?.avatar || seedContact.avatar,
+                gender: fromContact?.gender || seedContact.gender,
+                phone: fromContact?.phone || seedContact.phone || '',
+                online: isUserOnline(seedContact.id),
+              },
+              lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
+              lastTime: existingConv?.lastTime || (gate.mode === 'AUTHORIZED_CONTACT' ? new Date(0) : new Date()),
+              unread: existingConv?.unread || 0,
+            });
+          }
         }
       }
     }
@@ -577,10 +577,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const imageInputRef = useRef(null);
   const [showEmojis, setShowEmojis] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedParticipants, setSelectedParticipants] = useState([]);
-  const [groupToDelete, setGroupToDelete] = useState(null); // ID của nhóm cần xóa
+  const [groupToDelete, setGroupToDelete] = useState(null);
+  const [groupToLeave, setGroupToLeave] = useState(null);
   const [uploadError, setUploadError] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   // Trạng thái recall đang xử lý
@@ -931,7 +933,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Xóa mềm lịch sử cá nhân ───────────────────────────────────────────────
   const [showMessageOptions, setShowMessageOptions] = useState(null);
-  
+
   const handleDeleteHistory = useCallback(async (msgId) => {
     setShowMessageOptions(null);
     try {
@@ -973,7 +975,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       }) || normalizeRole(conv.user.role);
       const myRole = getMessagingRole({ id: currentUserId, role: currentUserRole }) || normalizeRole(currentUserRole);
       const properId = buildConversationId(myRole, currentUserId, peerRole, conv.user.id);
-      
+
       // Kiểm tra xem đã có conv này trong dataContext chưa
       const existing = dataContextConvs.find(dc => dc.id === properId);
       if (existing) {
@@ -1237,7 +1239,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       const response = await fetch(fullUrl);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = safeName || 'download';
@@ -1494,20 +1496,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       selectConversation({ ...conv, isGroup });
                     }
                   }}
-                  className={`cms-chat-conv-row ${
-                    activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'
-                  }`}
+                  className={`cms-chat-conv-row ${activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'
+                    }`}
                 >
                   <div className="relative shrink-0">
-                    <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md relative z-10 overflow-hidden ${
-                      isGroup ? 'bg-red-500' : 'bg-white ring-2 ' + (
+                    <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md relative z-10 overflow-hidden ${isGroup ? 'bg-red-500' : 'bg-white ring-2 ' + (
                         conv.user.role === 'teacher' ? 'ring-amber-400/80'
                           : conv.user.role === 'student' ? 'ring-sky-400/80'
                             : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'ring-blue-400/80'
                               : conv.user.role === 'admin' ? 'ring-rose-400/80'
                                 : 'ring-slate-300'
                       )
-                    }`}>
+                      }`}>
                       {isGroup ? (
                         <Users size={20} />
                       ) : (
@@ -1526,14 +1526,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </div>
                     {!isGroup && (
                       <span
-                        className={`absolute -bottom-0.5 -right-0.5 z-20 text-[8px] px-1 min-w-[18px] h-4 rounded-md font-black leading-none flex items-center justify-center shadow-sm border border-white ${
-                          conv.user.role === 'teacher' ? 'bg-amber-500 text-white'
+                        className={`absolute -bottom-0.5 -right-0.5 z-20 text-[8px] px-1 min-w-[18px] h-4 rounded-md font-black leading-none flex items-center justify-center shadow-sm border border-white ${conv.user.role === 'teacher' ? 'bg-amber-500 text-white'
                             : conv.user.role === 'student' ? 'bg-sky-500 text-white'
                               : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'bg-blue-600 text-white'
                                 : String(conv.user.adminRole || '').toUpperCase() === 'STAFF' || conv.user.role === 'staff' ? 'bg-slate-600 text-white'
                                   : conv.user.role === 'admin' ? 'bg-rose-600 text-white'
                                     : 'bg-slate-600 text-white'
-                        }`}
+                          }`}
                       >
                         {conv.user.role === 'teacher' ? 'GV' : conv.user.role === 'student' ? 'HV' : (
                           String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT'
@@ -1563,9 +1562,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           </span>
                         )}
                         {currentUserRole === 'admin' && conv.user.phone && (
-                          <a 
-                            href={`https://zalo.me/${conv.user.phone.replace(/\s+/g, '')}`} 
-                            target="_blank" 
+                          <a
+                            href={`https://zalo.me/${conv.user.phone.replace(/\s+/g, '')}`}
+                            target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             className="hover:scale-110 transition-transform cursor-pointer flex-shrink-0"
@@ -1577,7 +1576,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        <button 
+                        <button
                           onClick={(e) => handleHideConversation(e, conv.id)}
                           className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg"
                           title="Ẩn cuộc trò chuyện"
@@ -1613,50 +1612,50 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             <div className="flex-1 flex items-center justify-center p-8 bg-white/50 backdrop-blur-sm">
               <div className="text-center animate-in fade-in zoom-in duration-500">
                 <div className="mb-6 relative inline-block">
-                   <div className="absolute inset-0 bg-blue-100 rounded-full blur-2xl opacity-20 animate-pulse" />
-                   <div className="relative w-24 h-24 bg-white rounded-[32px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-slate-100 flex items-center justify-center">
-                     <MessageCircle size={40} className="text-blue-500" />
-                   </div>
-                   <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg border-2 border-white rotate-12">
-                     <CheckCircle2 size={20} />
-                   </div>
+                  <div className="absolute inset-0 bg-blue-100 rounded-full blur-2xl opacity-20 animate-pulse" />
+                  <div className="relative w-24 h-24 bg-white rounded-[32px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-slate-100 flex items-center justify-center">
+                    <MessageCircle size={40} className="text-blue-500" />
+                  </div>
+                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg border-2 border-white rotate-12">
+                    <CheckCircle2 size={20} />
+                  </div>
                 </div>
                 <h3 className="text-slate-900 font-black text-xl mb-2">Trung tâm Tin học & Công nghệ</h3>
                 <p className="text-slate-500 font-bold max-w-sm mx-auto text-[14px] leading-relaxed">
                   Chọn một cuộc trò chuyện từ danh sách bên trái để bắt đầu thảo luận hoặc gửi tài liệu.
                 </p>
-                 <div className="mt-8 flex flex-wrap gap-3 justify-center">
-                    {['admin', 'staff'].includes(currentUserRole) ? (
-                      <>
-                         <button 
-                           onClick={() => setBroadcastConfig({ targetRole: 'admin', label: 'Kênh Admin' })}
-                           className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
-                         >
-                           📢 Gửi toàn bộ Admin
-                         </button>
-                         <button 
-                           onClick={() => setBroadcastConfig({ targetRole: 'teacher', label: 'Giảng viên' })}
-                           className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
-                         >
-                           📢 Gửi toàn bộ Giảng viên
-                         </button>
-                         {!isHighAdmin ? (
-                         <button 
-                           onClick={() => setBroadcastConfig({ targetRole: 'student', label: 'Học viên' })}
-                           className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
-                         >
-                           📢 Gửi toàn bộ Học viên
-                         </button>
-                         ) : null}
-                      </>
-                    ) : (
-                      <>
-                         <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Kênh Admin</span>
-                         <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Giảng viên</span>
-                         <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Học viên</span>
-                      </>
-                    )}
-                 </div>
+                <div className="mt-8 flex flex-wrap gap-3 justify-center">
+                  {['admin', 'staff'].includes(currentUserRole) ? (
+                    <>
+                      <button
+                        onClick={() => setBroadcastConfig({ targetRole: 'admin', label: 'Kênh Admin' })}
+                        className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
+                      >
+                        📢 Gửi toàn bộ Admin
+                      </button>
+                      <button
+                        onClick={() => setBroadcastConfig({ targetRole: 'teacher', label: 'Giảng viên' })}
+                        className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
+                      >
+                        📢 Gửi toàn bộ Giảng viên
+                      </button>
+                      {!isHighAdmin ? (
+                        <button
+                          onClick={() => setBroadcastConfig({ targetRole: 'student', label: 'Học viên' })}
+                          className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
+                        >
+                          📢 Gửi toàn bộ Học viên
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Kênh Admin</span>
+                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Giảng viên</span>
+                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Học viên</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
@@ -1672,9 +1671,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <ChevronLeft size={22} />
                   </button>
                   <div className="relative shrink-0">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ring-2 ring-white shadow-sm ${
-                      activeConv.isGroup ? 'bg-red-500' : 'bg-white'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ring-2 ring-white shadow-sm ${activeConv.isGroup ? 'bg-red-500' : 'bg-white'
+                      }`}>
                       {activeConv.isGroup ? (
                         <Users size={16} />
                       ) : (
@@ -1704,9 +1702,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         </span>
                       )}
                       {currentUserRole === 'admin' && activeConv.user.phone && (
-                        <a 
-                          href={`https://zalo.me/${activeConv.user.phone.replace(/\s+/g, '')}`} 
-                          target="_blank" 
+                        <a
+                          href={`https://zalo.me/${activeConv.user.phone.replace(/\s+/g, '')}`}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="hover:scale-110 transition-transform cursor-pointer"
                           title="Chat Zalo"
@@ -1723,15 +1721,45 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
-                {activeConv.isGroup && currentUserRole !== 'student' && (
-                  <button
-                    onClick={() => setGroupToDelete(activeConv.id.replace('group_', ''))}
-                    className="flex shrink-0 items-center justify-center w-8 h-8 md:w-9 md:h-9 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm"
-                    title="Xóa nhóm vĩnh viễn"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
+                {activeConv.isGroup && (() => {
+                  const groupIdStr = activeConv.id.replace('group_', '');
+                  const groupObj = groups?.find(g => String(g._id) === groupIdStr || String(g.id) === groupIdStr);
+                  const isCreator = groupObj && String(groupObj.createdBy?.userId) === String(currentUserId);
+                  return (
+                    <div className="flex items-center gap-1.5 ml-2">
+                      {isCreator && (
+                        <button
+                          onClick={() => {
+                            setSelectedParticipants([]);
+                            setMemberSearch('');
+                            setShowAddMemberModal(true);
+                          }}
+                          className="flex shrink-0 items-center justify-center w-8 h-8 md:w-9 md:h-9 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all shadow-sm"
+                          title="Thêm thành viên"
+                        >
+                          <UserPlus size={16} />
+                        </button>
+                      )}
+                      {isCreator ? (
+                        <button
+                          onClick={() => setGroupToDelete(groupIdStr)}
+                          className="flex shrink-0 items-center justify-center w-8 h-8 md:w-9 md:h-9 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm"
+                          title="Xóa nhóm vĩnh viễn"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setGroupToLeave(groupIdStr)}
+                          className="flex shrink-0 items-center justify-center w-8 h-8 md:w-9 md:h-9 bg-orange-50 text-orange-500 hover:bg-orange-500 hover:text-white rounded-xl transition-all shadow-sm"
+                          title="Rời nhóm"
+                        >
+                          <LogOut size={16} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
                 {activeConv.isAiHandoff ? (
                   <button
                     type="button"
@@ -1827,38 +1855,47 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     ? displayRoleLabel(msg.senderDisplayRole)
                     : (String(msg.senderAdminRole || '').toUpperCase() === 'SUPPORT' ? 'Hỗ trợ'
                       : role === 'admin' ? 'Admin'
-                      : role === 'staff' ? 'Giáo vụ'
-                      : role === 'teacher' ? 'Giảng viên'
-                      : 'Học viên');
+                        : role === 'staff' ? 'Giáo vụ'
+                          : role === 'teacher' ? 'Giảng viên'
+                            : 'Học viên');
 
                   const bubbleRoleClass =
                     !isMine && (role === 'admin' || String(msg.senderAdminRole || '').toUpperCase() === 'SUPPORT')
                       ? 'cms-bubble-other-admin'
                       : !isMine && role === 'staff'
                         ? 'cms-bubble-other-admin'
-                      : !isMine && role === 'teacher'
-                        ? 'cms-bubble-other-teacher'
-                        : !isMine && role === 'student'
-                          ? 'cms-bubble-other-student'
-                          : '';
+                        : !isMine && role === 'teacher'
+                          ? 'cms-bubble-other-teacher'
+                          : !isMine && role === 'student'
+                            ? 'cms-bubble-other-student'
+                            : '';
 
                   const heartCount = (msg.reactions || []).filter(r => r.type === 'heart').length;
                   const likeCount = (msg.reactions || []).filter(r => r.type === 'like').length;
                   const myReactions = (msg.reactions || []).filter(r => r.userId === currentUserId).map(r => r.type);
+
+                  if (msg.messageType === 'system') {
+                    return (
+                      <div key={msg.id} className="flex justify-center my-3">
+                        <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full shadow-sm">
+                          {msg.content}
+                        </span>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative`}>
                       <div className={`max-w-[85%] md:max-w-[70%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
                         {!isMine && (
                           <div className="flex items-center gap-2 mb-1 ml-1">
-                             <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
-                             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
-                               role === 'admin' ? 'bg-red-500 text-white' :
-                               role === 'staff' ? 'bg-amber-600 text-white' :
-                               role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
-                             }`}>
-                               {badgeLabel}
-                             </span>
+                            <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
+                                role === 'staff' ? 'bg-amber-600 text-white' :
+                                  role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+                              }`}>
+                              {badgeLabel}
+                            </span>
                           </div>
                         )}
 
@@ -1866,13 +1903,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                           {/* Message bubble */}
-                          <div className={`relative px-4 py-2.5 text-[14px] leading-relaxed transition-all ${
-                            isMine ? 'cms-bubble-mine' : 'cms-bubble-other'
-                          } ${bubbleRoleClass}`}>
+                          <div className={`relative px-4 py-2.5 text-[14px] leading-relaxed transition-all ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'
+                            } ${bubbleRoleClass}`}>
                             {msg.isRecalled ? (
-                               <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
-                                 <RotateCcw size={12} /> Tin nhắn đã được thu hồi
-                               </p>
+                              <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
+                                <RotateCcw size={12} /> Tin nhắn đã được thu hồi
+                              </p>
                             ) : isAttachmentExpired(msg) ? (
                               <p className="italic text-amber-600/90 flex items-start gap-1.5 text-xs leading-relaxed">
                                 <AlertCircle size={14} className="shrink-0 mt-0.5" />
@@ -1880,76 +1916,76 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               </p>
                             ) : isImageMessage(msg) ? (
                               <div className="space-y-1.5">
-                                  <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openImagePreview(msg);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
                                       openImagePreview(msg);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        openImagePreview(msg);
-                                      }
-                                    }}
-                                    className="group/img relative block w-full max-w-[min(420px,100%)] -mx-1 cursor-zoom-in touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl"
-                                    title="Bấm để xem ảnh lớn"
-                                  >
-                                    <img
-                                      src={resolveMediaUrl(msg.fileUrl)}
-                                      alt={showFileName(msg.fileName) || 'Hình ảnh'}
-                                      className="w-full h-auto rounded-xl max-h-96 object-contain border border-black/5 bg-black/5 select-none"
-                                      draggable={false}
-                                    />
-                                    <span className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-[10px] font-bold shadow-sm pointer-events-none">
-                                      <ZoomIn size={12} /> Phóng to
-                                    </span>
+                                    }
+                                  }}
+                                  className="group/img relative block w-full max-w-[min(420px,100%)] -mx-1 cursor-zoom-in touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl"
+                                  title="Bấm để xem ảnh lớn"
+                                >
+                                  <img
+                                    src={resolveMediaUrl(msg.fileUrl)}
+                                    alt={showFileName(msg.fileName) || 'Hình ảnh'}
+                                    className="w-full h-auto rounded-xl max-h-96 object-contain border border-black/5 bg-black/5 select-none"
+                                    draggable={false}
+                                  />
+                                  <span className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-[10px] font-bold shadow-sm pointer-events-none">
+                                    <ZoomIn size={12} /> Phóng to
+                                  </span>
+                                </div>
+                                {attachmentCaption(msg) ? (
+                                  <div className="whitespace-pre-wrap break-words px-0.5">
+                                    <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
                                   </div>
-                                  {attachmentCaption(msg) ? (
-                                    <div className="whitespace-pre-wrap break-words px-0.5">
-                                      <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
-                                    </div>
-                                  ) : null}
+                                ) : null}
                               </div>
-                                ) : msg.messageType === 'file' ? (
-                                  <div className="space-y-1.5">
-                                  <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                                    <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-red-500 text-white'}`}>
-                                      <Paperclip size={18} />
-                                    </div>
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
-                                      <span className="text-[10px] font-medium opacity-50">Tài liệu đính kèm</span>
-                                    </div>
-                                  </a>
-                                  {attachmentCaption(msg) ? (
-                                    <div className="whitespace-pre-wrap break-words px-0.5">
-                                      <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
-                                    </div>
-                                  ) : null}
+                            ) : msg.messageType === 'file' ? (
+                              <div className="space-y-1.5">
+                                <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                                  <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-red-500 text-white'}`}>
+                                    <Paperclip size={18} />
                                   </div>
-                                ) : (
-                                  <div className="whitespace-pre-wrap break-words">
-                                    <MessageRichText text={msg.content} mine={isMine} />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
+                                    <span className="text-[10px] font-medium opacity-50">Tài liệu đính kèm</span>
                                   </div>
-                                )}
+                                </a>
+                                {attachmentCaption(msg) ? (
+                                  <div className="whitespace-pre-wrap break-words px-0.5">
+                                    <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <div className="whitespace-pre-wrap break-words">
+                                <MessageRichText text={msg.content} mine={isMine} />
+                              </div>
+                            )}
 
                             {/* Reaction badge */}
                             {!msg.isRecalled && (heartCount > 0 || likeCount > 0) && (
                               <div className={`cms-bubble-reactions absolute -bottom-3 ${isMine ? 'right-2' : 'left-2'}`}>
-                                 {heartCount > 0 && (
-                                   <span className="flex items-center gap-0.5 text-[11px]">
-                                     <span>❤️</span>
-                                     {heartCount > 1 && <span className="text-gray-500 font-bold">{heartCount}</span>}
-                                   </span>
-                                 )}
-                                 {likeCount > 0 && (
-                                   <span className="flex items-center gap-0.5 text-[11px]">
-                                     <span>👍</span>
-                                     {likeCount > 1 && <span className="text-gray-500 font-bold">{likeCount}</span>}
-                                   </span>
-                                 )}
+                                {heartCount > 0 && (
+                                  <span className="flex items-center gap-0.5 text-[11px]">
+                                    <span>❤️</span>
+                                    {heartCount > 1 && <span className="text-gray-500 font-bold">{heartCount}</span>}
+                                  </span>
+                                )}
+                                {likeCount > 0 && (
+                                  <span className="flex items-center gap-0.5 text-[11px]">
+                                    <span>👍</span>
+                                    {likeCount > 1 && <span className="text-gray-500 font-bold">{likeCount}</span>}
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1963,7 +1999,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               myReactions={myReactions}
                             />
                           )}
-                          
+
                           {/* Options/Menu button for Soft Delete */}
                           <div className="relative">
                             <button
@@ -2025,18 +2061,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             const diffHours = (now - sentAt) / (1000 * 60 * 60);
                             return diffHours <= 24;
                           })() && (
-                            <button
-                              onClick={() => handleRecall(msg.id)}
-                              disabled={recallingId === msg.id}
-                              className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-slate-100 active:scale-90 disabled:opacity-30"
-                              title="Thu hồi tin nhắn"
-                            >
-                              {recallingId === msg.id
-                                ? <span className="w-3 h-3 border-2 border-red-300 border-t-red-500 rounded-full inline-block animate-spin" />
-                                : <RotateCcw size={12} />
-                              }
-                            </button>
-                          )}
+                              <button
+                                onClick={() => handleRecall(msg.id)}
+                                disabled={recallingId === msg.id}
+                                className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-slate-100 active:scale-90 disabled:opacity-30"
+                                title="Thu hồi tin nhắn"
+                              >
+                                {recallingId === msg.id
+                                  ? <span className="w-3 h-3 border-2 border-red-300 border-t-red-500 rounded-full inline-block animate-spin" />
+                                  : <RotateCcw size={12} />
+                                }
+                              </button>
+                            )}
 
                         </div>
 
@@ -2172,148 +2208,147 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       {/* ── Create Group Modal ── */}
       {showCreateGroup && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-[24px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-280 max-h-[min(92dvh,720px)] flex flex-col">
-              <div className="px-5 py-4 bg-gradient-to-br from-red-700 to-red-900 text-white flex items-center justify-between shrink-0">
-                 <div className="flex items-center gap-2.5 min-w-0">
-                   <Users size={18} className="text-red-200 shrink-0" />
-                   <h3 className="font-semibold text-base tracking-tight truncate">Tạo nhóm chat mới</h3>
-                 </div>
-                 <button type="button" onClick={() => setShowCreateGroup(false)} className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-xl transition-colors" aria-label="Đóng"><X size={18}/></button>
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-[24px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-280 max-h-[min(92dvh,720px)] flex flex-col">
+            <div className="px-5 py-4 bg-gradient-to-br from-red-700 to-red-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Users size={18} className="text-red-200 shrink-0" />
+                <h3 className="font-semibold text-base tracking-tight truncate">Tạo nhóm chat mới</h3>
               </div>
-              <div className="p-5 space-y-5 overflow-y-auto min-h-0 flex-1">
-                <div>
-                   <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tên nhóm</label>
-                   <input
-                     type="text"
-                     value={groupName}
-                     onChange={e => setGroupName(e.target.value)}
-                     placeholder="Ví dụ: Nhóm học Tiếng Anh Giao Tiếp..."
-                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 focus:bg-white transition-all font-medium text-sm text-slate-800"
-                   />
-                </div>
+              <button type="button" onClick={() => setShowCreateGroup(false)} className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-xl transition-colors" aria-label="Đóng"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-5 overflow-y-auto min-h-0 flex-1">
+              <div>
+                <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tên nhóm</label>
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={e => setGroupName(e.target.value)}
+                  placeholder="Ví dụ: Nhóm học Tiếng Anh Giao Tiếp..."
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 focus:bg-white transition-all font-medium text-sm text-slate-800"
+                />
+              </div>
 
-                 <div>
-                  <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Chọn thành viên</label>
-                  <div className="relative mb-3">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      value={memberSearch}
-                      onChange={e => setMemberSearch(e.target.value)}
-                      placeholder="Tìm tên giáo viên hoặc học viên..."
-                      className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-300 focus:bg-white transition-all font-medium text-slate-700"
-                    />
-                  </div>
-                  <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                     {contacts
-                       .filter(u => u.id !== currentUserId && u.id !== 'admin')
-                       .filter(u => !memberSearch || (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()))
-                       .map(u => {
-                         const isSelected = selectedParticipants.some(p => p.userId === u.id);
-                         return (
-                          <label key={u.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all group ${isSelected ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
-                             <div className="relative">
-                               <input
-                                 type="checkbox"
-                                 className="w-5 h-5 rounded-md border-2 border-slate-200 text-red-600 focus:ring-red-500 transition-all cursor-pointer"
-                                 checked={isSelected}
-                                 onChange={(e) => {
-                                   if (e.target.checked) setSelectedParticipants([...selectedParticipants, { userId: u.id, name: u.name, role: u.role }]);
-                                   else setSelectedParticipants(selectedParticipants.filter(p => p.userId !== u.id));
-                                 }}
-                               />
-                             </div>
-                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
-                               u.role === 'admin' ? 'bg-red-500' :
-                               u.role === 'teacher' ? 'bg-amber-600' : 'bg-emerald-600'
-                             }`}>
-                               {(u.name || '?')[0].toUpperCase()}
-                             </div>
-                             <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{u.name}</p>
-                                <p className="text-[11px] text-slate-500 font-medium">
-                                  {u.role === 'admin' ? 'Nhân viên / Admin' :
-                                  u.role === 'teacher' ? 'Giảng viên' : 'Học viên'}
-                                </p>
-                             </div>
-                          </label>
-                         );
-                       })}
-                  </div>
+              <div>
+                <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Chọn thành viên</label>
+                <div className="relative mb-3">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={memberSearch}
+                    onChange={e => setMemberSearch(e.target.value)}
+                    placeholder="Tìm tên giáo viên hoặc học viên..."
+                    className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-300 focus:bg-white transition-all font-medium text-slate-700"
+                  />
                 </div>
+                <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {contacts
+                    .filter(u => u.id !== currentUserId && u.id !== 'admin')
+                    .filter(u => !memberSearch || (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()))
+                    .map(u => {
+                      const isSelected = selectedParticipants.some(p => p.userId === u.id);
+                      return (
+                        <label key={u.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all group ${isSelected ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                          <div className="relative">
+                            <input
+                              type="checkbox"
+                              className="w-5 h-5 rounded-md border-2 border-slate-200 text-red-600 focus:ring-red-500 transition-all cursor-pointer"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedParticipants([...selectedParticipants, { userId: u.id, name: u.name, role: u.role }]);
+                                else setSelectedParticipants(selectedParticipants.filter(p => p.userId !== u.id));
+                              }}
+                            />
+                          </div>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${u.role === 'admin' ? 'bg-red-500' :
+                              u.role === 'teacher' ? 'bg-amber-600' : 'bg-emerald-600'
+                            }`}>
+                            {(u.name || '?')[0].toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{u.name}</p>
+                            <p className="text-[11px] text-slate-500 font-medium">
+                              {u.role === 'admin' ? 'Nhân viên / Admin' :
+                                u.role === 'teacher' ? 'Giảng viên' : 'Học viên'}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                </div>
+              </div>
 
-                <div className="flex gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateGroup(false)}
-                    className="flex-1 min-h-12 py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-all"
-                  >
-                    Hủy bỏ
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!groupName.trim() || selectedParticipants.length === 0}
-                    onClick={async () => {
-                      try {
-                        const newGroup = await createChatGroup(groupName, selectedParticipants);
-                        if (newGroup) {
-                          setShowCreateGroup(false);
-                          setGroupName('');
-                          setSelectedParticipants([]);
-                          toast?.success('Tạo nhóm thành công!');
-                        } else {
-                          toast?.error('Không thể tạo nhóm. Vui lòng thử lại.');
-                        }
-                      } catch (err) {
-                        toast?.error('Lỗi kết nối máy chủ.');
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateGroup(false)}
+                  className="flex-1 min-h-12 py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-all"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={!groupName.trim() || selectedParticipants.length === 0}
+                  onClick={async () => {
+                    try {
+                      const newGroup = await createChatGroup(groupName, selectedParticipants);
+                      if (newGroup) {
+                        setShowCreateGroup(false);
+                        setGroupName('');
+                        setSelectedParticipants([]);
+                        toast?.success('Tạo nhóm thành công!');
+                      } else {
+                        toast?.error('Không thể tạo nhóm. Vui lòng thử lại.');
                       }
-                    }}
-                    className="flex-[1.4] min-h-12 py-3 px-4 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                  >
-                    Tạo nhóm ngay
-                  </button>
-                </div>
+                    } catch (err) {
+                      toast?.error('Lỗi kết nối máy chủ.');
+                    }
+                  }}
+                  className="flex-[1.4] min-h-12 py-3 px-4 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                >
+                  Tạo nhóm ngay
+                </button>
               </div>
-           </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* ── Delete Group Confirm Modal ── */}
       {groupToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-500 text-center p-8">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                <Trash2 size={32} className="text-red-500" />
-              </div>
-              <h3 className="font-black text-xl text-slate-800 mb-2">Xóa Nhóm Này?</h3>
-              <p className="text-sm text-slate-500 font-bold mb-8 leading-relaxed">
-                Toàn bộ tin nhắn và dữ liệu nhóm sẽ bị <span className="text-red-500">xóa vĩnh viễn</span> và không thể khôi phục. Bạn chắc chắn chứ?
-              </p>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setGroupToDelete(null)}
-                  className="flex-1 py-3.5 px-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-all"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  onClick={async () => {
-                    const success = await deleteChatGroup(groupToDelete);
-                    if (success) {
-                       toast.success('Đã xóa nhóm vĩnh viễn');
-                       setActiveConv(null);
-                    } else {
-                       toast.error('Có lỗi xảy ra khi xóa nhóm');
-                    }
-                    setGroupToDelete(null);
-                  }}
-                  className="flex-1 py-3.5 px-4 bg-red-500 text-white rounded-2xl font-black text-xs uppercase hover:bg-red-600 transition-all shadow-lg shadow-red-200"
-                >
-                  Xóa Vĩnh Viễn
-                </button>
-              </div>
-           </div>
+          <div className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-500 text-center p-8">
+            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <Trash2 size={32} className="text-red-500" />
+            </div>
+            <h3 className="font-black text-xl text-slate-800 mb-2">Xóa Nhóm Này?</h3>
+            <p className="text-sm text-slate-500 font-bold mb-8 leading-relaxed">
+              Toàn bộ tin nhắn và dữ liệu nhóm sẽ bị <span className="text-red-500">xóa vĩnh viễn</span> và không thể khôi phục. Bạn chắc chắn chứ?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setGroupToDelete(null)}
+                className="flex-1 py-3.5 px-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-all"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={async () => {
+                  const success = await deleteChatGroup(groupToDelete);
+                  if (success) {
+                    toast.success('Đã xóa nhóm vĩnh viễn');
+                    setActiveConv(null);
+                  } else {
+                    toast.error('Có lỗi xảy ra khi xóa nhóm');
+                  }
+                  setGroupToDelete(null);
+                }}
+                className="flex-1 py-3.5 px-4 bg-red-500 text-white rounded-2xl font-black text-xs uppercase hover:bg-red-600 transition-all shadow-lg shadow-red-200"
+              >
+                Xóa Vĩnh Viễn
+              </button>
+            </div>
+          </div>
         </div>
       )}
       <ImageLightbox
@@ -2325,80 +2360,225 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       {/* ── Broadcast Message Modal ── */}
       {broadcastConfig && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-8 duration-500">
-              <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6 flex items-center justify-between">
+          <div className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-8 duration-500">
+            <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-black text-lg flex items-center gap-2">
+                  <Megaphone size={20} /> Gửi tin nhắn hàng loạt
+                </h3>
+                <p className="text-blue-100 text-[11px] font-bold uppercase tracking-widest opacity-80 mt-1">
+                  Đối tượng: <span className="text-white bg-white/20 px-2 py-0.5 rounded-lg ml-1">{broadcastConfig.label}</span>
+                </p>
+              </div>
+              <button onClick={() => setBroadcastConfig(null)} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all"><X size={20} /></button>
+            </div>
+
+            <div className="p-8">
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-6 flex gap-3 items-start">
+                <AlertCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-[13px] text-amber-700 font-bold leading-relaxed">
+                  Tin nhắn này sẽ được gửi <span className="underline decoration-2">riêng biệt</span> tới từng người dùng thuộc nhóm <span className="text-amber-800 font-black">{broadcastConfig.label}</span>.
+                  {currentUserRole === 'staff' && ' Bạn chỉ có thể gửi cho người dùng thuộc cùng chi nhánh.'}
+                </p>
+              </div>
+
+              <div className="space-y-4">
                 <div>
-                  <h3 className="text-white font-black text-lg flex items-center gap-2">
-                    <Megaphone size={20} /> Gửi tin nhắn hàng loạt
-                  </h3>
-                  <p className="text-blue-100 text-[11px] font-bold uppercase tracking-widest opacity-80 mt-1">
-                    Đối tượng: <span className="text-white bg-white/20 px-2 py-0.5 rounded-lg ml-1">{broadcastConfig.label}</span>
-                  </p>
-                </div>
-                <button onClick={() => setBroadcastConfig(null)} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all"><X size={20}/></button>
-              </div>
-
-              <div className="p-8">
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-6 flex gap-3 items-start">
-                  <AlertCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-[13px] text-amber-700 font-bold leading-relaxed">
-                    Tin nhắn này sẽ được gửi <span className="underline decoration-2">riêng biệt</span> tới từng người dùng thuộc nhóm <span className="text-amber-800 font-black">{broadcastConfig.label}</span>. 
-                    {currentUserRole === 'staff' && ' Bạn chỉ có thể gửi cho người dùng thuộc cùng chi nhánh.'}
-                  </p>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Nội dung thông báo</label>
+                  <textarea
+                    value={broadcastContent}
+                    onChange={(e) => setBroadcastContent(e.target.value)}
+                    placeholder="Nhập nội dung tin nhắn gửi đi..."
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] px-6 py-5 text-[15px] font-medium outline-none focus:border-blue-500 focus:bg-white transition-all h-40 resize-none shadow-inner"
+                    autoFocus
+                  />
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Nội dung thông báo</label>
-                    <textarea
-                      value={broadcastContent}
-                      onChange={(e) => setBroadcastContent(e.target.value)}
-                      placeholder="Nhập nội dung tin nhắn gửi đi..."
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] px-6 py-5 text-[15px] font-medium outline-none focus:border-blue-500 focus:bg-white transition-all h-40 resize-none shadow-inner"
-                      autoFocus
-                    />
-                  </div>
-
-                  <div className="flex gap-4 pt-2">
-                    <button
-                      onClick={() => setBroadcastConfig(null)}
-                      disabled={isBroadcasting}
-                      className="flex-1 py-4 px-6 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
-                    >
-                      Hủy bỏ
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!broadcastContent.trim()) return toast.error('Vui lòng nhập nội dung');
-                        setIsBroadcasting(true);
-                        try {
-                          const res = await messagesAPI.broadcast(broadcastConfig.targetRole, broadcastContent);
-                          if (res.success) {
-                             toast.success(res.message || 'Đã gửi tin nhắn thành công');
-                             setBroadcastConfig(null);
-                             setBroadcastContent('');
-                          } else {
-                             toast.error(res.message || 'Lỗi khi gửi tin nhắn');
-                          }
-                        } catch (err) {
-                           toast.error('Lỗi kết nối máy chủ');
-                        } finally {
-                           setIsBroadcasting(false);
+                <div className="flex gap-4 pt-2">
+                  <button
+                    onClick={() => setBroadcastConfig(null)}
+                    disabled={isBroadcasting}
+                    className="flex-1 py-4 px-6 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!broadcastContent.trim()) return toast.error('Vui lòng nhập nội dung');
+                      setIsBroadcasting(true);
+                      try {
+                        const res = await messagesAPI.broadcast(broadcastConfig.targetRole, broadcastContent);
+                        if (res.success) {
+                          toast.success(res.message || 'Đã gửi tin nhắn thành công');
+                          setBroadcastConfig(null);
+                          setBroadcastContent('');
+                        } else {
+                          toast.error(res.message || 'Lỗi khi gửi tin nhắn');
                         }
-                      }}
-                      disabled={isBroadcasting || !broadcastContent.trim()}
-                      className="flex-[2] py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-xl hover:shadow-red-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
-                    >
-                      {isBroadcasting ? (
-                        <><Loader2 size={16} className="animate-spin" /> Đang gửi...</>
-                      ) : (
-                        <><Send size={16} /> Gửi ngay bây giờ</>
-                      )}
-                    </button>
-                  </div>
+                      } catch (err) {
+                        toast.error('Lỗi kết nối máy chủ');
+                      } finally {
+                        setIsBroadcasting(false);
+                      }
+                    }}
+                    disabled={isBroadcasting || !broadcastContent.trim()}
+                    className="flex-[2] py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-xl hover:shadow-red-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                  >
+                    {isBroadcasting ? (
+                      <><Loader2 size={16} className="animate-spin" /> Đang gửi...</>
+                    ) : (
+                      <><Send size={16} /> Gửi ngay bây giờ</>
+                    )}
+                  </button>
                 </div>
               </div>
-           </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 🔴 Leave Group Confirm Modal 🔴 */}
+      {groupToLeave && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-500 text-center p-8">
+            <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <LogOut size={32} className="text-orange-500" />
+            </div>
+            <h3 className="font-black text-xl text-slate-800 mb-2">Rời khỏi nhóm?</h3>
+            <p className="text-sm text-slate-500 font-bold mb-8 leading-relaxed">
+              Bạn sẽ không còn nhận được tin nhắn và nhóm sẽ biến mất khỏi danh sách của bạn.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setGroupToLeave(null)}
+                className="flex-1 py-3.5 px-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-all"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  const success = await leaveChatGroup(groupToLeave);
+                  if (success) {
+                    toast?.success('Đã rời khỏi nhóm');
+                    setActiveConv(null);
+                  } else {
+                    toast?.error('Có lỗi xảy ra khi rời nhóm');
+                  }
+                  setGroupToLeave(null);
+                }}
+                className="flex-1 py-3.5 px-4 bg-orange-500 text-white rounded-2xl font-black text-xs uppercase hover:bg-orange-600 transition-all shadow-lg shadow-orange-200"
+              >
+                Xác nhận rời
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 Add Member Modal 🟢 */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-[500px] max-h-[85vh] rounded-[32px] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-500">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-3">
+                <UserPlus size={18} className="text-blue-500 shrink-0" />
+                <h3 className="font-semibold text-base tracking-tight truncate">Thêm thành viên</h3>
+              </div>
+              <button type="button" onClick={() => setShowAddMemberModal(false)} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-colors" aria-label="Đóng"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-5 overflow-y-auto min-h-0 flex-1">
+              <div>
+                <div className="relative mb-3">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={memberSearch}
+                    onChange={e => setMemberSearch(e.target.value)}
+                    placeholder="Tìm tên thành viên..."
+                    className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-300 focus:bg-white transition-all font-medium text-slate-700"
+                  />
+                </div>
+                <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {contacts
+                    .filter(u => u.id !== currentUserId && u.id !== 'admin')
+                    .filter(u => !memberSearch || (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()))
+                    .map(u => {
+                      const groupObj = groups?.find(g => String(g._id) === String(activeConv?.id?.replace('group_', '')));
+                      const isAlreadyInGroup = groupObj?.participants?.some(p => String(p.userId) === String(u.id));
+
+                      const roleLabel = u.role === 'admin' ? (u.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : u.adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : 'Quản trị viên')
+                        : u.role === 'staff' ? (u.adminRole === 'SUPPORT' ? 'Support viên' : 'Admin Chi nhánh')
+                          : u.role === 'teacher' ? 'Giảng viên'
+                            : 'Học viên';
+                      const roleColor = u.role === 'admin' ? 'bg-red-500 text-white' : u.role === 'staff' ? 'bg-amber-600 text-white' : u.role === 'teacher' ? 'bg-blue-600 text-white' : 'bg-green-600 text-white';
+                      const isSelected = selectedParticipants.some(p => p.userId === u.id);
+
+                      return (
+                        <div key={u.id} className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${isAlreadyInGroup ? 'bg-slate-50 border-transparent opacity-70' : isSelected ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-blue-200 cursor-pointer'}`}
+                          onClick={() => {
+                            if (isAlreadyInGroup) return;
+                            if (isSelected) setSelectedParticipants(selectedParticipants.filter(p => p.userId !== u.id));
+                            else setSelectedParticipants([...selectedParticipants, { userId: u.id, name: u.name, role: u.role }]);
+                          }}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img src={resolveAvatarUrl(u)} className="w-10 h-10 rounded-full object-cover shrink-0" alt="" />
+                            <div className="min-w-0 truncate">
+                              <p className="text-[13px] font-bold text-slate-800 truncate leading-tight mb-1">{u.name}</p>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${roleColor}`}>{roleLabel}</span>
+                            </div>
+                          </div>
+                          {!isAlreadyInGroup ? (
+                            <div className="shrink-0 ml-3">
+                              <input
+                                type="checkbox"
+                                className="w-5 h-5 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer pointer-events-none"
+                                checked={isSelected}
+                                readOnly
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-slate-400 bg-slate-200 px-2 py-1 rounded shrink-0">Đã tham gia</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAddMemberModal(false)}
+                  className="flex-1 min-h-12 py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-all"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedParticipants.length === 0}
+                  onClick={async () => {
+                    try {
+                      const groupIdStr = activeConv?.id?.replace('group_', '');
+                      const success = await addGroupMembers(groupIdStr, selectedParticipants);
+                      if (success) {
+                        setShowAddMemberModal(false);
+                        setSelectedParticipants([]);
+                        setMemberSearch('');
+                        toast?.success('Đã thêm thành viên!');
+                      } else {
+                        toast?.error('Không thể thêm thành viên.');
+                      }
+                    } catch (err) {
+                      toast?.error('Lỗi kết nối máy chủ.');
+                    }
+                  }}
+                  className="flex-[1.4] min-h-12 py-3 px-4 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                >
+                  Thêm ({selectedParticipants.length})
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

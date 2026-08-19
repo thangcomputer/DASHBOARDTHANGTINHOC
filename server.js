@@ -772,10 +772,10 @@ app.notifyUser = (role, userId, eventName, data) => {
   const conversationId = data?.conversationId || null;
   const productRole = data?.sender?.adminRole || data?.receiver?.adminRole || null;
 
-  // Legacy root "admin": target root admin room + SUPER/HIGH (ALL_ADMIN).
-  // NEVER fan-out private messages to ALL_STAFF / ALL_SUPPORT.
+  // Root "admin" (HỖ TRỢ TIN HỌC): target ALL_ADMIN, ALL_STAFF, and ALL_SUPPORT
+  // because this inbox is handled by everyone in the support team.
   if (strUserId === 'admin') {
-    io.to('admin').to('ALL_ADMIN').emit(eventName, data);
+    io.to('admin').to('ALL_ADMIN').to('ALL_STAFF').to('ALL_SUPPORT').emit(eventName, data);
     logDelivery({
       eventName,
       targetRole: role,

@@ -1196,6 +1196,17 @@ export const messagesAPI = {
     const res = await apiFetch(`/messages/groups/${groupId}`, { method: 'DELETE' });
     return res.json();
   },
+  leaveGroup: async (groupId) => {
+    const res = await apiFetch(`/messages/groups/${groupId}/leave`, { method: 'POST' });
+    return res.json();
+  },
+  addGroupMembers: async (groupId, participants) => {
+    const res = await apiFetch(`/messages/groups/${groupId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ participants })
+    });
+    return res.json();
+  },
 
   markRead: async (conversationId) => {
     const res = await apiFetch(`/messages/read/${conversationId}`, { method: 'PUT' });

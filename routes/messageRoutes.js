@@ -749,6 +749,16 @@ router.patch('/:messageId/soft-delete', messagesGuard('soft_delete'), async (req
   }
 });
 
+const normalizeGroupRole = (r) => {
+  const upper = String(r || '').toUpperCase();
+  if (upper === 'HIGH_ADMIN' || upper === 'SUPER_ADMIN' || upper === 'ADMIN') return 'admin';
+  if (upper === 'STAFF' || upper === 'SUPPORT') return 'staff';
+  if (String(r).toLowerCase() === 'teacher') return 'teacher';
+  if (String(r).toLowerCase() === 'student') return 'student';
+  if (String(r).toLowerCase() === 'staff') return 'staff';
+  return null;
+};
+
 // ── Tạo nhóm mới ──
 router.post('/groups', messagesGuard('group_create'), async (req, res) => {
   try {
@@ -767,15 +777,6 @@ router.post('/groups', messagesGuard('group_create'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Danh sách thành viên không hợp lệ' });
     }
     const validRoles = ['admin', 'teacher', 'student', 'staff'];
-    const normalizeGroupRole = (r) => {
-      const upper = String(r || '').toUpperCase();
-      if (upper === 'HIGH_ADMIN' || upper === 'SUPER_ADMIN' || upper === 'ADMIN') return 'admin';
-      if (upper === 'STAFF' || upper === 'SUPPORT') return 'staff';
-      if (String(r).toLowerCase() === 'teacher') return 'teacher';
-      if (String(r).toLowerCase() === 'student') return 'student';
-      if (String(r).toLowerCase() === 'staff') return 'staff';
-      return null;
-    };
 
     const sanitizedParticipants = participants
       .map(p => ({ ...p, normRole: normalizeGroupRole(p?.role) }))
@@ -827,6 +828,113 @@ router.get('/groups/user/:userId', messagesGuard('group_list'), async (req, res)
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// ── Rời nhóm ──
+router.post('/groups/:groupId/leave', async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = String(req.user.id);
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm' });
+
+    const isMember = group.participants.some(p => String(p.userId) === userId);
+    if (!isMember) return res.status(400).json({ success: false, message: 'Bạn không phải là thành viên nhóm này' });
+
+    group.participants = group.participants.filter(p => String(p.userId) !== userId);
+    await group.save();
+
+    const systemMsg = await Message.create({
+      conversationId: `group_${groupId}`,
+      senderId: req.user.id,
+      senderName: 'Thông báo hệ thống',
+      senderRole: 'system',
+      receiverId: groupId,
+      receiverName: group.name,
+      receiverRole: 'group',
+      content: `${req.user.name} đã rời khỏi nhóm.`,
+      messageType: 'system'
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`group_${groupId}`).emit('message:receive', systemMsg);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── Thêm thành viên vào nhóm ──
+router.post('/groups/:groupId/members', async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { participants } = req.body;
+    const group = await Group.findById(groupId);
+    
+    if (!group) return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm' });
+
+    const isCreator = String(group.createdBy?.userId) === String(req.user.id);
+    if (!isCreator && !isAdminLevelAccount(req.user)) {
+      return res.status(403).json({ success: false, message: 'Chỉ người tạo nhóm mới có quyền thêm thành viên' });
+    }
+
+    if (!Array.isArray(participants) || participants.length === 0) {
+      return res.status(400).json({ success: false, message: 'Danh sách thành viên không hợp lệ' });
+    }
+
+    const sanitizedParticipants = participants
+      .map(p => ({ ...p, normRole: normalizeGroupRole(p?.role) }))
+      .filter(p => p && typeof p === 'object' && p.userId && p.name && p.normRole)
+      .map(p => ({
+        userId: String(p.userId).slice(0, 50),
+        name: String(p.name).slice(0, 100),
+        role: p.normRole,
+        joinedAt: new Date(),
+      }));
+
+    if (sanitizedParticipants.length === 0) {
+      return res.status(400).json({ success: false, message: 'Không có thành viên hợp lệ' });
+    }
+
+    // Filter out already existing participants
+    const newMembers = sanitizedParticipants.filter(np => 
+      !group.participants.some(op => String(op.userId) === String(np.userId))
+    );
+
+    if (newMembers.length > 0) {
+      group.participants.push(...newMembers);
+      await group.save();
+
+      const io = req.app.get('io');
+      for (const member of newMembers) {
+        const systemMsg = await Message.create({
+          conversationId: `group_${groupId}`,
+          senderId: req.user.id,
+          senderName: 'Thông báo hệ thống',
+          senderRole: 'system',
+          receiverId: groupId,
+          receiverName: group.name,
+          receiverRole: 'group',
+          content: `${member.name} đã được thêm vào nhóm.`,
+          messageType: 'system'
+        });
+        
+        if (io) {
+          io.to(`group_${groupId}`).emit('message:receive', systemMsg);
+        }
+        
+        // Notify the new member to join the group locally
+        req.app.notifyUser(member.role, member.userId, 'group:new', group);
+      }
+    }
+
+    res.json({ success: true, data: group });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 
 // ── Xóa nhóm vĩnh viễn ──
 router.delete('/groups/:groupId', messagesGuard('group_delete'), async (req, res) => {

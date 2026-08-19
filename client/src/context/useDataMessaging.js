@@ -386,6 +386,33 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
     return false;
   }, [triggerBackgroundSync]);
 
+  const leaveChatGroup = useCallback(async (groupId) => {
+    try {
+      const json = await api.messages.leaveGroup(groupId);
+      if (json.success) {
+        setGroups(prev => prev.filter(g => String(g._id) !== String(groupId) && String(g.id) !== String(groupId)));
+        setMessages(prev => prev.filter(m => m.convId !== `group_${groupId}`));
+        triggerBackgroundSync();
+        return true;
+      }
+    } catch (err) {
+    }
+    return false;
+  }, [triggerBackgroundSync]);
+
+  const addGroupMembers = useCallback(async (groupId, participants) => {
+    try {
+      const json = await api.messages.addGroupMembers(groupId, participants);
+      if (json.success) {
+        setGroups(prev => prev.map(g => String(g._id) === String(groupId) ? json.data : g));
+        triggerBackgroundSync();
+        return true;
+      }
+    } catch (err) {
+    }
+    return false;
+  }, [triggerBackgroundSync]);
+
   const markMessagesRead = useCallback(async (convId, readerId, extraReceiverIds = []) => {
     if (!convId) return;
     // extraReceiverIds giữ tương thích caller (admin mailbox); server tự suy receiverTargets từ token
@@ -571,7 +598,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
   return {
     messages, setMessages, groups, setGroups,
     sendMessage, syncMessages, toggleMessageReaction, recallMessage,
-    softDeleteMessage, createChatGroup, deleteChatGroup,
+    softDeleteMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers,
     markMessagesRead, getConversations, getMessages,
   };
 }

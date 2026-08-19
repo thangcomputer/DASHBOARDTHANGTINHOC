@@ -153,7 +153,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
   const {
     messages, setMessages, groups, setGroups,
     sendMessage, syncMessages, toggleMessageReaction, recallMessage,
-    softDeleteMessage, createChatGroup, deleteChatGroup,
+    softDeleteMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers,
     markMessagesRead, getConversations, getMessages,
   } = useDataMessaging({ currentUser, students, teachers, staffs, triggerBackgroundSync });
   setGroupsRef.current = setGroups;
@@ -228,7 +228,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     getSchedulesByStudent,
     approveStudentExam, revokeStudentExam, failStudentExam, saveExamResult,
     sendMessage, syncMessages, markMessagesRead, getConversations, getMessages,
-    recallMessage, softDeleteMessage, createChatGroup, deleteChatGroup,
+    recallMessage, softDeleteMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers,
     addNotification, markNotificationRead, dismissNotificationLocal, getNotifications,
     addSchedule, updateSchedule, cancelSchedule,
     addMaterial, removeMaterial, getMaterialsByCourse, getMaterialsByCategory,
@@ -259,7 +259,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     getSchedulesByStudent,
     approveStudentExam, revokeStudentExam, failStudentExam, saveExamResult,
     sendMessage, syncMessages, markMessagesRead, getConversations, getMessages,
-    recallMessage, softDeleteMessage, createChatGroup, deleteChatGroup,
+    recallMessage, softDeleteMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers,
     addNotification, markNotificationRead, dismissNotificationLocal, getNotifications,
     addSchedule, updateSchedule, cancelSchedule,
     addMaterial, removeMaterial, getMaterialsByCourse, getMaterialsByCategory,
