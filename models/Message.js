@@ -51,7 +51,7 @@ const messageSchema = new mongoose.Schema({
   content: {
     type: String,
     required: [true, 'Nội dung tin nhắn không được trống'],
-    maxlength: 6000,
+    maxlength: 16000,
   },
   messageType: {
     type: String,

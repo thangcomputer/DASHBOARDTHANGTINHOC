@@ -627,7 +627,7 @@ function sanitizeSupportReply(raw, { stripGreeting = false } = {}) {
   if (!t) return '';
   if (isBotLeakText(t)) return '';
   if (stripGreeting) t = stripLeadingGreeting(t);
-  if (t.length > 5500) return t.slice(0, 5500).trim();
+  if (t.length > 15000) return t.slice(0, 15000).trim();
   return t;
 }
 
@@ -640,7 +640,7 @@ async function callSupportLlm(messages, { images } = {}) {
         messages,
         model,
         temperature: 0.35,
-        maxTokens: 2500,
+        maxTokens: 8000,
         images: images || [],
       });
     } catch (err) {
@@ -672,7 +672,7 @@ async function persistBotReply({
     receiverName: humanName || 'Bạn',
     receiverRole: humanRole,
     receiverBranchCode: '',
-    content: String(content || '').trim().slice(0, 6000),
+    content: String(content || '').trim().slice(0, 16000),
     messageType: type,
   });
 
