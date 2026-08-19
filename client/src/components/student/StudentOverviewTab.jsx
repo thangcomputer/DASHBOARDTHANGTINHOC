@@ -56,7 +56,15 @@ export default function StudentOverviewTab({
       try {
         const res = await api.quizzes.getStudentQuizzes();
         if (!res?.success || cancelled) return;
-        const n = (res.data || []).filter((q) => !q.mySubmission).length;
+        const nowMs = Date.now();
+        const n = (res.data || []).filter((q) => {
+          if (q.mySubmission) return false;
+          if (q.deadline) {
+            const diffMs = new Date(q.deadline).getTime() - nowMs;
+            if (diffMs <= 0) return false;
+          }
+          return true;
+        }).length;
         setPendingQuizCount(n);
       } catch {
         if (!cancelled) setPendingQuizCount(0);
