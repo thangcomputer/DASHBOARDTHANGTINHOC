@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
-  ImagePlus, Link2, Loader2, MoreVertical, Edit3, Bot, UserRound, Check,
+  ImagePlus, Link2, Loader2, MoreVertical, Edit3, RotateCcw, Bot, UserRound, Check,
   Copy, Scaling,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
@@ -422,18 +422,21 @@ function ChatWindow({
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
-  const handleRecallMessage = async (msgId, msgContent) => {
+  const handleRecallMessage = async (msgId) => {
     try {
       if (onRecall) {
         await onRecall(msgId);
-        toast.success('Đã xóa để hỏi lại');
-        if (msgContent && msgContent !== '[Hình ảnh]') {
-          setText(msgContent);
-          setTimeout(() => inputRef.current?.focus(), 100);
-        }
+        toast.success('Đã thu hồi tin nhắn');
       }
     } catch {
-      toast.error('Không thể xử lý');
+      toast.error('Không thể thu hồi tin nhắn');
+    }
+  };
+
+  const handleEditMessage = (msgContent) => {
+    if (msgContent && msgContent !== '[Hình ảnh]') {
+      setText(msgContent);
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
 
@@ -692,7 +695,7 @@ function ChatWindow({
                   <div className="relative shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                     <button
                       type="button"
-                      onClick={() => handleRecallMessage(msgId, m.content)}
+                      onClick={() => handleEditMessage(m.content)}
                       className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
                       title="Chỉnh sửa / Hỏi lại"
                     >
@@ -719,12 +722,12 @@ function ChatWindow({
                             type="button"
                             onClick={() => {
                               setActiveMsgOptions(null);
-                              handleRecallMessage(msgId, m.content);
+                              handleRecallMessage(msgId);
                             }}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 text-left transition font-bold"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-red-600 hover:bg-red-50 text-left transition font-bold"
                           >
-                            <Edit3 size={14} className="shrink-0 text-blue-600" />
-                            <span className="whitespace-nowrap">Sửa / Hỏi lại</span>
+                            <RotateCcw size={14} className="shrink-0 text-red-600" />
+                            <span className="whitespace-nowrap">Thu hồi tin nhắn</span>
                           </button>
                         </div>
                       )}
