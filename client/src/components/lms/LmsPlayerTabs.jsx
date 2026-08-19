@@ -674,7 +674,7 @@ function ResourcesPanel({ files }) {
                     await downloadMediaFile(file.fileUrl || file.url, file.fileOriginalName || file.title);
                   } catch (err) {
                     // eslint-disable-next-line no-alert
-                    window.alert(err?.message || 'Không tải được tài liệu');
+                    window.cmsAlert(err?.message || 'Không tải được tài liệu', 'error');
                   }
                 }}
                 className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 border-0 cursor-pointer"

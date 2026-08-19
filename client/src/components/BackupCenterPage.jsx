@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Archive, Download, Loader2, RefreshCw, Trash2, Database, Plus,
 } from 'lucide-react';
@@ -78,7 +78,7 @@ export default function BackupCenterPage() {
   };
 
   const onDelete = async (id) => {
-    if (!window.confirm('Xóa bản backup này?')) return;
+    if (!(await window.cmsConfirm('Xóa bản backup này?'))) return;
     setBusyId(id);
     try {
       const res = await backupsAPI.remove(id);

@@ -106,7 +106,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
               const isLocked = !!m.isLocked;
               return (
               <div key={m.id} className={`px-4 md:px-6 py-5 flex flex-col md:flex-row md:items-center justify-between group transition-colors gap-4 ${isLocked ? 'bg-slate-50 opacity-70' : 'hover:bg-purple-50/30 cursor-pointer'}`} onClick={() => {
-                if (isLocked) alert('Video này hiện đang bị khóa bởi Quản trị viên!');
+                if (isLocked) window.cmsAlert('Video này hiện đang bị khóa bởi Quản trị viên!', 'warning');
                 else window.open(m.url, '_blank');
               }}>
                 <div className="flex items-center gap-4 min-w-0">
@@ -222,7 +222,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
                           <Download size={14} /> Tải đề bài
                         </a>
                       ) : (
-                        <button type="button" onClick={() => alert("Giảng viên chưa đính kèm file đề bài cho bài tập này.")} className="flex-1 justify-center text-xs font-bold text-gray-400 bg-gray-50 px-4 py-2 rounded-xl hover:bg-gray-100 transition flex items-center gap-2">
+                        <button type="button" onClick={() => window.cmsAlert("Giảng viên chưa đính kèm file đề bài cho bài tập này.", "info")} className="flex-1 justify-center text-xs font-bold text-gray-400 bg-gray-50 px-4 py-2 rounded-xl hover:bg-gray-100 transition flex items-center gap-2">
                           <Download size={14} /> Tải đề bài
                         </button>
                       )}

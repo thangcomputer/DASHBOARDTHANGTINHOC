@@ -205,7 +205,7 @@ const StudentDashboard = ({ onNavigate }) => {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 3 * 1024 * 1024) {
-      alert("File bài làm quá lớn. Xin vui lòng giới hạn dưới 3MB!");
+      window.cmsAlert("File bài làm quá lớn. Xin vui lòng giới hạn dưới 3MB!", "error");
       e.target.value = '';
       return;
     }
@@ -215,10 +215,10 @@ const StudentDashboard = ({ onNavigate }) => {
       if (res.success) {
         setSubmissionLink(res.fileUrl);
       } else {
-        alert(res.message || "Lỗi tải file");
+        window.cmsAlert(res.message || "Lỗi tải file", "error");
       }
     } catch(err) {
-      alert("Lỗi mạng khi tải file");
+      window.cmsAlert("Lỗi mạng khi tải file", "error");
     }
     setIsSubmitting(false);
     e.target.value = '';

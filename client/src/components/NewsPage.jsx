@@ -774,7 +774,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                 type="button"
                 className="px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 hover:bg-red-50"
                 onClick={async () => {
-                  if (!window.confirm('Xóa bài viết này?')) return;
+                  if (!(await window.cmsConfirm('Xóa bài viết này?'))) return;
                   const res = await blogAPI.remove(detail.id);
                   if (res?.success) {
                     toast.success('Đã xóa bài viết');
@@ -914,7 +914,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                   className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1"
                   onClick={async (e) => {
                     e.stopPropagation();
-                    if (!window.confirm(`Xóa bài viết "${p.title}"?`)) return;
+                    if (!(await window.cmsConfirm(`Xóa bài viết "${p.title}"?`))) return;
                     try {
                       const res = await blogAPI.remove(p.id);
                       if (res?.success) {

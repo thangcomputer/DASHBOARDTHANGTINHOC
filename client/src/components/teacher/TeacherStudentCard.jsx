@@ -765,7 +765,7 @@ export const StudentCard = ({
       showGlossyAlert('Bài đã chấm điểm — không thể xóa.');
       return;
     }
-    if (!window.confirm("Bạn có chắc muốn xóa bài tập này?")) return;
+    if (!(await window.cmsConfirm("Bạn có chắc muốn xóa bài tập này?"))) return;
     try {
       const res = await api.assignments.delete(id);
       if (res.success) {

@@ -387,7 +387,7 @@ export default function TeacherQuizManager({
 
   // Xóa bài trắc nghiệm
   const handleDeleteQuiz = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa bài trắc nghiệm này?')) return;
+    if (!(await window.cmsConfirm('Bạn có chắc chắn muốn xóa bài trắc nghiệm này?'))) return;
     try {
       const res = await api.quizzes.remove(id);
       if (res.success) {

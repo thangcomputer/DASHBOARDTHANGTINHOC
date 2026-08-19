@@ -99,7 +99,7 @@ export default function FileCenterPage() {
   };
 
   const onDelete = async (id) => {
-    if (!window.confirm('Xóa file này khỏi hệ thống?')) return;
+    if (!(await window.cmsConfirm('Xóa file này khỏi hệ thống?'))) return;
     setBusyId(id);
     try {
       const res = await filesAPI.remove(id);
@@ -117,7 +117,7 @@ export default function FileCenterPage() {
   };
 
   const onPurge = async () => {
-    if (!window.confirm('Dọn tất cả file đã hết hạn?')) return;
+    if (!(await window.cmsConfirm('Dọn tất cả file đã hết hạn?'))) return;
     try {
       const res = await filesAPI.purgeExpired();
       if (res.success) {

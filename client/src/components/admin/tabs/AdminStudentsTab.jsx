@@ -355,7 +355,7 @@ export default function AdminStudentsTab() {
         return;
       }
       const names = (preview.data?.names || []).slice(0, 8).join(', ');
-      const ok = window.confirm(
+      const ok = await window.cmsConfirm(
         `Tìm thấy ${count} học viên chỉ còn khóa đã hủy/hoàn.\n`
         + (names ? `Ví dụ: ${names}${count > 8 ? '…' : ''}\n\n` : '\n')
         + 'Xóa VĨNH VIỄN các tài khoản này? (Lịch học & chat liên quan cũng được dọn. Hóa đơn/sổ cái giữ lại để đối soát.)',

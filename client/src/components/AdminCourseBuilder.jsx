@@ -59,8 +59,8 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
     setEditingChapterId(null);
   };
 
-  const deleteChapter = (id) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa chương này (bao gồm tất cả bài học bên trong)?')) {
+  const deleteChapter = async (id) => {
+    if (await window.cmsConfirm('Bạn có chắc chắn muốn xóa chương này (bao gồm tất cả bài học bên trong)?')) {
       setChapters(chapters.filter(c => c.id !== id));
     }
   };
@@ -104,8 +104,8 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
     setEditingLessonId(null);
   };
 
-  const deleteLesson = (chapterId, lessonId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa bài học này?')) {
+  const deleteLesson = async (chapterId, lessonId) => {
+    if (await window.cmsConfirm('Bạn có chắc chắn muốn xóa bài học này?')) {
       setChapters(chapters.map(c => {
         if (c.id === chapterId) {
           return { ...c, lessons: c.lessons.filter(l => l.id !== lessonId) };

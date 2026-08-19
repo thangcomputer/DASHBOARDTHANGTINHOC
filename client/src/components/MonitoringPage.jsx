@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Activity, AlertTriangle, CheckCircle2, Database, HardDrive,
   Loader2, RefreshCw, Server, Timer, RotateCcw,
@@ -70,7 +70,7 @@ export default function MonitoringPage({ session }) {
   }, [load]);
 
   const onReset = async () => {
-    if (!window.confirm('Reset bộ đếm metrics trong RAM?')) return;
+    if (!(await window.cmsConfirm('Reset bộ đếm metrics trong RAM?'))) return;
     try {
       const res = await monitoringAPI.resetMetrics();
       if (res.success) {

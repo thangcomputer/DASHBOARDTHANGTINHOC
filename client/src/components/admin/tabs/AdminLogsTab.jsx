@@ -40,7 +40,7 @@ function RowMenu({ logId, onDeleted, toast }) {
 
   const handleDelete = async () => {
     if (busy) return;
-    if (!window.confirm('Xóa dòng nhật ký này?')) return;
+    if (!(await window.cmsConfirm('Xóa dòng nhật ký này?'))) return;
     setBusy(true);
     try {
       const res = await api.systemLogs.remove(logId);

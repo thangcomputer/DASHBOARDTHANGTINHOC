@@ -116,7 +116,7 @@ export default function FormReportBuilderPage() {
   };
 
   const removeForm = async (id) => {
-    if (!window.confirm('Xóa form và toàn bộ bài nộp?')) return;
+    if (!(await window.cmsConfirm('Xóa form và toàn bộ bài nộp?'))) return;
     const res = await builderAPI.deleteForm(id);
     if (res.success) {
       toast.success('Đã xóa');

@@ -378,7 +378,7 @@ export default function FeedBoard({ session, role }) {
   };
 
   const handleDelete = async (postId) => {
-    if (!window.confirm('Xóa bài viết này?')) return;
+    if (!(await window.cmsConfirm('Xóa bài viết này?'))) return;
     setBusyId(postId);
     try {
       const res = await api.feed.remove(postId);

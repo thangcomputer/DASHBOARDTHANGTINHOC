@@ -244,7 +244,7 @@ const PublicPaymentPage = () => {
                 <button 
                   onClick={() => {
                     navigator.clipboard.writeText(session?.ref || '');
-                    alert('Đã copy nội dung chuyển khoản!');
+                    window.cmsAlert('Đã copy nội dung chuyển khoản!', 'success');
                   }}
                   className="p-2 bg-white rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all border border-slate-100"
                 >

@@ -9,13 +9,39 @@ const FOCUSABLE =
 export const ModalProvider = ({ children }) => {
   const [modal, setModal] = useState(null);
 
-  const showModal = useCallback(({ title, content, type = 'info', onConfirm, onCancel, confirmText = 'Đóng', cancelText = null, size = 'sm' }) => {
-    setModal({ title, content, type, onConfirm, onCancel, confirmText, cancelText, size });
+  const showModal = useCallback(({ title, content, type = 'info', onConfirm, onCancel, confirmText = 'Đóng', cancelText = null, size = 'sm', confirmButtonClass }) => {
+    setModal({ title, content, type, onConfirm, onCancel, confirmText, cancelText, size, confirmButtonClass });
   }, []);
 
   const closeModal = useCallback(() => {
     setModal(null);
   }, []);
+
+  const confirmAsync = useCallback(({ title = 'Xác nhận', content, type = 'warning', confirmText = 'Chắc chắn', cancelText = 'Hủy', confirmButtonClass = 'bg-red-600 hover:bg-red-700 text-white shadow-sm' }) => {
+    return new Promise((resolve) => {
+      showModal({
+        title,
+        content,
+        type,
+        confirmText,
+        cancelText,
+        confirmButtonClass,
+        onConfirm: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+  }, [showModal]);
+
+  useEffect(() => {
+    window.cmsConfirm = (content) => confirmAsync({ content });
+    window.cmsAlert = (content, type = 'info') => confirmAsync({ content, type, cancelText: null, confirmText: 'Đã hiểu' });
+    window.cmsConfirmAdvanced = confirmAsync;
+    return () => {
+      delete window.cmsConfirm;
+      delete window.cmsAlert;
+      delete window.cmsConfirmAdvanced;
+    };
+  }, [confirmAsync]);
 
   const handleConfirm = useCallback(() => {
     if (modal?.onConfirm) modal.onConfirm();
@@ -28,7 +54,7 @@ export const ModalProvider = ({ children }) => {
   }, [modal]);
 
   return (
-    <ModalContext.Provider value={{ showModal, closeModal }}>
+    <ModalContext.Provider value={{ showModal, closeModal, confirmAsync }}>
       {children}
       {modal && <ModalUI modal={modal} onConfirm={handleConfirm} onCancel={handleCancel} />}
     </ModalContext.Provider>
@@ -149,7 +175,7 @@ const ModalUI = ({ modal, onConfirm, onCancel }) => {
               </button>
             ) : null}
             {modal.confirmText ? (
-              <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary">
+              <button type="button" onClick={onConfirm} className={modal.confirmButtonClass ? `cms-btn ${modal.confirmButtonClass}` : "cms-btn cms-btn-primary"}>
                 {modal.confirmText}
               </button>
             ) : null}
