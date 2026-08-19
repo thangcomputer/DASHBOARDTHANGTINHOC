@@ -153,9 +153,11 @@ class EvaluationApplicationService {
         // Notify Teacher
         if (targetTeacherId && targetTeacherId !== 'current') {
            const NotificationService = require('../../notification/services/NotificationService');
+           const { maskStudentName } = require('../../../utils/maskName');
            const evalId = String(evalDoc._id || evalDoc.id);
            const stars = evalDoc?.criteria?.stars;
-           const hvLabel = studentInfo?.name || 'Vô danh';
+           const rawName = studentInfo?.name || 'Vô danh';
+           const hvLabel = maskStudentName(rawName);
            const starsBit = stars != null ? ` ${stars}/5 sao` : '';
            await NotificationService.send(io, {
              type: 'EVALUATION',

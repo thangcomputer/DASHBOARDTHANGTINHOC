@@ -315,7 +315,7 @@ export default function StudentOverviewTab({
               </div>
               <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
                 {studyLogs.map((item, idx) => {
-                  const isCancelled = item.type === 'cancelled';
+                  const isCancelled = item.type === 'cancelled' || item.type === 'attendance_cancel' || item.type === 'schedule_cancel';
                   const isScheduled = item.type === 'scheduled';
                   const isPastPending = item.type === 'past_pending'
                     || item.type === 'pending_attendance'
@@ -324,6 +324,9 @@ export default function StudentOverviewTab({
                   const isHomework = item.type === 'homework';
                   const isQuiz = item.type === 'quiz';
                   const isAttendance = item.type === 'attendance';
+                  const isGradeUpdate = item.type === 'grade_update';
+                  const isEvaluation = item.type === 'evaluation';
+                  const isCourseComplete = item.type === 'course_complete';
 
                   return (
                     <div

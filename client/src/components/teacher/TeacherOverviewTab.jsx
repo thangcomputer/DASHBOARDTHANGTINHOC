@@ -439,7 +439,7 @@ export default function TeacherOverviewTab({
                 {centerAnnouncements.map((item) => (
                   <div
                     key={item.id}
-                    onClick={() => navigate('/teacher/inbox')}
+                    onClick={() => navigate(item.slug ? `/teacher/news/${item.slug}` : '/teacher/news')}
                     className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-300 hover:bg-blue-50/50 transition flex items-center justify-between gap-2 cursor-pointer group"
                   >
                     <div className="min-w-0 flex-1">

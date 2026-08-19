@@ -18,6 +18,7 @@ import {
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
 import { getScheduleDisplayKind } from '../utils/scheduleTime';
+import { buildStudentActivityLogs } from '../utils/studentActivityLogs';
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
 import { StudentNoteModal } from './student/StudentNoteModal';
 import {
@@ -100,7 +101,7 @@ const StudentDashboard = ({ onNavigate }) => {
       }
     }
 
-    return {
+    const result = {
       ...student,
       // Đồng bộ avatar gender với session (sidebar) — tránh profile lệch nam/nữ
       gender: session?.gender || student.gender || '',
@@ -124,6 +125,14 @@ const StudentDashboard = ({ onNavigate }) => {
         : Math.max(0, (student.totalSessions || 12) - (Number(student.completedSessions) || 0)),
       totalSessions: student.totalSessions || 12,
     };
+    // Tính nhãn trạng thái dựa vào tiến độ thực tế
+    const comp = Number(result.completedSessions) || 0;
+    const total = Number(result.totalSessions) || 12;
+    const rawStatus = String(student.status || '').toLowerCase();
+    const isCompletedByStatus = rawStatus === 'completed' || rawStatus === 'hoàn thành' || rawStatus === 'hoan thanh';
+    const isCompletedBySessions = total > 0 && comp >= total;
+    result.status = (isCompletedByStatus || isCompletedBySessions) ? 'Đã hoàn thành' : 'Đang học';
+    return result;
   }, [student, teachers, session?.gender, session?.avatar]);
 
   const enrollments = useMemo(() => studentData?.courses || [], [studentData?.courses]);
@@ -341,38 +350,6 @@ const StudentDashboard = ({ onNavigate }) => {
       }
     }).catch(err => void 0);
   }, [viewStudent?.teacherId]);
-
-  const displayGrades = useMemo(() => {
-    const grades = viewStudent?.grades || [];
-    if (!grades.length) return [];
-
-    const homeworkByKey = new Map();
-    const others = [];
-
-    grades.forEach((g, idx) => {
-      const note = g.note || '';
-      const noteLower = note.toLowerCase();
-      const isHomework = noteLower.includes('bài nộp') || noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm');
-      if (!isHomework) {
-        others.push({ ...g, _sortKey: new Date(g.date).getTime() || idx, _idx: idx });
-        return;
-      }
-
-      const titleMatch = note.match(/^(?:Bài nộp|Cập nhật điểm|Sửa điểm):\s*(.+?)(?:\s*\(|(?:\s*-\s*)|$)/i);
-      const key = g.assignmentId
-        ? String(g.assignmentId)
-        : (titleMatch ? titleMatch[1].trim().toLowerCase() : `hw_${idx}`);
-      const sortKey = new Date(g.date).getTime() || idx;
-      const existing = homeworkByKey.get(key);
-      if (!existing || sortKey >= existing._sortKey) {
-        homeworkByKey.set(key, { ...g, _sortKey: sortKey, _idx: idx });
-      }
-    });
-
-    return [...others, ...homeworkByKey.values()]
-      .sort((a, b) => b._sortKey - a._sortKey);
-  }, [viewStudent?.grades]);
-
   // ─── Quizzes State (Trắc nghiệm Giảng viên giao) ───
   const [myQuizzes, setMyQuizzes] = useState([]);
 
@@ -388,9 +365,31 @@ const StudentDashboard = ({ onNavigate }) => {
     fetchMyQuizzes();
   }, [fetchMyQuizzes]);
 
+  const displayGrades = useMemo(() => {
+    if (!viewStudent) return [];
+    return buildStudentActivityLogs({
+      student: viewStudent,
+      assignments: myAssignments || [],
+      quizzes: myQuizzes || [],
+      evaluations: privateEvaluations || [],
+      schedules: mySchedules || [],
+    });
+  }, [viewStudent, myAssignments, myQuizzes, privateEvaluations, mySchedules]);
+
+  const displayGradesAll = useMemo(() => {
+    if (!studentData) return [];
+    return buildStudentActivityLogs({
+      student: { ...studentData, course: null }, // bypass course filter to show all logs
+      assignments: myAssignments || [],
+      quizzes: myQuizzes || [],
+      evaluations: privateEvaluations || [],
+      schedules: mySchedulesAll || [],
+    });
+  }, [studentData, myAssignments, myQuizzes, privateEvaluations, mySchedulesAll]);
+
   const studyLogs = useMemo(() => {
     if (!viewStudent) return [];
-    const logs = [];
+    const pendingLogs = [];
     const seenKeys = new Set();
 
     const parseDateToMs = (dStr) => {
@@ -412,58 +411,7 @@ const StudentDashboard = ({ onNavigate }) => {
       return Number.isNaN(dt.getTime()) ? 0 : dt.getTime();
     };
 
-    // 1. Buổi học đã hoàn thành / Điểm danh / Bài nộp
-    const attList = Array.isArray(viewStudent.attendanceHistory) ? viewStudent.attendanceHistory : [];
-    let sessionCount = attList.filter(item => !(item.note && item.note.toLowerCase().includes('bài nộp'))).length;
-
-    attList.forEach((item, idx) => {
-       let parsedDate = item.date;
-       if (parsedDate && parsedDate.includes('T')) {
-         parsedDate = new Date(parsedDate).toLocaleDateString('vi-VN');
-       }
-       const sched = (mySchedules || []).find(s => new Date(s.date).toLocaleDateString('vi-VN') === parsedDate && s.status === 'completed');
-       const isHomework = item.note && item.note.toLowerCase().includes('bài nộp');
-       const ts = parseDateToMs(item.date) || (sched ? parseDateToMs(sched.date) : 0) || (Date.now() - idx * 1000);
-
-       const itemKey = `att_${parsedDate}_${item.note || ''}_${idx}`;
-       seenKeys.add(itemKey);
-
-       logs.push({
-          type: isHomework ? 'homework' : 'attendance',
-          date: parsedDate,
-          time: sched ? (sched.startTime ? `${sched.startTime}${sched.endTime ? ` - ${sched.endTime}` : ''}` : sched.time || '') : '',
-          note: item.note || 'Đã điểm danh hoàn thành buổi học',
-          grade: item.grade,
-          index: isHomework ? null : sessionCount--,
-          timestamp: ts
-       });
-    });
-
-    // 2. Trắc nghiệm từ Giảng viên giao (myQuizzes)
-    (myQuizzes || []).forEach((q, qIdx) => {
-       const sub = q.mySubmission;
-       if (!sub) return;
-       const dateStr = sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('vi-VN') : (q.createdAt ? new Date(q.createdAt).toLocaleDateString('vi-VN') : '');
-       const ts = parseDateToMs(sub.submittedAt || q.createdAt) || (Date.now() - qIdx * 1000);
-       const score10 = sub.score != null ? Math.round((sub.score / 10) * 10) / 10 : null;
-       const key = `quiz_${q._id || qIdx}_${sub.submittedAt || ''}`;
-       if (!seenKeys.has(key)) {
-         seenKeys.add(key);
-         logs.push({
-            type: 'quiz',
-            date: dateStr,
-            time: sub.submittedAt ? new Date(sub.submittedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-            note: `Trắc nghiệm GV giao: ${q.title || 'Bài trắc nghiệm'} (${sub.correctCount ?? 0}/${sub.totalQuestions ?? 0} câu)`,
-            grade: score10,
-            rawScore: sub.score,
-            isPassed: sub.status === 'passed' || (sub.score != null && sub.score >= 70),
-            index: null,
-            timestamp: ts
-         });
-       }
-    });
-
-    // 3. Lịch GV xếp — nhãn theo thời gian thực (không đổi status DB)
+    // Lịch GV xếp — nhãn theo thời gian thực (upcoming/pending)
     (mySchedules || []).forEach((s, sIdx) => {
        const dateStr = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
        const ts = parseDateToMs(s.date) || Date.now();
@@ -473,7 +421,7 @@ const StudentDashboard = ({ onNavigate }) => {
          const key = `sched_${dateStr}_${s.startTime || sIdx}`;
          if (!seenKeys.has(key)) {
            seenKeys.add(key);
-           logs.push({
+           pendingLogs.push({
               type: 'scheduled',
               displayKind: kind,
               date: dateStr,
@@ -491,7 +439,7 @@ const StudentDashboard = ({ onNavigate }) => {
            const pendingNote = kind === 'overdue_attendance'
              ? `Quá hạn điểm danh — chờ quản trị viên điểm danh bù (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`
              : `Chưa điểm danh — buổi đã kết thúc (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`;
-           logs.push({
+           pendingLogs.push({
               type: kind === 'overdue_attendance' ? 'overdue_attendance' : 'pending_attendance',
               displayKind: kind,
               date: dateStr,
@@ -502,27 +450,12 @@ const StudentDashboard = ({ onNavigate }) => {
               timestamp: ts
            });
          }
-       } else if (kind === 'cancelled') {
-         const key = `cancel_${dateStr}_${s.startTime || sIdx}`;
-         if (!seenKeys.has(key)) {
-           seenKeys.add(key);
-           logs.push({
-              type: 'cancelled',
-              displayKind: kind,
-              date: dateStr,
-              time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
-              note: s.note || 'Lịch học đã bị hủy',
-              grade: null,
-              index: null,
-              timestamp: ts
-           });
-         }
        }
        // completed: đã hiện qua attendanceHistory/grades ở bước 1 — không nhân đôi
     });
 
-    return logs.sort((a, b) => b.timestamp - a.timestamp);
-  }, [viewStudent, mySchedules, myQuizzes]);
+    return [...pendingLogs, ...displayGrades].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  }, [viewStudent, mySchedules, displayGrades]);
 
 
   const isNew = viewStudent?.completedSessions === 0;
@@ -776,7 +709,7 @@ const StudentDashboard = ({ onNavigate }) => {
             viewStudent={viewStudent}
             mySchedules={mySchedulesAll}
             setNoteModalSched={setNoteModalSched}
-            displayGrades={displayGrades}
+            displayGrades={displayGradesAll}
           />
         ) : currentHash === 'materials' ? (
           <StudentLazyMaterialsTab

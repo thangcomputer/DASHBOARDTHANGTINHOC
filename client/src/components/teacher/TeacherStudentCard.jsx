@@ -20,6 +20,7 @@ import TeacherQuizManager from './TeacherQuizManager';
 import { useData } from '../../context/DataContext';
 import { useScheduleContext } from '../../context/ScheduleContext';
 import { buildStudentActivityLogs, ACTIVITY_LOG_META } from '../../utils/studentActivityLogs';
+import ScheduleModal from './TeacherScheduleModal';
 import {
   buildAttendanceMakeupDraft,
   pickAdminContactForMakeup,
@@ -42,11 +43,18 @@ import {
   subscribeAttendanceConfirm,
 } from '../../utils/attendanceConfirmStore';
 
+const maskPhone = (str) => {
+  if (!str) return str;
+  const s = String(str);
+  // Match 10-11 digit phone numbers and mask the middle (e.g. 098***123)
+  return s.replace(/(0\d{2})(\d{4,5})(\d{3})/g, '$1***$3');
+};
+
 const getDisplayName = (person) => {
   if (!person) return 'Không rõ';
   const name = person.name || '';
-  if (name && !/^\d{5,}$/.test(name)) return name;
-  return person.email || person.phone || person.zalo || `HV-${String(person.id || person._id || '').slice(-4)}`;
+  if (name && !/^\d{5,}$/.test(name)) return maskPhone(name);
+  return maskPhone(person.email || person.phone || person.zalo || `HV-${String(person.id || person._id || '').slice(-4)}`);
 };
 
 /** Chỉ đánh trượt khi học viên đã được mở khóa phòng thi (chưa mở / đã trượt → không bấm lại). */
@@ -169,6 +177,7 @@ export const StudentCard = ({
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [sendingMakeup, setSendingMakeup] = useState(false);
+  const [showQuickSchedule, setShowQuickSchedule] = useState(false);
   const confirmKey = attendanceConfirmKey(student);
   /** Chờ 30s sau "Xác nhận Điểm danh" — persist sessionStorage để đổi tab không mất */
   const [pendingAttendance, setPendingAttendance] = useState(() => {
@@ -656,14 +665,6 @@ export const StudentCard = ({
 
   const activityLogs = useMemo(() => {
     const sid = String(student.id || student._id || '');
-    const localEvals = (privateEvaluations || []).filter(
-      (e) => String(e.studentId?._id || e.studentId) === sid
-    );
-    const evalMap = new Map();
-    [...studentEvals, ...localEvals].forEach((e) => {
-      const key = String(e._id || e.id || `${e.type}_${e.createdAt}_${e.content || ''}`);
-      if (!evalMap.has(key)) evalMap.set(key, e);
-    });
     const studentSchedules = (allSchedules || []).filter(
       (sch) => String(sch.studentId?._id || sch.studentId || '') === sid
     );
@@ -671,10 +672,10 @@ export const StudentCard = ({
       student,
       assignments: courseAssignments,
       quizzes: studentQuizzes,
-      evaluations: [...evalMap.values()],
+      evaluations: [], // KHÔNG hiển thị đánh giá của học viên cho giảng viên
       schedules: studentSchedules,
     });
-  }, [student, courseAssignments, studentQuizzes, studentEvals, privateEvaluations, allSchedules]);
+  }, [student, courseAssignments, studentQuizzes, allSchedules]);
 
   /** Realtime: học viên nộp bài → cập nhật trạng thái ngay */
   useEffect(() => {
@@ -856,6 +857,21 @@ export const StudentCard = ({
     setGradeSaved(true); setTimeout(() => setGradeSaved(false), 2000);
   };
 
+  const handleQuickScheduleSubmit = async (scheduleData) => {
+    try {
+      const res = await api.schedules.create(scheduleData);
+      if (res?.success) {
+        toast.success('Đã xếp lịch học mới');
+        setShowQuickSchedule(false);
+        triggerBackgroundSync?.();
+      } else {
+        toast.error(res?.message || 'Không thể xếp lịch');
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Lỗi kết nối khi xếp lịch');
+    }
+  };
+
   const gradeValue = Number(gradeInput) || 0;
   const gradeLetter = gradeValue >= 8.5 ? 'A' : gradeValue >= 7 ? 'B' : gradeValue >= 5 ? 'C' : 'D';
 
@@ -864,7 +880,7 @@ export const StudentCard = ({
     { key: 'assignments', icon: BookOpen, label: 'Bài tập' },
     { key: 'quiz', icon: ListChecks, label: 'Trắc nghiệm' },
     { key: 'link', icon: Video, label: 'Link học' },
-    { key: 'grade', icon: Award, label: 'Đánh giá' },
+    { key: 'schedule', icon: Calendar, label: 'Sắp lịch' },
     { key: 'logs', icon: History, label: 'Nhật ký' },
   ];
 
@@ -966,6 +982,10 @@ export const StudentCard = ({
               onClick={() => {
                 if (key === 'quiz') {
                   openQuizCreate();
+                  return;
+                }
+                if (key === 'schedule') {
+                  setShowQuickSchedule(true);
                   return;
                 }
                 setActivePanel(key);
@@ -1673,6 +1693,17 @@ export const StudentCard = ({
             </div>
           </div>
         )}
+
+        {showQuickSchedule && (
+          <ScheduleModal
+            students={myStudents && myStudents.length > 0 ? myStudents : [student]}
+            allSchedules={allSchedules}
+            schedule={{ studentId: student.id || student._id }}
+            teacherId={currentUser?.id || currentUser?._id || 'current'}
+            onClose={() => setShowQuickSchedule(false)}
+            onSubmit={handleQuickScheduleSubmit}
+          />
+        )}
       </div>
     );
   }
@@ -1704,7 +1735,7 @@ export const StudentCard = ({
             }`}>{isCompleted ? '✓ Hoàn thành' : student.status}</span>
             <a href={`https://zalo.me/${student.zalo}`} target="_blank" rel="noreferrer"
               className="inline-flex flex-1 min-[440px]:flex-initial justify-center items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all min-w-0 max-w-full">
-              <MessageSquare size={14} className="shrink-0" /> <span className="truncate">{student.zalo}</span>
+              <MessageSquare size={14} className="shrink-0" /> <span className="truncate">{maskPhone(student.zalo)}</span>
             </a>
             {onLockExam && (
               <FailExamButton student={student} onLockExam={onLockExam} compact />
@@ -1730,7 +1761,17 @@ export const StudentCard = ({
           <button
             key={key}
             type="button"
-            onClick={() => setActivePanel(key)}
+            onClick={() => {
+              if (key === 'quiz') {
+                openQuizCreate();
+                return;
+              }
+              if (key === 'schedule') {
+                setShowQuickSchedule(true);
+                return;
+              }
+              setActivePanel(key);
+            }}
             title={label}
             aria-label={label}
             className={`flex-1 min-w-0 min-h-11 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-0.5 py-2 sm:py-3.5 text-[10px] sm:text-sm font-semibold transition-all ${
@@ -2022,6 +2063,17 @@ export const StudentCard = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showQuickSchedule && (
+        <ScheduleModal
+          students={myStudents && myStudents.length > 0 ? myStudents : [student]}
+          allSchedules={allSchedules}
+          schedule={{ studentId: student.id || student._id }}
+          teacherId={currentUser?.id || currentUser?._id || 'current'}
+          onClose={() => setShowQuickSchedule(false)}
+          onSubmit={handleQuickScheduleSubmit}
+        />
       )}
     </React.Fragment>
   );

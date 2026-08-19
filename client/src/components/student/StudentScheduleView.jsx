@@ -369,10 +369,13 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                   if (parsedDate && parsedDate.includes('T')) {
                     parsedDate = new Date(parsedDate).toLocaleDateString('vi-VN');
                   }
-                  const noteLower = (g.note || '').toLowerCase();
-                  const isUpdated = noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm');
-                  const isHomework = noteLower.includes('bài nộp') || isUpdated;
-                  const isQuiz = noteLower.includes('trắc nghiệm');
+                  
+                  const isUpdated = g.type === 'grade_update';
+                  const isHomework = g.type === 'homework' || isUpdated;
+                  const isQuiz = g.type === 'quiz';
+                  const isCancelled = g.type === 'schedule_cancel' || g.type === 'attendance_cancel';
+                  const isEvaluation = g.type === 'evaluation';
+                  const isCourseComplete = g.type === 'course_complete';
 
                   return (
                     <div
@@ -381,20 +384,35 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm ${
+                          isCancelled ? 'bg-red-50 text-red-600 border border-red-100' :
                           isQuiz ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                          isEvaluation ? 'bg-pink-50 text-pink-600 border border-pink-100' :
+                          isCourseComplete ? 'bg-amber-50 text-amber-600 border border-amber-100' :
                           isHomework ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                           'bg-blue-50 text-blue-600 border border-blue-100'
                         }`}>
-                          {isQuiz ? <Award size={13} /> : isHomework ? <ClipboardList size={13} /> : <CheckCircle size={13} />}
+                          {isCancelled ? <XCircle size={13} /> : isQuiz ? <Award size={13} /> : isCourseComplete ? <Award size={13} /> : isHomework ? <ClipboardList size={13} /> : <CheckCircle size={13} />}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[11px] font-extrabold text-slate-900 font-mono leading-none">
                               {g.time ? `${g.time} - ${parsedDate}` : parsedDate}
                             </span>
-                            {isUpdated ? (
+                            {isCancelled ? (
+                              <span className="text-[9px] font-black uppercase bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.2 rounded-full leading-none">
+                                Đã hủy
+                              </span>
+                            ) : isUpdated ? (
                               <span className="text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded-full leading-none">
                                 Cập nhật điểm
+                              </span>
+                            ) : isEvaluation ? (
+                              <span className="text-[9px] font-black uppercase bg-pink-50 text-pink-700 border border-pink-200 px-1.5 py-0.2 rounded-full leading-none">
+                                Đánh giá
+                              </span>
+                            ) : isCourseComplete ? (
+                              <span className="text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded-full leading-none">
+                                Hoàn thành
                               </span>
                             ) : isHomework ? (
                               <span className="text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded-full leading-none">

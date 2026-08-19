@@ -230,7 +230,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
   const [enrollmentSessionForms, setEnrollmentSessionForms] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const { updateStudent, assignTeacher, teachers, triggerBackgroundSync } = useData() || {};
+  const { updateStudent, assignTeacher, teachers, triggerBackgroundSync, examSubjectsCatalog } = useData() || {};
   const [showAddEnrollment, setShowAddEnrollment] = useState(false);
 
   useEffect(() => {
@@ -1408,9 +1408,14 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                             const splitTeachers = (courseOrEnr) => {
                               const matched = [];
                               const other = [];
+                              const currentTeacherId = String(courseOrEnr.teacherId || '');
                               for (const t of activeTeachers) {
-                                if (teacherMatchesCourse(t, courseOrEnr)) matched.push(t);
-                                else other.push(t);
+                                const tid = String(t.id || t._id);
+                                if (teacherMatchesCourse(t, courseOrEnr, examSubjectsCatalog) || (currentTeacherId && tid === currentTeacherId)) {
+                                  matched.push(t);
+                                } else {
+                                  other.push(t);
+                                }
                               }
                               return { matched, other };
                             };
@@ -1491,8 +1496,15 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                               <option value="">Chưa phân công GV</option>
                                               {(() => {
                                                 const { matched, other } = splitTeachers(enr);
+                                                const allOptions = [...matched, ...other];
+                                                const currentTid = String(enr.teacherId || '');
+                                                const currentInList = currentTid && allOptions.some(t => String(t.id || t._id) === currentTid);
                                                 return (
                                                   <>
+                                                    {/* Nếu GV hiện tại không có trong danh sách (ID không khớp), thêm option fallback */}
+                                                    {currentTid && !currentInList && (
+                                                      <option value={currentTid}>{enr.teacherName || currentTid}</option>
+                                                    )}
                                                     {matched.map((t) => (
                                                       <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
                                                     ))}

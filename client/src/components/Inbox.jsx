@@ -1848,7 +1848,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </button>
                   </div>
                 ) : null}
-                {messagesToRender.map(msg => {
+                {messagesToRender.map((msg, msgIndex) => {
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
                   const role = normalizeRole(msg.senderRole);
                   const badgeLabel = msg.senderDisplayRole
@@ -1903,8 +1903,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                           {/* Message bubble */}
-                          <div className={`relative px-4 py-2.5 text-[14px] leading-relaxed transition-all ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'
-                            } ${bubbleRoleClass}`}>
+                          <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-hidden !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
                             {msg.isRecalled ? (
                               <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
                                 <RotateCcw size={12} /> Tin nhắn đã được thu hồi
@@ -1915,7 +1914,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 <span>{msg.content || 'Tệp đính kèm đã hết hạn lưu trữ (10 ngày) và không còn được lưu trên hệ thống.'}</span>
                               </p>
                             ) : isImageMessage(msg) ? (
-                              <div className="space-y-1.5">
+                              <div className="space-y-0">
                                 <div
                                   role="button"
                                   tabIndex={0}
@@ -1929,13 +1928,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                       openImagePreview(msg);
                                     }
                                   }}
-                                  className="group/img relative block w-full max-w-[min(420px,100%)] -mx-1 cursor-zoom-in touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl"
+                                  className="group/img relative block w-full max-w-[min(420px,100%)] cursor-zoom-in touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl overflow-hidden"
                                   title="Bấm để xem ảnh lớn"
                                 >
                                   <img
                                     src={resolveMediaUrl(msg.fileUrl)}
                                     alt={showFileName(msg.fileName) || 'Hình ảnh'}
-                                    className="w-full h-auto rounded-xl max-h-96 object-contain border border-black/5 bg-black/5 select-none"
+                                    className="w-full h-auto max-h-96 object-cover select-none"
                                     draggable={false}
                                   />
                                   <span className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-[10px] font-bold shadow-sm pointer-events-none">
@@ -1943,7 +1942,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                   </span>
                                 </div>
                                 {attachmentCaption(msg) ? (
-                                  <div className="whitespace-pre-wrap break-words px-0.5">
+                                  <div className={`whitespace-pre-wrap break-words px-4 py-2.5 mt-1 rounded-xl ${isMine ? 'bg-[#dc2626] text-white' : 'bg-white border border-slate-100 text-slate-800'}`}>
                                     <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
                                   </div>
                                 ) : null}
@@ -2010,17 +2009,66 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               <MoreHorizontal size={14} />
                             </button>
                             {showMessageOptions === msg.id && (
-                              <div className={`absolute bottom-full mb-1 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
-                                {msg.fileUrl && !isAttachmentExpired(msg) && (
+                              <div className={`absolute ${msgIndex < 2 ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
+                                {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
                                   <button
-                                    onClick={() => handleDownload(msg.fileUrl, msg.fileName)}
+                                    onClick={() => {
+                                      handleDownload(msg.fileUrl, msg.fileName);
+                                      setShowMessageOptions(null);
+                                    }}
                                     className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors"
                                   >
                                     <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
                                   </button>
                                 )}
+                                {!msg.isRecalled && msg.messageType !== 'image' && (
+                                  <button
+                                    onClick={() => {
+                                      handleCopyText(msg.content);
+                                      setShowMessageOptions(null);
+                                    }}
+                                    className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-green-600 hover:bg-green-50 transition-colors"
+                                  >
+                                    <Copy size={12} /> Sao chép
+                                  </button>
+                                )}
+                                {!msg.isRecalled && msg.messageType !== 'image' && (
+                                  <button
+                                    onClick={() => {
+                                      setNewMsg(msg.content);
+                                      setTimeout(() => inputRef.current?.focus(), 100);
+                                      setShowMessageOptions(null);
+                                    }}
+                                    className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-colors"
+                                  >
+                                    <Edit3 size={12} /> Chỉnh sửa / Viết lại
+                                  </button>
+                                )}
+                                {isMine && !msg.isRecalled && (() => {
+                                  const now = new Date();
+                                  const sentAt = new Date(msg.time);
+                                  const diffHours = (now - sentAt) / (1000 * 60 * 60);
+                                  return diffHours <= 24;
+                                })() && (
+                                  <button
+                                    onClick={() => {
+                                      handleRecall(msg.id);
+                                      setShowMessageOptions(null);
+                                    }}
+                                    disabled={recallingId === msg.id}
+                                    className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                                  >
+                                    {recallingId === msg.id
+                                      ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
+                                      : <RotateCcw size={12} />
+                                    } Thu hồi tin nhắn
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => handleDeleteHistory(msg.id)}
+                                  onClick={() => {
+                                    handleDeleteHistory(msg.id);
+                                    setShowMessageOptions(null);
+                                  }}
                                   className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
                                 >
                                   <Trash2 size={12} /> Xóa lịch sử
@@ -2028,52 +2076,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               </div>
                             )}
                           </div>
-
-                          {/* Copy vào khung chat (Edit3) */}
-                          {!msg.isRecalled && msg.messageType !== 'image' && (
-                            <button
-                              onClick={() => {
-                                setNewMsg(msg.content);
-                                setTimeout(() => inputRef.current?.focus(), 100);
-                              }}
-                              className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all shadow-sm border border-slate-100 active:scale-90"
-                              title="Chỉnh sửa / Viết lại"
-                            >
-                              <Edit3 size={13} strokeWidth={2.5} />
-                            </button>
-                          )}
-
-                          {/* Copy clipboard */}
-                          {!msg.isRecalled && msg.messageType !== 'image' && (
-                            <button
-                              onClick={() => handleCopyText(msg.content)}
-                              className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all shadow-sm border border-slate-100 active:scale-90"
-                              title="Sao chép"
-                            >
-                              <Copy size={13} strokeWidth={2.5} />
-                            </button>
-                          )}
-
-                          {/* Thu hồi button — chỉ hiện khi là tin của mình, chưa thu hồi và trong vòng 24h */}
-                          {isMine && !msg.isRecalled && (() => {
-                            const now = new Date();
-                            const sentAt = new Date(msg.time);
-                            const diffHours = (now - sentAt) / (1000 * 60 * 60);
-                            return diffHours <= 24;
-                          })() && (
-                              <button
-                                onClick={() => handleRecall(msg.id)}
-                                disabled={recallingId === msg.id}
-                                className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-slate-100 active:scale-90 disabled:opacity-30"
-                                title="Thu hồi tin nhắn"
-                              >
-                                {recallingId === msg.id
-                                  ? <span className="w-3 h-3 border-2 border-red-300 border-t-red-500 rounded-full inline-block animate-spin" />
-                                  : <RotateCcw size={12} />
-                                }
-                              </button>
-                            )}
-
                         </div>
 
                         {/* Time & read status */}

@@ -901,14 +901,15 @@
     overflow-wrap: break-word;
     word-break: normal;
   }
-  .cms-fm-bubble--media {
-    @apply p-1.5 overflow-hidden;
-  }
   .cms-fm-bubble.is-mine {
     @apply bg-red-600 text-white rounded-br-md;
   }
   .cms-fm-bubble.is-theirs {
     @apply bg-white text-slate-800 border border-slate-100 rounded-bl-md;
+  }
+  .cms-fm-bubble--media.is-mine,
+  .cms-fm-bubble--media.is-theirs {
+    @apply p-0 overflow-hidden bg-transparent border-transparent shadow-none;
   }
   .cms-fm-img {
     @apply block w-full max-h-48 object-cover rounded-xl;

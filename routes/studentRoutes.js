@@ -2830,13 +2830,15 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
     try {
       if (io && !isUnassign) {
         const NotificationService = require('../services/NotificationService');
+        const { maskStudentName } = require('../utils/maskName');
         const isNewAssign = !isReassign;
+        const hvLabel = maskStudentName(student.name);
         await NotificationService.send(io, {
           type: 'COURSE',
           title: isNewAssign ? '📚 Học viên mới được giao' : '👨‍🏫 Đổi giảng viên phụ trách',
           content: isNewAssign
-            ? `Học viên ${student.name} (${targetCourse || student.course}) đã được giao cho bạn.`
-            : `Bạn được phân công tiếp khóa "${targetCourse || student.course}" của ${student.name} (từ buổi ${completedSessionsAtSwitch + 1}).`,
+            ? `Học viên ${hvLabel} (${targetCourse || student.course}) đã được giao cho bạn.`
+            : `Bạn được phân công tiếp khóa "${targetCourse || student.course}" của ${hvLabel} (từ buổi ${completedSessionsAtSwitch + 1}).`,
           receivers: teacherId.toString(),
           payload: { studentId: student._id, type: 'student', reassign: isReassign },
           link: `/teacher#students?studentId=${student._id}`,
