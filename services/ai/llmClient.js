@@ -149,16 +149,33 @@ async function chatCompletionGeminiNative(cfg, opts) {
       maxOutputTokens: opts.maxTokens ?? 1200,
     };
     if (opts.responseFormat === 'json') config.responseMimeType = 'application/json';
+    if (system) config.systemInstruction = system;
+
+    const contents = opts.messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: String(m.content || '') }],
+      }));
+
     const images = Array.isArray(opts.images) ? opts.images.filter((i) => i?.data && i?.mimeType) : [];
-    const contents = images.length
-      ? [{
-        role: 'user',
-        parts: [
+    if (images.length) {
+      const lastUser = [...contents].reverse().find((c) => c.role === 'user');
+      if (lastUser) {
+        lastUser.parts = [
           ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
-          { text: prompt },
-        ],
-      }]
-      : prompt;
+          ...lastUser.parts,
+        ];
+      } else {
+        contents.push({
+          role: 'user',
+          parts: [
+            ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
+            { text: 'Hãy xem ảnh này' },
+          ],
+        });
+      }
+    }
     const res = await ai.models.generateContent({ model, contents, config });
     return { content: res.text || '', model, usage: res.usageMetadata || null };
   }

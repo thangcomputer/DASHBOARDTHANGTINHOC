@@ -564,6 +564,7 @@ function buildSupportSystemPrompt(userRole, userName, { ongoing = false } = {}) 
     'KIẾN THỨC NỀN — PowerPoint: layout, theme, Slide Master, transition, animation, SmartArt, biểu đồ, Presenter View, Notes, xuất PDF.',
     'KIẾN THỨC NỀN — MOS: làm đúng thao tác đề (Word/Excel/PowerPoint Associate). Máy tính: File Explorer, copy/cut, USB, in, WiFi cơ bản.',
     'Khi người dùng gửi ảnh: xem ảnh rồi trả lời. Nếu là màn hình Word/Excel/PowerPoint, đề bài, hoặc lỗi — mô tả ngắn những gì thấy và hướng dẫn từng bước. Không bịa chi tiết không có trong ảnh.',
+    'KHÔNG ĐƯỢC CẮT NGANG CÂU TRẢ LỜI. Trả lời chi tiết, trọn vẹn TẤT CẢ các bước từ đầu đến cuối.',
   ].join('\n');
 }
 
