@@ -252,7 +252,13 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
     const onReceiveNotification = (data) => {
       playNotifySound();
-      setNotifications((prev) => [{ ...data, id: data._id || Date.now(), read: false }, ...prev]);
+      setNotifications((prev) => {
+        const id = data._id || Date.now();
+        if (prev.some((n) => n.id === id || n._id === id)) {
+          return prev.map((n) => (n.id === id || n._id === id ? { ...n, ...data, id, read: false } : n));
+        }
+        return [{ ...data, id, read: false }, ...prev];
+      });
     };
 
     // Legacy signal: chỉ refresh danh sách unread — KHÔNG kêu (tránh double beep + beep nhầm cho Admin)
