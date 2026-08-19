@@ -295,6 +295,7 @@ function ChatWindow({
   peerTyping = false, isAiPeer = false, aiStatus = AI_SUPPORT_STATUS.AI_ACTIVE,
   canShowEscalate = false, feedbackPhase = '', supportOnline = false,
   onEscalate, onResetAi, onAgree, onDisagree, onMoreYes, onMoreNo,
+  onDisagreeReason, onDisagree2, onFinalExplain, onFinalStaff,
   escalating = false, resettingAi = false,
   onTypingStart, onTypingStop,
   imageQuota = { remaining: 5, limit: 5, used: 0 },
@@ -731,8 +732,14 @@ function ChatWindow({
           })
         )}
         {peerTyping ? <TypingIndicator label={isAiPeer && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE ? 'Trợ lý AI đang trả lời' : 'Đang gõ'} /> : null}
-        {isAiPeer && questionBlocked && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping ? (
-          <div className="px-2 pb-1">
+        <div ref={endRef} />
+      </div>
+
+      {/* ── Feedback panel: đặt NGOÀI body để không che nội dung chat ── */}
+      {isAiPeer ? (
+        <div className="cms-fm-feedback-panel">
+          {/* Hết lượt hỏi → nút nhân viên */}
+          {questionBlocked && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping ? (
             <button
               type="button"
               disabled={escalating}
@@ -742,105 +749,147 @@ function ChatWindow({
               {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
               Cần nhân viên hỗ trợ
             </button>
-          </div>
-        ) : null}
-        {isAiPeer ? (
-          <div className="px-2 pb-1 space-y-2">
-            {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && !questionBlocked && canShowEscalate && (
-              !feedbackPhase
-              || feedbackPhase === 'agree'
-              || feedbackPhase === 'staff'
-              || feedbackPhase === 'more'
-              || feedbackPhase === 'invite'
-              || feedbackPhase === 'ended'
-            ) ? (
-              <div className="space-y-1.5">
-                {(!feedbackPhase || feedbackPhase === 'agree') && canShowEscalate ? (
-                  <>
-                    <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn đồng ý câu trả lời này không?</p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onAgree?.(tab)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors"
-                      >
-                        <Check size={14} />
-                        Có
+          ) : null}
+
+          {/* Reset AI khi đã escalate/resolved */}
+          {(aiStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
+            || aiStatus === AI_SUPPORT_STATUS.CLOSED
+            || aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT) ? (
+            <button
+              type="button"
+              disabled={resettingAi}
+              onClick={() => onResetAi?.(tab)}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-900 text-[10px] font-black uppercase tracking-wide hover:bg-violet-100 disabled:opacity-50 transition-colors"
+            >
+              {resettingAi ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
+              Hỏi Trợ lý AI
+            </button>
+          ) : null}
+
+          {/* Luồng feedback chính — chỉ hiện khi AI đang active, không đang gõ, không hết lượt */}
+          {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && !questionBlocked && canShowEscalate ? (
+            <div className="space-y-1.5">
+
+              {/* Bước 0: Lần 1 — đồng ý / không */}
+              {(!feedbackPhase || feedbackPhase === 'agree') ? (
+                <>
+                  <p className="text-[11px] text-slate-500 text-center font-semibold">Bạn đồng ý câu trả lời này không?</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => onAgree?.(tab)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors">
+                      <Check size={14} /> Có
+                    </button>
+                    <button type="button" onClick={() => onDisagree?.(tab)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors">
+                      <X size={14} /> Không
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
+              {/* Bước 1: Chọn lý do không đồng ý (lần 1) */}
+              {feedbackPhase === 'disagree_reason' ? (
+                <>
+                  <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn chưa hài lòng vì?</p>
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      { label: 'Tôi không hiểu chỗ này', value: 'unclear' },
+                      { label: 'Câu trả lời chưa đúng trọng tâm', value: 'offtopic' },
+                      { label: 'Nội dung còn ít quá', value: 'too_short' },
+                    ].map((r) => (
+                      <button key={r.value} type="button"
+                        onClick={() => onDisagreeReason?.(tab, r.value)}
+                        className="w-full flex items-center justify-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[11px] font-semibold hover:bg-blue-50 hover:border-blue-200 hover:text-blue-800 transition-colors text-left">
+                        <MessageSquare size={13} className="shrink-0 text-slate-400" />
+                        {r.label}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onDisagree?.(tab)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors"
-                      >
-                        <X size={14} />
-                        Không
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-                {feedbackPhase === 'staff' ? (
-                  <button
-                    type="button"
-                    disabled={escalating}
-                    onClick={() => onEscalate?.(tab)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black uppercase tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors"
-                  >
-                    {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
-                    Cần nhân viên hỗ trợ
-                  </button>
-                ) : null}
-                {feedbackPhase === 'more' ? (
-                  <>
-                    <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn cần hỗ trợ thêm câu hỏi nào nữa không?</p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onMoreYes?.(tab)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors"
-                      >
-                        <Check size={14} />
-                        Có
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onMoreNo?.(tab)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors"
-                      >
-                        <X size={14} />
-                        Không
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-                {feedbackPhase === 'invite' ? (
-                  <p className="text-[11px] text-violet-800 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
-                    Mời bạn đặt câu hỏi.
-                  </p>
-                ) : null}
-                {feedbackPhase === 'ended' ? (
-                  <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
-                    Xin chào, hẹn gặp lại bạn.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-            {aiStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
-              || aiStatus === AI_SUPPORT_STATUS.CLOSED
-              || aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT ? (
-              <button
-                type="button"
-                disabled={resettingAi}
-                onClick={() => onResetAi?.(tab)}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-900 text-[10px] font-black uppercase tracking-wide hover:bg-violet-100 disabled:opacity-50 transition-colors"
-              >
-                {resettingAi ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
-                Hỏi Trợ lý AI
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        <div ref={endRef} />
-      </div>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+
+              {/* Bước 2: Đang chờ AI giải thích lại */}
+              {feedbackPhase === 're_explain' ? (
+                <p className="text-[11px] text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
+                  Trợ lý AI đang giải thích thêm cho bạn…
+                </p>
+              ) : null}
+
+              {/* Bước 3: Lần 2 — đồng ý kết quả tiếp theo không? */}
+              {feedbackPhase === 'disagree2' ? (
+                <>
+                  <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn có đồng ý với kết quả tiếp theo này không?</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => onAgree?.(tab)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors">
+                      <Check size={14} /> Có
+                    </button>
+                    <button type="button" onClick={() => onDisagree2?.(tab)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors">
+                      <X size={14} /> Không
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
+              {/* Bước 4: Lựa chọn cuối — giải thích thêm hay gặp nhân viên */}
+              {feedbackPhase === 'final_choice' ? (
+                <>
+                  <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn muốn?</p>
+                  <div className="flex flex-col gap-1.5">
+                    <button type="button" onClick={() => onFinalExplain?.(tab)}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-[10px] font-black uppercase tracking-wide hover:bg-blue-100 transition-colors">
+                      <Bot size={14} /> Giải thích thêm 1 lần nữa
+                    </button>
+                    <button type="button"
+                      disabled={escalating}
+                      onClick={() => onFinalStaff?.(tab)}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black uppercase tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors">
+                      {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
+                      Gặp nhân viên trực tiếp
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
+              {/* Bước cuối: Đồng ý → hỏi thêm không */}
+              {feedbackPhase === 'more' ? (
+                <>
+                  <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn cần hỗ trợ thêm câu hỏi nào nữa không?</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => onMoreYes?.(tab)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors">
+                      <Check size={14} /> Có
+                    </button>
+                    <button type="button" onClick={() => onMoreNo?.(tab)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors">
+                      <X size={14} /> Không
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
+              {feedbackPhase === 'invite' ? (
+                <p className="text-[11px] text-violet-800 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
+                  Mời bạn đặt câu hỏi.
+                </p>
+              ) : null}
+              {feedbackPhase === 'ended' ? (
+                <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
+                  Xin chào, hẹn gặp lại bạn.
+                </p>
+              ) : null}
+              {feedbackPhase === 'staff' ? (
+                <button type="button" disabled={escalating} onClick={() => onEscalate?.(tab)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black uppercase tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors">
+                  {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
+                  Cần nhân viên hỗ trợ
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <form className="cms-fm-window__foot" onSubmit={submit}>
         {pendingImage ? (
@@ -1329,7 +1378,8 @@ export default function FloatingMessenger({ session, role }) {
 
   const handleDisagree = useCallback((tab) => {
     if (!tab?.id) return;
-    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'staff' } }));
+    // Lần 1 nhấn Không → hiện 3 lý do
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'disagree_reason' } }));
   }, []);
 
   const handleMoreYes = useCallback((tab) => {
@@ -1341,6 +1391,64 @@ export default function FloatingMessenger({ session, role }) {
     if (!tab?.id) return;
     setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'ended' } }));
   }, []);
+
+  /** Gửi tin nhắn lên AI từ feedback flow (không cần handleSend) */
+  const sendAiMessage = useCallback(async (tab, text) => {
+    if (!tab?.id || !text) return;
+    setAiFeedback((prev) => {
+      const cur = prev[tab.id];
+      if (!cur?.phase || cur.phase === 'idle') return prev;
+      return { ...prev, [tab.id]: { ...cur, phase: 'idle' } };
+    });
+    await sendMessage({
+      conversationId: buildAiSupportConversationId(meRole, meId),
+      senderId: meId,
+      senderName: meName,
+      senderRole: meRole,
+      receiverId: AI_SUPPORT_PEER.id,
+      receiverName: AI_SUPPORT_PEER.name,
+      receiverRole: AI_SUPPORT_PEER.role,
+      content: text,
+      messageType: 'text',
+      isGroup: false,
+    });
+  }, [sendMessage, meRole, meId, meName]);
+
+  /** Người dùng chọn lý do không đồng ý → gửi yêu cầu AI giải thích thêm */
+  const handleDisagreeReason = useCallback(async (tab, reason) => {
+    if (!tab?.id) return;
+    // Chuyển phase sang re_explain ngay để UI hiện thông báo
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 're_explain' } }));
+    const reasonText = {
+      unclear: 'Tôi không hiểu câu trả lời vừa rồi, bạn có thể giải thích rõ hơn không?',
+      offtopic: 'Câu trả lời chưa đúng trọng tâm câu hỏi của tôi, bạn hãy trả lời lại đúng vào câu hỏi hơn.',
+      too_short: 'Câu trả lời còn quá ngắn, bạn hãy giải thích đầy đủ và chi tiết hơn.',
+    }[reason] || 'Bạn có thể giải thích thêm không?';
+    try {
+      await sendAiMessage(tab, reasonText);
+    } catch { /* ignore */ }
+  }, [sendAiMessage]);
+
+  /** Người dùng nhấn Không lần 2 → hiện lựa chọn cuối */
+  const handleDisagree2 = useCallback((tab) => {
+    if (!tab?.id) return;
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 'final_choice' } }));
+  }, []);
+
+  /** Giải thích thêm 1 lần nữa → gửi tin AI, quay về re_explain */
+  const handleFinalExplain = useCallback(async (tab) => {
+    if (!tab?.id) return;
+    setAiFeedback((prev) => ({ ...prev, [tab.id]: { ...(prev[tab.id] || {}), phase: 're_explain' } }));
+    try {
+      await sendAiMessage(tab, 'Bạn có thể giải thích thêm một lần nữa với nhiều ví dụ và chi tiết hơn không?');
+    } catch { /* ignore */ }
+  }, [sendAiMessage]);
+
+  /** Gặp nhân viên trực tiếp → escalate */
+  const handleFinalStaff = useCallback(async (tab) => {
+    if (!tab?.id) return;
+    await handleEscalate(tab);
+  }, [handleEscalate]);
 
   const handleFocus = useCallback((convId) => {
     setUserOpenedChat(true);
@@ -1372,7 +1480,9 @@ export default function FloatingMessenger({ session, role }) {
     setAiFeedback((prev) => {
       const cur = prev[openWindowId];
       if (cur?.replyId === latestAiReplyId) return prev;
-      return { ...prev, [openWindowId]: { phase: 'agree', replyId: latestAiReplyId } };
+      // Nếu đang ở phase re_explain → AI vừa trả lời xong → chuyển sang disagree2
+      const nextPhase = cur?.phase === 're_explain' ? 'disagree2' : 'agree';
+      return { ...prev, [openWindowId]: { phase: nextPhase, replyId: latestAiReplyId } };
     });
   }, [openWindowId, openWindowStatus, latestAiReplyId]);
 
@@ -1531,6 +1641,10 @@ export default function FloatingMessenger({ session, role }) {
             onDisagree={handleDisagree}
             onMoreYes={handleMoreYes}
             onMoreNo={handleMoreNo}
+            onDisagreeReason={handleDisagreeReason}
+            onDisagree2={handleDisagree2}
+            onFinalExplain={handleFinalExplain}
+            onFinalStaff={handleFinalStaff}
             escalating={escalatingId === openWindow.id}
             resettingAi={resettingAiId === openWindow.id}
             onTypingStart={handleTypingStart}
