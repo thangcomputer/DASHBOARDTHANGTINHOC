@@ -1441,7 +1441,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 if (currentUserRole === 'student' && (tab.id === 'student' || tab.id === 'admin')) return false;
                 if (currentUserRole === 'teacher' && tab.id === 'teacher') return false;
                 if (isHighAdmin && tab.id === 'student') return false;
-                if (['admin', 'staff'].includes(currentUserRole) && tab.id === 'staff') return false;
+                if (currentUserRole === 'staff' && tab.id === 'staff') return false;
                 return true;
               }).map(tab => (
                 <button
