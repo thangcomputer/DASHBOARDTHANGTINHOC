@@ -704,6 +704,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                             },
                           }));
                         }, 250);
+                          } else if (role === 'teacher' && (n.payload?.type === 'schedule' || n.type === 'schedule')) {
+                            // Chuyển hướng đến tab lịch học của giảng viên khi nhận thông báo ghi chú từ học viên
+                            navigate('/teacher#schedule');
                           } else if (
                             (role === 'admin' || role === 'staff')
                             && (n.payload?.kind === 'admin_feedback'
