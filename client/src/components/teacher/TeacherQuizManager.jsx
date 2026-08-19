@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Plus, Trash2, Clock, Calendar, Users, Award, BookOpen, CheckCircle,
-  X, HelpCircle, Eye, AlertCircle, RefreshCw, Send, Check, Sparkles
+  X, HelpCircle, Eye, AlertCircle, RefreshCw, Send, Check, Sparkles, Copy
 } from 'lucide-react';
 import api from '../../services/api';
 import { useToast } from '../../utils/toast';
@@ -401,6 +401,17 @@ export default function TeacherQuizManager({
     }
   };
 
+  // Tạo lại bài thi
+  const handleDuplicateQuiz = (quiz) => {
+    setTitle(`${quiz.title} (Bản sao)`);
+    setCourseName(quiz.courseName || '');
+    setTargetStudentIds(quiz.targetStudentIds || []);
+    setTimeLimitMinutes(quiz.timeLimitMinutes || 15);
+    setQuestions(quiz.questions || []);
+    setShowCreateModal(true);
+    toast.success('Đã tải bộ câu hỏi cũ. Bạn có thể sửa và tạo bài mới.');
+  };
+
   return (
     <div className={createOnly ? '' : 'space-y-4 w-full'}>
       {!createOnly && (
@@ -483,13 +494,23 @@ export default function TeacherQuizManager({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSelectedDetailQuiz(quiz)}
-                  className="mt-4 w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
-                >
-                  <Eye size={14} /> Xem kết quả ({subCount})
-                </button>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDuplicateQuiz(quiz)}
+                    className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                    title="Tạo bài mới dựa trên bộ câu hỏi này"
+                  >
+                    <Copy size={14} /> Tạo lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDetailQuiz(quiz)}
+                    className="flex-[1.5] py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                  >
+                    <Eye size={14} /> Xem kết quả ({subCount})
+                  </button>
+                </div>
               </div>
             );
           })}
