@@ -585,8 +585,14 @@ function buildSupportMessages(history, userRole, userName) {
 
   for (const m of rows) {
     let text = String(m.content).trim().slice(0, 1500);
-    if (m.messageType === 'image' && (!text || text === '[Hình ảnh]')) {
-      text = 'Người dùng gửi một hình ảnh.';
+    // Nếu tin nhắn là ảnh và caption chỉ là placeholder — thay bằng mô tả rõ hơn
+    if (m.messageType === 'image') {
+      if (!text || text === '[Hình ảnh]') {
+        text = 'Người dùng gửi một hình ảnh (đề bài, màn hình hoặc tài liệu).';
+      } else {
+        // Có caption thực sự — gữ nguyên và thêm chú thích đây là tin kèm ảnh
+        text = `[Người dùng gửi ảnh kèm nội dung] ${text}`;
+      }
     }
     if (!text) continue;
     if (isBotLeakText(text)) continue;
@@ -888,12 +894,14 @@ async function replyToUserMessage({
     if (imageFileUrl) {
       const inline = loadInlineImage(imageFileUrl);
       if (inline) images.push(inline);
-      const hasUser = messages.some((x) => x.role === 'user');
-      if (!hasUser) {
-        messages.push({
-          role: 'user',
-          content: 'Mình gửi ảnh này, xem giúp mình với.',
-        });
+      // Chỉ thêm tin placeholder nếu không có user message nào trong lịch sử
+      // (trường hợp ảnh đầu tiên, chưa có caption)
+      const hasUserMessage = messages.some((x) => x.role === 'user');
+      if (!hasUserMessage) {
+        const hint = userText && userText !== '[Hình ảnh]'
+          ? `Người dùng gửi ảnh kèm yêu cầu: "${userText.slice(0, 200)}". Hãy xem ảnh và giải thích chi tiết.`
+          : 'Người dùng gửi ảnh (đề bài hoặc màn hình). Hãy mô tả và hướng dẫn chi tiết từng bước.';
+        messages.push({ role: 'user', content: hint });
       }
     }
     const result = await callSupportLlm(messages, { images });

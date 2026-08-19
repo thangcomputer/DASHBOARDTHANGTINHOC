@@ -766,12 +766,12 @@ function ChatWindow({
             </button>
           ) : null}
 
-          {/* Luồng feedback chính — chỉ hiện khi AI đang active, không đang gõ, không hết lượt */}
-          {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && !questionBlocked && canShowEscalate ? (
+          {/* Luồng feedback chính */}
+          {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && !questionBlocked ? (
             <div className="space-y-1.5">
 
-              {/* Bước 0: Lần 1 — đồng ý / không */}
-              {(!feedbackPhase || feedbackPhase === 'agree') ? (
+              {/* Bước 0: Lần 1 — đồng ý / không — chỉ hiện khi có AI reply và canShowEscalate */}
+              {(!feedbackPhase || feedbackPhase === 'agree') && canShowEscalate ? (
                 <>
                   <p className="text-[11px] text-slate-500 text-center font-semibold">Bạn đồng ý câu trả lời này không?</p>
                   <div className="flex gap-2">
@@ -1395,11 +1395,8 @@ export default function FloatingMessenger({ session, role }) {
   /** Gửi tin nhắn lên AI từ feedback flow (không cần handleSend) */
   const sendAiMessage = useCallback(async (tab, text) => {
     if (!tab?.id || !text) return;
-    setAiFeedback((prev) => {
-      const cur = prev[tab.id];
-      if (!cur?.phase || cur.phase === 'idle') return prev;
-      return { ...prev, [tab.id]: { ...cur, phase: 'idle' } };
-    });
+    // KHÔNG reset phase ở đây — phase đã được set trước khi gọi hàm này
+    // useEffect sẽ chuyển phase khi AI trả lời xong
     await sendMessage({
       conversationId: buildAiSupportConversationId(meRole, meId),
       senderId: meId,
