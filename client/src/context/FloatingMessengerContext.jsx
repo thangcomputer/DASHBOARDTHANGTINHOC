@@ -26,12 +26,16 @@ function ensureExclusiveExpand(tabs, activeId) {
   }));
 }
 
-function loadPersisted() {
+function loadPersisted(currentUserId) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
       || localStorage.getItem('cms_floating_messenger_v1');
     if (!raw) return { supportOpen: false, tabs: [], activeTabId: null };
     const parsed = JSON.parse(raw);
+    // Clear tabs khi đổi tài khoản (userId khác) để tránh tích lũy chat-heads cũ
+    if (currentUserId && parsed.savedUserId && parsed.savedUserId !== String(currentUserId)) {
+      return { supportOpen: false, tabs: [], activeTabId: null };
+    }
     const tabs = Array.isArray(parsed.tabs) ? parsed.tabs.slice(0, MAX_OPEN_CHATS) : [];
     const activeTabId = parsed.activeTabId
       || tabs.find((t) => !t.minimized)?.id
@@ -48,7 +52,7 @@ function loadPersisted() {
 }
 
 export function FloatingMessengerProvider({ children, currentUserId, currentUserRole, getConversations }) {
-  const initial = loadPersisted();
+  const initial = loadPersisted(currentUserId);
   const [supportOpen, setSupportOpen] = useState(initial.supportOpen);
   const [tabs, setTabs] = useState(initial.tabs);
   const [activeTabId, setActiveTabId] = useState(initial.activeTabId);
@@ -60,6 +64,7 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         supportOpen,
         activeTabId,
+        savedUserId: currentUserId || null, // Lưu userId để detect đổi tài khoản
         tabs: tabs.map((t) => ({
           id: t.id,
           user: t.user,
@@ -67,7 +72,7 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
         })),
       }));
     } catch { /* ignore */ }
-  }, [supportOpen, tabs, activeTabId]);
+  }, [supportOpen, tabs, activeTabId, currentUserId]);
 
   /**
    * @param {object} person

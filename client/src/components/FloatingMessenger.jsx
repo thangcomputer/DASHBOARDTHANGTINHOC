@@ -1672,7 +1672,8 @@ export default function FloatingMessenger({ session, role }) {
         ) : null}
 
         {/* Chat-heads: mỗi người 1 vòng tròn */}
-        {heads.length > 0 && (
+        {/* Khi HV/GV dùng AI (canUseAiSupport), ẩn chat-heads để tránh nhiều icon xuất hiện cùng FAB robot */}
+        {heads.length > 0 && !canUseAiSupport && (
           <div className="cms-fm-heads">
             {heads.map((tab) => {
               const peerKey = `${normalizeChatRole(tab.user.role)}_${tab.user.id}`;
