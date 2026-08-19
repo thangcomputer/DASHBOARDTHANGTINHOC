@@ -767,21 +767,35 @@ router.post('/groups', messagesGuard('group_create'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Danh sách thành viên không hợp lệ' });
     }
     const validRoles = ['admin', 'teacher', 'student', 'staff'];
+    const normalizeGroupRole = (r) => {
+      const upper = String(r || '').toUpperCase();
+      if (upper === 'HIGH_ADMIN' || upper === 'SUPER_ADMIN' || upper === 'ADMIN') return 'admin';
+      if (upper === 'STAFF' || upper === 'SUPPORT') return 'staff';
+      if (String(r).toLowerCase() === 'teacher') return 'teacher';
+      if (String(r).toLowerCase() === 'student') return 'student';
+      if (String(r).toLowerCase() === 'staff') return 'staff';
+      return null;
+    };
+
     const sanitizedParticipants = participants
-      .filter(p => p && typeof p === 'object' && p.userId && p.name && validRoles.includes(p.role))
+      .map(p => ({ ...p, normRole: normalizeGroupRole(p?.role) }))
+      .filter(p => p && typeof p === 'object' && p.userId && p.name && p.normRole)
       .map(p => ({
         userId: String(p.userId).slice(0, 50),
         name: String(p.name).slice(0, 100),
-        role: p.role,
+        role: p.normRole,
         joinedAt: new Date(),
       }));
+
     if (sanitizedParticipants.length === 0) {
       return res.status(400).json({ success: false, message: 'Không có thành viên hợp lệ' });
     }
 
+    const creatorRole = normalizeGroupRole(req.user.adminRole) || normalizeGroupRole(req.user.role) || 'admin';
+
     const group = await Group.create({
       name: String(name).trim().slice(0, 100),
-      participants: [...sanitizedParticipants, { userId: req.user.id, name: req.user.name, role: req.user.role }],
+      participants: [...sanitizedParticipants, { userId: req.user.id, name: req.user.name, role: creatorRole }],
       createdBy: { userId: req.user.id, name: req.user.name }
     });
 
