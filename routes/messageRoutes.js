@@ -621,6 +621,14 @@ router.patch('/:messageId/reaction', messagesGuard('reaction'), async (req, res)
             });
           }
         });
+        
+        if (message.conversationId && message.conversationId.includes('system_ai_support')) {
+          io.to('ALL_SUPPORT').emit('message:reaction', {
+            messageId: message._id,
+            reactions: message.reactions,
+            conversationId: message.conversationId
+          });
+        }
       }
     }
 
@@ -687,6 +695,13 @@ router.patch('/:messageId/recall', messagesGuard('recall'), async (req, res) => 
             });
           }
         });
+        
+        if (message.conversationId && message.conversationId.includes('system_ai_support')) {
+          io.to('ALL_SUPPORT').emit('message:recall', {
+            messageId: message._id,
+            conversationId: message.conversationId
+          });
+        }
       }
     }
 

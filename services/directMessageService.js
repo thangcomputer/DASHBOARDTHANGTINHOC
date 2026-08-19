@@ -297,6 +297,11 @@ async function sendCanonicalMessageInner({
     } else {
       notifyUser(finalReceiverRole, finalReceiverId, 'message:receive', clientMessage);
       notifyUser(senderRole, senderId, 'message:sent', clientMessage);
+
+      // Broadcast cho admin/support nếu đây là hội thoại AI để cập nhật realtime cho Support viên
+      if (conversationId && conversationId.includes('system_ai_support')) {
+        io.to('ALL_SUPPORT').emit('message:receive', clientMessage);
+      }
     }
   }
 
