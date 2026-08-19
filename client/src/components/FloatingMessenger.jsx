@@ -230,16 +230,31 @@ function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '', ch
     );
   }
 
+  let displayContent = String(m.content || '');
+  let extractedChips = [...(chips || [])];
+
+  if (!mine) {
+    const suggestionRe = /\[GỢI Ý:\s*(.*?)\]/gi;
+    let match;
+    while ((match = suggestionRe.exec(displayContent)) !== null) {
+      const suggestions = match[1].split('|').map((s) => s.trim()).filter(Boolean);
+      suggestions.forEach((s, idx) => {
+        extractedChips.push({ id: `sug-${match.index}-${idx}`, label: s });
+      });
+    }
+    displayContent = displayContent.replace(/\[GỢI Ý:\s*(.*?)\]/gi, '').trim();
+  }
+
   return (
     <div className="w-fit max-w-[88%]">
       {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
       <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
         <div className="whitespace-pre-wrap">
-          <MessageRichText text={m.content} mine={mine} />
+          <MessageRichText text={displayContent} mine={mine} />
         </div>
-        {Array.isArray(chips) && chips.length > 0 ? (
+        {Array.isArray(extractedChips) && extractedChips.length > 0 ? (
           <div className="mt-2 flex flex-col gap-1.5">
-            {chips.map((chip) => (
+            {extractedChips.map((chip) => (
               <button
                 key={chip.id}
                 type="button"

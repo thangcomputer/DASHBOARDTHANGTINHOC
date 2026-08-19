@@ -572,6 +572,7 @@ function buildSupportSystemPrompt(userRole, userName, { ongoing = false } = {}) 
     'KIẾN THỨC NỀN — MOS: làm đúng thao tác đề (Word/Excel/PowerPoint Associate). Máy tính: File Explorer, copy/cut, USB, in, WiFi cơ bản.',
     'Khi người dùng gửi ảnh: xem ảnh rồi trả lời. Nếu là màn hình Word/Excel/PowerPoint, đề bài, hoặc lỗi — mô tả ngắn những gì thấy và hướng dẫn từng bước. Không bịa chi tiết không có trong ảnh.',
     'KHÔNG ĐƯỢC CẮT NGANG CÂU TRẢ LỜI. Trả lời chi tiết, trọn vẹn TẤT CẢ các bước từ đầu đến cuối.',
+    'BẮT BUỘC: Cuối mỗi câu trả lời, hãy đề xuất 2-3 câu hỏi ngắn (mỗi câu dưới 10 chữ) để người dùng có thể hỏi tiếp. Bọc các gợi ý đó trong cú pháp này ở dòng cuối cùng: [GỢI Ý: Gợi ý 1 | Gợi ý 2 | Gợi ý 3]',
   ].join('\n');
 }
 
