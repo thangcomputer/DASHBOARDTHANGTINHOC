@@ -125,6 +125,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [ratingDetail, setRatingDetail] = useState(null);
   const [ratingDetailLoading, setRatingDetailLoading] = useState(false);
   const [ratingDetailError, setRatingDetailError] = useState('');
+  const [adminQuickPopup, setAdminQuickPopup] = useState(null);
   const { socket } = useSocket() || {};
   const { students, teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead, getConversations } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
@@ -713,6 +714,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               || String(n.type || '').toUpperCase() === 'EVALUATION')
                           ) {
                             navigate('/admin#evaluations');
+                          } else if ((role === 'admin' || role === 'staff') && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
+                            const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                            if (st) {
+                              setAdminQuickPopup({
+                                type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
+                                notif: n,
+                                student: st,
+                              });
+                            } else if (n.path) {
+                              navigate(n.path);
+                            }
                           } else if (n.path) {
                             let targetPath = n.path;
 
@@ -799,6 +811,103 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           }}
         />
       ) : null}
+      {adminQuickPopup && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2 text-base">
+                {adminQuickPopup.type === 'register' ? '🎉 Học viên mới đăng ký' : '📋 Điểm danh buổi học'}
+              </h3>
+              <button type="button" onClick={() => setAdminQuickPopup(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-sm font-medium">
+              {adminQuickPopup.type === 'register' ? (
+                <>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Cơ sở:</span>
+                    <span className="font-black text-slate-800">{adminQuickPopup.student.branchCode || 'Không rõ'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Học viên:</span>
+                    <span className="font-bold text-slate-800">{adminQuickPopup.student.name}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Môn học:</span>
+                    <span className="font-bold text-blue-700">{adminQuickPopup.student.course}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Thời gian:</span>
+                    <span className="font-bold text-slate-800">{formatTime(adminQuickPopup.notif.time || adminQuickPopup.notif.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">SĐT:</span>
+                    <span className="font-bold text-slate-800">{adminQuickPopup.student.phone || adminQuickPopup.student.zalo || 'Không có'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Thanh toán:</span>
+                    <span className="font-bold text-emerald-600">{adminQuickPopup.student.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Người lập phiếu:</span>
+                    <span className="font-bold text-slate-800">Hệ thống</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Học viên:</span>
+                    <span className="font-bold text-slate-800">{adminQuickPopup.student.name}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Môn học:</span>
+                    <span className="font-bold text-blue-700">{adminQuickPopup.notif.payload?.course || adminQuickPopup.student.course}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Giảng viên:</span>
+                    <span className="font-bold text-slate-800">{adminQuickPopup.notif.payload?.teacherName || 'Không rõ'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Tiến độ:</span>
+                    <span className="font-black text-emerald-600">Buổi {adminQuickPopup.notif.payload?.completedSessions || '?'} / {adminQuickPopup.notif.payload?.totalRequired || '?'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">Thời gian:</span>
+                    <span className="font-bold text-slate-800">{formatTime(adminQuickPopup.notif.time || adminQuickPopup.notif.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-500">SĐT Học viên:</span>
+                    <span className="font-bold text-slate-800">{adminQuickPopup.student.phone || adminQuickPopup.student.zalo || 'Không có'}</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <button
+                onClick={() => setAdminQuickPopup(null)}
+                className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={() => {
+                  setAdminQuickPopup(null);
+                  if (adminQuickPopup.type === 'register') {
+                    navigate(`/admin#students?studentId=${adminQuickPopup.student._id || adminQuickPopup.student.id}`);
+                  } else {
+                    navigate(`/admin#students?studentId=${adminQuickPopup.student._id || adminQuickPopup.student.id}&tab=attendance`);
+                  }
+                }}
+                className="flex-1 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition"
+              >
+                Xem chi tiết
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
       <FloatingMessenger session={session} role={role} />
