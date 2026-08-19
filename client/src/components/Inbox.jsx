@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
   User, Circle, Image, Paperclip, Smile, Download,
-  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown
+  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -896,6 +896,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   }, [socket, activeConv?.isAiHandoff, activeConv?.id]);
 
   // ─── Thu hồi tin nhắn ────────────────────────────────────────────────────────
+  // ── Copy tin nhắn ──
+  const handleCopyText = useCallback((text) => {
+    if (navigator.clipboard && text) {
+      navigator.clipboard.writeText(text);
+      toast.success('Đã sao chép tin nhắn');
+    }
+  }, [toast]);
+
+  // ── Thu hồi tin nhắn ──
   const handleRecall = useCallback(async (msgId) => {
     if (recallingId) return; // Chống double click
     setRecallingId(msgId);
@@ -1982,6 +1991,31 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               </div>
                             )}
                           </div>
+
+                          {/* Copy vào khung chat (Edit3) */}
+                          {!msg.isRecalled && msg.messageType !== 'image' && (
+                            <button
+                              onClick={() => {
+                                setNewMsg(msg.content);
+                                setTimeout(() => inputRef.current?.focus(), 100);
+                              }}
+                              className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all shadow-sm border border-slate-100 active:scale-90"
+                              title="Chỉnh sửa / Viết lại"
+                            >
+                              <Edit3 size={13} strokeWidth={2.5} />
+                            </button>
+                          )}
+
+                          {/* Copy clipboard */}
+                          {!msg.isRecalled && msg.messageType !== 'image' && (
+                            <button
+                              onClick={() => handleCopyText(msg.content)}
+                              className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all shadow-sm border border-slate-100 active:scale-90"
+                              title="Sao chép"
+                            >
+                              <Copy size={13} strokeWidth={2.5} />
+                            </button>
+                          )}
 
                           {/* Thu hồi button — chỉ hiện khi là tin của mình, chưa thu hồi và trong vòng 24h */}
                           {isMine && !msg.isRecalled && (() => {
