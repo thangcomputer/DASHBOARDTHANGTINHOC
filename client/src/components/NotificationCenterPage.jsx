@@ -299,10 +299,10 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         openPopup(st);
         return;
       } else if (n.payload?.studentId) {
-        api.get(`/students/${n.payload.studentId}`)
+        api.students.getById(n.payload.studentId)
           .then(res => {
-            if (res.data?.success && res.data?.data) {
-              openPopup(res.data.data);
+            if (res?.success && res?.data) {
+              openPopup(res.data);
             } else {
               setStudentDetailTab(tab);
               setStudentDetailId(String(n.payload.studentId));

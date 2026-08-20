@@ -728,10 +728,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                             if (st) {
                               openPopup(st);
                             } else if (n.payload?.studentId) {
-                              api.get(`/students/${n.payload.studentId}`)
+                              api.students.getById(n.payload.studentId)
                                 .then(res => {
-                                  if (res.data?.success && res.data?.data) {
-                                    openPopup(res.data.data);
+                                  if (res?.success && res?.data) {
+                                    openPopup(res.data);
                                   } else if (n.path) {
                                     navigate(n.path);
                                   }
