@@ -336,6 +336,28 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
       logger.warn({ err: notifyErr.message }, '[QUIZ] notify teacher on submit');
     }
 
+    try {
+      const NotificationService = require('../services/NotificationService');
+      const io = req.app.get('io');
+      const stuTitle = isForfeit
+        ? '⚠️ Kết quả: Rớt (thoát giữa giờ)'
+        : '📝 Đã nộp bài trắc nghiệm';
+      const stuContent = isForfeit
+        ? `Bạn đã bị tính rớt do thoát giữa giờ bài thi "${quiz.title}".`
+        : `Bạn đã nộp bài "${quiz.title}". Điểm: ${score}% (${correctCount}/${totalQuestions}) · ${status === 'passed' ? 'ĐẠT' : 'CHƯA ĐẠT'}.`;
+      
+      await NotificationService.send(io, {
+        type: 'EXAM',
+        title: stuTitle,
+        content: stuContent,
+        receivers: [String(studentId)],
+        payload: { quizId: String(quiz._id) },
+        link: '/student/exam',
+      });
+    } catch (stuErr) {
+      logger.warn('[QUIZ] Send student notification error:', stuErr.message);
+    }
+
     const detailedReview = isForfeit
       ? []
       : quiz.questions.map((q, idx) => ({
