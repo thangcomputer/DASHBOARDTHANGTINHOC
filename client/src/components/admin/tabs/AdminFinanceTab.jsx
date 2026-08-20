@@ -240,8 +240,8 @@ export default function AdminFinanceTab() {
             {financeRows.map((r) => {
               const isRefund = r.kind === 'refund';
               return (
-                <div key={r.key} className="cms-m-list-row hover:bg-slate-50">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div key={r.key} className="cms-m-list-row hover:bg-slate-50 flex-col lg:flex-row lg:items-center">
+                  <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-[1.5]">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${
                       isRefund ? 'bg-red-500' : (r.paid ? 'bg-emerald-500' : 'bg-amber-500')
                     }`}>
@@ -249,21 +249,35 @@ export default function AdminFinanceTab() {
                     </div>
                     <div className="min-w-0">
                       <p className="cms-m-list-title">{r.studentName}</p>
-                      <p className="cms-m-caption line-clamp-2">
+                      <p className="cms-m-caption lg:hidden line-clamp-1">
                         {r.studentCode ? `${r.studentCode} · ` : ''}{r.courseName}
+                      </p>
+                      <p className="cms-m-caption hidden lg:block">
+                        {r.studentCode || ''}
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2 min-[640px]:flex-row min-[640px]:flex-wrap min-[640px]:items-center min-[640px]:justify-end min-w-0 w-full min-[640px]:w-auto">
+                  <div className="hidden lg:block min-w-0 flex-1">
+                     <p className="text-[13px] text-slate-700 font-semibold truncate">{r.courseName}</p>
+                     <p className="text-[11px] text-slate-400">Khóa học</p>
+                  </div>
+                  <div className="hidden lg:block min-w-0 flex-1">
+                     <p className="text-[13px] text-slate-700 font-semibold truncate">{r.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</p>
+                     <p className="text-[11px] text-slate-400">Hình thức</p>
+                  </div>
+                  <div className="flex flex-col gap-2 min-[640px]:flex-row min-[640px]:flex-wrap min-[640px]:items-center min-[640px]:justify-end min-w-0 w-full min-[640px]:w-auto lg:flex-1">
                     <div className="text-left min-[640px]:text-right min-w-0">
                       <p className={`text-[15px] font-extrabold break-words tabular-nums ${isRefund ? 'text-red-600' : 'text-slate-900'}`}>
                         {(Number(r.price) || 0).toLocaleString('vi-VN')}đ
                       </p>
-                      <span className={`text-[13px] font-bold ${
-                        isRefund ? 'text-red-600' : (r.paid ? 'text-sky-700' : 'text-red-500')
-                      }`}>
-                        {isRefund ? 'Hoàn' : (r.paid ? 'Đã nộp' : 'Chưa nộp')}
-                      </span>
+                      <div className="flex items-center gap-1.5 min-[640px]:justify-end">
+                        <span className={`text-[13px] font-bold ${
+                          isRefund ? 'text-red-600' : (r.paid ? 'text-sky-700' : 'text-red-500')
+                        }`}>
+                          {isRefund ? 'Hoàn' : (r.paid ? 'Đã nộp' : 'Chưa nộp')}
+                        </span>
+                        <span className="lg:hidden text-[11px] font-medium text-slate-400">· {r.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</span>
+                      </div>
                     </div>
                     {!isRefund && !r.paid && (
                       <button
