@@ -871,7 +871,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   </div>
                   <div className="flex justify-between border-b border-slate-50 pb-2">
                     <span className="text-slate-500">Người lập phiếu:</span>
-                    <span className="font-bold text-slate-800">Hệ thống</span>
+                    <span className="font-bold text-slate-800">
+                      {adminQuickPopup.notif.payload?.creatorName 
+                        ? `${adminQuickPopup.notif.payload.creatorName} (${adminQuickPopup.notif.payload.creatorRole})` 
+                        : 'Hệ thống'}
+                    </span>
                   </div>
                 </>
               ) : (

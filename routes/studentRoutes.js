@@ -988,7 +988,13 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         branchId: student.branchId,
         title: '🆕 Học viên mới đăng ký',
         content: `Học viên ⟦student_detail:${student._id}:profile|${student.name}⟧ đã đăng ký khóa học ${student.course}.`,
-        payload: { studentId: student._id },
+        payload: { 
+          studentId: student._id,
+          creatorName: req.user?.name || 'Hệ thống',
+          creatorRole: req.user?.adminRole === 'SUPER_ADMIN' || req.user?.adminRole === 'HIGH_ADMIN' 
+            ? 'Admin' 
+            : (req.user?.role === 'staff' ? 'Nhân viên chi nhánh' : (req.user?.role === 'teacher' ? 'Giảng viên' : 'Hệ thống'))
+        },
         link: '/admin/students',
       });
       
