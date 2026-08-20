@@ -787,7 +787,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                           </div>
                           {n.title && <h4 className={`text-sm font-semibold mb-0.5 break-anywhere ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</h4>}
                           <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>
-                            {role === 'teacher' ? formatNotificationStudentMask(n.text || n.message || n.content, students) : (n.text || n.message || n.content)}
+                            {formatNotificationStudentMask(n.text || n.message || n.content, students, role !== 'teacher')}
                           </p>
                         </div>
                       </div>
