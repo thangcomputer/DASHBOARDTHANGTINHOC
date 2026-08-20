@@ -316,6 +316,7 @@ async function fetchInlineImageFromUrl(fileUrl) {
   } catch {
     return null;
   }
+}
 
 function uniqueModels() {
   const seen = new Set();
