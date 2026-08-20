@@ -331,6 +331,7 @@ export default function StudentOverviewTab({
                   const isOverdue = item.type === 'overdue_attendance' || item.displayKind === 'overdue_attendance';
                   const isHomework = item.type === 'homework';
                   const isQuiz = item.type === 'quiz';
+                  const isPassed = isQuiz ? (item.isPassed ?? item.meta?.isPassed) : undefined;
                   const isAttendance = item.type === 'attendance';
                   const isGradeUpdate = item.type === 'grade_update';
                   const isEvaluation = item.type === 'evaluation';
@@ -402,15 +403,24 @@ export default function StudentOverviewTab({
 
                       {!isCancelled && item.grade != null && (
                         <div className="flex items-center justify-end gap-1.5 shrink-0 pl-10">
-                          <span className={`text-xs font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>
-                            {item.grade} / 10
-                          </span>
+                          {isQuiz ? (
+                            /* Quiz: hiện % điểm hoặc correctCount/totalQuestions từ note nếu có */
+                            <span className={`text-xs font-extrabold tabular-nums ${
+                              isPassed ? 'text-emerald-600' : 'text-red-600'
+                            }`}>
+                              {item.rawScore != null ? `${Math.round(item.rawScore)}%` : `${item.grade} / 10`}
+                            </span>
+                          ) : (
+                            <span className={`text-xs font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>
+                              {item.grade} / 10
+                            </span>
+                          )}
                           <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
                             isQuiz
-                              ? (item.isPassed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200')
+                              ? (isPassed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200')
                               : getGradePillClasses(item.grade)
                           }`}>
-                            {isQuiz ? (item.isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
+                            {isQuiz ? (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
                           </span>
                         </div>
                       )}
