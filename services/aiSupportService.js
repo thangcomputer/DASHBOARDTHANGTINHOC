@@ -2,6 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 const Message = require('../models/Message');
 const AiSupportSession = require('../models/AiSupportSession');
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
@@ -243,32 +245,77 @@ async function consumeAiImageQuota(sessionDoc) {
   return {
     applies: true,
     blocked: false,
-    remaining: AI_IMAGE_DAILY_LIMIT - used - 1,
+    remaining: limit - used - 1,
     used: used + 1,
-    limit: AI_IMAGE_DAILY_LIMIT,
+    limit,
   };
 }
 
 function loadInlineImage(fileUrl) {
   const disk = resolveDiskPath(fileUrl);
-  if (!disk || !fs.existsSync(disk)) return null;
+  if (disk && fs.existsSync(disk)) {
+    try {
+      const stat = fs.statSync(disk);
+      if (!stat.size || stat.size > 4 * 1024 * 1024) return null;
+      const buf = fs.readFileSync(disk);
+      const ext = path.extname(disk).toLowerCase();
+      const mime = ext === '.png'
+        ? 'image/png'
+        : ext === '.webp'
+          ? 'image/webp'
+          : ext === '.gif'
+            ? 'image/gif'
+            : 'image/jpeg';
+      return { mimeType: mime, data: buf.toString('base64') };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Fetch ảnh qua HTTP/HTTPS và trả về inline image object cho Gemini Vision.
+ * Dùng khi disk file không tồn tại (ephemeral server, cloud host).
+ */
+async function fetchInlineImageFromUrl(fileUrl) {
   try {
-    const stat = fs.statSync(disk);
-    if (!stat.size || stat.size > 4 * 1024 * 1024) return null;
-    const buf = fs.readFileSync(disk);
-    const ext = path.extname(disk).toLowerCase();
-    const mime = ext === '.png'
-      ? 'image/png'
-      : ext === '.webp'
-        ? 'image/webp'
-        : ext === '.gif'
-          ? 'image/gif'
-          : 'image/jpeg';
-    return { mimeType: mime, data: buf.toString('base64') };
+    // Resolve relative URL to absolute using BASE_URL or SERVER_URL env
+    let targetUrl = String(fileUrl || '').trim();
+    if (!targetUrl) return null;
+    if (targetUrl.startsWith('/')) {
+      const base = (process.env.BASE_URL || process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
+      targetUrl = `${base}${targetUrl}`;
+    }
+    if (!targetUrl.startsWith('http')) return null;
+
+    const MAX_BYTES = 4 * 1024 * 1024;
+    return await new Promise((resolve) => {
+      const lib = targetUrl.startsWith('https') ? https : http;
+      const req = lib.get(targetUrl, { timeout: 8000 }, (res) => {
+        if (res.statusCode !== 200) { res.resume(); resolve(null); return; }
+        const contentType = res.headers['content-type'] || '';
+        const mime = contentType.split(';')[0].trim();
+        if (!mime.startsWith('image/')) { res.resume(); resolve(null); return; }
+        const chunks = [];
+        let total = 0;
+        res.on('data', (chunk) => {
+          total += chunk.length;
+          if (total > MAX_BYTES) { req.destroy(); resolve(null); return; }
+          chunks.push(chunk);
+        });
+        res.on('end', () => {
+          const buf = Buffer.concat(chunks);
+          resolve({ mimeType: mime, data: buf.toString('base64') });
+        });
+        res.on('error', () => resolve(null));
+      });
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+    });
   } catch {
     return null;
   }
-}
 
 function uniqueModels() {
   const seen = new Set();
@@ -901,7 +948,7 @@ async function replyToUserMessage({
     const ongoing = isOngoingConversation(history);
     const images = [];
     if (imageFileUrl) {
-      const inline = loadInlineImage(imageFileUrl);
+      const inline = loadInlineImage(imageFileUrl) || await fetchInlineImageFromUrl(imageFileUrl);
       if (inline) images.push(inline);
       // Chỉ thêm tin placeholder nếu không có user message nào trong lịch sử
       // (trường hợp ảnh đầu tiên, chưa có caption)
@@ -911,6 +958,9 @@ async function replyToUserMessage({
           ? `Người dùng gửi ảnh kèm yêu cầu: "${userText.slice(0, 200)}". Hãy xem ảnh và giải thích chi tiết.`
           : 'Người dùng gửi ảnh (đề bài hoặc màn hình). Hãy mô tả và hướng dẫn chi tiết từng bước.';
         messages.push({ role: 'user', content: hint });
+      }
+      if (!inline) {
+        logger.warn({ imageFileUrl }, '[AI Support] Cannot load image inline, AI will respond without image');
       }
     }
     const result = await callSupportLlm(messages, { images });

@@ -535,6 +535,8 @@ function ChatWindow({
           setText('');
           clearPendingImage();
         }
+      } catch (err) {
+        toast?.error(err?.message || 'Gửi ảnh thất bại');
       } finally {
         setUploading(false);
       }
