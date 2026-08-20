@@ -715,8 +715,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                           ) {
                             navigate('/admin#evaluations');
                           } else if ((role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF') && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
-                            const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
-                            
+
                             const openPopup = (studentData) => {
                               setAdminQuickPopup({
                                 type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
@@ -725,22 +724,27 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               });
                             };
 
-                            if (st) {
-                              openPopup(st);
-                            } else if (n.payload?.studentId) {
+                            if (n.payload?.studentId) {
                               api.students.getById(n.payload.studentId)
                                 .then(res => {
                                   if (res?.success && res?.data) {
                                     openPopup(res.data);
-                                  } else if (n.path) {
-                                    navigate(n.path);
+                                  } else {
+                                    // fallback to local state
+                                    const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                                    if (st) openPopup(st);
+                                    else if (n.path) navigate(n.path);
                                   }
                                 })
                                 .catch(() => {
-                                  if (n.path) navigate(n.path);
+                                  const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                                  if (st) openPopup(st);
+                                  else if (n.path) navigate(n.path);
                                 });
-                            } else if (n.path) {
-                              navigate(n.path);
+                            } else {
+                              const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                              if (st) openPopup(st);
+                              else if (n.path) navigate(n.path);
                             }
                           } else if (n.path) {
                             let targetPath = n.path;
@@ -847,7 +851,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 <>
                   <div className="flex justify-between border-b border-slate-50 pb-2">
                     <span className="text-slate-500">Cơ sở:</span>
-                    <span className="font-black text-slate-800">{adminQuickPopup.student.branchCode || 'Không rõ'}</span>
+                    <span className="font-black text-slate-800">{adminQuickPopup.student.branchId?.name || adminQuickPopup.student.branchCode || adminQuickPopup.student.createdByBranch || 'Không rõ'}</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-50 pb-2">
                     <span className="text-slate-500">Học viên:</span>

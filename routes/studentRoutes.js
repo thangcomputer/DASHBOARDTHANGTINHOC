@@ -449,7 +449,8 @@ router.get('/stats', [authMiddleware, branchFilter, policyShadowStudentRead('sta
 router.get('/:id', [authMiddleware, branchFilter, policyShadowStudentRead('get_one'), dataScopeObserve('student', { listMode: false })], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
-      .populate('teacherId', 'name phone specialty avatar');
+      .populate('teacherId', 'name phone specialty avatar')
+      .populate('branchId', 'name code');
 
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
 

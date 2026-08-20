@@ -285,8 +285,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
     // Popup nhanh cho "Học viên mới đăng ký" và "Điểm danh buổi học"
     if (isAdmin && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
       const tab = n.title?.includes('Điểm danh') ? 'attendance' : 'summary';
-      const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
-      
+
       const openPopup = (studentData) => {
         setQuickPopup({
           type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
@@ -295,22 +294,21 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         });
       };
 
-      if (st) {
-        openPopup(st);
-        return;
-      } else if (n.payload?.studentId) {
+      if (n.payload?.studentId) {
         api.students.getById(n.payload.studentId)
           .then(res => {
             if (res?.success && res?.data) {
               openPopup(res.data);
             } else {
-              setStudentDetailTab(tab);
-              setStudentDetailId(String(n.payload.studentId));
+              const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+              if (st) openPopup(st);
+              else { setStudentDetailTab(tab); setStudentDetailId(String(n.payload.studentId)); }
             }
           })
           .catch(() => {
-            setStudentDetailTab(tab);
-            setStudentDetailId(String(n.payload.studentId));
+            const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+            if (st) openPopup(st);
+            else { setStudentDetailTab(tab); setStudentDetailId(String(n.payload.studentId)); }
           });
         return;
       }
@@ -564,7 +562,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                 <>
                   <div className="flex justify-between border-b border-slate-50 pb-2">
                     <span className="text-slate-500">Chi nhánh:</span>
-                    <span className="font-black text-slate-800">{quickPopup.student.branchCode || 'Không rõ'}</span>
+                    <span className="font-black text-slate-800">{quickPopup.student.branchId?.name || quickPopup.student.branchCode || 'Không rõ'}</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-50 pb-2">
                     <span className="text-slate-500">Học viên:</span>
