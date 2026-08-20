@@ -13,17 +13,18 @@ export function maskStudentPhone(phone) {
   return clean + '****';
 }
 
-export function formatNotificationStudentMask(text, students = []) {
+export function formatNotificationStudentMask(text, students = [], isAdmin = false) {
   if (!text || typeof text !== 'string') return text || '';
   
   let formatted = text;
 
-  // 0. Strip ⟦student_detail:ID:tab|NAME⟧ tokens → hiển thị tên đã mask
-  // Token format: ⟦student_detail:ID:tab|DisplayName⟧
+  // 0. Strip ⟦student_detail:ID:tab|NAME⟧ or [student_detail:ID:tab|NAME] tokens
   formatted = formatted.replace(
-    /⟦student_detail:[^|⟧]+\|([^⟧]+)⟧/g,
+    /(?:⟦|\[)student_detail:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\])/g,
     (match, displayName) => {
-      if (!displayName) return '09****';
+      if (!displayName) return isAdmin ? '' : '09****';
+      if (isAdmin) return displayName.trim();
+      
       // Tìm student trong danh sách để lấy số điện thoại
       const st = Array.isArray(students)
         ? students.find((s) => s?.name?.trim() === displayName.trim())
