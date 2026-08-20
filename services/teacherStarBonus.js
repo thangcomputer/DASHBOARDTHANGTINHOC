@@ -9,7 +9,7 @@ const mongoose = require('mongoose');
 const Schedule = require('../models/Schedule');
 const Evaluation = require('../models/Evaluation');
 
-const MIN_STUDENTS = 10;
+const MIN_STUDENTS = 5;
 const MIN_STARS = 5;
 const BONUS_PER_MONTH = 200000;
 const MAX_LOOKBACK_MONTHS = 24;
