@@ -1972,7 +1972,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                             {/* Reaction badge */}
                             {!msg.isRecalled && (heartCount > 0 || likeCount > 0) && (
-                              <div className={`cms-bubble-reactions absolute -bottom-3 ${isMine ? 'right-2' : 'left-2'}`}>
+                              <div className={`cms-bubble-reactions absolute -bottom-5 ${isMine ? 'right-2' : 'left-2'}`}>
                                 {heartCount > 0 && (
                                   <span className="flex items-center gap-0.5 text-[11px]">
                                     <span>❤️</span>
