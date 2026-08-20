@@ -285,23 +285,33 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
     // Popup nhanh cho "Học viên mới đăng ký" và "Điểm danh buổi học"
     if (isAdmin && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
       const tab = n.title?.includes('Điểm danh') ? 'attendance' : 'summary';
-      let st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
-      if (!st && n.payload?.studentId) {
-        st = {
-          _id: n.payload.studentId,
-          id: n.payload.studentId,
-          name: n.payload.studentName || n.payload.name || 'Học viên',
-          course: n.payload.course || 'Không rõ',
-          phone: n.payload.phone || 'Không rõ',
-          branchCode: n.payload.branchCode || 'Hệ thống',
-        };
-      }
-      if (st) {
+      const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+      
+      const openPopup = (studentData) => {
         setQuickPopup({
           type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
           notif: n,
-          student: st,
+          student: studentData,
         });
+      };
+
+      if (st) {
+        openPopup(st);
+        return;
+      } else if (n.payload?.studentId) {
+        api.get(`/students/${n.payload.studentId}`)
+          .then(res => {
+            if (res.data?.success && res.data?.data) {
+              openPopup(res.data.data);
+            } else {
+              setStudentDetailTab(tab);
+              setStudentDetailId(String(n.payload.studentId));
+            }
+          })
+          .catch(() => {
+            setStudentDetailTab(tab);
+            setStudentDetailId(String(n.payload.studentId));
+          });
         return;
       }
     }

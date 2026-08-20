@@ -715,23 +715,30 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                           ) {
                             navigate('/admin#evaluations');
                           } else if ((role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF') && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
-                            let st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
-                            if (!st && n.payload?.studentId) {
-                              st = {
-                                _id: n.payload.studentId,
-                                id: n.payload.studentId,
-                                name: n.payload.studentName || n.payload.name || 'Học viên',
-                                course: n.payload.course || 'Không rõ',
-                                phone: n.payload.phone || 'Không rõ',
-                                branchCode: n.payload.branchCode || 'Hệ thống',
-                              };
-                            }
-                            if (st) {
+                            const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                            
+                            const openPopup = (studentData) => {
                               setAdminQuickPopup({
                                 type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
                                 notif: n,
-                                student: st,
+                                student: studentData,
                               });
+                            };
+
+                            if (st) {
+                              openPopup(st);
+                            } else if (n.payload?.studentId) {
+                              api.get(`/students/${n.payload.studentId}`)
+                                .then(res => {
+                                  if (res.data?.success && res.data?.data) {
+                                    openPopup(res.data.data);
+                                  } else if (n.path) {
+                                    navigate(n.path);
+                                  }
+                                })
+                                .catch(() => {
+                                  if (n.path) navigate(n.path);
+                                });
                             } else if (n.path) {
                               navigate(n.path);
                             }
