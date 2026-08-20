@@ -22,20 +22,11 @@ export function formatNotificationStudentMask(text, students = [], isAdmin = fal
   formatted = formatted.replace(
     /(?:⟦|\[)student_detail:[^|⟧\]]+\|([^⟧\]]+)(?:⟧|\])/g,
     (match, displayName) => {
-      if (!displayName) return isAdmin ? '' : '09****';
+      if (!displayName) return isAdmin ? '' : '***';
       if (isAdmin) return displayName.trim();
       
-      // Tìm student trong danh sách để lấy số điện thoại
-      const st = Array.isArray(students)
-        ? students.find((s) => s?.name?.trim() === displayName.trim())
-        : null;
-      if (st) return maskStudentPhone(st.phone || st.zalo);
-      // Không tìm thấy → mask tên: giữ ký tự đầu + ****
-      const parts = displayName.trim().split(/\s+/);
-      if (parts.length >= 2) {
-        return parts[0] + ' ' + parts[parts.length - 1][0] + '****';
-      }
-      return displayName[0] + '****';
+      // Mask tên: giữ 1 ký tự đầu + ***
+      return displayName.trim()[0] + '***';
     }
   );
 
@@ -50,7 +41,7 @@ export function formatNotificationStudentMask(text, students = [], isAdmin = fal
       if (s?.name && typeof s.name === 'string' && s.name.trim().length > 1) {
         const sName = s.name.trim();
         if (formatted.includes(sName)) {
-          const masked = maskStudentPhone(s.phone || s.zalo);
+          const masked = sName[0] + '***';
           formatted = formatted.split(sName).join(masked);
         }
       }
@@ -64,7 +55,7 @@ export function formatNotificationStudentMask(text, students = [], isAdmin = fal
       if (/^\d{3,}/.test(nameMatch) || nameMatch.includes('*')) {
         return match;
       }
-      return `Học viên 09**** đã đánh giá`;
+      return `Học viên ${nameMatch[0]}*** đã đánh giá`;
     }
   );
 
