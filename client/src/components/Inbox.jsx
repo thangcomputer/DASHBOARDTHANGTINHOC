@@ -1903,7 +1903,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                           {/* Message bubble */}
-                          <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-hidden !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                          <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${(heartCount > 0 || likeCount > 0) && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
                             {msg.isRecalled ? (
                               <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
                                 <RotateCcw size={12} /> Tin nhắn đã được thu hồi
