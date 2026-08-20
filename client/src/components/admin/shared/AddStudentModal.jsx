@@ -241,6 +241,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
             age: form.age === '' || form.age == null ? undefined : Number(form.age),
             id: Date.now(),
             paid: true,
+            paymentMethod: 'transfer',
             reservedStudentCode,
           }))
             .then(() => onClose())
@@ -273,6 +274,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
               age: form.age === '' || form.age == null ? undefined : Number(form.age),
               id: Date.now(),
               paid: true,
+              paymentMethod: 'transfer',
               reservedStudentCode,
             }))
               .then(() => onClose())
@@ -289,6 +291,7 @@ export default function AddStudentModal({ onAdd, onClose, teachers }) {
     age: form.age === '' || form.age == null ? undefined : Number(form.age),
     id: Date.now(),
     paid: !!paid,
+    paymentMethod: paid ? 'cash' : undefined,
     zalo: form.zalo || form.phone,
   });
 
