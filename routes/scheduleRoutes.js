@@ -1116,7 +1116,8 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
            title: '📝 Ghi chú mới từ học viên',
            content: `Học viên ${schedule.studentName} vừa để lại ghi chú trên lịch học ngày ${new Date(schedule.date).toLocaleDateString('vi-VN')}.`,
            receivers: [schedule.teacherId.toString()],
-           payload: { scheduleId: schedule._id, studentId: schedule.studentId, type: 'schedule' }
+           payload: { scheduleId: schedule._id, studentId: schedule.studentId, type: 'schedule' },
+           link: '/teacher#schedule',
          });
          
          // Báo chuông
