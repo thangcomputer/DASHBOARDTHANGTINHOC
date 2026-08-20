@@ -39,6 +39,11 @@ export function formatNotificationStudentMask(text, students = [], isAdmin = fal
     }
   );
 
+  // Bỏ qua masking thủ công nếu là admin (để admin thấy tên thật)
+  if (isAdmin) {
+    return formatted;
+  }
+
   // 1. Replace exact student names if matched in students array
   if (Array.isArray(students) && students.length > 0) {
     students.forEach((s) => {
