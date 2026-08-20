@@ -482,7 +482,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                       {n.title}
                     </h3>
                     <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                      {formatNotificationStudentMask(n.message || n.content || n.text, students)}
+                      {role === 'teacher' ? formatNotificationStudentMask(n.message || n.content || n.text, students) : (n.message || n.content || n.text)}
                     </p>
                   </div>
                   <div className="flex flex-col gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -677,7 +677,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             </div>
 
             <div className="overflow-y-auto flex-1 text-sm text-slate-700 leading-relaxed whitespace-pre-line pr-1 font-medium space-y-3">
-              {formatNotificationStudentMask(selectedNotif.message || selectedNotif.content || selectedNotif.text, students)}
+              {role === 'teacher' ? formatNotificationStudentMask(selectedNotif.message || selectedNotif.content || selectedNotif.text, students) : (selectedNotif.message || selectedNotif.content || selectedNotif.text)}
               {qaDetail ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-left">
                   <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Chi tiết câu hỏi LMS</p>
