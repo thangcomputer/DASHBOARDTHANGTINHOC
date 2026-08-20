@@ -950,6 +950,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
           idempotencyKey: `payment:create:${student._id}:${primaryEnr?._id || createdInvoice?.maHoaDon || 'nohd'}`,
           actor: financeActor(req),
           note: 'Thanh toán khi thêm học viên',
+          metadata: { paymentMethod: student.paymentMethod || 'cash' },
           reqMeta: financeReqMeta(req, student),
         });
         bustFinanceCaches();
@@ -1597,6 +1598,7 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
         })(),
         actor: financeActor(req),
         note,
+        metadata: { paymentMethod: paymentMethod || 'transfer' },
         reqMeta: financeReqMeta(req, student),
       });
       bustFinanceCaches();
@@ -2114,6 +2116,7 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
             : `payment:enrollment_add:${student._id}:${invoice?.maHoaDon || 'nohd'}`,
           actor: financeActor(req),
           note: `Thêm khóa ${resolvedName}`,
+          metadata: { paymentMethod: paymentMethod || 'transfer' },
           reqMeta: financeReqMeta(req, student),
         });
         bustFinanceCaches();
@@ -2336,6 +2339,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
           idempotencyKey: `payment:student:${fresh._id}:enr:${claimedEnr._id}`,
           actor: financeActor(req),
           note: note || '',
+          metadata: { paymentMethod: paymentMethod || 'cash' },
           reqMeta: financeReqMeta(req, fresh),
         });
         bustFinanceCaches();

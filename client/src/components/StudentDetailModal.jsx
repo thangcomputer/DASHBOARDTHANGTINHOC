@@ -1047,7 +1047,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
           synthetic: false,
           ledgerType: line.type,
           enrollmentId: line.enrollmentId ? String(line.enrollmentId) : '',
-          paymentMethod: line.metadata?.paymentMethod || line.paymentMethod || 'transfer',
+          paymentMethod: line.metadata?.paymentMethod || line.paymentMethod || data?.student?.paymentMethod || 'transfer',
         };
       });
 
