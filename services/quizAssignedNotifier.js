@@ -68,7 +68,7 @@ function scheduleQuizAssignedNotify({ quiz, notifyUser, io }) {
               content: `Giảng viên ${payload.teacherName} đã tạo bài trắc nghiệm: ${payload.title} (${payload.timeLimitMinutes} phút).`,
               receivers: ids,
               payload: { quizId: payload.quizId },
-              link: '/student#materials',
+              link: '/student/exam',
             });
           } catch (err) {
             logger.warn({ err: err.message }, '[QUIZ] Failed to create persistent notification for quiz');
