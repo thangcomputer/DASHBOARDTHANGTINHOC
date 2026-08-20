@@ -90,6 +90,21 @@ const systemSettingsSchema = new mongoose.Schema({
   adminMfaSecret:  { type: String, default: '', select: false },
   /** Secret tạm khi setup MFA (chưa enable) */
   adminMfaPendingSecret: { type: String, default: '', select: false },
+
+  // ── Khung Banner Quảng Cáo Học viên & Giảng viên (Carousel) ─────────────────────────────
+  studentBanners: [{
+    imageUrl: { type: String, default: '' },
+    linkUrl:  { type: String, default: '' },
+    order:    { type: Number, default: 0 }
+  }],
+  studentBannerSpeed: { type: Number, default: 5 }, // giây
+
+  teacherBanners: [{
+    imageUrl: { type: String, default: '' },
+    linkUrl:  { type: String, default: '' },
+    order:    { type: Number, default: 0 }
+  }],
+  teacherBannerSpeed: { type: Number, default: 5 }, // giây
 }, { timestamps: true });
 
 module.exports = mongoose.model('SystemSettings', systemSettingsSchema);

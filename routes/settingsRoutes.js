@@ -156,6 +156,28 @@ router.post('/upload-popup-image', authMiddleware, ...settingsGuard('system_writ
   }
 });
 
+// ── POST /api/settings/upload-student-banner ── Upload banner học viên ─────────────
+router.post('/upload-student-banner', authMiddleware, ...settingsGuard('system_write'), upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
+    const imageUrl = `/uploads/popup/${req.file.filename}`; // reusing popup directory for public access
+    return res.json({ success: true, imageUrl, message: 'Upload thành công' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── POST /api/settings/upload-teacher-banner ── Upload banner giảng viên ─────────────
+router.post('/upload-teacher-banner', authMiddleware, ...settingsGuard('system_write'), upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Không có file ảnh' });
+    const imageUrl = `/uploads/popup/${req.file.filename}`;
+    return res.json({ success: true, imageUrl, message: 'Upload thành công' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── POST /api/settings/upload-invoice-signature ── Upload chữ ký hóa đơn ─────────
 const sigDir = path.join(__dirname, '..', 'uploads', 'signature');
 if (!fs.existsSync(sigDir)) fs.mkdirSync(sigDir, { recursive: true });
@@ -248,6 +270,10 @@ router.get('/web', ...settingsGuard('public_read'), async (req, res) => {
         invoiceLogoUrl:      settings.invoiceLogoUrl      || '',
         invoiceSignatureUrl: settings.invoiceSignatureUrl || '',
         invoiceStampText:    settings.invoiceStampText    || 'ĐÃ THANH TOÁN',
+        studentBanners:      settings.studentBanners      || [],
+        studentBannerSpeed:  settings.studentBannerSpeed  || 5,
+        teacherBanners:      settings.teacherBanners      || [],
+        teacherBannerSpeed:  settings.teacherBannerSpeed  || 5,
       },
     });
   } catch (err) {
@@ -271,6 +297,20 @@ router.put('/web', authMiddleware, ...settingsGuard('system_write'), async (req,
       updates['staffPopup.title']     = staffPopup.title    ?? '';
       updates['staffPopup.content']   = staffPopup.content  ?? '';
       updates['staffPopup.updatedAt'] = new Date();
+    }
+
+    if (req.body.studentBanners !== undefined) {
+      updates.studentBanners = req.body.studentBanners;
+    }
+    if (req.body.studentBannerSpeed !== undefined) {
+      updates.studentBannerSpeed = Math.max(1, Number(req.body.studentBannerSpeed) || 5);
+    }
+    
+    if (req.body.teacherBanners !== undefined) {
+      updates.teacherBanners = req.body.teacherBanners;
+    }
+    if (req.body.teacherBannerSpeed !== undefined) {
+      updates.teacherBannerSpeed = Math.max(1, Number(req.body.teacherBannerSpeed) || 5);
     }
 
     const settings = await updateMainSettings({ $set: updates });

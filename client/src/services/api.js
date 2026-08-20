@@ -1444,6 +1444,16 @@ export const settingsAPI = {
     fd.append('image', file);
     return uploadWithAuth('/settings/upload-popup-image', fd);
   },
+  uploadStudentBanner: async (file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return uploadWithAuth('/settings/upload-student-banner', fd);
+  },
+  uploadTeacherBanner: async (file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return uploadWithAuth('/settings/upload-teacher-banner', fd);
+  },
   uploadInvoiceSignature: async (file) => {
     const fd = new FormData();
     fd.append('image', file);

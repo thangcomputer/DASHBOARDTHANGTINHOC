@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { CourseSwitcher, StatCard } from './StudentShared';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
-import api, { downloadMediaFile } from '../../services/api';
+import api, { downloadMediaFile, resolveMediaUrl } from '../../services/api';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 
 export default function StudentOverviewTab({
@@ -30,6 +30,8 @@ export default function StudentOverviewTab({
   const pendingHw = myAssignments ? myAssignments.filter((a) => !a.mySubmission).length : 0;
   const docs = (studentTrainingForLms?.files || []).slice(0, 3);
   const [pendingQuizCount, setPendingQuizCount] = useState(0);
+  const [banners, setBanners] = useState([]);
+  const [bannerSpeed, setBannerSpeed] = useState(5);
   /** Tick so banner flips to "Đang học" when the session window opens */
   const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -70,8 +72,28 @@ export default function StudentOverviewTab({
         if (!cancelled) setPendingQuizCount(0);
       }
     })();
+
+    // Fetch Banners
+    api.settings.getWeb()
+      .then((res) => {
+        if (res?.success && !cancelled) {
+          setBanners(res.data.studentBanners || []);
+          setBannerSpeed(res.data.studentBannerSpeed || 5);
+        }
+      })
+      .catch(() => {});
+
     return () => { cancelled = true; };
   }, []);
+
+  const [bannerIdx, setBannerIdx] = useState(0);
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const t = setInterval(() => {
+      setBannerIdx((prev) => (prev + 1) % banners.length);
+    }, bannerSpeed * 1000);
+    return () => clearInterval(t);
+  }, [banners, bannerSpeed]);
 
   const todoItems = [
     {
@@ -135,16 +157,39 @@ export default function StudentOverviewTab({
 
   return (
     <div className="cms-sd cms-sd-stack min-w-0">
-      <header className="cms-sd-page !py-0 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
+      <header className="cms-sd-page !py-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 sm:w-1/3 shrink-0">
           <h2 className="cms-sd-h1 truncate">Chào mừng, {studentData.name}! 👋</h2>
-          <p className="cms-sd-caption italic mt-1.5">
+          <p className="cms-sd-caption italic mt-1.5 mb-1 text-gray-500">
             &quot;Học hôm nay, thành công mai sau.&quot;
           </p>
+          <p className="cms-sd-caption font-bold text-red-600 uppercase tracking-wide">
+            Trung tâm Thắng Tin Học
+          </p>
         </div>
-        <p className="cms-sd-caption font-bold text-red-600 uppercase tracking-wide shrink-0">
-          Trung tâm Thắng Tin Học
-        </p>
+        
+        {banners.length > 0 && (
+          <div 
+            className="relative w-full sm:w-2/3 max-w-[800px] aspect-[5/1] bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group"
+            onClick={() => banners[bannerIdx]?.linkUrl && window.open(banners[bannerIdx].linkUrl, '_blank')}
+          >
+            {banners.map((b, i) => (
+              <img 
+                key={i}
+                src={resolveMediaUrl(b.imageUrl)} 
+                alt="Banner" 
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${i === bannerIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+              />
+            ))}
+            {banners.length > 1 && (
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10">
+                {banners.map((_, i) => (
+                  <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === bannerIdx ? 'bg-white shadow-sm' : 'bg-white/40'}`} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       <div className="cms-sd-page !pt-0 cms-sd-stack">

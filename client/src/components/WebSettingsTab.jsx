@@ -125,6 +125,10 @@ export default function WebSettingsTab() {
     faviconUrl: '',
     faviconAdminUrl: '',
     loadingStyle: 1,
+    studentBanners: [],
+    studentBannerSpeed: 5,
+    teacherBanners: [],
+    teacherBannerSpeed: 5,
   });
 
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -140,6 +144,10 @@ export default function WebSettingsTab() {
             faviconUrl: res.data.faviconUrl || '',
             faviconAdminUrl: res.data.faviconAdminUrl || '',
             loadingStyle: res.data.loadingStyle || 1,
+            studentBanners: res.data.studentBanners || [],
+            studentBannerSpeed: res.data.studentBannerSpeed || 5,
+            teacherBanners: res.data.teacherBanners || [],
+            teacherBannerSpeed: res.data.teacherBannerSpeed || 5,
           }));
         }
       })
@@ -160,6 +168,48 @@ export default function WebSettingsTab() {
       }
     } catch {
       toast.error('Lỗi upload logo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleBannerUpload = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await api.settings.uploadStudentBanner(file);
+      if (res.success) {
+        setConfig((prev) => ({
+          ...prev,
+          studentBanners: [...(prev.studentBanners || []), { imageUrl: res.imageUrl, linkUrl: '', order: (prev.studentBanners || []).length }],
+        }));
+        toast.success('Upload banner thành công');
+      } else {
+        toast.error(res.message || 'Upload banner thất bại');
+      }
+    } catch {
+      toast.error('Lỗi upload banner');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleTeacherBannerUpload = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await api.settings.uploadTeacherBanner(file);
+      if (res.success) {
+        setConfig((prev) => ({
+          ...prev,
+          teacherBanners: [...(prev.teacherBanners || []), { imageUrl: res.imageUrl, linkUrl: '', order: (prev.teacherBanners || []).length }],
+        }));
+        toast.success('Upload banner thành công');
+      } else {
+        toast.error(res.message || 'Upload banner thất bại');
+      }
+    } catch {
+      toast.error('Lỗi upload banner');
     } finally {
       setUploading(false);
     }
@@ -201,6 +251,10 @@ export default function WebSettingsTab() {
             faviconUrl: res.data.faviconUrl ?? prev.faviconUrl,
             faviconAdminUrl: res.data.faviconAdminUrl ?? prev.faviconAdminUrl,
             loadingStyle: res.data.loadingStyle ?? prev.loadingStyle,
+            studentBanners: res.data.studentBanners ?? prev.studentBanners,
+            studentBannerSpeed: res.data.studentBannerSpeed ?? prev.studentBannerSpeed,
+            teacherBanners: res.data.teacherBanners ?? prev.teacherBanners,
+            teacherBannerSpeed: res.data.teacherBannerSpeed ?? prev.teacherBannerSpeed,
           }));
         }
         window.dispatchEvent(new Event('web-settings-changed'));
@@ -261,10 +315,10 @@ export default function WebSettingsTab() {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-              <Image size={14} className="text-blue-600" /> Nhận diện thương hiệu
+              <Image size={14} className="text-blue-600" /> Logo Web
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5">
-              Logo (sidebar / login) · Favicon tab trình duyệt
+              Logo (sidebar / login) • Khuyến nghị: 400x100px (Tỷ lệ 4:1)
             </p>
           </div>
           <button
@@ -330,8 +384,7 @@ export default function WebSettingsTab() {
         {/* Favicons */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
           <div className="flex items-center gap-1.5 text-[10px] text-slate-400 md:col-span-2">
-            <Shield size={11} className="text-rose-500" />
-            Favicon · PNG / SVG / ICO / WEBP · tối đa 2MB
+            Favicon • Khuyến nghị: 192x192px (Tỷ lệ 1:1) • Định dạng PNG / SVG / ICO / WEBP • Tối đa 2MB
           </div>
           <FaviconRow
             label="Chung (HV / GV / Public)"
@@ -355,6 +408,158 @@ export default function WebSettingsTab() {
             onUpload={(file) => handleFaviconUpload(file, 'admin')}
             fallbackSrc="/favicon-admin.svg"
           />
+        </div>
+      </div>
+
+      {/* Cấu hình Banner Học viên */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+              <Image size={14} className="text-red-600" /> Banner Quảng cáo Học viên
+            </h3>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Banner dạng trượt hiển thị góc phải trên Dashboard học viên. Khuyến nghị thiết kế để tối ưu chiều cao: 1000x200px hoặc 1200x240px (Tỷ lệ 5:1).
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] font-bold text-gray-600">
+              Tốc độ lướt (giây):
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="60"
+              className="w-16 h-8 text-xs border border-gray-200 rounded-lg px-2"
+              value={config.studentBannerSpeed || 5}
+              onChange={(e) => setConfig((prev) => ({ ...prev, studentBannerSpeed: parseInt(e.target.value) || 5 }))}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(config.studentBanners || []).map((banner, index) => (
+            <div key={index} className="relative rounded-xl border border-gray-200 bg-gray-50 p-2 group">
+              <button
+                type="button"
+                className="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow hover:bg-red-600 hover:text-white z-10"
+                onClick={() => setConfig((prev) => ({
+                  ...prev,
+                  studentBanners: prev.studentBanners.filter((_, i) => i !== index),
+                }))}
+              >
+                <X size={12} />
+              </button>
+              <div className="w-full h-20 bg-white rounded-lg border border-gray-200 mb-2 overflow-hidden flex items-center justify-center">
+                <img src={resolveMediaUrl(banner.imageUrl)} alt="Banner" className="w-full h-full object-cover" />
+              </div>
+              <input
+                type="text"
+                placeholder="Link khi click (tùy chọn)..."
+                className="w-full text-[10px] border border-gray-200 rounded p-1.5"
+                value={banner.linkUrl || ''}
+                onChange={(e) => {
+                  const newBanners = [...config.studentBanners];
+                  newBanners[index].linkUrl = e.target.value;
+                  setConfig((prev) => ({ ...prev, studentBanners: newBanners }));
+                }}
+              />
+            </div>
+          ))}
+
+          <label className="rounded-xl border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center gap-1.5 h-[116px] cursor-pointer hover:bg-gray-100 transition">
+            {uploading ? (
+              <Loader2 size={20} className="animate-spin text-gray-400" />
+            ) : (
+              <Upload size={20} className="text-gray-400" />
+            )}
+            <span className="text-[11px] font-bold text-gray-500">
+              {uploading ? 'Đang tải lên...' : 'Thêm banner'}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleBannerUpload(e.target.files?.[0])}
+              disabled={uploading}
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Cấu hình Banner Giảng viên */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+              <Image size={14} className="text-sky-600" /> Banner Quảng cáo Giảng viên
+            </h3>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Banner dạng trượt hiển thị góc phải trên Dashboard giảng viên. Khuyến nghị thiết kế để tối ưu chiều cao: 1000x200px hoặc 1200x240px (Tỷ lệ 5:1).
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] font-bold text-gray-600">
+              Tốc độ lướt (giây):
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="60"
+              className="w-16 h-8 text-xs border border-gray-200 rounded-lg px-2"
+              value={config.teacherBannerSpeed || 5}
+              onChange={(e) => setConfig((prev) => ({ ...prev, teacherBannerSpeed: parseInt(e.target.value) || 5 }))}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(config.teacherBanners || []).map((banner, index) => (
+            <div key={index} className="relative rounded-xl border border-gray-200 bg-gray-50 p-2 group">
+              <button
+                type="button"
+                className="absolute -top-2 -right-2 w-6 h-6 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow hover:bg-sky-600 hover:text-white z-10"
+                onClick={() => setConfig((prev) => ({
+                  ...prev,
+                  teacherBanners: prev.teacherBanners.filter((_, i) => i !== index),
+                }))}
+              >
+                <X size={12} />
+              </button>
+              <div className="w-full h-20 bg-white rounded-lg border border-gray-200 mb-2 overflow-hidden flex items-center justify-center">
+                <img src={resolveMediaUrl(banner.imageUrl)} alt="Banner" className="w-full h-full object-cover" />
+              </div>
+              <input
+                type="text"
+                placeholder="Link khi click (tùy chọn)..."
+                className="w-full text-[10px] border border-gray-200 rounded p-1.5"
+                value={banner.linkUrl || ''}
+                onChange={(e) => {
+                  const newBanners = [...config.teacherBanners];
+                  newBanners[index].linkUrl = e.target.value;
+                  setConfig((prev) => ({ ...prev, teacherBanners: newBanners }));
+                }}
+              />
+            </div>
+          ))}
+
+          <label className="rounded-xl border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center gap-1.5 h-[116px] cursor-pointer hover:bg-gray-100 transition">
+            {uploading ? (
+              <Loader2 size={20} className="animate-spin text-gray-400" />
+            ) : (
+              <Upload size={20} className="text-gray-400" />
+            )}
+            <span className="text-[11px] font-bold text-gray-500">
+              {uploading ? 'Đang tải lên...' : 'Thêm banner'}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleTeacherBannerUpload(e.target.files?.[0])}
+              disabled={uploading}
+            />
+          </label>
         </div>
       </div>
 

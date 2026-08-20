@@ -5,7 +5,7 @@ import {
   CheckCircle2, ArrowRight, History
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
-import { blogAPI } from '../../services/api';
+import api, { blogAPI, resolveMediaUrl } from '../../services/api';
 import TeacherRatingDisplay from './TeacherRatingDisplay';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 
@@ -28,6 +28,8 @@ export default function TeacherOverviewTab({
       tag: 'Hệ thống LMS',
     }
   ]);
+  const [banners, setBanners] = useState([]);
+  const [bannerSpeed, setBannerSpeed] = useState(5);
 
   useEffect(() => {
     let unmounted = false;
@@ -48,6 +50,29 @@ export default function TeacherOverviewTab({
     }
     return () => { unmounted = true; };
   }, []);
+
+  // Fetch Banners
+  useEffect(() => {
+    let unmounted = false;
+    api.settings.getWeb()
+      .then((res) => {
+        if (res?.success && !unmounted) {
+          setBanners(res.data.teacherBanners || []);
+          setBannerSpeed(res.data.teacherBannerSpeed || 5);
+        }
+      })
+      .catch(() => {});
+    return () => { unmounted = true; };
+  }, []);
+
+  const [bannerIdx, setBannerIdx] = useState(0);
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const t = setInterval(() => {
+      setBannerIdx((prev) => (prev + 1) % banners.length);
+    }, bannerSpeed * 1000);
+    return () => clearInterval(t);
+  }, [banners, bannerSpeed]);
 
   const initials = (teacherName || 'GV').substring(0, 2).toUpperCase();
   const avatarTone = currentTeacher?.color || 'bg-indigo-600';
@@ -119,6 +144,42 @@ export default function TeacherOverviewTab({
   return (
     <div className="py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0">
       
+      {/* ── HEADER & BANNER ── */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-2">
+        <div className="min-w-0 sm:w-1/3 shrink-0">
+          <h2 className="text-xl sm:text-2xl font-black text-slate-800 truncate">Chào mừng, {teacherName || 'Giảng viên'}! 👋</h2>
+          <p className="text-sm font-medium italic mt-1.5 mb-1 text-gray-500">
+            &quot;Nỗ lực hôm nay, thành công mai sau.&quot;
+          </p>
+          <p className="text-xs font-bold text-sky-600 uppercase tracking-wide">
+            Trung tâm Thắng Tin Học
+          </p>
+        </div>
+        
+        {banners.length > 0 && (
+          <div 
+            className="relative w-full sm:w-2/3 max-w-[800px] aspect-[5/1] bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group"
+            onClick={() => banners[bannerIdx]?.linkUrl && window.open(banners[bannerIdx].linkUrl, '_blank')}
+          >
+            {banners.map((b, i) => (
+              <img 
+                key={i}
+                src={resolveMediaUrl(b.imageUrl)} 
+                alt="Banner" 
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${i === bannerIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+              />
+            ))}
+            {banners.length > 1 && (
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10">
+                {banners.map((_, i) => (
+                  <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === bannerIdx ? 'bg-white shadow-sm' : 'bg-white/40'}`} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </header>
+
       {/* ── LIVE ONGOING SCHEDULE BANNER (Hiển thị nổi bật khi có lớp đang diễn ra) ── */}
       {ongoingSchedule && (
         <div className="bg-gradient-to-r from-red-600 via-rose-600 to-indigo-700 text-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-xl shadow-red-500/20 flex flex-col sm:flex-row items-center justify-between gap-4 border border-red-400/30 animate-pulse">

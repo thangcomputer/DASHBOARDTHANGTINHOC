@@ -604,7 +604,7 @@ export default function SystemSettingsTab() {
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-500 block mb-1">Ảnh banner (tuỳ chọn)</label>
+            <label className="text-[11px] font-semibold text-slate-500 block mb-1">Ảnh banner (Khuyến nghị: 600x400px hoặc 16:9)</label>
             <input
               ref={imgInputRef}
               type="file"
@@ -673,7 +673,7 @@ export default function SystemSettingsTab() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Logo hóa đơn</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Logo hóa đơn (300x100px)</label>
               <div className="flex items-center gap-2">
                 {settings.invoiceLogoUrl ? (
                   <img
@@ -703,7 +703,7 @@ export default function SystemSettingsTab() {
             </div>
 
             <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Chữ ký người nhận</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Chữ ký người nhận (250x150px)</label>
               <div className="flex items-center gap-2">
                 {settings.invoiceSignatureUrl ? (
                   <img
