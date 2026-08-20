@@ -33,6 +33,7 @@ export function useDataAdminCrud({
       totalSessions: Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12,
       remainingSessions: Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12,
       paid:          !!student.paid,
+      paymentMethod: student.paymentMethod,
       notes:         student.notes || '',
       linkHoc:       student.linkHoc || '',
       teacherId:     student.teacherId || null,

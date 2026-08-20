@@ -136,9 +136,11 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         price: student.price,
         totalSessions: Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12,
         paid: student.paid,
+        paymentMethod: student.paymentMethod,
         learningMode: student.learningMode,
         teacherId: student.teacherId,
         branchId: student.branchId,
+        reservedStudentCode: student.reservedStudentCode,
       });
       toast.success('Đã thêm học viên thành công!');
 
