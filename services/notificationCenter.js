@@ -45,6 +45,12 @@ function buildReceiverMatch(user) {
   if (isSuperAdmin) {
     match.push(broadCond('ALL_ADMIN'));
     match.push(broadCond('ALL_SUPER_ADMIN'));
+  } else if (adminRole === 'HIGH_ADMIN') {
+    match.push(broadCond('ALL_ADMIN'));
+    if (branchId) {
+      match.push(broadCond('ALL_ADMIN_' + branchId));
+      match.push(broadCond('ALL_STAFF_' + branchId));
+    }
   } else if (isAdminSide) {
     if (branchId) {
       match.push(broadCond('ALL_ADMIN_' + branchId));

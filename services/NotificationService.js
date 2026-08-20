@@ -100,6 +100,7 @@ class NotificationService {
     const receivers = ['ALL_SUPER_ADMIN'];
     if (branchId) {
       receivers.push(`ALL_ADMIN_${branchId}`);
+      receivers.push('ALL_ADMIN');
     } else {
       receivers.push('ALL_ADMIN');
     }
