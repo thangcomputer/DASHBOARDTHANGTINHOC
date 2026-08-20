@@ -2840,9 +2840,8 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
     try {
       if (io && !isUnassign) {
         const NotificationService = require('../services/NotificationService');
-        const { maskStudentName } = require('../utils/maskName');
         const isNewAssign = !isReassign;
-        const hvLabel = maskStudentName(student.name);
+        const hvLabel = `⟦student_detail:${student._id}:profile|${student.name}⟧`;
         await NotificationService.send(io, {
           type: 'COURSE',
           title: isNewAssign ? '📚 Học viên mới được giao' : '👨‍🏫 Đổi giảng viên phụ trách',
