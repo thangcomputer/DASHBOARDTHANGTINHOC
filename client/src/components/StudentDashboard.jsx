@@ -765,7 +765,7 @@ const StudentDashboard = ({ onNavigate }) => {
             upcomingScheduleCount={upcomingScheduleCount}
             myUnreadMsgs={myUnreadMsgs}
             studyLogs={studyLogs}
-            materials={materials}
+            studentTrainingForLms={studentTrainingForLms}
           />
         )}
                   </div>

@@ -24,11 +24,11 @@ export default function StudentOverviewTab({
   upcomingScheduleCount,
   myUnreadMsgs,
   studyLogs,
-  materials,
+  studentTrainingForLms,
 }) {
   const navigate = useNavigate();
   const pendingHw = myAssignments ? myAssignments.filter((a) => !a.mySubmission).length : 0;
-  const docs = materials.filter((m) => m.category === 'document').slice(0, 3);
+  const docs = (studentTrainingForLms?.files || []).slice(0, 3);
   const [pendingQuizCount, setPendingQuizCount] = useState(0);
   /** Tick so banner flips to "Đang học" when the session window opens */
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -286,17 +286,19 @@ export default function StudentOverviewTab({
                   docs.map((m) => (
                     <div
                       key={m.id}
+                      onClick={() => m.fileUrl && window.open(m.fileUrl, '_blank')}
                       className="flex justify-between items-center bg-slate-600/45 p-3 rounded-[12px] hover:bg-slate-600 transition-colors duration-200 cursor-pointer min-h-[44px]"
+                      title={m.title}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className={`text-xs font-extrabold px-1.5 py-0.5 rounded shrink-0 ${
-                            m.type === 'PDF' ? 'bg-red-500' : m.type === 'XLSX' ? 'bg-green-500' : 'bg-orange-500'
+                            m.fileType === 'PDF' ? 'bg-red-500' : (m.fileType === 'XLSX' || m.fileType === 'XLS') ? 'bg-green-500' : 'bg-orange-500'
                           }`}
                         >
-                          {m.type}
+                          {m.fileType || 'DOC'}
                         </span>
-                        <span className="text-sm font-semibold text-white truncate">{m.name}</span>
+                        <span className="text-sm font-semibold text-white truncate">{m.title}</span>
                       </div>
                       <Download size={16} className="text-sky-300 shrink-0 ml-2" aria-hidden="true" />
                     </div>
