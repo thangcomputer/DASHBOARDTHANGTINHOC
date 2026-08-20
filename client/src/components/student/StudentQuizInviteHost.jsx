@@ -146,7 +146,7 @@ export default function StudentQuizInviteHost() {
     sessionStorage.setItem(PENDING_QUIZ_START_KEY, invite.quizId);
     setInvite(null);
     setQueue([]);
-    navigate('/student#materials');
+    navigate('/student/exam');
   };
 
   if (!invite) return null;
