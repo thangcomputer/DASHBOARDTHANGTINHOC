@@ -1047,6 +1047,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
           synthetic: false,
           ledgerType: line.type,
           enrollmentId: line.enrollmentId ? String(line.enrollmentId) : '',
+          paymentMethod: line.metadata?.paymentMethod || line.paymentMethod || 'transfer',
         };
       });
 
@@ -1812,6 +1813,9 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                             <p className="text-[11px] text-slate-500 break-words">
                               {inv.khoaHoc}{inv.ghiChu ? ` — ${inv.ghiChu}` : ''}
                             </p>
+                            <p className="text-[11px] text-slate-500 font-medium">
+                              {inv.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
+                            </p>
                             <div className="flex items-center justify-between gap-2">
                               <span className={`text-sm font-black tabular-nums ${inv.isRefund || inv.hocPhi < 0 ? 'text-red-600' : 'text-slate-800'}`}>
                                 {fmt(inv.hocPhi)}
@@ -1828,6 +1832,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                               <th className="px-4 sm:px-6 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Mã HĐ</th>
                               <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Ngày</th>
                               <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Nội dung</th>
+                              <th className="px-3 sm:px-4 py-3 text-[11px] font-black text-slate-400 tracking-widest uppercase">Hình thức</th>
                               <th className="px-3 sm:px-4 py-3 text-right text-[11px] font-black text-slate-400 tracking-widest uppercase">Số tiền</th>
                               <th className="px-3 sm:px-4 py-3 text-center text-[11px] font-black text-slate-400 tracking-widest uppercase">Hoàn thành</th>
                             </tr>
@@ -1843,6 +1848,9 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                 <td className="px-3 sm:px-4 py-3.5 text-xs font-semibold text-slate-600 whitespace-nowrap">{fmtDate(inv.createdAt)}</td>
                                 <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-500 max-w-[180px] break-words">
                                   {inv.khoaHoc}{inv.ghiChu ? ` — ${inv.ghiChu}` : ''}
+                                </td>
+                                <td className="px-3 sm:px-4 py-3.5 text-xs text-slate-500 whitespace-nowrap font-medium">
+                                  {inv.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
                                 </td>
                                 <td className={`px-3 sm:px-4 py-3.5 text-right font-black text-sm whitespace-nowrap ${inv.isRefund || inv.hocPhi < 0 ? 'text-red-600' : 'text-slate-800'}`}>
                                   {fmt(inv.hocPhi)}
