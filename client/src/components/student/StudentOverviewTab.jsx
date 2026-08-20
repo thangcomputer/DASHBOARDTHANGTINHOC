@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { CourseSwitcher, StatCard } from './StudentShared';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
-import api from '../../services/api';
+import api, { downloadMediaFile } from '../../services/api';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
 
 export default function StudentOverviewTab({
@@ -286,7 +286,7 @@ export default function StudentOverviewTab({
                   docs.map((m) => (
                     <div
                       key={m.id}
-                      onClick={() => m.fileUrl && window.open(m.fileUrl, '_blank')}
+                      onClick={() => m.fileUrl && downloadMediaFile(m.fileUrl, m.title)}
                       className="flex justify-between items-center bg-slate-600/45 p-3 rounded-[12px] hover:bg-slate-600 transition-colors duration-200 cursor-pointer min-h-[44px]"
                       title={m.title}
                     >
@@ -307,7 +307,10 @@ export default function StudentOverviewTab({
               </div>
               <button
                 type="button"
-                onClick={() => navigate('/student#materials')}
+                onClick={() => {
+                  try { sessionStorage.setItem('student_lms_main_tab', 'files'); } catch { /* ignore */ }
+                  navigate('/student#materials');
+                }}
                 className="cms-sd-btn w-full mt-3 bg-slate-600/50 text-sky-200 hover:bg-slate-600 hover:text-white"
               >
                 Xem tất cả <ChevronRight size={16} aria-hidden="true" />
