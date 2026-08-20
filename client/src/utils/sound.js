@@ -69,9 +69,23 @@ export const playNotifySound = () => {
   setTimeout(() => playTone(1174.66, 'triangle', 0.2, 0.2), 150);
 };
 
+/**
+ * FIX Bug 1 & 2: Dùng lại audioCtx module-level (tránh rò rỉ), kiểm tra muted.
+ * KHÔNG tạo AudioContext mới mỗi lần gọi nữa.
+ */
 const playExamWarningBeep = () => {
+  if (muted) return;
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Đảm bảo có audioCtx — tạo nếu chưa có (ưu tiên dùng lại)
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioUnlocked = true;
+    }
+    if (audioCtx.state === 'suspended') {
+      void audioCtx.resume();
+    }
+
+    const ctx = audioCtx; // alias để code ngắn gọn
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'square';
@@ -97,40 +111,52 @@ const playExamWarningBeep = () => {
       } catch { /* ignore */ }
     }, 120);
   } catch {
-    playTone(880, 'square', 0.14, 0.35);
+    /* noop — context hoàn toàn không khả dụng, im lặng */
   }
 };
 
 let currentWarningAudio = null;
 
-/** Cảnh báo phòng thi: file Admin tải lên; không có thì beep. */
+/**
+ * FIX Bug 3: await resume() trước khi phát để xử lý AudioContext.state === 'suspended'.
+ * Cảnh báo phòng thi: file Admin tải lên; không có thì beep.
+ */
 export const playExamWarningSound = (customUrl = '') => {
   unlockAudio();
   if (muted) return;
-  
-  if (currentWarningAudio) {
-    try {
-      currentWarningAudio.pause();
-      currentWarningAudio.currentTime = 0;
-    } catch { /* ignore */ }
-  }
 
-  const url = String(customUrl || '').trim();
-  if (url) {
-    try {
-      currentWarningAudio = new Audio(url);
-      currentWarningAudio.volume = 0.7;
-      void currentWarningAudio.play().catch(() => {
-        currentWarningAudio = null;
-        playExamWarningBeep();
-      });
-      return;
-    } catch {
-      currentWarningAudio = null;
-      /* fall through to beep */
+  const doPlay = () => {
+    if (currentWarningAudio) {
+      try {
+        currentWarningAudio.pause();
+        currentWarningAudio.currentTime = 0;
+      } catch { /* ignore */ }
     }
+
+    const url = String(customUrl || '').trim();
+    if (url) {
+      try {
+        currentWarningAudio = new Audio(url);
+        currentWarningAudio.volume = 0.7;
+        void currentWarningAudio.play().catch(() => {
+          currentWarningAudio = null;
+          playExamWarningBeep();
+        });
+        return;
+      } catch {
+        currentWarningAudio = null;
+        /* fall through to beep */
+      }
+    }
+    playExamWarningBeep();
+  };
+
+  // FIX Bug 3: đảm bảo AudioContext resumed trước khi phát
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().then(doPlay).catch(doPlay);
+  } else {
+    doPlay();
   }
-  playExamWarningBeep();
 };
 
 export const stopExamWarningSound = () => {

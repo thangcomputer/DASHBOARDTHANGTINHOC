@@ -4,6 +4,14 @@ import { AlertTriangle } from 'lucide-react';
 import { playExamWarningSound, stopExamWarningSound, unlockAudio } from '../../utils/sound';
 import { resolveMediaUrl } from '../../services/api';
 
+/** Kiểm tra xem người dùng đã tương tác (gesture) với trang chưa (để tránh trigger âm thanh trước khi unlock) */
+const hasUserGesture = () => {
+  try { return sessionStorage.getItem('thvp_gesture') === '1'; } catch { return false; }
+};
+const markUserGesture = () => {
+  try { sessionStorage.setItem('thvp_gesture', '1'); } catch { /* ignore */ }
+};
+
 const IGNORE_SELECTOR = [
   '[data-exam-surface]',
   '[data-exam-warning-overlay]',
@@ -34,8 +42,11 @@ export default function ExamClickOutsideGuard({
     if (!enabled) setOpen(false);
   }, [enabled]);
 
-  const trigger = useCallback(() => {
+  const trigger = useCallback((source = 'click') => {
     if (!enabled || openRef.current) return;
+    // FIX Bug 4: blur/visibility chỉ trigger sau khi người dùng đã có gesture
+    // tránh false-positive + âm thanh không có khi chưa unlock audio
+    if (source !== 'click' && !hasUserGesture()) return;
     const now = Date.now();
     if (now - cooldownRef.current < 400) return;
     cooldownRef.current = now;
@@ -51,8 +62,10 @@ export default function ExamClickOutsideGuard({
       if (openRef.current) return;
       const t = e.target;
       if (!(t instanceof Element)) return;
+      // Ghi nhận gesture khi người dùng click trong vùng thi (exam-surface)
+      if (t.closest('[data-exam-surface]')) markUserGesture();
       if (t.closest(IGNORE_SELECTOR)) return;
-      trigger();
+      trigger('click');
     };
 
     const onBlur = () => {
@@ -61,13 +74,13 @@ export default function ExamClickOutsideGuard({
         if (!enabled || openRef.current) return;
         if (document.visibilityState === 'hidden') return; // tab/visibility xử lý riêng
         if (document.hasFocus()) return;
-        trigger();
+        trigger('blur');
       }, 120);
     };
 
     const onVisibility = () => {
       if (!watchVisibility || !document.hidden) return;
-      trigger();
+      trigger('visibility');
     };
 
     document.addEventListener('pointerdown', onPointerDown, true);
@@ -82,6 +95,7 @@ export default function ExamClickOutsideGuard({
 
   const dismiss = () => {
     unlockAudio();
+    markUserGesture(); // Bấm dismiss cũng là gesture → unlock cho lần sau
     stopExamWarningSound();
     setOpen(false);
     cooldownRef.current = Date.now();
