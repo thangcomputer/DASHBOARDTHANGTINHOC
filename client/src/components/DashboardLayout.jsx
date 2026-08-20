@@ -714,28 +714,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               || String(n.type || '').toUpperCase() === 'EVALUATION')
                           ) {
                             navigate('/admin#evaluations');
-                          } else if ((role === 'admin' || role === 'staff') && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
-                            const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                          } else if ((role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF') && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
+                            let st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                            if (!st && n.payload?.studentId) {
+                              st = {
+                                _id: n.payload.studentId,
+                                id: n.payload.studentId,
+                                name: n.payload.studentName || n.payload.name || 'Học viên',
+                                course: n.payload.course || 'Không rõ',
+                                phone: n.payload.phone || 'Không rõ',
+                                branchCode: n.payload.branchCode || 'Hệ thống',
+                              };
+                            }
                             if (st) {
                               setAdminQuickPopup({
                                 type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
                                 notif: n,
                                 student: st,
                               });
-                            } else if (n.payload?.studentId) {
-                              // Không tìm thấy trong cache → dispatch open-student-detail
-                              setShowNotif(false);
-                              const dispatchOpen = () => {
-                                window.dispatchEvent(new CustomEvent('open-student-detail', {
-                                  detail: { id: String(n.payload.studentId), tab: n.title?.includes('Điểm danh') ? 'attendance' : 'summary' }
-                                }));
-                              };
-                              if (!window.location.pathname.startsWith('/admin')) {
-                                navigate('/admin');
-                                setTimeout(dispatchOpen, 400);
-                              } else {
-                                dispatchOpen();
-                              }
                             } else if (n.path) {
                               navigate(n.path);
                             }
