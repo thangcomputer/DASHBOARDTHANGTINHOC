@@ -12,17 +12,17 @@ class EnrollmentApplicationService {
   try {
     const { courseName, courseId, teacherId, price, totalSessions, paid, paymentMethod } = data.body;
     if (!courseName?.trim() && !courseId) {
-      return { _status: 400, _body: ({ success: false, message: 'Tên khóa học hoặc courseId là bắt buộc' });
+      return { _status: 400, _body: { success: false, message: 'Tên khóa học hoặc courseId là bắt buộc' } };
     }
 
     const isPaidFlag = paid === true || paid === 'true' || paid === 1 || paid === '1';
     if (isPaidFlag) {
       const canFinance = await userHasPermission(data.currentUser, PERMISSIONS.MANAGE_FINANCE);
       if (!canFinance) {
-        return { _status: 403, _body: ({
+        return { _status: 403, _body: {
           success: false,
           message: '403 Forbidden: Đánh dấu đã thanh toán khi thêm khóa cần quyền tài chính.',
-        });
+        } };
       }
     }
 
@@ -33,12 +33,12 @@ class EnrollmentApplicationService {
     }
     const resolvedName = (catalogCourse?.name || courseName || '').trim();
     if (!resolvedName) {
-      return { _status: 400, _body: ({ success: false, message: 'Không xác định được tên khóa học' });
+      return { _status: 400, _body: { success: false, message: 'Không xác định được tên khóa học' } };
     }
 
     const student = await studentRepository.findById(data.id).populate('teacherId', 'name phone');
     if (!student) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy học viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
 
     if (!student.enrollments?.length && student.course) {
@@ -52,7 +52,7 @@ class EnrollmentApplicationService {
       return (e.courseName || '').toLowerCase() === resolvedName.toLowerCase();
     });
     if (duplicate) {
-      return { _status: 409, _body: ({ success: false, message: 'Học viên đã đăng ký khóa học này' });
+      return { _status: 409, _body: { success: false, message: 'Học viên đã đăng ký khóa học này' } };
     }
 
     let teacherName = '';
@@ -140,11 +140,11 @@ class EnrollmentApplicationService {
         if (invoice?._id) {
           try { await Invoice.findByIdAndUpdate(invoice._id, { status: 'void' }); } catch { /* ignore */ }
         }
-        return { _status: 500, _body: ({
+        return { _status: 500, _body: {
           success: false,
           message: 'Đã thêm khóa nhưng ghi sổ cái thất bại — trạng thái thu đã rollback.',
           data: student.toObject(),
-        });
+        } };
       }
     }
 
@@ -154,13 +154,13 @@ class EnrollmentApplicationService {
     const io = data.app.get('io');
     if (io) io.emit('data:refresh', { type: 'student', id: student._id });
 
-    return { _status: 201, _body: ({
+    return { _status: 201, _body: {
       success: true,
       message: `Đã thêm khóa "${resolvedName}" cho học viên`,
       data: doc,
-    });
+    } };
   } catch (error) {
-    return { _status: 500, _body: ({ success: false, message: error.message });
+    return { _status: 500, _body: { success: false, message: error.message } };
   }
 }
 
@@ -168,7 +168,7 @@ class EnrollmentApplicationService {
   try {
     const student = await studentRepository.findById(data.id);
     if (!student) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy học viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
     if (!student.enrollments?.length && student.course) {
       student.enrollments = [legacyEnrollmentFromStudent(student)];
@@ -176,7 +176,7 @@ class EnrollmentApplicationService {
     }
     const idx = (student.enrollments || []).findIndex((e) => String(e._id) === String(data.enrollmentId));
     if (idx < 0) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy khóa học' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy khóa học' } };
     }
 
     const { requireWebcam, examUnlocked } = data.body || {};
@@ -202,13 +202,13 @@ class EnrollmentApplicationService {
     const io = data.app.get('io');
     if (io) io.emit('data:refresh', { type: 'student', id: student._id });
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       message: 'Đã cập nhật quyền khóa học',
       data: doc,
-    });
+    } };
   } catch (error) {
-    return { _status: 500, _body: ({ success: false, message: error.message });
+    return { _status: 500, _body: { success: false, message: error.message } };
   }
 }
 
@@ -217,7 +217,7 @@ class EnrollmentApplicationService {
     const { paymentMethod = 'cash', note = '' } = data.body || {};
     const student = await studentRepository.findById(data.id);
     if (!student) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy học viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
     if (!student.enrollments?.length && student.course) {
       student.enrollments = [legacyEnrollmentFromStudent(student)];
@@ -225,11 +225,11 @@ class EnrollmentApplicationService {
     }
     const idx = (student.enrollments || []).findIndex((e) => String(e._id) === String(data.enrollmentId));
     if (idx < 0) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy khóa học' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy khóa học' } };
     }
     const enr = student.enrollments[idx];
     if (enr.paid) {
-      return { _status: 409, _body: ({ success: false, message: 'Khóa học này đã thanh toán' });
+      return { _status: 409, _body: { success: false, message: 'Khóa học này đã thanh toán' } };
     }
     const amount = Number(enr.price) || 0;
     const paidAt = new Date();
@@ -256,7 +256,7 @@ class EnrollmentApplicationService {
       { returnDocument: 'after' }
     );
     if (!claimed) {
-      return { _status: 409, _body: ({ success: false, message: 'Khóa học này đã thanh toán' });
+      return { _status: 409, _body: { success: false, message: 'Khóa học này đã thanh toán' } };
     }
 
     // Refresh + sync root paid cache
@@ -312,10 +312,10 @@ class EnrollmentApplicationService {
         if (invoice?._id) {
           try { await Invoice.findByIdAndUpdate(invoice._id, { status: 'void' }); } catch { /* ignore */ }
         }
-        return { _status: 500, _body: ({
+        return { _status: 500, _body: {
           success: false,
           message: 'Ghi sổ cái thất bại — đã rollback trạng thái thu khóa.',
-        });
+        } };
       }
     }
 
@@ -324,13 +324,13 @@ class EnrollmentApplicationService {
 
     const doc = fresh.toObject();
     await applyEnrollmentStats(doc, fresh._id, Schedule);
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       message: `Đã xác nhận thanh toán khóa "${claimedEnr.courseName}"${amount ? ` — ${amount.toLocaleString('vi-VN')}đ` : ''}`,
       data: { student: doc, invoice },
-    });
+    } };
   } catch (error) {
-    return { _status: 500, _body: ({ success: false, message: error.message });
+    return { _status: 500, _body: { success: false, message: error.message } };
   }
 }
 
@@ -338,7 +338,7 @@ class EnrollmentApplicationService {
   try {
     const student = await studentRepository.findById(data.id);
     if (!student) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy học viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
     if (!student.enrollments?.length && student.course) {
       const { legacyEnrollmentFromStudent } = require('../../enrollment/services/enrollmentService');
@@ -348,11 +348,11 @@ class EnrollmentApplicationService {
     const list = student.enrollments || [];
     const idx = list.findIndex((e) => String(e._id) === String(data.enrollmentId));
     if (idx < 0) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy khóa học' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy khóa học' } };
     }
     const enr = list[idx];
     if (enr.status === 'cancelled') {
-      return { _status: 400, _body: ({ success: false, message: 'Khóa học này đã bị hủy trước đó.' });
+      return { _status: 400, _body: { success: false, message: 'Khóa học này đã bị hủy trước đó.' } };
     }
 
     // Cho phép hủy cả khóa active cuối cùng — HV vẫn giữ hồ sơ (dòng danh sách mờ)
@@ -375,10 +375,10 @@ class EnrollmentApplicationService {
     if (refundAmt > 0) {
       const canFinance = await userHasPermission(data.currentUser, PERMISSIONS.MANAGE_FINANCE);
       if (!canFinance) {
-        return { _status: 403, _body: ({
+        return { _status: 403, _body: {
           success: false,
           message: '403 Forbidden: Hoàn tiền khi hủy khóa cần quyền quản lý tài chính.',
-        });
+        } };
       }
     }
 
@@ -460,14 +460,14 @@ class EnrollmentApplicationService {
 
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       message: `Đã hủy khóa "${courseName}".${refundMsg}`,
       data: doc,
       meta: { refundedAmount: refundAmt, cancelReason },
-    });
+    } };
   } catch (error) {
-    return { _status: 500, _body: ({ success: false, message: error.message });
+    return { _status: 500, _body: { success: false, message: error.message } };
   }
 }
 
