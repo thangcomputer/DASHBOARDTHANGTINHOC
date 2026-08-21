@@ -2005,7 +2005,7 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, policyShadowStudentM
 // Admin thêm khóa học mới cho học viên (cùng tài khoản, khác môn / thầy)
 router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStudentMutation('enrollment_create'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
-    const { courseName, courseId, teacherId, price, totalSessions, paid } = req.body;
+    const { courseName, courseId, teacherId, price, totalSessions, paid, paymentMethod } = req.body;
     if (!courseName?.trim() && !courseId) {
       return res.status(400).json({ success: false, message: 'Tên khóa học hoặc courseId là bắt buộc' });
     }

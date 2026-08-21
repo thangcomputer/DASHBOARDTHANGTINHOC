@@ -211,10 +211,11 @@ const StudentVideoPlayer = ({
 
   // Restore watched seconds: lấy max(session, server) — không để session thấp ghi đè SoT
   const bestInitial = useMemo(() => {
+    if (lessonCompleted) return 0; // If already completed, restart from 0 when revisiting
     const sessionWatched = Number(sessionStorage.getItem(`student_lms_watched_${lessonId}`) || 0);
     const serverWatched = Number(initialWatchedSeconds) || 0;
     return Math.max(sessionWatched, serverWatched);
-  }, [lessonId, initialWatchedSeconds]);
+  }, [lessonId, initialWatchedSeconds, lessonCompleted]);
 
   const playerRef = useRef(null);
   const containerRef = useRef(null);
@@ -300,7 +301,13 @@ const StudentVideoPlayer = ({
     });
     if (completion.completionEligible && displayWatched > 0) {
       eligibilitySentRef.current = true;
-      onEligibilityReached(displayWatched, totalDuration || effectiveDuration);
+      Promise.resolve(onEligibilityReached(displayWatched, totalDuration || effectiveDuration)).then(success => {
+        if (success === false) {
+          eligibilitySentRef.current = false; // Reset to allow retry
+        }
+      }).catch(() => {
+        eligibilitySentRef.current = false;
+      });
     }
   }, [isReady, displayWatched, effectiveDuration, totalDuration, onEligibilityReached]);
 
@@ -1159,26 +1166,34 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   }, [currentLesson, selectedCourse]);
 
   const handleEligibilityReached = useCallback(async (actualWatched, totalDur) => {
-    if (!currentLesson || !selectedCourse) return;
+    if (!currentLesson || !selectedCourse) return false;
     try {
       const res = await completeLessonOnServer(actualWatched, totalDur);
       if (res?.success === false && isCompletionRequirementCode(res?.code)) {
         toast.error(res.message || LESSON_COMPLETION_REQUIREMENT_MESSAGE);
-        return;
+        return false;
       }
       if (res?.success === false && res?.code === PREV_LESSON_REQUIRED_CODE) {
         toast.error(res.message || 'Hoàn thành bài trước để mở bài này.');
-        return;
+        return false;
       }
-      if (res?.success === false) return;
+      if (res?.success === false) {
+        toast.error('Lỗi khi mở bài: ' + (res?.message || 'Không thể ghi nhận hoàn thành'));
+        return false;
+      }
       const courseId = selectedCourse._id || selectedCourse.id;
       await fetchLessons(courseId);
+      
       try {
         const prog = await lmsApiFetch('/progress/me');
         if (prog?.success && prog.data) setCourseProgressMap(prog.data);
       } catch { /* ignore */ }
-    } catch (e) { /* ignore */ }
-  }, [currentLesson, selectedCourse, toast, completeLessonOnServer]);
+      return true;
+    } catch (e) { 
+      toast.error('Lỗi mạng khi ghi nhận hoàn thành');
+      return false; 
+    }
+  }, [currentLesson, selectedCourse, toast, completeLessonOnServer, fetchLessons, setCurrentLesson]);
 
   // Video kết thúc
   const handleVideoEnded = useCallback(async (actualWatched, totalDur) => {

@@ -28,8 +28,12 @@ export function getLessonCompletionProgressUi(lesson) {
   const freeSeek = lesson?.antiSeek === false;
 
   let towardGatePct = null;
-  if (required > 0) {
-    towardGatePct = Math.min(100, Math.round((watched / required) * 100));
+  const duration = Math.max(0, Number(lesson?.duration) || 0);
+  
+  if (duration > 0) {
+    towardGatePct = Math.min(100, Math.round((watched / duration) * 100));
+  } else if (required > 0) {
+    towardGatePct = Math.min(100, Math.round((watched / (required * 1.5)) * 100));
   } else if (watched > 0) {
     towardGatePct = null;
   } else {
@@ -90,9 +94,10 @@ export function getLessonAccessStatusLines(lesson, opts = {}) {
       tone: 'success',
     });
   } else if (p.towardGatePct != null && p.required > 0) {
+    const remaining = Math.max(0, p.required - p.watched);
     lines.push({
       key: 'pct',
-      text: `Đã xem ${p.towardGatePct}% · cần ${COMPLETION_GATE_LABEL} để mở bài tiếp`,
+      text: remaining > 0 ? `Còn ${remaining} giây nữa để mở bài tiếp` : 'Đang xử lý mở bài...',
       tone: 'info',
     });
   } else if (p.required <= 0) {
@@ -194,9 +199,10 @@ export function getPlayerCompletionBadgeText({
   const req = typeof requiredWatchSecondsFn === 'function'
     ? (requiredWatchSecondsFn(effectiveDuration) || 1)
     : 1;
-  const pct = Math.min(100, Math.round((Math.max(0, displayWatched) / req) * 100));
-  if (displayWatched >= req) return 'Đủ điều kiện · có thể mở bài tiếp';
-  return `Đã xem ${pct}% · cần ${COMPLETION_GATE_LABEL} để mở bài tiếp`;
+  const remainingSecs = Math.max(0, req - Math.max(0, displayWatched));
+  
+  if (displayWatched >= req) return 'Đủ điều kiện · có thể học tiếp phần còn lại hoặc bấm qua bài sau';
+  return `Còn ${remainingSecs} giây nữa để được mở bài tiếp`;
 }
 
 export function lessonStatusToneClass(tone, surface = 'dark') {

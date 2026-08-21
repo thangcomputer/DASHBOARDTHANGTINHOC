@@ -10,7 +10,7 @@ const { applyEnrollmentStats, resolveEnrollmentExamSubjects } = require('./enrol
 class EnrollmentApplicationService {
   async post_id_enrollments(data) {
   try {
-    const { courseName, courseId, teacherId, price, totalSessions, paid } = data.body;
+    const { courseName, courseId, teacherId, price, totalSessions, paid, paymentMethod } = data.body;
     if (!courseName?.trim() && !courseId) {
       return { _status: 400, _body: ({ success: false, message: 'Tên khóa học hoặc courseId là bắt buộc' });
     }
@@ -123,6 +123,7 @@ class EnrollmentApplicationService {
           actor: financeActor(req),
           note: `Thêm khóa ${resolvedName}`,
           reqMeta: financeReqMeta(req, student),
+          metadata: { paymentMethod: paymentMethod || 'transfer' },
         });
         bustFinanceCaches();
       } catch (ledgerErr) {
