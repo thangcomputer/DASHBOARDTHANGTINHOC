@@ -1835,11 +1835,47 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     title="Đánh dấu đã xử lý"
                   >
                     Đã xử lý
-                  </button>
-                ) : null}
-              </div>
+                    </button>
+                  ) : null}
+                  
+                  {(!activeConv.isGroup && activeConv.user?.role === 'student' && currentUserRole !== 'student') && (
+                    <button
+                      onClick={() => setShowScheduleModal(true)}
+                      className="flex shrink-0 items-center justify-center px-3 h-9 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-wide transition-colors shadow-sm gap-1.5 ml-auto"
+                      title="Xếp lịch học"
+                    >
+                      <Calendar size={14} /> Xếp lịch
+                    </button>
+                  )}
+                </div>
 
-              {showHandoffSummaryPanel ? (
+                {pinnedMessageObj && (
+                  <div className="mx-3 mt-2 px-4 py-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl flex items-center justify-between gap-3 shadow-sm relative group overflow-hidden shrink-0">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400 rounded-l-xl"></div>
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                        <Pin size={12} className="rotate-45" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-blue-800 uppercase tracking-widest mb-0.5">Tin nhắn đã ghim</p>
+                        <p className="text-xs text-slate-700 font-medium truncate">
+                          {pinnedMessageObj.messageType === 'system' ? pinnedMessageObj.content : 
+                           (isImageMessage(pinnedMessageObj) ? '[Hình ảnh] ' + attachmentCaption(pinnedMessageObj) : 
+                            pinnedMessageObj.messageType === 'file' ? '[Tệp đính kèm]' : pinnedMessageObj.content)}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => handlePinMessage(pinnedMessageObj.id || pinnedMessageObj._id)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-white transition-colors opacity-0 group-hover:opacity-100 shrink-0 shadow-sm"
+                      title="Bỏ ghim"
+                    >
+                      <PinOff size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {showHandoffSummaryPanel ? (
                 <div className="mx-3 mt-2 mb-0 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-950 leading-snug">
                   <p className="font-black uppercase tracking-wide text-amber-800 mb-1">Tóm tắt cho Support (nội bộ)</p>
                   {handoffSummaryParts.head ? (
@@ -2649,6 +2685,33 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             </div>
           </div>
         </div>
+      )}
+
+      {showScheduleModal && activeConv && !activeConv.isGroup && (
+        <ScheduleModal
+          students={students}
+          allSchedules={[]}
+          schedule={{ studentId: activeConv?.user?.id }}
+          teacherId={currentUserId}
+          onClose={() => setShowScheduleModal(false)}
+          onSubmit={async (data) => {
+            setShowScheduleModal(false);
+            if (socket) {
+              const properId = buildConversationId(currentUserRole, currentUserId, activeConv.user.role, activeConv.user.id);
+              socket.emit('send_message', {
+                conversationId: properId,
+                senderId: currentUserId,
+                senderName: currentUserName,
+                senderRole: currentUserRole,
+                receiverId: activeConv.user.id,
+                receiverName: activeConv.user.name,
+                receiverRole: activeConv.user.role,
+                content: `Hệ thống: Đã xếp lịch học thành công cho học viên.`,
+                messageType: 'system'
+              });
+            }
+          }}
+        />
       )}
     </div>
   );
