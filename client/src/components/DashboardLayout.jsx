@@ -471,7 +471,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     : (session?.name || 'Admin');
   const pageTitle = resolvePageTitle(role, location.pathname, location.hash);
   const adminHash = (location.hash || '').replace('#', '') || (location.pathname === '/admin' ? 'dashboard' : '');
-  const isStudentsTab = adminHash === 'students';
+  const activeHash = (location.hash || '').replace('#', '');
+  const isStudentsTab = adminHash === 'students' || (role === 'teacher' && location.pathname === '/teacher' && !activeHash);
   const isInboxPage = location.pathname.includes('/inbox');
   const isBiPage = location.pathname.includes('/bi');
   const isImmersivePage =
@@ -1052,4 +1053,5 @@ const ChangePasswordModal = ({ session, role }) => {
 };
 
 export default DashboardLayout;
+
 
