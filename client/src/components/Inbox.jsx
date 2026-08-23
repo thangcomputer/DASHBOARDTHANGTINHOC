@@ -1843,9 +1843,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       onClick={() => setShowScheduleModal(true)}
                       className="flex shrink-0 items-center justify-center px-3 h-9 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-wide transition-colors shadow-sm gap-1.5 ml-auto"
                       title="Xếp lịch học"
-                    >
-                      <Calendar size={14} /> Xếp lịch
-                    </button>
+                      >
+                        <Calendar size={14} /> Xếp lịch
+                      </button>
                   )}
                 </div>
 
