@@ -42,10 +42,10 @@ export default function TeacherStudentsTab({
   cancelSchedule,
 }) {
   return (
-          <div className="py-1 sm:py-4 md:py-6 min-h-0 flex-1 flex flex-col xl:flex-row gap-4 sm:gap-6 xl:min-h-0 xl:overflow-hidden min-w-0 w-full max-w-full">
+          <div className="py-1 sm:py-4 md:py-6 min-h-0 flex-1 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:min-h-0 lg:overflow-hidden min-w-0 w-full max-w-full">
             
             {/* CỘT 1: DANH SÁCH HỌC VIÊN (Sidebar) */}
-            <div className="w-full xl:w-80 xl:h-full flex flex-col bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden shrink-0 min-w-0 max-xl:flex-none">
+            <div className="w-full lg:w-80 xl:w-96 lg:h-full flex flex-col bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden shrink-0 min-w-0 max-lg:flex-none">
                <div className="p-3 sm:p-4 border-b border-slate-50 bg-slate-50/40">
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -58,7 +58,7 @@ export default function TeacherStudentsTab({
                   </div>
                </div>
                
-               <div className="flex-1 min-h-0 overflow-visible xl:overflow-y-auto p-2 space-y-1">
+               <div className="flex-1 min-h-0 overflow-visible lg:overflow-y-auto p-2 space-y-1">
                   {students
                     .filter((s) => {
                       const q = String(studentSearch || '').toLowerCase();
@@ -152,7 +152,7 @@ export default function TeacherStudentsTab({
             </div>
 
             {/* CỘT 2: CHI TIẾT HỌC VIÊN (Main Content) */}
-            <div className="flex-1 min-w-0 xl:overflow-y-auto pr-0 sm:pr-1">
+            <div className="flex-1 min-w-0 lg:overflow-y-auto pr-0 sm:pr-1">
               {selectedEnrollmentKey ? (
                 (() => {
                   const student = students.find(s => String(s._enrollmentKey || s._id || s.id) === String(selectedEnrollmentKey));
@@ -221,3 +221,4 @@ export default function TeacherStudentsTab({
           </div>
   );
 }
+
