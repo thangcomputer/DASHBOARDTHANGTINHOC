@@ -4,6 +4,29 @@ const chatApplicationService = require('../services/ChatApplicationService');
 const { ChatValidator, ChatMapper } = require('../dto');
 
 class ChatController {
+  async get_message_ById(req, res) {
+    try {
+      const Message = require('../models/Message');
+      const message = await Message.findById(req.params.id);
+      if (!message) return res.status(404).json({ success: false });
+      return res.status(200).json({ success: true, message });
+    } catch (err) {
+      return res.status(500).json({ success: false });
+    }
+  }
+
+  async put_pinMessage(req, res) {
+    try {
+      const { conversationId } = req.params;
+      const { messageId } = req.body;
+      const result = await chatApplicationService.pinMessage({ conversationId, messageId, requester: req.user });
+      return res.status(200).json(result);
+    } catch (err) {
+      const status = err.status || err.statusCode || (err.code === 'VALIDATION_ERROR' ? 400 : 500);
+      return res.status(status).json({ success: false, message: err.message || 'L?i server', errors: err.errors });
+    }
+  }
+
   async get_contacts(req, res) {
     try {
       // Replaced by Zod Validator
@@ -241,3 +264,5 @@ class ChatController {
 }
 
 module.exports = new ChatController();
+
+

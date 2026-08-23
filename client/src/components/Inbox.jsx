@@ -3,13 +3,14 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
   User, Circle, Image, Paperclip, Smile, Download,
-  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus
+  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
 import { useLocation } from 'react-router-dom';
 import { useToast } from '../utils/toast';
-import { messagesAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
+import { messagesAPI, aiSupportAPI, resolveMediaUrl, schedulesAPI } from '../services/api';
+import { ScheduleModal } from './teacher/TeacherScheduleModal';
 import { displayFileName } from '../utils/validators';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
@@ -371,6 +372,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [pinnedMessageObj, setPinnedMessageObj] = useState(null);
 
   // Đóng hội thoại chỉ khi peer chắc chắn ghost (không dùng students/teachers/staffs local —
   // Admin/Staff thường students=[], GV chỉ có teachers=[self] → trước đây kill nhầm mọi chat).
@@ -392,6 +395,61 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     setMessages([]);
   }, [activeConv, contactsLoaded, contacts, students, teachers, staffs]);
   const [pendingImage, setPendingImage] = useState(null);
+  // Fetch pinned message if not in local state
+  useEffect(() => {
+    const pinnedId = activeConv?.metadata?.pinnedMessageId;
+    if (!pinnedId) {
+      setPinnedMessageObj(null);
+      return;
+    }
+    const localMatch = messages.find(m => String(m.id || m._id) === String(pinnedId));
+    if (localMatch) {
+      setPinnedMessageObj(localMatch);
+    } else {
+      messagesAPI.getMessage(pinnedId).then(res => {
+        if (res?.success) setPinnedMessageObj(res.message);
+      }).catch(err => console.log('Failed to fetch pinned message', err));
+    }
+  }, [activeConv?.metadata?.pinnedMessageId, messages]);
+
+  const handlePinMessage = async (msgId) => {
+    if (!activeConv) return;
+    try {
+      const res = await messagesAPI.pinMessage(activeConv.id, msgId);
+      if (res?.success) {
+        toast.success(res.message || '�� c?p nh?t ghim');
+        // socket will trigger 'conversation_updated' and we might need to handle it or it's handled automatically if we have a listener.
+        // But for optimistic update:
+        setActiveConv(prev => ({
+          ...prev,
+          metadata: {
+            ...prev.metadata,
+            pinnedMessageId: res.pinnedMessageId || null
+          }
+        }));
+      } else {
+        toast.error(res?.message || 'L?i khi ghim tin nh?n');
+      }
+    } catch (err) {
+      toast.error('L?i khi ghim tin nh?n');
+    }
+  };
+
+  const handleScheduleSubmit = async (formData) => {
+    try {
+      const res = await schedulesAPI.create(formData);
+      if (!res?.success) throw new Error(res?.message || 'Kh�ng th? x?p l?ch');
+      toast.success('�� x?p l?ch h?c th�nh c�ng');
+      setShowScheduleModal(false);
+      // Send system message
+      if (activeConv && activeConv.id) {
+        await ctxSendMessage(activeConv.id, '�� x?p l?ch h?c th�nh c�ng', [], null, 'system');
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Kh�ng th? c?p nh?t l?ch h?c');
+    }
+  };
+
 
   const conversations = useMemo(() => {
     const entries = [];
@@ -1991,13 +2049,22 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                           {/* Reaction picker button */}
                           {!msg.isRecalled && (
-                            <ReactionPicker
-                              msgId={msg.id}
-                              isMine={isMine}
-                              onReact={handleReaction}
-                              myReactions={myReactions}
-                            />
-                          )}
+                              <div className={`opacity-0 group-hover/msg:opacity-100 absolute flex items-center gap-1 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2`}>
+                                <ReactionPicker
+                                  msgId={msg.id}
+                                  isMine={isMine}
+                                  onReact={handleReaction}
+                                  myReactions={myReactions}
+                                />
+                                <button
+                                  onClick={() => handlePinMessage(msg.id)}
+                                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
+                                  title={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+                                >
+                                  <Pin size={14} className={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "text-blue-500" : ""} />
+                                </button>
+                              </div>
+                            )}
 
                           {/* Options/Menu button for Soft Delete */}
                           <div className="relative">
@@ -2588,3 +2655,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 };
 
 export default Inbox;
+
+
+
+
+
+
+
+
+

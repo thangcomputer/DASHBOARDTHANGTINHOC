@@ -109,6 +109,8 @@ router.post('/hide/:conversationId',chatController.post_hide_conversationId);
 
 // ── Đánh dấu đã đọc ──
 router.put('/read/:conversationId',chatController.put_read_conversationId);
+router.put('/:conversationId/pin', chatController.put_pinMessage);
+router.get('/message/:id', chatController.get_message_ById);
 
 // ── Phản ứng (Reaction) ──
 router.patch('/:messageId/reaction',chatController.patch_messageId_reaction);
@@ -149,4 +151,6 @@ router.use((err, req, res, next) => {
 });
 
 module.exports = router;
+
+
 

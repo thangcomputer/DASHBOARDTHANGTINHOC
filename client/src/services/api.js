@@ -1,4 +1,4 @@
-// ─── API Service - Hệ thống CMS Thắng Tin Học ───────────────────────────────
+﻿// ─── API Service - Hệ thống CMS Thắng Tin Học ───────────────────────────────
 
 export const SOCKET_BASE = import.meta.env.VITE_API_URL || '';
 export const BASE_URL = SOCKET_BASE;
@@ -1120,6 +1120,17 @@ export const aiSupportAPI = {
 
 // ─── MESSAGE API ────────────────────────────────────────────────────────────
 export const messagesAPI = {
+    getMessage: async (id) => {
+      const res = await apiFetch(`/messages/message/${id}`);
+      return res.json();
+    },
+    pinMessage: async (conversationId, messageId) => {
+      const res = await apiFetch('/messages/' + conversationId + '/pin', {
+        method: 'PUT',
+        body: JSON.stringify({ messageId })
+      });
+      return res.json();
+    },
   getContacts: async () => {
     const res = await apiFetch('/messages/contacts');
     return res.json();
@@ -2223,3 +2234,8 @@ export default {
   feed:          feedAPI,
   blog:          blogAPI,
 };
+
+
+
+
+

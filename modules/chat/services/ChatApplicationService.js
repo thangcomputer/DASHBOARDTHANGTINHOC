@@ -46,6 +46,44 @@ function deptOutboundToStudent(reqUser) {
 // └────────────────┴────────────────────────────────────────────┘
 
 class ChatApplicationService {
+  async pinMessage({ conversationId, messageId, requester }) {
+    const Conversation = require('../models/Conversation');
+    const Message = require('../models/Message');
+    const { getIo } = require('../../../config/socket');
+    const io = getIo();
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      throw { status: 404, message: 'Kh�ng t�m th?y cu?c h?i tho?i' };
+    }
+
+    if (conversation.metadata?.pinnedMessageId === String(messageId)) {
+      await Conversation.updateOne({ _id: conversationId }, { "$unset": { 'metadata.pinnedMessageId': '' } });
+      if (io) {
+        io.to(String(conversationId)).emit('conversation_updated', {
+          conversationId,
+          pinnedMessageId: null
+        });
+      }
+      return { success: true, message: '�� b? ghim tin nh?n' };
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message || String(message.conversationId) !== String(conversationId)) {
+      throw { status: 404, message: 'Tin nh?n kh�ng h?p l?' };
+    }
+
+    await Conversation.updateOne({ _id: conversationId }, { "$set": { 'metadata.pinnedMessageId': String(messageId) } });
+    if (io) {
+      io.to(String(conversationId)).emit('conversation_updated', {
+        conversationId,
+        pinnedMessageId: String(messageId)
+      });
+    }
+
+    return { success: true, message: '�� ghim tin nh?n', pinnedMessageId: messageId };
+  }
+
   async get_contacts(data) {
   try {
     const { role: userRole, id: userId, adminRole } = data.currentUser;
@@ -286,10 +324,10 @@ class ChatApplicationService {
       return true;
     });
 
-    return { _status: 200, _body: ({ success: true, data: deduped });
+    return { _status: 200, _body: { success: true, data: deduped } };
   } catch (err) {
     logger.error('[CONTACTS]', err);
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -299,7 +337,7 @@ class ChatApplicationService {
 
     // Bảo vệ: Chỉ Admin hoặc chính User đó mới được xem
     if (data.currentUser.role !== 'admin' && data.currentUser.id !== userId) {
-      return { _status: 403, _body: ({ success: false, message: 'Bạn không có quyền xem thông tin này' });
+      return { _status: 403, _body: { success: false, message: 'Bạn không có quyền xem thông tin này' } };
     }
 
     // Branch Filtering logic
@@ -360,9 +398,9 @@ class ChatApplicationService {
       };
     });
 
-    return { _status: 200, _body: ({ success: true, data: conversations });
+    return { _status: 200, _body: { success: true, data: conversations } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -372,10 +410,10 @@ class ChatApplicationService {
     const { q } = data.query;
     
     if (data.currentUser.role !== 'admin' && data.currentUser.id !== userId) {
-      return { _status: 403, _body: ({ success: false, message: 'Bạn không có quyền tìm kiếm' });
+      return { _status: 403, _body: { success: false, message: 'Bạn không có quyền tìm kiếm' } };
     }
 
-    if (!q) return { _status: 200, _body: ({ success: true, data: [] });
+    if (!q) return { _status: 200, _body: { success: true, data: [] } };
 
     const { sanitizeRegex } = require('../../../middleware/sanitizeRegex');
     const safeQ = sanitizeRegex(q);
@@ -403,9 +441,9 @@ class ChatApplicationService {
 
     const messages = await Message.find(searchQuery).sort({ createdAt: -1 }).limit(50);
 
-    return { _status: 200, _body: ({ success: true, data: sanitizeMessages(messages) });
+    return { _status: 200, _body: { success: true, data: sanitizeMessages(messages) } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -414,9 +452,9 @@ class ChatApplicationService {
     const userId = data.currentUser.id;
     const hiddenRows = await ConversationVisibility.find({ hiddenByUsers: userId }).lean();
     const hiddenList = hiddenRows.map(r => r.conversationId);
-    return { _status: 200, _body: ({ success: true, data: hiddenList });
+    return { _status: 200, _body: { success: true, data: hiddenList } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -446,7 +484,7 @@ class ChatApplicationService {
     })();
 
     if (!isParticipant) {
-      return { _status: 403, _body: ({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
+      return { _status: 403, _body: { success: false, message: 'Bạn không thuộc cuộc hội thoại này' } };
     }
     const messages = await Message.find({ 
       conversationId: data.conversationId,
@@ -455,9 +493,9 @@ class ChatApplicationService {
       .sort({ createdAt: 1 })
       .limit(200);
 
-    return { _status: 200, _body: ({ success: true, data: sanitizeMessages(messages) });
+    return { _status: 200, _body: { success: true, data: sanitizeMessages(messages) } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -465,7 +503,7 @@ class ChatApplicationService {
   try {
     const { userId } = data.params;
     if (data.currentUser.role !== 'admin' && String(data.currentUser.id) !== String(userId)) {
-      return { _status: 403, _body: ({ success: false, message: 'Bạn không có quyền đồng bộ dữ liệu này' });
+      return { _status: 403, _body: { success: false, message: 'Bạn không có quyền đồng bộ dữ liệu này' } };
     }
 
     // Lấy các nhóm mà user là thành viên
@@ -483,26 +521,26 @@ class ChatApplicationService {
       hiddenFor: { $ne: userId }
     }).sort({ createdAt: -1 }).limit(500);
 
-    return { _status: 200, _body: ({ success: true, data: sanitizeMessages(messages.reverse()) });
+    return { _status: 200, _body: { success: true, data: sanitizeMessages(messages.reverse()) } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async post_upload(data) {
   try {
-    if (!data.file) return { _status: 400, _body: ({ success: false, message: 'Không có file' });
+    if (!data.file) return { _status: 400, _body: { success: false, message: 'Không có file' } };
     normalizeMulterFile(data.file);
 
     const { validateUploadedFileMagic } = require('../../../utils/uploadSniff');
     const sniff = validateUploadedFileMagic(data.file.path, data.file.originalname || data.file.filename);
     if (!sniff.ok) {
       try { fs.unlinkSync(data.file.path); } catch { /* ignore */ }
-      return { _status: 400, _body: ({
+      return { _status: 400, _body: {
         success: false,
         message: 'Nội dung file không khớp định dạng khai báo',
         code: 'MAGIC_MISMATCH',
-      });
+      } };
     }
 
     const fileUrl = `/${data.file.path.replace(/\\/g, '/')}`;
@@ -518,9 +556,9 @@ class ChatApplicationService {
     } catch (regErr) {
       logger.warn({ err: regErr.message }, '[MESSAGES] FileAsset register failed');
     }
-    return { _status: 200, _body: ({ success: true, url: fileUrl, name: data.file.originalname });
+    return { _status: 200, _body: { success: true, url: fileUrl, name: data.file.originalname } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -536,20 +574,20 @@ class ChatApplicationService {
 
     const isBroadcast = receiverId === 'ALL_USERS' || receiverId === 'ALL_STUDENTS' || receiverId === 'ALL_TEACHERS';
     if (isBroadcast && !(data.currentUser.role === 'admin' || data.currentUser.role === 'staff')) {
-      return { _status: 403, _body: ({ success: false, message: 'Chỉ admin/staff được gửi thông báo broadcast' });
+      return { _status: 403, _body: { success: false, message: 'Chỉ admin/staff được gửi thông báo broadcast' } };
     }
     if (isBroadcast && receiverId === 'ALL_STUDENTS' && data.currentUser.adminRole === 'HIGH_ADMIN') {
-      return { _status: 403, _body: ({ success: false, message: 'Admin cấp cao không gửi thông báo tới học viên' });
+      return { _status: 403, _body: { success: false, message: 'Admin cấp cao không gửi thông báo tới học viên' } };
     }
 
     if (isGroup && groupId) {
       const group = await Group.findById(groupId).select('participants').lean();
       if (!group) {
-        return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy nhóm chat' });
+        return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhóm chat' } };
       }
       const isMember = (group.participants || []).some((p) => String(p.userId) === String(senderId));
       if (!isMember && !isAdminLevelAccount(data.currentUser)) {
-        return { _status: 403, _body: ({ success: false, message: 'Bạn không thuộc nhóm chat này' });
+        return { _status: 403, _body: { success: false, message: 'Bạn không thuộc nhóm chat này' } };
       }
     }
 
@@ -558,7 +596,7 @@ class ChatApplicationService {
       const { assertCanDirectMessage } = require('../services/chatAccessService');
       const access = await assertCanDirectMessage(data.currentUser, receiverId, receiverRole);
       if (!access.ok) {
-        return { _status: 403, _body: ({ success: false, message: access.message || 'Không được nhắn tin đến người này' });
+        return { _status: 403, _body: { success: false, message: access.message || 'Không được nhắn tin đến người này' } };
       }
     }
 
@@ -617,7 +655,7 @@ class ChatApplicationService {
     if (!isSuperAdmin && (senderRole === 'admin' || senderRole === 'staff') && receiverRole === 'student') {
         // Staff messaging student
         if (sBranch && rBranch && sBranch !== rBranch) {
-            return { _status: 403, _body: ({ success: false, message: 'Bạn không được phép nhắn tin cho học viên chi nhánh khác' });
+            return { _status: 403, _body: { success: false, message: 'Bạn không được phép nhắn tin cho học viên chi nhánh khác' } };
         }
     }
 
@@ -693,9 +731,9 @@ class ChatApplicationService {
       }
     }
 
-    return { _status: 201, _body: ({ success: true, data: clientMessage });
+    return { _status: 201, _body: { success: true, data: clientMessage } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -709,9 +747,9 @@ class ChatApplicationService {
       { $addToSet: { hiddenByUsers: userId } },
       { upsert: true, returnDocument: 'after' }
     );
-    return { _status: 200, _body: ({ success: true, message: 'Đã ẩn cuộc trò chuyện' });
+    return { _status: 200, _body: { success: true, message: 'Đã ẩn cuộc trò chuyện' } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -741,7 +779,7 @@ class ChatApplicationService {
       }
     }
     if (!allowed) {
-        return { _status: 403, _body: ({ success: false, message: 'Thao tác không hợp lệ' });
+        return { _status: 403, _body: { success: false, message: 'Thao tác không hợp lệ' } };
     }
 
     const receiverTargets = isAdminLevelAccount(data.currentUser)
@@ -756,9 +794,9 @@ class ChatApplicationService {
       filter,
       { $set: { isRead: true, readAt: new Date() } }
     );
-    return { _status: 200, _body: ({ success: true, message: 'Đã đánh dấu đọc' });
+    return { _status: 200, _body: { success: true, message: 'Đã đánh dấu đọc' } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -770,21 +808,21 @@ class ChatApplicationService {
     const userName = data.currentUser.name;
 
     const message = await Message.findById(messageId);
-    if (!message) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy tin nhắn' });
+    if (!message) return { _status: 404, _body: { success: false, message: 'Không tìm thấy tin nhắn' } };
 
     // BUG-04: Kiểm tra user thuộc cuộc hội thoại
     if (message.isGroup && message.groupId) {
       const group = await Group.findById(message.groupId).select('participants').lean();
       const isMember = group && (group.participants || []).some(p => String(p.userId) === String(userId));
       if (!isMember && !isAdminLevelAccount(data.currentUser)) {
-        return { _status: 403, _body: ({ success: false, message: 'Bạn không thuộc nhóm chat này' });
+        return { _status: 403, _body: { success: false, message: 'Bạn không thuộc nhóm chat này' } };
       }
     } else {
       const isParticipant = String(message.senderId) === String(userId) ||
         String(message.receiverId) === String(userId) ||
         (isAdminLevelAccount(data.currentUser) && (message.senderId === 'admin' || message.receiverId === 'admin'));
       if (!isParticipant) {
-        return { _status: 403, _body: ({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
+        return { _status: 403, _body: { success: false, message: 'Bạn không thuộc cuộc hội thoại này' } };
       }
     }
 
@@ -831,9 +869,9 @@ class ChatApplicationService {
       }
     }
 
-    return { _status: 200, _body: ({ success: true, data: message.reactions });
+    return { _status: 200, _body: { success: true, data: message.reactions } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -843,13 +881,13 @@ class ChatApplicationService {
     const userId = data.currentUser.id;
 
     const message = await Message.findById(messageId);
-    if (!message) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy tin nhắn' });
+    if (!message) return { _status: 404, _body: { success: false, message: 'Không tìm thấy tin nhắn' } };
 
     const isStaffOrAdmin = data.currentUser.role === 'admin' || isStaffAccount(data.currentUser);
     const senderMatch = String(message.senderId) === String(userId) || 
       (isStaffOrAdmin && (message.senderId === 'admin' || String(message.senderId) === String(userId)));
     if (!senderMatch) {
-      return { _status: 403, _body: ({ success: false, message: 'Bạn không có quyền thu hồi tin nhắn này' });
+      return { _status: 403, _body: { success: false, message: 'Bạn không có quyền thu hồi tin nhắn này' } };
     }
 
     // 24h limit check
@@ -857,7 +895,7 @@ class ChatApplicationService {
     const sentAt = new Date(message.createdAt);
     const diffHours = (now - sentAt) / (1000 * 60 * 60);
     if (diffHours > 24) {
-      return { _status: 403, _body: ({ success: false, message: 'Chỉ có thể thu hồi tin nhắn trong vòng 24 giờ kể từ lúc gửi' });
+      return { _status: 403, _body: { success: false, message: 'Chỉ có thể thu hồi tin nhắn trong vòng 24 giờ kể từ lúc gửi' } };
     }
 
     // BUG-11: Xóa file đính kèm khi thu hồi
@@ -896,9 +934,9 @@ class ChatApplicationService {
       }
     }
 
-    return { _status: 200, _body: ({ success: true, data: message });
+    return { _status: 200, _body: { success: true, data: message } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -908,21 +946,21 @@ class ChatApplicationService {
     const userId = data.currentUser.id;
 
     const message = await Message.findById(messageId);
-    if (!message) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy tin nhắn' });
+    if (!message) return { _status: 404, _body: { success: false, message: 'Không tìm thấy tin nhắn' } };
 
     // BUG-04: Kiểm tra user thuộc cuộc hội thoại trước khi cho xóa
     if (message.isGroup && message.groupId) {
       const group = await Group.findById(message.groupId).select('participants').lean();
       const isMember = group && (group.participants || []).some(p => String(p.userId) === String(userId));
       if (!isMember && !isAdminLevelAccount(data.currentUser)) {
-        return { _status: 403, _body: ({ success: false, message: 'Bạn không thuộc nhóm chat này' });
+        return { _status: 403, _body: { success: false, message: 'Bạn không thuộc nhóm chat này' } };
       }
     } else {
       const isParticipant = String(message.senderId) === String(userId) ||
         String(message.receiverId) === String(userId) ||
         (isAdminLevelAccount(data.currentUser) && (message.senderId === 'admin' || message.receiverId === 'admin'));
       if (!isParticipant) {
-        return { _status: 403, _body: ({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
+        return { _status: 403, _body: { success: false, message: 'Bạn không thuộc cuộc hội thoại này' } };
       }
     }
 
@@ -933,27 +971,27 @@ class ChatApplicationService {
       await message.save();
     }
 
-    return { _status: 200, _body: ({ success: true, message: 'Đã xóa tin nhắn', data: message.hiddenFor });
+    return { _status: 200, _body: { success: true, message: 'Đã xóa tin nhắn', data: message.hiddenFor } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async post_groups(data) {
   try {
     if (data.currentUser.role === 'student') {
-        return { _status: 403, _body: ({ success: false, message: 'Học viên không có quyền tạo nhóm' });
+        return { _status: 403, _body: { success: false, message: 'Học viên không có quyền tạo nhóm' } };
     }
     const { name, participants } = data.body;
 
     // BUG-03: Validate tên nhóm
     if (!name || typeof name !== 'string' || !name.trim()) {
-      return { _status: 400, _body: ({ success: false, message: 'Tên nhóm không được để trống' });
+      return { _status: 400, _body: { success: false, message: 'Tên nhóm không được để trống' } };
     }
 
     // BUG-03: Validate & sanitize participants
     if (!Array.isArray(participants) || participants.length === 0) {
-      return { _status: 400, _body: ({ success: false, message: 'Danh sách thành viên không hợp lệ' });
+      return { _status: 400, _body: { success: false, message: 'Danh sách thành viên không hợp lệ' } };
     }
     const validRoles = ['admin', 'teacher', 'student', 'staff'];
     const sanitizedParticipants = participants
@@ -965,7 +1003,7 @@ class ChatApplicationService {
         joinedAt: new Date(),
       }));
     if (sanitizedParticipants.length === 0) {
-      return { _status: 400, _body: ({ success: false, message: 'Không có thành viên hợp lệ' });
+      return { _status: 400, _body: { success: false, message: 'Không có thành viên hợp lệ' } };
     }
 
     const group = await Group.create({
@@ -981,9 +1019,9 @@ class ChatApplicationService {
       });
     }
 
-    return { _status: 201, _body: ({ success: true, data: group });
+    return { _status: 201, _body: { success: true, data: group } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -993,30 +1031,30 @@ class ChatApplicationService {
     const isSelf = String(data.currentUser.id) === targetId;
     const isAdminOrStaff = data.currentUser.role === 'admin' || data.currentUser.role === 'staff';
     if (!isSelf && !isAdminOrStaff) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền xem nhóm của người khác' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền xem nhóm của người khác' } };
     }
     const groups = await Group.find({ 'participants.userId': data.userId }).sort({ updatedAt: -1 });
-    return { _status: 200, _body: ({ success: true, data: groups });
+    return { _status: 200, _body: { success: true, data: groups } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async delete_groups_groupId(data) {
   try {
     if (data.currentUser.role === 'student') {
-        return { _status: 403, _body: ({ success: false, message: 'Học viên không có quyền xóa nhóm' });
+        return { _status: 403, _body: { success: false, message: 'Học viên không có quyền xóa nhóm' } };
     }
     const { groupId } = data.params;
 
     // BUG-02: Kiểm tra quyền — chỉ creator hoặc SuperAdmin mới được xóa nhóm
     const group = await Group.findById(groupId).select('createdBy').lean();
     if (!group) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy nhóm' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhóm' } };
     }
     const isCreator = String(group.createdBy?.userId) === String(data.currentUser.id);
     if (!isCreator && !isAdminLevelAccount(data.currentUser)) {
-      return { _status: 403, _body: ({ success: false, message: 'Chỉ người tạo nhóm hoặc Super Admin mới có quyền xóa nhóm' });
+      return { _status: 403, _body: { success: false, message: 'Chỉ người tạo nhóm hoặc Super Admin mới có quyền xóa nhóm' } };
     }
     
     // Xóa tất cả tin nhắn của nhóm này
@@ -1025,9 +1063,9 @@ class ChatApplicationService {
     // Xóa Group
     await Group.findByIdAndDelete(groupId);
 
-    return { _status: 200, _body: ({ success: true, message: 'Đã xóa nhóm vĩnh viễn' });
+    return { _status: 200, _body: { success: true, message: 'Đã xóa nhóm vĩnh viễn' } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -1035,16 +1073,16 @@ class ChatApplicationService {
   try {
     const { userId } = data.params;
     if (data.currentUser.id !== userId) {
-       return { _status: 403, _body: ({ success: false, message: 'Quyền truy cập bị từ chối' });
+       return { _status: 403, _body: { success: false, message: 'Quyền truy cập bị từ chối' } };
     }
     const receiverTargets = isAdminLevelAccount(data.currentUser) ? ['admin', String(userId)] : [String(userId)];
     const count = await Message.countDocuments({
       receiverId: { $in: receiverTargets },
       isRead: false,
     });
-    return { _status: 200, _body: ({ success: true, data: { unreadCount: count } });
+    return { _status: 200, _body: { success: true, data: { unreadCount: count } } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -1055,18 +1093,18 @@ class ChatApplicationService {
 
     // Chỉ Admin hoặc STAFF mới được gửi broadcast
     if (userRole !== 'admin' && userRole !== 'staff') {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền thực hiện' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền thực hiện' } };
     }
     if (adminRole === 'HIGH_ADMIN' && targetRole === 'student') {
-      return { _status: 403, _body: ({ success: false, message: 'Admin cấp cao không gửi thông báo tới học viên' });
+      return { _status: 403, _body: { success: false, message: 'Admin cấp cao không gửi thông báo tới học viên' } };
     }
 
     if (!['student', 'teacher', 'admin'].includes(targetRole)) {
-      return { _status: 400, _body: ({ success: false, message: 'Đối tượng nhận không hợp lệ' });
+      return { _status: 400, _body: { success: false, message: 'Đối tượng nhận không hợp lệ' } };
     }
 
     if (!content && messageType === 'text') {
-      return { _status: 400, _body: ({ success: false, message: 'Nội dung không được trống' });
+      return { _status: 400, _body: { success: false, message: 'Nội dung không được trống' } };
     }
 
     // Lấy branchId của người gửi (nếu là STAFF thì chỉ gửi trong branch đó)
@@ -1144,18 +1182,21 @@ class ChatApplicationService {
       }
     }
 
-    return { _status: 200, _body: ({ 
+    return { _status: 200, _body: { 
       success: true, 
       message: `Đã gửi tin nhắn tới ${results.length} người dùng.`,
       count: results.length 
-    });
+    } };
 
   } catch (err) {
     logger.error('[BROADCAST] Error:', err);
-    return { _status: 500, _body: ({ success: false, message: 'Lỗi hệ thống khi gửi broadcast' });
+    return { _status: 500, _body: { success: false, message: 'Lỗi hệ thống khi gửi broadcast' } };
   }
 }
 
 }
 
 module.exports = new ChatApplicationService();
+
+
+
