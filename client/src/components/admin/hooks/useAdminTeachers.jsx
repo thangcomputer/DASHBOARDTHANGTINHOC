@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { mutate } from 'swr';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../../services/api';
 import { parseQuestionBankExcel } from '../../../utils/studentQuestionsExcel';
 import {
@@ -74,6 +75,16 @@ export function useAdminTeachers({
   useEffect(() => {
     fetchTeachers();
   }, [fetchTeachers, activeTab]);
+
+  useEffect(() => {
+    if (onDataRefresh && activeTab === 'teachers') {
+      return onDataRefresh((payload) => {
+        if (payload?.type === 'teachers' || payload?.type === 'teacher' || payload?.type === 'socket:any') {
+          fetchTeachers();
+        }
+      });
+    }
+  }, [onDataRefresh, activeTab, fetchTeachers]);
 
   const safeTeachersList = useMemo(() => (teachers || []).filter(Boolean), [teachers]);
   const safeTeachers = safeTeachersList;

@@ -56,13 +56,15 @@ export default function AdminOverviewTab({
           sub={`${statActiveTeachers} đang trực tiếp giảng dạy`}
           color="bg-slate-800"
         />
-        <StatCard
-          icon={DollarSign}
-          label="Doanh thu"
-          value={`${(statTotalRevenue / 1000000).toFixed(1)}M`}
-          sub="VNĐ doanh thu thực tế"
-          color="bg-red-500"
-        />
+        {(hasPermission(session, PERMISSIONS.MANAGE_FINANCE) || hasPermission(session, PERMISSIONS.VIEW_BRANCH_REVENUE)) && (
+          <StatCard
+            icon={DollarSign}
+            label="Doanh thu"
+            value={`${(statTotalRevenue / 1000000).toFixed(1)}M`}
+            sub="VNĐ doanh thu thực tế"
+            color="bg-red-500"
+          />
+        )}
         <StatCard
           icon={TrendingUp}
           label="Hồ sơ mới"

@@ -61,6 +61,8 @@ function RefundHint({ amount }) {
 
 /** Nút ⋯ + menu portal (fixed) — tránh bị che bởi overflow bảng/card. */
 function StudentRowActions({
+    submittingAction,
+    setSubmittingAction,
   s,
   actionMenuId,
   setActionMenuId,
@@ -173,7 +175,17 @@ function StudentRowActions({
           </button>
         )}
         {!locked && (
-          <button type="button" role="menuitem" onClick={() => { s.studentExamUnlocked ? revokeStudentExam(s.id) : approveStudentExam(s.id); setActionMenuId(null); }}
+          <button type="button" role="menuitem" onClick={async () => {
+                setActionMenuId(null);
+                setSubmittingAction(s.id + '-exam');
+                try {
+                  if (s.studentExamUnlocked) await revokeStudentExam(s.id);
+                  else await approveStudentExam(s.id);
+                } finally {
+                  setSubmittingAction(null);
+                }
+              }}
+              disabled={submittingAction === s.id + '-exam'}
             className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
             {s.studentExamUnlocked
               ? <><Lock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Khóa phòng thi</span></>
@@ -247,7 +259,7 @@ function StudentRowActions({
           </button>
         )}
         <div className="border-t border-slate-100 my-0.5" />
-        <button type="button" role="menuitem" onClick={() => { removeStudent(s.id); setActionMenuId(null); }}
+        <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); removeStudent(s.id); }}
           className={`${itemCls} text-red-600 hover:bg-red-50`}>
           <Trash2 size={15} className="shrink-0" />
           <span className="min-w-0">Xóa học viên</span>
@@ -317,8 +329,10 @@ function ModeBranchBadges({ s, safeBranches }) {
 }
 
 export default function AdminStudentsTab() {
+  const [submittingAction, setSubmittingAction] = useState(null);
   const {
-    search, setSearch, filterCourse, setFilterCourse, filterPaid, setFilterPaid,
+    search,
+    setSearch, filterCourse, setFilterCourse, filterPaid, setFilterPaid,
     handleExportExcel, isExportingExcel, setShowImportModal, setShowModal,
     studentsPagination, filteredStudents, safeTeachers, safeBranches,
     assignTeacher, actionMenuId, setActionMenuId, setShowStudentDetailId,
@@ -497,6 +511,7 @@ export default function AdminStudentsTab() {
   };
 
   const menuProps = {
+      submittingAction, setSubmittingAction,
     actionMenuId, setActionMenuId, setShowStudentDetailId,
     setEnrollmentModalStudent, approveStudentExam, revokeStudentExam,
     ctxUpdateStudent, toast, handlePrintInvoice, removeStudent,

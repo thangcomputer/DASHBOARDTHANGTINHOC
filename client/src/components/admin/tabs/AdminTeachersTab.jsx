@@ -128,6 +128,7 @@ export default function AdminTeachersTab() {
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [menuId, setMenuId] = useState(null);
+  const [submittingAction, setSubmittingAction] = useState(null);
   const menuRootRef = useRef(null);
 
   useEffect(() => {
@@ -540,7 +541,15 @@ export default function AdminTeachersTab() {
             </div>
             <div className="cms-sheet-footer">
               <button type="button" onClick={() => setReviewModal(null)} className="cms-btn cms-btn-outline flex-1">Đóng</button>
-              <button type="button" onClick={() => markFileReviewed(reviewModal.id)} className="cms-btn cms-btn-success flex-[1.4]">
+              <button type="button" onClick={async () => {
+                  setSubmittingAction('review');
+                  try {
+                    await markFileReviewed(reviewModal.id);
+                  } finally {
+                    setSubmittingAction(null);
+                  }
+                }}
+                disabled={submittingAction === 'review'} className="cms-btn cms-btn-success flex-[1.4]">
                 <CheckCircle2 size={16} /> Đạt yêu cầu
               </button>
             </div>

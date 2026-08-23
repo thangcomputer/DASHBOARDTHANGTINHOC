@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { mutate } from 'swr';
+import { useSearchParams } from 'react-router-dom';
 import { Printer, Download } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
@@ -33,14 +34,27 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
     fetchStudentsPaginated,
   } = useData();
 
-  const { socket } = useSocket();
+  const { socket, onDataRefresh } = useSocket();
   const toast = useToast();
   const { showModal: showGlobalModal, closeModal } = useModal();
   const { selectedBranchId } = useBranch();
 
-  const [search, setSearch] = useState('');
-  const [filterPaid, setFilterPaid] = useState('all');
-  const [filterCourse, setFilterCourse] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get('search') || '';
+  const filterPaid = searchParams.get('filterPaid') || 'all';
+  const filterCourse = searchParams.get('filterCourse') || 'all';
+
+  const updateSearchParam = (key, value) => {
+    setSearchParams(prev => {
+      if (!value || value === 'all' && key !== 'search') prev.delete(key);
+      else prev.set(key, value);
+      return prev;
+    }, { replace: true });
+  };
+
+  const setSearch = (val) => updateSearchParam('search', val);
+  const setFilterPaid = (val) => updateSearchParam('filterPaid', val);
+  const setFilterCourse = (val) => updateSearchParam('filterCourse', val);
   const [currentPage, setCurrentPage] = useState(1);
   const [actionMenuId, setActionMenuId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -114,6 +128,22 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
     const s = safeStudentsList.find((x) => String(x.id) === String(id));
     setDeleteModal({ type: 'student', id, name: s?.name || 'Học viên' });
   };
+
+  useEffect(() => {
+    if (onDataRefresh) {
+      return onDataRefresh((payload) => {
+        if (payload?.type === 'students' || payload?.type === 'student' || payload?.type === 'socket:any') {
+          // Tránh gọi quá nhiều, có thể debounce nếu cần, 
+          // nhưng onDataRefresh trong SocketContext đã có debounce 320ms.
+          fetchStudentsPaginated({
+            page: currentPage, limit: PAGE_SIZE, search,
+            paid: filterPaid, course: filterCourse, branch_id: selectedBranchId,
+            forceBranchIdAll: selectedBranchId === 'all' && ['students', 'dashboard'].includes(activeTab),
+          });
+        }
+      });
+    }
+  }, [onDataRefresh, currentPage, search, filterPaid, filterCourse, selectedBranchId, activeTab]);
 
   const refreshStudentList = (page = currentPage) => {
     fetchStudentsPaginated({
