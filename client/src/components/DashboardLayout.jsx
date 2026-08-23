@@ -470,9 +470,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         : currentTeacher?.email || currentTeacher?.phone || session?.name || 'Giảng viên')
     : (session?.name || 'Admin');
   const pageTitle = resolvePageTitle(role, location.pathname, location.hash);
-  const adminHash = (location.hash || '').replace('#', '') || (location.pathname === '/admin' ? 'dashboard' : '');
-  const activeHash = (location.hash || '').replace('#', '');
-  const isStudentsTab = adminHash === 'students' || (role === 'teacher' && location.pathname === '/teacher' && !activeHash);
+  const activeHash = (location.hash || '').replace('#', '').split('?')[0];
+    const adminHash = activeHash || (location.pathname === '/admin' ? 'dashboard' : '');
+    const isStudentsTab = adminHash === 'students' || (role === 'teacher' && location.pathname === '/teacher' && !activeHash);
   const isInboxPage = location.pathname.includes('/inbox');
   const isBiPage = location.pathname.includes('/bi');
   const isImmersivePage =
@@ -1053,5 +1053,7 @@ const ChangePasswordModal = ({ session, role }) => {
 };
 
 export default DashboardLayout;
+
+
 
 
