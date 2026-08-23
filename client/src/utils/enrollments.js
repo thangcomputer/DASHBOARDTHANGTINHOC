@@ -400,7 +400,7 @@ export function getStudentCourseAccessKeys(enrollments, fallbackCourse) {
 export function studentCanAccessTrainingItem(item, accessKeys, enrollments, fallbackCourse) {
   if (!item) return false;
   const { courseId: cid, courseName: cname } = item;
-  if (!cid && !cname) return true;
+  if (!cid && !cname) return false; // Sửa lỗi: Không tự động cho phép nếu không có khóa cụ thể (để bộ lọc môn xử lý)
   if (cid && accessKeys.has(`id:${String(cid)}`)) return true;
   if (cname && accessKeys.has(`name:${normCourseKey(cname)}`)) return true;
   const enrolled = (enrollments || []).some((e) => {
@@ -418,8 +418,6 @@ function matchesActiveCourse(item, activeCourseName, enrollments) {
   if (item.courseName && normCourseKey(item.courseName) === activeNorm) return true;
   const enr = (enrollments || []).find((e) => normCourseKey(e.courseName || e.name) === activeNorm);
   if (item.courseId && enr?.courseId && String(item.courseId) === String(enr.courseId)) return true;
-  // Tài liệu không gắn khóa cụ thể → hiện theo môn (đã lọc subject ở ngoài)
-  if (!item.courseId && !item.courseName) return true;
   return false;
 }
 

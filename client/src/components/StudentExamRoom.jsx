@@ -446,6 +446,7 @@ const StudentExamRoom = ({
   const courseOptions = useMemo(() => {
     const opts = [{ value: 'all', label: 'Tất cả khóa học' }];
     enrollments.forEach((e) => {
+      if (e.cancelledAt || e.status === 'cancelled' || e.status === 'refunded') return;
       const name = e.courseName || e.name;
       if (name && !opts.some((o) => o.value === name)) {
         opts.push({ value: name, label: name });

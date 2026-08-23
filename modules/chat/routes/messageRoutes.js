@@ -3,7 +3,7 @@ const router  = express.Router();
 const Message = require('../models/Message');
 const Group   = require('../../student/models/Group');
 const { authMiddleware } = require('../../../shared/middleware/authMiddleware');
-
+console.log('--- MESSAGE ROUTES LOADED ---', typeof authMiddleware);
 router.use(authMiddleware);
 
 const Student = require('../../student/models/Student');

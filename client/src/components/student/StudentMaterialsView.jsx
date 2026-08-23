@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PlayCircle, FileText, BookOpen, HelpCircle, Download, Lock, Search, ChevronRight, Video, ClipboardList, Calendar, Clock, FileUp, Trophy } from 'lucide-react';
 import { htmlToPlainText } from '../../utils/htmlContent';
 import StudentQuizList from './StudentQuizList';
+import { buildMediaDownloadUrl } from '../../services/api';
 
 export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSelectAssignment }) => {
   const [activeTab, setActiveTab] = useState(() => {
@@ -163,7 +164,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
                 </div>
                 {m.fileUrl ? (
                   <a
-                    href={m.fileUrl}
+                    href={buildMediaDownloadUrl(m.fileUrl, m.title)}
                     target="_blank"
                     rel="noreferrer"
                     className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition flex-shrink-0 group-hover:bg-blue-100"
@@ -309,3 +310,5 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
 
 
 export default MaterialsView;
+
+

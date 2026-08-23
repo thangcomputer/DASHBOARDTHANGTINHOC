@@ -92,7 +92,7 @@ const SESSION_TTL_MS = 15 * 60 * 1000; // 15 phút
 // ── POST /api/webhooks/payment-session & /api/webhooks/create-session ──
 const handleCreateSession = async (req, res) => {
   try {
-    const { ref, content, amount, studentName, courseName } = req.body;
+    const { ref, content, amount, studentName, courseName, courseId, branchId, branchCode, studentId } = req.body;
     const finalRef = (ref || content || '').toLowerCase().trim();
     if (!finalRef) return res.status(400).json({ success: false, message: 'Thiếu nội dung chuyển khoản (ref/content)' });
 
@@ -105,6 +105,10 @@ const handleCreateSession = async (req, res) => {
       status: 'pending',
       studentName: studentName || '',
       courseName: courseName || '',
+      courseId: courseId || null,
+      branchId: branchId || null,
+      branchCode: branchCode || '',
+      studentId: studentId || null,
     });
 
     logger.info(`[PAYMENT SESSION] Tạo mới (DB): ${sessionId} — ref: "${finalRef}"`);
@@ -281,6 +285,54 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
           matched = true;
           matchedRef = claimed.ref;
           logger.info(`[SEPAY] Session ${claimed.sessionId} khớp ref="${claimed.ref}" — ${amount}đ (+Ledger)`);
+
+          // Update student if studentId is present
+          if (claimed.studentId) {
+            try {
+              const Student = require('../models/Student');
+              const setStudentFields = {
+                paid: true,
+                paidAmount: amount,
+                paidAt: new Date(),
+                paidNote: String(body.content || '').slice(0, 300),
+              };
+              if (claimed.branchId) {
+                setStudentFields.branchId = claimed.branchId;
+                setStudentFields.branchCode = claimed.branchCode || '';
+              }
+              if (claimed.courseName) {
+                setStudentFields.course = claimed.courseName;
+              }
+              if (claimed.courseId) {
+                setStudentFields.courseId = claimed.courseId;
+              }
+              setStudentFields.price = claimed.amount;
+              setStudentFields.status = 'Active';
+
+              const newEnrollment = {
+                courseName: claimed.courseName || '',
+                courseId: claimed.courseId || null,
+                branchId: claimed.branchId || null,
+                status: 'active',
+                paid: true,
+                price: claimed.amount,
+                paidAmount: amount,
+                totalSessions: 12,
+                remainingSessions: 12,
+                learningMode: 'OFFLINE',
+                registeredAt: new Date(),
+                learningAccess: true
+              };
+  
+              await Student.findByIdAndUpdate(claimed.studentId, { 
+                $set: setStudentFields,
+                $push: { enrollments: newEnrollment }
+              });
+              logger.info(`[SEPAY] Updated student ${claimed.studentId} with branch and course info from session`);
+            } catch (stuErr) {
+              logger.error(`[SEPAY] Failed to update student ${claimed.studentId} from session: %s`, stuErr.message);
+            }
+          }
 
           const io = req.app.get('io');
           if (io) {

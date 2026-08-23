@@ -124,7 +124,7 @@ export function mapCourseToExamSubjectIds(courseName, catalog) {
   for (const sub of Object.values(cat)) {
     if (n.includes(sub.id) || n.includes(normalizeCourseKey(sub.label))) return [sub.id];
   }
-  return pick([...OFFICE_EXAM_IDS]);
+  return [];
 }
 
 /**
@@ -338,11 +338,12 @@ export function requireWebcamForSubject(enrollments, subjectId, catalog, fallbac
 export function getSubjectIdsForStudent(enrollments, fallbackCourse, catalog) {
   const ids = new Set();
   if (Array.isArray(enrollments) && enrollments.length) {
-    enrollments.forEach((e) => getSubjectIdsForEnrollment(e, catalog).forEach((id) => ids.add(id)));
+    enrollments.forEach((e) => {
+      if (e.cancelledAt || e.status === 'cancelled' || e.status === 'refunded') return; // Bỏ qua khóa học đã hủy
+      getSubjectIdsForEnrollment(e, catalog).forEach((id) => ids.add(id));
+    });
   } else if (fallbackCourse) {
     mapCourseToExamSubjectIds(fallbackCourse, catalog).forEach((id) => ids.add(id));
-  } else {
-    OFFICE_EXAM_IDS.forEach((id) => { if ((catalog || BUILTIN_EXAM_SUBJECTS)[id]) ids.add(id); });
   }
   return [...ids];
 }
@@ -350,12 +351,15 @@ export function getSubjectIdsForStudent(enrollments, fallbackCourse, catalog) {
 export function getSubjectIdsForCourseFilter(enrollments, filterCourse, fallbackCourse, catalog) {
   if (filterCourse === 'all') return getSubjectIdsForStudent(enrollments, fallbackCourse, catalog);
   const enr = enrollments.find((e) => (e.courseName || e.name) === filterCourse);
-  if (enr) return getSubjectIdsForEnrollment(enr, catalog);
+  if (enr) {
+    if (enr.cancelledAt || enr.status === 'cancelled' || enr.status === 'refunded') return []; // Bỏ qua khóa học đã hủy
+    return getSubjectIdsForEnrollment(enr, catalog);
+  }
   return mapCourseToExamSubjectIds(filterCourse, catalog);
 }
 
 export function buildExamSubjectsFromProgress(examProgress, subjectIds) {
-  const ids = subjectIds?.length ? subjectIds : [...OFFICE_EXAM_IDS];
+  const ids = subjectIds || [];
   return ids.map((id) => {
     const def = { id, status: 'chua_thi', tracNghiem: null, thucHanh: 'chua_nop', lockUntil: null };
     const saved = (examProgress || []).find((s) => s.id === id);

@@ -197,7 +197,7 @@ export default function AdminStudentTrainingTab() {
                             </label>
                             {sTrainingForm.fileUrl && (
                               <a
-                                href={sTrainingForm.fileUrl}
+                                href={buildMediaDownloadUrl(sTrainingForm.fileUrl, sTrainingForm.fileOriginalName)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex items-center gap-2 max-w-[min(100%,14rem)] px-3 py-2 rounded-xl bg-sky-100/80 border border-sky-200 text-sky-900 text-xs font-bold hover:bg-sky-200/80 transition-colors truncate"
@@ -398,7 +398,7 @@ export default function AdminStudentTrainingTab() {
                                 <td className="px-4 py-3 text-center">
                                   {r.thucHanh === 'da_nop' ? (
                                     r.essayFile ? (
-                                      <a href={r.essayFile.startsWith('http') ? r.essayFile : `${import.meta.env.VITE_API_URL || ""}${r.essayFile}`} 
+                                      <a href={buildMediaDownloadUrl(r.essayFile, r.essayFile.split('/').pop())} 
                                          target="_blank" rel="noopener noreferrer"
                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-black transition border border-blue-200">
                                         <Download size={12} /> Tải bài

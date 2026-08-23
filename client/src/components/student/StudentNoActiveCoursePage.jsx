@@ -1,48 +1,67 @@
 import React from 'react';
-import { BookOpen, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Lock, LogOut } from 'lucide-react';
+import RegistrationForm from '../RegistrationForm';
 
 /**
  * Shown when student account is valid but has no usable course
- * (chỉ còn hủy / hoàn tiền / chưa thanh toán — không gồm đã hoàn thành khóa).
+ * Displays a full-screen Registration Form, blocking interaction with the dashboard.
  */
-export default function StudentNoActiveCoursePage() {
+export default function StudentNoActiveCoursePage({ student }) {
   const navigate = useNavigate();
+  
+  const handleNavigate = (path) => {
+    // Navigate via hard reload if the user completes registration
+    if (path.includes('payment') || path === '/') {
+       window.location.href = path;
+    } else {
+       navigate(path);
+    }
+  };
+
+  const isLocked = student && (student.status === 'Locked' || student.status === 'Bị khóa');
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center p-6">
-      <div className="max-w-md w-full text-center space-y-5">
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <GraduationCap className="text-slate-500" size={32} />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-xl font-black text-slate-800">
-            Bạn hiện không có khóa học để tiếp tục
-          </h1>
-          <p className="text-sm text-slate-500 leading-relaxed">
-            Khóa học trước của bạn đã được hủy hoặc hoàn tiền.
-            Bạn có thể đăng ký khóa học mới để tiếp tục học.
-            Tài khoản của bạn vẫn còn hiệu lực.
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+      <div className="absolute top-4 right-4 z-50">
+        <button
+          onClick={() => {
+            localStorage.removeItem('student_user');
+            localStorage.removeItem('student_token');
+            window.location.href = '/login';
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 hover:text-red-600 border border-slate-200 rounded-lg shadow-sm font-medium transition-colors"
+        >
+          <LogOut size={16} />
+          <span>Đăng xuất</span>
+        </button>
+      </div>
+
+      {isLocked ? (
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden p-8 text-center border-t-4 border-red-500">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Tài khoản bị khóa</h2>
+          <p className="text-slate-600 mb-6 leading-relaxed">
+            Tài khoản của bạn đã bị khóa bởi quản trị viên. Bạn không thể thực hiện bất kỳ thao tác nào hoặc đăng ký khóa học mới lúc này.
+          </p>
+          <p className="text-sm text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-100">
+            Vui lòng liên hệ với trung tâm qua số điện thoại hoặc Zalo hỗ trợ để được giải đáp.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 justify-center">
-          <button
-            type="button"
-            onClick={() => navigate('/dangkykhoahoc')}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700"
-          >
-            <BookOpen size={16} />
-            Đăng ký khóa học
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/student#profile')}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold hover:bg-slate-50"
-          >
-            Xem hồ sơ
-          </button>
-        </div>
-      </div>
+      ) : (
+        <RegistrationForm 
+          onNavigate={handleNavigate} 
+          initialData={student ? { 
+            id: student._id || student.id, 
+            name: student.name, 
+            phone: student.phone || student.zalo,
+            branchId: student.branchId,
+            branchCode: student.branchCode
+          } : {}}
+        />
+      )}
     </div>
   );
 }

@@ -54,7 +54,7 @@ export default function StudentLearningAccessGate({
   const hasAccess = hasLearningAccessEnrollment(student);
 
   if ((!student || !hasAccess) && !hashAllowed) {
-    return <StudentNoActiveCoursePage />;
+    return <StudentNoActiveCoursePage student={student} />;
   }
 
   return children;

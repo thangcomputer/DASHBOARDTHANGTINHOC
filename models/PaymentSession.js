@@ -7,6 +7,10 @@ const paymentSessionSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'paid', 'expired'], default: 'pending' },
   studentName: { type: String, default: '' },
   courseName: { type: String, default: '' },
+  courseId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
+  branchCode: { type: String, default: '' },
+  studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
   paidAmount: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now, expires: 86400 } // Tự động xóa sau 24h (86400 giây)
 });

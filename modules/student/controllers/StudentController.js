@@ -37,6 +37,21 @@ class StudentController {
       // Replaced by Zod Validator
       const result = await queryBus.dispatch(new queries.Get_idQuery(StudentValidator.validateGet_id(req)));
       if (!result) return;
+      
+      if (req.user && req.user.role === 'student' && result._body && result._body.success && result._body.data) {
+        const student = result._body.data;
+        if (student._id && String(student._id) === String(req.user.id)) {
+          const activeEnrs = (student.enrollments || []).filter(e => !e.cancelledAt && e.status !== 'cancelled' && e.status !== 'refunded');
+          if (activeEnrs.length === 0) {
+            return res.status(403).json({
+              success: false,
+              code: 'ACCOUNT_DISABLED',
+              message: 'Bạn không có khóa học nào đang hoạt động hoặc các khóa học đã bị hủy/hoàn tiền. Tài khoản đã tạm khóa. Vui lòng liên hệ trung tâm.'
+            });
+          }
+        }
+      }
+
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
     } catch (err) {
@@ -50,6 +65,21 @@ class StudentController {
       // Replaced by Zod Validator
       const result = await queryBus.dispatch(new queries.Get_id_full_detailQuery(StudentValidator.validateGet_id_full_detail(req)));
       if (!result) return;
+
+      if (req.user && req.user.role === 'student' && result._body && result._body.success && result._body.data) {
+        const student = result._body.data;
+        if (student._id && String(student._id) === String(req.user.id)) {
+          const activeEnrs = (student.enrollments || []).filter(e => !e.cancelledAt && e.status !== 'cancelled' && e.status !== 'refunded');
+          if (activeEnrs.length === 0) {
+            return res.status(403).json({
+              success: false,
+              code: 'ACCOUNT_DISABLED',
+              message: 'Bạn không có khóa học nào đang hoạt động hoặc các khóa học đã bị hủy/hoàn tiền. Tài khoản đã tạm khóa. Vui lòng liên hệ trung tâm.'
+            });
+          }
+        }
+      }
+
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
     } catch (err) {

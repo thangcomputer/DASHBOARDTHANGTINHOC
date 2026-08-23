@@ -10,6 +10,7 @@ import AdminCourseBuilder from '../../AdminCourseBuilder';
 import TeacherQuestionBankPanel from './TeacherQuestionBankPanel';
 import RichTextEditor from '../shared/RichTextEditor';
 import { resolveTeacherExamDate, isTeacherExamDateApproximate, resolvePracticalFileUrl, practicalFileDisplayName, practicalFileDownloadUrl, practicalFileViewUrl } from '../utils/teacherExam';
+import { buildMediaDownloadUrl } from '../../../services/api';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
@@ -135,7 +136,7 @@ export default function AdminTrainingTab() {
                             </label>
                             {trainingForm.fileUrl && (
                               <a
-                                href={trainingForm.fileUrl}
+                                href={buildMediaDownloadUrl(trainingForm.fileUrl, trainingForm.fileOriginalName)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex items-center gap-2 max-w-[min(100%,14rem)] px-3 py-2 rounded-xl bg-red-100/80 border border-red-200 text-red-900 text-xs font-bold hover:bg-red-200/80 transition-colors truncate"
@@ -641,3 +642,5 @@ export default function AdminTrainingTab() {
             </div>
   );
 }
+
+

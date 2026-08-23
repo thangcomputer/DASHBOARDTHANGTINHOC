@@ -6,6 +6,7 @@ const Teacher = require('../../modules/teacher/models/Teacher');
 
 // Proxy requireAuth to authenticate, ensuring req.user is set
 const requireAuth = (req, res, next) => {
+  console.log('--- REQUIRE AUTH CALLED ---', req.url);
   return authenticate(req, res, () => {
     req.user = req.user || req.currentUser;
     next();

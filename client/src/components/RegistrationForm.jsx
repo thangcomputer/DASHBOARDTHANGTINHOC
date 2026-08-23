@@ -75,7 +75,7 @@ function ExpiredOverlay({ onBack }) {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-const RegistrationForm = ({ onNavigate }) => {
+const RegistrationForm = ({ onNavigate, initialData = {} }) => {
   const { addStudent } = useData();
   const toast = useToast();
   const [step, setStep]         = useState(1);
@@ -101,14 +101,14 @@ const RegistrationForm = ({ onNavigate }) => {
   const [coursesLoading, setCoursesLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    name: '', age: '', zalo: '', gender: 'male',
+    name: initialData.name || '', age: '', zalo: initialData.phone || '', gender: 'male',
     courseId:        '',
     course:          '',
     price:           0,
     discountPercent: 0,
     effectivePrice:  0,
-    branchId:        '',
-    branchCode:      '', // CS1, CS2 — dùng prefix QR
+    branchId:        initialData.branchId || '',
+    branchCode:      initialData.branchCode || '', // CS1, CS2 — dùng prefix QR
   });
 
   // Fetch branches
@@ -120,8 +120,19 @@ const RegistrationForm = ({ onNavigate }) => {
       .then(res => {
         if (res.success && res.data.length > 0) {
           setBranches(res.data);
-          // Chọn chi nhánh đầu tiên mặc định
-          setFormData(f => ({ ...f, branchId: res.data[0]._id, branchCode: res.data[0].code }));
+          // Chọn chi nhánh mặc định: ưu tiên initialData, sau đó là chi nhánh CNTT, cuối cùng là chi nhánh đầu tiên
+          setFormData(f => {
+            if (f.branchId) {
+              if (!f.branchCode) {
+                const b = res.data.find(x => x._id === f.branchId);
+                if (b) return { ...f, branchCode: b.code || '' };
+              }
+              return f;
+            }
+            const cnttBranch = res.data.find(b => b.code === 'CNTT' || b.name?.toUpperCase().includes('CNTT'));
+            const defaultBranch = cnttBranch || res.data[0];
+            return { ...f, branchId: defaultBranch._id, branchCode: defaultBranch.code };
+          });
         }
       })
       .catch(() => {})
@@ -188,7 +199,16 @@ const RegistrationForm = ({ onNavigate }) => {
       fetch(`${API}/api/webhooks/payment-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: ckContent.toLowerCase(), amount: payAmount }),
+        body: JSON.stringify({
+          ref: ckContent.toLowerCase(),
+          amount: payAmount,
+          studentName: formData.name,
+          courseName: formData.course,
+          courseId: formData.courseId,
+          branchId: formData.branchId,
+          branchCode: formData.branchCode,
+          studentId: initialData?.id || initialData?._id || undefined,
+        }),
       })
         .then(r => r.json())
         .then(res => {
@@ -237,59 +257,67 @@ const RegistrationForm = ({ onNavigate }) => {
               branchCode: formData.branchCode || '',
               paid: true,
             };
-            addStudent(studentPayload)
-              .then(() => {
-                showModal({
-              title: 'HÓA ĐƠN ĐĂNG KÝ HỌC',
-              content: (
-                <div className="flex flex-col items-center gap-4 w-full rounded-2xl bg-slate-100 p-3 sm:p-5">
-                  <InvoicePreviewFrame
-                    data={{
-                      studentName: formData.name,
-                      courseName: formData.course,
-                      tuitionFee: formData.effectivePrice || formData.price,
-                      date: new Date(),
-                      isPaid: true,
-                    }}
-                  />
-                  <div className="flex flex-wrap justify-center gap-3 w-full max-w-lg relative z-20">
-                    <button
-                      type="button"
-                      onClick={() => printInvoice()}
-                      className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Printer size={18} /> IN (PRINT)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => exportPDF({ studentName: formData.name })}
-                      className="flex-1 min-w-[120px] py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Download size={18} /> TẢI PDF
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closeModal();
-                        setStep(3);
+
+            const handleSuccess = () => {
+              showModal({
+                title: 'HÓA ĐƠN ĐĂNG KÝ HỌC',
+                content: (
+                  <div className="flex flex-col items-center gap-4 w-full rounded-2xl bg-slate-100 p-3 sm:p-5">
+                    <InvoicePreviewFrame
+                      data={{
+                        studentName: formData.name,
+                        courseName: formData.course,
+                        tuitionFee: formData.effectivePrice || formData.price,
+                        date: new Date(),
+                        isPaid: true,
                       }}
-                      className="flex-1 min-w-[120px] py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center justify-center"
-                    >
-                      ĐÓNG
-                    </button>
+                    />
+                    <div className="flex flex-wrap justify-center gap-3 w-full max-w-lg relative z-20">
+                      <button
+                        type="button"
+                        onClick={() => printInvoice()}
+                        className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Printer size={18} /> IN (PRINT)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => exportPDF({ studentName: formData.name })}
+                        className="flex-1 min-w-[120px] py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Download size={18} /> TẢI PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeModal();
+                          setStep(3);
+                        }}
+                        className="flex-1 min-w-[120px] py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center justify-center"
+                      >
+                        ĐÓNG
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ),
-              type: 'info',
-              confirmText: null,
-              size: '3xl',
-              onConfirm: () => setStep(3)
-            });
-                setTimeout(() => setStep(3), 500);
-              })
-              .catch((err) => {
-                toast.error('Đã thanh toán nhưng đăng ký học viên thất bại: ' + (err.message || ''));
+                ),
+                size: '3xl',
+                onConfirm: () => setStep(3)
               });
+            };
+
+            if (initialData?.id || initialData?._id) {
+              handleSuccess();
+              setTimeout(() => setStep(3), 500);
+            } else {
+              addStudent(studentPayload)
+                .then(() => {
+                  handleSuccess();
+                  setTimeout(() => setStep(3), 500);
+                })
+                .catch((err) => {
+                  toast.error('Đã thanh toán nhưng đăng ký học viên thất bại: ' + (err.message || ''));
+                });
+            }
           } else if (res.status === 'expired') {
             clearInterval(countdownRef.current);
             clearInterval(pollRef.current);

@@ -1263,7 +1263,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                     </div>
                     <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
                       <Building2 size={14} className="text-slate-400 shrink-0" />
-                      <span className="truncate">Chi nhánh: {data.student.branchCode || 'Hệ thống'}</span>
+                      <span className="truncate">Chi nhánh: {data.student.branchId?.name || data.student.branchId?.code || data.student.branchCode || 'Hệ thống'}</span>
                     </div>
                     <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
                       <Calendar size={14} className="text-slate-400 shrink-0" />
@@ -1452,7 +1452,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                   </button>
                                 </div>
                                 <div className="space-y-3">
-                                  {enrollments.map((enr) => {
+                                  {enrollments.filter(e => !e.cancelledAt && e.status !== 'cancelled' && e.status !== 'refunded').map((enr) => {
                                     const enrId = enr.enrollmentId || enr._id || enr.id;
                                     const isCancelled = enr.status === 'cancelled';
                                     const progress = enr.totalSessions

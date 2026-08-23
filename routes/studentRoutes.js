@@ -456,7 +456,7 @@ router.get('/:id', [authMiddleware, branchFilter, policyShadowStudentRead('get_o
 
     // ⭐ 403 guard: STAFF chỉ được xem HV của chi nhánh mình
     if (req.userBranchId) {
-      const studentBranch = student.branchId ? String(student.branchId) : null;
+      const studentBranch = student.branchId ? String(student.branchId._id || student.branchId) : null;
       if (studentBranch && studentBranch !== String(req.userBranchId)) {
         return res.status(403).json({ success: false, message: 'Không có quyền truy cập học viên này' });
       }
@@ -489,12 +489,13 @@ router.get('/:id', [authMiddleware, branchFilter, policyShadowStudentRead('get_o
 router.get('/:id/full-detail', [authMiddleware, branchFilter, policyShadowStudentRead('full_detail')], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
-      .populate('teacherId', 'name phone specialty avatar');
+      .populate('teacherId', 'name phone specialty avatar')
+        .populate('branchId', 'name code');
 
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
 
     // 🛡️ 403 guard: STAFF chỉ được xem HV của chi nhánh mình
-    if (req.userBranchId && student.branchId && String(student.branchId) !== String(req.userBranchId)) {
+    if (req.userBranchId && student.branchId && String(student.branchId._id || student.branchId) !== String(req.userBranchId)) {
       return res.status(403).json({ success: false, message: 'Không có quyền truy cập dữ liệu học viên cơ sở khác' });
     }
 
@@ -3184,3 +3185,6 @@ router.put('/:id/pay-teacher', [authMiddleware, branchFilter, policyShadowStuden
 });
 
 module.exports = router;
+
+
+

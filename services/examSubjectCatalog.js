@@ -112,21 +112,18 @@ function inferExamSubjectsFromCourseName(name, category, customRaw) {
   if (n.includes('c++') || n.includes('cpp')) return pick(['cpp']);
   if (n.includes('web')) return pick(['web']);
   if (n.includes('canva')) return pick(['canva']);
-  if (category === 'van-phong') return pick([...OFFICE_EXAM_IDS]);
-  if (category === 'chung-chi') return pick(['mos-word', 'mos-excel', 'mos-powerpoint']);
-  if (category === 'do-hoa') return pick(['photoshop', 'canva', 'corel', 'autocad']);
-  if (category === 'lap-trinh') return pick(['cpp', 'web', 'python']);
+
   if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
   if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
   if (n.includes('powerpoint') || n.includes('ppt')) return pick(['coban', 'powerpoint']);
   for (const sub of getMergedExamCatalog(customRaw)) {
     if (n.includes(sub.id) || n.includes(normalizeCourseKey(sub.label))) return [sub.id];
   }
-  return pick([...OFFICE_EXAM_IDS]);
+  return [];
 }
 
 function resolveExamSubjectsForCourse(course, customRaw) {
-  if (!course) return sanitizeExamSubjects([...OFFICE_EXAM_IDS], customRaw);
+  if (!course) return [];
   const sanitized = sanitizeExamSubjects(course.examSubjects, customRaw);
   if (sanitized.length) return sanitized;
   return inferExamSubjectsFromCourseName(course.name, course.category, customRaw);
