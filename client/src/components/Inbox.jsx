@@ -35,7 +35,8 @@ import {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 const formatTime = (date) => {
-  const d = new Date(date);
+    if (!date) return '';
+    const d = new Date(date);
   const now = new Date();
   const diffMs = now - d;
   if (diffMs < 60000) return 'Vừa xong';
