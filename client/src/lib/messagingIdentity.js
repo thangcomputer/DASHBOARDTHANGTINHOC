@@ -274,6 +274,7 @@ export function normalizeMessage(raw = {}) {
     read: Boolean(raw.read ?? raw.isRead),
     isRead: Boolean(raw.isRead ?? raw.read),
     isRecalled: Boolean(raw.isRecalled),
+    isPinned: Boolean(raw.isPinned),
     reactions: raw.reactions || [],
   };
 }

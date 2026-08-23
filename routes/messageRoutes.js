@@ -554,6 +554,56 @@ router.put('/read/:conversationId', messagesGuard('read'), async (req, res) => {
   }
 });
 
+// ── Ghim tin nhắn ──
+router.put('/:conversationId/pin', messagesGuard('reaction'), async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { messageId } = req.body;
+    const message = await Message.findOne({ _id: messageId, conversationId });
+    if (!message) return res.status(404).json({ success: false, message: 'Không tìm thấy tin nhắn' });
+
+    // Toggle pin status
+    message.isPinned = !message.isPinned;
+    await message.save();
+
+    // If it is pinned, unpin all others in this conversation
+    if (message.isPinned) {
+      await Message.updateMany(
+        { conversationId, _id: { $ne: message._id }, isPinned: true },
+        { $set: { isPinned: false } }
+      );
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      const pinPayload = {
+        conversationId,
+        messageId: message._id,
+        isPinned: message.isPinned
+      };
+      if (conversationId.startsWith('group_')) {
+        io.to(conversationId).emit('message:pinned', pinPayload);
+      } else {
+        const parts = (conversationId || '').split('__');
+        parts.forEach(p => {
+          if (!p) return;
+          const sepIdx = p.indexOf('_');
+          if (sepIdx <= 0) return;
+          const role = p.substring(0, sepIdx);
+          const id = p.substring(sepIdx + 1);
+          if (role === 'admin') return io.to('ALL_ADMIN').emit('message:pinned', pinPayload);
+          if (role === 'staff') return io.to('ALL_STAFF').emit('message:pinned', pinPayload);
+          io.to(`${role}_${id}`).emit('message:pinned', pinPayload);
+        });
+      }
+    }
+
+    res.json({ success: true, message: message.isPinned ? 'Đã ghim tin nhắn' : 'Đã bỏ ghim', pinnedMessageId: message.isPinned ? message._id : null });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── Phản ứng (Reaction) ──
 router.patch('/:messageId/reaction', messagesGuard('reaction'), async (req, res) => {
   try {

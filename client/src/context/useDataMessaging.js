@@ -61,6 +61,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         isGroup: n.isGroup,
         groupId: n.groupId,
         isRecalled: n.isRecalled,
+              isPinned: n.isPinned,
         messageType: n.messageType,
         fileName: n.fileName,
         fileUrl: n.fileUrl,
@@ -300,6 +301,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             time: n.time instanceof Date ? n.time : new Date(m.createdAt || Date.now()),
             read: n.read,
             isRecalled: n.isRecalled,
+              isPinned: n.isPinned,
             reactions: n.reactions,
           };
         });

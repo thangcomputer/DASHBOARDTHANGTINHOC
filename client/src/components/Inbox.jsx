@@ -218,7 +218,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const location = useLocation();
   const toast = useToast();
   const socketCtx = useSocket();
-  const { isConnected, sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
+  const { isConnected, sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onMessagePinned, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
   const {
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers, groups,
@@ -395,31 +395,39 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     setMessages([]);
   }, [activeConv, contactsLoaded, contacts, students, teachers, staffs]);
   const [pendingImage, setPendingImage] = useState(null);
-  // Fetch pinned message if not in local state
+    // Fetch pinned message if not in local state
   useEffect(() => {
     const pinnedId = activeConv?.metadata?.pinnedMessageId;
-    if (!pinnedId) {
-      setPinnedMessageObj(null);
-      return;
-    }
-    const localMatch = messages.find(m => String(m.id || m._id) === String(pinnedId));
-    if (localMatch) {
-      setPinnedMessageObj(localMatch);
+    if (pinnedId) {
+      const localMatch = messages.find(m => String(m.id || m._id) === String(pinnedId));
+      if (localMatch) {
+        setPinnedMessageObj(localMatch);
+      } else {
+        messagesAPI.getMessage(pinnedId).then(res => {
+          if (res?.success) setPinnedMessageObj(res.message);
+        }).catch(err => console.log('Failed to fetch pinned message', err));
+      }
     } else {
-      messagesAPI.getMessage(pinnedId).then(res => {
-        if (res?.success) setPinnedMessageObj(res.message);
-      }).catch(err => console.log('Failed to fetch pinned message', err));
+      const localMatch = messages.find(m => m.isPinned);
+      if (localMatch) {
+        setPinnedMessageObj(localMatch);
+        setActiveConv(prev => prev ? ({
+          ...prev,
+          metadata: { ...(prev.metadata || {}), pinnedMessageId: localMatch.id || localMatch._id }
+        }) : prev);
+      } else {
+        setPinnedMessageObj(null);
+      }
     }
   }, [activeConv?.metadata?.pinnedMessageId, messages]);
 
   const handlePinMessage = async (msgId) => {
     if (!activeConv) return;
     try {
+      const isCurrentlyPinned = activeConv?.metadata?.pinnedMessageId === String(msgId);
       const res = await messagesAPI.pinMessage(activeConv.id, msgId);
       if (res?.success) {
-        toast.success(res.message || '�� c?p nh?t ghim');
-        // socket will trigger 'conversation_updated' and we might need to handle it or it's handled automatically if we have a listener.
-        // But for optimistic update:
+        toast.success(res.message || 'Đã cập nhật ghim');
         setActiveConv(prev => ({
           ...prev,
           metadata: {
@@ -427,11 +435,30 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             pinnedMessageId: res.pinnedMessageId || null
           }
         }));
+        
+        if (activeConv && activeConv.user && activeConv.user.id) {
+          const properMsg = {
+            conversationId: activeConv.id,
+            senderId: currentUserId,
+            senderName: currentUserName,
+            senderRole: currentUserRole,
+            receiverId: activeConv.user.id,
+            receiverName: activeConv.user.name,
+            receiverRole: activeConv.user.role,
+            content: !isCurrentlyPinned 
+              ? `${currentUserName || 'Người dùng'} đã ghim một tin nhắn.` 
+              : `${currentUserName || 'Người dùng'} đã bỏ ghim một tin nhắn.`,
+            messageType: 'system',
+            isGroup: activeConv.isGroup || false,
+            groupId: activeConv.isGroup ? activeConv.user.id : null,
+          };
+          await ctxSendMessage(properMsg);
+        }
       } else {
-        toast.error(res?.message || 'L?i khi ghim tin nh?n');
+        toast.error(res?.message || 'Lỗi khi ghim tin nhắn');
       }
     } catch (err) {
-      toast.error('L?i khi ghim tin nh?n');
+      toast.error('Lỗi khi ghim tin nhắn');
     }
   };
 
@@ -441,11 +468,32 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (!res?.success) throw new Error(res?.message || 'Kh�ng th? x?p l?ch');
       toast.success('�� x?p l?ch h?c th�nh c�ng');
       setShowScheduleModal(false);
-      // Send system message
-      if (activeConv && activeConv.id) {
-        await ctxSendMessage(activeConv.id, '�� x?p l?ch h?c th�nh c�ng', [], null, 'system');
-      }
-    } catch (err) {
+        // Send system message
+        if (activeConv && activeConv.id) {
+          let displayDate = formData.date;
+          try {
+            if (displayDate && displayDate.includes('-')) {
+              const parts = displayDate.split('-');
+              if (parts.length === 3) displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+          } catch(e) {}
+          
+          const properMsg = {
+            conversationId: activeConv.id,
+            senderId: currentUserId,
+            senderName: currentUserName,
+            senderRole: currentUserRole,
+            receiverId: activeConv.user.id,
+            receiverName: activeConv.user.name,
+            receiverRole: activeConv.user.role,
+            content: `Đã xếp lịch học thành công cho học viên vào ngày ${displayDate} từ ${formData.startTime} đến ${formData.endTime}.`,
+            messageType: 'system',
+            isGroup: activeConv.isGroup || false,
+            groupId: activeConv.isGroup ? activeConv.user.id : null,
+          };
+          await ctxSendMessage(properMsg);
+        }
+          } catch (err) {
       toast.error(err?.message || 'Kh�ng th? c?p nh?t l?ch h?c');
     }
   };
@@ -772,6 +820,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       fileUrl: m.fileUrl,
       fileExpired: m.fileExpired || false,
       reactions: m.reactions || [],
+        isPinned: m.isPinned || false,
     };
   }, [resolveSenderMeta, currentUserId, currentUserName, activeConv?.user?.role]);
 
@@ -875,7 +924,23 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Socket real-time listeners ──────────────────────────────────────────────
   useEffect(() => {
-    let unsubRecall, unsubReaction, unsubMsg;
+    let unsubRecall, unsubReaction, unsubMsg, unsubPinned;
+      
+      if (onMessagePinned) {
+        unsubPinned = onMessagePinned((data) => {
+          if (activeConv && String(data.conversationId) === String(activeConv.id)) {
+            setActiveConv(prev => ({
+              ...prev,
+              metadata: { ...prev.metadata, pinnedMessageId: data.isPinned ? data.messageId : null }
+            }));
+            setMessages(prev => prev.map(m => {
+              if (String(m.id) === String(data.messageId)) return { ...m, isPinned: data.isPinned };
+              if (data.isPinned && m.isPinned) return { ...m, isPinned: false };
+              return m;
+            }));
+          }
+        });
+      }
 
     if (onMessageReceive) {
       unsubMsg = onMessageReceive((data) => {
@@ -900,6 +965,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               fileUrl: data.fileUrl,
               fileExpired: data.fileExpired || false,
               reactions: data.reactions || [],
+                isPinned: data.isPinned || false,
             };
             return [...prev, mappedMsg];
           });
@@ -1838,19 +1904,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </button>
                   ) : null}
                   
-                  {(!activeConv.isGroup && currentUserRole !== 'student') && (
-                    <button
-                      onClick={() => setShowScheduleModal(true)}
-                      className="flex shrink-0 items-center justify-center px-3 h-9 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-wide transition-colors shadow-sm gap-1.5 ml-auto"
-                      title="Xếp lịch học"
-                      >
-                        <Calendar size={14} /> Xếp lịch
-                      </button>
-                  )}
+                  
                 </div>
 
                 {pinnedMessageObj && (
-                  <div className="mx-3 mt-2 px-4 py-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl flex items-center justify-between gap-3 shadow-sm relative group overflow-hidden shrink-0">
+                  <div 
+                      onClick={() => {
+                        const el = document.getElementById(`msg-${pinnedMessageObj.id || pinnedMessageObj._id}`);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          el.classList.add('animate-pulse', 'bg-blue-50/50');
+                          setTimeout(() => el.classList.remove('animate-pulse', 'bg-blue-50/50'), 2000);
+                        }
+                      }}
+                      className="mx-3 mt-2 px-4 py-2.5 bg-blue-50/50 hover:bg-blue-50 cursor-pointer transition-colors border border-blue-100/50 rounded-xl flex items-center justify-between gap-3 shadow-sm relative group overflow-hidden shrink-0">
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400 rounded-l-xl"></div>
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
@@ -1970,7 +2037,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                   if (msg.messageType === 'system') {
                     return (
-                      <div key={msg.id} className="flex justify-center my-3">
+                      <div id={`msg-${msg.id}`} key={msg.id} className="flex justify-center my-3">
                         <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full shadow-sm">
                           {msg.content}
                         </span>
@@ -1979,7 +2046,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   }
 
                   return (
-                    <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative`}>
+                    <div id={`msg-${msg.id}`} key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative`}>
                       <div className={`max-w-[85%] md:max-w-[70%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
                         {!isMine && (
                           <div className="flex items-center gap-2 mb-1 ml-1">
@@ -2183,7 +2250,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                         {/* Time & read status */}
                         <div className={`flex items-center gap-1.5 mt-1.5 ${isMine ? 'justify-end' : ''}`}>
-                          <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
+                          {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
+                              <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
+                                <Pin size={10} className="rotate-45" />
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
                           {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
                             <span title="Chưa gửi được (Kết nối yếu)">
                               <AlertCircle size={10} className="text-red-500 animate-pulse" />
@@ -2231,6 +2303,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     >
                       {isUploading ? <span className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
                     </button>
+                      {(!activeConv?.isGroup && currentUserRole === 'teacher' && activeConv?.user?.role === 'student') && (
+                        <button
+                          onClick={() => setShowScheduleModal(true)}
+                          className="p-2 text-violet-500 hover:text-violet-600 hover:bg-violet-50 hover:shadow-sm rounded-xl transition-all"
+                          title="Xếp lịch học"
+                        >
+                          <Calendar size={20} />
+                        </button>
+                      )}
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading}
@@ -2694,23 +2775,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           schedule={{ studentId: activeConv?.user?.id }}
           teacherId={currentUserId}
           onClose={() => setShowScheduleModal(false)}
-          onSubmit={async (data) => {
-            setShowScheduleModal(false);
-            if (socket) {
-              const properId = buildConversationId(currentUserRole, currentUserId, activeConv.user.role, activeConv.user.id);
-              socket.emit('send_message', {
-                conversationId: properId,
-                senderId: currentUserId,
-                senderName: currentUserName,
-                senderRole: currentUserRole,
-                receiverId: activeConv.user.id,
-                receiverName: activeConv.user.name,
-                receiverRole: activeConv.user.role,
-                content: `Hệ thống: Đã xếp lịch học thành công cho học viên.`,
-                messageType: 'system'
-              });
-            }
-          }}
+          onSubmit={handleScheduleSubmit}
         />
       )}
     </div>

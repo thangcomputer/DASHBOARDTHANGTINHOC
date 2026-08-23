@@ -323,6 +323,9 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     newSocket.on('message:sent', onMessageSentEvt);
     newSocket.on('message:reaction', onMessageReaction);
     newSocket.on('message:recall', onMessageRecall);
+    newSocket.on('message:pinned', (data) => {
+      if (onMessagePinned) onMessagePinned(data);
+    });
     newSocket.on('message:read_ack', onMessageReadAck);
     newSocket.on('typing:show', onTypingShow);
     newSocket.on('typing:hide', onTypingHide);
