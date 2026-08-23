@@ -563,11 +563,11 @@ const TeacherDashboard = ({ onNavigate }) => {
   }
 
   return (
-    <div className="bg-transparent h-full flex flex-col">
+    <div className="bg-transparent h-full flex flex-col min-h-0">
       {/* Popup thông báo — hiện 1 lần/ngày */}
       <PopupBanner role="teacher" />
 
-      <div className="min-w-0 flex-1 flex flex-col h-full">
+      <div className="min-w-0 flex-1 flex flex-col">
         {/* Topbar removed - using DashboardLayout header */}
 
 
@@ -805,4 +805,6 @@ const TeacherDashboard = ({ onNavigate }) => {
 };
 
 export default TeacherDashboard;
+
+
 

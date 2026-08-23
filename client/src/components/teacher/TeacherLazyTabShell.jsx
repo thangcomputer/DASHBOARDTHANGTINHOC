@@ -17,7 +17,7 @@ function TabFallback() {
 
 function LazyTeacherTab({ Component, ...props }) {
   return (
-    <div className="animate-in fade-in duration-300 h-full flex flex-col">
+    <div className="animate-in fade-in duration-300 flex-1 min-h-0 flex flex-col w-full">
       <Suspense fallback={<TabFallback />}>
         <Component {...props} />
       </Suspense>
@@ -40,4 +40,5 @@ export function TeacherLazyProfileTab(props) {
 export function TeacherLazyOverviewTab(props) {
   return <LazyTeacherTab Component={LazyOverviewTab} {...props} />;
 }
+
 

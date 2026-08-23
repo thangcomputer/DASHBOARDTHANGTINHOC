@@ -475,7 +475,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const isInboxPage = location.pathname.includes('/inbox');
   const isBiPage = location.pathname.includes('/bi');
   const isImmersivePage =
-    isInboxPage || isBiPage || (role === 'teacher' && location.pathname === '/teacher/test');
+    isInboxPage || isBiPage || (role === 'teacher' && location.pathname === '/teacher/test') || (role === 'teacher' && isStudentsTab);
   const showAdminBranch = role === 'admin';
   const roleLabel = role === 'admin'
     ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : session?.adminRole === 'SUPPORT' ? 'Chuyên viên Hỗ trợ' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')
@@ -1052,3 +1052,4 @@ const ChangePasswordModal = ({ session, role }) => {
 };
 
 export default DashboardLayout;
+
