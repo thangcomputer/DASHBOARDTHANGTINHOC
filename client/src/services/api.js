@@ -1,4 +1,4 @@
-﻿// ─── API Service - Hệ thống CMS Thắng Tin Học ───────────────────────────────
+// ─── API Service - Hệ thống CMS Thắng Tin Học ───────────────────────────────
 
 export const SOCKET_BASE = import.meta.env.VITE_API_URL || '';
 export const BASE_URL = SOCKET_BASE;
@@ -95,7 +95,10 @@ async function parseApiJson(res, fallbackMessage = 'Máy chủ không phản h�
   }
   if (!res.ok) {
     let msg = data?.message || `${fallbackMessage} (HTTP ${res.status})`;
-    if ([502, 503, 504].includes(res.status)) {
+    try {
+        window.dispatchEvent(new CustomEvent('cms:api-error', { detail: { message: msg, status: res.status } }));
+      } catch (e) {}
+      if ([502, 503, 504].includes(res.status)) {
       msg = `${fallbackMessage}. Máy chủ đang khởi động lại — vui lòng đợi vài giây rồi tải lại.`;
     }
     const err = new Error(msg);
@@ -1736,12 +1739,21 @@ export const workflowsAPI = {
 // ─── BI API ─────────────────────────────────────────────────────────────────
 export const biAPI = {
   overview: async ({ period = '1m', branchId = 'all' } = {}) => {
-    const q = new URLSearchParams({ period, branchId });
+    // Backend branchFilter ưu tiên branch_id (HIGH_ADMIN all-branch allowlist).
+    const q = new URLSearchParams({
+      period,
+      branchId,
+      branch_id: branchId,
+    });
     const res = await apiFetch(`/bi/overview?${q}`);
     return res.json();
   },
   exportCsv: async ({ period = '1m', branchId = 'all' } = {}) => {
-    const q = new URLSearchParams({ period, branchId });
+    const q = new URLSearchParams({
+      period,
+      branchId,
+      branch_id: branchId,
+    });
     const res = await apiFetch(`/bi/export?${q}`);
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
@@ -2040,6 +2052,13 @@ export const feedAPI = {
   },
   remove: async (id) => {
     const res = await apiFetch(`/feed/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+  update: async (id, data) => {
+    const res = await apiFetch(`/feed/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
     return res.json();
   },
   like: async (id, type = 'heart') => {

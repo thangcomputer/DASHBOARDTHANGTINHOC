@@ -1,6 +1,7 @@
 import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
+import { useAdminTraining } from '../hooks/AdminTrainingContext';
 import { useData } from '../../../context/DataContext';
 import {
   Clock, Trash2, Plus, Download, FileSpreadsheet, Upload, Loader2, FileText,
@@ -98,13 +99,13 @@ export default function StudentQuestionBankPanel() {
     removeStudentQuestion,
   } = useData();
 
+  const { showGlobalModal, toast, studentQuestionsExcelInputRef, handleStudentQuestionsExcelFile } = useAdminTab();
   const {
-    showGlobalModal, resetStudentQuestions, setSqForm, BLANK_Q,
-    studentQuestionsExcelInputRef, handleStudentQuestionsExcelFile,
-    toast, sqSection, setSqSection,
+    resetStudentQuestions, setSqForm, BLANK_Q,
+    sqSection, setSqSection,
     sqForm, examSubjectsCatalog,
-  } = useAdminTab();
-
+  } = useAdminTraining();
+  
   const subjectOpts = React.useMemo(
     () => getExamSubjectOptions(examSubjectsCatalog),
     [examSubjectsCatalog],

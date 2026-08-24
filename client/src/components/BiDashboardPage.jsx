@@ -46,7 +46,8 @@ function Kpi({ icon: Icon, label, value, sub, delta, color = 'text-sky-700', bg 
 }
 
 function MiniBars({ data = [], field = 'students', color = '#6366f1' }) {
-  if (!data.length) {
+  const total = data.reduce((s, d) => s + (Number(d[field]) || 0), 0);
+  if (!data.length || total <= 0) {
     return (
       <div className="cms-m-empty min-h-[200px] flex-1">
         <BarChart3 size={28} className="opacity-30" aria-hidden="true" />
@@ -184,7 +185,7 @@ export default function BiDashboardPage() {
               icon={DollarSign}
               label="Lợi nhuận (kỳ)"
               value={fmtMoney(k.profitPeriod ?? ((k.revenuePeriod || 0) - (k.costsPeriod || 0)))}
-              sub={`Chi phí ${fmtMoney(k.costsPeriod ?? 0)}`}
+              sub={`Thuần đã trừ hoàn · Chi phí ${fmtMoney(k.costsPeriod ?? 0)}`}
               color="text-indigo-600"
               bg="bg-indigo-50"
             />
@@ -202,6 +203,7 @@ export default function BiDashboardPage() {
             <div className="cms-m-card overflow-hidden flex flex-col min-h-[220px]">
               <div className="px-4 py-3 border-b border-slate-50 shrink-0">
                 <h2 className="cms-m-heading text-base">Top khóa học (kỳ này)</h2>
+                <p className="cms-m-caption mt-0.5">Theo giao dịch Ledger thu · không phải HV mới</p>
               </div>
               <ul className="divide-y divide-slate-50 flex-1 min-h-0 overflow-y-auto">
                 {(data?.byCourse || []).length === 0 ? (
@@ -211,7 +213,7 @@ export default function BiDashboardPage() {
                     <li key={c.course} className="cms-m-list-row">
                       <span className="cms-m-list-title flex-1">{c.course}</span>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="cms-m-caption font-bold">{c.count} HV</span>
+                        <span className="cms-m-caption font-bold">{c.count} GD</span>
                         <span className="text-[13px] font-extrabold text-emerald-700">{fmtMoney(c.revenue)}</span>
                       </div>
                     </li>

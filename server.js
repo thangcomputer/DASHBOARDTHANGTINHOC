@@ -20,6 +20,7 @@ require('./config/validateEnv')();
 const logger = require('./config/logger');
 const { buildConversationId } = require('./utils/chatConversationId');
 const { getMessagingRole } = require('./utils/messagingRoles');
+const { logDelivery } = require('./services/messagingObservability');
 
 const app    = express();
 const server = http.createServer(app);
@@ -348,6 +349,20 @@ io.use(socketAuthMiddleware);
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
 
+  if (socket.user) {
+    const uid = socketUserId(socket.user);
+    const mRole = getMessagingRole(socket.user);
+    if (uid) socket.join(uid);
+    socket.join('feed_room');
+    if (mRole) {
+      const uRole = mRole.toUpperCase();
+      socket.join(`ALL_${uRole}`);
+      if (mRole === 'student') socket.join(`student_${uid}`);
+      if (mRole === 'teacher') socket.join(`teacher_${uid}`);
+      if (mRole === 'admin' || mRole === 'staff') socket.join('admin_room');
+    }
+  }
+
   // Đăng ký user online — CHẶN SPOOFING: lấy ID/Role từ JWT thay vì tin client 100%
   socket.on('register', async ({ branchId: _clientBranchId, branchCode: _clientBranchCode } = {}) => {
     if (!socket.user) return;
@@ -421,6 +436,27 @@ io.on('connection', (socket) => {
         socket.join(`ALL_${uRole}_${bcode}`);
       }
     }
+
+    // Tự động join các room nhóm chat của user
+    try {
+      const GroupModel = require('./models/Group');
+      const targetUserIds = [...new Set([
+        String(userId || ''),
+        String(socket.user.id || ''),
+        String(socket.user._id || ''),
+        ...(socket.user?.adminRole === 'SUPER_ADMIN' || userId === 'admin' ? ['admin'] : []),
+      ].filter(Boolean))];
+      GroupModel.find({
+        $or: [
+          { 'participants.userId': { $in: targetUserIds } },
+          { 'createdBy.userId': { $in: targetUserIds } },
+        ],
+      }).select('_id').lean().then((userGroups) => {
+        (userGroups || []).forEach((g) => {
+          if (g?._id) socket.join(`group_${g._id}`);
+        });
+      }).catch(() => {});
+    } catch (_) { /* ignore */ }
 
     // Broadcast danh sách online (scoped)
     broadcastOnlinePresence();
@@ -527,6 +563,7 @@ io.on('connection', (socket) => {
         fileName: data.fileName || '',
         isGroup: Boolean(data.isGroup),
         groupId: data.groupId || null,
+        conversationId: data.conversationId || null,
         notifyUser: app.notifyUser,
         io,
       });
@@ -723,16 +760,18 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('group:join', async (groupId) => {
-    if (!socket.user || !groupId) return;
+  socket.on('group:join', async (payload) => {
+    const rawId = typeof payload === 'object' && payload?.groupId ? payload.groupId : payload;
+    const groupId = String(rawId || '').trim();
+    if (!socket.user || !groupId || !mongoose.Types.ObjectId.isValid(groupId)) return;
     try {
       const uid = socketUserId(socket.user);
-      const group = await Group.findById(groupId).select('participants').lean();
+      const group = await Group.findById(groupId).select('participants createdBy').lean();
       if (!group) return;
-      const isMember = (group.participants || []).some((p) => String(p.userId) === uid);
+      const isMember = (group.participants || []).some((p) => String(p.userId) === uid)
+        || String(group.createdBy?.userId) === uid;
       if (!isMember && socket.user.id !== 'admin' && socket.user.adminRole !== 'SUPER_ADMIN' && socket.user.adminRole !== 'HIGH_ADMIN') return;
       socket.join(`group_${groupId}`);
-      console.log(`💬 Socket ${socket.id} joined group_${groupId}`);
     } catch (err) {
       logger.warn({ err: err.message, groupId }, 'group:join failed');
     }
@@ -762,83 +801,27 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── Hàm gửi notification real-time ──
+// ── Hàm gửi notification real-time (NEVER fan-out private messages to ALL_STAFF) ──
 app.notifyUser = (role, userId, eventName, data) => {
   const strUserId = String(userId);
-  const {
-    logDelivery,
-  } = require('./services/messagingObservability');
-  const messageId = data?._id || data?.id || null;
-  const conversationId = data?.conversationId || null;
-  const productRole = data?.sender?.adminRole || data?.receiver?.adminRole || null;
-
-  // Root "admin" (HỖ TRỢ TIN HỌC): target ALL_ADMIN, ALL_STAFF, and ALL_SUPPORT
-  // because this inbox is handled by everyone in the support team.
   if (strUserId === 'admin') {
-    io.to('admin').to('ALL_ADMIN').to('ALL_STAFF').to('ALL_SUPPORT').emit(eventName, data);
-    logDelivery({
-      eventName,
-      targetRole: role,
-      targetUserId: 'admin',
-      presenceKey: null,
-      selectedSocketId: null,
-      room: 'admin+ALL_ADMIN',
-      mode: 'legacy_admin_mailbox',
-      messageId,
-      conversationId,
-      productRole,
-      transportRole: 'admin',
-      ok: true,
-    });
+    io.to('admin').to('ALL_ADMIN').emit(eventName, data);
+    logDelivery({ eventName, targetRole: role, targetUserId: 'admin', mode: 'legacy_admin_mailbox', ok: true });
     return true;
   }
 
-  const tryRoles = new Set([role, getMessagingRole({ id: strUserId, role })]);
-  if (role === 'admin' || role === 'staff' || role === 'support') {
-    tryRoles.add('admin');
-    tryRoles.add('staff');
-  }
-
-  for (const r of tryRoles) {
-    if (!r) continue;
-    const presenceKey = `${r}_${strUserId}`;
-    const user = onlineUsers.get(presenceKey);
+  const tryRoles = [role, getMessagingRole({ id: strUserId, role }), ...(role === 'admin' || role === 'staff' || role === 'support' ? ['admin', 'staff'] : [])];
+  for (const r of new Set(tryRoles.filter(Boolean))) {
+    const user = onlineUsers.get(`${r}_${strUserId}`);
     if (user?.socketId) {
       io.to(user.socketId).emit(eventName, data);
-      logDelivery({
-        eventName,
-        targetRole: r,
-        targetUserId: strUserId,
-        presenceKey,
-        selectedSocketId: user.socketId,
-        room: user.socketId,
-        mode: 'presence_socketId',
-        messageId,
-        conversationId,
-        productRole,
-        transportRole: r,
-        ok: true,
-      });
+      logDelivery({ eventName, targetRole: r, targetUserId: strUserId, selectedSocketId: user.socketId, mode: 'presence_socketId', ok: true });
       return true;
     }
   }
 
-  // Canonical private delivery: userId room joined at connect
   io.to(strUserId).emit(eventName, data);
-  logDelivery({
-    eventName,
-    targetRole: role,
-    targetUserId: strUserId,
-    presenceKey: null,
-    selectedSocketId: null,
-    room: strUserId,
-    mode: 'userId_room',
-    messageId,
-    conversationId,
-    productRole,
-    transportRole: role,
-    ok: true,
-  });
+  logDelivery({ eventName, targetRole: role, targetUserId: strUserId, mode: 'userId_room', ok: true });
   return true;
 };
 

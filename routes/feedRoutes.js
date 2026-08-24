@@ -23,20 +23,112 @@ function normalizeRole(role) {
   return 'student';
 }
 
+function isSuperAdminUser(user) {
+  if (!user) return false;
+  const uid = String(user.id || user._id || '');
+  const adminRole = String(user.adminRole || '').toUpperCase();
+  return uid === 'admin' || adminRole === 'SUPER_ADMIN';
+}
+
+function isHighAdminUser(user) {
+  if (!user) return false;
+  const adminRole = String(user.adminRole || '').toUpperCase();
+  return adminRole === 'HIGH_ADMIN';
+}
+
+function isSuperAdminAuthor(authorId, authorAdminRole, authorRole) {
+  const uid = String(authorId || '');
+  const aRole = String(authorAdminRole || '').toUpperCase();
+  return uid === 'admin' || aRole === 'SUPER_ADMIN';
+}
+
 function isAdminLike(user) {
   const r = normalizeRole(user?.role);
-  return r === 'admin' || r === 'staff' || user?.id === 'admin' || user?.adminRole === 'SUPER_ADMIN';
+  return r === 'admin' || r === 'staff' || isSuperAdminUser(user) || isHighAdminUser(user);
+}
+
+function canEditPost(user, post) {
+  if (!user || !post) return false;
+  if (isSuperAdminUser(user)) return true;
+  return String(post.authorId) === String(user.id || user._id);
+}
+
+function buildFeedFilter(user) {
+  if (!user) return { visibility: 'public' };
+  const r = normalizeRole(user.role);
+  const uid = String(user.id || user._id || '');
+  if (isSuperAdminUser(user) || isHighAdminUser(user) || r === 'admin' || r === 'staff') {
+    return {};
+  }
+  if (r === 'teacher') {
+    return {
+      $or: [
+        { visibility: { $in: ['public', 'teachers'] } },
+        { visibility: { $exists: false } },
+        { visibility: null },
+        { authorId: uid },
+      ],
+    };
+  }
+  if (r === 'student') {
+    return {
+      $or: [
+        { visibility: { $in: ['public', 'students'] } },
+        { visibility: { $exists: false } },
+        { visibility: null },
+        { authorId: uid },
+      ],
+    };
+  }
+  return {
+    $or: [
+      { visibility: 'public' },
+      { visibility: { $exists: false } },
+      { visibility: null },
+      { authorId: uid },
+    ],
+  };
 }
 
 function canDeletePost(user, post) {
   if (!user || !post) return false;
-  if (isAdminLike(user)) return true;
-  return String(post.authorId) === String(user.id);
+  const isPostAuthor = String(post.authorId) === String(user.id || user._id);
+  const isPostFromSuper = isSuperAdminAuthor(post.authorId, post.authorAdminRole, post.authorRole);
+
+  // 1. Bài của Super Admin: CHỈ Super Admin mới xóa được
+  if (isPostFromSuper) {
+    return isSuperAdminUser(user);
+  }
+
+  // 2. Tác giả tự xóa bài của mình
+  if (isPostAuthor) return true;
+
+  // 3. Super Admin và High Admin xóa được bài của người khác
+  if (isSuperAdminUser(user) || isHighAdminUser(user)) return true;
+
+  // 4. Người khác không được xóa bài của người khác
+  return false;
 }
 
 function emitFeed(io, event, payload) {
   if (!io) return;
-  io.to('feed_room').emit(event, payload);
+  const visibility = payload?.visibility || 'public';
+  if (event === 'feed:deleted' || event === 'feed:like' || event === 'feed:comment' || visibility === 'public') {
+    io.to('feed_room').emit(event, payload);
+    return;
+  }
+  let emitter = io;
+  if (visibility === 'admin_only') {
+    emitter = io.to('ALL_ADMIN').to('ALL_STAFF').to('admin_room');
+  } else if (visibility === 'teachers') {
+    emitter = io.to('ALL_ADMIN').to('ALL_STAFF').to('admin_room').to('ALL_TEACHER');
+  } else if (visibility === 'students') {
+    emitter = io.to('ALL_ADMIN').to('ALL_STAFF').to('admin_room').to('ALL_STUDENT');
+  }
+  if (payload?.authorId) {
+    emitter = emitter.to(String(payload.authorId));
+  }
+  emitter.emit(event, payload);
 }
 
 const _feedHits = new Map();
@@ -56,9 +148,25 @@ function feedRateOk(userId, action, max, windowMs) {
 
 function canDeleteComment(user, post, comment) {
   if (!user || !comment) return false;
-  if (isAdminLike(user)) return true;
-  if (String(comment.authorId) === String(user.id)) return true;
-  return String(post.authorId) === String(user.id);
+  const isCommentAuthor = String(comment.authorId) === String(user.id || user._id);
+  const isCommentFromSuper = isSuperAdminAuthor(comment.authorId, comment.authorAdminRole, comment.authorRole);
+
+  // 1. Bình luận của Super Admin: CHỈ Super Admin mới xóa được (không ai khác được xóa)
+  if (isCommentFromSuper) {
+    return isSuperAdminUser(user);
+  }
+
+  // 2. Tác giả tự xóa bình luận của chính mình
+  if (isCommentAuthor) return true;
+
+  // 3. Super Admin và High Admin xóa được bình luận của tất cả mọi người
+  if (isSuperAdminUser(user) || isHighAdminUser(user)) return true;
+
+  // 4. Chủ bài viết (nếu không phải comment của Super Admin) có thể xóa comment trong bài mình
+  if (post && String(post.authorId) === String(user.id || user._id)) return true;
+
+  // 5. Người khác không được xóa bình luận của người khác
+  return false;
 }
 
 function normalizeReactions(o) {
@@ -92,11 +200,21 @@ function serializePost(doc, currentUserId) {
     authorId: o.authorId,
     authorName: o.authorName,
     authorRole: o.authorRole,
+    authorAdminRole: o.authorAdminRole || (String(o.authorId) === 'admin' ? 'SUPER_ADMIN' : null),
     authorAvatar: o.authorAvatar || '',
     content: o.content || '',
     images: o.images || [],
+    visibility: o.visibility || 'public',
+    isEdited: !!o.isEdited,
+    editedAt: o.editedAt || null,
     reactions: counts,
     reactionsCount: total,
+    reactionsList: reactions.map((r) => ({
+      userId: String(r.userId || ''),
+      userName: r.userName || 'Người dùng',
+      role: r.role || 'student',
+      type: r.type || 'heart',
+    })),
     myReaction,
     likesCount: total,
     likedByMe: !!myReaction,
@@ -105,6 +223,7 @@ function serializePost(doc, currentUserId) {
       authorId: c.authorId,
       authorName: c.authorName,
       authorRole: c.authorRole,
+      authorAdminRole: c.authorAdminRole || (String(c.authorId) === 'admin' ? 'SUPER_ADMIN' : null),
       authorAvatar: c.authorAvatar || '',
       content: c.content || '',
       images: Array.isArray(c.images) ? c.images : [],
@@ -160,9 +279,10 @@ router.get('/', authMiddleware, ...feedGuard('list'), async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
+    const query = buildFeedFilter(req.user);
     const [rows, total] = await Promise.all([
-      FeedPost.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit),
-      FeedPost.countDocuments({}),
+      FeedPost.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      FeedPost.countDocuments(query),
     ]);
     return res.json({
       success: true,
@@ -181,6 +301,9 @@ router.post('/', authMiddleware, ...feedGuard('create'), async (req, res) => {
     const images = Array.isArray(req.body?.images)
       ? req.body.images.map((u) => String(u || '').trim()).filter(Boolean).slice(0, 6)
       : [];
+    const safeVisibilities = ['public', 'teachers', 'students', 'admin_only'];
+    const visibility = safeVisibilities.includes(req.body?.visibility) ? req.body.visibility : 'public';
+
     if (!content && images.length === 0) {
       return res.status(400).json({ success: false, message: 'Nhap noi dung hoac them anh' });
     }
@@ -194,9 +317,12 @@ router.post('/', authMiddleware, ...feedGuard('create'), async (req, res) => {
       authorId: req.user.id,
       authorName: req.user.name || 'Nguoi dung',
       authorRole: normalizeRole(req.user.role),
+      authorAdminRole: (req.user.id === 'admin' || req.user.adminRole === 'SUPER_ADMIN') ? 'SUPER_ADMIN' : (req.user.adminRole || null),
       authorAvatar: req.body?.authorAvatar || req.user.avatar || '',
       content,
       images,
+      visibility,
+      isEdited: false,
       reactions: [],
       comments: [],
     });
@@ -205,6 +331,45 @@ router.post('/', authMiddleware, ...feedGuard('create'), async (req, res) => {
     return res.status(201).json({ success: true, data });
   } catch (err) {
     logger.error('[FEED] create error', err);
+    return res.status(500).json({ success: false, message: 'Loi server' });
+  }
+});
+
+router.put('/:id', authMiddleware, ...feedGuard('update_post'), async (req, res) => {
+  try {
+    const post = await FeedPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ success: false, message: 'Khong tim thay bai viet' });
+    if (!canEditPost(req.user, post)) {
+      return res.status(403).json({ success: false, message: 'Ban khong co quyen sua bai viet nay' });
+    }
+
+    const content = String(req.body?.content !== undefined ? req.body.content : post.content || '').trim();
+    let images = post.images || [];
+    if (Array.isArray(req.body?.images)) {
+      images = req.body.images.map((u) => String(u || '').trim()).filter(Boolean).slice(0, 6);
+    }
+    const safeVisibilities = ['public', 'teachers', 'students', 'admin_only'];
+    const visibility = safeVisibilities.includes(req.body?.visibility) ? req.body.visibility : (post.visibility || 'public');
+
+    if (!content && images.length === 0) {
+      return res.status(400).json({ success: false, message: 'Noi dung hoac anh khong duoc de trong' });
+    }
+    if (content.length > 5000) {
+      return res.status(400).json({ success: false, message: 'Noi dung qua dai' });
+    }
+
+    post.content = content;
+    post.images = images;
+    post.visibility = visibility;
+    post.isEdited = true;
+    post.editedAt = new Date();
+
+    await post.save();
+    const data = serializePost(post, req.user.id);
+    emitFeed(req.app.get('io'), 'feed:updated', data);
+    return res.json({ success: true, data });
+  } catch (err) {
+    logger.error('[FEED] update error', err);
     return res.status(500).json({ success: false, message: 'Loi server' });
   }
 });
@@ -261,6 +426,7 @@ async function applyReaction(req, res, typeIn) {
     id: data.id,
     reactions: data.reactions,
     reactionsCount: data.reactionsCount,
+    reactionsList: data.reactionsList,
     likesCount: data.likesCount,
     byUserId: uid,
   });
@@ -334,6 +500,7 @@ router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req
       authorName: req.user.name || 'Nguoi dung',
       authorAvatar: req.user.avatar || '',
       authorRole: normalizeRole(req.user.role),
+      authorAdminRole: (req.user.id === 'admin' || req.user.adminRole === 'SUPER_ADMIN') ? 'SUPER_ADMIN' : (req.user.adminRole || null),
       content,
       images: safeImages,
       parentId,

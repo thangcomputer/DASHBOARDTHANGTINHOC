@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { mutate } from 'swr';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { Printer, Download } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
@@ -38,24 +38,35 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
   const toast = useToast();
   const { showModal: showGlobalModal, closeModal } = useModal();
   const { selectedBranchId } = useBranch();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const search = searchParams.get('search') || '';
   const filterPaid = searchParams.get('filterPaid') || 'all';
   const filterCourse = searchParams.get('filterCourse') || 'all';
 
+  /** Giữ hash tab (#finance, #teachers…) — setSearchParams mặc định sẽ làm mất hash → về Tổng quan. */
   const updateSearchParam = (key, value) => {
-    setSearchParams(prev => {
-      if (!value || value === 'all' && key !== 'search') prev.delete(key);
-      else prev.set(key, value);
-      return prev;
-    }, { replace: true });
+    const next = new URLSearchParams(searchParams);
+    if (!value || (value === 'all' && key !== 'search')) next.delete(key);
+    else next.set(key, value);
+    const qs = next.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: qs ? `?${qs}` : '',
+        hash: location.hash,
+      },
+      { replace: true },
+    );
   };
 
   const setSearch = (val) => updateSearchParam('search', val);
   const setFilterPaid = (val) => updateSearchParam('filterPaid', val);
   const setFilterCourse = (val) => updateSearchParam('filterCourse', val);
-  const [currentPage, setCurrentPage] = useState(1);
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const setCurrentPage = (val) => updateSearchParam('page', val.toString());
   const [actionMenuId, setActionMenuId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showStudentDetailId, setShowStudentDetailId] = useState(null);
@@ -94,9 +105,13 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
     }
   }, [activeTab, currentPage, search, filterPaid, filterCourse, fetchStudentsPaginated, selectedBranchId]);
 
+  // Chỉ reset page khi đang tab Học viên — tránh navigate làm mất hash tab khác (finance…)
   useEffect(() => {
+    if (activeTab !== 'students') return;
+    if (currentPage === 1) return;
     setCurrentPage(1);
-  }, [search, filterPaid, filterCourse, selectedBranchId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ reset khi filter/branch đổi trên tab students
+  }, [search, filterPaid, filterCourse, selectedBranchId, activeTab]);
 
   useEffect(() => {
     if (!actionMenuId) return;
@@ -118,6 +133,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
     }
   };
 
+
   const sendDebtReminder = (student) => {
     const message = `Chào ${student.name}, Trung tâm gửi lời nhắn nhắc bạn hoàn thiện học phí khóa ${student.course}. Trân trọng!`;
     const url = `https://zalo.me/${student.zalo}?text=${encodeURIComponent(message)}`;
@@ -125,8 +141,15 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
   };
 
   const removeStudent = (id) => {
-    const s = safeStudentsList.find((x) => String(x.id) === String(id));
-    setDeleteModal({ type: 'student', id, name: s?.name || 'Học viên' });
+    const s = safeStudentsList.find((x) => String(x.id || x._id) === String(id));
+    setDeleteModal({
+      type: 'student',
+      id: s?._id || s?.id || id,
+      code: s?.studentCode || s?.code || '',
+      name: s?.name || 'Học viên',
+      phone: s?.phone || s?.zalo || '',
+      course: s?.course || '',
+    });
   };
 
   useEffect(() => {

@@ -179,6 +179,80 @@ test('branchFilter: HIGH_ADMIN + GET + branch_id=all → analytics allowlisted (
   }
 });
 
+test('branchFilter: HIGH_ADMIN + GET + branch_id=all → bi allowlisted (BI Dashboard)', async () => {
+  const { branchFilter } = require('../../middleware/auth');
+  const TeacherOrig = Teacher.findById;
+  Teacher.findById = () => ({
+    select() {
+      return {
+        lean: async () => ({
+          adminRole: 'HIGH_ADMIN',
+          branchId: null,
+          branchCode: '',
+        }),
+      };
+    },
+  });
+
+  try {
+    const req = {
+      user: {
+        id: '507f1f77bcf86cd799439011',
+        role: 'staff',
+        adminRole: 'HIGH_ADMIN',
+      },
+      method: 'GET',
+      query: { branch_id: 'all', period: '7d' },
+      headers: {},
+      originalUrl: '/api/bi/overview?period=7d&branch_id=all',
+    };
+    const res = mockRes();
+    let next = false;
+    await branchFilter(req, res, () => { next = true; });
+    assert.equal(next, true);
+    assert.deepEqual(req.branchFilter, {});
+  } finally {
+    Teacher.findById = TeacherOrig;
+  }
+});
+
+test('branchFilter: HIGH_ADMIN + GET + branchId=all (camelCase) → bi allowlisted', async () => {
+  const { branchFilter } = require('../../middleware/auth');
+  const TeacherOrig = Teacher.findById;
+  Teacher.findById = () => ({
+    select() {
+      return {
+        lean: async () => ({
+          adminRole: 'HIGH_ADMIN',
+          branchId: null,
+          branchCode: '',
+        }),
+      };
+    },
+  });
+
+  try {
+    const req = {
+      user: {
+        id: '507f1f77bcf86cd799439011',
+        role: 'staff',
+        adminRole: 'HIGH_ADMIN',
+      },
+      method: 'GET',
+      query: { branchId: 'all', period: '7d' },
+      headers: {},
+      originalUrl: '/api/bi/overview?period=7d&branchId=all',
+    };
+    const res = mockRes();
+    let next = false;
+    await branchFilter(req, res, () => { next = true; });
+    assert.equal(next, true);
+    assert.deepEqual(req.branchFilter, {});
+  } finally {
+    Teacher.findById = TeacherOrig;
+  }
+});
+
 test('branchFilter: HIGH_ADMIN + GET + branch_id=all → fail-closed outside allowlist', async () => {
   const { branchFilter } = require('../../middleware/auth');
   const TeacherOrig = Teacher.findById;

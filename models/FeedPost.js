@@ -11,6 +11,7 @@ const commentSchema = new mongoose.Schema({
     enum: ['admin', 'teacher', 'student', 'staff'],
     required: true,
   },
+  authorAdminRole: { type: String, default: null },
   content:    { type: String, default: '', trim: true, maxlength: 2000 },
   images:     { type: [String], default: [] },
   parentId:   { type: String, default: null },
@@ -33,6 +34,7 @@ const feedPostSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  authorAdminRole: { type: String, default: null },
   authorAvatar: { type: String, default: '' },
   content: {
     type: String,
@@ -48,11 +50,20 @@ const feedPostSchema = new mongoose.Schema({
   likes:      { type: [mongoose.Schema.Types.Mixed], default: [] },
   reactions:  { type: [reactionSchema], default: [] },
   comments:   { type: [commentSchema], default: [] },
+  visibility: {
+    type: String,
+    enum: ['public', 'teachers', 'students', 'admin_only'],
+    default: 'public',
+    index: true,
+  },
+  isEdited:   { type: Boolean, default: false },
+  editedAt:   { type: Date, default: null },
 }, { timestamps: true });
 
 feedPostSchema.index({ createdAt: -1 });
 feedPostSchema.index({ authorId: 1, createdAt: -1 });
 feedPostSchema.index({ authorRole: 1, createdAt: -1 });
+feedPostSchema.index({ visibility: 1, createdAt: -1 });
 
 module.exports = mongoose.model('FeedPost', feedPostSchema);
 module.exports.REACTION_TYPES = REACTION_TYPES;

@@ -16,7 +16,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
   const [groups, setGroups] = useState(() => loadState('thvp_groups', []));
 
   const {
-    onGroupNew, onRecallReceive, onReactionReceive, onMessageReceive, onMessageSent, onReadAck,
+    onGroupNew, onGroupDelete, onRecallReceive, onReactionReceive, onMessageReceive, onMessageSent, onReadAck, onMessagePinned,
   } = useSocket();
 
   // Strip null entries that may exist in legacy localStorage caches
@@ -42,9 +42,21 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       }
 
       const n = normalizeMessage(data);
+      const isGrp = Boolean(
+        n.isGroup
+        || data.isGroup
+        || (n.conversationId && String(n.conversationId).startsWith('group_'))
+        || n.groupId
+        || data.groupId
+      );
+      const gId = isGrp
+        ? String(n.groupId || data.groupId || (String(n.conversationId || '').startsWith('group_') ? String(n.conversationId).slice(6) : '') || '') || null
+        : null;
+      const convId = isGrp && gId ? `group_${gId}` : n.conversationId;
       const mappedMsg = {
         id: n.id,
-        convId: n.conversationId,
+        convId,
+        conversationId: convId,
         senderId: n.senderId,
         senderName: n.senderName,
         senderRole: n.senderRole,
@@ -58,8 +70,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         content: n.content,
         time: n.time instanceof Date ? n.time : new Date(n.time || Date.now()),
         read: n.read,
-        isGroup: n.isGroup,
-        groupId: n.groupId,
+        isGroup: isGrp,
+        groupId: gId,
         isRecalled: n.isRecalled,
               isPinned: n.isPinned,
         messageType: n.messageType,
@@ -143,15 +155,43 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       });
     }
 
+    let unsubPinned;
+    if (onMessagePinned) {
+      unsubPinned = onMessagePinned((data) => {
+        setMessages((prev) => prev.map((m) => {
+          if (String(m.id || m._id) === String(data.messageId)) {
+            return { ...m, isPinned: Boolean(data.isPinned) };
+          }
+          if (data.isPinned && String(m.convId) === String(data.conversationId) && m.isPinned) {
+            return { ...m, isPinned: false };
+          }
+          return m;
+        }));
+      });
+    }
+
+    let unsubGroupDelete;
+    if (onGroupDelete) {
+      unsubGroupDelete = onGroupDelete((data) => {
+        const deletedGroupId = String(data?.groupId || '');
+        if (!deletedGroupId) return;
+        setGroups((prev) => (Array.isArray(prev) ? prev.filter((g) => String(g._id || g.id) !== deletedGroupId) : []));
+        setMessages((prev) => (Array.isArray(prev) ? prev.filter((m) => String(m.convId) !== `group_${deletedGroupId}`) : []));
+        triggerBackgroundSync();
+      });
+    }
+
     return () => {
       if (unsubGroup) unsubGroup();
+      if (unsubGroupDelete) unsubGroupDelete();
       if (unsubRecall) unsubRecall();
       if (unsubReaction) unsubReaction();
       if (unsubMsg) unsubMsg();
       if (unsubSent) unsubSent();
       if (unsubRead) unsubRead();
+      if (unsubPinned) unsubPinned();
     };
-  }, [onGroupNew, onRecallReceive, onMessageReceive, onMessageSent, onReactionReceive, onReadAck, upsertServerMessage, currentUser]);
+  }, [onGroupNew, onGroupDelete, onRecallReceive, onMessageReceive, onMessageSent, onReactionReceive, onReadAck, onMessagePinned, upsertServerMessage, currentUser, triggerBackgroundSync]);
 
   useEffect(() => {
     try {
@@ -164,18 +204,35 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
   // Gửi tin nhắn qua API → lưu MongoDB → phát Socket.io
   const sendMessage = useCallback(async (msg) => {
     const tempId = `temp_${Date.now()}`;
-    const convId = msg.conversationId || (msg.isGroup && msg.groupId
-      ? `group_${msg.groupId}`
-      : buildConversationId(msg.senderRole, msg.senderId, msg.receiverRole, msg.receiverId));
+    const inferredGroup = Boolean(
+      msg.isGroup
+      || msg.groupId
+      || String(msg.conversationId || '').startsWith('group_')
+      || String(msg.receiverRole || '').toLowerCase() === 'group'
+    );
+    const groupId = inferredGroup
+      ? String(
+        msg.groupId
+        || (String(msg.conversationId || '').startsWith('group_') ? String(msg.conversationId).slice(6) : '')
+        || msg.receiverId
+        || ''
+      ) || null
+      : null;
+    const convId = inferredGroup && groupId
+      ? `group_${groupId}`
+      : (msg.conversationId || buildConversationId(msg.senderRole, msg.senderId, msg.receiverRole, msg.receiverId));
     const newMsg = {
       id: tempId,
       convId,
+      conversationId: convId,
+      isGroup: inferredGroup,
+      groupId: inferredGroup ? groupId : null,
       senderId: msg.senderId,
       senderName: msg.senderName,
       senderRole: msg.senderRole,
       receiverId: msg.receiverId,
       receiverName: msg.receiverName,
-      receiverRole: msg.receiverRole,
+      receiverRole: inferredGroup ? 'group' : msg.receiverRole,
       content: msg.content,
       messageType: msg.messageType || 'text',
       fileUrl: msg.fileUrl || '',
@@ -194,19 +251,28 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         senderId: String(msg.senderId),
         senderName: msg.senderName,
         senderRole: msg.senderRole,
-        receiverId: String(msg.receiverId),
+        receiverId: String(inferredGroup && groupId ? groupId : msg.receiverId),
         receiverName: msg.receiverName,
-        receiverRole: msg.receiverRole,
+        receiverRole: inferredGroup ? 'group' : msg.receiverRole,
         content: msg.content,
         messageType: msg.messageType || 'text',
         fileUrl: msg.fileUrl || '',
         fileName: msg.fileName || '',
-        isGroup: msg.isGroup || false,
-        groupId: msg.groupId || null,
+        isGroup: inferredGroup,
+        groupId: inferredGroup ? groupId : null,
       });
       if (res?.success && res?.data?._id) {
         const d = res.data;
         const n = normalizeMessage(d);
+        const savedIsGroup = Boolean(
+          n.isGroup || d.isGroup || (n.conversationId && String(n.conversationId).startsWith('group_')) || n.groupId || d.groupId
+        );
+        const savedGroupId = savedIsGroup
+          ? String(n.groupId || d.groupId || (String(n.conversationId || '').startsWith('group_') ? String(n.conversationId).slice(6) : groupId) || '') || null
+          : null;
+        const savedConvId = savedIsGroup && savedGroupId
+          ? `group_${savedGroupId}`
+          : (n.conversationId || convId);
         setMessages((prev) => {
           // Primary dedupe key: server _id (HTTP + socket race)
           if (prev.some((m) => String(m.id) === String(d._id))) {
@@ -217,7 +283,10 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
               ? {
                   ...m,
                   id: n.id,
-                  convId: n.conversationId || m.convId,
+                  convId: savedConvId,
+                  conversationId: savedConvId,
+                  isGroup: savedIsGroup,
+                  groupId: savedIsGroup ? savedGroupId : null,
                   senderId: n.senderId,
                   senderName: n.senderName,
                   senderRole: n.senderRole,
@@ -246,7 +315,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             return true;
           });
         });
-        return { ...newMsg, id: res.data._id };
+        return { ...newMsg, id: res.data._id, convId: savedConvId, isGroup: savedIsGroup, groupId: savedIsGroup ? savedGroupId : null };
       }
     } catch (err) {
       const failMsg = err?.message || 'Gửi tin nhắn thất bại';
@@ -274,14 +343,17 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       if (json.success) {
         const syncedMsgs = (json.data || []).map((m) => {
           const n = normalizeMessage(m);
-          const convId = m.isGroup && m.groupId
-            ? `group_${m.groupId}`
+          const isGrp = Boolean(m.isGroup || n.isGroup || (m.conversationId && m.conversationId.startsWith('group_')) || m.groupId);
+          const gId = m.groupId || n.groupId || (m.conversationId && m.conversationId.startsWith('group_') ? m.conversationId.slice(6) : null);
+          const convId = isGrp && gId
+            ? `group_${gId}`
             : (n.conversationId || m.conversationId);
           return {
             id: n.id,
             convId,
-            groupId: n.groupId,
-            isGroup: n.isGroup,
+            conversationId: convId,
+            groupId: gId,
+            isGroup: isGrp,
             senderId: n.senderId,
             senderName: n.senderName,
             senderRole: n.senderRole,
@@ -301,13 +373,12 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             time: n.time instanceof Date ? n.time : new Date(m.createdAt || Date.now()),
             read: n.read,
             isRecalled: n.isRecalled,
-              isPinned: n.isPinned,
+            isPinned: n.isPinned,
             reactions: n.reactions,
           };
         });
 
         // Server là nguồn đúng (kể cả isRead). Chỉ giữ tin temp_* chưa lên server.
-        // Tránh badge "chưa đọc" từ localStorage cũ khi đã đọc trên server.
         setMessages(prev => {
           const localById = new Map(prev.map(m => [String(m.id), m]));
           const merged = syncedMsgs.map(sm => {
@@ -324,119 +395,104 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         });
       }
     } catch (err) {
+      console.log('Sync messages failed', err);
     }
   }, []);
 
-  const toggleMessageReaction = useCallback(async (messageId, type) => {
+  // ── Soft Delete Message (Chỉ ẩn phía người dùng) ──
+  const softDeleteMessage = useCallback(async (msgId) => {
+    setMessages(prev => prev.filter(m => String(m.id) !== String(msgId)));
     try {
-      const json = await api.messages.toggleReaction(messageId, type);
-      if (json.success) {
-        setMessages((prev) => prev.map((m) =>
-          String(m.id || m._id) === String(messageId) ? { ...m, reactions: json.data } : m
-        ));
-      }
+      await api.messages.softDelete(msgId);
     } catch (err) {
+      console.log('Soft delete failed', err);
     }
   }, []);
 
-  const recallMessage = useCallback(async (messageId) => {
-    const json = await api.messages.recall(messageId);
-    if (json.success) {
+  // ── Recall Message (Thu hồi tin nhắn 2 phía) ──
+  const recallMessage = useCallback(async (msgId) => {
+    // Optimistic update
+    setMessages(prev => prev.map(m =>
+      String(m.id) === String(msgId)
+        ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' }
+        : m
+    ));
+
+    const res = await api.messages.recall(msgId);
+    if (!res.success) {
+      throw new Error(res.message || 'Lỗi khi thu hồi tin nhắn');
+    }
+    return res;
+  }, []);
+
+  // ── Reaction (Thả cảm xúc) ──
+  const toggleMessageReaction = useCallback(async (msgId, emoji) => {
+    const res = await api.messages.toggleReaction(msgId, emoji);
+    if (res.success && res.data) {
       setMessages(prev => prev.map(m =>
-        String(m.id || m._id) === String(messageId) ? { ...m, isRecalled: true, content: 'Tin nhắn đã được thu hồi' } : m
+        String(m.id) === String(msgId)
+          ? { ...m, reactions: res.data }
+          : m
       ));
-    } else {
-      throw new Error(json.message || 'Không thể thu hồi tin nhắn');
     }
+    return res;
   }, []);
 
-  const softDeleteMessage = useCallback(async (messageId) => {
-    try {
-      const json = await api.messages.softDelete(messageId);
-      if (json.success) {
-        // Chỉ ẩn/xóa khỏi mảng cục bộ trên giao diện của user này
-        setMessages(prev => prev.filter(m => String(m.id || m._id) !== String(messageId)));
-      }
-    } catch (err) {
-    }
-  }, []);
-
+  // ── Group Chat Actions ──
   const createChatGroup = useCallback(async (name, participants) => {
-    try {
-      const json = await api.messages.createGroup(name, participants);
-      if (json.success) {
-        setGroups(prev => [json.data, ...prev]);
-        triggerBackgroundSync();
-        return json.data;
-      }
-    } catch (err) {
+    const res = await api.messages.createGroup(name, participants);
+    if (res.success && res.data) {
+      setGroups(prev => [res.data, ...prev]);
     }
-    return null;
-  }, [triggerBackgroundSync]);
+    return res;
+  }, []);
 
   const deleteChatGroup = useCallback(async (groupId) => {
-    try {
-      const json = await api.messages.deleteGroup(groupId);
-      if (json.success) {
-        setGroups(prev => prev.filter(g => String(g._id) !== String(groupId) && String(g.id) !== String(groupId)));
-        setMessages(prev => prev.filter(m => m.convId !== `group_${groupId}`));
-        triggerBackgroundSync();
-        return true;
-      }
-    } catch (err) {
+    const res = await api.messages.deleteGroup(groupId);
+    if (res.success) {
+      setGroups(prev => prev.filter(g => String(g._id || g.id) !== String(groupId)));
+      setMessages(prev => prev.filter(m => String(m.groupId) !== String(groupId) && String(m.convId) !== `group_${groupId}`));
     }
-    return false;
-  }, [triggerBackgroundSync]);
-
-  const leaveChatGroup = useCallback(async (groupId) => {
-    try {
-      const json = await api.messages.leaveGroup(groupId);
-      if (json.success) {
-        setGroups(prev => prev.filter(g => String(g._id) !== String(groupId) && String(g.id) !== String(groupId)));
-        setMessages(prev => prev.filter(m => m.convId !== `group_${groupId}`));
-        triggerBackgroundSync();
-        return true;
-      }
-    } catch (err) {
-    }
-    return false;
-  }, [triggerBackgroundSync]);
-
-  const addGroupMembers = useCallback(async (groupId, participants) => {
-    try {
-      const json = await api.messages.addGroupMembers(groupId, participants);
-      if (json.success) {
-        setGroups(prev => prev.map(g => String(g._id) === String(groupId) ? json.data : g));
-        triggerBackgroundSync();
-        return true;
-      }
-    } catch (err) {
-    }
-    return false;
-  }, [triggerBackgroundSync]);
-
-  const markMessagesRead = useCallback(async (convId, readerId, extraReceiverIds = []) => {
-    if (!convId) return;
-    // extraReceiverIds giữ tương thích caller (admin mailbox); server tự suy receiverTargets từ token
-    void extraReceiverIds;
-
-    setMessages(prev => {
-      let changed = false;
-      const next = prev.map(m => {
-        if (String(m.convId) !== String(convId) || m.read === true) return m;
-        changed = true;
-        return { ...m, read: true };
-      });
-      return changed ? next : prev;
-    });
-
-    // Luôn gọi API (idempotent) — tránh lệch badge khi local/server không khớp
-    try {
-      await api.messages.markRead(convId, readerId);
-    } catch (err) {
-    }
+    return res;
   }, []);
 
+  const leaveChatGroup = useCallback(async (groupId) => {
+    const res = await api.messages.leaveGroup(groupId);
+    if (res.success) {
+      setGroups(prev => prev.filter(g => String(g._id || g.id) !== String(groupId)));
+      setMessages(prev => prev.filter(m => String(m.groupId) !== String(groupId) && String(m.convId) !== `group_${groupId}`));
+    }
+    return res;
+  }, []);
+
+  const addGroupMembers = useCallback(async (groupId, participants) => {
+    const res = await api.messages.addGroupMembers(groupId, participants);
+    if (res.success && res.data) {
+      setGroups(prev => prev.map(g => (String(g._id || g.id) === String(groupId) ? res.data : g)));
+    }
+    return res;
+  }, []);
+
+  // ── Đánh dấu đã đọc hội thoại (trực tiếp + socket) ──
+  const markMessagesRead = useCallback((convId, userId, extraUserIds = []) => {
+    if (!convId || !userId) return;
+    const uids = [String(userId), ...extraUserIds.map(String)];
+
+    // 1. Optimistic update local messages
+    setMessages(prev => prev.map(m => {
+      if (m.convId === convId || m.conversationId === convId || (m.isGroup && `group_${m.groupId}` === convId)) {
+        if (m.read !== true && !uids.includes(String(m.senderId))) {
+          return { ...m, read: true };
+        }
+      }
+      return m;
+    }));
+
+    // 2. Gọi API đánh dấu đã đọc trên server
+    api.messages.markRead(convId, userId).catch(() => {});
+  }, []);
+
+  // ── Biến đổi danh sách tin nhắn thành danh sách cuộc trò chuyện ──
   const getConversations = useCallback((userId) => {
     const sId = String(userId);
     const safeStudents = Array.isArray(students) ? students.filter(Boolean) : [];
@@ -448,43 +504,33 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       || currentUser?.adminRole === 'SUPPORT'
       || safeStaffs.some(st => String(st.id || st._id) === sId);
     const isSuperAdmin = sId === 'admin'
-      || currentUser?.adminRole === 'SUPER_ADMIN'
-      || currentUser?.adminRole === 'HIGH_ADMIN'
-      || (safeTeachers.find(t => String(t.id) === sId)?.adminRole === 'SUPER_ADMIN')
-      || (safeTeachers.find(t => String(t.id) === sId)?.adminRole === 'HIGH_ADMIN');
-    const userRole = getMessagingRole(currentUser || { id: sId })
-      || (safeStudents.find(s => String(s.id) === sId) ? 'student' : 'teacher');
+      || currentUser?.adminRole === 'SUPER_ADMIN';
 
     const userMsgs = safeMessages.filter(m => {
       const isDirect = String(m.senderId) === sId || String(m.receiverId) === sId;
-      // Legacy shared admin mailbox — SUPER/HIGH only (not STAFF/SUPPORT)
-      const isAdminMailbox = isSuperAdmin && (String(m.senderId) === 'admin' || String(m.receiverId) === 'admin');
+      const isAdminMailbox = sId === 'admin' && (String(m.senderId) === 'admin' || String(m.receiverId) === 'admin');
       return isDirect || isAdminMailbox;
     });
+
     const convMap = {};
 
-    // 1. Add existing conversations from messages
+    // 1. Nhóm tin nhắn theo hội thoại (bỏ qua tin nhóm — xử lý riêng ở mục 3)
     userMsgs.forEach(m => {
-      if (isAiSupportConversationId(m.convId)) return;
-      const mTime = new Date(m.time).getTime();
-      const existing = convMap[m.convId];
-      const existingTime = existing ? new Date(existing.lastTime).getTime() : 0;
+      if (m.isGroup) return;
+      const convId = m.convId;
+      if (!convId) return;
+
+      const mTime = new Date(m.time || 0).getTime();
+      const existing = convMap[convId];
+      const existingTime = existing ? new Date(existing.lastTime || 0).getTime() : 0;
 
       if (!existing || mTime > existingTime) {
-        const isMeSender = String(m.senderId) === sId
-          || (isSuperAdmin && String(m.senderId) === 'admin');
-
-        const isViewerStaffOrAdmin = isSupportStaff || sId === 'admin' || isSuperAdmin || currentUser?.role === 'staff' || currentUser?.role === 'admin';
+        const isMeSender = String(m.senderId) === sId;
         const otherUserId = isMeSender ? m.receiverId : m.senderId;
         const otherRole = isMeSender ? m.receiverRole : m.senderRole;
 
-        // Bỏ qua hội thoại tự chat với chính mình / peer ảo AI
         if (String(otherUserId) === String(sId) || String(otherUserId) === 'ai_support') return;
 
-        // Không ẩn DM theo students/teachers/staffs local — directory thiếu theo role
-        // (Admin students=[] đến khi mở tab HV; GV teachers=[self]). Ghost cleanup: purge orphans + Inbox contacts.
-
-        // Phase 8.21: resolve by participant ID. NEVER map otherRole==="admin" → SUPER profile.
         const peerHintName = isMeSender ? m.receiverName : m.senderName;
         const actor = resolveMessagingActor(
           {
@@ -503,54 +549,27 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
           { teachers: safeTeachers, students: safeStudents, staffs: safeStaffs },
         );
 
-        const matchedStudent = safeStudents.find(s => String(s.id || s._id) === String(otherUserId));
-        const matchedTeacher = safeTeachers.find(t => String(t.id || t._id) === String(otherUserId));
-        const matchedStaff = safeStaffs.find(st => String(st.id || st._id) === String(otherUserId));
-        const finalGender = matchedStudent?.gender || matchedTeacher?.gender || matchedStaff?.gender || '';
-
-        const finalName = actor.displayName;
-        const finalRole = actor.role;
-        const finalAdminRole = actor.adminRole;
-        const finalAvatar = actor.avatar || String(finalName || 'H').substring(0, 2).toUpperCase();
-
-        // Ưu tiên lấy branchCode trực tiếp từ tin nhắn (nếu có), nếu không mới tìm trong list local
-        let branchCode = isMeSender ? m.receiverBranchCode : m.senderBranchCode;
-
-        if (!branchCode) {
-          if (finalRole === 'teacher') {
-            const t = safeTeachers.find(t => String(t.id) === String(otherUserId));
-            branchCode = t?.branchCode || '';
-          } else if (finalRole === 'student') {
-            const s = safeStudents.find(s => String(s.id) === String(otherUserId));
-            branchCode = s?.branchCode || '';
-          } else if (finalRole === 'admin' || finalRole === 'staff') {
-            const st = safeStaffs.find(st => String(st.id) === String(otherUserId) || String(st._id) === String(otherUserId));
-            branchCode = st?.branchCode || '';
-          }
-        }
-
-        convMap[m.convId] = {
-          id: m.convId,
+        convMap[convId] = {
+          id: convId,
+          isGroup: false,
           user: {
             id: otherUserId,
-            name: finalName,
-            role: finalRole,
-            adminRole: finalAdminRole,
-            gender: finalGender,
-            avatar: finalAvatar || String(finalName || 'H').substring(0, 2).toUpperCase(),
-            online: true,
-            branchCode: branchCode
+            name: actor.displayName,
+            role: actor.role,
+            displayRole: actor.displayRole,
+            adminRole: actor.adminRole,
+            avatar: actor.avatar,
+            online: false,
           },
-          lastMessage: m.content,
+          lastMessage: m.isRecalled ? 'Tin nhắn đã được thu hồi' : (m.content || (m.fileUrl ? '[Tệp tin]' : '')),
           lastTime: m.time,
           unread: (() => {
             const seen = new Set();
             let n = 0;
-            for (const um of userMsgs) {
-              if (um.convId !== m.convId) continue;
-              if (!(String(um.receiverId) === sId || (isSuperAdmin && String(um.receiverId) === 'admin'))) continue;
-              if (um.read === true) continue;
-              const id = String(um.id);
+            for (const x of userMsgs) {
+              if (x.convId !== convId) continue;
+              if (x.read === true || String(x.senderId) === sId) continue;
+              const id = String(x.id);
               if (seen.has(id)) continue;
               seen.add(id);
               n += 1;
@@ -567,33 +586,52 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
 
     // 3. Add Groups
     if (groups && Array.isArray(groups)) {
-      groups.filter(g => g && g._id).filter(g => g.participants?.some(p => String(p.userId) === sId)).forEach(g => {
-        const groupMsgs = safeMessages.filter(m => String(m.groupId) === String(g._id));
-        const lastMsg = groupMsgs.reduce((best, m) => {
-          if (!best) return m;
-          return new Date(m.time).getTime() > new Date(best.time).getTime() ? m : best;
-        }, null);
-        const convId = `group_${g._id}`;
+      const userTargetIds = new Set([
+        sId,
+        String(currentUser?.id || ''),
+        String(currentUser?._id || ''),
+        ...(isSuperAdmin ? ['admin'] : []),
+      ].filter(Boolean));
 
-        convMap[convId] = {
-          id: convId,
-          isGroup: true,
-          user: { id: g._id, name: g.name, role: 'group', avatar: 'GN', online: true },
-          lastMessage: lastMsg ? lastMsg.content : 'Bắt đầu cuộc trò chuyện nhóm',
-          lastTime: lastMsg ? lastMsg.time : new Date(g.createdAt || 0),
-          unread: groupMsgs.filter(m => m.read !== true && String(m.senderId) !== sId).length,
-        };
-      });
+      groups
+        .filter(g => g && (g._id || g.id))
+        .filter(g => {
+          const isParticipant = g.participants?.some(p => userTargetIds.has(String(p.userId)));
+          const isCreator = userTargetIds.has(String(g.createdBy?.userId));
+          return isParticipant || isCreator || isSuperAdmin;
+        })
+        .forEach(g => {
+          const gid = String(g._id || g.id);
+          const groupMsgs = safeMessages.filter(m => String(m.groupId) === gid || String(m.convId) === `group_${gid}` || String(m.conversationId) === `group_${gid}`);
+          const lastMsg = groupMsgs.reduce((best, m) => {
+            if (!best) return m;
+            return new Date(m.time).getTime() > new Date(best.time).getTime() ? m : best;
+          }, null);
+          const convId = `group_${gid}`;
+
+          convMap[convId] = {
+            id: convId,
+            isGroup: true,
+            user: { id: gid, name: g.name, role: 'group', avatar: 'GN', online: true },
+            lastMessage: lastMsg ? lastMsg.content : 'Bắt đầu cuộc trò chuyện nhóm',
+            lastTime: lastMsg ? lastMsg.time : new Date(g.createdAt || 0),
+            unread: groupMsgs.filter(m => m.read !== true && !userTargetIds.has(String(m.senderId))).length,
+          };
+        });
     }
 
-    // Ai nhắn sau → lên đầu (immutable — không sort tại chỗ trên shared state)
     return sortConversationsByLastMessageAt(Object.values(convMap));
   }, [messages, students, teachers, staffs, groups, currentUser]);
 
   const getMessages = useCallback((convId) => {
     const id = String(convId || '');
     return messages
-      .filter((m) => m && (String(m.convId || '') === id || String(m.conversationId || '') === id))
+      .filter((m) => m && (
+        String(m.convId || '') === id
+        || String(m.conversationId || '') === id
+        || (m.isGroup && m.groupId && `group_${m.groupId}` === id)
+        || (id.startsWith('group_') && String(m.groupId) === id.slice(6))
+      ))
       .sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0));
   }, [messages]);
 

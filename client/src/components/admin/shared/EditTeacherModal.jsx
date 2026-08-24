@@ -413,7 +413,7 @@ export default function EditTeacherModal({
             <>
               <button
                 type="button"
-                onClick={() => onResetPassword(editTeacher.id || editTeacher._id, editTeacher.name)}
+                onClick={() => onResetPassword?.(editTeacher.id || editTeacher._id, editTeacher.name)}
                 className="cms-btn cms-btn-outline"
               >
                 <KeyRound size={15} /> Cấp MK

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-10T13:02:09.964Z",
+  "generatedAt": "2026-08-23T18:00:49.204Z",
   "origin": "http://127.0.0.1:5018",
   "live": true,
   "envFailure": null,
@@ -18,21 +18,21 @@
           "teacherA"
         ],
         "origin": "http://127.0.0.1:5018",
-        "studentA": "6a79cbb8ee530fa0f98b3d20",
-        "supportA": "6a79cbb8ee530fa0f98b3d1e",
-        "supportB": "6a79cbb8ee530fa0f98b3d1f"
+        "studentA": "6a8b35378952220bdf3ffc06",
+        "supportA": "6a8b35378952220bdf3ffc04",
+        "supportB": "6a8b35378952220bdf3ffc05"
       }
     },
     {
       "name": "student_to_supportA",
       "status": "PASS",
       "detail": {
-        "sender": "6a79cbb8ee530fa0f98b3d20",
-        "recipient": "6a79cbb8ee530fa0f98b3d1e",
+        "sender": "6a8b35378952220bdf3ffc06",
+        "recipient": "6a8b35378952220bdf3ffc04",
         "event": "message:receive",
         "unexpectedRecipients": 0,
         "dbCountDelta": 1,
-        "conversationId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20"
+        "conversationId": "staff_6a8b35378952220bdf3ffc04__student_6a8b35378952220bdf3ffc06"
       }
     },
     {
@@ -109,7 +109,7 @@
       "status": "PASS",
       "detail": {
         "hint": "teacher",
-        "actualReceiver": "6a79cbb8ee530fa0f98b3d1e",
+        "actualReceiver": "6a8b35378952220bdf3ffc04",
         "receiverRole": "staff"
       }
     },
@@ -117,7 +117,7 @@
       "name": "typing_isolation",
       "status": "PASS",
       "detail": {
-        "convId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20",
+        "convId": "staff_6a8b35378952220bdf3ffc04__student_6a8b35378952220bdf3ffc06",
         "supportA": 1,
         "supportB": 0,
         "events": "typing:show/hide"
@@ -128,7 +128,7 @@
       "status": "PASS",
       "detail": {
         "note": "Message.isRead remains global boolean — only verify no Support B socket event",
-        "convId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20"
+        "convId": "staff_6a8b35378952220bdf3ffc04__student_6a8b35378952220bdf3ffc06"
       }
     },
     {
@@ -136,10 +136,10 @@
       "status": "PASS",
       "detail": {
         "messages": [
-          "[P8:conc:S→SupA] 1786366926428",
-          "[P8:conc:S→SupB] 1786366926428",
-          "[P8:conc:Staff→S] 1786366926428",
-          "[P8:conc:T→S] 1786366926428"
+          "[P8:conc:S→SupA] 1787508045951",
+          "[P8:conc:S→SupB] 1787508045951",
+          "[P8:conc:Staff→S] 1787508045951",
+          "[P8:conc:T→S] 1787508045951"
         ]
       }
     },
@@ -147,20 +147,20 @@
       "name": "persistence",
       "status": "PASS",
       "detail": {
-        "conversationId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20",
+        "conversationId": "staff_6a8b35378952220bdf3ffc04__student_6a8b35378952220bdf3ffc06",
         "senderRole": "student",
         "receiverRole": "staff",
         "senderBranchCode": "P8A",
         "receiverBranchCode": "P8A",
         "note": "Message schema has no tenantId field — unchanged",
-        "clientConversationId": "staff_6a79cbb8ee530fa0f98b3d1e__student_6a79cbb8ee530fa0f98b3d20"
+        "clientConversationId": "staff_6a8b35378952220bdf3ffc04__student_6a8b35378952220bdf3ffc06"
       }
     },
     {
       "name": "reconnect",
       "status": "PASS",
       "detail": {
-        "supportA": "6a79cbb8ee530fa0f98b3d1e"
+        "supportA": "6a8b35378952220bdf3ffc04"
       }
     },
     {
@@ -174,7 +174,7 @@
       "name": "http_contacts",
       "status": "PASS",
       "detail": {
-        "count": 3,
+        "count": 4,
         "hasSupportA": true,
         "hasCrossTenantSupport": false
       }

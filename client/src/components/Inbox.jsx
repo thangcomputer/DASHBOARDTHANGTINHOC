@@ -219,7 +219,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const location = useLocation();
   const toast = useToast();
   const socketCtx = useSocket();
-  const { isConnected, sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onMessagePinned, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
+  const { isConnected, sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onMessagePinned, onGroupDelete, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
   const {
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers, groups,
@@ -227,6 +227,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     softDeleteMessage: ctxDeleteMessage, currentUser, messages: contextMessages,
   } = useData();
   const isHighAdmin = currentUser?.adminRole === 'HIGH_ADMIN';
+  const isSuperAdmin = currentUser?.id === 'admin' || currentUser?.adminRole === 'SUPER_ADMIN';
   const isSupportAgent = currentUser?.adminRole === 'SUPPORT';
   const [aiHandoffSession, setAiHandoffSession] = useState(null);
   const [showPriorAiThread, setShowPriorAiThread] = useState(false);
@@ -422,6 +423,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   }, [activeConv?.metadata?.pinnedMessageId, messages]);
 
+  const resolveGroupSendFlags = (conv) => {
+    const convId = String(conv?.id || '');
+    const isGroup = Boolean(
+      conv?.isGroup
+      || convId.startsWith('group_')
+      || String(conv?.user?.role || '').toLowerCase() === 'group'
+    );
+    const groupId = isGroup
+      ? String(conv?.user?.id || conv?.groupId || (convId.startsWith('group_') ? convId.slice(6) : '') || '')
+      : null;
+    return { isGroup, groupId: groupId || null };
+  };
+
   const handlePinMessage = async (msgId) => {
     if (!activeConv) return;
     try {
@@ -436,8 +450,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             pinnedMessageId: res.pinnedMessageId || null
           }
         }));
-        
         if (activeConv && activeConv.user && activeConv.user.id) {
+          const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
           const properMsg = {
             conversationId: activeConv.id,
             senderId: currentUserId,
@@ -445,13 +459,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             senderRole: currentUserRole,
             receiverId: activeConv.user.id,
             receiverName: activeConv.user.name,
-            receiverRole: activeConv.user.role,
+            receiverRole: sendIsGroup ? 'group' : activeConv.user.role,
             content: !isCurrentlyPinned 
               ? `${currentUserName || 'Người dùng'} đã ghim một tin nhắn.` 
               : `${currentUserName || 'Người dùng'} đã bỏ ghim một tin nhắn.`,
             messageType: 'system',
-            isGroup: activeConv.isGroup || false,
-            groupId: activeConv.isGroup ? activeConv.user.id : null,
+            isGroup: sendIsGroup,
+            groupId: sendGroupId,
           };
           await ctxSendMessage(properMsg);
         }
@@ -466,52 +480,49 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const handleScheduleSubmit = async (formData) => {
     try {
       const res = await schedulesAPI.create(formData);
-      if (!res?.success) throw new Error(res?.message || 'Kh�ng th? x?p l?ch');
-      toast.success('�� x?p l?ch h?c th�nh c�ng');
+      if (!res?.success) throw new Error(res?.message || 'Không thể xếp lịch');
+      toast.success('Đã xếp lịch học thành công');
       setShowScheduleModal(false);
-        // Send system message
-        if (activeConv && activeConv.id) {
-          let displayDate = formData.date;
-          try {
-            if (displayDate && displayDate.includes('-')) {
-              const parts = displayDate.split('-');
-              if (parts.length === 3) displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-            }
-          } catch(e) {}
-          
-          const properMsg = {
-            conversationId: activeConv.id,
-            senderId: currentUserId,
-            senderName: currentUserName,
-            senderRole: currentUserRole,
-            receiverId: activeConv.user.id,
-            receiverName: activeConv.user.name,
-            receiverRole: activeConv.user.role,
-            content: `Đã xếp lịch học thành công cho học viên vào ngày ${displayDate} từ ${formData.startTime} đến ${formData.endTime}.`,
-            messageType: 'system',
-            isGroup: activeConv.isGroup || false,
-            groupId: activeConv.isGroup ? activeConv.user.id : null,
-          };
-          await ctxSendMessage(properMsg);
-        }
-          } catch (err) {
-      toast.error(err?.message || 'Kh�ng th? c?p nh?t l?ch h?c');
+      // Send system message
+      if (activeConv && activeConv.id) {
+        let displayDate = formData.date;
+        try {
+          if (displayDate && displayDate.includes('-')) {
+            const parts = displayDate.split('-');
+            if (parts.length === 3) displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          }
+        } catch (e) {}
+
+        const properMsg = {
+          conversationId: activeConv.id,
+          senderId: currentUserId,
+          senderName: currentUserName,
+          senderRole: currentUserRole,
+          receiverId: activeConv.user.id,
+          receiverName: activeConv.user.name,
+          receiverRole: activeConv.user.role,
+          content: `Đã xếp lịch học thành công cho học viên vào ngày ${displayDate} từ ${formData.startTime} đến ${formData.endTime}.`,
+          messageType: 'system',
+          isGroup: false,
+          groupId: null,
+        };
+        await ctxSendMessage(properMsg);
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Không thể cập nhật lịch học');
     }
   };
-
 
   const conversations = useMemo(() => {
     const entries = [];
 
-    // Dedupe contacts từ API (tránh duplicate key + lọc trùng tên Super Admin)
+    // Dedupe contacts từ API (tránh duplicate key + không lọc bỏ High Admin)
     const seenContacts = new Set();
     const uniqueContacts = (contacts || []).filter((c) => {
       if (!c?.id) return false;
-      const role = normalizeRole(c?.role);
-      const nameKey = String(c?.name || '').trim().toLowerCase();
-      const key = role === 'admin' ? `admin:${nameKey}` : `${String(c?.id)}:${role}`;
-      if (seenContacts.has(key)) return false;
-      seenContacts.add(key);
+      const idStr = String(c.id);
+      if (seenContacts.has(idStr)) return false;
+      seenContacts.add(idStr);
       return true;
     });
 
@@ -528,15 +539,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     const seenConvIds = new Set();
     const contactIdSet = new Set(uniqueContacts.map((c) => String(c.id)));
+    // SUPER: chỉ peers trong GET /contacts (HIGH_ADMIN) — không leak activity từ students/teachers local.
     const isListedPeer = (peerId) => {
       const id = String(peerId || '');
-      if (!id || isSpecialMessagingPeerId(id)) return true;
+      if (!id) return false;
+      if (isSpecialMessagingPeerId(id) && !isSuperAdmin) return true;
       if (!contactsLoaded) return true;
-      return contactIdSet.has(id);
+      if (isSuperAdmin) return contactIdSet.has(id);
+      return contactIdSet.has(id) || isAliveMessagingPeer(id, { contacts, students, teachers, staffs });
     };
     const pushEntry = (entry) => {
       const id = String(entry?.id || '');
       if (!id || seenConvIds.has(id)) return false;
+      if (isSuperAdmin && entry?.isGroup) return false;
       if (!entry?.isGroup && entry?.user?.id && !isListedPeer(entry.user.id)) return false;
       seenConvIds.add(id);
       entries.push(entry);
@@ -560,11 +575,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       const builtId = String(buildConversationId(myRole, currentUserId, role, c.id));
 
       // Prefer exact conversationId; fallback peer id (role mismatch must not hide contact)
-      const existingConv = activityById.get(builtId) || activityByPeer.get(String(c.id));
+      const existingConv = activityById.get(builtId)
+        || activityByPeer.get(String(c.id))
+        || ((c.id === 'admin' || c.adminRole === 'SUPER_ADMIN') ? activityByPeer.get('admin') : null);
       const canonicalId = existingConv?.id && !isAiSupportConversationId(existingConv.id)
         ? String(existingConv.id)
         : builtId;
-      if (isAiSupportConversationId(canonicalId) || seenConvIds.has(canonicalId)) return;
+      if (isAiSupportConversationId(canonicalId)) return;
+      if (seenConvIds.has(canonicalId)) return;
 
       pushEntry({
         id: canonicalId,
@@ -587,8 +605,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       });
     });
 
-    // Phase 7: deep-link seedContact may open ONLY if peer is already in the list
-    // (authorized contact or existing conversation activity). Never invent a new peer.
+    // Phase 7: deep-link seed if peer is in contacts/activity, or trusted teacher→HV nav.
+    // Server still authorizes sends; this only seeds Inbox UX.
     if (seedContact?.id && String(seedContact.id) !== String(currentUserId)) {
       const activityPeerIds = existingPeerIdsFromConversations(dataContextConvs);
       const gate = resolveMessagingDeepLink({
@@ -596,7 +614,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         contacts: uniqueContacts,
         existingPeerIds: activityPeerIds,
       });
-      if (gate.allowed) {
+      if (gate.allowed || seedContact.trusted) {
         const seedRole = normalizeRole(seedContact.role);
         if (isHighAdmin && seedRole === 'student' && seedContact.adminRole !== 'STAFF' && seedContact.adminRole !== 'SUPPORT') {
           /* High Admin không mở thread học viên */
@@ -637,7 +655,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 online: isUserOnline(seedContact.id),
               },
               lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
-              lastTime: existingConv?.lastTime || (gate.mode === 'AUTHORIZED_CONTACT' ? new Date(0) : new Date()),
+              lastTime: existingConv?.lastTime || (gate.mode === 'AUTHORIZED_CONTACT' || seedContact.trusted ? new Date(0) : new Date()),
               unread: existingConv?.unread || 0,
             });
           }
@@ -651,6 +669,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (!dc?.id) return;
       const id = String(dc.id);
       if (isAiSupportConversationId(id) || seenConvIds.has(id)) return;
+      if (isSuperAdmin && dc.isGroup) return;
       const peerRole = normalizeRole(dc.user?.role);
       if (isHighAdmin && peerRole === 'student' && dc.user?.adminRole !== 'STAFF' && dc.user?.adminRole !== 'SUPPORT') return;
       const peerId = dc.user?.id != null ? String(dc.user.id) : '';
@@ -676,7 +695,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     // Canonical id merge + newest lastTime first (immutable)
     return mergeConversationsById(entries);
-  }, [contacts, contactsLoaded, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin, isSupportAgent, handoffUserIds]);
+  }, [contacts, contactsLoaded, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin, isSuperAdmin, isSupportAgent, handoffUserIds, students, teachers, staffs]);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -730,13 +749,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   // ─── Join groups ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (activeConv && activeConv.isGroup) {
-      joinGroupChat(activeConv.user.id);
+      const gid = activeConv.user?.id || activeConv.groupId || (activeConv.id?.startsWith('group_') ? activeConv.id.slice(6) : null);
+      if (gid) joinGroupChat(gid);
     }
   }, [activeConv, joinGroupChat]);
 
   useEffect(() => {
     if (groups && groups.length > 0) {
-      groups.forEach(g => joinGroupChat(g._id));
+      groups.forEach(g => {
+        const gid = g._id || g.id;
+        if (gid) joinGroupChat(gid);
+      });
     }
   }, [groups, joinGroupChat]);
 
@@ -794,8 +817,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const activeConvId = activeConv?.id ? String(activeConv.id) : '';
   const activeConvMsgKey = useMemo(() => {
     if (!activeConvId || !Array.isArray(contextMessages)) return '';
+    const gid = activeConvId.startsWith('group_') ? activeConvId.slice(6) : '';
     return contextMessages
-      .filter((m) => m && String(m.convId) === activeConvId)
+      .filter((m) => m && (
+        String(m.convId || '') === activeConvId
+        || String(m.conversationId || '') === activeConvId
+        || (m.isGroup && m.groupId && `group_${m.groupId}` === activeConvId)
+        || (gid && String(m.groupId || '') === gid)
+      ))
       .map((m) => `${m.id}:${m.read ? 1 : 0}:${m.isRecalled ? 1 : 0}:${(m.reactions || []).length}`)
       .join('|');
   }, [contextMessages, activeConvId]);
@@ -925,23 +954,42 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Socket real-time listeners ──────────────────────────────────────────────
   useEffect(() => {
-    let unsubRecall, unsubReaction, unsubMsg, unsubPinned;
+    let unsubRecall, unsubReaction, unsubMsg, unsubPinned, unsubGroupDelete;
       
-      if (onMessagePinned) {
-        unsubPinned = onMessagePinned((data) => {
-          if (activeConv && String(data.conversationId) === String(activeConv.id)) {
-            setActiveConv(prev => ({
-              ...prev,
-              metadata: { ...prev.metadata, pinnedMessageId: data.isPinned ? data.messageId : null }
-            }));
-            setMessages(prev => prev.map(m => {
-              if (String(m.id) === String(data.messageId)) return { ...m, isPinned: data.isPinned };
-              if (data.isPinned && m.isPinned) return { ...m, isPinned: false };
-              return m;
-            }));
+    if (onMessagePinned) {
+      unsubPinned = onMessagePinned((data) => {
+        if (activeConv && String(data.conversationId) === String(activeConv.id)) {
+          setActiveConv(prev => ({
+            ...prev,
+            metadata: { ...prev.metadata, pinnedMessageId: data.isPinned ? data.messageId : null }
+          }));
+          setMessages(prev => prev.map(m => {
+            if (String(m.id) === String(data.messageId)) return { ...m, isPinned: data.isPinned };
+            if (data.isPinned && m.isPinned) return { ...m, isPinned: false };
+            return m;
+          }));
+        }
+      });
+    }
+
+    if (onGroupDelete) {
+      unsubGroupDelete = onGroupDelete((data) => {
+        const deletedGroupId = String(data?.groupId || '');
+        if (!deletedGroupId) return;
+
+        // Tự động đóng khung chat nếu đang xem nhóm vừa bị xóa
+        setActiveConv((prev) => {
+          if (prev && (prev.isGroup || String(prev.id).startsWith('group_')) && (String(prev.id) === `group_${deletedGroupId}` || String(prev.user?.id) === deletedGroupId)) {
+            toast.info(`Nhóm "${data.groupName || 'này'}" đã bị giải tán.`);
+            return null;
           }
+          return prev;
         });
-      }
+
+        // Xóa nhóm khỏi danh sách hội thoại
+        setConversations((prev) => (Array.isArray(prev) ? prev.filter((c) => String(c.id) !== `group_${deletedGroupId}`) : []));
+      });
+    }
 
     if (onMessageReceive) {
       unsubMsg = onMessageReceive((data) => {
@@ -966,7 +1014,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               fileUrl: data.fileUrl,
               fileExpired: data.fileExpired || false,
               reactions: data.reactions || [],
-                isPinned: data.isPinned || false,
+              isPinned: data.isPinned || false,
             };
             return [...prev, mappedMsg];
           });
@@ -997,8 +1045,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (unsubMsg) unsubMsg();
       if (unsubRecall) unsubRecall();
       if (unsubReaction) unsubReaction();
+      if (unsubPinned) unsubPinned();
+      if (unsubGroupDelete) unsubGroupDelete();
     };
-  }, [activeConv, onMessageReceive, onRecallReceive, onReactionReceive, currentUserId, currentUserRole, markMessagesRead, resolveSenderName, resolveSenderMeta]);
+  }, [activeConv, onMessageReceive, onRecallReceive, onReactionReceive, onMessagePinned, onGroupDelete, currentUserId, currentUserRole, markMessagesRead, resolveSenderName, resolveSenderMeta, toast]);
 
   useEffect(() => {
     if (!socket || !activeConv?.isAiHandoff) return undefined;
@@ -1058,6 +1108,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Xóa mềm lịch sử cá nhân ───────────────────────────────────────────────
   const [showMessageOptions, setShowMessageOptions] = useState(null);
+  const [showConvOptions, setShowConvOptions] = useState(null);
 
   const handleDeleteHistory = useCallback(async (msgId) => {
     setShowMessageOptions(null);
@@ -1091,6 +1142,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Gửi tin nhắn ────────────────────────────────────────────────────────────
   const selectConversation = (conv) => {
+    const { isGroup } = resolveGroupSendFlags(conv);
+    // Never rebuild group threads as DM conversationIds
+    if (isGroup) {
+      const gid = String(conv?.user?.id || conv?.groupId || (String(conv?.id || '').startsWith('group_') ? String(conv.id).slice(6) : ''));
+      setActiveConv({
+        ...conv,
+        isGroup: true,
+        id: gid ? `group_${gid}` : conv.id,
+        user: { ...(conv.user || {}), id: gid || conv?.user?.id, role: 'group' },
+      });
+      return;
+    }
     // Nếu conv truyền vào là object từ danh bạ (chưa có id hoặc id kiểu r_i__r_i)
     if (conv.user && !conv.lastMessage) {
       const peerRole = getMessagingRole({
@@ -1223,6 +1286,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
 
     if (pendingImage) {
+      const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
       const msgData = {
         conversationId: activeConv.id,
         senderId: currentUserId,
@@ -1230,13 +1294,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         senderRole: currentUserRole,
         receiverId: activeConv.user.id,
         receiverName: activeConv.user.name,
-        receiverRole: activeConv.user.role,
+        receiverRole: sendIsGroup ? 'group' : activeConv.user.role,
         content: contentText || '[Hình ảnh]',
         messageType: 'image',
         fileUrl: pendingImage.url,
         fileName: pendingImage.fileName,
-        isGroup: activeConv.isGroup || false,
-        groupId: activeConv.isGroup ? activeConv.user.id : null,
+        isGroup: sendIsGroup,
+        groupId: sendGroupId,
       };
       const sentImg = await ctxSendMessage(msgData);
       if (sentImg?.failed) {
@@ -1245,6 +1309,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setPendingImage(null);
       setNewMsg('');
     } else if (contentText) {
+      const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
       const msgData = {
         conversationId: activeConv.id,
         senderId: currentUserId,
@@ -1252,11 +1317,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         senderRole: currentUserRole,
         receiverId: activeConv.user.id,
         receiverName: activeConv.user.name,
-        receiverRole: activeConv.user.role,
+        receiverRole: sendIsGroup ? 'group' : activeConv.user.role,
         content: contentText,
         messageType: 'text',
-        isGroup: activeConv.isGroup || false,
-        groupId: activeConv.isGroup ? activeConv.user.id : null,
+        isGroup: sendIsGroup,
+        groupId: sendGroupId,
       };
       const sent = await ctxSendMessage(msgData);
       if (sent?.failed) {
@@ -1301,6 +1366,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         return;
       }
 
+      const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
       const msgData = {
         conversationId: activeConv.id,
         senderId: currentUserId,
@@ -1308,13 +1374,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         senderRole: currentUserRole,
         receiverId: activeConv.user.id,
         receiverName: activeConv.user.name,
-        receiverRole: activeConv.user.role,
+        receiverRole: sendIsGroup ? 'group' : activeConv.user.role,
         content: isImage ? '[Hình ảnh]' : `Đã gửi tệp: ${file.name}`,
         messageType: isImage ? 'image' : 'file',
         fileUrl: uploadRes.url,
         fileName: file.name,
-        isGroup: activeConv.isGroup || false,
-        groupId: activeConv.isGroup ? activeConv.user.id : null
+        isGroup: sendIsGroup,
+        groupId: sendGroupId,
       };
 
       await ctxSendMessage(msgData);
@@ -1463,6 +1529,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         adminRole: selectUser.adminRole || null,
         avatar: selectUser.avatar,
         phone: selectUser.phone || '',
+        trusted: Boolean(selectUser.trusted),
       };
       setSeedContact((prev) => {
         if (
@@ -1471,6 +1538,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           && prev.name === next.name
           && String(prev.adminRole || '') === String(next.adminRole || '')
           && String(prev.role || '') === String(next.role || '')
+          && Boolean(prev.trusted) === next.trusted
         ) {
           return prev;
         }
@@ -1501,10 +1569,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     // Peer is an authorized contact — wait for seedContact merge into conversations
     const inContacts = (contacts || []).some((c) => String(c?.id) === String(selectId));
     if (inContacts) return;
+    // Teacher→assigned-student deep link: wait for trusted seed merge
+    if (selectUser?.trusted || (seedContact?.trusted && String(seedContact.id) === String(selectId))) return;
 
     // Not in merged list (contacts + activity) → do not create a synthetic conversation
     hasAutoSelected.current = true;
-  }, [location.state?.selectUserId, location.state?.selectUser, location.state?.draftMessage, conversations, currentUserId, currentUserRole, contactsLoaded, contacts]);
+  }, [location.state?.selectUserId, location.state?.selectUser, location.state?.draftMessage, conversations, currentUserId, currentUserRole, contactsLoaded, contacts, seedContact]);
 
   // Apply draft when conversation becomes active after deep-link
   useEffect(() => {
@@ -1541,7 +1611,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   className="cms-input pl-10 pr-3"
                 />
               </div>
-              {currentUserRole !== 'student' && (
+              {currentUserRole !== 'student' && !isSuperAdmin && (
                 <button
                   type="button"
                   onClick={() => setShowCreateGroup(true)}
@@ -1565,6 +1635,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 { id: 'support', label: 'Hỗ trợ' },
                 { id: 'group', label: 'Nhóm' }
               ].filter(tab => {
+                if (isSuperAdmin) return tab.id === 'all' || tab.id === 'admin';
                 if (currentUserRole === 'student' && (tab.id === 'student' || tab.id === 'admin')) return false;
                 if (currentUserRole === 'teacher' && tab.id === 'teacher') return false;
                 if (isHighAdmin && tab.id === 'student') return false;
@@ -1608,7 +1679,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               />
             ) : null}
             {filteredConvs.map(conv => {
-              const isGroup = !!(groups || []).find(g => g._id === conv.user.id);
+              const isGroup = Boolean(
+                conv.isGroup
+                || String(conv.id || '').startsWith('group_')
+                || String(conv.user?.role || '').toLowerCase() === 'group'
+                || (groups || []).some((g) => String(g._id || g.id) === String(conv.user?.id))
+              );
               return (
                 <div
                   key={conv.id}
@@ -1621,8 +1697,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       selectConversation({ ...conv, isGroup });
                     }
                   }}
-                  className={`cms-chat-conv-row ${activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'
-                    }`}
+                  className={`cms-chat-conv-row group ${activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'}`}
                 >
                   <div className="relative shrink-0">
                     <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md relative z-10 overflow-hidden ${isGroup ? 'bg-red-500' : 'bg-white ring-2 ' + (
@@ -1701,13 +1776,31 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={(e) => handleHideConversation(e, conv.id)}
-                          className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg"
-                          title="Ẩn cuộc trò chuyện"
-                        >
-                          <EyeOff size={14} />
-                        </button>
+                        <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowConvOptions(showConvOptions === conv.id ? null : conv.id);
+                              }}
+                              className="text-slate-400 hover:text-slate-700 bg-white shadow-sm border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-slate-50"
+                              title="Tùy chọn"
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                            {showConvOptions === conv.id && (
+                              <div className="absolute right-0 top-full mt-1 z-[100] animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                                <button
+                                  onClick={(e) => {
+                                    setShowConvOptions(null);
+                                    handleHideConversation(e, conv.id);
+                                  }}
+                                  className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                  <EyeOff size={12} /> Ẩn trò chuyện
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         <span className="text-xs text-slate-400 font-medium tabular-nums">{formatTime(conv.lastTime)}</span>
                       </div>
                     </div>
@@ -2769,15 +2862,29 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         </div>
       )}
 
-      {showScheduleModal && activeConv && !activeConv.isGroup && (
-        <ScheduleModal
-          students={students}
-          allSchedules={[]}
-          schedule={{ studentId: activeConv?.user?.id }}
-          teacherId={currentUserId}
-          onClose={() => setShowScheduleModal(false)}
-          onSubmit={handleScheduleSubmit}
-        />
+      {showScheduleModal && activeConv && !activeConv.isGroup && activeConv.user && (
+        (() => {
+          const targetId = String(activeConv.user.id || activeConv.user._id || '');
+          const matchedStudent = (students || []).find((s) => String(s.id || s._id) === targetId);
+          const chatStudent = matchedStudent || {
+            id: activeConv.user.id,
+            _id: activeConv.user.id,
+            name: activeConv.user.name || 'Học viên',
+            course: activeConv.user.course || 'Học viên',
+            branchCode: activeConv.user.branchCode || '',
+          };
+          return (
+            <ScheduleModal
+              students={[chatStudent]}
+              allSchedules={[]}
+              schedule={{ studentId: chatStudent.id || chatStudent._id }}
+              lockStudent={true}
+              teacherId={currentUserId}
+              onClose={() => setShowScheduleModal(false)}
+              onSubmit={handleScheduleSubmit}
+            />
+          );
+        })()
       )}
     </div>
   );

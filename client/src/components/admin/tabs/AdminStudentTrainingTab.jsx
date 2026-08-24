@@ -1,6 +1,7 @@
 import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
+import { useAdminTraining } from '../hooks/AdminTrainingContext';
 import {
   BookOpen, Video, Download, HelpCircle, Trophy, Plus, Clock, Trash2,
   FileSpreadsheet, Edit3, X, Upload, Loader2, FileText, Save, Search,
@@ -39,19 +40,25 @@ function mergeDocumentCourseOptions(dbCourses, lmsVideos) {
 
 export default function AdminStudentTrainingTab() {
   const {
+    students, showGlobalModal, BLANK_Q,
+    erSearch, setErSearch, gradingRow, setGradingRow,
+    gradingValue, setGradingValue, ctxUpdateStudent, toast, addNotification,
+    erForm, setErForm, safeStudentsList,
+  } = useAdminTab();
+
+  const {
     sCourseBuilderMode, setSCourseBuilderMode, updateStudentTrainingItem,
     studentTrainingData, sTrainingTab, setSTrainingTab, setSTrainingForm,
-    students, studentQuestions, studentExamMinutes, updateStudentExamMinutes,
+    studentQuestions, studentExamMinutes, updateStudentExamMinutes,
     studentExamFiles, setStudentExamFile,
-    showGlobalModal, resetStudentQuestions, setSqForm, BLANK_Q,
+    resetStudentQuestions, setSqForm,
     studentQuestionsExcelInputRef, handleStudentQuestionsExcelFile,
     sTrainingForm, sTrainingFileUploading, handleTrainingDocUpload,
-    addStudentTrainingItem, erSearch, setErSearch, gradingRow, setGradingRow,
-    gradingValue, setGradingValue, ctxUpdateStudent, toast, addNotification,
+    addStudentTrainingItem,
     sqSection, setSqSection, sqType, setSqType, sqSearch, setSqSearch, removeStudentQuestion,
     removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
-    erForm, setErForm, safeStudentsList, updateExamResult, addExamResult, examSubjectsCatalog,
-  } = useAdminTab();
+    updateExamResult, addExamResult, examSubjectsCatalog,
+  } = useAdminTraining();
 
   const [dbCourses, setDbCourses] = React.useState([]);
 

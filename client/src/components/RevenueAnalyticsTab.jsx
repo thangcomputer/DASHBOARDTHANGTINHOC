@@ -1,4 +1,4 @@
-﻿/**
+/**
  * RevenueAnalyticsTab.jsx — Dashboard Báo cáo Doanh thu Đa tầng
  * Hiển thị: Tổng doanh thu, So sánh kỳ trước, Biểu đồ thời gian, Breakdown theo chi nhánh
  */
@@ -9,6 +9,8 @@ import {
   ChevronDown, AlertCircle
 } from 'lucide-react';
 import { useBranch } from '../context/BranchContext';
+import { exportToCSV } from '../utils/exportExcel';
+import api from '../services/api';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 
@@ -189,6 +191,32 @@ export default function RevenueAnalyticsTab() {
   const fmt = (n) => `${Number(n || 0).toLocaleString('vi-VN')}đ`;
   const selectedPeriodLabel = PERIODS.find(p => p.value === period)?.label || '';
 
+  const exportRevenueReport = () => {
+    try {
+      const rows = (data?.timeline || []).map((t) => ({
+        'Thời gian / Ngày': t.label || t.date || 'N/A',
+        'Doanh thu (VNĐ)': t.value || t.amount || 0,
+      }));
+      if (rows.length === 0) {
+        rows.push({
+          'Kỳ báo cáo': selectedPeriodLabel,
+          'Tổng doanh thu (VNĐ)': data?.totalRevenue || 0,
+          'Số giao dịch thu': data?.paidStudentsCount || 0,
+          'Học viên mới': data?.newStudentsCount || 0,
+        });
+      }
+      exportToCSV(rows, `BaoCaoDoanhThu_${period}_${new Date().toISOString().split('T')[0]}.csv`);
+      api.systemLogs.create({
+        action: 'TẢI BÁO CÁO DOANH THU',
+        category: 'finance',
+        message: `Tải file báo cáo doanh thu (${selectedPeriodLabel})`,
+        target: 'revenue-analytics-csv',
+      }).catch(() => {});
+    } catch (e) {
+      console.error('Lỗi khi xuất báo cáo:', e);
+    }
+  };
+
   return (
     <div className="cms-viewport-fill">
       {/* ── Header Controls ────────────────────────────────────────── */}
@@ -206,6 +234,17 @@ export default function RevenueAnalyticsTab() {
               <Building2 size={14} /> {staffBranchCode || 'Chi nhánh của bạn'}
             </div>
           )}
+          {/* Export Report */}
+          <button
+            type="button"
+            onClick={exportRevenueReport}
+            disabled={loading}
+            className="flex items-center justify-center gap-1.5 border border-emerald-200 bg-emerald-50 rounded-xl px-4 min-h-[44px] text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-50 touch-manipulation shadow-sm"
+            title="Xuất file báo cáo doanh thu CSV"
+          >
+            <Download size={14} />
+            Xuất báo cáo
+          </button>
           {/* Refresh */}
           <button onClick={() => fetchAll(period, selectedBranchId)} disabled={loading}
             className="flex items-center justify-center gap-1.5 border border-gray-200 rounded-xl px-4 min-h-[44px] text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-50 touch-manipulation">

@@ -50,7 +50,7 @@ function clampSessions(total, completed, remaining) {
   return { totalSessions: t || 12, completedSessions: c, remainingSessions: r };
 }
 
-export default function EditStudentModal({ student, onSave, onClose, teachers, onResetPassword }) {
+export default function EditStudentModal({ student, onSave, onClose, teachers, onResetPassword , isSubmitting }) {
   const toast = useToast();
   const API = import.meta.env.VITE_API_URL || '';
   const { isSuperAdmin, branches } = useBranch();

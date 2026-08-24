@@ -9,6 +9,7 @@ const ACTIONS = new Set([
   'create',
   'upload',
   'delete_post',
+  'update_post',
   'like',
   'react',
   'comment',
@@ -35,13 +36,38 @@ function normalizeRole(role) {
   return 'student';
 }
 
+function isSuperAdminUser(subject) {
+  if (!subject) return false;
+  const uid = String(subject.id || subject._id || '');
+  const adminRole = String(subject.adminRole || '').toUpperCase();
+  return uid === 'admin' || adminRole === 'SUPER_ADMIN';
+}
+
+function isHighAdminUser(subject) {
+  if (!subject) return false;
+  const adminRole = String(subject.adminRole || '').toUpperCase();
+  return adminRole === 'HIGH_ADMIN';
+}
+
+function isSuperAdminAuthor(authorId, authorAdminRole, authorRole) {
+  const uid = String(authorId || '');
+  const aRole = String(authorAdminRole || '').toUpperCase();
+  return uid === 'admin' || aRole === 'SUPER_ADMIN';
+}
+
 /** Mirrors feedRoutes isAdminLike. */
 function isAdminLike(subject) {
-  const r = normalizeRole(subject.role);
+  const r = normalizeRole(subject?.role);
   return r === 'admin'
     || r === 'staff'
-    || subject.id === 'admin'
-    || subject.adminRole === 'SUPER_ADMIN';
+    || isSuperAdminUser(subject)
+    || isHighAdminUser(subject);
+}
+
+function canEditPost(subject, post) {
+  if (!subject || !post) return false;
+  if (isSuperAdminUser(subject)) return true;
+  return String(post.authorId) === String(subject.id || subject._id);
 }
 
 function evaluateAuthOnly(subject) {
@@ -53,15 +79,57 @@ function evaluateAuthOnly(subject) {
 
 function canDeletePost(subject, post) {
   if (!subject || !post) return false;
-  if (isAdminLike(subject)) return true;
-  return String(post.authorId) === String(subject.id);
+  const isPostAuthor = String(post.authorId) === String(subject.id || subject._id);
+  const isPostFromSuper = isSuperAdminAuthor(post.authorId, post.authorAdminRole, post.authorRole);
+
+  // 1. Bài của Super Admin: CHỈ Super Admin mới xóa được
+  if (isPostFromSuper) {
+    return isSuperAdminUser(subject);
+  }
+
+  // 2. Tác giả tự xóa bài của mình
+  if (isPostAuthor) return true;
+
+  // 3. Super Admin và High Admin xóa được bài của người khác
+  if (isSuperAdminUser(subject) || isHighAdminUser(subject)) return true;
+
+  // 4. Người khác không được xóa bài của người khác
+  return false;
 }
 
 function canDeleteComment(subject, post, comment) {
   if (!subject || !comment) return false;
-  if (isAdminLike(subject)) return true;
-  if (String(comment.authorId) === String(subject.id)) return true;
-  return post && String(post.authorId) === String(subject.id);
+  const isCommentAuthor = String(comment.authorId) === String(subject.id || subject._id);
+  const isCommentFromSuper = isSuperAdminAuthor(comment.authorId, comment.authorAdminRole, comment.authorRole);
+
+  // 1. Bình luận của Super Admin: CHỈ Super Admin mới xóa được (không ai khác được xóa)
+  if (isCommentFromSuper) {
+    return isSuperAdminUser(subject);
+  }
+
+  // 2. Tác giả tự xóa bình luận của chính mình
+  if (isCommentAuthor) return true;
+
+  // 3. Super Admin và High Admin xóa được bình luận của tất cả mọi người
+  if (isSuperAdminUser(subject) || isHighAdminUser(subject)) return true;
+
+  // 4. Chủ bài viết (nếu không phải comment của Super Admin) có thể xóa comment trong bài mình
+  if (post && String(post.authorId) === String(subject.id || subject._id)) return true;
+
+  // 5. Người khác không được xóa bình luận của người khác
+  return false;
+}
+
+function evaluateUpdatePost(subject, ctx) {
+  const auth = evaluateAuthOnly(subject);
+  if (auth.decision === 'DENY') return auth;
+  if (!ctx.post) {
+    return { decision: 'ALLOW', reason: 'missing_post_handler_404', statusHint: 200 };
+  }
+  if (!canEditPost(subject, ctx.post)) {
+    return { decision: 'DENY', reason: 'not_post_author_or_super_admin', statusHint: 403 };
+  }
+  return { decision: 'ALLOW', reason: 'update_post_ok', statusHint: 200 };
 }
 
 function evaluateDeletePost(subject, ctx) {
@@ -103,6 +171,8 @@ function evaluateLegacyFeed(subject, action, ctx = {}) {
     case 'react':
     case 'comment':
       return evaluateAuthOnly(subject);
+    case 'update_post':
+      return evaluateUpdatePost(subject, ctx);
     case 'delete_post':
       return evaluateDeletePost(subject, ctx);
     case 'delete_comment':
@@ -144,6 +214,7 @@ module.exports = {
   evaluatePolicyFeed,
   compareDecisions,
   isAdminLike,
+  canEditPost,
   canDeletePost,
   canDeleteComment,
 };

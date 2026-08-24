@@ -91,7 +91,10 @@ function isPairStructurallyAllowed(senderProduct, peerProduct) {
     return false;
   }
 
-  if (senderProduct === PRODUCT_ROLES.SUPER_ADMIN) return true;
+  // Super Admin chỉ nhắn High Admin (khớp discover SUPER_SEES_HIGH)
+  if (senderProduct === PRODUCT_ROLES.SUPER_ADMIN) {
+    return peerProduct === PRODUCT_ROLES.HIGH_ADMIN;
+  }
   if (senderProduct === PRODUCT_ROLES.HIGH_ADMIN) return true;
   if (senderProduct === PRODUCT_ROLES.SUPPORT) return true;
 

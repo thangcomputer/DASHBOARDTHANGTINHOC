@@ -75,5 +75,5 @@
     "notEvaluatedStillBlocksPrimary": true
   },
   "note": "NOT_EVALUATED ≠ FAIL and ≠ PASS. NOT_EVALUATED still blocks ENTERPRISE_PRIMARY_READY. ENTERPRISE_PRIMARY_READY=YES means cutover review eligibility only — never auto-promote.",
-  "generatedAt": "2026-08-10T11:39:28.835Z"
+  "generatedAt": "2026-08-23T18:00:22.438Z"
 }

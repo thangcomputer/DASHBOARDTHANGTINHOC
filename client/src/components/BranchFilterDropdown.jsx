@@ -15,7 +15,7 @@ const BRANCH_VISIBLE_HASHES = [
   'teachers',
   'evaluations',
   'finance',
-  'system-logs',
+  'logs',
   'hr',
   'analytics',
   'bi',
@@ -41,7 +41,7 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
 
   const HIDDEN_PATHS = ['/admin/inbox', '/admin/settings'];
   const isHiddenPath = HIDDEN_PATHS.some((p) => location.pathname.startsWith(p));
-  const currentHash = location.hash?.replace('#', '') || (location.pathname === '/admin' ? 'dashboard' : '');
+  const currentHash = (location.hash || '').replace(/^#/, '').split(/[?#]/)[0] || (location.pathname === '/admin' ? 'dashboard' : '');
   const showDropdown = !isHiddenPath && (
     BRANCH_VISIBLE_HASHES.includes(currentHash) ||
     location.pathname.startsWith('/admin/bi')
@@ -102,7 +102,7 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
     };
   }, [open, fullWidth]);
 
-  const widthCls = fullWidth ? 'w-full max-w-none' : 'max-w-[9.5rem] sm:max-w-[11rem]';
+  const widthCls = fullWidth ? 'w-full max-w-none' : 'max-w-[12rem] sm:max-w-[14rem]';
   const heightCls = fullWidth ? 'h-11 rounded-xl text-sm' : 'h-9 rounded-lg text-xs';
 
   if (isStaff) {

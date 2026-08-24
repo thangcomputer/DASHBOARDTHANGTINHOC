@@ -30,7 +30,7 @@ function isOnlineBranch(branch) {
   return String(branch?.name || '').toLowerCase().includes('online');
 }
 
-export default function AddStudentModal({ onAdd, onClose, teachers }) {
+export default function AddStudentModal({ onAdd, onClose, teachers , isSubmitting }) {
   const toast    = useToast();
   const API      = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const TOTAL_PAYMENT_SECS = 900; // 15 phút

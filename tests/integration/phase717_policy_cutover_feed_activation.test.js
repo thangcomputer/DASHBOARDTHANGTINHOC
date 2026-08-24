@@ -202,13 +202,17 @@ test('Phase7.17 auth-only actions: actor matrix', () => {
 test('Phase7.17 delete_post: owner/admin ALLOW; stranger DENY; missing → ALLOW(404)', () => {
   const owner = sub({ id: AUTHOR, role: 'student' });
   const other = sub({ id: OTHER, role: 'student' });
+  const superAdmin = sub({ id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN' });
+  const highAdmin = sub({ id: 'ha1', role: 'admin', adminRole: 'HIGH_ADMIN' });
   const staff = sub({ id: 'st1', role: 'staff', adminRole: 'STAFF' });
   const teacher = sub({ id: 't1', role: 'teacher' });
   const post = { authorId: AUTHOR };
 
   assert.equal(parity('delete_post', owner, { post }).policy.decision, 'ALLOW');
   assert.equal(parity('delete_post', other, { post }).policy.decision, 'DENY');
-  assert.equal(parity('delete_post', staff, { post }).policy.decision, 'ALLOW');
+  assert.equal(parity('delete_post', superAdmin, { post }).policy.decision, 'ALLOW');
+  assert.equal(parity('delete_post', highAdmin, { post }).policy.decision, 'ALLOW');
+  assert.equal(parity('delete_post', staff, { post }).policy.decision, 'DENY');
   assert.equal(parity('delete_post', teacher, { post }).policy.decision, 'DENY');
   assert.equal(parity('delete_post', owner, { post: null }).policy.decision, 'ALLOW');
 });
@@ -217,6 +221,8 @@ test('Phase7.17 delete_comment: commenter / post author / admin; missing → ALL
   const postAuthor = sub({ id: AUTHOR, role: 'student' });
   const commenter = sub({ id: OTHER, role: 'student' });
   const stranger = sub({ id: 'x1', role: 'student' });
+  const superAdmin = sub({ id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN' });
+  const highAdmin = sub({ id: 'ha1', role: 'admin', adminRole: 'HIGH_ADMIN' });
   const staff = sub({ id: 'st1', role: 'staff', adminRole: 'STAFF' });
   const post = { authorId: AUTHOR };
   const comment = { authorId: OTHER };
@@ -224,7 +230,9 @@ test('Phase7.17 delete_comment: commenter / post author / admin; missing → ALL
   assert.equal(parity('delete_comment', commenter, { post, comment }).policy.decision, 'ALLOW');
   assert.equal(parity('delete_comment', postAuthor, { post, comment }).policy.decision, 'ALLOW');
   assert.equal(parity('delete_comment', stranger, { post, comment }).policy.decision, 'DENY');
-  assert.equal(parity('delete_comment', staff, { post, comment }).policy.decision, 'ALLOW');
+  assert.equal(parity('delete_comment', superAdmin, { post, comment }).policy.decision, 'ALLOW');
+  assert.equal(parity('delete_comment', highAdmin, { post, comment }).policy.decision, 'ALLOW');
+  assert.equal(parity('delete_comment', staff, { post, comment }).policy.decision, 'DENY');
   assert.equal(parity('delete_comment', commenter, { post: null, comment: null }).policy.decision, 'ALLOW');
   assert.equal(parity('delete_comment', commenter, { post, comment: null }).policy.decision, 'ALLOW');
 });

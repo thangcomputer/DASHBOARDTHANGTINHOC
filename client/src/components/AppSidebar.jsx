@@ -427,6 +427,10 @@ const AppSidebar = ({
     if (adminRole === 'HIGH_ADMIN') {
       if (item.superAdminOnly) return false;
       if (!item.permission) return true;
+      // Nhật ký thêm/xóa/tài chính/đổi TT HV–GV: luôn hiện cho HIGH_ADMIN
+      const wantsLogs = item.permission === PERMISSIONS.VIEW_LOGS
+        || (Array.isArray(item.permission) && item.permission.includes(PERMISSIONS.VIEW_LOGS));
+      if (wantsLogs) return true;
       if (Array.isArray(item.permission)) {
         return item.permission.some((p) => userPermissions.includes(p));
       }

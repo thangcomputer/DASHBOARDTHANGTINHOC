@@ -49,5 +49,5 @@
     "hookEventsNotUniqueRequests": true
   },
   "note": "hookEvents may count observe+dual-check hooks per HTTP call. uniqueRuntimeRequests uses correlation/request IDs only — never invented. ENTERPRISE_PRIMARY_READY remains NO in Phase 8.20.",
-  "timestamp": "2026-08-10T11:39:28.886Z"
+  "timestamp": "2026-08-23T18:00:22.448Z"
 }

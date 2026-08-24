@@ -343,7 +343,7 @@ const branchFilter = async (req, res, next) => {
   try {
     // Hardcoded admin
     if (!req.user || req.user.id === 'admin') {
-      const qBranch = req.query.branch_id;
+      const qBranch = req.query.branch_id || req.query.branchId;
       if (qBranch && qBranch !== 'all' && qBranch !== '') {
         req.branchFilter = { branchId: qBranch };
       } else {
@@ -370,7 +370,7 @@ const branchFilter = async (req, res, next) => {
       const isActuallySuper = user.adminRole === 'SUPER_ADMIN';
       const isHighAdmin = user.adminRole === 'HIGH_ADMIN';
       const isSupport = user.adminRole === 'SUPPORT';
-      const qBranch = req.query.branch_id;
+      const qBranch = req.query.branch_id || req.query.branchId;
 
       if (isActuallySuper) {
         if (qBranch && qBranch !== 'all' && qBranch !== '') {
@@ -381,9 +381,9 @@ const branchFilter = async (req, res, next) => {
       } else if (isHighAdmin) {
         const isApprovedHighAllBranchRead = () => {
           const url = req.originalUrl || '';
-          // 5 module gốc (Overview/HR/Teachers/Students/Finance) + analytics báo cáo doanh thu
+          // Overview/HR/Teachers/Students/Finance + analytics báo cáo + BI Dashboard
           // (cùng UI Super khi chọn Tất cả chi nhánh). Không mở messaging/courses/…
-          return /\/(students|teachers|employees|finance|transactions|analytics)(\/|\?|$)/.test(url);
+          return /\/(students|teachers|employees|finance|transactions|analytics|bi)(\/|\?|$)/.test(url);
         };
         if (qBranch && qBranch !== 'all' && qBranch !== '') {
           req.branchFilter = { branchId: qBranch };

@@ -69,7 +69,7 @@ const loadSession = () => {
     
     // 1. Kiểm tra role ưu tiên theo URL trước
     if (priorityRole === 'admin') {
-      for (const r of ['staff', 'admin']) {
+      for (const r of ['admin', 'staff']) {
         const userStr = localStorage.getItem(`${r}_user`);
         if (userStr && localStorage.getItem(`${r}_access_token`)) {
           return JSON.parse(userStr);
@@ -518,6 +518,24 @@ function InactivityWarning({ visible, secondsLeft, onExtend, onLogout }) {
 }
 
 // ── Main App ──────────────────────────────────────────────────────────────────
+
+import { useToast } from './utils/toast.jsx';
+function GlobalApiErrorHandler() {
+  const toast = useToast();
+  useEffect(() => {
+    const handler = (e) => {
+      const msg = e.detail?.message || 'Lỗi API';
+      const status = e.detail?.status;
+      if (status === 403 || status >= 500) {
+        toast.error(msg);
+      }
+    };
+    window.addEventListener('cms:api-error', handler);
+    return () => window.removeEventListener('cms:api-error', handler);
+  }, [toast]);
+  return null;
+}
+
 function App() {
   const [session, setSession]           = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -692,7 +710,8 @@ function App() {
             <DataProvider key={session?.id || 'guest'} user={session} onLogout={handleLogout}>
                 <BranchProvider session={session}>
                 <ToastProvider>
-                    <AppRoutes
+                    <GlobalApiErrorHandler />
+                      <AppRoutes
                         session={session}
                         onSessionChange={handleSessionChange}
                         isAuthLoading={isAuthLoading}

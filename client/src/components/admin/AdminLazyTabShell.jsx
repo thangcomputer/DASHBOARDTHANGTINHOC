@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { Loader2 } from 'lucide-react';
+import ErrorBoundary from '../ErrorBoundary';
 
 const LazySystemSettingsTab = lazy(() => import('../SystemSettingsTab'));
 const LazyStaffManagementTab = lazy(() => import('../StaffManagementTab'));
@@ -36,9 +37,11 @@ export function AdminLazyExternalTab({ tab }) {
   if (!Component) return null;
   return (
     <div className="animate-in fade-in duration-300 h-full min-h-0">
-      <Suspense fallback={<TabFallback />}>
-        <Component />
-      </Suspense>
+      <ErrorBoundary inline>
+        <Suspense fallback={<TabFallback />}>
+          <Component />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }
@@ -46,9 +49,11 @@ export function AdminLazyExternalTab({ tab }) {
 export function AdminLazyOverviewTab(props) {
   return (
     <div className="h-full min-h-0">
-      <Suspense fallback={<TabFallback />}>
-        <LazyAdminOverviewTab {...props} />
-      </Suspense>
+      <ErrorBoundary inline>
+        <Suspense fallback={<TabFallback />}>
+          <LazyAdminOverviewTab {...props} />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }
@@ -56,9 +61,11 @@ export function AdminLazyOverviewTab(props) {
 function LazyAdminTab({ Component }) {
   return (
     <div className="animate-in fade-in duration-300 h-full min-h-0">
-      <Suspense fallback={<TabFallback />}>
-        <Component />
-      </Suspense>
+      <ErrorBoundary inline>
+        <Suspense fallback={<TabFallback />}>
+          <Component />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

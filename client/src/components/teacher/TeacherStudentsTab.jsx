@@ -2,9 +2,27 @@ import React from 'react';
 import { Search, MessageSquare, Users, GraduationCap } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import TeacherStudentCard from './TeacherStudentCard';
-import { openSiteChat } from '../FloatingMessenger';
 import { getAttendanceAction } from '../../utils/attendanceAction';
 import { normalizeScheduleDate } from '../../utils/scheduleTime';
+
+/** GV mở hộp thư với HV đã gán (deep-link Inbox). */
+function navigateTeacherStudentChat(navigate, student) {
+  if (!navigate || !student) return;
+  const id = String(student._id || student.id || '');
+  if (!id) return;
+  navigate('/teacher/inbox', {
+    state: {
+      selectUserId: id,
+      selectUser: {
+        id,
+        name: student.name || 'Học viên',
+        role: 'student',
+        avatar: student.avatar,
+        trusted: true,
+      },
+    },
+  });
+}
 
 function resolveTodayAttendanceGate(todaySchedules) {
   if (!todaySchedules.length) return { status: 'no_schedule' };
@@ -125,16 +143,11 @@ export default function TeacherStudentsTab({
                               type="button"
                               onClick={(e) => { 
                                 e.stopPropagation(); 
-                                openSiteChat({
-                                  id: String(sId),
-                                  name: s.name || 'Học viên',
-                                  role: 'student',
-                                  avatar: s.avatar,
-                                });
+                                navigateTeacherStudentChat(navigate, s);
                               }} 
                               className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 hover:text-blue-700 transition-all border-none outline-none shrink-0"
-                              title="Nhắn tin nội bộ"
-                              aria-label="Nhắn tin nội bộ"
+                              title="Nhắn tin với học viên"
+                              aria-label="Nhắn tin với học viên"
                             >
                               <MessageSquare size={14} />
                             </button>
@@ -206,6 +219,7 @@ export default function TeacherStudentsTab({
                       attendanceGate={attendanceGate}
                       myStudents={students}
                       onCancelSchedule={cancelSchedule}
+                      navigate={navigate}
                     />
                   );
                 })()

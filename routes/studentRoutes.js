@@ -1082,7 +1082,10 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     delete safeBody.paymentMethod;
     delete safeBody.paidNote;
     const before = await Student.findById(req.params.id)
-      .select('studentExamUnlocked examApproved name examProgress')
+      .select(
+        'studentExamUnlocked examApproved name examProgress phone email course status price '
+        + 'totalSessions completedSessions remainingSessions teacherId teacherName linkHoc address',
+      )
       .lean();
 
     // Nếu là Teacher, chỉ cho phép cập nhật thông tin điểm danh, thành tích
@@ -1168,11 +1171,13 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     }
 
     // Hash mật khẩu nếu admin/staff đổi (findByIdAndUpdate không chạy pre('save'))
+    let passwordChanged = false;
     if (Object.prototype.hasOwnProperty.call(safeBody, 'password')) {
       const plain = String(safeBody.password || '').trim();
       if (plain) {
         const bcrypt = require('bcryptjs');
         safeBody.password = await bcrypt.hash(plain, 10);
+        passwordChanged = true;
       } else {
         delete safeBody.password;
       }
@@ -1410,7 +1415,31 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
       }
     }
 
-    res.json({ success: true, data: student });
+    res.json({
+      success: true,
+      data: student,
+      meta: {
+        passwordChanged,
+        changes: require('../utils/systemLogChangeSummary').summarizeStudentUpdates(
+          { ...safeBody, ...(passwordChanged ? { _passwordChanged: true } : {}) },
+          before,
+          { passwordChanged },
+        ),
+        previous: before
+          ? {
+            name: before.name,
+            phone: before.phone,
+            course: before.course,
+            status: before.status,
+            price: before.price,
+            totalSessions: before.totalSessions,
+            completedSessions: before.completedSessions,
+            remainingSessions: before.remainingSessions,
+            teacherName: before.teacherName,
+          }
+          : null,
+      },
+    });
   } catch (error) {
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(e => e.message);
@@ -2249,6 +2278,19 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
       success: true,
       message: touchSessions ? 'Đã cập nhật số buổi khóa học' : 'Đã cập nhật quyền khóa học',
       data: doc,
+      meta: {
+        courseName: student.enrollments[idx]?.courseName || '',
+        changes: require('../utils/systemLogChangeSummary').summarizeEnrollmentSettings({
+          ...req.body,
+          courseName: student.enrollments[idx]?.courseName || '',
+          ...(typeof examUnlocked === 'boolean'
+            ? { status: examUnlocked ? 'Mở quyền thi khóa' : 'Khóa quyền thi khóa' }
+            : {}),
+          ...(typeof requireWebcam === 'boolean'
+            ? { notes: requireWebcam ? 'Bật webcam' : 'Tắt webcam' }
+            : {}),
+        }),
+      },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -2889,12 +2931,25 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
 
+    let previousTeacherName = '';
+    if (prevTeacherIdForReassign) {
+      try {
+        const Teacher = require('../models/Teacher');
+        const prevT = await Teacher.findById(prevTeacherIdForReassign).select('name').lean();
+        previousTeacherName = prevT?.name || '';
+      } catch { /* ignore */ }
+    }
+
     res.json({
       success: true,
       message: isUnassign ? 'Đã bỏ phân công giảng viên' : (isReassign ? 'Đã đổi giảng viên thành công' : 'Đã gán giảng viên thành công'),
       data: doc,
       meta: {
         reassign: !!isReassign,
+        unassign: !!isUnassign,
+        teacherName: isUnassign ? '' : teacherName,
+        previousTeacherName,
+        targetCourse: targetCourse || student.course || '',
         completedSessionsAtSwitch,
         futureSchedulesUpdated,
         completedSplit,

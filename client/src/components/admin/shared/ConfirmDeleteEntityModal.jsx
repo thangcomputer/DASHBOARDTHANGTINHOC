@@ -2,7 +2,7 @@ import React from 'react';
 import { Trash2, AlertTriangle, X } from 'lucide-react';
 
 /** Confirm delete student or teacher. */
-export default function ConfirmDeleteEntityModal({ modal, onCancel, onConfirm }) {
+export default function ConfirmDeleteEntityModal({ modal, onCancel, onConfirm , isSubmitting }) {
   if (!modal) return null;
   return (
     <>
@@ -34,8 +34,24 @@ export default function ConfirmDeleteEntityModal({ modal, onCancel, onConfirm })
             {modal.type === 'teacher' ? 'Giảng viên' : 'Học viên'}
           </p>
           <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-center">
-            <p className="text-red-800 font-semibold text-base">{modal.name}</p>
-            <p className="text-red-600 text-[12px] mt-1">ID: {modal.id}</p>
+            <p className="text-red-800 font-semibold text-base">{modal.name || 'Học viên'}</p>
+            <div className="flex items-center justify-center gap-2 mt-2 flex-wrap text-[12px] text-red-700">
+              {modal.code && (
+                <span className="px-2 py-0.5 rounded-md bg-red-100/80 border border-red-200 font-medium">
+                  Mã: {modal.code}
+                </span>
+              )}
+              {modal.phone && (
+                <span className="px-2 py-0.5 rounded-md bg-red-100/80 border border-red-200">
+                  SĐT: {modal.phone}
+                </span>
+              )}
+              {modal.course && (
+                <span className="px-2 py-0.5 rounded-md bg-red-100/80 border border-red-200">
+                  Khóa: {modal.course}
+                </span>
+              )}
+            </div>
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
             <p className="text-amber-800 text-sm font-semibold flex items-center gap-2">
@@ -49,7 +65,7 @@ export default function ConfirmDeleteEntityModal({ modal, onCancel, onConfirm })
         </div>
         <div className="cms-sheet-footer">
           <button type="button" onClick={onCancel} className="cms-btn cms-btn-outline">Huỷ bỏ</button>
-          <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary">
+          <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary" disabled={isSubmitting}>
             <Trash2 size={16} /> Xoá ngay
           </button>
         </div>

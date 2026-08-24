@@ -142,12 +142,14 @@ export default function TeacherOverviewTab({
   }, [mySchedules, students]);
 
   return (
-    <div className="py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0">
+    <div className="py-3 sm:py-5 md:py-6 space-y-4 sm:space-y-5 md:space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0 max-w-full overflow-x-hidden pb-4">
       
       {/* ── HEADER & BANNER ── */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-2">
-        <div className="min-w-0 sm:w-1/3 shrink-0">
-          <h2 className="text-xl sm:text-2xl font-black text-slate-800 truncate">Chào mừng, {teacherName || 'Giảng viên'}! 👋</h2>
+      <header className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between mb-1 min-w-0">
+        <div className="min-w-0 w-full lg:max-w-[36%] lg:shrink-0">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-800 break-words">
+            Chào mừng, {teacherName || 'Giảng viên'}! 👋
+          </h2>
           <p className="text-sm font-medium italic mt-1.5 mb-1 text-gray-500">
             &quot;Nỗ lực hôm nay, thành công mai sau.&quot;
           </p>
@@ -158,7 +160,7 @@ export default function TeacherOverviewTab({
         
         {banners.length > 0 && (
           <div 
-            className="relative w-full sm:w-2/3 max-w-[800px] aspect-[5/1] bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group"
+            className="relative w-full lg:flex-1 lg:max-w-[800px] h-28 sm:h-32 md:aspect-[5/1] md:h-auto bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group"
             onClick={() => banners[bannerIdx]?.linkUrl && window.open(banners[bannerIdx].linkUrl, '_blank')}
           >
             {banners.map((b, i) => (
@@ -215,30 +217,30 @@ export default function TeacherOverviewTab({
       )}
 
       {/* ── Income + Profile ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
-        <div className="md:col-span-2 xl:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 text-white relative overflow-hidden shadow-lg shadow-slate-900/15">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 min-w-0">
+        <div className="lg:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 text-white relative overflow-hidden shadow-lg shadow-slate-900/15 min-w-0">
           <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" aria-hidden="true" />
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 md:gap-8 h-full">
-            <div className="space-y-3 sm:space-y-4 min-w-0">
-              <div>
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 h-full min-w-0">
+            <div className="space-y-3 sm:space-y-4 min-w-0 flex-1">
+              <div className="min-w-0">
                 <p className="text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wider mb-1">
                   Thu nhập tháng {new Date().getMonth() + 1}
                 </p>
-                <h3 className="text-xl sm:text-3xl md:text-4xl font-black tabular-nums tracking-tight">
+                <h3 className="text-xl sm:text-3xl md:text-4xl font-black tabular-nums tracking-tight break-words">
                   {totalMonthlyIncome.toLocaleString('vi-VN')}{' '}
                   <span className="text-base sm:text-xl font-bold">đ</span>
                 </h3>
               </div>
-              <div className="flex items-stretch gap-3 sm:gap-6">
-                <div className="flex flex-col min-w-0">
-                  <span className="text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wide">Học viên hoàn thành</span>
+              <div className="flex items-stretch gap-3 sm:gap-6 min-w-0">
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-slate-300 text-[10px] sm:text-sm font-bold uppercase tracking-wide">Học viên hoàn thành</span>
                   <span className="text-lg sm:text-2xl font-black text-emerald-400 tabular-nums mt-0.5">
                     {completed} <span className="text-xs text-slate-300 font-bold">người</span>
                   </span>
                 </div>
-                <div className="w-px self-stretch bg-white/10" aria-hidden="true" />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wide">Buổi dạy đã xong</span>
+                <div className="w-px self-stretch bg-white/10 shrink-0" aria-hidden="true" />
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-slate-300 text-[10px] sm:text-sm font-bold uppercase tracking-wide">Buổi dạy đã xong</span>
                   <span className="text-lg sm:text-2xl font-black text-sky-400 tabular-nums mt-0.5">
                     {totalDone} <span className="text-xs text-slate-300 font-bold">buổi</span>
                   </span>
@@ -248,7 +250,7 @@ export default function TeacherOverviewTab({
             <button
               type="button"
               onClick={() => navigate('/teacher/finance')}
-              className="w-full md:w-auto shrink-0 bg-white/10 hover:bg-white/15 border border-white/10 px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all flex items-center justify-center gap-2 group min-h-11 cursor-pointer"
+              className="w-full sm:w-auto shrink-0 bg-white/10 hover:bg-white/15 border border-white/10 px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wide transition-all flex items-center justify-center gap-2 group min-h-11 cursor-pointer"
             >
               Chi tiết thu nhập
               <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
@@ -256,7 +258,7 @@ export default function TeacherOverviewTab({
           </div>
         </div>
 
-        <div className="md:col-span-2 xl:col-span-1 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
+        <div className="lg:col-span-1 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden min-w-0">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 to-orange-300" aria-hidden="true" />
           <div className={`w-14 h-14 sm:w-20 sm:h-20 ${avatarTone} rounded-full sm:rounded-2xl flex items-center justify-center text-white text-lg sm:text-3xl font-black shadow-md mb-3 sm:mb-4`}>
             {initials}
@@ -312,7 +314,7 @@ export default function TeacherOverviewTab({
           <Zap size={16} className="text-amber-300 shrink-0" aria-hidden="true" />
           <h3 className="font-bold text-sm sm:text-base">Công việc cần xử lý ngay</h3>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
             {
               icon: UserCheck,
@@ -363,13 +365,13 @@ export default function TeacherOverviewTab({
               key={label}
               type="button"
               onClick={action}
-              className={`${tint} border rounded-xl p-3 sm:p-4 text-left transition-all active:scale-[0.98] min-h-[4.25rem] cursor-pointer`}
+              className={`${tint} border rounded-xl p-3 sm:p-4 text-left transition-all active:scale-[0.98] min-h-[4.25rem] cursor-pointer min-w-0`}
             >
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 min-w-0">
                 <Icon size={16} className="text-white/90 shrink-0" aria-hidden="true" />
                 <p className="font-bold text-xs sm:text-sm text-white truncate">{label}</p>
               </div>
-              <p className="text-[10px] sm:text-xs text-white/55 leading-snug pl-0 sm:pl-0">{sub}</p>
+              <p className="text-[10px] sm:text-xs text-white/55 leading-snug break-words">{sub}</p>
             </button>
           ))}
         </div>
@@ -445,31 +447,31 @@ export default function TeacherOverviewTab({
             </div>
           </div>
 
-          {/* Card 2: Bảng tin Hoạt động gần đây & Thông báo từ Trung tâm (Chiều cao cố định h-[260px] vừa đủ 3 dòng không bị cắt chữ) */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 h-[260px] shrink-0 flex flex-col justify-between">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-wrap gap-2 shrink-0">
-              <div className="flex items-center gap-2">
+          {/* Card 2: Bảng tin Hoạt động gần đây & Thông báo từ Trung tâm */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 min-h-[220px] max-h-[320px] sm:h-[260px] sm:max-h-none shrink-0 flex flex-col min-w-0">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-b border-slate-100 pb-2 gap-2 shrink-0 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
                 <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                   <History size={16} />
                 </div>
-                <h4 className="text-xs sm:text-sm font-black text-slate-900">
-                  ⚡️ Nhật ký Hoạt động &amp; Bảng tin
+                <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                  Nhật ký hoạt động &amp; Bảng tin
                 </h4>
               </div>
 
               {/* Sub tabs */}
-              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold w-full sm:w-auto overflow-x-auto">
                 <button
                   type="button"
                   onClick={() => setActivityTab('recent')}
-                  className={`px-2 py-1 rounded-md transition cursor-pointer ${activityTab === 'recent' ? 'bg-white text-indigo-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`flex-1 sm:flex-none px-2 py-1.5 rounded-md transition cursor-pointer whitespace-nowrap ${activityTab === 'recent' ? 'bg-white text-indigo-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                  Hoạt động mới ({teacherActivities.length})
+                  Hoạt động ({teacherActivities.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setActivityTab('announcements')}
-                  className={`px-2 py-1 rounded-md transition cursor-pointer ${activityTab === 'announcements' ? 'bg-white text-indigo-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`flex-1 sm:flex-none px-2 py-1.5 rounded-md transition cursor-pointer whitespace-nowrap ${activityTab === 'announcements' ? 'bg-white text-indigo-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                   Thông báo ({centerAnnouncements.length})
                 </button>

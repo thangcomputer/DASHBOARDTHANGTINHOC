@@ -305,25 +305,43 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
 router.get('/sync/:userId', messagesGuard('sync'), async (req, res) => {
   try {
     const { userId } = req.params;
-    if (req.user.role !== 'admin' && req.user.id !== userId) {
+    const isSelf = String(req.user.id) === String(userId) || String(req.user._id) === String(userId);
+    const isAdminOrStaff = req.user.role === 'admin' || req.user.role === 'staff' || isAdminLevelAccount(req.user);
+    if (!isSelf && !isAdminOrStaff) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền đồng bộ dữ liệu này' });
     }
 
-    // Lấy các nhóm mà user là thành viên
-    const userGroups = await Group.find({ 'participants.userId': userId });
+    const targetIds = [...new Set([
+      String(userId || ''),
+      String(req.user.id || ''),
+      String(req.user._id || ''),
+      ...(isAdminLevelAccount(req.user) ? ['admin'] : []),
+    ].filter(Boolean))];
+
+    // Lấy các nhóm mà user là thành viên hoặc người tạo
+    const userGroups = await Group.find({
+      $or: [
+        { 'participants.userId': { $in: targetIds } },
+        { 'createdBy.userId': { $in: targetIds } },
+      ],
+    });
     const groupIds = userGroups.map(g => String(g._id));
 
     // Lấy tin nhắn cá nhân + tin nhắn nhóm
     // Legacy receiverId/senderId 'admin' chỉ cho SUPER/HIGH — không fan-out cho STAFF
     const messages = await Message.find({
       $or: [
-        { senderId: userId },
-        { receiverId: userId },
+        { senderId: { $in: targetIds } },
+        { receiverId: { $in: targetIds } },
         ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
-        ...(groupIds.length > 0 ? [{ conversationId: { $in: groupIds.map(id => `group_${id}`) } }] : [])
+        ...(groupIds.length > 0 ? [
+          { conversationId: { $in: groupIds.map(id => `group_${id}`) } },
+          { groupId: { $in: groupIds } },
+          { isGroup: true, groupId: { $in: groupIds } },
+        ] : []),
       ],
-      hiddenFor: { $ne: userId }
-    }).sort({ createdAt: -1 }).limit(500);
+      hiddenFor: { $nin: targetIds }
+    }).sort({ createdAt: -1 }).limit(1000);
 
     const sanitized = sanitizeMessages(messages.reverse());
     const enriched = await enrichMessageIdentities(sanitized);
@@ -409,7 +427,7 @@ router.post('/', messagesGuard('send'), async (req, res) => {
     const senderRole = getMessagingRole(req.user);
     const senderName = req.user.name;
 
-    const { receiverId, receiverName, receiverRole, content, isGroup, groupId, messageType, fileUrl, fileName } = req.body;
+    const { receiverId, receiverName, receiverRole, content, isGroup, groupId, messageType, fileUrl, fileName, conversationId: bodyConversationId } = req.body;
 
     const isBroadcast = receiverId === 'ALL_USERS' || receiverId === 'ALL_STUDENTS' || receiverId === 'ALL_TEACHERS';
     if (isBroadcast && !(req.user.role === 'admin' || req.user.role === 'staff')) {
@@ -472,6 +490,7 @@ router.post('/', messagesGuard('send'), async (req, res) => {
       fileName,
       isGroup,
       groupId,
+      conversationId: bodyConversationId || null,
       notifyUser: req.app.notifyUser,
       io: req.app.get('io'),
     }));
@@ -578,7 +597,7 @@ router.put('/:conversationId/pin', messagesGuard('reaction'), async (req, res) =
     if (io) {
       const pinPayload = {
         conversationId,
-        messageId: message._id,
+        messageId: String(message._id),
         isPinned: message.isPinned
       };
       if (conversationId.startsWith('group_')) {
@@ -589,11 +608,11 @@ router.put('/:conversationId/pin', messagesGuard('reaction'), async (req, res) =
           if (!p) return;
           const sepIdx = p.indexOf('_');
           if (sepIdx <= 0) return;
-          const role = p.substring(0, sepIdx);
-          const id = p.substring(sepIdx + 1);
-          if (role === 'admin') return io.to('ALL_ADMIN').emit('message:pinned', pinPayload);
-          if (role === 'staff') return io.to('ALL_STAFF').emit('message:pinned', pinPayload);
-          io.to(`${role}_${id}`).emit('message:pinned', pinPayload);
+          const role = p.slice(0, sepIdx);
+          const id = p.slice(sepIdx + 1);
+          if (role && id) {
+            req.app.notifyUser(role, id, 'message:pinned', pinPayload);
+          }
         });
       }
     }
@@ -867,12 +886,25 @@ router.post('/groups', messagesGuard('group_create'), async (req, res) => {
 router.get('/groups/user/:userId', messagesGuard('group_list'), async (req, res) => {
   try {
     const targetId = String(req.params.userId || '');
-    const isSelf = String(req.user.id) === targetId;
-    const isAdminOrStaff = req.user.role === 'admin' || req.user.role === 'staff';
+    const isSelf = String(req.user.id) === targetId || String(req.user._id) === targetId;
+    const isAdminOrStaff = req.user.role === 'admin' || req.user.role === 'staff' || isAdminLevelAccount(req.user);
     if (!isSelf && !isAdminOrStaff) {
       return res.status(403).json({ success: false, message: 'Không có quyền xem nhóm của người khác' });
     }
-    const groups = await Group.find({ 'participants.userId': req.params.userId }).sort({ updatedAt: -1 });
+
+    const targetIds = [...new Set([
+      targetId,
+      String(req.user.id || ''),
+      String(req.user._id || ''),
+      ...(isAdminLevelAccount(req.user) ? ['admin'] : []),
+    ].filter(Boolean))];
+
+    const groups = await Group.find({
+      $or: [
+        { 'participants.userId': { $in: targetIds } },
+        { 'createdBy.userId': { $in: targetIds } },
+      ],
+    }).sort({ updatedAt: -1 });
     res.json({ success: true, data: groups });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -995,7 +1027,7 @@ router.delete('/groups/:groupId', messagesGuard('group_delete'), async (req, res
     const { groupId } = req.params;
 
     // BUG-02: Kiểm tra quyền — chỉ creator hoặc SuperAdmin mới được xóa nhóm
-    const group = await Group.findById(groupId).select('createdBy').lean();
+    const group = await Group.findById(groupId).select('createdBy participants name').lean();
     if (!group) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm' });
     }
@@ -1009,6 +1041,38 @@ router.delete('/groups/:groupId', messagesGuard('group_delete'), async (req, res
     
     // Xóa Group
     await Group.findByIdAndDelete(groupId);
+
+    // Phát sự kiện Real-time group:deleted đến toàn bộ thành viên và các phòng liên quan
+    const io = req.app.get('io');
+    if (io) {
+      const deletePayload = {
+        groupId: String(groupId),
+        groupName: group.name || 'Nhóm',
+        deletedBy: {
+          id: String(req.user.id),
+          name: req.user.name || 'Quản trị viên',
+          role: req.user.role || 'admin',
+        },
+      };
+
+      // 1. Gửi vào socket room của nhóm
+      io.to(`group_${groupId}`).emit('group:deleted', deletePayload);
+
+      // 2. Gửi vào socket cá nhân của từng thành viên trong nhóm
+      if (Array.isArray(group.participants)) {
+        group.participants.forEach((p) => {
+          if (p && p.userId) {
+            const memberRole = p.role || 'student';
+            req.app.notifyUser(memberRole, p.userId, 'group:deleted', deletePayload);
+          }
+        });
+      }
+
+      // 3. Gửi thông báo đến các phòng tổng để đồng bộ danh sách nhóm tức thì
+      io.to('ALL_ADMIN').emit('group:deleted', deletePayload);
+      io.to('ALL_STAFF').emit('group:deleted', deletePayload);
+      io.to('ALL_TEACHER').emit('group:deleted', deletePayload);
+    }
 
     res.json({ success: true, message: 'Đã xóa nhóm vĩnh viễn' });
   } catch (err) {

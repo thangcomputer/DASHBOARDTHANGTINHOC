@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAdminTab } from '../AdminTabContext';
+import { useAdminLogs } from '../hooks/AdminLogsContext';
 import { Lock, RefreshCw, MoreVertical, Trash2 } from 'lucide-react';
 import api from '../../../services/api';
 
@@ -83,16 +84,14 @@ function RowMenu({ logId, onDeleted, toast }) {
 }
 
 export default function AdminLogsTab() {
+  const { toast } = useAdminTab();
   const {
-    isLoadingLogs, setIsLoadingLogs, dbLogs, setDbLogs, toast,
-  } = useAdminTab();
+    isLoadingLogs, dbLogs, setDbLogs, refreshLogs,
+  } = useAdminLogs();
 
   const refresh = () => {
-    setIsLoadingLogs(true);
-    api.systemLogs.getAll(1, 100)
-      .then((res) => setDbLogs(res.data || []))
-      .catch(() => toast?.error?.('Không tải được nhật ký'))
-      .finally(() => setIsLoadingLogs(false));
+    refreshLogs()
+      .catch(() => toast?.error?.('Không tải được nhật ký'));
   };
 
   const onDeleted = (id) => {

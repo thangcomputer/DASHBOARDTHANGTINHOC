@@ -174,6 +174,12 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
         return;
       }
 
+      // Trusted deep-link from assigned-student UI (server still gates send)
+      if (d.trusted) {
+        openChat(d, { expand: true });
+        return;
+      }
+
       // New conversation UX requires server-authorized contact (Case B)
       try {
         const res = await messagesAPI.getContacts();

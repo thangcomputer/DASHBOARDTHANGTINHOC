@@ -129,7 +129,8 @@ describe('Phase 4 MessagingPolicy', { concurrency: false }, () => {
     assert.equal(canSendStructurally(actors.support, actors.staff).allowed, true);
     assert.equal(canSendStructurally(actors.staff, actors.student).allowed, true);
     assert.equal(canSendStructurally(actors.high, actors.student).allowed, false);
-    assert.equal(canSendStructurally(actors.super, actors.staff).allowed, true);
+    assert.equal(canSendStructurally(actors.super, actors.staff).allowed, false);
+    assert.equal(canSendStructurally(actors.super, actors.high).allowed, true);
   });
 
   it('canStartConversation requires discover+structural for directory starts', async () => {

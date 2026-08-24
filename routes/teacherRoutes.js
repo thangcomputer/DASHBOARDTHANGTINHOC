@@ -533,7 +533,10 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
       }
     }
 
-    const prev = await Teacher.findById(req.params.id).select('status tokenVersion phone zalo email testStatus testScore name').lean();
+    const prev = await Teacher.findById(req.params.id).select(
+      'status tokenVersion phone zalo email testStatus testScore name specialty subjectIds '
+      + 'baseSalaryPerSession customStarBonusAmount branchId branchCode bankAccount address bio startDate practicalStatus',
+    ).lean();
     if (!prev) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
@@ -628,6 +631,19 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
       success: true,
       message: `Đã cập nhật giảng viên ${teacher.name}`,
       data: teacher,
+      meta: {
+        changes: require('../utils/systemLogChangeSummary').summarizeTeacherUpdates(updates, prev),
+        previous: {
+          name: prev.name,
+          phone: prev.phone,
+          email: prev.email,
+          specialty: prev.specialty,
+          baseSalaryPerSession: prev.baseSalaryPerSession,
+          customStarBonusAmount: prev.customStarBonusAmount,
+          status: prev.status,
+          branchCode: prev.branchCode,
+        },
+      },
     });
   } catch (error) {
     logger.error('[TEACHERS] Update error:', error);

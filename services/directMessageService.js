@@ -63,6 +63,7 @@ async function sendCanonicalMessageInner({
   fileName = '',
   isGroup = false,
   groupId = null,
+  conversationId: clientConversationId = null,
   notifyUser,
   io,
 } = {}) {
@@ -75,6 +76,22 @@ async function sendCanonicalMessageInner({
 
   const ridHint = String(receiverId || '');
   const rRoleHint = String(receiverRole || '').toLowerCase();
+  const clientConvId = String(clientConversationId || '');
+  // Defense: client may forget isGroup but still target a group thread
+  let resolvedGroupId = groupId ? String(groupId) : null;
+  if (!resolvedGroupId && clientConvId.startsWith('group_')) {
+    resolvedGroupId = clientConvId.slice('group_'.length);
+  }
+  if (!resolvedGroupId && rRoleHint === 'group' && mongoose.Types.ObjectId.isValid(ridHint)) {
+    resolvedGroupId = ridHint;
+  }
+  let resolvedIsGroup = Boolean(isGroup) || Boolean(resolvedGroupId) || rRoleHint === 'group' || clientConvId.startsWith('group_');
+  if (resolvedIsGroup && !resolvedGroupId && mongoose.Types.ObjectId.isValid(ridHint)) {
+    resolvedGroupId = ridHint;
+  }
+  const isGroupFinal = Boolean(resolvedIsGroup && resolvedGroupId);
+  const groupIdFinal = isGroupFinal ? resolvedGroupId : null;
+
   const isBroadcast =
     ridHint === 'ALL_USERS' || ridHint === 'ALL_STUDENTS' || ridHint === 'ALL_TEACHERS' || ridHint.startsWith('ALL_BRANCH_');
 
@@ -83,8 +100,8 @@ async function sendCanonicalMessageInner({
   }
 
   let pair = null;
-  if (isGroup && groupId) {
-    const group = await Group.findById(groupId).select('participants').lean();
+  if (isGroupFinal && groupIdFinal) {
+    const group = await Group.findById(groupIdFinal).select('participants').lean();
     if (!group) return { ok: false, status: 404, message: 'Không tìm thấy nhóm chat' };
     const isMember = (group.participants || []).some((p) => String(p.userId) === senderId);
     if (!isMember && !isAdminLevelAccount(sender)) {
@@ -139,8 +156,8 @@ async function sendCanonicalMessageInner({
   const peerDoc = pair?.peer || null;
 
   let conversationId;
-  if (isGroup && groupId) {
-    conversationId = `group_${groupId}`;
+  if (isGroupFinal && groupIdFinal) {
+    conversationId = `group_${groupIdFinal}`;
   } else {
     conversationId = buildCanonicalConversationId(sender, rRole, rid);
   }
@@ -160,7 +177,7 @@ async function sendCanonicalMessageInner({
 
   let rBranch = peerDoc?.branchCode || '';
   let resolvedReceiverName = receiverName || peerDoc?.name || '';
-  if (!isGroup) {
+  if (!isGroupFinal) {
     if (rid === 'admin') {
       rBranch = 'HỆ THỐNG';
       if (!resolvedReceiverName) resolvedReceiverName = 'Admin';
@@ -178,7 +195,7 @@ async function sendCanonicalMessageInner({
       }
     }
   }
-  if (!resolvedReceiverName && !isGroup) resolvedReceiverName = 'Người nhận';
+  if (!resolvedReceiverName && !isGroupFinal) resolvedReceiverName = 'Người nhận';
 
   // Defense-in-depth branch check (pairing already scoped STAFF)
   if (
@@ -192,16 +209,16 @@ async function sendCanonicalMessageInner({
     }
   }
 
-  let finalReceiverId = isGroup ? groupId : rid;
-  let finalReceiverName = isGroup ? 'Group' : resolvedReceiverName;
-  let finalReceiverRole = isGroup ? 'admin' : rRole;
+  let finalReceiverId = isGroupFinal ? groupIdFinal : rid;
+  let finalReceiverName = isGroupFinal ? 'Group' : resolvedReceiverName;
+  let finalReceiverRole = isGroupFinal ? 'admin' : rRole;
 
-  if (!isGroup && rid === 'ai_support') {
+  if (!isGroupFinal && rid === 'ai_support') {
     finalReceiverRole = 'system';
   }
 
   if (
-    !isGroup
+    !isGroupFinal
     && senderRole === 'student'
     && rRole === 'admin'
   ) {
@@ -213,7 +230,7 @@ async function sendCanonicalMessageInner({
   }
 
   let aiImageRemaining = null;
-  const isAiImage = !isGroup
+  const isAiImage = !isGroupFinal
     && String(finalReceiverId) === 'ai_support'
     && String(messageType || '') === 'image'
     && String(fileUrl || '').trim();
@@ -256,8 +273,8 @@ async function sendCanonicalMessageInner({
     messageType: messageType || 'text',
     fileUrl: fileUrl || '',
     fileName: fileName || '',
-    isGroup: Boolean(isGroup),
-    groupId: isGroup ? groupId : null,
+    isGroup: Boolean(isGroupFinal),
+    groupId: isGroupFinal ? groupIdFinal : null,
   };
   if (aiImageRemaining != null) messagePayload.aiImageRemaining = aiImageRemaining;
 
@@ -272,8 +289,8 @@ async function sendCanonicalMessageInner({
     receiverRole: finalReceiverRole,
   });
 
-  if (isGroup && groupId) {
-    await Group.findByIdAndUpdate(groupId, {
+  if (isGroupFinal && groupIdFinal) {
+    await Group.findByIdAndUpdate(groupIdFinal, {
       lastMessage: { content: message.content, senderName, sentAt: new Date() },
     });
   }
@@ -292,8 +309,18 @@ async function sendCanonicalMessageInner({
   const [clientMessage] = await enrichMessageIdentities([message]);
 
   if (io && typeof notifyUser === 'function') {
-    if (isGroup && groupId) {
-      io.to(`group_${groupId}`).emit('message:receive', clientMessage);
+    if (isGroupFinal && groupIdFinal) {
+      io.to(`group_${groupIdFinal}`).emit('message:receive', clientMessage);
+      try {
+        const groupDoc = await Group.findById(groupIdFinal).select('participants').lean();
+        if (groupDoc?.participants) {
+          groupDoc.participants.forEach((p) => {
+            if (p?.userId && String(p.userId) !== senderId) {
+              notifyUser(p.role || 'student', String(p.userId), 'message:receive', clientMessage);
+            }
+          });
+        }
+      } catch (_) { /* ignore */ }
     } else {
       notifyUser(finalReceiverRole, finalReceiverId, 'message:receive', clientMessage);
       notifyUser(senderRole, senderId, 'message:sent', clientMessage);
@@ -307,7 +334,7 @@ async function sendCanonicalMessageInner({
 
   // Trợ lý AI — hook riêng, không ảnh hưởng luồng tin nhắn thường
   if (
-    !isGroup
+    !isGroupFinal
     && String(finalReceiverId) === 'ai_support'
     && process.env.AI_SUPPORT_ENABLED === '1'
     && (String(content || '').trim() || isAiImage)

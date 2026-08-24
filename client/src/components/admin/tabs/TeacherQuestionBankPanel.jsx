@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
+import { useAdminTraining } from '../hooks/AdminTrainingContext';
 import { useData } from '../../../context/DataContext';
 import {
   Clock, Trash2, Plus, Download, FileSpreadsheet, Upload, Loader2, FileText,
@@ -116,13 +117,13 @@ export default function TeacherQuestionBankPanel() {
     removeQuestion,
   } = useData();
 
+  const { showGlobalModal, toast, teacherQuestionsExcelInputRef, handleTeacherQuestionsExcelFile } = useAdminTab();
   const {
-    showGlobalModal, resetQuestions, setQForm, BLANK_Q,
-    teacherQuestionsExcelInputRef, handleTeacherQuestionsExcelFile,
-    toast, qSection, setQSection,
+    resetQuestions, setQForm, BLANK_Q,
+    qSection, setQSection,
     qForm, examSubjectsCatalog,
-  } = useAdminTab();
-
+  } = useAdminTraining();
+  
   const sectionOpts = React.useMemo(
     () => buildTeacherSectionOptions(examSubjectsCatalog, questions),
     [examSubjectsCatalog, questions],

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { mutate } from 'swr';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
+import { useSocket } from '../../../context/SocketContext';
 import { parseQuestionBankExcel } from '../../../utils/studentQuestionsExcel';
 import {
   buildTeacherPayoutTransferNote,
@@ -34,6 +35,7 @@ export function useAdminTeachers({
   triggerBackgroundSync,
   getTeacherRating,
 }) {
+  const { onDataRefresh } = useSocket();
   const [teachers, setLocalTeachers] = useState([]);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [teacherForm, setTeacherForm] = useState({
@@ -47,7 +49,24 @@ export function useAdminTeachers({
   const [approveModal, setApproveModal] = useState(null);
   const [reviewModal, setReviewModal] = useState(null);
   const [payoutModal, setPayoutModal] = useState(null);
-  const [teacherSearch, setTeacherSearch] = useState('');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const teacherSearch = searchParams.get('teacherSearch') || '';
+  const setTeacherSearch = (val) => {
+    const next = new URLSearchParams(searchParams);
+    if (!val) next.delete('teacherSearch');
+    else next.set('teacherSearch', val);
+    const qs = next.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: qs ? `?${qs}` : '',
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  };
   const [erGvSearch, setErGvSearch] = useState('');
   const [erGvForm, setErGvForm] = useState(null);
   const teacherQuestionsExcelInputRef = useRef(null);

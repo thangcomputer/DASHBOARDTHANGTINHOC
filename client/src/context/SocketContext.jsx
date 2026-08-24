@@ -30,7 +30,9 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   const messageSentCallbacksRef = useRef(new Set());
   const reactionCallbacksRef = useRef(new Set());
   const recallCallbacksRef = useRef(new Set());
+  const pinnedCallbacksRef = useRef(new Set());
   const groupNewCallbackRef = useRef(null);
+  const groupDeleteCallbacksRef = useRef(new Set());
   const dataRefreshCallbacksRef = useRef(new Set());
   const contactListUpdatedCallbackRef = useRef(null);
   const readAckCallbackRef = useRef(new Set());
@@ -73,11 +75,21 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     return () => recallCallbacksRef.current.delete(callback);
   }, []);
 
+  const onMessagePinned = useCallback((callback) => {
+    pinnedCallbacksRef.current.add(callback);
+    return () => pinnedCallbacksRef.current.delete(callback);
+  }, []);
+
   const onGroupNew = useCallback((callback) => {
     groupNewCallbackRef.current = callback;
     return () => {
       if (groupNewCallbackRef.current === callback) groupNewCallbackRef.current = null;
     };
+  }, []);
+
+  const onGroupDelete = useCallback((callback) => {
+    groupDeleteCallbacksRef.current.add(callback);
+    return () => groupDeleteCallbacksRef.current.delete(callback);
   }, []);
 
   const onDataRefresh = useCallback((callback) => {
@@ -152,37 +164,31 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       setIsConnected(false);
       pauseReconnectIfOffline();
       try {
-        window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: false } }));
+        if (newSocket.connected) newSocket.disconnect();
       } catch { /* ignore */ }
     };
     const onBrowserOnline = () => {
       resumeReconnectIfOnline();
-      try {
-        window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: true } }));
-      } catch { /* ignore */ }
     };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('offline', onBrowserOffline);
+      window.addEventListener('online', onBrowserOnline);
+    }
+    pauseReconnectIfOffline();
 
     const onConnect = () => {
       setIsConnected(true);
-      try {
-        window.dispatchEvent(new CustomEvent('cms:connectivity', { detail: { online: true } }));
-      } catch { /* ignore */ }
-
-      if (userId && role && name) {
-        newSocket.emit('register', { userId, role, name });
+      if (userId) {
+        const uRole = getMessagingRole(sessionUser);
+        const resolvedId = String(userId);
+        newSocket.emit('user:join', {
+          userId: resolvedId,
+          role: uRole,
+          name: name || uRole,
+          adminRole: adminRole || undefined,
+        });
       }
-      if (userId && role === 'student') {
-        newSocket.emit('student:join', { studentId: userId });
-      }
-      if (userId && role === 'teacher') {
-        newSocket.emit('teacher:join', { teacherId: userId });
-      }
-      if (role === 'admin' || role === 'staff') {
-        newSocket.emit('admin:join');
-      }
-      try {
-        window.dispatchEvent(new CustomEvent('cms:socket-reconnected'));
-      } catch { /* ignore */ }
     };
 
     const onConnectError = () => {
@@ -190,24 +196,31 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       pauseReconnectIfOffline();
     };
 
-    const onDisconnect = () => {
+    const onDisconnect = (reason) => {
       setIsConnected(false);
-    };
-
-    const onUsersOnline = (users) => setOnlineUsers(users);
-    const onUsersLastSeen = (map) => {
-      setLastSeenUsers((prev) => ({ ...prev, ...map }));
-    };
-
-    const onMessageReceive = (data) => {
-      if (!isMessageFromSelf(data, sessionUser)) {
-        playMessageSound();
+      if (reason === 'io server disconnect') {
+        newSocket.connect();
       }
-      messageCallbacksRef.current.forEach((cb) => cb(data));
     };
 
-    const onMessageSentEvt = (data) => {
-      messageSentCallbacksRef.current.forEach((cb) => cb(data));
+    const onUsersOnline = (users) => {
+      setOnlineUsers(users);
+    };
+
+    const onUsersLastSeen = (data) => {
+      if (data && typeof data === 'object') {
+        setLastSeenUsers((prev) => ({ ...prev, ...data }));
+      }
+    };
+
+    const onMessageReceive = (message) => {
+      if (isMessageFromSelf(message, sessionUser)) return;
+      playMessageSound();
+      messageCallbacksRef.current.forEach((cb) => cb(message));
+    };
+
+    const onMessageSentEvt = (message) => {
+      messageSentCallbacksRef.current.forEach((cb) => cb(message));
     };
 
     const onMessageReaction = (data) => {
@@ -216,6 +229,10 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
     const onMessageRecall = (data) => {
       recallCallbacksRef.current.forEach((cb) => cb(data));
+    };
+
+    const onMessagePinnedEvt = (data) => {
+      pinnedCallbacksRef.current.forEach((cb) => cb(data));
     };
 
     const onMessageReadAck = (data) => {
@@ -233,6 +250,10 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       if (groupNewCallbackRef.current) groupNewCallbackRef.current(data);
     };
 
+    const onGroupDeleteEvt = (data) => {
+      groupDeleteCallbacksRef.current.forEach((cb) => cb(data));
+    };
+
     const ignoredAnyEvents = new Set([
       'connect',
       'disconnect',
@@ -243,6 +264,8 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       'message:sent',
       'message:reaction',
       'message:recall',
+      'message:pinned',
+      'group:deleted',
     ]);
     const onAnyEvent = (eventName, payload) => {
       if (ignoredAnyEvents.has(eventName)) return;
@@ -251,68 +274,96 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     };
 
     const onReceiveNotification = (data) => {
+      if (!data || typeof data !== 'object') return;
       playNotifySound();
       setNotifications((prev) => {
-        const id = data._id || Date.now();
-        if (prev.some((n) => n.id === id || n._id === id)) {
-          return prev.map((n) => (n.id === id || n._id === id ? { ...n, ...data, id, read: false } : n));
+        const list = Array.isArray(prev) ? prev.filter(Boolean) : [];
+        const id = data._id || data.id || Date.now();
+        if (list.some((n) => n && (n.id === id || n._id === id))) {
+          return list.map((n) => (n && (n.id === id || n._id === id) ? { ...n, ...data, id, read: false } : n));
         }
-        return [{ ...data, id, read: false }, ...prev];
+        return [{
+          ...data,
+          id,
+          read: Boolean(data.read),
+          message: data.content || data.message || '',
+          time: data.createdAt || data.time || new Date(),
+        }, ...list];
       });
     };
 
-    // Legacy signal: chỉ refresh danh sách unread — KHÔNG kêu (tránh double beep + beep nhầm cho Admin)
-    const onNewNotification = () => {
-      triggerRefresh({ type: 'notifications' });
-      apiFetch('/notifications/unread')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.data) {
-            setNotifications(data.data.map((n) => ({
-              ...n,
-              id: n._id,
-              read: Array.isArray(n.read_by) && n.read_by.includes(String(userId)),
-              message: n.content || n.message,
-              time: n.createdAt || n.time,
-            })));
+    const onNewNotification = (notif) => {
+      playNotifySound();
+      if (notif && typeof notif === 'object' && (notif._id || notif.id || notif.message || notif.content)) {
+        setNotifications((prev) => {
+          const list = Array.isArray(prev) ? prev.filter(Boolean) : [];
+          const id = notif._id || notif.id || Date.now();
+          if (list.some((n) => n && (n.id === id || n._id === id))) {
+            return list.map((n) => (n && (n.id === id || n._id === id) ? { ...n, ...notif, id, read: false } : n));
           }
-        })
-        .catch(() => {});
+          return [{
+            ...notif,
+            id,
+            read: false,
+            message: notif.content || notif.message || '',
+            time: notif.createdAt || notif.time || new Date(),
+          }, ...list];
+        });
+      } else if (userId) {
+        apiFetch('/notifications/unread')
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.success && Array.isArray(data.data)) {
+              setNotifications(data.data.filter(Boolean).map((n) => ({
+                ...n,
+                id: n._id || n.id || Date.now(),
+                read: Array.isArray(n.read_by) && n.read_by.includes(String(userId)),
+                message: n.content || n.message || '',
+                time: n.createdAt || n.time || new Date(),
+              })));
+            }
+          })
+          .catch(() => {});
+      }
     };
 
-    const onClassReminder = (data) => {
+    const onClassReminder = (reminder) => {
+      if (!reminder || typeof reminder !== 'object') return;
       playNotifySound();
       setNotifications((prev) => [{
-        id: Date.now(), read: false, type: 'reminder',
-        ...data,
-      }, ...prev]);
+        id: Date.now(),
+        type: 'reminder',
+        title: reminder.title || 'Nhắc nhở lịch học',
+        message: reminder.message || reminder.content || '',
+        time: new Date(),
+        read: false,
+        priority: 'high',
+      }, ...(Array.isArray(prev) ? prev.filter(Boolean) : [])]);
     };
 
-    const onSystemReset = () => {
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = '/login?msg=system_cleared';
+    const onSystemReset = (data) => {
+      try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('admin_user');
+        localStorage.removeItem('teacher_user');
+        localStorage.removeItem('student_user');
+        sessionStorage.clear();
+      } catch (e) {
+        console.error('Lỗi khi xóa storage:', e);
+      }
+      alert(data?.message || 'Hệ thống đã được thiết lập lại từ Admin. Vui lòng đăng nhập lại!');
+      window.location.href = '/login';
     };
 
-    const onContactListUpdated = (data) => {
+    const onContactListUpdated = () => {
       if (contactListUpdatedCallbackRef.current) {
-        contactListUpdatedCallbackRef.current(data);
+        contactListUpdatedCallbackRef.current();
       }
     };
 
     const onPaymentConfirmed = (data) => {
-      playNotifySound();
-      setNotifications((prev) => [{
-        id: Date.now(), read: false, type: 'payment',
-        ...data,
-      }, ...prev]);
-      triggerRefresh({ type: 'payment' });
+      triggerRefresh({ type: 'payment:confirmed', ...data });
     };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('offline', onBrowserOffline);
-      window.addEventListener('online', onBrowserOnline);
-    }
 
     newSocket.on('connect', onConnect);
     newSocket.on('connect_error', onConnectError);
@@ -323,13 +374,12 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     newSocket.on('message:sent', onMessageSentEvt);
     newSocket.on('message:reaction', onMessageReaction);
     newSocket.on('message:recall', onMessageRecall);
-    newSocket.on('message:pinned', (data) => {
-      if (onMessagePinned) onMessagePinned(data);
-    });
+    newSocket.on('message:pinned', onMessagePinnedEvt);
     newSocket.on('message:read_ack', onMessageReadAck);
     newSocket.on('typing:show', onTypingShow);
     newSocket.on('typing:hide', onTypingHide);
     newSocket.on('group:new', onGroupNewEvt);
+    newSocket.on('group:deleted', onGroupDeleteEvt);
     newSocket.on('data:refresh', triggerRefresh);
     newSocket.on('student:updated', triggerRefresh);
     DATA_REFRESH_EVENTS.forEach((ev) => newSocket.on(ev, triggerRefresh));
@@ -345,13 +395,13 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       apiFetch('/notifications/unread')
         .then((res) => res.json())
         .then((data) => {
-          if (data.success && data.data) {
-            setNotifications(data.data.map((n) => ({
+          if (data?.success && Array.isArray(data.data)) {
+            setNotifications(data.data.filter(Boolean).map((n) => ({
               ...n,
-              id: n._id,
+              id: n._id || n.id || Date.now(),
               read: Array.isArray(n.read_by) && n.read_by.includes(String(userId)),
-              message: n.content || n.message,
-              time: n.createdAt || n.time,
+              message: n.content || n.message || '',
+              time: n.createdAt || n.time || new Date(),
             })));
           }
         })
@@ -378,10 +428,12 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       newSocket.off('message:sent', onMessageSentEvt);
       newSocket.off('message:reaction', onMessageReaction);
       newSocket.off('message:recall', onMessageRecall);
+      newSocket.off('message:pinned', onMessagePinnedEvt);
       newSocket.off('message:read_ack', onMessageReadAck);
       newSocket.off('typing:show', onTypingShow);
       newSocket.off('typing:hide', onTypingHide);
       newSocket.off('group:new', onGroupNewEvt);
+      newSocket.off('group:deleted', onGroupDeleteEvt);
       newSocket.off('data:refresh', triggerRefresh);
       newSocket.off('student:updated', triggerRefresh);
       DATA_REFRESH_EVENTS.forEach((ev) => newSocket.off(ev, triggerRefresh));
@@ -395,29 +447,31 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
       if (socketRef.current === newSocket) socketRef.current = null;
       try { newSocket.io.opts.reconnection = false; } catch { /* ignore */ }
-      if (newSocket.connected) newSocket.disconnect();
-      else {
-        try { newSocket.close(); } catch { /* ignore */ }
-      }
+      try { newSocket.disconnect(); } catch { /* ignore */ }
     };
   }, [userId, role, name, token, adminRole]);
 
-  const sendMessage = useCallback((data) => {
-    if (socketRef.current) socketRef.current.emit('message:send', data);
+  const sendMessage = useCallback((messageData) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('message:send', messageData);
+    }
   }, []);
 
-  const markRead = useCallback((conversationId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('message:read', { conversationId, readerId: userId });
+  const markRead = useCallback((notificationId) => {
+    setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)));
+    if (userId) {
+      apiFetch(`/notifications/${notificationId}/read`, { method: 'PUT' }).catch(() => {});
     }
   }, [userId]);
 
-  const clearNotification = useCallback((id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  const clearNotification = useCallback((notificationId) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
   }, []);
 
   const joinGroupChat = useCallback((groupId) => {
-    if (socketRef.current) socketRef.current.emit('group:join', groupId);
+    if (socketRef.current?.connected && groupId) {
+      socketRef.current.emit('group:join', { groupId });
+    }
   }, []);
 
   const value = {
@@ -434,7 +488,9 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     onMessageSent,
     onReactionReceive,
     onRecallReceive,
+    onMessagePinned,
     onGroupNew,
+    onGroupDelete,
     onDataRefresh,
     onContactListUpdated,
     onReadAck,
@@ -466,6 +522,10 @@ export const useSocket = () => {
       onMessageReceive: () => () => {},
       onMessageSent: () => () => {},
       onReactionReceive: () => () => {},
+      onRecallReceive: () => () => {},
+      onMessagePinned: () => () => {},
+      onGroupNew: () => () => {},
+      onGroupDelete: () => () => {},
       onDataRefresh: () => () => {},
     };
   }

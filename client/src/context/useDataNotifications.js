@@ -25,7 +25,7 @@ export function useDataNotifications({ currentUser }) {
   }, [setSocketNotifications, currentUser]);
 
   const markNotificationRead = useCallback((notifId) => {
-    setSocketNotifications(prev => prev.map(n => (!notifId || n.id === notifId || n._id === notifId) ? { ...n, read: true } : n));
+    setSocketNotifications(prev => (Array.isArray(prev) ? prev.filter(Boolean) : []).map(n => (!notifId || n.id === notifId || n._id === notifId) ? { ...n, read: true } : n));
 
     // Persist to server
     if (notifId) {
@@ -47,12 +47,12 @@ export function useDataNotifications({ currentUser }) {
   const dismissNotificationLocal = useCallback((notifId) => {
     if (!notifId) return;
     setSocketNotifications((prev) =>
-      (prev || []).filter((n) => String(n.id || n._id) !== String(notifId)),
+      (Array.isArray(prev) ? prev.filter(Boolean) : []).filter((n) => String(n.id || n._id) !== String(notifId)),
     );
   }, [setSocketNotifications]);
 
   const getNotifications = useCallback((userId, role) => {
-    return (socketNotifications || []).filter(n =>
+    return (socketNotifications || []).filter(Boolean).filter(n =>
       (String(n.userId) === String(userId) || !n.userId) && (n.role === role || !n.role)
     );
   }, [socketNotifications]);

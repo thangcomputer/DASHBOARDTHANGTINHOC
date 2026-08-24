@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import { useAdminTab } from '../AdminTabContext';
+import { useAdminFinance } from '../hooks/AdminFinanceContext';
 import {
   DollarSign, Download, TrendingUp, RefreshCw, CreditCard, Users, BookOpen,
 } from 'lucide-react';
@@ -25,11 +26,13 @@ const TYPE_LABEL = {
 
 export default function AdminFinanceTab() {
   const {
-    isSuperAdmin, toast, addSystemLog,
-    financeStudents, isLoadingFinance, markStudentPaid, financialData,
+    isSuperAdmin, isHighAdmin, toast, addSystemLog,
+    markStudentPaid,
   } = useAdminTab();
   const { selectedBranchId } = useBranch();
+  const { financialData, financeStudents, isLoadingFinance } = useAdminFinance();
   const [ledgerType, setLedgerType] = useState('');
+  const canManageTeacherPayoutUi = !!(isSuperAdmin || isHighAdmin);
 
   const financeRows = useMemo(
     () => expandFinanceEnrollmentRows(financeStudents),
@@ -144,7 +147,7 @@ export default function AdminFinanceTab() {
         </div>
       )}
 
-      <div className={`grid grid-cols-1 ${isSuperAdmin ? 'lg:grid-cols-2 lg:items-stretch' : ''} gap-4 sm:gap-6`}>
+      <div className={`grid grid-cols-1 ${canManageTeacherPayoutUi ? 'lg:grid-cols-2 lg:items-stretch' : ''} gap-4 sm:gap-6`}>
         <div className="cms-m-card flex flex-col overflow-hidden shadow-sm min-h-0 max-lg:h-auto lg:min-h-[28rem] lg:h-[min(32rem,calc(100dvh-14rem))]">
           <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0 shrink-0">
             <h3 className="cms-m-heading flex items-center gap-2 min-w-0">
@@ -295,7 +298,7 @@ export default function AdminFinanceTab() {
           </div>
         </div>
 
-        {isSuperAdmin && (
+        {canManageTeacherPayoutUi && (
           <div className="cms-m-card flex flex-col overflow-hidden shadow-sm min-h-0 max-lg:h-auto lg:min-h-[28rem] lg:h-[min(32rem,calc(100dvh-14rem))]">
             <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0 shrink-0">
               <h3 className="cms-m-heading flex items-center gap-2 min-w-0">

@@ -77,9 +77,11 @@ const transactionSchema = new mongoose.Schema({
 
 // Index cho truy vấn nhanh
 transactionSchema.index({ teacherId: 1, status: 1 });
+transactionSchema.index({ teacherId: 1, createdAt: -1 });
 transactionSchema.index({ createdAt: -1 });
 transactionSchema.index({ status: 1, createdAt: -1 });
 transactionSchema.index({ branchId: 1, status: 1 });
+transactionSchema.index({ branchId: 1, createdAt: -1 });
 transactionSchema.index(
   { idempotencyKey: 1 },
   { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }

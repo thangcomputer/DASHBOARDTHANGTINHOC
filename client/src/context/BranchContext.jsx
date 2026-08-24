@@ -120,9 +120,14 @@ export function BranchProvider({ session, children }) {
     setSelectedBranchName(name || (nextId === 'all' ? 'Tất cả chi nhánh' : 'Chi nhánh'));
   }, [isStaff]);
 
-  const branchQueryParam = selectedBranchId && selectedBranchId !== 'all'
-    ? `branch_id=${selectedBranchId}`
-    : '';
+  // HIGH_ADMIN cần ?branch_id=all rõ ràng (không omit) để backend cho phép all-branch READ.
+  // SUPER_ADMIN: gửi all cũng tương đương không lọc.
+  const branchQueryParam = (() => {
+    if (!selectedBranchId || selectedBranchId === 'all') {
+      return (isSuperAdmin || isHighAdmin) ? 'branch_id=all' : '';
+    }
+    return `branch_id=${selectedBranchId}`;
+  })();
 
   return (
     <BranchContext.Provider value={{

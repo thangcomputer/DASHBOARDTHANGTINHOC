@@ -16,16 +16,19 @@ import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 
 export default function AdminTrainingTab() {
+  // GV + training UI state live on AdminTabProvider (useAdminDashboardState / useAdminTeachers).
+  // Do not read teachers/safeTeachersList from AdminTrainingContext — it does not provide them.
   const {
+    toast, showGlobalModal, erGvSearch, setErGvSearch, erGvForm,
+    ctxUpdateTeacher, fetchTeachers, safeTeachersList,
     courseBuilderMode, setCourseBuilderMode, trainingData, updateTrainingItem, trainingTab, setTrainingTab,
-    trainingForm, setTrainingForm, questions, teachers, setErGvForm, BLANK_ER_GV, trainingFileUploading,
-    handleTrainingDocUpload, addTrainingItem, toast, showGlobalModal, erGvSearch, setErGvSearch, erGvForm,
-    ctxUpdateTeacher, fetchTeachers, qSearch, setQSearch, qSection, setQSection, qDifficulty, setQDifficulty,
-    qSort, qForm, setQForm, BLANK_Q, addQuestion, updateQuestion, removeQuestion, resetQuestions,
-    setTeacherExamTimeLimitMinutes, teacherExamTimeLimitMinutes, setDeleteConfirm, safeTeachersList,
-    teacherQuestionsExcelInputRef, handleTeacherQuestionsExcelFile, examSubjectsCatalog,
+    trainingForm, setTrainingForm, questions, setErGvForm, BLANK_ER_GV, trainingFileUploading,
+    handleTrainingDocUpload, addTrainingItem, setDeleteConfirm,
+    setTeacherExamTimeLimitMinutes, teacherExamTimeLimitMinutes,
+    examSubjectsCatalog,
   } = useAdminTab();
 
+  const teachersForExamResults = safeTeachersList || [];
   const [gvReviewModal, setGvReviewModal] = useState(null);
 
   return (
@@ -52,7 +55,7 @@ export default function AdminTrainingTab() {
                   { key: 'guides', icon: FileText, label: 'Quy trình', count: trainingData?.guides?.length || 0 },
                   { key: 'files', icon: Download, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
                   { key: 'questions', icon: ClipboardList, label: 'Ngân hàng câu hỏi', count: questions?.length || 0 },
-                  { key: 'exam-results-gv', icon: Trophy, label: 'Kết quả thi', count: (teachers || []).filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked').length },
+                  { key: 'exam-results-gv', icon: Trophy, label: 'Kết quả thi', count: teachersForExamResults.filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked').length },
                 ].map(t => (
                   <button
                     key={t.key}
@@ -194,8 +197,8 @@ export default function AdminTrainingTab() {
 
               {/* ===== TEACHER EXAM RESULTS TAB ===== */}
               {trainingTab === 'exam-results-gv' && (() => {
-                // Sử dụng mảng teachers thay vì examResults để phản ánh dữ liệu thật
-                const gvResults = (teachers || []).filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked');
+                // Dùng danh sách GV thật (safeTeachersList) thay vì examResults riêng
+                const gvResults = teachersForExamResults.filter(t => t.testDate || t.testScore > 0 || t.status === 'Locked');
                 const filteredGv = gvResults.filter(t =>
                   !erGvSearch || (t.name || '').toLowerCase().includes(erGvSearch.toLowerCase())
                 );
@@ -510,10 +513,10 @@ export default function AdminTrainingTab() {
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Giảng viên</label>
                       <CmsSelect value={erGvForm.teacherId || ''}
-                        onChange={e => { const t = safeTeachersList.find(x => String(x.id) === e.target.value || String(x._id) === e.target.value); setErGvForm({ ...erGvForm, teacherId: e.target.value, teacherName: t?.name || '' }); }}
+                        onChange={e => { const t = teachersForExamResults.find(x => String(x.id) === e.target.value || String(x._id) === e.target.value); setErGvForm({ ...erGvForm, teacherId: e.target.value, teacherName: t?.name || '' }); }}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm font-bold">
                         <option value="">-- Chọn giảng viên --</option>
-                        {safeTeachersList.map(t => (<option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>))}
+                        {teachersForExamResults.map(t => (<option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>))}
                       </CmsSelect>
                     </div>
                     <div>

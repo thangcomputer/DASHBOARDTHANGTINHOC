@@ -9,12 +9,14 @@ import {
 } from '../../utils/scheduleTime';
 import { getStudentScheduleGate, MAX_STUDENT_SESSIONS_PER_DAY } from '../../utils/schedulingLimits';
 
-export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSubmit, teacherId }) => {
+export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, onSubmit, teacherId, lockStudent = false }) => {
   const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
   const getDayOfWeek = (dateStr) => {
     const d = new Date(dateStr + 'T00:00:00');
     return DAY_NAMES[d.getDay()] || 'Thứ 2';
   };
+
+  const isStudentLocked = Boolean(lockStudent || students.length === 1 || schedule?.lockStudent);
 
   const studentKey = (s) => String(s?._enrollmentKey || s?.id || s?._id || '');
   const findStudentByKey = (key) => students.find((s) => studentKey(s) === String(key));
@@ -38,10 +40,10 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
   const [form, setForm] = useState(() => {
     const initStudentId = String(schedule?.studentId?._id || schedule?.studentId || '');
     const initCourse = schedule?.course || '';
-    const matched = students.find(
+    const matched = (students || []).find(
       (s) => String(s.id || s._id) === initStudentId && (!initCourse || s.course === initCourse)
-    ) || students.find((s) => String(s.id || s._id) === initStudentId) || students[0];
-    const key = matched ? studentKey(matched) : studentKey(students[0]);
+    ) || (students || []).find((s) => String(s.id || s._id) === initStudentId) || (students && students[0]) || null;
+    const key = matched ? studentKey(matched) : (students && students[0] ? studentKey(students[0]) : '');
     return {
       enrollmentKey: key,
       studentId: String(matched?.id || matched?._id || initStudentId),
@@ -50,12 +52,12 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
       endTime: initEnd,
       dayOfWeek: getDayOfWeek(initDate),
       topic: schedule?.topic || schedule?.note || '',
-      course: matched?.course || initCourse || students[0]?.course || '',
+      course: matched?.course || initCourse || (students && students[0]?.course) || '',
     };
   });
 
   const selectedStudent = findStudentByKey(form.enrollmentKey)
-    || students.find((s) => String(s.id || s._id) === String(form.studentId));
+    || (students || []).find((s) => String(s.id || s._id) === String(form.studentId));
 
   const gate = useMemo(
     () => getStudentScheduleGate(selectedStudent, allSchedules, form.date, isEdit ? excludeId : null),
@@ -168,8 +170,14 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
         <div className="p-6 space-y-4 overflow-y-auto">
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chọn học viên</label>
-            <CmsSelect name="enrollmentKey" value={form.enrollmentKey} onChange={handleChange} disabled={lockedPast} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none">
-              {students.map((s) => {
+            {isStudentLocked && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-1.5 mb-2 flex items-center justify-between text-xs text-indigo-700 font-bold">
+                <span>📌 Đã khóa theo học viên trong hội thoại</span>
+                <span className="bg-indigo-200/60 text-indigo-900 text-[10px] px-2 py-0.5 rounded-md uppercase">Cố định</span>
+              </div>
+            )}
+            <CmsSelect name="enrollmentKey" value={form.enrollmentKey} onChange={handleChange} disabled={lockedPast || isStudentLocked} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none disabled:opacity-80 disabled:bg-slate-100">
+              {(students || []).map((s) => {
                 const key = studentKey(s);
                 const sid = String(s.id || s._id || '');
                 const displayName = (s.name && !/^\d{5,}$/.test(s.name)) ? s.name : (s.email || s.phone || `HV-${sid.slice(-4)}`);
@@ -179,7 +187,7 @@ export const ScheduleModal = ({ schedule, students, allSchedules, onClose, onSub
                   : g.reason;
                 return (
                   <option key={key} value={key} disabled={!g.canSchedule && !isEdit}>
-                    {displayName} ({s.course}) — {suffix}
+                    {displayName} ({s.course || 'Học viên'}) — {suffix}
                   </option>
                 );
               })}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
   FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
@@ -148,10 +148,32 @@ function OverviewPanel({
   );
 }
 
+function readNoteTimeSec(getCurrentTime) {
+  try {
+    return Math.max(0, Math.floor(Number(getCurrentTime?.() || 0) || 0));
+  } catch {
+    return 0;
+  }
+}
+
 function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
   const [notes, setNotes] = useLmsLocalStore(storageKey, []);
   const [draft, setDraft] = useState('');
   const [filterLesson, setFilterLesson] = useState('current');
+  // Đồng bộ với giây player — trước đây chỉ đọc lúc render nên lệch đến khi đổi tab
+  const [liveAtSec, setLiveAtSec] = useState(() => readNoteTimeSec(getCurrentTime));
+  const getCurrentTimeRef = useRef(getCurrentTime);
+  getCurrentTimeRef.current = getCurrentTime;
+
+  useEffect(() => {
+    const tick = () => {
+      const next = readNoteTimeSec(getCurrentTimeRef.current);
+      setLiveAtSec((prev) => (prev === next ? prev : next));
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [lessonId]);
 
   const filtered = useMemo(() => {
     const list = Array.isArray(notes) ? notes : [];
@@ -163,19 +185,15 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
   const addNote = () => {
     const text = draft.trim();
     if (!text || !lessonId) return;
-    let at = 0;
-    try {
-      at = Number(getCurrentTime?.() || 0) || 0;
-    } catch {
-      at = 0;
-    }
+    const at = readNoteTimeSec(getCurrentTimeRef.current);
+    setLiveAtSec(at);
     setNotes((prev) => [
       {
         id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         lessonId: String(lessonId),
         lessonTitle: lessonTitle || '',
         text,
-        atSec: Math.floor(at),
+        atSec: at,
         createdAt: Date.now(),
       },
       ...(Array.isArray(prev) ? prev : []),
@@ -197,7 +215,7 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
               addNote();
             }
           }}
-          placeholder={`Tạo ghi chú mới tại ${formatLmsTimestamp(getCurrentTime?.() || 0)}`}
+          placeholder={`Tạo ghi chú mới tại ${formatLmsTimestamp(liveAtSec)}`}
           className="flex-1 min-w-0 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 outline-none"
         />
         <button

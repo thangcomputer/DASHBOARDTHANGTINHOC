@@ -224,6 +224,7 @@ TeacherSchema.index({ status: 1 });
 TeacherSchema.index({ role: 1 });
 TeacherSchema.index({ branchId: 1, status: 1 });
 TeacherSchema.index({ role: 1, status: 1 });
+TeacherSchema.index({ teacherCode: 1 }, { sparse: true });
 
 const Teacher = mongoose.models.Teacher || mongoose.model('Teacher', TeacherSchema);
 module.exports = Teacher;

@@ -471,12 +471,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     : (session?.name || 'Admin');
   const pageTitle = resolvePageTitle(role, location.pathname, location.hash);
   const activeHash = (location.hash || '').replace('#', '').split('?')[0];
-    const adminHash = activeHash || (location.pathname === '/admin' ? 'dashboard' : '');
-    const isStudentsTab = adminHash === 'students' || (role === 'teacher' && location.pathname === '/teacher' && !activeHash);
+  const adminHash = activeHash || (location.pathname === '/admin' ? 'dashboard' : '');
+  // GV Tổng quan = /teacher (không hash) — KHÔNG immersive; chỉ #students mới khóa scroll như split-pane.
+  const isTeacherStudentsTab =
+    role === 'teacher' && location.pathname === '/teacher' && activeHash === 'students';
+  const isStudentsTab = adminHash === 'students' || isTeacherStudentsTab;
   const isInboxPage = location.pathname.includes('/inbox');
   const isBiPage = location.pathname.includes('/bi');
   const isImmersivePage =
-    isInboxPage || isBiPage || (role === 'teacher' && location.pathname === '/teacher/test') || (role === 'teacher' && isStudentsTab);
+    isInboxPage
+    || isBiPage
+    || (role === 'teacher' && location.pathname === '/teacher/test')
+    || isTeacherStudentsTab;
   const showAdminBranch = role === 'admin';
   const roleLabel = role === 'admin'
     ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : session?.adminRole === 'SUPPORT' ? 'Chuyên viên Hỗ trợ' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')

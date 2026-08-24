@@ -4,19 +4,36 @@ import { useNavigate } from 'react-router-dom';
 import StatCard from '../shared/StatCard';
 import Avatar from '../shared/Avatar';
 import { getClientEnrollments } from '../../../utils/enrollments';
+import { useAdminTab } from '../AdminTabContext';
+import useSWR from 'swr';
+import api from '../../../services/api';
+import { useBranch } from '../../../context/BranchContext';
+import { sumClientPaidTuition } from '../../../utils/enrollments';
 import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
 
-export default function AdminOverviewTab({
-  statTotalStudents,
-  statPaidStudents,
-  statTotalTeachers,
-  statActiveTeachers,
-  statTotalRevenue,
-  statPendingTeachers,
-  filteredStudents,
-  safeTeachers,
-  session,
-}) {
+export default function AdminOverviewTab({ session }) {
+  const { filteredStudents = [], safeTeachers = [] } = useAdminTab() || {};
+  const { selectedBranchId } = useBranch();
+  
+  const statsFetcher = async ([, branch_id]) => {
+    const params = branch_id ? { branch_id } : {};
+    const res = await api.students.getStats(params);
+    return res?.success ? res.data : null;
+  };
+  
+  const { data: branchStats } = useSWR(
+    ['admin_stats', selectedBranchId],
+    statsFetcher,
+    { refreshInterval: 60_000, revalidateOnFocus: false, dedupingInterval: 15_000 }
+  );
+  
+  const statTotalStudents = branchStats?.total ?? filteredStudents.length;
+  const statPaidStudents = branchStats?.paid ?? filteredStudents.filter((s) => s.paid).length;
+  const statActiveTeachers = branchStats?.activeTeachers ?? safeTeachers.filter((t) => t.status === 'Active' || t.status === 'active').length;
+  const statTotalTeachers = branchStats?.totalTeachers ?? safeTeachers.length;
+  const statTotalRevenue = branchStats?.totalRevenue ?? filteredStudents.reduce((sum, s) => sum + sumClientPaidTuition(s), 0);
+  const statPendingTeachers = branchStats?.pendingTeachers ?? safeTeachers.filter((t) => t.status === 'Pending').length;
+
   const navigate = useNavigate();
 
   const quickLinks = [

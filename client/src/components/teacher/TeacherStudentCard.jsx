@@ -15,7 +15,6 @@ import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { formatLocalDateKey, isScheduleOngoingNow, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
-import { openSiteChat } from '../FloatingMessenger';
 import TeacherQuizManager from './TeacherQuizManager';
 import { useData } from '../../context/DataContext';
 import { useScheduleContext } from '../../context/ScheduleContext';
@@ -157,6 +156,7 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
 export const StudentCard = ({
   student, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam,
   isDetailed, attendanceGate, myStudents = [], onCancelSchedule,
+  navigate,
 }) => {
   const toast = useToast();
   const { showModal } = useModal();
@@ -928,15 +928,25 @@ export const StudentCard = ({
                   </span>
                   <button
                     type="button"
-                    onClick={() => openSiteChat({
-                      id: String(student.id || student._id),
-                      name: student.name || 'Học viên',
-                      role: 'student',
-                      avatar: student.avatar,
-                    })}
+                    onClick={() => {
+                      const id = String(student.id || student._id || '');
+                      if (!navigate || !id) return;
+                      navigate('/teacher/inbox', {
+                        state: {
+                          selectUserId: id,
+                          selectUser: {
+                            id,
+                            name: student.name || 'Học viên',
+                            role: 'student',
+                            avatar: student.avatar,
+                            trusted: true,
+                          },
+                        },
+                      });
+                    }}
                     className="w-9 h-9 sm:w-8 sm:h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition-all border border-blue-100 shrink-0"
-                    title="Nhắn tin nội bộ"
-                    aria-label="Nhắn tin nội bộ"
+                    title="Nhắn tin với học viên"
+                    aria-label="Nhắn tin với học viên"
                   >
                     <MessageSquare size={14} />
                   </button>
@@ -1696,9 +1706,10 @@ export const StudentCard = ({
 
         {showQuickSchedule && (
           <ScheduleModal
-            students={myStudents && myStudents.length > 0 ? myStudents : [student]}
+            students={[student]}
             allSchedules={allSchedules}
             schedule={{ studentId: student.id || student._id }}
+            lockStudent={true}
             teacherId={currentUser?.id || currentUser?._id || 'current'}
             onClose={() => setShowQuickSchedule(false)}
             onSubmit={handleQuickScheduleSubmit}
@@ -2067,9 +2078,10 @@ export const StudentCard = ({
 
       {showQuickSchedule && (
         <ScheduleModal
-          students={myStudents && myStudents.length > 0 ? myStudents : [student]}
+          students={[student]}
           allSchedules={allSchedules}
           schedule={{ studentId: student.id || student._id }}
+          lockStudent={true}
           teacherId={currentUser?.id || currentUser?._id || 'current'}
           onClose={() => setShowQuickSchedule(false)}
           onSubmit={handleQuickScheduleSubmit}

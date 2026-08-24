@@ -27,10 +27,10 @@ function policyShadowFeed(action) {
       });
 
       const ctx = { post: null, comment: null };
-      if (['delete_post', 'delete_comment', 'like', 'react', 'comment'].includes(action) && req.params?.id) {
-        // delete/like need post; only load fields needed for ownership on delete*
-        if (action === 'delete_post' || action === 'delete_comment') {
-          const post = await FeedPost.findById(req.params.id).select('authorId comments').lean();
+      if (['delete_post', 'update_post', 'delete_comment', 'like', 'react', 'comment'].includes(action) && req.params?.id) {
+        // delete/update need post; only load fields needed for ownership
+        if (action === 'delete_post' || action === 'update_post' || action === 'delete_comment') {
+          const post = await FeedPost.findById(req.params.id).select('authorId authorAdminRole authorRole comments').lean();
           ctx.post = post;
           if (action === 'delete_comment' && post && req.params?.commentId) {
             const comments = post.comments || [];

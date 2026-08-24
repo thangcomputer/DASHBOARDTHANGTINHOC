@@ -26,7 +26,7 @@ router.get('/overview', guard('overview'), async (req, res) => {
     const data = await biService.getOverview({
       period: req.query.period || '1m',
       branchFilter: req.branchFilter || {},
-      queryBranch: req.query.branchId || 'all',
+      queryBranch: req.query.branch_id || req.query.branchId || 'all',
     });
     res.json({ success: true, data });
   } catch (err) {
@@ -40,7 +40,7 @@ router.get('/export', guard('export'), async (req, res) => {
     const data = await biService.getOverview({
       period: req.query.period || '1m',
       branchFilter: req.branchFilter || {},
-      queryBranch: req.query.branchId || 'all',
+      queryBranch: req.query.branch_id || req.query.branchId || 'all',
     });
     const csv = biService.overviewToCsv(data);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

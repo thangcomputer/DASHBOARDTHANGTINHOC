@@ -90,8 +90,18 @@ export function useAdminDashboardState() {
   const safeBranches = (branches || []).filter(Boolean);
 
   const _sess = outlet.session
-    || JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
-  const isSuperAdmin = _sess?.id === 'admin' || _sess?.adminRole === 'SUPER_ADMIN';
+    || (() => {
+      try {
+        return JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
+      } catch {
+        return {};
+      }
+    })();
+  const isSuperAdmin = _sess?.id === 'admin'
+    || _sess?._id === 'admin'
+    || _sess?.username === 'admin'
+    || _sess?.adminRole === 'SUPER_ADMIN'
+    || (_sess?.role === 'admin' && (!_sess?.adminRole || _sess?.adminRole === 'SUPER_ADMIN'));
   const isHighAdmin = _sess?.adminRole === 'HIGH_ADMIN';
 
   const location = useLocation();
@@ -102,9 +112,9 @@ export function useAdminDashboardState() {
 
   // Chặn mở tab bằng URL hash khi không có quyền (menu đã ẩn nhưng URL vẫn vào được)
   useEffect(() => {
-    // Nếu là Staff (không phải SuperAdmin) chỉ có quyền Hộp thư (manage_messages)
-    if (_sess && _sess.id !== 'admin' && _sess.adminRole !== 'SUPER_ADMIN' && _sess.adminRole !== 'HIGH_ADMIN') {
-      const perms = _sess.permissions || [];
+    // Nếu là Staff (không phải SuperAdmin / HighAdmin) chỉ có quyền Hộp thư (manage_messages)
+    if (_sess && !isSuperAdmin && !isHighAdmin) {
+      const perms = Array.isArray(_sess.permissions) ? _sess.permissions : [];
       const hasOtherPerms = Object.values(TAB_PERMISSION).some((p) => perms.includes(p));
       if (!hasOtherPerms && perms.includes(PERMISSIONS.MANAGE_MESSAGES)) {
         if (location.pathname === '/admin' && (activeTab === 'dashboard' || activeTab === 'overview')) {
@@ -114,8 +124,8 @@ export function useAdminDashboardState() {
       }
     }
 
-    if (activeTab === 'dashboard') return undefined;
-    if (activeTab === 'staff' && !isSuperAdmin && !isHighAdmin) {
+    if (activeTab === 'dashboard' || activeTab === 'overview') return undefined;
+    if (activeTab === 'staff' && !isSuperAdmin) {
       navigate('/admin#dashboard', { replace: true });
       return undefined;
     }
@@ -242,23 +252,8 @@ export function useAdminDashboardState() {
   const { data: branchStats } = useSWR(
     activeTab === 'dashboard' ? ['admin_stats', selectedBranchId] : null,
     statsFetcher,
-    // Socket đã bump khi có thay đổi — không poll 5s (gây 429)
     { refreshInterval: 60_000, revalidateOnFocus: false, dedupingInterval: 15_000 },
   );
-
-  // System logs from DB
-  const [dbLogs, setDbLogs] = useState([]);
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-
-  useEffect(() => {
-    if (activeTab === 'logs') {
-      setIsLoadingLogs(true);
-      api.systemLogs.getAll(1, 100)
-        .then((res) => setDbLogs(res.data))
-        .catch(() => {})
-        .finally(() => setIsLoadingLogs(false));
-    }
-  }, [activeTab]);
 
   // Finance from server — lấy đủ HV + mọi enrollment (không chỉ khóa chính / page 10)
   const financeFetcher = async ([, branch_id]) => {
@@ -311,13 +306,6 @@ export function useAdminDashboardState() {
       mutate(['admin_stats', selectedBranchId]);
       mutate(['admin_finance', selectedBranchId]);
       refreshStudentsForTab();
-      if (activeTab === 'logs') {
-        setIsLoadingLogs(true);
-        api.systemLogs.getAll(1, 100)
-          .then((res) => setDbLogs(res.data))
-          .catch(() => {})
-          .finally(() => setIsLoadingLogs(false));
-      }
       if (activeTab === 'teachers') {
         fetchTeachers();
       }
@@ -331,7 +319,7 @@ export function useAdminDashboardState() {
       }, 350);
     };
 
-    const onStudentNew = (data) => {
+    const onStudentNew = () => {
       bumpAdminViews();
     };
 
@@ -533,26 +521,36 @@ export function useAdminDashboardState() {
 
   const adminTabValue = useMemo(() => ({
     search, setSearch, filterCourse, setFilterCourse, filterPaid, setFilterPaid,
-    handleExportExcel, isExportingExcel, setShowImportModal, setShowModal,
+    handleExportExcel, isExportingExcel, showImportModal, setShowImportModal, showModal, setShowModal,
     studentsPagination, filteredStudents, safeTeachers, safeBranches,
-    assignTeacher, addEnrollment, actionMenuId, setActionMenuId, setShowStudentDetailId, setEditStudent,
+    assignTeacher, addEnrollment, actionMenuId, setActionMenuId, showStudentDetailId, setShowStudentDetailId,
+    studentDetailTab, setStudentDetailTab, studentDetailScheduleId, setStudentDetailScheduleId,
+    editStudent, setEditStudent,
     enrollmentModalStudent, setEnrollmentModalStudent,
     sendDebtReminder, approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
     handlePrintInvoice, removeStudent, currentPage, setCurrentPage,
-    refreshStudentList,
-    teachers, filteredTeachers, teacherSearch, setTeacherSearch, isSuperAdmin, isHighAdmin, setShowTeacherModal, getTeacherRating,
-    setReviewModal, setGrantModal, setApproveModal, setEditTeacher, handlePayTeacher,
-    removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed,
+    refreshStudentList, printStudent, addStudent,
+    teachers, globalTeachers, filteredTeachers, teacherSearch, setTeacherSearch, isSuperAdmin, isHighAdmin,
+    showTeacherModal, setShowTeacherModal, teacherForm, setTeacherForm, ctxAddTeacher,
+    getTeacherRating,
+    reviewModal, setReviewModal, grantModal, setGrantModal, approveModal, setApproveModal,
+    editTeacher, setEditTeacher, handlePayTeacher, handleGoToQR, handlePayout, handleSaveHoaHongRate,
+    payoutModal, setPayoutModal,
+    removeTeacher, approveTeacher, fetchTeachers, markFileReviewed, grantPending,
+    deleteModal, setDeleteModal, confirmDelete,
+    resetPwModal, setResetPwModal, handleOpenResetPw,
     courseBuilderMode, setCourseBuilderMode, trainingData, updateTrainingItem, trainingTab, setTrainingTab,
     trainingForm, setTrainingForm, questions, setErGvForm, BLANK_ER_GV, trainingFileUploading,
     handleTrainingDocUpload, teacherQuestionsExcelInputRef, handleTeacherQuestionsExcelFile,
     addTrainingItem, showGlobalModal, erGvSearch, setErGvSearch, erGvForm, ctxUpdateTeacher,
     qSearch, setQSearch, qSection, setQSection, qDifficulty, setQDifficulty, qSort, qForm, setQForm,
     BLANK_Q, addQuestion, updateQuestion, removeQuestion, resetQuestions,
-    setTeacherExamTimeLimitMinutes, teacherExamTimeLimitMinutes, setDeleteConfirm, safeTeachersList, examSubjectsCatalog,
+    setTeacherExamTimeLimitMinutes, teacherExamTimeLimitMinutes, deleteConfirm, setDeleteConfirm, removeTrainingItem,
+    safeTeachersList, examSubjectsCatalog,
     getPrivateEvaluationsForAdmin, markEvaluationRead,
     transactions, addSystemLog, financeStudents, isLoadingFinance, markStudentPaid, financialData,
-    isLoadingLogs, setIsLoadingLogs, dbLogs, setDbLogs,
+    selectedBranchId,
+    
     sCourseBuilderMode, setSCourseBuilderMode, updateStudentTrainingItem,
     studentTrainingData, sTrainingTab, setSTrainingTab, setSTrainingForm,
     students, studentQuestions, studentExamMinutes, updateStudentExamMinutes,
@@ -564,24 +562,31 @@ export function useAdminDashboardState() {
     removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
     erForm, setErForm, safeStudentsList, updateExamResult, addExamResult,
   }), [
-    search, filterCourse, filterPaid, handleExportExcel, isExportingExcel,
+    search, filterCourse, filterPaid, handleExportExcel, isExportingExcel, showImportModal, showModal,
     studentsPagination, filteredStudents, safeTeachers, safeBranches,
     assignTeacher, addEnrollment, actionMenuId, enrollmentModalStudent,
+    showStudentDetailId, studentDetailTab, studentDetailScheduleId,
+    editStudent, printStudent, addStudent,
     sendDebtReminder, approveStudentExam, revokeStudentExam, ctxUpdateStudent, toast,
     handlePrintInvoice, removeStudent, currentPage,
     refreshStudentList,
-    teachers, filteredTeachers, isSuperAdmin, isHighAdmin, getTeacherRating,
-    handlePayTeacher, removeTeacher, approveTeacher, fetchTeachers, reviewModal, approveModal, markFileReviewed,
+    teachers, globalTeachers, filteredTeachers, isSuperAdmin, isHighAdmin, getTeacherRating,
+    showTeacherModal, teacherForm, ctxAddTeacher,
+    reviewModal, grantModal, approveModal, editTeacher, payoutModal,
+    handlePayTeacher, handleGoToQR, handlePayout, handleSaveHoaHongRate,
+    removeTeacher, approveTeacher, fetchTeachers, markFileReviewed,
+    deleteModal, confirmDelete, resetPwModal, selectedBranchId, grantPending, handleOpenResetPw,
     courseBuilderMode, trainingData, updateTrainingItem, trainingTab,
     trainingForm, questions, trainingFileUploading,
     handleTrainingDocUpload, handleTeacherQuestionsExcelFile,
     addTrainingItem, showGlobalModal, erGvSearch, erGvForm, ctxUpdateTeacher,
     qSearch, qSection, qDifficulty, qSort, qForm,
     addQuestion, updateQuestion, removeQuestion, resetQuestions,
-    teacherExamTimeLimitMinutes, safeTeachersList, examSubjectsCatalog,
+    teacherExamTimeLimitMinutes, deleteConfirm, removeTrainingItem,
+    safeTeachersList, examSubjectsCatalog,
     getPrivateEvaluationsForAdmin, markEvaluationRead,
     transactions, addSystemLog, financeStudents, isLoadingFinance, markStudentPaid, financialData,
-    isLoadingLogs, dbLogs,
+    
     sCourseBuilderMode, updateStudentTrainingItem,
     studentTrainingData, sTrainingTab,
     students, studentQuestions, studentExamMinutes, updateStudentExamMinutes,

@@ -1048,29 +1048,17 @@ export default function FloatingMessenger({ session, role }) {
   // HV/GV: không tự mở cửa sổ chat ngay khi login.
   // Chỉ hiển thị khi người dùng đã bấm (FAB hoặc chat-head).
   const [userOpenedChat, setUserOpenedChat] = useState(false);
+
+  useEffect(() => {
+    const onOpenChat = () => setUserOpenedChat(true);
+    window.addEventListener('cms:open-chat', onOpenChat);
+    return () => window.removeEventListener('cms:open-chat', onOpenChat);
+  }, []);
   // UI: staff/admin hide student quick-support chrome
   const isSuper = isSuperAdminViewer(session);
+  const isTrueSuperAdmin = meId === 'admin' || session?.adminRole === 'SUPER_ADMIN';
   // Directory: only SUPER/HIGH may browse presence; others use GET /contacts
   const usePresenceDirectory = isElevatedPresenceDirectoryViewer(session);
-
-  const conversations = useMemo(
-    () => (meId ? (getConversations(meId) || []) : []),
-    [getConversations, meId],
-  );
-
-  const unreadTotal = useMemo(
-    () => conversations.reduce((sum, c) => sum + (Number(c.unread) || 0), 0),
-    [conversations],
-  );
-
-  const unreadByPeer = useMemo(() => {
-    const map = new Map();
-    for (const c of conversations) {
-      if (!c?.user?.id || !(c.unread > 0) || c.isGroup) continue;
-      map.set(`${normalizeChatRole(c.user.role)}_${c.user.id}`, Number(c.unread) || 0);
-    }
-    return map;
-  }, [conversations]);
 
   // Elevated + non-elevated: GET /contacts is the authorization source.
   // Presence only overlays online — never fall back to local staffs[] for WHO.
@@ -1092,6 +1080,34 @@ export default function FloatingMessenger({ session, role }) {
     return undefined;
   }, [usePresenceDirectory, onContactListUpdated]);
 
+  const conversations = useMemo(() => {
+    const raw = meId ? (getConversations(meId) || []) : [];
+    if (!isTrueSuperAdmin) return raw;
+    // SUPER: chỉ HIGH_ADMIN từ contacts — không hiện group / HV / GV / staff activity
+    const allowed = new Set((fmContacts || []).map((c) => String(c.id)));
+    return raw.filter((c) => {
+      if (!c || c.isGroup) return false;
+      const pid = c.user?.id != null ? String(c.user.id) : '';
+      if (allowed.size > 0) return allowed.has(pid);
+      const ar = String(c.user?.adminRole || c.user?.productRole || '').toUpperCase();
+      return ar === 'HIGH_ADMIN';
+    });
+  }, [getConversations, meId, isTrueSuperAdmin, fmContacts]);
+
+  const unreadTotal = useMemo(
+    () => conversations.reduce((sum, c) => sum + (Number(c.unread) || 0), 0),
+    [conversations],
+  );
+
+  const unreadByPeer = useMemo(() => {
+    const map = new Map();
+    for (const c of conversations) {
+      if (!c?.user?.id || !(c.unread > 0) || c.isGroup) continue;
+      map.set(`${normalizeChatRole(c.user.role)}_${c.user.id}`, Number(c.unread) || 0);
+    }
+    return map;
+  }, [conversations]);
+
   const effectiveStaffs = fmContacts;
 
   const directory = useMemo(
@@ -1111,12 +1127,12 @@ export default function FloatingMessenger({ session, role }) {
   const unreadConversations = useMemo(() => {
     const list = conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup);
     if (usePresenceDirectory) return list.slice(0, 8);
-    // Non-elevated: nhận tin từ chuyên viên SUPPORT (không staff chi nhánh)
+    // Non-elevated: nhận tin từ chuyên viên SUPPORT hoặc HIGH_ADMIN / SUPER_ADMIN / STAFF
     return list.filter((c) => {
       const ar = String(c.user?.adminRole || c.user?.productRole || '').toUpperCase();
-      if (canUseAiSupport) return ar === 'SUPPORT';
+      if (canUseAiSupport) return ar === 'SUPPORT' || ar === 'HIGH_ADMIN' || ar === 'SUPER_ADMIN';
       const r = String(c.user?.role || '').toLowerCase();
-      return r === 'staff' || ar === 'STAFF' || ar === 'SUPPORT';
+      return r === 'staff' || r === 'admin' || ar === 'STAFF' || ar === 'SUPPORT' || ar === 'HIGH_ADMIN' || ar === 'SUPER_ADMIN';
     }).slice(0, 8);
   }, [conversations, usePresenceDirectory, canUseAiSupport]);
 

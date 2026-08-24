@@ -65,10 +65,17 @@ export const ALL_PERMISSIONS = [
 /** Kiểm tra quyền: Super Admin có tất cả quyền */
 export function hasPermission(session, permKey) {
   if (!session) return false;
-  if (session.id === 'admin') return true;
+  // 1. Root admin / Super Admin
+  if (session.id === 'admin' || session._id === 'admin' || session.username === 'admin') return true;
   if (session.adminRole === 'SUPER_ADMIN') return true;
-  // HIGH_ADMIN: kiểm tra từ permissions array (KHÔNG bypass toàn quyền)
-  // STAFF: tương tự
-  const perms = session.permissions || [];
-  return perms.includes(permKey);
+  if (session.role === 'admin' && (!session.adminRole || session.adminRole === 'SUPER_ADMIN')) return true;
+
+  // 2. HIGH_ADMIN hoặc STAFF có permissions
+  const perms = Array.isArray(session.permissions) ? session.permissions : [];
+  if (perms.includes(permKey)) return true;
+
+  // 3. Fallback theo role admin
+  if (session.role === 'admin') return true;
+
+  return false;
 }
