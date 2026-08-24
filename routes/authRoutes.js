@@ -854,9 +854,19 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
           course: user.course,
           remainingSessions: user.remainingSessions,
           isFirstLogin: !!user.isFirstLogin,
-          showWelcomeCelebration: userRole === 'student' && user.welcomeCelebrationSeen === false,
+          // HV + GV: hiện pháo hoa ngay lúc login (trước đây chỉ student → GV phải chờ /me)
+          showWelcomeCelebration:
+            (userRole === 'student' || userRole === 'teacher')
+            && user.welcomeCelebrationSeen === false,
           avatar: user.avatar || '',
           gender: user.gender || '',
+          ...(userRole === 'teacher' ? {
+            testScore: user.testScore,
+            testStatus: user.testStatus,
+            practicalStatus: user.practicalStatus,
+            specialty: user.specialty,
+            subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
+          } : {}),
         },
         accessToken, refreshToken,
       },
