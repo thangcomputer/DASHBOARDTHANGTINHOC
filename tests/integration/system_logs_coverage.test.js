@@ -164,6 +164,28 @@ describe('Admin System Logs Coverage Verification', () => {
     assert.ok(isVisibleSystemLogAction(res.action));
   });
 
+  it('10a. Teacher update ignores unchanged startDate / exam fields from full form body', () => {
+    const changes = summarizeTeacherUpdates(
+      {
+        baseSalaryPerSession: 130000,
+        startDate: '2024-03-01',
+        testScore: 0,
+        testStatus: 'not_started',
+      },
+      {
+        baseSalaryPerSession: 160000,
+        startDate: new Date('2024-03-01T00:00:00.000Z'),
+        testScore: 0,
+        testStatus: 'not_started',
+        name: 'GV TEST 2',
+      },
+    );
+    assert.equal(changes.length, 1);
+    assert.ok(changes[0].includes('Giảm lương'));
+    assert.ok(!changes.some((c) => c.includes('ngày vào làm')));
+    assert.ok(!changes.some((c) => c.includes('kết quả thi')));
+  });
+
   it('10b. summarizeStudentUpdates covers sessions and password', () => {
     const parts = summarizeStudentUpdates(
       { totalSessions: 20, completedSessions: 5, _passwordChanged: true },

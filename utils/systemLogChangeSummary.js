@@ -21,6 +21,36 @@ function sameVal(a, b) {
   return normStr(a) === normStr(b);
 }
 
+/** Chuẩn hóa ngày về YYYY-MM-DD để so form (date input) vs Mongo ISO/Date. */
+function normDateKey(v) {
+  if (v == null || v === '') return '';
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  }
+  const d = v instanceof Date ? v : new Date(v);
+  if (!Number.isNaN(d.getTime())) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return String(v).trim();
+}
+
+function sameDate(a, b) {
+  return normDateKey(a) === normDateKey(b);
+}
+
+function sameScore(a, b) {
+  const na = a == null || a === '' ? null : Number(a);
+  const nb = b == null || b === '' ? null : Number(b);
+  if (na == null && nb == null) return true;
+  if (na == null || nb == null) return false;
+  if (!Number.isFinite(na) || !Number.isFinite(nb)) return sameVal(a, b);
+  return na === nb;
+}
+
 const TEACHER_STATUS_LABEL = {
   active: 'Đã cấp quyền',
   pending: 'Chờ duyệt / được thi',
@@ -119,13 +149,21 @@ function summarizeTeacherUpdates(updates, prev = null) {
   if (updates.bio !== undefined && !sameVal(updates.bio, prev?.bio)) {
     parts.push('Đổi giới thiệu');
   }
-  if (updates.startDate !== undefined && !sameVal(updates.startDate, prev?.startDate)) {
+  if (updates.startDate !== undefined && !sameDate(updates.startDate, prev?.startDate)) {
     parts.push('Đổi ngày vào làm');
   }
   if (updates.testScore !== undefined || updates.testStatus !== undefined) {
-    const score = updates.testScore != null ? updates.testScore : prev?.testScore;
-    const st = updates.testStatus || prev?.testStatus;
-    parts.push(`Cập nhật kết quả thi${st ? ` (${st})` : ''}${score != null ? ` ${score}/100` : ''}`);
+    const scoreChanged = updates.testScore !== undefined
+      && !sameScore(updates.testScore, prev?.testScore);
+    const statusChanged = updates.testStatus !== undefined
+      && !sameVal(updates.testStatus, prev?.testStatus);
+    if (scoreChanged || statusChanged) {
+      const score = updates.testScore != null ? updates.testScore : prev?.testScore;
+      const st = updates.testStatus != null && updates.testStatus !== ''
+        ? updates.testStatus
+        : prev?.testStatus;
+      parts.push(`Cập nhật kết quả thi${st ? ` (${st})` : ''}${score != null ? ` ${score}/100` : ''}`);
+    }
   }
   if (updates.practicalStatus !== undefined && !sameVal(updates.practicalStatus, prev?.practicalStatus)) {
     parts.push(`File thực hành: ${updates.practicalStatus}`);
