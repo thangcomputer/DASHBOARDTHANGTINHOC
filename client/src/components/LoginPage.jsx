@@ -105,6 +105,13 @@ const LoginPage = ({ onLogin }) => {
             ? '/teacher'
             : '/student';
         navigate(teacherHome);
+      } else if (data.code === 'NEEDS_RE_ENROLL' || data.redirect === '/dangkykhoahoc') {
+        const p = String(data.phone || phone || '').trim();
+        setError(data.message || 'Bạn cần đăng ký và thanh toán khóa học mới để đăng nhập.');
+        const q = new URLSearchParams({ reEnroll: '1' });
+        if (p) q.set('phone', p);
+        // Cho HV bấm ngay sang form đăng ký
+        setTimeout(() => navigate(`/dangkykhoahoc?${q.toString()}`), 600);
       } else {
         setError(data.message || 'Số điện thoại hoặc mật khẩu không đúng');
       }
@@ -246,7 +253,27 @@ const LoginPage = ({ onLogin }) => {
                   <Clock size={18} aria-hidden="true" /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
                 </div>
               )}
-              {error && <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 text-sm font-bold"><AlertCircle size={18} aria-hidden="true" /> {error}</div>}
+              {error && (
+                <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex flex-col gap-2 text-red-400 text-sm font-bold">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle size={18} aria-hidden="true" className="shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                  {(String(error).includes('đăng ký') || String(error).includes('khóa học')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const q = new URLSearchParams({ reEnroll: '1' });
+                        if (phone) q.set('phone', normalizePhone(phone) || phone);
+                        navigate(`/dangkykhoahoc?${q.toString()}`);
+                      }}
+                      className="mt-1 w-full py-2.5 rounded-xl bg-red-600 text-white text-xs font-black uppercase tracking-wide hover:bg-red-500 transition"
+                    >
+                      Đăng ký / thanh toán khóa học →
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5">
                   <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">{role === 'student' ? 'SỐ ĐIỆN THOẠI HOẶC EMAIL' : 'TÀI KHOẢN GIẢNG VIÊN'}</label>

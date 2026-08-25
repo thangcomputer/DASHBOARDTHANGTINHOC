@@ -233,6 +233,7 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
   const go = useCallback((page, data) => {
     const routes = {
       register: '/dangkykhoahoc',
+      login:    '/login',
       admin:    '/admin',
       teacher:  '/teacher',
       student:  '/student',
@@ -401,21 +402,19 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
       {/* ═══ Student ═══ */}
       <Route element={
         <Guard allowedRoles={['student', 'admin']} session={session}>
-          <DashboardLayout role="student" session={session} onLogout={onLogout} />
+          <StudentLearningAccessGate session={session}>
+            <DashboardLayout role="student" session={session} onLogout={onLogout} />
+          </StudentLearningAccessGate>
         </Guard>
       }>
         <Route path="/student" element={
           <ErrorBoundary inline>
-            <StudentLearningAccessGate session={session}>
-              <StudentDashboard onNavigate={go} />
-            </StudentLearningAccessGate>
+            <StudentDashboard onNavigate={go} />
           </ErrorBoundary>
         } />
         <Route path="/student/exam" element={
           <ErrorBoundary inline>
-            <StudentLearningAccessGate session={session} allowHashes={[]}>
-              <StudentExamWrapper session={session} />
-            </StudentLearningAccessGate>
+            <StudentExamWrapper session={session} />
           </ErrorBoundary>
         } />
         <Route path="/student/notifications" element={
@@ -440,23 +439,17 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         } />
         <Route path="/student/cert-prep" element={
           <ErrorBoundary inline>
-            <StudentLearningAccessGate session={session} allowHashes={[]}>
-              <CertPrepCatalogPage />
-            </StudentLearningAccessGate>
+            <CertPrepCatalogPage />
           </ErrorBoundary>
         } />
         <Route path="/student/cert-prep/levels/:levelId" element={
           <ErrorBoundary inline>
-            <StudentLearningAccessGate session={session} allowHashes={[]}>
-              <CertPrepLevelPage />
-            </StudentLearningAccessGate>
+            <CertPrepLevelPage />
           </ErrorBoundary>
         } />
         <Route path="/student/cert-prep/result/:sessionId" element={
           <ErrorBoundary inline>
-            <StudentLearningAccessGate session={session} allowHashes={[]}>
-              <CertPrepResult />
-            </StudentLearningAccessGate>
+            <CertPrepResult />
           </ErrorBoundary>
         } />
       </Route>

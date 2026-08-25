@@ -8,6 +8,7 @@ import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useSocket } from '../../../context/SocketContext';
 import { getAccessToken } from '../../../services/api';
+import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 
 function readPortalAccessToken() {
   return (
@@ -115,12 +116,19 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
     
     if (name === 'branchId') {
       const selectedB = branches.find(b => String(b._id) === String(value));
-      setForm(f => ({
-        ...f,
-        branchId: value,
-        branchCode: selectedB?.code || '',
-        learningMode: selectedB && isOnlineBranch(selectedB) ? 'ONLINE' : f.learningMode,
-      }));
+      setForm(f => {
+        const next = {
+          ...f,
+          branchId: value,
+          branchCode: selectedB?.code || '',
+          learningMode: selectedB && isOnlineBranch(selectedB) ? 'ONLINE' : f.learningMode,
+        };
+        if (f.teacherId) {
+          const t = (teachers || []).find((x) => String(x.id || x._id) === String(f.teacherId));
+          if (!t || !teacherInStudentBranch(t, value)) next.teacherId = '';
+        }
+        return next;
+      });
       return;
     }
 
@@ -702,13 +710,21 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
                 <label className="cms-label">Giảng viên hướng dẫn</label>
                 <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="cms-input">
                   <option value="">-- Chọn sau (không bắt buộc) --</option>
-                  {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').map((t) => (
+                  {(teachers || []).filter(Boolean).filter((t) => {
+                    if (String(t.status || '').toLowerCase() !== 'active') return false;
+                    const bid = toBranchId(form.branchId);
+                    if (!bid) return true;
+                    return teacherInStudentBranch(t, bid);
+                  }).map((t) => (
                     <option key={t.id || t._id} value={t.id || t._id}>
                       {t.name}{t.phone ? ` — ${t.phone}` : ''}
                     </option>
                   ))}
                 </CmsSelect>
-                {(teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').length === 0 && (
+                {toBranchId(form.branchId) && (teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active' && teacherInStudentBranch(t, form.branchId)).length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên Active cùng chi nhánh để phân công.</p>
+                )}
+                {!toBranchId(form.branchId) && (teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').length === 0 && (
                   <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên Active để phân công.</p>
                 )}
               </div>

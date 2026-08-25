@@ -3,6 +3,7 @@ import CmsSelect from '../../ui/CmsSelect';
 import { X, Save, KeyRound, Edit3, Loader2 } from 'lucide-react';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
+import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 
 function courseEffectivePrice(c) {
   return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
@@ -173,7 +174,14 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
       const selectedB = branches.find((b) => String(b._id) === String(value));
       let mode = form.learningMode;
       if (selectedB && selectedB.name.toLowerCase().includes('online')) mode = 'ONLINE';
-      setForm((f) => ({ ...f, branchId: value, branchCode: selectedB?.code || '', learningMode: mode }));
+      setForm((f) => {
+        const next = { ...f, branchId: value, branchCode: selectedB?.code || '', learningMode: mode };
+        if (f.teacherId) {
+          const t = (teachers || []).find((x) => String(x.id || x._id) === String(f.teacherId));
+          if (!t || !teacherInStudentBranch(t, value)) next.teacherId = '';
+        }
+        return next;
+      });
       return;
     }
 
@@ -405,8 +413,10 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
               <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="cms-input">
                 <option value="">-- Có thể chọn sau --</option>
                 {(teachers || []).filter(Boolean).filter((t) => {
-                  const s = (t.status || '').toLowerCase();
-                  return s === 'active';
+                  if ((t.status || '').toLowerCase() !== 'active') return false;
+                  const bid = toBranchId(form.branchId);
+                  if (!bid) return false;
+                  return teacherInStudentBranch(t, bid);
                 }).map((t) => (
                   <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.phone ? ` — ${t.phone}` : ''}</option>
                 ))}

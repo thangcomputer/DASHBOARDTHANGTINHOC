@@ -25,6 +25,7 @@ const { invalidateSettingsCache } = require('../services/settingsCache');
 const { enqueueOtp, enqueuePassword } = require('../services/queue/jobQueue');
 const QRCode = require('qrcode');
 const { generateStudentCode, generateTeacherCode } = require('../services/businessCodeService');
+const { studentHasLearningAccess } = require('../services/enrollmentService');
 
 const router = express.Router();
 
@@ -811,6 +812,18 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     if (!isMatch) {
       if (user.incLoginAttempts) await user.incLoginAttempts();
       return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+    }
+
+    // HV hết khóa (hủy/hoàn) → không cấp session Dashboard; phải đăng ký + thanh toán lại
+    if (userRole === 'student' && !studentHasLearningAccess(user)) {
+      const phone = String(user.phone || user.zalo || rawId || '').trim();
+      return res.status(403).json({
+        success: false,
+        code: 'NEEDS_RE_ENROLL',
+        redirect: '/dangkykhoahoc',
+        phone,
+        message: 'Bạn không còn khóa học đang học (đã hủy/hoàn phí). Vui lòng đăng ký và thanh toán khóa mới để đăng nhập lại.',
+      });
     }
 
     // ⭐ Kiểm tra Device Fingerprint

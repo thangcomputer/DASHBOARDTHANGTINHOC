@@ -112,12 +112,12 @@ export function getStudentScheduleGate(student, schedules, date, excludeSchedule
   const course = student?.course || '';
   const enrStatus = String(
     student?.enrollmentStatus
+    || student?.status
     || (Array.isArray(student?.enrollments)
       ? (student.enrollments.find((e) => normCourse(e.courseName) === normCourse(course))?.status)
       : '')
-    || student?.status
     || 'active',
-  );
+  ).toLowerCase();
 
   const progress = resolveEnrollmentProgress(student, schedules, excludeScheduleId);
   const {
@@ -134,13 +134,15 @@ export function getStudentScheduleGate(student, schedules, date, excludeSchedule
   const todayCount = countStudentSessionsOnDate(schedules, studentId, date, excludeScheduleId);
 
   const completedLike = enrStatus === 'completed'
-    || enrStatus === 'Hoàn thành'
+    || enrStatus === 'hoàn thành'
     || effectiveUsed >= totalSessions
     || displayDone >= totalSessions;
   const notActive = enrStatus === 'cancelled'
     || enrStatus === 'refunded'
     || enrStatus === 'paused'
-    || enrStatus === 'pending_payment';
+    || enrStatus === 'pending_payment'
+    || enrStatus === 'thôi học'
+    || student?.interactionLocked === true;
   const dailyFull = todayCount >= MAX_STUDENT_SESSIONS_PER_DAY;
 
   let canSchedule = true;
@@ -150,7 +152,9 @@ export function getStudentScheduleGate(student, schedules, date, excludeSchedule
     reason = `Đã hoàn thành ${totalSessions}/${totalSessions} buổi`;
   } else if (notActive) {
     canSchedule = false;
-    reason = `Khóa học không còn active (${enrStatus})`;
+    reason = (student?.interactionLocked || enrStatus === 'cancelled' || enrStatus === 'refunded' || enrStatus === 'thôi học')
+      ? 'Học viên đã thôi học / hoàn phí'
+      : `Khóa học không còn active (${enrStatus})`;
   } else if (dailyFull) {
     canSchedule = false;
     reason = `Đã đủ ${MAX_STUDENT_SESSIONS_PER_DAY} ca trong ngày`;

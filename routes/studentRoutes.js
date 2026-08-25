@@ -2551,6 +2551,30 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
     }
     if (refundAmt > 0) bustFinanceCaches();
 
+    // Hủy lịch chưa học (scheduled) của khóa này — giữ completed để Admin trả lương GV
+    try {
+      const cancelSch = await Schedule.updateMany(
+        {
+          studentId: student._id,
+          status: 'scheduled',
+          ...(courseName ? { course: courseName } : {}),
+        },
+        {
+          $set: {
+            status: 'cancelled',
+            note: cancelReason
+              ? `Hủy khóa: ${cancelReason}`
+              : 'Hủy khóa / hoàn học phí — ca chưa học',
+          },
+        },
+      );
+      if (cancelSch.modifiedCount > 0) {
+        logger.info('[STUDENTS] cancelled %s future schedules for student %s course %s', cancelSch.modifiedCount, student._id, courseName);
+      }
+    } catch (schErr) {
+      logger.warn('[STUDENTS] cancel future schedules skipped: %s', schErr.message);
+    }
+
     let refundMsg = '';
     if (refundAmt > 0) {
       try {
@@ -2621,7 +2645,7 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
         return res.status(400).json({ success: false, message: 'ID giảng viên không hợp lệ' });
       }
       const Teacher = require('../models/Teacher');
-      const t = await Teacher.findById(teacherId).select('name status role specialty subjectIds').lean();
+      const t = await Teacher.findById(teacherId).select('name status role specialty subjectIds branchId').lean();
       if (!t || t.role !== 'teacher') {
         return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
       }
@@ -2629,6 +2653,27 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
         return res.status(400).json({
           success: false,
           message: 'Giảng viên chưa được cấp quyền giảng dạy (Active). Duyệt GV trước khi phân công.',
+        });
+      }
+      // Cùng chi nhánh HV ↔ GV (tránh lệch staff/admin nhắn tin chi nhánh)
+      const studentBranchId = String(student.branchId?._id || student.branchId || '').trim();
+      const teacherBranchId = String(t.branchId?._id || t.branchId || '').trim();
+      if (!studentBranchId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Học viên chưa có chi nhánh. Gán chi nhánh trước khi phân giảng viên.',
+        });
+      }
+      if (!teacherBranchId) {
+        return res.status(400).json({
+          success: false,
+          message: `Giảng viên "${t.name || ''}" chưa được gán chi nhánh.`,
+        });
+      }
+      if (studentBranchId !== teacherBranchId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Chỉ được phân giảng viên cùng chi nhánh với học viên.',
         });
       }
       teacherDoc = t;

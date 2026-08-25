@@ -214,6 +214,9 @@ export const StudentCard = ({
   const done = student.completedSessions != null
     ? Math.max(0, Number(student.completedSessions) || 0)
     : Math.max(0, sessionTotal - (Number(student.remainingSessions) || 0));
+  const isDroppedOut = Boolean(student.interactionLocked)
+    || ['cancelled', 'refunded'].includes(String(student.enrollmentStatus || '').toLowerCase())
+    || String(student.status || '') === 'Thôi học';
   const onCalendarDone = useMemo(() => {
     const sid = String(student._id || student.id || '');
     if (!sid || !Array.isArray(allSchedules) || allSchedules.length === 0) return 0;
@@ -448,7 +451,8 @@ export const StudentCard = ({
 
   // Có buổi hôm nay (scheduled / overdue / done) → hiện cặp nút điểm danh + hủy
   const showSessionActionRow = Boolean(
-    !isCompleted && (
+    !isDroppedOut
+    && !isCompleted && (
       isPendingConfirm
       || alreadyAttendedToday
       || makeupPending
@@ -492,6 +496,10 @@ export const StudentCard = ({
   }, [pendingAttendance]);
 
   const beginAttendanceConfirm = useCallback(() => {
+    if (isDroppedOut) {
+      toast.info('Học viên đã thôi học — không điểm danh được.');
+      return;
+    }
     if (alreadyAttendedToday || isPendingConfirm || isCompleted) return;
     setShowAttendanceModal(false);
     const gateSchedule = attendanceGate?.schedule;
@@ -514,6 +522,7 @@ export const StudentCard = ({
     });
     toast.info('Đã ghi nhận — còn 30 giây để hủy điểm danh trước khi tính buổi.');
   }, [
+    isDroppedOut,
     alreadyAttendedToday,
     isPendingConfirm,
     isCompleted,
@@ -551,6 +560,10 @@ export const StudentCard = ({
   }, [makeupPending, alreadyAttendedToday]);
 
   const openAttendanceModal = useCallback(() => {
+    if (isDroppedOut) {
+      toast.info('Học viên đã thôi học — không điểm danh được.');
+      return;
+    }
     if (makeupPending) return;
     if (isOverdueMakeup) {
       openMakeupModal();
@@ -565,6 +578,8 @@ export const StudentCard = ({
     });
     setShowAttendanceModal(true);
   }, [
+    isDroppedOut,
+    toast,
     makeupPending,
     isOverdueMakeup,
     openMakeupModal,
@@ -654,7 +669,7 @@ export const StudentCard = ({
     'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60';
 
   const leftAttendanceLocked = alreadyAttendedToday || isPendingConfirm || makeupPending;
-  const leftAttendanceDisabled = isCompleted || leftAttendanceLocked || (!isOverdueMakeup && !canCheckIn && !makeupPending);
+  const leftAttendanceDisabled = isDroppedOut || isCompleted || leftAttendanceLocked || (!isOverdueMakeup && !canCheckIn && !makeupPending);
 
   const fetchStudentAssignments = useCallback(async () => {
     setLoadingAssign(true);
@@ -898,16 +913,28 @@ export const StudentCard = ({
   };
 
   const handleLinkSave = () => {
+    if (isDroppedOut) {
+      toast.info('Học viên đã thôi học — không cập nhật được.');
+      return;
+    }
     onUpdateLink(student._id || student.id, linkInput);
     setLinkSaved(true); setTimeout(() => setLinkSaved(false), 2000);
   };
 
   const handleGradeSave = () => {
+    if (isDroppedOut) {
+      toast.info('Học viên đã thôi học — không cập nhật được.');
+      return;
+    }
     onSaveGrade(student._id || student.id, Number(gradeInput), student.course);
     setGradeSaved(true); setTimeout(() => setGradeSaved(false), 2000);
   };
 
   const handleQuickScheduleSubmit = async (scheduleData) => {
+    if (isDroppedOut) {
+      toast.info('Học viên đã thôi học — không xếp lịch được.');
+      return;
+    }
     try {
       const res = await api.schedules.create(scheduleData);
       if (res?.success) {
@@ -944,7 +971,12 @@ export const StudentCard = ({
 
   if (isDetailed) {
     return (
-      <div className="bg-white rounded-2xl sm:rounded-[40px] shadow-lg sm:shadow-2xl shadow-blue-900/5 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 min-w-0 w-full max-w-full">
+      <div className={`bg-white rounded-2xl sm:rounded-[40px] shadow-lg sm:shadow-2xl shadow-blue-900/5 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 min-w-0 w-full max-w-full ${isDroppedOut ? 'opacity-85' : ''}`}>
+        {isDroppedOut && (
+          <div className="bg-slate-700 text-white text-center text-[11px] sm:text-xs font-bold uppercase tracking-wide px-3 py-2.5">
+            Học viên đã thôi học / hoàn phí — chỉ xem lịch sử · không thao tác
+          </div>
+        )}
         {/* Header */}
         <div className="bg-slate-50/80 px-3 py-3 sm:px-8 sm:py-6 md:px-10 md:py-8 border-b border-slate-100">
           <div className="bg-white border border-slate-100 shadow-sm rounded-2xl sm:rounded-[28px] p-3 sm:p-6 min-w-0">
@@ -977,13 +1009,17 @@ export const StudentCard = ({
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className={`hidden min-[420px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${
-                    isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+                    isDroppedOut
+                      ? 'bg-slate-100 text-slate-500'
+                      : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
                   }`}>
-                    {isCompleted ? 'Hoàn thành' : 'Đang học'}
+                    {isDroppedOut ? 'Thôi học' : isCompleted ? 'Hoàn thành' : 'Đang học'}
                   </span>
                   <button
                     type="button"
+                    disabled={isDroppedOut}
                     onClick={() => {
+                      if (isDroppedOut) return;
                       const id = String(student.id || student._id || '');
                       if (!navigate || !id) return;
                       navigate('/teacher/inbox', {
@@ -999,22 +1035,28 @@ export const StudentCard = ({
                         },
                       });
                     }}
-                    className="w-9 h-9 sm:w-8 sm:h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition-all border border-blue-100 shrink-0"
-                    title="Nhắn tin với học viên"
+                    className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all border shrink-0 ${
+                      isDroppedOut
+                        ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed'
+                        : 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-100'
+                    }`}
+                    title={isDroppedOut ? 'HV đã thôi học' : 'Nhắn tin với học viên'}
                     aria-label="Nhắn tin với học viên"
                   >
                     <MessageSquare size={14} />
                   </button>
-                  {onLockExam && (
+                  {onLockExam && !isDroppedOut && (
                     <FailExamButton student={student} onLockExam={onLockExam} compact />
                   )}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 mt-2">
                 <span className={`min-[420px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase whitespace-nowrap ${
-                  isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+                  isDroppedOut
+                    ? 'bg-slate-100 text-slate-500'
+                    : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
                 }`}>
-                  {isCompleted ? 'Hoàn thành' : 'Đang học'}
+                  {isDroppedOut ? 'Thôi học' : isCompleted ? 'Hoàn thành' : 'Đang học'}
                 </span>
                 <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase whitespace-nowrap border ${
                   isStudentOnline
@@ -1062,11 +1104,24 @@ export const StudentCard = ({
               key={key}
               type="button"
               onClick={() => {
+                if (isDroppedOut && (key === 'quiz' || key === 'schedule' || key === 'assignments' || key === 'link')) {
+                  toast.info('Học viên đã thôi học — không thao tác được.');
+                  if (key === 'schedule') {
+                    // Cho xem nhật ký lịch qua panel logs; không mở xếp lịch mới
+                    setActivePanel('logs');
+                  }
+                  return;
+                }
                 if (key === 'quiz') {
+                  if (isDroppedOut) return;
                   openQuizCreate();
                   return;
                 }
                 if (key === 'schedule') {
+                  if (isDroppedOut) {
+                    toast.info('Học viên đã thôi học — không xếp lịch mới.');
+                    return;
+                  }
                   setShowQuickSchedule(true);
                   return;
                 }
@@ -1210,9 +1265,13 @@ export const StudentCard = ({
                     <div className="border border-slate-200 rounded-xl p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
                     <textarea 
                        value={notesInput} onChange={e => setNotesInput(e.target.value)}
-                       onBlur={() => onUpdateNotes((student._id || student.id), notesInput)}
+                       onBlur={() => {
+                         if (isDroppedOut) return;
+                         onUpdateNotes((student._id || student.id), notesInput);
+                       }}
+                       readOnly={isDroppedOut}
                        placeholder="Nhận xét cá nhân, ghi nhận đặc biệt về học viên này..."
-                       className="w-full bg-transparent border-0 rounded-none p-0 text-xs sm:text-sm font-medium outline-none resize-none"
+                       className={`w-full bg-transparent border-0 rounded-none p-0 text-xs sm:text-sm font-medium outline-none resize-none ${isDroppedOut ? 'opacity-60 cursor-not-allowed' : ''}`}
                        rows={3}
                     />
                     <span className="text-[11px] text-slate-400 ml-auto block mt-2">Tự động lưu khi rời ô nhập</span>
@@ -1794,7 +1853,7 @@ export const StudentCard = ({
           </div>
         )}
 
-        {showQuickSchedule && (
+        {showQuickSchedule && !isDroppedOut && (
           <ScheduleModal
             students={[student]}
             allSchedules={allSchedules}
@@ -1812,7 +1871,12 @@ export const StudentCard = ({
   // STANDARD COMPACT VIEW (For Dashboard/List)
   return (
     <React.Fragment>
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${isDroppedOut ? 'opacity-70' : ''}`}>
+      {isDroppedOut && (
+        <div className="bg-slate-600 text-white text-center text-[10px] font-bold uppercase tracking-wide px-3 py-1.5">
+          Thôi học — chỉ xem
+        </div>
+      )}
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 min-[440px]:flex-row min-[440px]:items-start min-[440px]:justify-between min-w-0">
@@ -1838,7 +1902,7 @@ export const StudentCard = ({
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full min-[440px]:w-auto min-[440px]:justify-end">
             <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${
               isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-blue-400'
-            }`}>{isCompleted ? '✓ Hoàn thành' : student.status}</span>
+            }`}>{isDroppedOut ? 'Thôi học' : isCompleted ? '✓ Hoàn thành' : student.status}</span>
             <a href={`https://zalo.me/${student.zalo}`} target="_blank" rel="noreferrer"
               className="inline-flex flex-1 min-[440px]:flex-initial justify-center items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all min-w-0 max-w-full">
               <MessageSquare size={14} className="shrink-0" /> <span className="truncate">{maskPhone(student.zalo)}</span>
@@ -1873,6 +1937,10 @@ export const StudentCard = ({
             key={key}
             type="button"
             onClick={() => {
+              if (isDroppedOut && (key === 'quiz' || key === 'schedule' || key === 'assignments' || key === 'link')) {
+                toast.info('Học viên đã thôi học — không thao tác được.');
+                return;
+              }
               if (key === 'quiz') {
                 openQuizCreate();
                 return;
@@ -2009,9 +2077,14 @@ export const StudentCard = ({
             <div>
               <label className="text-sm font-semibold text-gray-700 block mb-2 font-black uppercase text-xs text-gray-400 tracking-widest">📝 Ghi chú học viên</label>
               <textarea value={notesInput} onChange={e => setNotesInput(e.target.value)}
-                onBlur={() => onUpdateNotes(student._id || student.id, notesInput)} rows={3}
+                onBlur={() => {
+                  if (isDroppedOut) return;
+                  onUpdateNotes(student._id || student.id, notesInput);
+                }}
+                readOnly={isDroppedOut}
+                rows={3}
                 placeholder="Nhận xét, ghi chú về học viên..."
-                className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:border-blue-400 outline-none" />
+                className={`w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:border-blue-400 outline-none ${isDroppedOut ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`} />
             </div>
           </div>
         )}
@@ -2194,7 +2267,7 @@ export const StudentCard = ({
         </div>
       )}
 
-      {showQuickSchedule && (
+      {showQuickSchedule && !isDroppedOut && (
         <ScheduleModal
           students={[student]}
           allSchedules={allSchedules}

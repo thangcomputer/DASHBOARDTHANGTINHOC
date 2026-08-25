@@ -90,6 +90,9 @@ export default function TeacherStudentsTab({
                       const rowKey = s._enrollmentKey || String(sId);
                       const isOnline = onlineUsers.some(u => String(u.userId) === String(sId));
                       const isSelected = String(selectedEnrollmentKey) === String(rowKey);
+                      const isDropped = Boolean(s.interactionLocked)
+                        || ['cancelled', 'refunded'].includes(String(s.enrollmentStatus || '').toLowerCase())
+                        || String(s.status || '') === 'Thôi học';
                       return (
                         <div
                           key={rowKey}
@@ -97,6 +100,8 @@ export default function TeacherStudentsTab({
                           role="button"
                           tabIndex={0}
                           className={`w-full flex items-center gap-3 p-2.5 sm:p-3 rounded-xl transition-all group cursor-pointer border ${
+                            isDropped ? 'opacity-55 grayscale-[0.35]' : ''
+                          } ${
                             isSelected
                               ? 'bg-blue-50/60 border-blue-200 border-l-4 border-l-blue-600 shadow-sm'
                               : 'border-transparent hover:bg-slate-50 text-slate-700'
@@ -112,20 +117,24 @@ export default function TeacherStudentsTab({
                             <div className="w-10 h-10 rounded-full overflow-hidden shadow-sm bg-white border border-slate-100">
                               <img src={resolveAvatarUrl({ avatar: s.avatar, role: 'student', gender: s.gender })} alt="" className="w-full h-full object-cover" />
                             </div>
-                            {isOnline && (
+                            {isOnline && !isDropped && (
                               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" title="Đang hoạt động" />
                             )}
                           </div>
                           
                           <div className="flex-1 text-left min-w-0">
-                            <p className={`text-sm font-bold truncate ${isSelected ? 'text-slate-900' : 'text-slate-900'}`}>{s.name}</p>
+                            <p className={`text-sm font-bold truncate ${isDropped ? 'text-slate-500' : 'text-slate-900'}`}>{s.name}</p>
                             {s.course && (
                               <p className={`text-[10px] font-bold uppercase tracking-tight truncate mt-0.5 ${isSelected ? 'text-blue-600' : 'text-indigo-600'}`}>
                                 {s.course}
                               </p>
                             )}
-                            <div className="flex items-center gap-1.5 mt-1">
-                              {isOnline ? (
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {isDropped ? (
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                                  Thôi học
+                                </span>
+                              ) : isOnline ? (
                                 <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
                                   Đang online
                                 </span>
@@ -141,12 +150,18 @@ export default function TeacherStudentsTab({
                           
                           <button 
                               type="button"
+                              disabled={isDropped}
                               onClick={(e) => { 
-                                e.stopPropagation(); 
+                                e.stopPropagation();
+                                if (isDropped) return;
                                 navigateTeacherStudentChat(navigate, s);
                               }} 
-                              className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 hover:text-blue-700 transition-all border-none outline-none shrink-0"
-                              title="Nhắn tin với học viên"
+                              className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all border-none outline-none shrink-0 ${
+                                isDropped
+                                  ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'
+                              }`}
+                              title={isDropped ? 'HV đã thôi học — không nhắn tin' : 'Nhắn tin với học viên'}
                               aria-label="Nhắn tin với học viên"
                             >
                               <MessageSquare size={14} />

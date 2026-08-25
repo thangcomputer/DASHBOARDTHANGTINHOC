@@ -379,8 +379,8 @@ function expandStudentsForTeacher(students, teacherId) {
 
   students.forEach((student) => {
     const enrollments = getEnrollmentsFromStudent(student);
-    const mine = enrollments.filter((e) => teacherIdStr(e.teacherId) === tid && e.status !== 'cancelled' && e.status !== 'refunded');
-
+    // Giữ cancelled/refunded để GV vẫn thấy HV thôi học (UI khóa thao tác).
+    const mine = enrollments.filter((e) => teacherIdStr(e.teacherId) === tid);
 
     if (mine.length > 0) {
       mine.forEach((enr, idx) => {
@@ -388,6 +388,8 @@ function expandStudentsForTeacher(students, teacherId) {
         const completed = enr.completedSessions != null
           ? enr.completedSessions
           : Math.max(0, (enr.totalSessions || 12) - (enr.remainingSessions ?? 0));
+        const st = String(enr.status || 'active').toLowerCase();
+        const locked = st === 'cancelled' || st === 'refunded';
         result.push({
           ...student,
           id: student.id || student._id,
@@ -406,13 +408,25 @@ function expandStudentsForTeacher(students, teacherId) {
           avgGrade: enr.avgGrade ?? student.avgGrade,
           paid: enr.paid ?? student.paid,
           price: enr.price ?? student.price,
+          enrollmentStatus: st,
+          interactionLocked: locked,
+          status: locked ? 'Thôi học' : (student.status || 'Đang học'),
         });
       });
       return;
     }
 
     if (teacherIdStr(student.teacherId) === tid) {
-      result.push({ ...student, _enrollmentKey: String(student._id || student.id) });
+      const rootSt = String(student.status || '').toLowerCase();
+      const locked = rootSt === 'hủy' || rootSt === 'cancelled' || rootSt === 'refunded'
+        || String(student.course || '').includes('Đã hủy');
+      result.push({
+        ...student,
+        _enrollmentKey: String(student._id || student.id),
+        enrollmentStatus: locked ? 'cancelled' : 'active',
+        interactionLocked: locked,
+        status: locked ? 'Thôi học' : student.status,
+      });
     }
   });
 

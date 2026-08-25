@@ -58,6 +58,24 @@ function isPlaceholderCourseName(name) {
   return !n || n === '(đã hủy)' || n === 'chưa xếp lớp';
 }
 
+/**
+ * HV còn ≥1 khóa usable (active | completed | paused) → được vào Dashboard.
+ * Hủy / hoàn / pending_payment / placeholder → phải đăng ký lại (/dangkykhoahoc).
+ * Khớp client hasLearningAccessEnrollment.
+ */
+function studentHasLearningAccess(student) {
+  if (!student) return false;
+  const list = getEnrollmentsFromStudent(student);
+  return list.some((e) => {
+    if (e?.learningAccess === false) return false;
+    const st = String(e?.status || 'active').toLowerCase();
+    if (st === 'cancelled' || st === 'refunded' || st === 'pending_payment') return false;
+    if (st !== 'active' && st !== 'completed' && st !== 'paused' && st !== 'hoàn thành') return false;
+    const label = e?.courseName || e?.name || e?.course || '';
+    return !isPlaceholderCourseName(label);
+  });
+}
+
 function getEnrollmentsFromStudent(student) {
   const doc = student.toObject ? student.toObject() : { ...student };
   if (Array.isArray(doc.enrollments) && doc.enrollments.length > 0) {
@@ -389,8 +407,8 @@ function expandStudentsForTeacher(students, teacherId) {
 
   students.forEach((student) => {
     const enrollments = getEnrollmentsFromStudent(student);
-    const mine = enrollments.filter((e) => teacherIdStr(e.teacherId) === tid && e.status !== 'cancelled' && e.status !== 'refunded');
-
+    // Giữ cả cancelled/refunded để GV vẫn thấy HV thôi học (UI khóa thao tác).
+    const mine = enrollments.filter((e) => teacherIdStr(e.teacherId) === tid);
 
     if (mine.length > 0) {
       mine.forEach((enr, idx) => {
@@ -398,6 +416,8 @@ function expandStudentsForTeacher(students, teacherId) {
         const completed = enr.completedSessions != null
           ? enr.completedSessions
           : Math.max(0, (enr.totalSessions || 12) - (enr.remainingSessions ?? 0));
+        const st = String(enr.status || 'active').toLowerCase();
+        const locked = st === 'cancelled' || st === 'refunded';
         result.push({
           ...student,
           id: student.id || student._id,
@@ -416,13 +436,25 @@ function expandStudentsForTeacher(students, teacherId) {
           avgGrade: enr.avgGrade ?? student.avgGrade,
           paid: enr.paid ?? student.paid,
           price: enr.price ?? student.price,
+          enrollmentStatus: st,
+          interactionLocked: locked,
+          status: locked ? 'Thôi học' : (student.status || 'Đang học'),
         });
       });
       return;
     }
 
     if (teacherIdStr(student.teacherId) === tid) {
-      result.push({ ...student, _enrollmentKey: String(student._id || student.id) });
+      const rootSt = String(student.status || '').toLowerCase();
+      const locked = rootSt === 'hủy' || rootSt === 'cancelled' || rootSt === 'refunded'
+        || String(student.course || '').includes('Đã hủy');
+      result.push({
+        ...student,
+        _enrollmentKey: String(student._id || student.id),
+        enrollmentStatus: locked ? 'cancelled' : 'active',
+        interactionLocked: locked,
+        status: locked ? 'Thôi học' : student.status,
+      });
     }
   });
 
@@ -464,13 +496,93 @@ function syncStudentFromPrimaryEnrollment(student) {
   student.completedSessions = primary.completedSessions || 0;
 }
 
+/**
+ * Sau hoàn phí / đăng ký lại: gắn enrollment mới sạch (0 buổi), root sync khóa mới.
+ * Không xóa lịch completed cũ (để admin trả lương GV).
+ */
+async function applyReEnrollmentAfterPayment(studentDoc, {
+  courseName = '',
+  courseId = null,
+  branchId = null,
+  branchCode = '',
+  amount = 0,
+  totalSessions = 12,
+  learningMode = 'OFFLINE',
+} = {}) {
+  if (!studentDoc) return null;
+  const sessions = Number(totalSessions) > 0 ? Number(totalSessions) : 12;
+  const list = Array.isArray(studentDoc.enrollments) ? [...studentDoc.enrollments] : [];
+  list.forEach((e) => {
+    if (!e) return;
+    e.isPrimary = false;
+  });
+
+  const newEnrollment = {
+    courseName: courseName || 'Khóa học mới',
+    courseId: courseId || null,
+    branchId: branchId || studentDoc.branchId || null,
+    status: 'active',
+    paid: true,
+    price: Number(amount) || 0,
+    paidAmount: Number(amount) || 0,
+    paidAt: new Date(),
+    totalSessions: sessions,
+    remainingSessions: sessions,
+    completedSessions: 0,
+    grades: [],
+    avgGrade: 0,
+    linkHoc: '',
+    nextClass: '',
+    nextClassTime: '',
+    teacherId: null,
+    teacherName: '',
+    learningMode: learningMode || 'OFFLINE',
+    registeredAt: new Date(),
+    learningAccess: true,
+    isPrimary: true,
+    examUnlocked: false,
+    requireWebcam: true,
+  };
+  list.push(newEnrollment);
+  studentDoc.enrollments = list;
+  studentDoc.markModified?.('enrollments');
+
+  if (branchId) {
+    studentDoc.branchId = branchId;
+    studentDoc.branchCode = branchCode || studentDoc.branchCode || '';
+  }
+  studentDoc.course = newEnrollment.courseName;
+  studentDoc.courseId = courseId || studentDoc.courseId;
+  studentDoc.price = Number(amount) || 0;
+  studentDoc.paid = true;
+  studentDoc.paidAmount = Number(amount) || 0;
+  studentDoc.paidAt = new Date();
+  studentDoc.status = 'Active';
+  studentDoc.totalSessions = sessions;
+  studentDoc.remainingSessions = sessions;
+  studentDoc.completedSessions = 0;
+  studentDoc.grades = [];
+  studentDoc.avgGrade = 0;
+  studentDoc.lastGrade = 0;
+  studentDoc.linkHoc = '';
+  studentDoc.nextClass = '';
+  studentDoc.nextClassTime = '';
+  studentDoc.teacherId = null;
+  studentDoc.teacherName = '';
+  studentDoc.notes = '';
+  studentDoc.markModified?.('grades');
+  return newEnrollment;
+}
+
 module.exports = {
   legacyEnrollmentFromStudent,
   getEnrollmentsFromStudent,
+  studentHasLearningAccess,
   toClientCourse,
   applyEnrollmentStats,
   studentMatchesTeacher,
   expandStudentsForTeacher,
+  applyReEnrollmentAfterPayment,
   teacherIdStr,
   resolveEnrollmentExamSubjects,
   recordAttendanceGrade,

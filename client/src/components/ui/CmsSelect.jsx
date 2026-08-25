@@ -24,7 +24,13 @@ function flattenOptionElements(children) {
       Children.forEach(child.props.children, (inner) => {
         if (!isValidElement(inner) || inner.type !== 'option') return;
         opts.push({
-          value: String(inner.props.value ?? ''),
+          value: (() => {
+            const v = inner.props.value;
+            if (v == null) return '';
+            if (typeof v === 'object') return String(v._id || v.id || '');
+            const s = String(v);
+            return s === '[object Object]' ? '' : s;
+          })(),
           label: inner.props.children,
           disabled: Boolean(inner.props.disabled),
         });
@@ -33,7 +39,13 @@ function flattenOptionElements(children) {
     }
     if (child.type !== 'option') return;
     opts.push({
-      value: String(child.props.value ?? ''),
+      value: (() => {
+        const v = child.props.value;
+        if (v == null) return '';
+        if (typeof v === 'object') return String(v._id || v.id || '');
+        const s = String(v);
+        return s === '[object Object]' ? '' : s;
+      })(),
       label: child.props.children,
       disabled: Boolean(child.props.disabled),
     });
@@ -76,12 +88,31 @@ export default function CmsSelect({
     return flattenOptionElements(children);
   }, [children, optionsProp]);
 
-  const strValue = value == null ? '' : String(value);
+  const strValue = (() => {
+    if (value == null || value === '') return '';
+    if (typeof value === 'object') {
+      const id = value._id ?? value.id;
+      return id != null ? String(id) : '';
+    }
+    const s = String(value);
+    return s === '[object Object]' ? '' : s;
+  })();
+
   const selected = options.find((o) => o.value === strValue);
-  const displayLabel =
-    selected?.label ??
-    (strValue === '' ? options.find((o) => o.value === '')?.label : null) ??
-    strValue;
+  const placeholderOpt = options.find((o) => o.value === '');
+  let displayLabel = selected?.label;
+  if (displayLabel == null || displayLabel === '') {
+    displayLabel = strValue === ''
+      ? (placeholderOpt?.label ?? '')
+      : (placeholderOpt?.label && !selected ? placeholderOpt.label : strValue);
+  }
+  // Tránh hiện chữ kỹ thuật khi value lệch / label là object lạ
+  if (typeof displayLabel === 'object' && displayLabel !== null && !isValidElement(displayLabel) && !Array.isArray(displayLabel)) {
+    displayLabel = displayLabel.name || displayLabel.label || placeholderOpt?.label || 'Chọn…';
+  }
+  if (displayLabel === '[object Object]') {
+    displayLabel = placeholderOpt?.label || 'Chọn…';
+  }
 
   const updateCoords = () => {
     const el = triggerRef.current;

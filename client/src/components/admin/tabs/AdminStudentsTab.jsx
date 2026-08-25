@@ -17,6 +17,7 @@ import {
 } from '../../../utils/learningModeBranchDisplay';
 import { isTeacherActive } from '../../../constants/teacherStatus';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
+import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 import api, { apiFetch } from '../../../services/api';
 
 /** Tổng tiền đã hoàn từ khóa cancelled (chỉ hiển thị, không sửa). */
@@ -481,12 +482,18 @@ export default function AdminStudentsTab() {
     (t) => t && (t.role == null || t.role === 'teacher') && isTeacherActive(t.status),
   );
 
-  const teachersForCourse = (courseOrEnrollment, currentTeacherId = '') => {
+  const teachersForCourse = (courseOrEnrollment, currentTeacherId = '', studentBranchId = '') => {
     const matched = [];
     const other = [];
     const cur = String(currentTeacherId || '');
+    const branchId = toBranchId(studentBranchId);
     for (const t of assignableTeachers) {
       const tid = String(t.id || t._id);
+      const sameBranch = teacherInStudentBranch(t, branchId) || (cur && tid === cur);
+      if (!sameBranch) {
+        other.push({ ...t, _branchMismatch: true });
+        continue;
+      }
       if (teacherMatchesCourse(t, courseOrEnrollment, examSubjectsCatalog) || (cur && tid === cur)) {
         matched.push(t);
       } else {
@@ -526,6 +533,7 @@ export default function AdminStudentsTab() {
   const teacherSelectWrapClass = 'w-full max-w-full';
 
   const renderTeacherSelects = (s, enrollments, hasMultiCourse, primaryEnr, teacherVal) => {
+    const studentBranchId = s?.branchId;
     if (hasMultiCourse) {
       return (
         <div className="space-y-2">
@@ -533,7 +541,7 @@ export default function AdminStudentsTab() {
             const enrTeacherVal = enr.teacherId || '';
             const enrId = enr.enrollmentId || enr.id;
             const courseLabel = enr.courseName || enr.name || '';
-            const { matched, other } = teachersForCourse(enr, enrTeacherVal);
+            const { matched, other } = teachersForCourse(enr, enrTeacherVal, studentBranchId);
             return (
               <div key={enrId} className="space-y-1 min-w-0">
                 <p className="text-xs font-semibold text-sky-700 truncate" title={courseLabel}>{courseLabel}</p>
@@ -553,7 +561,7 @@ export default function AdminStudentsTab() {
                   ))}
                   {other.map((t) => (
                     <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
-                      {t.name} (khác môn)
+                      {t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}
                     </option>
                   ))}
                 </CmsSelect>
@@ -564,7 +572,7 @@ export default function AdminStudentsTab() {
       );
     }
     const courseRef = primaryEnr || s.course;
-    const { matched, other } = teachersForCourse(courseRef, teacherVal);
+    const { matched, other } = teachersForCourse(courseRef, teacherVal, studentBranchId);
     return (
       <CmsSelect
         value={teacherVal ? String(teacherVal) : ''}
@@ -582,7 +590,7 @@ export default function AdminStudentsTab() {
         ))}
         {other.map((t) => (
           <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
-            {t.name} (khác môn)
+            {t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}
           </option>
         ))}
       </CmsSelect>

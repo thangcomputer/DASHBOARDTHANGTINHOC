@@ -297,49 +297,34 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
           matchedRef = claimed.ref;
           logger.info(`[SEPAY] Session ${claimed.sessionId} khớp ref="${claimed.ref}" — ${amount}đ (+Ledger)`);
 
-          // Update student if studentId is present
+          // Update student if studentId is present (re-enroll sau hoàn → enrollment mới sạch)
           if (claimed.studentId) {
             try {
               const Student = require('../models/Student');
-              const setStudentFields = {
-                paid: true,
-                paidAmount: amount,
-                paidAt: new Date(),
-                paidNote: String(body.content || '').slice(0, 300),
-              };
-              if (claimed.branchId) {
-                setStudentFields.branchId = claimed.branchId;
-                setStudentFields.branchCode = claimed.branchCode || '';
-              }
-              if (claimed.courseName) {
-                setStudentFields.course = claimed.courseName;
-              }
-              if (claimed.courseId) {
-                setStudentFields.courseId = claimed.courseId;
-              }
-              setStudentFields.price = claimed.amount;
-              setStudentFields.status = 'Active';
+              const Course = require('../models/Course');
+              const { applyReEnrollmentAfterPayment } = require('../services/enrollmentService');
 
-              const newEnrollment = {
-                courseName: claimed.courseName || '',
-                courseId: claimed.courseId || null,
-                branchId: claimed.branchId || null,
-                status: 'active',
-                paid: true,
-                price: claimed.amount,
-                paidAmount: amount,
-                totalSessions: 12,
-                remainingSessions: 12,
-                learningMode: 'OFFLINE',
-                registeredAt: new Date(),
-                learningAccess: true
-              };
-  
-              await Student.findByIdAndUpdate(claimed.studentId, { 
-                $set: setStudentFields,
-                $push: { enrollments: newEnrollment }
-              });
-              logger.info(`[SEPAY] Updated student ${claimed.studentId} with branch and course info from session`);
+              let totalSessions = 12;
+              if (claimed.courseId) {
+                const courseDoc = await Course.findById(claimed.courseId).select('totalSessions').lean();
+                if (Number(courseDoc?.totalSessions) > 0) totalSessions = Number(courseDoc.totalSessions);
+              }
+
+              const studentDoc = await Student.findById(claimed.studentId);
+              if (studentDoc) {
+                await applyReEnrollmentAfterPayment(studentDoc, {
+                  courseName: claimed.courseName || '',
+                  courseId: claimed.courseId || null,
+                  branchId: claimed.branchId || null,
+                  branchCode: claimed.branchCode || '',
+                  amount,
+                  totalSessions,
+                  learningMode: 'OFFLINE',
+                });
+                studentDoc.paidNote = String(body.content || '').slice(0, 300);
+                await studentDoc.save({ validateModifiedOnly: true });
+                logger.info(`[SEPAY] Re-enrolled student ${claimed.studentId} with fresh enrollment (${totalSessions} buổi)`);
+              }
             } catch (stuErr) {
               logger.error(`[SEPAY] Failed to update student ${claimed.studentId} from session: %s`, stuErr.message);
             }
@@ -421,36 +406,86 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
       } else if (selection.status === 'one') {
         const { student: s, matchedIdentity } = selection.candidates[0];
         const list = Array.isArray(s.enrollments) ? s.enrollments : [];
+        // Chỉ gắn lại enrollment chưa hủy/chưa đóng. Nếu chỉ còn cancelled → enrollment mới (không hồi sinh khóa cũ).
         const unpaidEnr = list.find((e) => {
           const st = String(e.status || 'active');
           if (st === 'cancelled' || st === 'refunded') return false;
           return e.paid !== true;
-        }) || list.find((e) => e.isPrimary) || list[0];
-        const enrId = unpaidEnr?._id ? String(unpaidEnr._id) : '';
+        });
+        const needsFreshEnrollment = !unpaidEnr;
+        let updated = null;
+        let enrId = '';
+        let settledCourseName = '';
 
-        const setFields = {
-          paid: true,
-          paidAmount: amount,
-          paidAt: new Date(),
-          paidNote: String(body.content || '').slice(0, 300),
-        };
-        if (enrId) {
-          setFields['enrollments.$[enr].paid'] = true;
-          setFields['enrollments.$[enr].paidAt'] = new Date();
-          setFields['enrollments.$[enr].learningAccess'] = true;
-          setFields['enrollments.$[enr].status'] = 'active';
+        if (needsFreshEnrollment) {
+          try {
+            const Course = require('../models/Course');
+            const { applyReEnrollmentAfterPayment } = require('../services/enrollmentService');
+            const lastCancelled = [...list].reverse().find((e) => {
+              const st = String(e?.status || '').toLowerCase();
+              return st === 'cancelled' || st === 'refunded';
+            });
+            const rootCourse = String(s.course || '').trim();
+            const courseName = (rootCourse && rootCourse !== '(Đã hủy)')
+              ? rootCourse
+              : (lastCancelled?.courseName || 'Khóa học mới');
+            let totalSessions = Number(lastCancelled?.totalSessions) > 0
+              ? Number(lastCancelled.totalSessions)
+              : 12;
+            const courseId = lastCancelled?.courseId || null;
+            if (courseId) {
+              const courseDoc = await Course.findById(courseId).select('totalSessions').lean();
+              if (Number(courseDoc?.totalSessions) > 0) totalSessions = Number(courseDoc.totalSessions);
+            }
+            const studentDoc = await Student.findOne({ _id: s._id, paid: false });
+            if (studentDoc) {
+              await applyReEnrollmentAfterPayment(studentDoc, {
+                courseName,
+                courseId,
+                branchId: studentDoc.branchId || s.branchId || null,
+                amount,
+                totalSessions,
+                learningMode: 'OFFLINE',
+              });
+              studentDoc.paidNote = String(body.content || '').slice(0, 300);
+              updated = await studentDoc.save({ validateModifiedOnly: true });
+              const primaryAfter = (updated.enrollments || []).find((e) => e.isPrimary)
+                || (updated.enrollments || [])[(updated.enrollments || []).length - 1];
+              enrId = primaryAfter?._id ? String(primaryAfter._id) : '';
+              settledCourseName = courseName;
+              logger.info(`[SEPAY] Code-match re-enrolled ${s._id} with fresh enrollment (${totalSessions} buổi)`);
+            }
+          } catch (reEnrErr) {
+            logger.error('[SEPAY] code-match re-enroll failed: %s', reEnrErr.message);
+          }
+        } else {
+          enrId = unpaidEnr?._id ? String(unpaidEnr._id) : '';
+          settledCourseName = unpaidEnr?.courseName || s.course || '';
+
+          const setFields = {
+            paid: true,
+            paidAmount: amount,
+            paidAt: new Date(),
+            paidNote: String(body.content || '').slice(0, 300),
+          };
+          if (enrId) {
+            setFields['enrollments.$[enr].paid'] = true;
+            setFields['enrollments.$[enr].paidAt'] = new Date();
+            setFields['enrollments.$[enr].learningAccess'] = true;
+            setFields['enrollments.$[enr].status'] = 'active';
+          }
+
+          const updateOpts = { returnDocument: 'after' };
+          if (enrId) {
+            updateOpts.arrayFilters = [{ 'enr._id': unpaidEnr._id }];
+          }
+
+          updated = await Student.findOneAndUpdate(
+            { _id: s._id, paid: false },
+            { $set: setFields },
+            updateOpts
+          );
         }
-
-        const updateOpts = { returnDocument: 'after' };
-        if (enrId) {
-          updateOpts.arrayFilters = [{ 'enr._id': unpaidEnr._id }];
-        }
-
-        const updated = await Student.findOneAndUpdate(
-          { _id: s._id, paid: false },
-          { $set: setFields },
-          updateOpts
-        );
 
         if (updated) {
           matched = true;
@@ -465,7 +500,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
               maHoaDon: maHD,
               hocVien: updated._id,
               hoTen: updated.name || s.name,
-              khoaHoc: updated.course || unpaidEnr?.courseName || 'Học phí',
+              khoaHoc: settledCourseName || updated.course || unpaidEnr?.courseName || 'Học phí',
               hocPhi: amount,
               ghiChu: `SePay CK — ${String(body.content || '').slice(0, 120)}`,
             });
@@ -474,7 +509,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
           }
           try {
             const { settlePayment } = require('../services/ledgerService');
-            const primary = (updated.enrollments || []).find((e) => String(e._id) === enrId)
+            const primary = (updated.enrollments || []).find((e) => enrId && String(e._id) === enrId)
               || (updated.enrollments || []).find((e) => e.isPrimary)
               || (updated.enrollments || [])[0];
             const settledEnrId = primary?._id ? String(primary._id) : enrId;
@@ -483,7 +518,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
               amount,
               invoice: sepayInvoice,
               enrollmentId: settledEnrId,
-              courseName: updated.course || primary?.courseName || '',
+              courseName: settledCourseName || updated.course || primary?.courseName || '',
               source: 'sepay',
               sourceRef: sepayInvoice?.maHoaDon || gatewayTxnId || matchedRef,
               idempotencyKey: settledEnrId
@@ -496,23 +531,38 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
           } catch (ledgerErr) {
             logger.error('[SEPAY] ledger settle FAILED — rollback paid: %s', ledgerErr.message);
             try {
-              const rollbackSet = {
-                paid: false,
-                paidAmount: 0,
-                paidNote: '',
-              };
-              if (enrId) {
-                rollbackSet['enrollments.$[enr].paid'] = false;
-                rollbackSet['enrollments.$[enr].learningAccess'] = false;
-                rollbackSet['enrollments.$[enr].status'] = 'pending_payment';
-              }
-              const rbOpts = { $set: rollbackSet, $unset: { paidAt: 1 } };
-              if (enrId) {
-                await Student.findByIdAndUpdate(updated._id, rbOpts, {
-                  arrayFilters: [{ 'enr._id': unpaidEnr._id }],
-                });
+              if (needsFreshEnrollment) {
+                // Gỡ enrollment vừa thêm; giữ các enrollment cancelled cũ
+                const doc = await Student.findById(updated._id);
+                if (doc && Array.isArray(doc.enrollments) && enrId) {
+                  doc.enrollments = doc.enrollments.filter((e) => String(e._id) !== enrId);
+                  doc.paid = false;
+                  doc.paidAmount = 0;
+                  doc.paidNote = '';
+                  doc.paidAt = undefined;
+                  const { syncStudentFromPrimaryEnrollment } = require('../services/enrollmentService');
+                  syncStudentFromPrimaryEnrollment(doc);
+                  await doc.save({ validateModifiedOnly: true });
+                }
               } else {
-                await Student.findByIdAndUpdate(updated._id, rbOpts);
+                const rollbackSet = {
+                  paid: false,
+                  paidAmount: 0,
+                  paidNote: '',
+                };
+                if (enrId) {
+                  rollbackSet['enrollments.$[enr].paid'] = false;
+                  rollbackSet['enrollments.$[enr].learningAccess'] = false;
+                  rollbackSet['enrollments.$[enr].status'] = 'pending_payment';
+                }
+                const rbOpts = { $set: rollbackSet, $unset: { paidAt: 1 } };
+                if (enrId) {
+                  await Student.findByIdAndUpdate(updated._id, rbOpts, {
+                    arrayFilters: [{ 'enr._id': unpaidEnr._id }],
+                  });
+                } else {
+                  await Student.findByIdAndUpdate(updated._id, rbOpts);
+                }
               }
               if (sepayInvoice?._id) {
                 const Invoice = require('../models/Invoice');

@@ -13,6 +13,7 @@ import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments, hasLearningAccessEnrollment } from '../utils/enrollments';
 import { teacherMatchesCourse } from '../utils/examSubjects';
+import { teacherInStudentBranch, toBranchId } from '../utils/branchIds';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
 import { useToast } from '../utils/toast';
 import { getAttendanceAction, attendanceToneClass } from '../utils/attendanceAction';
@@ -1458,12 +1459,19 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                             const enrollments = getClientEnrollments(data.student);
                             if (enrollments.length === 0) return null;
                             const activeTeachers = (teachers || []).filter((t) => String(t.status || '').toLowerCase() === 'active');
+                            const studentBranchId = data.student?.branchId;
                             const splitTeachers = (courseOrEnr) => {
                               const matched = [];
                               const other = [];
                               const currentTeacherId = String(courseOrEnr.teacherId || '');
+                              const branchId = toBranchId(studentBranchId);
                               for (const t of activeTeachers) {
                                 const tid = String(t.id || t._id);
+                                const sameBranch = teacherInStudentBranch(t, branchId) || (currentTeacherId && tid === currentTeacherId);
+                                if (!sameBranch) {
+                                  other.push({ ...t, _branchMismatch: true });
+                                  continue;
+                                }
                                 if (teacherMatchesCourse(t, courseOrEnr, examSubjectsCatalog) || (currentTeacherId && tid === currentTeacherId)) {
                                   matched.push(t);
                                 } else {
@@ -1562,7 +1570,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                                       <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
                                                     ))}
                                                     {other.map((t) => (
-                                                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t.name} (khác môn)</option>
+                                                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}</option>
                                                     ))}
                                                   </>
                                                 );

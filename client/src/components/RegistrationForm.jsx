@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CmsSelect from './ui/CmsSelect';
 import {
   CreditCard, User, Phone, BookOpen, GraduationCap, CheckCircle,
@@ -13,9 +14,20 @@ import { generateVietQRUrl } from './BankSelect';
 import { useModal } from '../utils/Modal.jsx';
 import { useToast } from '../utils/toast.jsx';
 import { isValidVNPhone } from '../utils/validators';
+import { toBranchId, branchOptionLabel } from '../utils/branchIds';
 
 const API   = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 const TOTAL = 5 * 60; // 5 phút = 300 giây
+
+function readReEnrollPhone(searchParams) {
+  const fromUrl = String(searchParams.get('phone') || '').trim();
+  if (fromUrl) return fromUrl;
+  try {
+    return String(sessionStorage.getItem('cms_re_enroll_phone') || '').trim();
+  } catch {
+    return '';
+  }
+}
 
 // Helper: tính effective price
 const calcEff = (price, pct) =>
@@ -78,6 +90,11 @@ function ExpiredOverlay({ onBack }) {
 const RegistrationForm = ({ onNavigate, initialData = {} }) => {
   const { addStudent } = useData();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const isReEnroll = searchParams.get('reEnroll') === '1'
+    || (() => { try { return sessionStorage.getItem('cms_re_enroll_notice') === '1'; } catch { return false; } })();
+  const reEnrollPhone = readReEnrollPhone(searchParams);
+
   const [step, setStep]         = useState(1);
   const [exporting, setExporting] = useState(false);
 
@@ -101,14 +118,17 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
   const [coursesLoading, setCoursesLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    name: initialData.name || '', age: '', zalo: initialData.phone || '', gender: 'male',
+    name: initialData.name || '',
+    age: initialData.age != null ? String(initialData.age) : '',
+    zalo: reEnrollPhone || initialData.phone || initialData.zalo || '',
+    gender: initialData.gender || 'male',
     courseId:        '',
     course:          '',
     price:           0,
     discountPercent: 0,
     effectivePrice:  0,
-    branchId:        initialData.branchId || '',
-    branchCode:      initialData.branchCode || '', // CS1, CS2 — dùng prefix QR
+    branchId:        toBranchId(initialData.branchId),
+    branchCode:      initialData.branchCode || '',
   });
 
   // Fetch branches
@@ -120,24 +140,24 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
       .then(res => {
         if (res.success && res.data.length > 0) {
           setBranches(res.data);
-          // Chọn chi nhánh mặc định: ưu tiên initialData, sau đó là chi nhánh CNTT, cuối cùng là chi nhánh đầu tiên
+          // Giữ branch đã chọn nếu hợp lệ; không auto-chọn → hiện "Chọn chi nhánh"
           setFormData(f => {
-            if (f.branchId) {
-              if (!f.branchCode) {
-                const b = res.data.find(x => x._id === f.branchId);
-                if (b) return { ...f, branchCode: b.code || '' };
-              }
-              return f;
-            }
-            const cnttBranch = res.data.find(b => b.code === 'CNTT' || b.name?.toUpperCase().includes('CNTT'));
-            const defaultBranch = cnttBranch || res.data[0];
-            return { ...f, branchId: defaultBranch._id, branchCode: defaultBranch.code };
+            const currentId = toBranchId(f.branchId);
+            if (!currentId) return { ...f, branchId: '', branchCode: f.branchCode || '' };
+            const b = res.data.find(x => toBranchId(x._id || x.id) === currentId);
+            if (b) return { ...f, branchId: toBranchId(b._id || b.id), branchCode: f.branchCode || b.code || '' };
+            return { ...f, branchId: '', branchCode: '' };
           });
         }
       })
       .catch(() => {})
       .finally(() => setBranchesLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!reEnrollPhone) return;
+    setFormData((f) => (f.zalo ? f : { ...f, zalo: reEnrollPhone }));
+  }, [reEnrollPhone]);
 
   // Fetch courses khi mount
   useEffect(() => {
@@ -207,7 +227,9 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
           courseId: formData.courseId,
           branchId: formData.branchId,
           branchCode: formData.branchCode,
-          studentId: initialData?.id || initialData?._id || undefined,
+          studentId: initialData?.id || initialData?._id
+            || (() => { try { return sessionStorage.getItem('cms_re_enroll_student_id') || undefined; } catch { return undefined; } })()
+            || undefined,
         }),
       })
         .then(r => r.json())
@@ -246,6 +268,11 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
             clearInterval(countdownRef.current);
             clearInterval(pollRef.current);
             setPollStatus('paid');
+            try {
+              sessionStorage.removeItem('cms_re_enroll_notice');
+              sessionStorage.removeItem('cms_re_enroll_phone');
+              sessionStorage.removeItem('cms_re_enroll_student_id');
+            } catch { /* ignore */ }
             const studentPayload = {
               name: formData.name,
               age: parseInt(formData.age) || 0,
@@ -305,7 +332,10 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
               });
             };
 
-            if (initialData?.id || initialData?._id) {
+            const existingStudentId = initialData?.id || initialData?._id
+              || (() => { try { return sessionStorage.getItem('cms_re_enroll_student_id'); } catch { return null; } })();
+
+            if (existingStudentId) {
               handleSuccess();
               setTimeout(() => setStep(3), 500);
             } else {
@@ -381,6 +411,10 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
         showModal({ title: 'Số không hợp lệ', content: 'Số Zalo/SĐT phải là 10 chữ số, bắt đầu bằng 0.', type: 'warning' });
         return;
     }
+    if (branches.length > 0 && !toBranchId(formData.branchId)) {
+        showModal({ title: 'Thiếu thông tin', content: 'Vui lòng chọn chi nhánh / cơ sở đăng ký học!', type: 'warning' });
+        return;
+    }
     sessionRef.current = null; // reset để tạo session mới
     setStep(2);
   };
@@ -448,6 +482,14 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                 <h2 className="text-2xl font-bold text-red-700 flex items-center gap-2">
                   <GraduationCap size={28} /> ĐĂNG KÝ KHÓA HỌC
                 </h2>
+                {isReEnroll && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 leading-snug">
+                    <p className="font-bold">Bạn cần đăng ký khóa học mới</p>
+                    <p className="mt-1 text-amber-800/90">
+                      Tài khoản đã hết khóa (hủy/hoàn phí). Điền thông tin, thanh toán xong rồi đăng nhập lại bằng số điện thoại đã đăng ký.
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
                     <User size={14} /> Họ và tên học viên
@@ -526,21 +568,32 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                 </div>
 
                 {/* Chọn chi nhánh */}
-                {branches.length > 1 && (
+                {branches.length > 0 && (
                   <div>
                     <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
                       🏢 Cơ sở đăng ký học
                     </label>
                     <CmsSelect
-                      value={formData.branchId}
+                      value={toBranchId(formData.branchId)}
                       onChange={e => {
-                        const b = branches.find(x => x._id === e.target.value);
-                        setFormData(f => ({ ...f, branchId: e.target.value, branchCode: b?.code || '' }));
+                        const id = toBranchId(e.target.value);
+                        const b = branches.find(x => toBranchId(x._id || x.id) === id);
+                        setFormData(f => ({
+                          ...f,
+                          branchId: id,
+                          branchCode: b?.code || '',
+                        }));
                       }}
                       className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold text-gray-800 bg-white transition-all">
-                      {branches.map(b => (
-                        <option key={b._id} value={b._id}>{b.name} ({b.code})</option>
-                      ))}
+                      <option value="">Chọn chi nhánh</option>
+                      {branches.map(b => {
+                        const id = toBranchId(b._id || b.id);
+                        return (
+                          <option key={id || branchOptionLabel(b)} value={id}>
+                            {branchOptionLabel(b)}
+                          </option>
+                        );
+                      })}
                     </CmsSelect>
                   </div>
                 )}
@@ -703,10 +756,10 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                     {exporting ? <Loader2 size={20} className="animate-spin"/> : <Download size={20} />} TẢI PDF
                   </button>
                   <button 
-                    onClick={() => onNavigate('student')}
+                    onClick={() => onNavigate('login')}
                     className="py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center justify-center gap-2"
                   >
-                    <LayoutDashboard size={20} /> ĐÓNG
+                    <LayoutDashboard size={20} /> ĐĂNG NHẬP
                   </button>
                 </div>
                 <div className="pt-2">

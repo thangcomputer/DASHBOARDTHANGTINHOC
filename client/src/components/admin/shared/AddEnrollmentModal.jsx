@@ -6,6 +6,7 @@ import {
 import { useToast } from '../../../utils/toast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
+import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 
 function courseEffectivePrice(c) {
   return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
@@ -453,14 +454,19 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
                   {(teachers || [])
                     .filter((t) => String(t.status || '').toLowerCase() === 'active')
                     .map((t) => {
-                      const match = teacherMatchesCourse(t, form.courseName);
+                      const sameBranch = teacherInStudentBranch(t, student?.branchId);
+                      const match = sameBranch && teacherMatchesCourse(t, form.courseName);
+                      const disabled = !sameBranch || !teacherMatchesCourse(t, form.courseName);
+                      let label = t.name;
+                      if (!sameBranch) label = `${t.name} (khác chi nhánh)`;
+                      else if (!match) label = `${t.name} (khác môn)`;
                       return (
                         <option
                           key={t.id || t._id}
                           value={String(t.id || t._id)}
-                          disabled={!match}
+                          disabled={disabled}
                         >
-                          {match ? t.name : `${t.name} (khác môn)`}
+                          {label}
                         </option>
                       );
                     })}

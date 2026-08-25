@@ -196,22 +196,50 @@ export function expandStudentsForTeacher(students, teacherId) {
   const tid = String(teacherId); const result = [];
   (students || []).filter(Boolean).forEach((student) => {
     const enrollments = getClientEnrollments(student);
-    const mine = enrollments.filter((e) => String(e.teacherId) === tid && e?.status !== 'cancelled' && e?.status !== 'refunded');
+    // Giữ cancelled/refunded → GV vẫn thấy HV thôi học (UI khóa).
+    const mine = enrollments.filter((e) => String(e.teacherId) === tid);
     if (mine.length > 0) {
-      mine.forEach((enr, idx) => result.push({ ...student, id: student.id || student._id,
-        _enrollmentKey: `${student._id || student.id}-${enr.enrollmentId || idx}`,
-        _enrollmentId: enr.enrollmentId || `enr-${idx}`, course: enr.courseName,
-        teacherId: enr.teacherId, teacherName: enr.teacherName,
-        totalSessions: enr.totalSessions || 12,         remainingSessions: enr.remainingSessions ?? Math.max(0, (enr.totalSessions || 12) - (Number(enr.completedSessions) || 0)),
-        completedSessions: enr.completedSessions ?? Math.max(0, (enr.totalSessions || 12) - (enr.remainingSessions ?? 0)), examSubjects: enr.examSubjects || [],
-        grades: enr.grades?.length ? enr.grades : (enr.isPrimary ? student.grades : []),
-        linkHoc: enr.linkHoc || student.linkHoc, nextClass: enr.nextClass || student.nextClass,
-        nextClassTime: enr.nextClassTime || student.nextClassTime,
-        avgGrade: enr.avgGrade ?? student.avgGrade, paid: enr.paid ?? student.paid, price: enr.price ?? student.price,
-      }));
+      mine.forEach((enr, idx) => {
+        const st = String(enr?.status || 'active').toLowerCase();
+        const locked = st === 'cancelled' || st === 'refunded';
+        result.push({
+          ...student,
+          id: student.id || student._id,
+          _enrollmentKey: `${student._id || student.id}-${enr.enrollmentId || idx}`,
+          _enrollmentId: enr.enrollmentId || `enr-${idx}`,
+          course: enr.courseName,
+          teacherId: enr.teacherId,
+          teacherName: enr.teacherName,
+          totalSessions: enr.totalSessions || 12,
+          remainingSessions: enr.remainingSessions ?? Math.max(0, (enr.totalSessions || 12) - (Number(enr.completedSessions) || 0)),
+          completedSessions: enr.completedSessions ?? Math.max(0, (enr.totalSessions || 12) - (enr.remainingSessions ?? 0)),
+          examSubjects: enr.examSubjects || [],
+          grades: enr.grades?.length ? enr.grades : (enr.isPrimary ? student.grades : []),
+          linkHoc: enr.linkHoc || student.linkHoc,
+          nextClass: enr.nextClass || student.nextClass,
+          nextClassTime: enr.nextClassTime || student.nextClassTime,
+          avgGrade: enr.avgGrade ?? student.avgGrade,
+          paid: enr.paid ?? student.paid,
+          price: enr.price ?? student.price,
+          enrollmentStatus: st,
+          interactionLocked: locked,
+          status: locked ? 'Thôi học' : (student.status || 'Đang học'),
+        });
+      });
       return;
     }
-    if (teacherIdStr(student.teacherId) === tid && (student.status !== 'Hoàn thành' && student.status !== 'Hủy')) result.push({ ...student, _enrollmentKey: String(student._id || student.id) });
+    if (teacherIdStr(student.teacherId) === tid) {
+      const rootSt = String(student.status || '').toLowerCase();
+      const locked = rootSt === 'hủy' || rootSt === 'cancelled' || rootSt === 'refunded'
+        || String(student.course || '').includes('Đã hủy');
+      result.push({
+        ...student,
+        _enrollmentKey: String(student._id || student.id),
+        enrollmentStatus: locked ? 'cancelled' : 'active',
+        interactionLocked: locked,
+        status: locked ? 'Thôi học' : student.status,
+      });
+    }
   });
   return result;
 }
