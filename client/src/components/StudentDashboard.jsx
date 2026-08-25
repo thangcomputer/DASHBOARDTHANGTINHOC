@@ -711,12 +711,21 @@ const StudentDashboard = ({ onNavigate }) => {
             setNoteModalSched={setNoteModalSched}
             displayGrades={displayGradesAll}
           />
-        ) : currentHash === 'materials' ? (
+        ) : ['materials', 'materials-videos', 'materials-files', 'materials-software', 'materials-assignments', 'exam-scores'].includes(currentHash) ? (
           <StudentLazyMaterialsTab
             viewStudent={viewStudent}
             studentTrainingForLms={studentTrainingForLms}
             myAssignments={myAssignments}
             studentTrainingData={studentTrainingData}
+            initialMainTab={{
+              materials: null,
+              'materials-videos': 'courses',
+              'materials-files': 'files',
+              'materials-software': 'software',
+              'materials-assignments': 'assignments',
+              'exam-scores': 'exams',
+            }[currentHash]}
+            hideTabBar={currentHash !== 'materials'}
           />
         ) : currentHash === 'evaluation' ? (
           <StudentLazyEvaluationTab

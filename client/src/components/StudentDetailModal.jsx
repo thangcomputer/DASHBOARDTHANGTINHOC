@@ -3,7 +3,7 @@ import CmsSelect from './ui/CmsSelect';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import {
   X, User, BookOpen, Clock, DollarSign, Trophy, 
-  MapPin, Phone, MessageSquare, Calendar, ChevronRight,
+  MapPin, Phone, Calendar, ChevronRight,
   TrendingUp, CreditCard, ClipboardList, ShieldCheck, 
   Printer, Loader2, AlertCircle, CheckCircle2, Star,
   Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2, Edit3, Award
@@ -16,6 +16,7 @@ import { teacherMatchesCourse } from '../utils/examSubjects';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
 import { useToast } from '../utils/toast';
 import { getAttendanceAction, attendanceToneClass } from '../utils/attendanceAction';
+import ZaloIcon from './ZaloIcon';
 
 const fmt = (n) => n ? Number(n).toLocaleString('vi-VN') + 'đ' : '0đ';
 const fmtTuition = (n) => {
@@ -2457,10 +2458,12 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                 <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-2 flex-1 min-w-0">
                   <button
                     type="button"
-                    onClick={() => window.open(`http://zalo.me/${data.student.zalo || data.student.phone}`, '_blank')}
+                    onClick={() => window.open(`https://zalo.me/${data.student.zalo || data.student.phone}`, '_blank', 'noopener,noreferrer')}
                     className="min-h-12 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    title="Nhắn tin Zalo"
+                    aria-label="Nhắn tin Zalo"
                   >
-                    <MessageSquare size={15} className="text-indigo-500 shrink-0" />
+                    <ZaloIcon size={18} className="shrink-0" />
                     Nhắn tin
                   </button>
                   

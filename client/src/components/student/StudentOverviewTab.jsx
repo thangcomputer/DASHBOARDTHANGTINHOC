@@ -114,10 +114,7 @@ export default function StudentOverviewTab({
     {
       key: 'hw',
       onClick: () => {
-        try {
-          sessionStorage.setItem('student_lms_main_tab', 'assignments');
-        } catch { /* ignore */ }
-        navigate('/student#materials');
+        navigate('/student#materials-assignments');
       },
       tone: pendingHw > 0
         ? 'bg-orange-50 border-orange-200 text-orange-600 ring-1 ring-orange-100'
@@ -159,7 +156,11 @@ export default function StudentOverviewTab({
     <div className="cms-sd cms-sd-stack min-w-0">
       <header className="cms-sd-page !py-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 sm:w-1/3 shrink-0">
-          <h2 className="cms-sd-h1 truncate">Chào mừng, {studentData.name}! 👋</h2>
+          <h2 className="cms-sd-h1 truncate">
+            Chào mừng,{' '}
+            <span className="text-[0.82em] font-extrabold tracking-tight">{studentData.name}</span>
+            ! 👋
+          </h2>
           <p className="cms-sd-caption italic mt-1.5 mb-1 text-gray-500">
             &quot;Học hôm nay, thành công mai sau.&quot;
           </p>
@@ -353,8 +354,7 @@ export default function StudentOverviewTab({
               <button
                 type="button"
                 onClick={() => {
-                  try { sessionStorage.setItem('student_lms_main_tab', 'files'); } catch { /* ignore */ }
-                  navigate('/student#materials');
+                  navigate('/student#materials-files');
                 }}
                 className="cms-sd-btn w-full mt-3 bg-slate-600/50 text-sky-200 hover:bg-slate-600 hover:text-white"
               >

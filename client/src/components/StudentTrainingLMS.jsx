@@ -3,7 +3,7 @@ import {
   Play, CheckCircle, Lock, ChevronRight, Clock, Award, BookOpen,
   ArrowLeft, Shield, Users, BarChart2, RefreshCw, GraduationCap,
   PlayCircle, ChevronDown, ChevronUp, Star, AlertCircle, CheckCircle2,
-  FileBox, Video, Download, FileText, Timer, FileUp, UploadCloud, Link as LinkIcon
+  FileBox, Video, Download, FileText, Timer, FileUp, UploadCloud, Link as LinkIcon, X, Crown, Gift,
 } from 'lucide-react';
 
 import { useData } from '../context/DataContext';
@@ -14,9 +14,12 @@ import {
   getSubjectIdsForStudent,
 } from '../utils/examSubjects';
 import StudentExamRoom from './StudentExamRoom';
+import VideoCoursePayModal from './VideoCoursePayModal';
 import api, { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, csrfFetch } from '../services/api';
 import { useToast } from '../utils/toast';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
+import CmsSelect from './ui/CmsSelect';
+import SoftwareLinksTable from './SoftwareLinksTable';
 import {
   formatLessonDisplayTitle,
   getPlayerCompletionBadgeText,
@@ -901,7 +904,7 @@ const AdminProgressPanel = ({ courseId }) => {
 };
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
+const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, hideTabBar = false }) => {
   const toast = useToast();
   const trainingData = trainingDataProp || { videos: [], guides: [], files: [] };
   const [courses, setCourses] = useState([]);
@@ -917,17 +920,47 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   const [highlightQaId, setHighlightQaId] = useState(null);
   const deepLinkRef = useRef(null);
   const playerApiRef = useRef(null);
-  const [mainTab, setMainTab] = useState('courses'); // courses | guides | files | assignments | exams
+  const [mainTab, setMainTab] = useState(() => {
+    const allowed = ['courses', 'files', 'software', 'assignments', 'exams'];
+    if (initialMainTab && allowed.includes(initialMainTab)) return initialMainTab;
+    return 'courses';
+  }); // courses | files | software | assignments | exams
   const [localSubmissions, setLocalSubmissions] = useState({});
   const [uploadingAssignId, setUploadingAssignId] = useState(null);
   const [expandedFileDescKey, setExpandedFileDescKey] = useState(null);
   const [expandedAssignKey, setExpandedAssignKey] = useState(null);
+  const [ownedCourseIds, setOwnedCourseIds] = useState(() => new Set());
+  const [payCheckout, setPayCheckout] = useState(null);
+  const [courseFilterStatus, setCourseFilterStatus] = useState('all'); // all | done | learning | new
+  const [courseFilterPrice, setCourseFilterPrice] = useState('all'); // all | paid | free
+  const [courseFilterSubject, setCourseFilterSubject] = useState('all');
+  const [catalogInfoTab, setCatalogInfoTab] = useState('content'); // content | desc | info
+
+  useEffect(() => {
+    const allowed = ['courses', 'files', 'software', 'assignments', 'exams'];
+    if (initialMainTab && allowed.includes(initialMainTab)) {
+      setMainTab(initialMainTab);
+      // Đổi hash sidebar (Video ↔ Tài liệu ↔ …) trên cùng LMS instance:
+      // phải thoát catalog/player, không giữ selectedCourse.
+      if (initialMainTab !== 'courses') {
+        setSelectedCourse(null);
+        setLessons([]);
+        setCurrentLesson(null);
+        setPayCheckout(null);
+        try {
+          sessionStorage.removeItem('lms_courseId');
+          sessionStorage.removeItem('lms_courseTitle');
+          sessionStorage.removeItem('lms_lessonId');
+        } catch { /* ignore */ }
+      }
+    }
+  }, [initialMainTab]);
 
   useEffect(() => {
     try {
       const tab = sessionStorage.getItem('student_lms_main_tab');
       if (tab && ['courses', 'files', 'assignments', 'exams'].includes(tab)) {
-        setMainTab(tab);
+        if (!initialMainTab) setMainTab(tab);
         sessionStorage.removeItem('student_lms_main_tab');
       }
     } catch {
@@ -938,8 +971,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       deepLinkRef.current = params;
       if (params.tab) setCourseTab(normalizeLmsPlayerTab(params.tab));
       if (params.qaId) setHighlightQaId(params.qaId);
-      setMainTab('courses');
+      // Deep-link video/QA → luôn mở tab video; không đè menu Tài liệu/Bài tập/Điểm thi
+      if (!initialMainTab) setMainTab('courses');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ bootstrap 1 lần khi mount
   }, []);
 
   const handleFileChange = async (assignmentObj, idx, file) => {
@@ -1019,6 +1054,23 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
     }
   }, [trainingData]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.trainingLms.listVideoPurchases();
+        if (cancelled || !res?.success) return;
+        const ids = new Set(
+          (res.data || [])
+            .filter((p) => p.status === 'paid')
+            .map((p) => String(p.courseId)),
+        );
+        setOwnedCourseIds(ids);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Deep-link: mở đúng khóa từ hash (?courseId=)
   useEffect(() => {
     const dl = deepLinkRef.current;
@@ -1053,6 +1105,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         if (cancelled) return;
         if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
           setLessons(res.data);
+          if (res.meta?.owned && courseId) {
+            setOwnedCourseIds((prev) => new Set(prev).add(String(courseId)));
+          }
           const chapters = {};
           res.data.forEach((l) => { chapters[l.chapterTitle || 'Danh mục'] = true; });
           setExpandedChapters(chapters);
@@ -1114,6 +1169,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
       const res = await lmsApiFetch(`/courses/${courseId}/lessons`);
       if (res?.success && Array.isArray(res.data)) {
         setLessons(res.data);
+        if (res.meta?.owned && courseId) {
+          setOwnedCourseIds((prev) => new Set(prev).add(String(courseId)));
+        }
         const savedLessonId = sessionStorage.getItem('lms_lessonId');
         const firstActive = (savedLessonId && res.data.find(l => String(l._id) === savedLessonId && l.isUnlocked))
           || res.data.find(l => l.isUnlocked && !l.isCompleted)
@@ -1296,6 +1354,222 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
     ? Math.round((lessons.filter(l => l.isCompleted).length / lessons.length) * 100)
     : 0;
 
+  const selectedCoursePrice = Math.max(0, Number(selectedCourse?.price) || 0);
+  const selectedCourseOwned = !selectedCourse
+    || selectedCoursePrice <= 0
+    || ownedCourseIds.has(String(selectedCourse.id || selectedCourse._id || ''));
+
+  const startVideoCheckout = async (course) => {
+    const id = course?.id || course?._id;
+    if (!id) return;
+    try {
+      const res = await api.trainingLms.checkoutVideoCourse(id);
+      if (!res?.success) {
+        toast.error(res?.message || 'Không tạo được thanh toán');
+        return;
+      }
+      if (res.data?.owned) {
+        setOwnedCourseIds((prev) => new Set(prev).add(String(id)));
+        await fetchLessons(id);
+        toast.success('Bạn đã sở hữu khóa này');
+        return;
+      }
+      setPayCheckout({ ...res.data, courseId: String(id), courseTitle: course.title });
+    } catch (e) {
+      toast.error(e?.message || 'Lỗi thanh toán');
+    }
+  };
+
+  const handleVideoCoursePaid = (courseId) => {
+    if (!courseId) return;
+    setOwnedCourseIds((prev) => new Set(prev).add(String(courseId)));
+    fetchLessons(courseId);
+  };
+
+  const videoPayModal = payCheckout ? (
+    <VideoCoursePayModal
+      courseTitle={payCheckout.courseTitle}
+      sessionId={payCheckout.sessionId}
+      refCode={payCheckout.ref}
+      amount={payCheckout.amount}
+      onClose={() => setPayCheckout(null)}
+      onPaid={() => handleVideoCoursePaid(payCheckout.courseId)}
+    />
+  ) : null;
+
+  const courseProgressOf = useCallback((course) => {
+    const id = course?.id || course?._id;
+    return Math.max(
+      0,
+      Math.min(
+        100,
+        Number(courseProgressMap[id] ?? course?.overallProgress ?? course?.progress ?? 0) || 0,
+      ),
+    );
+  }, [courseProgressMap]);
+
+  const courseSubjectOptions = useMemo(() => {
+    const ids = new Set();
+    courses.forEach((c) => {
+      (Array.isArray(c.examSubjects) ? c.examSubjects : []).forEach((sid) => {
+        if (sid) ids.add(String(sid));
+      });
+    });
+    return [...ids]
+      .map((id) => ({ id, label: getExamSubjectMeta(id, examSubjectsCatalog).label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [courses, examSubjectsCatalog]);
+
+  const filteredCourses = useMemo(() => {
+    return courses.filter((course) => {
+      const progress = courseProgressOf(course);
+      if (courseFilterStatus === 'done' && progress < 100) return false;
+      if (courseFilterStatus === 'learning' && !(progress > 0 && progress < 100)) return false;
+      if (courseFilterStatus === 'new' && progress > 0) return false;
+
+      const price = Math.max(0, Number(course.price) || 0);
+      if (courseFilterPrice === 'paid' && price <= 0) return false;
+      if (courseFilterPrice === 'free' && price > 0) return false;
+
+      if (courseFilterSubject !== 'all') {
+        const subjects = Array.isArray(course.examSubjects) ? course.examSubjects.map(String) : [];
+        if (!subjects.includes(String(courseFilterSubject))) return false;
+      }
+      return true;
+    });
+  }, [courses, courseFilterStatus, courseFilterPrice, courseFilterSubject, courseProgressOf]);
+
+  const hasActiveCourseFilters = courseFilterStatus !== 'all'
+    || courseFilterPrice !== 'all'
+    || courseFilterSubject !== 'all';
+
+  const freeFilteredCourses = useMemo(
+    () => filteredCourses.filter((c) => Math.max(0, Number(c.price) || 0) <= 0),
+    [filteredCourses],
+  );
+  const paidFilteredCourses = useMemo(
+    () => filteredCourses.filter((c) => Math.max(0, Number(c.price) || 0) > 0),
+    [filteredCourses],
+  );
+
+  const renderVideoCourseCard = (course, idx) => {
+    const gradients = [
+      'from-red-600 to-red-800',
+      'from-emerald-500 to-teal-600',
+      'from-violet-600 to-fuchsia-600',
+      'from-red-500 to-red-700',
+    ];
+    const bgClass = gradients[idx % gradients.length];
+    const progress = courseProgressOf(course);
+    const lessonCount = course.chapters
+      ? course.chapters.reduce((acc, ch) => acc + (ch.lessons ? ch.lessons.length : 0), 0)
+      : ((course.lessons || course.videos || [1]).length);
+    const price = Math.max(0, Number(course.price) || 0);
+    const owned = price <= 0 || ownedCourseIds.has(String(course.id || course._id || ''));
+    const coverSrc = course.coverImage ? resolveMediaUrl(course.coverImage) : '';
+    return (
+      <div
+        onClick={() => {
+          setSelectedCourse(course);
+          setCourseTab('overview');
+          setCatalogInfoTab('content');
+          fetchLessons(course.id || course._id);
+        }}
+        key={course.id || course._id}
+        className="bg-white rounded-2xl border border-slate-100/90 shadow-sm ring-1 ring-slate-900/5 transition-all duration-200 cursor-pointer group flex flex-col overflow-hidden hover:shadow-xl hover:ring-red-100 lg:hover:-translate-y-1"
+      >
+        <div className={`relative aspect-video bg-gradient-to-r ${bgClass} overflow-hidden`}>
+          {coverSrc ? (
+            <img
+              src={coverSrc}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            />
+          ) : (
+            <>
+              <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors pointer-events-none" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%)] pointer-events-none" />
+            </>
+          )}
+          {coverSrc ? <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent pointer-events-none" /> : null}
+
+          {price > 0 ? (
+            <div className="absolute top-3 left-3 z-[1]" title={owned ? 'Khóa đã mua' : 'Khóa có phí'}>
+              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-full shadow-md border ${
+                owned
+                  ? 'bg-emerald-500 border-emerald-300/60 text-white'
+                  : 'bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 border-amber-200/80 text-amber-950'
+              }`}>
+                <Crown size={16} className="shrink-0" fill="currentColor" aria-hidden="true" />
+                <span className="sr-only">{owned ? 'Đã mua' : 'Khóa VIP'}</span>
+              </span>
+            </div>
+          ) : (
+            <div className="absolute top-3 left-3 z-[1]" title="Khóa miễn phí">
+              <span className="inline-flex items-center gap-1.5 max-w-[calc(100%-5rem)] min-h-9 pl-2 pr-2.5 rounded-full shadow-md border border-emerald-200/70 bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
+                <Gift size={14} className="shrink-0" aria-hidden="true" />
+                <span className="text-[10px] font-black uppercase tracking-wide truncate">Miễn phí</span>
+              </span>
+            </div>
+          )}
+
+          <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-[1]">
+            {price > 0 ? (
+              <span className={`backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-black shadow-sm ${owned ? 'bg-emerald-600/90' : 'bg-red-600/95'}`}>
+                {owned ? 'Đã mua' : `${price.toLocaleString('vi-VN')}đ`}
+              </span>
+            ) : null}
+            {course.category && String(course.category).trim() && String(course.category).toUpperCase() !== 'MẶC ĐỊNH' ? (
+              <span className="bg-black/35 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-medium uppercase tracking-wider">
+                {course.category}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-5 flex-1 flex flex-col">
+          <div className="flex items-start gap-3 mb-2">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-slate-800 text-base sm:text-lg group-hover:text-red-600 transition-colors line-clamp-2 leading-snug">
+                {course.title}
+              </h3>
+            </div>
+            <div className="shrink-0 text-right min-w-[3rem]">
+              <p className="text-sm font-bold text-slate-700 tabular-nums">{progress}%</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
+              <div className="h-full rounded-full bg-red-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
+            {htmlToPlainText(course.description || course.desc) ||
+              'Hoàn thành khóa học này để nâng cao kiến thức và kỹ năng thực hành.'}
+          </p>
+
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 mt-auto">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1.5 min-w-0">
+              <Video size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
+              <span className="truncate">{lessonCount} bài học</span>
+            </div>
+
+            <span
+              className={`inline-flex items-center gap-1 shrink-0 min-h-9 px-3 rounded-xl text-[11px] font-black uppercase tracking-wide shadow-sm transition-all ${
+                price > 0 && !owned
+                  ? 'bg-red-600 text-white group-hover:bg-red-700 group-hover:shadow-md'
+                  : 'bg-slate-900 text-white group-hover:bg-red-600 group-hover:shadow-md'
+              }`}
+            >
+              {price > 0 && !owned ? 'Xem / Mua' : 'Vào học'}
+              <ChevronRight size={14} className="opacity-90 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Group lessons theo chapter
   const groupedLessons = lessons.reduce((acc, l) => {
     const ch = l.chapterTitle || 'Chương 1';
@@ -1307,6 +1581,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
   // ── COURSE LIST VIEW ────────────────────────────────────────────────────────
   if (!selectedCourse) {
     return (
+      <>
       <div className="w-full animate-in fade-in duration-500 min-h-full">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-5">
@@ -1318,9 +1593,26 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             )}
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight leading-snug">
-                Tài liệu học tập</h1>
+                {hideTabBar
+                  ? ({
+                    courses: 'Video học tập',
+                    files: 'Tài liệu',
+                    software: 'Link phần mềm',
+                    assignments: 'Bài tập về nhà',
+                    exams: 'Điểm thi',
+                  }[mainTab] || 'Tài liệu học tập')
+                  : 'Tài liệu học tập'}
+              </h1>
               <p className="text-slate-500 font-medium mt-1 text-xs sm:text-sm leading-relaxed">
-                Xem video bài giảng và hoàn thành bài tập về nhà để nắm vững kiến thức
+                {hideTabBar
+                  ? ({
+                    courses: 'Xem video bài giảng theo khóa học của bạn',
+                    files: 'Tải và xem tài liệu học tập được phát hành',
+                    software: 'Tải phần mềm và xem hướng dẫn cài đặt',
+                    assignments: 'Hoàn thành và nộp bài tập về nhà',
+                    exams: 'Theo dõi kết quả các bài thi của bạn',
+                  }[mainTab] || 'Xem nội dung học tập')
+                  : 'Xem video bài giảng và hoàn thành bài tập về nhà để nắm vững kiến thức'}
               </p>
             </div>
           </div>
@@ -1344,7 +1636,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Tabs — ẩn khi vào từ menu riêng (Video / Tài liệu / Bài tập / Điểm thi) */}
+        {!hideTabBar && (
         <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-2 w-full mb-5 relative z-10">
           {[
             { key: 'courses', icon: PlayCircle, label: 'Video học tập', count: courses.length },
@@ -1375,9 +1668,65 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
             </button>
           ))}
         </div>
+        )}
+        {hideTabBar && <div className="mb-5 border-b border-slate-200" />}
 
         {mainTab === 'courses' && (
-          loading ? (
+          <>
+          <div className="mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-end">
+            <label className="flex flex-col gap-1 min-w-0 sm:min-w-[9.5rem] flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Trạng thái học</span>
+              <CmsSelect
+                value={courseFilterStatus}
+                onChange={(e) => setCourseFilterStatus(e.target.value)}
+                className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+              >
+                <option value="all">Tất cả</option>
+                <option value="done">Đã học xong</option>
+                <option value="learning">Đang học</option>
+                <option value="new">Chưa học</option>
+              </CmsSelect>
+            </label>
+            <label className="flex flex-col gap-1 min-w-0 sm:min-w-[8.5rem] flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Học phí</span>
+              <CmsSelect
+                value={courseFilterPrice}
+                onChange={(e) => setCourseFilterPrice(e.target.value)}
+                className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+              >
+                <option value="all">Tất cả</option>
+                <option value="paid">Có phí</option>
+                <option value="free">Miễn phí</option>
+              </CmsSelect>
+            </label>
+            <label className="flex flex-col gap-1 min-w-0 sm:min-w-[10rem] flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Môn học</span>
+              <CmsSelect
+                value={courseFilterSubject}
+                onChange={(e) => setCourseFilterSubject(e.target.value)}
+                className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+              >
+                <option value="all">Tất cả môn</option>
+                {courseSubjectOptions.map((s) => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </CmsSelect>
+            </label>
+            {hasActiveCourseFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCourseFilterStatus('all');
+                  setCourseFilterPrice('all');
+                  setCourseFilterSubject('all');
+                }}
+                className="inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50"
+              >
+                <X size={14} aria-hidden="true" /> Xóa lọc
+              </button>
+            )}
+          </div>
+          {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="bg-gray-100 animate-pulse rounded-[32px] h-64" />
@@ -1389,76 +1738,41 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               <p className="font-bold">Chưa có khóa học nào</p>
               <p className="text-xs mt-1">Chưa có video đào tạo phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-              {courses.map((course, idx) => {
-                const gradients = [
-                  "from-red-600 to-red-800",
-                  "from-emerald-500 to-teal-600",
-                  "from-violet-600 to-fuchsia-600",
-                  "from-red-500 to-red-700"
-                ];
-                const bgClass = gradients[idx % gradients.length];
-                const progress = courseProgressMap[course.id || course._id] || course.overallProgress || course.progress || 0;
-                const lessonCount = course.chapters ? course.chapters.reduce((acc, ch) => acc + (ch.lessons ? ch.lessons.length : 0), 0) : ((course.lessons || course.videos || [1]).length);
-                return (
-                  <div onClick={() => {
-                    setSelectedCourse(course);
-                    setCourseTab('overview');
-                    fetchLessons(course.id || course._id);
-                  }} key={course.id || course._id} className="bg-white rounded-2xl border border-slate-100 shadow-md transition-all duration-200 cursor-pointer group flex flex-col overflow-hidden hover:shadow-xl lg:hover:-translate-y-1 lg:hover:shadow-xl">
-
-                    <div className={`relative aspect-video bg-gradient-to-r ${bgClass} overflow-hidden`}>
-                      <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors pointer-events-none" />
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%)] pointer-events-none" />
-
-                      <div className="absolute top-4 right-4">
-                        {course.category && String(course.category).trim() && String(course.category).toUpperCase() !== 'MẶC ĐỊNH' ? (
-                          <span className="bg-white/20 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-medium uppercase tracking-wider">
-                            {course.category}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="p-5 flex-1 flex flex-col">
-                      <div className="flex items-start gap-3 mb-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-slate-800 text-lg group-hover:text-red-600 transition-colors line-clamp-2 leading-snug">
-                        {course.title}
-                          </h3>
-                        </div>
-                        <div className="shrink-0 text-right min-w-[3rem]">
-                          <p className="text-sm font-bold text-slate-700">{progress}%</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
-                          <div className="h-full rounded-full bg-red-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
-                        {htmlToPlainText(course.description || course.desc) ||
-                          'Hoàn thành khóa học này để nâng cao kiến thức và kỹ năng thực hành.'}
-                      </p>
-
-                      <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
-                        <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                          <Video size={14} className="text-slate-400" />
-                          <span>{lessonCount} BÀI HỌC</span>
-                        </div>
-
-                        <div className="flex items-center gap-1 text-sm font-semibold text-red-600 group-hover:translate-x-1 transition-transform">
-                          <span>VÀO HỌC</span>
-                          <ChevronRight size={14} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          ) : filteredCourses.length === 0 ? (
+            <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
+              <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
+              <p className="font-bold">Không có khóa khớp bộ lọc</p>
+              <p className="text-xs mt-1">Thử đổi trạng thái, học phí hoặc môn học.</p>
             </div>
-          )
+          ) : (
+            <div className="space-y-8">
+              {freeFilteredCourses.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Gift size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
+                    <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">Khóa miễn phí</h2>
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full tabular-nums">{freeFilteredCourses.length}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                    {freeFilteredCourses.map((course, idx) => renderVideoCourseCard(course, idx))}
+                  </div>
+                </section>
+              )}
+              {paidFilteredCourses.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-3 pt-1 border-t border-slate-200/80">
+                    <Crown size={16} className="text-amber-500 shrink-0" aria-hidden="true" />
+                    <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">Khóa có phí</h2>
+                    <span className="text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full tabular-nums">{paidFilteredCourses.length}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                    {paidFilteredCourses.map((course, idx) => renderVideoCourseCard(course, idx))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+          </>
         )}
 
         {/* FILES TAB */}
@@ -1553,6 +1867,14 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
               )}
             </div>
           </div>
+        )}
+
+        {/* SOFTWARE LINKS TAB */}
+        {mainTab === 'software' && (
+          <SoftwareLinksTable
+            items={trainingData?.softwareLinks || []}
+            title=""
+          />
         )}
 
         {/* ASSIGNMENTS TAB */}
@@ -1801,6 +2123,218 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         })()}
 
       </div>
+      {videoPayModal}
+      </>
+    );
+  }
+
+  // ── CATALOG / PAYWALL (chưa mua khóa trả phí) ──────────────────────────────
+  if (selectedCourse && !selectedCourseOwned) {
+    const canPlayPreview = (l) => {
+      if (!l) return false;
+      if (!(l.isPreview || (l.isUnlocked && !l.paywallLocked))) return false;
+      return Boolean(resolveLessonVideoUrl(l));
+    };
+    const previewLesson = (canPlayPreview(currentLesson) ? currentLesson : null)
+      || lessons.find((l) => l.isPreview && resolveLessonVideoUrl(l))
+      || lessons.find((l) => l.isUnlocked && !l.paywallLocked && resolveLessonVideoUrl(l));
+    return (
+      <div className="w-full min-h-full bg-slate-50 pb-10">
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => { setSelectedCourse(null); setLessons([]); setCurrentLesson(null); }}
+            className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center justify-center"
+            aria-label="Quay lại"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="text-lg sm:text-2xl font-bold text-slate-800 truncate">{selectedCourse.title}</h1>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <div className="lg:col-span-8 min-w-0">
+            <div className="bg-black rounded-2xl overflow-hidden aspect-video mb-4">
+              {previewLesson ? (
+                <StudentVideoPlayer
+                  key={previewLesson._id}
+                  videoId={resolveLessonVideoUrl(previewLesson)}
+                  lessonId={previewLesson._id}
+                  courseId={selectedCourse._id || selectedCourse.id}
+                  initialWatchedSeconds={previewLesson.watchedSeconds || 0}
+                  adminDurationSeconds={previewLesson.adminDurationSeconds || previewLesson.duration || 0}
+                  antiSeekEnabled={false}
+                  lessonCompleted={false}
+                  onSaveProgress={() => {}}
+                  onWatchProgress={() => {}}
+                  onVideoEnded={() => {}}
+                  onEligibilityReached={() => {}}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-white/70 text-sm font-semibold px-6 text-center">
+                  Chưa có bài xem thử. Đăng ký để xem toàn bộ khóa.
+                </div>
+              )}
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+              <div className="flex border-b border-slate-100 overflow-x-auto">
+                {[
+                  { key: 'content', label: 'Nội dung khóa học' },
+                  { key: 'desc', label: 'Mô tả khóa học' },
+                  { key: 'info', label: 'Người hướng dẫn' },
+                ].map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setCatalogInfoTab(t.key)}
+                    className={`flex-1 min-w-[7.5rem] min-h-11 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${
+                      catalogInfoTab === t.key
+                        ? 'text-red-600 border-b-2 border-red-600 bg-red-50/40'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="p-4 sm:p-5">
+                {catalogInfoTab === 'content' && (
+                  <ul className="divide-y divide-slate-100">
+                    {lessons.map((lesson, idx) => {
+                      const playable = canPlayPreview(lesson);
+                      const isActive = previewLesson && String(previewLesson._id) === String(lesson._id);
+                      return (
+                      <li key={lesson._id || idx}>
+                        <button
+                          type="button"
+                          disabled={!playable}
+                          onClick={() => {
+                            if (!playable) {
+                              toast.error('Bài này cần thanh toán khóa học');
+                              return;
+                            }
+                            setCurrentLesson(lesson);
+                          }}
+                          className={`w-full flex items-center gap-3 py-2.5 px-1 text-left rounded-lg transition-colors ${
+                            playable
+                              ? `cursor-pointer hover:bg-slate-50 ${isActive ? 'bg-red-50/70' : ''}`
+                              : 'opacity-70 cursor-not-allowed'
+                          }`}
+                        >
+                          {playable ? (
+                            <PlayCircle size={16} className={`shrink-0 ${isActive ? 'text-red-600' : 'text-red-500'}`} />
+                          ) : (
+                            <Lock size={16} className="text-slate-400 shrink-0" />
+                          )}
+                          <span className={`flex-1 text-sm font-semibold truncate ${isActive ? 'text-red-700' : 'text-slate-700'}`}>
+                            {idx + 1}. {lesson.title}
+                          </span>
+                          {lesson.isPreview || playable ? (
+                            <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border shrink-0 ${
+                              isActive
+                                ? 'bg-red-600 text-white border-red-600'
+                                : 'bg-pink-50 text-pink-700 border-pink-200'
+                            }`}>
+                              {isActive ? 'Đang xem' : 'Xem thử'}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-400 shrink-0">Có phí</span>
+                          )}
+                        </button>
+                      </li>
+                      );
+                    })}
+                    {lessons.length === 0 && (
+                      <li className="py-6 text-center text-sm text-slate-500">Chưa có bài học.</li>
+                    )}
+                  </ul>
+                )}
+                {catalogInfoTab === 'desc' && (() => {
+                  const raw = selectedCourse.description || selectedCourse.desc || '';
+                  const plain = htmlToPlainText(raw);
+                  if (!plain) {
+                    return <p className="text-sm text-slate-500">Chưa có mô tả khóa học.</p>;
+                  }
+                  if (/<[a-z][\s\S]*>/i.test(String(raw))) {
+                    return (
+                      <div
+                        className="prose prose-sm max-w-none text-slate-700"
+                        dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(raw) }}
+                      />
+                    );
+                  }
+                  return <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{plain}</p>;
+                })()}
+                {catalogInfoTab === 'info' && (() => {
+                  const totalSec = lessons.reduce((sum, l) => {
+                    const d = Number(l.adminDurationSeconds ?? l.duration) || 0;
+                    return sum + Math.max(0, d);
+                  }, 0);
+                  const formatDur = (sec) => {
+                    const s = Math.max(0, Math.floor(Number(sec) || 0));
+                    if (s <= 0) return 'Chưa cập nhật';
+                    const h = Math.floor(s / 3600);
+                    const m = Math.floor((s % 3600) / 60);
+                    if (h > 0) return m > 0 ? `${h} giờ ${m} phút` : `${h} giờ`;
+                    if (m > 0) return `${m} phút`;
+                    return `${s} giây`;
+                  };
+                  const instructor = String(selectedCourse.instructorName || '').trim();
+                  const bio = String(selectedCourse.instructorBio || '').trim();
+                  const software = String(selectedCourse.software || '').trim();
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                          <Users size={18} aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-800">{instructor || 'Chưa cập nhật tên giảng viên'}</p>
+                          {bio ? <p className="text-sm text-slate-600 mt-1 leading-relaxed whitespace-pre-wrap">{bio}</p> : null}
+                        </div>
+                      </div>
+                      <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Tổng số bài</dt>
+                          <dd className="text-sm font-bold text-slate-800 mt-1 tabular-nums">{lessons.length} bài</dd>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Thời lượng xem</dt>
+                          <dd className="text-sm font-bold text-slate-800 mt-1">{formatDur(totalSec)}</dd>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Phần mềm</dt>
+                          <dd className="text-sm font-bold text-slate-800 mt-1">{software || 'Chưa cập nhật'}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+          <aside className="lg:col-span-4">
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm lg:sticky lg:top-4">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Học phí khóa video</p>
+              <p className="text-3xl font-black text-red-600 tabular-nums mb-4">
+                {selectedCoursePrice.toLocaleString('vi-VN')}đ
+              </p>
+              <ul className="text-sm text-slate-600 space-y-1.5 mb-5">
+                <li>{lessons.length} bài học</li>
+                <li>{lessons.filter((l) => l.isPreview).length} bài xem thử</li>
+                <li>Truy cập sau khi thanh toán VietQR / MoMo quét QR</li>
+              </ul>
+              <button
+                type="button"
+                onClick={() => startVideoCheckout(selectedCourse)}
+                className="w-full min-h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm"
+              >
+                Đăng ký / Thanh toán
+              </button>
+            </div>
+          </aside>
+        </div>
+        {videoPayModal}
+      </div>
     );
   }
 
@@ -1978,8 +2512,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
                           if (!lesson.isUnlocked) return;
                           setCurrentLesson(lesson);
                         }}
-                        title={
-                          !lesson.isUnlocked
+                          title={
+                          lesson.paywallLocked
+                            ? 'Cần thanh toán khóa học để xem bài này'
+                            : !lesson.isUnlocked
                             ? `Hoàn thành bài trước (≥67%) để mở bài này`
                             : (lesson.allowEarlyAccess && !lesson.prerequisiteCompleted && !lesson.isCompleted)
                               ? 'Có thể học sớm'
@@ -2035,6 +2571,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack }) => {
         </div>
 
       </div>
+
+      {videoPayModal}
 
       <style dangerouslySetInnerHTML={{
         __html: `

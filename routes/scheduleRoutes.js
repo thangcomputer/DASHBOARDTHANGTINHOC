@@ -876,6 +876,18 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
             date: result.schedule.date,
           }).catch((e) => logger.warn('[SCHEDULE] attendance notify:', e.message));
 
+          const isAdminMakeup = Boolean(req.body.adminMakeup || req.body.makeup);
+          if (isAdminMakeup && result.schedule.teacherId) {
+            const { notifyTeacherAdminMakeup } = require('../services/teacherAdminNotifier');
+            notifyTeacherAdminMakeup(ioAttend, result.schedule, req.user)
+              .catch((e) => logger.warn('[SCHEDULE] makeup teacher notify:', e.message));
+          }
+          if (result.schedule.teacherId) {
+            const { maybeNotifyStarBonusEligibility } = require('../services/teacherAdminNotifier');
+            maybeNotifyStarBonusEligibility(ioAttend, result.schedule.teacherId)
+              .catch((e) => logger.warn('[SCHEDULE] starBonus after attendance:', e.message));
+          }
+
           checkAndUnlockExam(
             String(result.schedule.studentId._id || result.schedule.studentId),
             ioAttend,

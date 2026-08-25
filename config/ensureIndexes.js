@@ -21,6 +21,7 @@ const Employee = require('../models/Employee');
 const PayrollLog = require('../models/PayrollLog');
 const ScheduleHistory = require('../models/ScheduleHistory');
 const TrainingProgress = require('../models/TrainingProgress');
+const VideoCoursePurchase = require('../models/VideoCoursePurchase');
 const TrainingLesson = require('../models/TrainingLesson');
 const TeachingGuide = require('../models/TeachingGuide');
 const FileAsset = require('../models/FileAsset');
@@ -59,6 +60,7 @@ async function ensureIndexes() {
       PayrollLog.syncIndexes(),
       ScheduleHistory.syncIndexes(),
       TrainingProgress.syncIndexes(),
+      VideoCoursePurchase.syncIndexes(),
       TrainingLesson.syncIndexes(),
       TeachingGuide.syncIndexes(),
       FileAsset.syncIndexes(),

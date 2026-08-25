@@ -5,6 +5,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import TeacherAssignmentsView from './TeacherAssignmentsView';
 import TeacherTrainingLMS from './TeacherTrainingLMS';
+import SoftwareLinksTable from './SoftwareLinksTable';
 import { useData } from '../context/DataContext';
 import { useSocket } from '../context/SocketContext';
 import api from '../services/api';
@@ -43,7 +44,8 @@ const TeacherDashboard = ({ onNavigate }) => {
     getConversations,
     getSchedulesByTeacher, getTeacherRating, RATING_CRITERIA, getTransactionsByTeacher,
     addSchedule, updateSchedule, cancelSchedule,
-    revokeStudentExam, updateStudent, updateTeacher, failStudentExam
+    revokeStudentExam, updateStudent, updateTeacher, failStudentExam,
+    studentTrainingData, trainingData,
   } = useData();
 
   const { socket, onlineUsers, lastSeenUsers } = useSocket();
@@ -574,6 +576,15 @@ const TeacherDashboard = ({ onNavigate }) => {
         {/* ═══ CONTENT ═══ */}
         {currentHash === 'training' ? (
            <TeacherTrainingLMS onBack={() => window.location.hash = ''} />
+        ) : currentHash === 'software-links' ? (
+          <div className="cms-sd cms-sd-page bg-slate-50 min-h-full py-2 sm:py-4">
+            <SoftwareLinksTable
+              items={[
+                ...(Array.isArray(studentTrainingData?.softwareLinks) ? studentTrainingData.softwareLinks : []),
+                ...(Array.isArray(trainingData?.softwareLinks) ? trainingData.softwareLinks : []),
+              ].filter((item, idx, arr) => arr.findIndex((x) => String(x.id) === String(item.id)) === idx)}
+            />
+          </div>
         ) : currentHash === 'students' ? (
           <TeacherLazyStudentsTab
             studentSearch={studentSearch}

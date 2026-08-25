@@ -182,6 +182,12 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       if (userId) {
         const uRole = getMessagingRole(sessionUser);
         const resolvedId = String(userId);
+        // Server presence chỉ nhận 'register' (không có handler 'user:join')
+        newSocket.emit('register', {
+          branchId: sessionUser?.branchId || null,
+          branchCode: sessionUser?.branchCode || '',
+        });
+        // Giữ emit cũ phòng consumer khác (no-op trên server hiện tại)
         newSocket.emit('user:join', {
           userId: resolvedId,
           role: uRole,
@@ -204,7 +210,10 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     };
 
     const onUsersOnline = (users) => {
-      setOnlineUsers(users);
+      const list = Array.isArray(users)
+        ? users
+        : (Array.isArray(users?.data) ? users.data : []);
+      setOnlineUsers(list);
     };
 
     const onUsersLastSeen = (data) => {

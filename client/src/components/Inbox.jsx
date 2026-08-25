@@ -34,6 +34,21 @@ import {
 } from '../utils/aiSupport';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
+
+/** Hiển thị tên: chữ cái đầu mỗi từ in hoa, còn lại thường (VD: SUPPORT TIN HỌC → Support Tin Học). */
+const formatDisplayName = (name) => {
+  const raw = String(name || '').trim();
+  if (!raw) return '';
+  return raw
+    .toLocaleLowerCase('vi-VN')
+    .split(/(\s+)/)
+    .map((part) => {
+      if (!part || /^\s+$/.test(part)) return part;
+      return part.charAt(0).toLocaleUpperCase('vi-VN') + part.slice(1);
+    })
+    .join('');
+};
+
 const formatTime = (date) => {
     if (!date) return '';
     const d = new Date(date);
@@ -250,7 +265,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const isUserOnline = useCallback((userId) => {
     if (!userId || !onlineUsers || !Array.isArray(onlineUsers)) return false;
     const targetStr = String(userId);
-    return onlineUsers.some(u => String(u.userId) === targetStr);
+    return onlineUsers.some((u) => {
+      const id = String(u?.userId || u?.id || '');
+      return id && id === targetStr;
+    });
   }, [onlineUsers]);
 
   const getUserStatusText = useCallback((userId, isOnline) => {
@@ -1506,6 +1524,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     return r === contactTab;
   });
 
+  // Online lên trên; offline / nhóm ở dưới — trong nhóm vẫn ưu tiên tin mới nhất
+  const sortedConvs = [...filteredConvs].sort((a, b) => {
+    const aOn = !a.isGroup && isUserOnline(a.user?.id) ? 1 : 0;
+    const bOn = !b.isGroup && isUserOnline(b.user?.id) ? 1 : 0;
+    if (aOn !== bOn) return bOn - aOn;
+    return new Date(b.lastTime || 0) - new Date(a.lastTime || 0);
+  });
+
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
 
   // Auto-select from navigation — Phase 7: never invent unauthorized peers
@@ -1678,7 +1704,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 }}
               />
             ) : null}
-            {filteredConvs.map(conv => {
+            {sortedConvs.map(conv => {
               const isGroup = Boolean(
                 conv.isGroup
                 || String(conv.id || '').startsWith('group_')
@@ -1744,13 +1770,28 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       </span>
                     )}
                     {!isGroup && isUserOnline(conv.user.id) && (
-                      <span className="absolute bottom-0 left-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white z-20" />
+                      <span
+                        className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white z-30 shadow-sm"
+                        title="Đang online"
+                        aria-label="Đang online"
+                      />
                     )}
                   </div>
                   <div className="flex-1 text-left min-w-0 pr-1">
                     <div className="flex justify-between items-center gap-2 mb-0.5">
                       <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <h4 className="font-semibold text-[#1E293B] text-base truncate">{conv.user.name}</h4>
+                        <h4 className="font-semibold text-[#1E293B] text-base truncate">{formatDisplayName(conv.user.name)}</h4>
+                        {!isGroup && (
+                          isUserOnline(conv.user.id) ? (
+                            <span className="shrink-0 text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 px-1 py-0.5 rounded">
+                              online
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-[9px] font-medium text-slate-400 bg-slate-50 border border-slate-100 px-1 py-0.5 rounded">
+                              offline
+                            </span>
+                          )
+                        )}
                         {conv.unread > 0 && (
                           <span className="ml-1 min-w-[16px] h-4 px-1 bg-red-600 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-sm">
                             {conv.unread > 99 ? '99+' : conv.unread}
@@ -1907,13 +1948,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         />
                       )}
                     </div>
-                    {!activeConv.isGroup && isUserOnline(activeConv.user.id) && (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
-                    )}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-slate-900 text-base truncate">{activeConv.user.name}</p>
+                      <p className="font-semibold text-slate-900 text-base truncate">{formatDisplayName(activeConv.user.name)}</p>
                       {activeConv.user.branchCode && (
                         <span className="bg-emerald-100 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-md shadow-sm">
                           Cơ sở: {activeConv.user.branchCode}

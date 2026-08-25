@@ -21,6 +21,14 @@ const {
   LESSON_COMPLETION_REQUIREMENT_CODE,
   LESSON_COMPLETION_REQUIREMENT_MESSAGE,
 } = require('../utils/lessonLearningPolicy');
+const {
+  studentOwnsVideoCourse,
+  applyVideoPaywallToLesson,
+  assertStudentMayWatchLesson,
+  coursePriceOf,
+} = require('../utils/videoCourseAccess');
+const { checkoutVideoCourse } = require('../services/videoCoursePurchaseService');
+const VideoCoursePurchase = require('../models/VideoCoursePurchase');
 
 /**
  * LIVE mount: server.js → app.use('/api/training-lms', trainingRoutes)
@@ -41,6 +49,56 @@ router.get('/courses', lmsGuard('lms_courses'), async (req, res) => {
     res.json({ success: true, data: courses });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/video-courses/:id/checkout', lmsGuard('lms_complete_lesson'), async (req, res) => {
+  try {
+    if (String(req.user.role || '').toLowerCase() !== 'student') {
+      return res.status(403).json({ success: false, message: 'Chỉ học viên được mua khóa video' });
+    }
+    const SystemSettings = require('../models/SystemSettings');
+    const settings = await SystemSettings.findOne() || {};
+    const course = findCourseInSettings(settings, req.params.id);
+    if (!course) return res.status(404).json({ success: false, message: 'Khóa học không tồn tại' });
+    const result = await checkoutVideoCourse({ user: req.user, course });
+    if (result.error) return res.status(result.error).json({ success: false, message: result.message });
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/video-purchases/session/:sessionId', lmsGuard('lms_progress_me'), async (req, res) => {
+  try {
+    const PaymentSession = require('../models/PaymentSession');
+    const session = await PaymentSession.findOne({
+      sessionId: req.params.sessionId,
+      studentId: req.user.id || req.user._id,
+      kind: 'video_course',
+    }).lean();
+    if (!session) return res.json({ success: true, paid: false, status: 'not_found' });
+    return res.json({
+      success: true,
+      paid: session.status === 'paid',
+      status: session.status,
+      amount: session.amount,
+      ref: session.ref,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/video-purchases', lmsGuard('lms_progress_me'), async (req, res) => {
+  try {
+    const uid = req.user.id || req.user._id;
+    const rows = await VideoCoursePurchase.find({ studentId: uid })
+      .sort({ createdAt: -1 })
+      .lean();
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -104,6 +162,12 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
     progress.forEach(p => { watchedSecondsMap[String(p.lessonId)] = p.watchedSeconds || 0; });
 
     // 3. ACCESS / SEEK / COMPLETION — independent (see lessonLearningPolicy)
+    const role = String(req.user.role || '').toLowerCase();
+    let owned = true;
+    if (role === 'student' && coursePriceOf(course) > 0) {
+      owned = await studentOwnsVideoCourse(userId, courseId);
+    }
+
     const lessonsWithStatus = lessons.map((lesson, index) => {
       const watched = watchedSecondsMap[String(lesson._id)] || 0;
       const state = resolveLessonLearningState({
@@ -114,25 +178,35 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
         watchedSeconds: watched,
       });
 
+      const gated = applyVideoPaywallToLesson({
+        role,
+        owned,
+        course,
+        lesson,
+        sequentialState: state,
+      });
+
       const base = {
         ...lesson,
-        isCompleted: state.isCompleted,
-        isUnlocked: state.isUnlocked,
-        canAccess: state.canAccess,
-        allowEarlyAccess: state.allowEarlyAccess,
+        isCompleted: gated.isCompleted,
+        isUnlocked: gated.isUnlocked,
+        canAccess: gated.canAccess,
+        allowEarlyAccess: gated.allowEarlyAccess,
         watchedSeconds: watched,
-        antiSeek: state.antiSeekEnabled,
-        adminDurationSeconds: state.adminDurationSeconds,
-        requiredWatchSeconds: state.requiredSeconds,
-        requiredSeconds: state.requiredSeconds,
-        completionEligible: state.completionEligible,
-        durationUnknown: state.durationUnknown,
-        effectiveDurationSeconds: state.effectiveDurationSeconds,
-        prerequisiteLessonId: state.prerequisiteLessonId,
-        prerequisiteCompleted: state.prerequisiteCompleted,
+        antiSeek: gated.antiSeekEnabled,
+        adminDurationSeconds: gated.adminDurationSeconds,
+        requiredWatchSeconds: gated.requiredSeconds,
+        requiredSeconds: gated.requiredSeconds,
+        completionEligible: gated.completionEligible,
+        durationUnknown: gated.durationUnknown,
+        effectiveDurationSeconds: gated.effectiveDurationSeconds,
+        prerequisiteLessonId: gated.prerequisiteLessonId,
+        prerequisiteCompleted: gated.prerequisiteCompleted,
+        isPreview: !!gated.isPreview,
+        paywallLocked: !!gated.paywallLocked,
       };
       // Không lộ nội dung video bài khóa qua API list
-      if (!state.canAccess) {
+      if (!gated.canAccess) {
         return {
           ...base,
           videoUrl: undefined,
@@ -145,7 +219,15 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
       return base;
     });
 
-    res.json({ success: true, data: lessonsWithStatus });
+    res.json({
+      success: true,
+      data: lessonsWithStatus,
+      meta: {
+        price: coursePriceOf(course),
+        owned,
+        paywall: role === 'student' && coursePriceOf(course) > 0 && !owned,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -177,8 +259,13 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       return res.status(404).json({ success: false, message: 'Bài học không tồn tại trong khóa' });
     }
 
+    const watchGate = await assertStudentMayWatchLesson({ user: req.user, course, lesson });
+    if (!watchGate.ok) {
+      return res.status(403).json({ success: false, code: watchGate.code, message: watchGate.message });
+    }
+
     // ACCESS: prerequisite required unless allowEarlyAccess (does NOT bypass 2/3)
-    const allowEarly = isLessonAllowEarlyAccess(lesson);
+    const allowEarly = isLessonAllowEarlyAccess(lesson) || (watchGate.preview === true);
     const prevId = previousLessonId(course, lessonId);
     if (prevId && !allowEarly) {
       const prevProg = await TrainingProgress.findOne({ userId, lessonId: prevId, status: 'completed' }).lean();
@@ -453,25 +540,31 @@ router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res)
 
     // ACCESS gate: do not accept watch progress for locked lessons
     if (course && lesson) {
-      const completed = await TrainingProgress.find({
-        userId,
-        courseId: String(courseId),
-        status: 'completed',
-      }).select('lessonId').lean();
-      const completedLessonIds = completed.map((p) => String(p.lessonId));
-      const { resolveCanAccessLesson } = require('../utils/lessonLearningPolicy');
-      const access = resolveCanAccessLesson({
-        course,
-        lessonId,
-        lesson,
-        completedLessonIds,
-      });
-      if (!access.canAccess) {
-        return res.status(403).json({
-          success: false,
-          code: 'PREVIOUS_LESSON_REQUIRED',
-          message: 'Hoàn thành bài trước để mở bài này.',
+      const watchGate = await assertStudentMayWatchLesson({ user: req.user, course, lesson });
+      if (!watchGate.ok) {
+        return res.status(403).json({ success: false, code: watchGate.code, message: watchGate.message });
+      }
+      if (!watchGate.preview) {
+        const completed = await TrainingProgress.find({
+          userId,
+          courseId: String(courseId),
+          status: 'completed',
+        }).select('lessonId').lean();
+        const completedLessonIds = completed.map((p) => String(p.lessonId));
+        const { resolveCanAccessLesson } = require('../utils/lessonLearningPolicy');
+        const access = resolveCanAccessLesson({
+          course,
+          lessonId,
+          lesson,
+          completedLessonIds,
         });
+        if (!access.canAccess) {
+          return res.status(403).json({
+            success: false,
+            code: 'PREVIOUS_LESSON_REQUIRED',
+            message: 'Hoàn thành bài trước để mở bài này.',
+          });
+        }
       }
     }
 

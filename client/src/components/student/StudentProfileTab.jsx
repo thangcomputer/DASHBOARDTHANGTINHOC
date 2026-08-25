@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle, User, Settings, BookOpen,
   Mail, Phone, MessageCircle, MapPin, Lock, ChevronRight, ChevronDown,
-  GraduationCap, BadgeDollarSign, Wallet,
+  GraduationCap, BadgeDollarSign, Wallet, Receipt,
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import EditableAvatar from '../EditableAvatar';
+import api from '../../services/api';
 
 function openChangePassword() {
   window.dispatchEvent(new CustomEvent('open-change-password-modal'));
@@ -22,7 +23,20 @@ export default function StudentProfileTab({
     personal: true,
     summary: true,
     courses: true,
+    videoOrders: true,
   });
+  const [videoOrders, setVideoOrders] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.trainingLms.listVideoPurchases();
+        if (!cancelled && res?.success) setVideoOrders(res.data || []);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // Cùng thứ tự với sidebar: ưu tiên gender đã hydrate trên session, rồi gender hồ sơ
@@ -289,6 +303,39 @@ export default function StudentProfileTab({
             <section className="cms-sd-card flex flex-col items-center justify-center py-12 text-center">
               <BookOpen size={28} className="text-slate-300 mb-2" aria-hidden="true" />
               <p className="text-sm font-semibold text-slate-600">Chưa có khóa học</p>
+            </section>
+          )}
+
+          {videoOrders.length > 0 && (
+            <section className="cms-sd-card !p-0 overflow-hidden mt-4">
+              <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2">
+                <button type="button" onClick={() => toggleSection('videoOrders')} className="text-sm lg:text-base font-extrabold text-slate-800 flex items-center gap-2">
+                  <Receipt size={16} className="text-violet-600 shrink-0" aria-hidden="true" /> Đơn mua khóa video
+                </button>
+                <span className="text-[11px] font-extrabold bg-violet-50 text-violet-700 px-2.5 py-0.5 rounded-full tabular-nums">
+                  {videoOrders.length}
+                </span>
+              </div>
+              <ul className={`${openSections.videoOrders ? 'block' : 'hidden lg:block'} divide-y divide-slate-100`}>
+                {videoOrders.map((o) => (
+                  <li key={o._id} className="px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">{o.courseTitle || 'Khóa video'}</p>
+                      <p className="text-[11px] text-slate-500 tabular-nums">
+                        {o.paidAt ? new Date(o.paidAt).toLocaleString('vi-VN') : (o.createdAt ? new Date(o.createdAt).toLocaleString('vi-VN') : '')}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-extrabold text-slate-800 tabular-nums">
+                        {Number(o.amount || 0).toLocaleString('vi-VN')}₫
+                      </p>
+                      <p className={`text-[10px] font-bold uppercase ${o.status === 'paid' ? 'text-emerald-600' : o.status === 'pending' ? 'text-amber-600' : 'text-slate-400'}`}>
+                        {o.status === 'paid' ? 'Đã thanh toán' : o.status === 'pending' ? 'Chờ thanh toán' : o.status}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
         </div>

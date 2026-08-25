@@ -1482,6 +1482,10 @@ export const settingsAPI = {
     const res = await apiFetch('/settings/popup');
     return res.json();
   },
+  getPayment: async () => {
+    const res = await apiFetch('/settings/payment', { skipAuth: true });
+    return res.json();
+  },
   getTrainingData: async () => {
     const res = await apiFetch('/settings/training-data');
     return res.json();
@@ -1943,6 +1947,18 @@ export const trainingLmsAPI = {
   },
   getLessons: async (courseId) => {
     const res = await apiFetch(`/training-lms/courses/${courseId}/lessons`);
+    return res.json();
+  },
+  checkoutVideoCourse: async (courseId) => {
+    const res = await apiFetch(`/training-lms/video-courses/${courseId}/checkout`, { method: 'POST' });
+    return res.json();
+  },
+  listVideoPurchases: async () => {
+    const res = await apiFetch('/training-lms/video-purchases');
+    return res.json();
+  },
+  getVideoPurchaseSession: async (sessionId) => {
+    const res = await apiFetch(`/training-lms/video-purchases/session/${encodeURIComponent(sessionId)}`);
     return res.json();
   },
   completeLesson: async (payload) => {

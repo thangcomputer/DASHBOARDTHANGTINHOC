@@ -5,13 +5,13 @@ import { useAdminTraining } from '../hooks/AdminTrainingContext';
 import {
   BookOpen, Video, Download, HelpCircle, Trophy, Plus, Clock, Trash2,
   FileSpreadsheet, Edit3, X, Upload, Loader2, FileText, Save, Search,
-  CheckCircle2, XCircle, Layers, Award,
+  CheckCircle2, XCircle, Layers, Award, ImagePlus, Link2,
 } from 'lucide-react';
 import AdminCourseBuilder from '../../AdminCourseBuilder';
 import RichTextEditor from '../shared/RichTextEditor';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
-import api, { apiFetch, buildMediaDownloadUrl } from '../../../services/api';
+import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
 import AdminTeacherQuizHistoryPanel from '../shared/AdminTeacherQuizHistoryPanel';
 
@@ -61,6 +61,28 @@ export default function AdminStudentTrainingTab() {
   } = useAdminTraining();
 
   const [dbCourses, setDbCourses] = React.useState([]);
+  const [coverUploading, setCoverUploading] = React.useState(false);
+
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!String(file.type || '').startsWith('image/')) {
+      toast.error('Chỉ chọn file ảnh (JPG, PNG, WEBP…)');
+      return;
+    }
+    setCoverUploading(true);
+    try {
+      const data = await api.settings.uploadTrainingFile(file);
+      if (!data.success) throw new Error(data.message || 'Upload thất bại');
+      setSTrainingForm((prev) => ({ ...prev, coverImage: data.fileUrl }));
+      toast.success('Đã tải ảnh bìa');
+    } catch (err) {
+      toast.error(err.message || 'Không tải được ảnh bìa');
+    } finally {
+      setCoverUploading(false);
+    }
+  };
 
   React.useEffect(() => {
     let cancelled = false;
@@ -106,6 +128,7 @@ export default function AdminStudentTrainingTab() {
                 {[
                   { key: 'videos', icon: Video, label: 'Quản lý Khóa học', count: studentTrainingData?.videos?.length || 0 },
                   { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
+                  { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: studentTrainingData?.softwareLinks?.length || 0 },
                   { key: 'questions', icon: HelpCircle, label: 'Ngân hàng câu hỏi', count: studentQuestions?.length || 0 },
                   { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: (students || []).reduce((acc, s) => acc + (s.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').length, 0) },
                   { key: 'quizzes', icon: Award, label: 'Lịch sử Trắc nghiệm GV', count: 'Mới' },
@@ -130,10 +153,10 @@ export default function AdminStudentTrainingTab() {
                 </div>
               </div>
 
-              {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && (
-                <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm({ examSubjects: [] }); }}
+              {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && sTrainingTab !== 'quizzes' && (
+                <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm(sTrainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [] }); }}
                   className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
-                  <Plus size={15} /> {sTrainingTab === 'videos' ? 'Thêm Khóa học' : 'Thêm tài liệu'}
+                  <Plus size={15} /> {sTrainingTab === 'videos' ? 'Thêm Khóa học' : sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
                 </button>
               )}
               </div>
@@ -151,6 +174,34 @@ export default function AdminStudentTrainingTab() {
                     <button type="button" onClick={() => setSTrainingForm(null)} className="shrink-0 inline-flex items-center justify-center min-w-11 min-h-11 rounded-2xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"><X size={18} /></button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {sTrainingTab === 'softwareLinks' ? (
+                      <>
+                        <div className="sm:col-span-2">
+                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tên phần mềm</label>
+                          <input value={sTrainingForm.title || ''} onChange={e => setSTrainingForm({ ...sTrainingForm, title: e.target.value })}
+                            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none" placeholder="VD: Microsoft Office 365" />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Link tải / mở</label>
+                          <input value={sTrainingForm.linkUrl || ''} onChange={e => setSTrainingForm({ ...sTrainingForm, linkUrl: e.target.value })}
+                            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none" placeholder="https://..." />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Mô tả</label>
+                          <textarea value={sTrainingForm.description || ''} onChange={e => setSTrainingForm({ ...sTrainingForm, description: e.target.value })}
+                            rows={3} className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none resize-y" placeholder="Mô tả ngắn về phần mềm..." />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Hướng dẫn cài đặt</label>
+                          <RichTextEditor
+                            value={sTrainingForm.installGuide || ''}
+                            onChange={(val) => setSTrainingForm((prev) => ({ ...prev, installGuide: val }))}
+                            placeholder="Các bước cài đặt (định dạng chữ, danh sách, chèn hình...)"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                    <>
                     {sTrainingTab !== 'files' && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tiêu đề</label>
@@ -164,6 +215,67 @@ export default function AdminStudentTrainingTab() {
                         <input value={sTrainingForm.desc || ''} onChange={e => setSTrainingForm({ ...sTrainingForm, desc: e.target.value })}
                           className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none" placeholder="Nhập mô tả tóm tắt..." />
                       </div>
+                    )}
+                    {sTrainingTab === 'videos' && (
+                      <>
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Ảnh bìa khóa học</label>
+                        <p className="text-[11px] text-slate-500 mb-2">Khuyến nghị <strong>1280×720px</strong> (16:9). Tối thiểu 640×360. JPG/PNG/WEBP, tối đa ~5MB cho ảnh rõ.</p>
+                        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-start">
+                          <div className="w-full sm:w-48 aspect-video rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                            {sTrainingForm.coverImage ? (
+                              <img src={resolveMediaUrl(sTrainingForm.coverImage)} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-xs text-slate-400 font-semibold">Chưa có ảnh</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2 items-center">
+                            <label className={`inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/50 text-sky-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-sky-100 transition-colors ${coverUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                              {coverUploading ? <Loader2 className="animate-spin" size={16} /> : <ImagePlus size={16} />}
+                              {coverUploading ? 'Đang tải...' : (sTrainingForm.coverImage ? 'Đổi ảnh' : 'Chọn ảnh')}
+                              <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleCoverUpload} />
+                            </label>
+                            {sTrainingForm.coverImage ? (
+                              <button
+                                type="button"
+                                onClick={() => setSTrainingForm((prev) => ({ ...prev, coverImage: '' }))}
+                                className="min-h-11 px-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50"
+                              >
+                                Xóa ảnh
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tên giảng viên / người hướng dẫn</label>
+                        <input
+                          value={sTrainingForm.instructorName || ''}
+                          onChange={(e) => setSTrainingForm({ ...sTrainingForm, instructorName: e.target.value })}
+                          className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none"
+                          placeholder="VD: Thầy Nguyễn Văn A"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Phần mềm sử dụng</label>
+                        <input
+                          value={sTrainingForm.software || ''}
+                          onChange={(e) => setSTrainingForm({ ...sTrainingForm, software: e.target.value })}
+                          className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none"
+                          placeholder="VD: Word, Excel, PowerPoint"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Giới thiệu giảng viên</label>
+                        <textarea
+                          value={sTrainingForm.instructorBio || ''}
+                          onChange={(e) => setSTrainingForm({ ...sTrainingForm, instructorBio: e.target.value })}
+                          rows={3}
+                          className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none resize-y"
+                          placeholder="Mô tả ngắn về người hướng dẫn (kinh nghiệm, chuyên môn…)"
+                        />
+                      </div>
+                      </>
                     )}
 
                     {sTrainingTab === 'files' && (
@@ -218,13 +330,17 @@ export default function AdminStudentTrainingTab() {
                         </div>
                       </>
                     )}
+                    </>
+                    )}
                   </div>
+                  {sTrainingTab !== 'softwareLinks' && (
                   <ExamSubjectCheckboxGrid
                     catalog={examSubjectsCatalog}
                     value={sTrainingForm.examSubjects || []}
                     onChange={(ids) => setSTrainingForm((prev) => ({ ...prev, examSubjects: ids }))}
                   />
-                  {/* Mô tả - Rich Text Editor */}
+                  )}
+                  {sTrainingTab !== 'softwareLinks' && (
                   <div>
                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nội dung (có định dạng)</label>
                     <RichTextEditor
@@ -233,7 +349,31 @@ export default function AdminStudentTrainingTab() {
                       placeholder="Nhập nội dung mô tả chi tiết..."
                     />
                   </div>
+                  )}
                   <button onClick={() => {
+                    if (sTrainingTab === 'softwareLinks') {
+                      if (!String(sTrainingForm.title || '').trim()) {
+                        toast.error('Nhập tên phần mềm');
+                        return;
+                      }
+                      if (!String(sTrainingForm.linkUrl || '').trim()) {
+                        toast.error('Nhập link tải / mở');
+                        return;
+                      }
+                      const payload = {
+                        title: String(sTrainingForm.title || '').trim(),
+                        linkUrl: String(sTrainingForm.linkUrl || '').trim(),
+                        description: String(sTrainingForm.description || '').trim(),
+                        installGuide: String(sTrainingForm.installGuide || '').trim(),
+                      };
+                      if (sTrainingForm.id) {
+                        updateStudentTrainingItem('softwareLinks', sTrainingForm.id, payload);
+                      } else {
+                        addStudentTrainingItem('softwareLinks', { ...payload, createdAt: new Date().toISOString().split('T')[0] });
+                      }
+                      setSTrainingForm(null);
+                      return;
+                    }
                     if (!sTrainingForm.examSubjects?.length) {
                       showGlobalModal({ title: 'Thiếu thông tin', content: 'Vui lòng chọn ít nhất một môn học!', type: 'warning' });
                       return;
@@ -615,8 +755,12 @@ export default function AdminStudentTrainingTab() {
                       <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition border-b border-gray-50 last:border-b-0">
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                           {sTrainingTab === 'videos' && (
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition" onClick={() => setSCourseBuilderMode(item)}>
-                              <BookOpen size={20} className="text-white" />
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition overflow-hidden" onClick={() => setSCourseBuilderMode(item)}>
+                              {item.coverImage ? (
+                                <img src={resolveMediaUrl(item.coverImage)} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <BookOpen size={20} className="text-white" />
+                              )}
                             </div>
                           )}
 
@@ -626,12 +770,24 @@ export default function AdminStudentTrainingTab() {
                               {item.fileType || 'FILE'}
                             </div>
                           )}
+                          {sTrainingTab === 'softwareLinks' && (
+                            <div className="w-12 h-12 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center flex-shrink-0">
+                              <Link2 size={20} aria-hidden="true" />
+                            </div>
+                          )}
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-[15px] sm:text-base text-gray-800 line-clamp-2">{item.title}</p>
                             {sTrainingTab === 'files' && item.courseName && (
                               <p className="text-xs sm:text-[13px] text-sky-700 font-bold mt-0.5">Khóa: {item.courseName}</p>
                             )}
-                            <p className="text-xs sm:text-[13px] text-gray-400 line-clamp-2">{(item.desc?.replace(/<[^>]*>/g, '') || '').slice(0, 80)}</p>
+                            {sTrainingTab === 'softwareLinks' && item.linkUrl && (
+                              <p className="text-xs sm:text-[13px] text-sky-700 font-semibold mt-0.5 truncate">{item.linkUrl}</p>
+                            )}
+                            <p className="text-xs sm:text-[13px] text-gray-400 line-clamp-2">
+                              {sTrainingTab === 'softwareLinks'
+                                ? (item.description || (item.installGuide || '').replace(/<[^>]*>/g, '') || '').slice(0, 80)
+                                : (item.desc?.replace(/<[^>]*>/g, '') || '').slice(0, 80)}
+                            </p>
                             {item.duration && <p className="text-xs text-green-500 mt-0.5">⏱ {item.duration}</p>}
                             {item.fileSize && <p className="text-xs text-gray-400 mt-0.5">{item.fileSize}</p>}
                           </div>

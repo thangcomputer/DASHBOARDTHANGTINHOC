@@ -2247,6 +2247,11 @@ html.cms-app-shell #root {
   max-width: 100%;
   padding: 0 16px 8px;
 }
+.cms-feed-card__stats {
+  padding: 10px 16px 4px;
+  margin-left: 0;
+  margin-right: 0;
+}
 .cms-feed-card__media {
   display: grid;
   gap: 2px;
@@ -2286,7 +2291,7 @@ html.cms-app-shell #root {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px 8px;
+  padding: 4px 16px 8px;
   border-top: 1px solid var(--cms-border);
   margin-top: 4px;
 }
@@ -2441,12 +2446,15 @@ html.cms-app-shell #root {
   .cms-feed-card__body {
     padding: 0 18px 10px;
   }
+  .cms-feed-card__stats {
+    padding: 10px 18px 4px;
+  }
   .cms-feed-list,
   .cms-feed-skeleton-list {
     gap: 14px;
   }
   .cms-feed-action {
-    padding: 6px 14px 10px;
+    padding: 6px 18px 10px;
     gap: 8px;
   }
 }
@@ -2460,8 +2468,11 @@ html.cms-app-shell #root {
   .cms-feed-card__body {
     padding: 0 20px 10px;
   }
+  .cms-feed-card__stats {
+    padding: 10px 20px 4px;
+  }
   .cms-feed-action {
-    padding: 8px 16px 12px;
+    padding: 8px 20px 12px;
   }
 }
 

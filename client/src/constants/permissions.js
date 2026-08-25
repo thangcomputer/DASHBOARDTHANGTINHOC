@@ -11,7 +11,7 @@ export const PERMISSIONS = {
   MANAGE_TRAINING:    'manage_training',      // Đào tạo GV: module đào tạo
   MANAGE_STUDENT_TRAINING: 'manage_student_training', // Đào tạo HV: module đào tạo học viên
   MANAGE_CERT_PREP:   'manage_cert_prep',      // Ôn thi MOS/IC3 (CertPrep)
-  MANAGE_STAFF:       'manage_staff',         // Phân quyền NV: chỉ Super Admin
+  MANAGE_STAFF:       'manage_staff',         // Phân quyền NV: Super luôn có; HIGH/STAFF khi được cấp
   MANAGE_HR:          'manage_hr',            // ⭐ Nhân sự & Lương: quản lý hồ sơ + trả lương
   MANAGE_BLOG:        'manage_blog',          // Tin tức / Blog trung tâm: đăng bài
   SYSTEM_SETTINGS:    'system_settings',      // Cài đặt hệ thống
@@ -59,7 +59,7 @@ export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.SYSTEM_SETTINGS,     label: 'Cài đặt hệ thống',          desc: 'Cấu hình ngân hàng, chi nhánh, thông báo' },
   { key: PERMISSIONS.VIEW_LOGS,           label: 'Nhật ký hệ thống',          desc: 'Xem log hoạt động hệ thống' },
   { key: PERMISSIONS.VIEW_EVALUATIONS,    label: 'Đánh giá nội bộ',           desc: 'Xem đánh giá và kiểm tra nội bộ' },
-  { key: PERMISSIONS.MANAGE_STAFF,        label: 'Quản lý Nhân viên',         desc: '⚠ Chỉ nên cấp cho Super Admin' },
+  { key: PERMISSIONS.MANAGE_STAFF,        label: 'Quản lý Nhân viên',         desc: 'Mở menu Phân quyền NV — nên cấp thận trọng (HIGH/Super)' },
 ];
 
 /** Kiểm tra quyền: Super Admin có tất cả quyền */

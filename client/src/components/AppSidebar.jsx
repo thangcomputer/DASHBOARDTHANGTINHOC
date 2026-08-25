@@ -4,7 +4,7 @@ import {
   Trophy, FileText, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown,
   GraduationCap, Users, DollarSign, ClipboardList, X,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper,
+  Newspaper, PlayCircle, Award, FileBox, Link2,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
@@ -31,15 +31,43 @@ const MENU_CONFIG = {
   student: {
     brand: { label: 'HỌC VIÊN', color: 'from-slate-900 to-indigo-950' },
     items: [
-      { key: 'dashboard',  icon: LayoutDashboard, label: 'Tổng quan',      path: '/student', requiresLearningAccess: true },
-      { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',       path: '/student/feed' },
-      { key: 'news',       icon: FileText,         label: 'Tin tức',        path: '/student/news' },
-      { key: 'exam',       icon: Trophy,           label: 'Phòng Thi',      path: '/student/exam', requiresLearningAccess: true },
-      { key: 'cert-prep',  icon: GraduationCap,    label: 'Ôn thi MOS/IC3', path: '/student/cert-prep', requiresLearningAccess: true },
-      { key: 'schedule',   icon: Calendar,         label: 'Lịch học',       path: '/student', hash: 'schedule', requiresLearningAccess: true },
-      { key: 'materials',  icon: BookOpen,          label: 'Tài liệu',      path: '/student', hash: 'materials', requiresLearningAccess: true },
-      { key: 'inbox',      icon: MessageSquare,     label: 'Hộp thư',       path: '/student/inbox' },
-      { key: 'evaluation', icon: Star,              label: 'Đánh giá',      path: '/student', hash: 'evaluation', requiresLearningAccess: true },
+      { key: 'dashboard',  icon: LayoutDashboard, label: 'Tổng quan', path: '/student', requiresLearningAccess: true },
+      { key: 'feed',       icon: Newspaper,        label: 'Bảng tin',  path: '/student/feed' },
+      { key: 'inbox',      icon: MessageSquare,    label: 'Hộp thư',   path: '/student/inbox' },
+      {
+        key: 'exam-group',
+        label: 'Ôn thi',
+        icon: Trophy,
+        isGroup: true,
+        children: [
+          { key: 'exam',        icon: Trophy,        label: 'Phòng Thi',      path: '/student/exam', requiresLearningAccess: true },
+          { key: 'cert-prep',   icon: GraduationCap, label: 'Ôn thi MOS/IC3', path: '/student/cert-prep', requiresLearningAccess: true },
+          { key: 'exam-scores', icon: Award,         label: 'Điểm thi',       path: '/student', hash: 'exam-scores', requiresLearningAccess: true },
+        ],
+      },
+      {
+        key: 'schedule-materials-group',
+        label: 'Lịch và học tập',
+        icon: Calendar,
+        isGroup: true,
+        children: [
+          { key: 'schedule',              icon: Calendar,      label: 'Lịch học',        path: '/student', hash: 'schedule', requiresLearningAccess: true },
+          { key: 'materials-files',       icon: FileBox,       label: 'Tài liệu',        path: '/student', hash: 'materials-files', requiresLearningAccess: true },
+          { key: 'materials-software',    icon: Link2,         label: 'Tải phần mềm',   path: '/student', hash: 'materials-software', requiresLearningAccess: true },
+          { key: 'materials-videos',      icon: PlayCircle,    label: 'Video học tập',   path: '/student', hash: 'materials-videos', requiresLearningAccess: true },
+          { key: 'materials-assignments', icon: ClipboardList, label: 'Bài tập về nhà',  path: '/student', hash: 'materials-assignments', requiresLearningAccess: true },
+        ],
+      },
+      {
+        key: 'news-evaluation-group',
+        label: 'Tin tức & đánh giá',
+        icon: FileText,
+        isGroup: true,
+        children: [
+          { key: 'news',       icon: FileText, label: 'Tin tức',  path: '/student/news' },
+          { key: 'evaluation', icon: Star,     label: 'Đánh giá', path: '/student', hash: 'evaluation', requiresLearningAccess: true },
+        ],
+      },
     ],
     bottomItems: [
       { key: 'profile',   icon: User,    label: 'Hồ sơ',      path: '/student', hash: 'profile' },
@@ -51,15 +79,32 @@ const MENU_CONFIG = {
   teacher: {
     brand: { label: 'GIẢNG VIÊN', color: 'from-slate-900 to-indigo-950' },
     items: [
-      { key: 'dashboard',   icon: LayoutDashboard, label: 'Tổng quan',                 path: '/teacher' },
-      { key: 'feed',        icon: Newspaper,        label: 'Bảng tin',                 path: '/teacher/feed' },
-      { key: 'news',        icon: FileText,         label: 'Tin tức',                  path: '/teacher/news' },
-      { key: 'assignments', icon: ClipboardList,    label: 'Tạo trắc nghiệm & bài tập', path: '/teacher', hash: 'assignments' },
-      { key: 'students',    icon: Users,            label: 'Quản lý học viên',           path: '/teacher', hash: 'students' },
-      { key: 'schedule',    icon: Calendar,         label: 'Lịch dạy',                 path: '/teacher', hash: 'schedule' },
-      { key: 'finance',     icon: DollarSign,       label: 'Tài chính',                path: '/teacher/finance' },
-      { key: 'training',    icon: BookOpen,          label: 'Đào tạo',                  path: '/teacher', hash: 'training' },
-      { key: 'inbox',       icon: MessageSquare,    label: 'Hộp thư',                  path: '/teacher/inbox' },
+      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/teacher' },
+      { key: 'feed',      icon: Newspaper,        label: 'Bảng tin',  path: '/teacher/feed' },
+      { key: 'inbox',     icon: MessageSquare,    label: 'Hộp thư',   path: '/teacher/inbox' },
+      {
+        key: 'teaching-group',
+        label: 'Giảng dạy',
+        icon: Users,
+        isGroup: true,
+        children: [
+          { key: 'students',    icon: Users,         label: 'Quản lý học viên',           path: '/teacher', hash: 'students' },
+          { key: 'assignments', icon: ClipboardList, label: 'Tạo trắc nghiệm & bài tập', path: '/teacher', hash: 'assignments' },
+          { key: 'schedule',    icon: Calendar,      label: 'Lịch dạy',                   path: '/teacher', hash: 'schedule' },
+        ],
+      },
+      { key: 'finance', icon: DollarSign, label: 'Tài chính', path: '/teacher/finance' },
+      {
+        key: 'news-training-group',
+        label: 'Tin tức & đào tạo',
+        icon: FileText,
+        isGroup: true,
+        children: [
+          { key: 'news',     icon: FileText, label: 'Tin tức', path: '/teacher/news' },
+          { key: 'training', icon: BookOpen, label: 'Đào tạo', path: '/teacher', hash: 'training' },
+          { key: 'software-links', icon: Link2, label: 'Tải phần mềm', path: '/teacher', hash: 'software-links' },
+        ],
+      },
     ],
     bottomItems: [
       { key: 'profile', icon: User,   label: 'Hồ sơ', path: '/teacher', hash: 'profile' },
@@ -80,27 +125,43 @@ const MENU_CONFIG = {
       { key: 'news',      icon: FileText,        label: 'Tin tức',   path: '/admin/news',  permission: [PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES] },
       { key: 'inbox',     icon: MessageSquare,   label: 'Hộp thư',   path: '/admin/inbox', permission: PERMISSIONS.MANAGE_MESSAGES },
       {
-        key: 'people-group',
-        label: 'Quản lý',
+        key: 'manage-train-group',
+        label: 'Quản lý và đào tạo',
         icon: Users,
         isGroup: true,
         children: [
-          { key: 'students', icon: Users,         label: 'Học Viên',       path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
-          { key: 'teachers', icon: GraduationCap, label: 'Giảng Viên',     path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
-          { key: 'staff',    icon: Users,         label: 'Phân quyền NV',  path: '/admin', hash: 'staff',    superAdminOnly: true, permission: PERMISSIONS.MANAGE_STAFF },
-          { key: 'hr',       icon: ClipboardList, label: 'Nhân sự & Lương', path: '/admin', hash: 'hr',     permission: PERMISSIONS.MANAGE_HR },
-        ],
-      },
-      {
-        key: 'training-group',
-        label: 'Đào tạo',
-        icon: BookOpen,
-        isGroup: true,
-        children: [
-          { key: 'training',         icon: BookOpen,      label: 'Đào tạo GV',       path: '/admin', hash: 'training',         permission: PERMISSIONS.MANAGE_TRAINING },
-          { key: 'student-training', icon: BookOpen,      label: 'Đào tạo HV',       path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-          { key: 'cert-prep',        icon: Trophy,        label: 'Ôn thi MOS/IC3',   path: '/admin', hash: 'cert-prep',        permission: PERMISSIONS.MANAGE_CERT_PREP },
-          { key: 'evaluations',      icon: AlertTriangle, label: 'Đánh giá nội bộ',  path: '/admin', hash: 'evaluations',      permission: PERMISSIONS.VIEW_EVALUATIONS },
+          {
+            key: 'students-hub',
+            label: 'Học viên',
+            icon: Users,
+            isGroup: true,
+            children: [
+              { key: 'students',         icon: Users,         label: 'Học viên',       path: '/admin', hash: 'students',         permission: PERMISSIONS.MANAGE_STUDENTS },
+              { key: 'student-training', icon: BookOpen,      label: 'Đào tạo HV',     path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+              { key: 'cert-prep',        icon: Trophy,        label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep',        permission: PERMISSIONS.MANAGE_CERT_PREP },
+            ],
+          },
+          {
+            key: 'teachers-hub',
+            label: 'Giảng viên',
+            icon: GraduationCap,
+            isGroup: true,
+            children: [
+              { key: 'teachers',    icon: GraduationCap,  label: 'Giảng viên',      path: '/admin', hash: 'teachers',    permission: PERMISSIONS.VIEW_TEACHERS },
+              { key: 'training',    icon: BookOpen,       label: 'Đào tạo GV',      path: '/admin', hash: 'training',    permission: PERMISSIONS.MANAGE_TRAINING },
+              { key: 'evaluations', icon: AlertTriangle,  label: 'Đánh giá nội bộ', path: '/admin', hash: 'evaluations', permission: PERMISSIONS.VIEW_EVALUATIONS },
+            ],
+          },
+          {
+            key: 'staff-hub',
+            label: 'Nhân viên',
+            icon: ClipboardList,
+            isGroup: true,
+            children: [
+              { key: 'staff', icon: Users,         label: 'Phân quyền NV',   path: '/admin', hash: 'staff', permission: PERMISSIONS.MANAGE_STAFF },
+              { key: 'hr',    icon: ClipboardList, label: 'Nhân sự & Lương', path: '/admin', hash: 'hr',    permission: PERMISSIONS.MANAGE_HR },
+            ],
+          },
         ],
       },
       {
@@ -139,6 +200,23 @@ const MENU_CONFIG = {
     activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md font-bold',
   },
 };
+
+/** Mở 1 nhóm → đóng các sibling cùng cấp */
+const SIDEBAR_GROUP_SIBLINGS = {
+  'manage-train-group': ['finance-group', 'system-group'],
+  'finance-group': ['manage-train-group', 'system-group'],
+  'system-group': ['manage-train-group', 'finance-group'],
+  'students-hub': ['teachers-hub', 'staff-hub'],
+  'teachers-hub': ['students-hub', 'staff-hub'],
+  'staff-hub': ['students-hub', 'teachers-hub'],
+  'exam-group': ['schedule-materials-group', 'news-evaluation-group'],
+  'schedule-materials-group': ['exam-group', 'news-evaluation-group'],
+  'news-evaluation-group': ['exam-group', 'schedule-materials-group'],
+  'teaching-group': ['news-training-group'],
+  'news-training-group': ['teaching-group'],
+};
+
+const NESTED_ACTIVE_CLASS = 'bg-white/10 text-red-400 font-semibold';
 
 // ─── AppSidebar Component ─────────────────────────────────────────────────────
 const AppSidebar = ({
@@ -243,10 +321,20 @@ const AppSidebar = ({
 
   const [openGroups, setOpenGroups] = useState(() => {
     const defaults = {
-      'people-group': false,
-      'training-group': false,
+      'manage-train-group': false,
+      'students-hub': false,
+      'teachers-hub': false,
+      'staff-hub': false,
       'finance-group': false,
       'system-group': false,
+      'exam-group': false,
+      'schedule-materials-group': false,
+      'news-evaluation-group': false,
+      'teaching-group': false,
+      'news-training-group': false,
+      // legacy keys (localStorage cũ)
+      'people-group': false,
+      'training-group': false,
     };
     try {
       const saved = localStorage.getItem('cms_sidebar_groups');
@@ -255,6 +343,8 @@ const AppSidebar = ({
       return defaults;
     }
   });
+  const [flyoutHubKey, setFlyoutHubKey] = useState(null);
+  const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 });
   const { 
     students, teachers, staffs, getPrivateEvaluationsForAdmin, getConversations, triggerBackgroundSync,
     notifications: allNotifications, markNotificationRead
@@ -444,12 +534,12 @@ const AppSidebar = ({
     return userPermissions.includes(item.permission);
   };
 
-  // ── Filter menu theo permissions (RBAC) ──────────────────────────────────────
+  // ── Filter menu theo permissions (RBAC) — đệ quy nhóm 3 cấp ─────────────────
   const filterItems = (items) => {
-    return items
+    return (items || [])
       .map((item) => {
         if (item.isGroup && Array.isArray(item.children)) {
-          const children = item.children.filter(canSeeItem);
+          const children = filterItems(item.children);
           if (children.length === 0) return null;
           return { ...item, children };
         }
@@ -458,11 +548,43 @@ const AppSidebar = ({
       .filter(Boolean);
   };
 
+  const itemOrDescendantActive = (node) => {
+    if (!node) return false;
+    if (node.isGroup && Array.isArray(node.children)) {
+      return node.children.some((c) => itemOrDescendantActive(c));
+    }
+    return isActive(node);
+  };
+
+  const collectGroupBadge = (nodes) => (nodes || []).reduce((sum, c) => {
+    if (c.isGroup && Array.isArray(c.children)) return sum + collectGroupBadge(c.children);
+    return sum + getBadgeCount(c.key);
+  }, 0);
+
+  const flattenLeaves = (nodes) => {
+    const out = [];
+    (nodes || []).forEach((n) => {
+      if (n.isGroup && Array.isArray(n.children)) out.push(...flattenLeaves(n.children));
+      else out.push(n);
+    });
+    return out;
+  };
+
+  const persistOpenGroups = (next) => {
+    try { localStorage.setItem('cms_sidebar_groups', JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  };
+
   const toggleGroup = (groupKey) => {
     setOpenGroups((prev) => {
-      const next = { ...prev, [groupKey]: !prev[groupKey] };
-      try { localStorage.setItem('cms_sidebar_groups', JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
+      const opening = !prev[groupKey];
+      const next = { ...prev, [groupKey]: opening };
+      if (opening) {
+        (SIDEBAR_GROUP_SIBLINGS[groupKey] || []).forEach((sib) => {
+          next[sib] = false;
+        });
+      }
+      return persistOpenGroups(next);
     });
   };
 
@@ -545,6 +667,38 @@ const AppSidebar = ({
     // Các trang lá khác: khớp path tuyệt đối
     return location.pathname === item.path && !currentHash;
   };
+
+  // Điều hướng → mở exclusive nhóm/hub chứa trang active
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      const activateExclusive = (key) => {
+        if (!next[key]) {
+          next[key] = true;
+          changed = true;
+        }
+        (SIDEBAR_GROUP_SIBLINGS[key] || []).forEach((sib) => {
+          if (next[sib]) {
+            next[sib] = false;
+            changed = true;
+          }
+        });
+      };
+      const walk = (nodes) => {
+        (nodes || []).forEach((n) => {
+          if (!n?.isGroup || !Array.isArray(n.children)) return;
+          if (itemOrDescendantActive(n)) {
+            activateExclusive(n.key);
+            walk(n.children);
+          }
+        });
+      };
+      walk(filterItems(config.items));
+      if (!changed) return prev;
+      return persistOpenGroups(next);
+    });
+  }, [location.pathname, location.hash, role]);
 
   const initials = userName ? userName.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase() : 'HV';
   const avatarUrl = resolveAvatarUrl({
@@ -666,7 +820,9 @@ const AppSidebar = ({
                     ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-3' : nested ? 'px-4 py-2.5 pl-9' : 'px-4 py-3'}
                     ${isLocked
                       ? 'text-white/40 cursor-not-allowed'
-                      : active ? config.activeClass : 'text-white/70 hover:text-white hover:bg-white/10'
+                      : active
+                        ? (nested ? NESTED_ACTIVE_CLASS : config.activeClass)
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
                     }
                   `}
                 >
@@ -690,15 +846,129 @@ const AppSidebar = ({
 
           if (item.isGroup && item.children?.length) {
             const GroupIcon = item.icon;
-            const childActive = item.children.some((c) => isActive(c));
-            const isOpen = openGroups[item.key] || childActive;
-            const groupBadge = item.children.reduce((sum, c) => sum + getBadgeCount(c.key), 0);
+            const childActive = itemOrDescendantActive(item);
+            const isOpen = !!openGroups[item.key];
+            const groupBadge = collectGroupBadge(item.children);
+            // Mobile drawer + tablet overlay: accordion hub; desktop mở rộng: hover flyout
+            const hubsAsAccordion = mobileOpen || tabletRail;
 
-            // Sidebar thu gọn: hiện thẳng các mục con (icon)
+            const renderMidHub = (hub) => {
+              const HubIcon = hub.icon;
+              const hubActive = itemOrDescendantActive(hub);
+              const hubBadge = collectGroupBadge(hub.children);
+              const hubOpen = !!openGroups[hub.key];
+              const showFlyout = !hubsAsAccordion && flyoutHubKey === hub.key;
+
+              if (hubsAsAccordion) {
+                return (
+                  <div key={hub.key} className="space-y-0.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(hub.key)}
+                      aria-expanded={hubOpen}
+                      className={`w-full flex items-center gap-3 rounded-xl transition-all px-4 py-2.5 pl-9
+                        ${hubActive ? 'text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}
+                      `}
+                    >
+                      <HubIcon size={16} className="flex-shrink-0" aria-hidden="true" />
+                      <span className="text-[13px] font-semibold flex-1 text-left truncate">{hub.label}</span>
+                      {hubBadge > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none">
+                          {hubBadge > 99 ? '99+' : hubBadge}
+                        </span>
+                      )}
+                      <ChevronDown
+                        size={14}
+                        className={`flex-shrink-0 text-white/50 transition-transform ${hubOpen ? 'rotate-180' : ''}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    {hubOpen && (
+                      <div className="space-y-0.5">
+                        {hub.children.map((leaf) => (
+                          <div key={leaf.key} className="pl-3">
+                            {renderNavButton(leaf, { nested: true })}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={hub.key}
+                  className="relative"
+                  onMouseEnter={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    // Sát mép hub (không để khe hở) để hover không bị mất khi kéo sang flyout
+                    setFlyoutPos({ top: rect.top, left: rect.right - 2 });
+                    setFlyoutHubKey(hub.key);
+                  }}
+                  onMouseLeave={() => setFlyoutHubKey((k) => (k === hub.key ? null : k))}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={showFlyout}
+                    aria-haspopup="menu"
+                    className={`w-full flex items-center gap-3 rounded-xl transition-all px-4 py-2.5 pl-9
+                      ${hubActive || showFlyout ? 'text-white bg-white/10' : 'text-white/70 hover:text-white hover:bg-white/10'}
+                    `}
+                  >
+                    <HubIcon size={16} className="flex-shrink-0" aria-hidden="true" />
+                    <span className="text-[13px] font-semibold flex-1 text-left truncate">{hub.label}</span>
+                    {hubBadge > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none">
+                        {hubBadge > 99 ? '99+' : hubBadge}
+                      </span>
+                    )}
+                    <ChevronRight size={14} className="flex-shrink-0 text-white/50" aria-hidden="true" />
+                  </button>
+                  {showFlyout && (
+                    <div
+                      role="menu"
+                      className="fixed z-[80] min-w-[11.5rem] rounded-xl border border-white/15 bg-slate-950/95 py-1.5 shadow-2xl backdrop-blur-md"
+                      style={{ top: flyoutPos.top, left: flyoutPos.left }}
+                    >
+                      {hub.children.map((leaf) => {
+                        const LeafIcon = leaf.icon;
+                        const leafActive = isActive(leaf);
+                        const leafBadge = getBadgeCount(leaf.key);
+                        return (
+                          <button
+                            key={leaf.key}
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              handleClick(leaf);
+                              setFlyoutHubKey(null);
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors
+                              ${leafActive ? NESTED_ACTIVE_CLASS : 'text-white/75 hover:bg-white/10 hover:text-white'}
+                            `}
+                          >
+                            <LeafIcon size={15} className="flex-shrink-0" aria-hidden="true" />
+                            <span className="text-[13px] font-medium truncate flex-1">{leaf.label}</span>
+                            {leafBadge > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black leading-none">
+                                {leafBadge > 99 ? '99+' : leafBadge}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            };
+
+            // Sidebar thu gọn: hiện thẳng các lá (icon)
             if (collapsed && !mobileOpen) {
               return (
                 <div key={item.key} className="space-y-1 pt-1 mt-1 border-t border-white/10">
-                  {item.children.map((child) => renderNavButton(child))}
+                  {flattenLeaves(item.children).map((leaf) => renderNavButton(leaf, { nested: true }))}
                 </div>
               );
             }
@@ -708,11 +978,12 @@ const AppSidebar = ({
                 <button
                   type="button"
                   onClick={() => toggleGroup(item.key)}
+                  aria-expanded={isOpen}
                   className={`w-full flex items-center gap-3 rounded-xl transition-all px-4 py-3
                     ${childActive ? 'text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}
                   `}
                 >
-                  <GroupIcon size={18} className="flex-shrink-0" />
+                  <GroupIcon size={18} className="flex-shrink-0" aria-hidden="true" />
                   <span className="text-sm font-semibold flex-1 text-left">{item.label}</span>
                   {groupBadge > 0 && (
                     <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none">
@@ -722,11 +993,16 @@ const AppSidebar = ({
                   <ChevronDown
                     size={16}
                     className={`flex-shrink-0 text-white/50 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    aria-hidden="true"
                   />
                 </button>
                 {isOpen && (
                   <div className="mt-0.5 space-y-0.5">
-                    {item.children.map((child) => renderNavButton(child, { nested: true }))}
+                    {item.children.map((child) => (
+                      child.isGroup && child.children?.length
+                        ? renderMidHub(child)
+                        : renderNavButton(child, { nested: true })
+                    ))}
                   </div>
                 )}
               </div>

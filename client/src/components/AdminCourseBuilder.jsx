@@ -17,6 +17,8 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
   const [tempDuration, setTempDuration] = useState(0);
   const [tempAntiSeek, setTempAntiSeek] = useState(true);
   const [tempAllowEarlyAccess, setTempAllowEarlyAccess] = useState(false);
+  const [tempIsPreview, setTempIsPreview] = useState(false);
+  const [coursePrice, setCoursePrice] = useState(() => String(course?.price > 0 ? course.price : ''));
   const [probingDuration, setProbingDuration] = useState(false);
   const probeSeqRef = useRef(0);
 
@@ -85,6 +87,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
       videoUrl: '',
       antiSeek: true,
       allowEarlyAccess: false,
+      isPreview: false,
     };
     setChapters(chapters.map(c => {
       if (c.id === chapterId) {
@@ -138,7 +141,8 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
         ...course,
         chapters,
         videos: allLessons,
-        lessons: allLessons
+        lessons: allLessons,
+        price: Math.max(0, Number(coursePrice) || 0),
       });
       toast.success('Đã lưu giáo trình thành công!');
     }
@@ -171,6 +175,18 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                Giá (đ)
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={coursePrice}
+                  onChange={(e) => setCoursePrice(e.target.value)}
+                  placeholder="0 = miễn phí"
+                  className="w-24 sm:w-28 min-h-11 px-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800"
+                />
+              </label>
               <button
                 type="button"
                 className="inline-flex items-center justify-center gap-1.5 min-h-11 min-w-11 sm:min-w-0 sm:px-3.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition"
@@ -360,6 +376,21 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                     ? 'Bật: học viên có thể mở bài này trước khi hoàn thành bài trước.'
                                     : 'Tắt: học viên phải hoàn thành bài trước mới được mở bài này.'}
                                 </p>
+                                <div className="flex items-center gap-2 mt-3">
+                                  <input
+                                    type="checkbox"
+                                    id={`preview_${lesson.id}`}
+                                    checked={tempIsPreview}
+                                    onChange={(e) => setTempIsPreview(e.target.checked)}
+                                    className="w-4 h-4 text-red-600 rounded focus:ring-red-500 cursor-pointer"
+                                  />
+                                  <label htmlFor={`preview_${lesson.id}`} className="text-xs font-bold text-slate-800 cursor-pointer select-none">
+                                    Cho xem thử (khóa trả phí)
+                                  </label>
+                                </div>
+                                <p className="text-[11px] text-slate-600 leading-relaxed pl-6">
+                                  HV chưa mua vẫn xem được bài này. Các bài khác bị khóa đến khi thanh toán.
+                                </p>
                               </div>
                             </div>
                             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
@@ -373,6 +404,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                   duration: parseInt(tempDuration, 10) || 0,
                                   antiSeek: tempAntiSeek,
                                   allowEarlyAccess: tempAllowEarlyAccess,
+                                  isPreview: tempIsPreview,
                                 })}
                                 className="min-h-11 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition"
                               >
@@ -407,6 +439,11 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                 }`}>
                                   {lesson.allowEarlyAccess === true ? 'Mở sớm: BẬT' : 'Mở sớm: TẮT'}
                                 </span>
+                                {lesson.isPreview === true && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-pink-50 text-pink-700 border border-pink-200">
+                                    Xem thử
+                                  </span>
+                                )}
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -419,6 +456,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
                                   setTempDuration(lesson.duration || 0);
                                   setTempAntiSeek(lesson.antiSeek !== false);
                                   setTempAllowEarlyAccess(lesson.allowEarlyAccess === true);
+                                  setTempIsPreview(lesson.isPreview === true);
                                 }}
                                 className="inline-flex items-center justify-center min-w-10 min-h-10 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl"
                                 aria-label="Sửa bài học"

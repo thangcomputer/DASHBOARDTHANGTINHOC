@@ -125,9 +125,15 @@ export function useAdminDashboardState() {
     }
 
     if (activeTab === 'dashboard' || activeTab === 'overview') return undefined;
-    if (activeTab === 'staff' && !isSuperAdmin) {
-      navigate('/admin#dashboard', { replace: true });
-      return undefined;
+    // Phân quyền NV: Super luôn vào được; HIGH/STAFF chỉ khi có manage_staff (không dùng hasPermission
+    // vì fallback role=admin sẽ mở quá rộng cho HIGH chưa được cấp).
+    if (activeTab === 'staff') {
+      const perms = Array.isArray(_sess?.permissions) ? _sess.permissions : [];
+      const canStaffTab = isSuperAdmin || perms.includes(PERMISSIONS.MANAGE_STAFF);
+      if (!canStaffTab) {
+        navigate('/admin#dashboard', { replace: true });
+        return undefined;
+      }
     }
     if (activeTab === 'analytics') {
       const ok = hasPermission(_sess, PERMISSIONS.MANAGE_FINANCE)

@@ -43,7 +43,8 @@ function normalizeUploadFileUrl(url) {
 function normalizeTrainingDataUrls(data) {
   if (!data || typeof data !== 'object') return data;
   const out = { ...data };
-  for (const key of ['files', 'videos', 'guides', 'assignments']) {
+  if (!Array.isArray(out.softwareLinks)) out.softwareLinks = [];
+  for (const key of ['files', 'videos', 'guides', 'assignments', 'softwareLinks']) {
     if (!Array.isArray(out[key])) continue;
     out[key] = out[key].map((item) => {
       if (!item || typeof item !== 'object') return item;
@@ -325,7 +326,7 @@ router.put('/web', authMiddleware, ...settingsGuard('system_write'), async (req,
 router.get('/training-data', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
-    const data = normalizeTrainingDataUrls(settings.trainingRawData || { videos: [], guides: [], files: [] });
+    const data = normalizeTrainingDataUrls(settings.trainingRawData || { videos: [], guides: [], files: [], softwareLinks: [] });
     return res.json({ success: true, data });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server' });
@@ -349,7 +350,7 @@ router.put('/training-data', authMiddleware, ...settingsGuard('training_write'),
 router.get('/student-training-data', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
-    const data = normalizeTrainingDataUrls(settings.studentTrainingRawData || { videos: [], guides: [], files: [] });
+    const data = normalizeTrainingDataUrls(settings.studentTrainingRawData || { videos: [], guides: [], files: [], softwareLinks: [] });
     return res.json({ success: true, data });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server' });

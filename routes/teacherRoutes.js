@@ -625,6 +625,17 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
           ).catch((err) => logger.warn('[TEACHERS] notify exam fail:', err.message));
         }
       }
+
+      // Admin đổi lương / hồ sơ → chuông cho GV (không ảnh hưởng self-edit)
+      if (isAdminRole) {
+        const { notifyTeacherAdminUpdates } = require('../services/teacherAdminNotifier');
+        notifyTeacherAdminUpdates(io, {
+          teacherId: teacher._id,
+          updates,
+          prev,
+          isAdminActor: true,
+        }).catch((err) => logger.warn('[TEACHERS] notify admin updates: %s', err.message));
+      }
     }
 
     return res.json({

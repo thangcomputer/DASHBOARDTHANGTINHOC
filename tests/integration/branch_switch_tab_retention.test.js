@@ -93,16 +93,29 @@ describe('Branch Switching and Tab Permission Retention Verification', () => {
     assert.ok(src.includes('hash: location.hash'), 'Must preserve hash when updating teacherSearch');
   });
 
-  it('12. #staff tab is SUPER_ADMIN only (HIGH redirected)', () => {
+  it('12. #staff tab needs Super or manage_staff (HIGH without grant redirected)', () => {
     const hookCode = fs.readFileSync(path.join(ROOT, 'client/src/components/admin/hooks/useAdminDashboardState.jsx'), 'utf8');
     assert.ok(
-      hookCode.includes("activeTab === 'staff' && !isSuperAdmin"),
-      'HIGH_ADMIN must not keep #staff via URL',
+      hookCode.includes("activeTab === 'staff'"),
+      'Must guard #staff tab',
+    );
+    assert.ok(
+      hookCode.includes('PERMISSIONS.MANAGE_STAFF') && hookCode.includes('canStaffTab'),
+      'HIGH/STAFF need manage_staff to keep #staff',
+    );
+    assert.ok(
+      hookCode.includes('isSuperAdmin || perms.includes(PERMISSIONS.MANAGE_STAFF)'),
+      'Super bypass + permission grant for #staff',
+    );
+    const sidebar = fs.readFileSync(path.join(ROOT, 'client/src/components/AppSidebar.jsx'), 'utf8');
+    assert.ok(
+      sidebar.includes("key: 'staff'") && sidebar.includes('PERMISSIONS.MANAGE_STAFF'),
+      'Sidebar staff item gated by MANAGE_STAFF',
     );
     assert.equal(
-      hookCode.includes("activeTab === 'staff' && !isSuperAdmin && !isHighAdmin"),
+      /key:\s*'staff'[^}]*superAdminOnly:\s*true/.test(sidebar),
       false,
-      'Must not allow HIGH_ADMIN into #staff',
+      'staff menu must not be superAdminOnly (HIGH with grant should see it)',
     );
   });
 

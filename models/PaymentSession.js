@@ -12,6 +12,9 @@ const paymentSessionSchema = new mongoose.Schema({
   branchCode: { type: String, default: '' },
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
   paidAmount: { type: Number, default: 0 },
+  /** tuition (mặc định) | video_course — không đụng enrollment học phí */
+  kind: { type: String, enum: ['tuition', 'video_course'], default: 'tuition' },
+  purchaseId: { type: mongoose.Schema.Types.ObjectId, ref: 'VideoCoursePurchase', default: null },
   createdAt: { type: Date, default: Date.now, expires: 86400 } // Tự động xóa sau 24h (86400 giây)
 });
 

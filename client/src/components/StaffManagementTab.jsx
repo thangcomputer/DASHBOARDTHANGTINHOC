@@ -872,12 +872,13 @@ export default function StaffManagementTab() {
       const sess = JSON.parse(localStorage.getItem('admin_user') || localStorage.getItem('staff_user') || '{}');
       const isRootSuperAdmin = sess?.id === 'admin';
       const isSuperAdmin = isRootSuperAdmin || sess?.adminRole === 'SUPER_ADMIN';
-      return { isRootSuperAdmin, isSuperAdmin };
+      const selfId = String(sess?.id || sess?._id || '');
+      return { isRootSuperAdmin, isSuperAdmin, selfId };
     } catch {
-      return { isRootSuperAdmin: false, isSuperAdmin: false };
+      return { isRootSuperAdmin: false, isSuperAdmin: false, selfId: '' };
     }
   }, []);
-  const { isRootSuperAdmin, isSuperAdmin } = sessionMeta;
+  const { isRootSuperAdmin, isSuperAdmin, selfId } = sessionMeta;
 
   const fetchStaff = useCallback(() => {
     setLoading(true);
@@ -888,6 +889,12 @@ export default function StaffManagementTab() {
   }, []);
 
   useEffect(() => { fetchStaff(); }, [fetchStaff]);
+
+  // Ẩn chính mình — đổi tên/MK đã có ở Cài đặt hệ thống
+  const visibleStaff = useMemo(() => {
+    if (!selfId || selfId === 'admin') return staffList;
+    return (staffList || []).filter((s) => String(s?._id || s?.id || '') !== selfId);
+  }, [staffList, selfId]);
 
   const handleDelete = async (s) => {
     if (s.adminRole === 'SUPER_ADMIN' && !isRootSuperAdmin) {
@@ -990,14 +997,15 @@ export default function StaffManagementTab() {
         <div className="cms-viewport-scroll flex items-center justify-center py-14 gap-3 text-slate-400">
           <Loader2 size={20} className="animate-spin" /> <span className="text-sm">Đang tải...</span>
         </div>
-      ) : staffList.length === 0 ? (
+      ) : visibleStaff.length === 0 ? (
         <div className="cms-viewport-scroll text-center py-14 text-slate-400">
           <Users size={36} className="mx-auto mb-3 opacity-25" />
           <p className="text-sm font-medium">Chưa có tài khoản nội bộ nào.</p>
+          <p className="text-xs mt-1 text-slate-400">Tài khoản đang đăng nhập không hiện ở đây — sửa ở Cài đặt hệ thống.</p>
         </div>
       ) : (
         <div className="cms-viewport-scroll space-y-3 pr-0.5">
-          {staffList.map((s) => (
+          {visibleStaff.map((s) => (
             <StaffCard
               key={s._id}
               s={s}

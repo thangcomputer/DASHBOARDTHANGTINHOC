@@ -7,6 +7,7 @@ import {
   Headphones, ImagePlus, Send, Trash2, MessageCircle,
   Loader2, X, Newspaper, RefreshCw, Reply, Sparkles, Heart, ThumbsUp, Laugh, Frown,
   Globe, GraduationCap, Users, Lock, Edit3, Check, ChevronDown, Eye, AlertCircle,
+  Play, ExternalLink,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
@@ -16,6 +17,7 @@ import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { openSiteChat } from './FloatingMessenger';
 import SupportMascot from './SupportMascot';
 import { isSuperAdminViewer, isSuperAdminPresence } from '../utils/supportPresence';
+import { extractYouTubeId } from '../utils/youtubeDuration';
 
 const ROLE_LABEL = {
   admin: 'Admin',
@@ -45,6 +47,67 @@ const PRIVACY_OPTIONS = [
   { value: 'students', label: 'Chỉ Học viên & Admin', icon: Users, desc: 'Giảng viên không xem được', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' },
   { value: 'admin_only', label: 'Chỉ Ban Quản trị', icon: Lock, desc: 'Chỉ Super Admin, High Admin & Staff xem được', badgeClass: 'bg-purple-50 text-purple-700 border-purple-200' },
 ];
+
+/** URL YouTube trong text bài viết / bình luận */
+const YOUTUBE_URL_RE = /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?[^\s]*v=|embed\/|shorts\/|live\/)|youtu\.be\/)[\w\-?=&%.]+/gi;
+
+function collectYouTubeFromText(text) {
+  const raw = String(text || '');
+  if (!raw) return [];
+  const seen = new Set();
+  const items = [];
+  const re = new RegExp(YOUTUBE_URL_RE.source, 'gi');
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const url = m[0];
+    const id = extractYouTubeId(url);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    items.push({ id, url });
+  }
+  return items;
+}
+
+function FeedYouTubePreviews({ text, onOpen, compact = false }) {
+  const items = useMemo(() => collectYouTubeFromText(text), [text]);
+  if (!items.length) return null;
+  return (
+    <div className={compact ? 'mt-1.5 space-y-1.5' : 'mt-3 space-y-2'}>
+      {items.map(({ id, url }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpen?.({ id, url });
+          }}
+          className={`group relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900 text-left shadow-sm hover:border-red-300 hover:shadow-md transition-all ${
+            compact ? 'aspect-video max-h-36' : 'aspect-video max-h-64'
+          }`}
+          title="Xem video YouTube"
+        >
+          <img
+            src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
+            alt="YouTube"
+            className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+            loading="lazy"
+          />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 text-white shadow-lg group-hover:scale-105 transition-transform">
+              <Play size={compact ? 18 : 22} className="ml-0.5 fill-white" aria-hidden="true" />
+            </span>
+          </span>
+          <span className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 text-white text-[11px] font-bold drop-shadow">
+            <span className="px-1.5 py-0.5 rounded bg-red-600/90">YouTube</span>
+            <span className="truncate opacity-90">Bấm để xem</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function reactionIconClass(r, active) {
   if (!active) return '';
@@ -186,6 +249,7 @@ export default function FeedBoard({ session, role }) {
   const [commentsOpen, setCommentsOpen] = useState({});
   const [busyId, setBusyId] = useState(null);
   const [lightbox, setLightbox] = useState(null);
+  const [youtubeModal, setYoutubeModal] = useState(null); // { id, url } | null
 
   // Edit Post State
   const [editingPost, setEditingPost] = useState(null);
@@ -262,6 +326,15 @@ export default function FeedBoard({ session, role }) {
   useEffect(() => {
     load(1, false);
   }, [load]);
+
+  useEffect(() => {
+    if (!youtubeModal) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setYoutubeModal(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [youtubeModal]);
 
   // Realtime Socket listeners
   useEffect(() => {
@@ -823,6 +896,10 @@ export default function FeedBoard({ session, role }) {
                       {post.content}
                     </p>
                   )}
+                  <FeedYouTubePreviews
+                    text={post.content}
+                    onOpen={setYoutubeModal}
+                  />
 
                   {/* Card Media */}
                   {post.images?.length > 0 && (
@@ -845,11 +922,11 @@ export default function FeedBoard({ session, role }) {
 
                   {/* Reaction Summary & Counts Breakdown */}
                   {hasAnyReaction && (
-                    <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
+                    <div className="cms-feed-card__stats flex items-center justify-between gap-3 mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
                       <button
                         type="button"
                         onClick={() => { setReactionModalPost(post); setReactionModalTab('all'); }}
-                        className="flex items-center gap-1.5 hover:underline cursor-pointer group"
+                        className="flex items-center gap-1.5 hover:underline cursor-pointer group min-w-0"
                         title="Bấm để xem ai đã thả cảm xúc"
                       >
                         {/* Stacked Emojis */}
@@ -863,7 +940,7 @@ export default function FeedBoard({ session, role }) {
                         </span>
 
                         {/* Breakdown Pills */}
-                        <div className="flex items-center gap-1 ml-1.5">
+                        <div className="flex items-center gap-1 ml-1.5 flex-wrap">
                           {activeReactionTypes.map((r) => (
                             <span key={r.type} className={'text-[11px] font-medium px-1.5 py-0.2 rounded-full border ' + r.bg}>
                               {r.emoji} {reactionsObj[r.type]}
@@ -872,7 +949,7 @@ export default function FeedBoard({ session, role }) {
                         </div>
                       </button>
 
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] text-slate-400 shrink-0">
                         {(post.commentsCount || 0)} bình luận
                       </span>
                     </div>
@@ -960,6 +1037,11 @@ export default function FeedBoard({ session, role }) {
                                   )}
                                 </div>
                                 {c.content && <p className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">{c.content}</p>}
+                                <FeedYouTubePreviews
+                                  text={c.content}
+                                  compact
+                                  onOpen={setYoutubeModal}
+                                />
                                 {(c.images || []).length > 0 && (
                                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                                     {c.images.map((url) => {
@@ -1067,6 +1149,11 @@ export default function FeedBoard({ session, role }) {
                                       )}
                                     </div>
                                     {r.content && <p className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">{r.content}</p>}
+                                    <FeedYouTubePreviews
+                                      text={r.content}
+                                      compact
+                                      onOpen={setYoutubeModal}
+                                    />
                                     {(r.images || []).length > 0 && (
                                       <div className="flex flex-wrap gap-1.5 mt-1.5">
                                         {r.images.map((url) => {
@@ -1418,6 +1505,55 @@ export default function FeedBoard({ session, role }) {
             className="relative z-[130001] max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>,
+        document.body,
+      )}
+
+      {/* YouTube Modal */}
+      {youtubeModal?.id && createPortal(
+        <div
+          className="fixed inset-0 z-[130000] flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xem video YouTube"
+          onClick={() => setYoutubeModal(null)}
+        >
+          <div
+            className="relative z-[130001] w-full max-w-3xl rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-950 border-b border-white/10">
+              <span className="text-white text-sm font-bold truncate">YouTube</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <a
+                  href={youtubeModal.url || `https://www.youtube.com/watch?v=${youtubeModal.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 text-xs font-bold"
+                >
+                  <ExternalLink size={14} />
+                  Mở YouTube
+                </a>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 text-xs font-bold"
+                  onClick={() => setYoutubeModal(null)}
+                >
+                  <X size={16} />
+                  Đóng
+                </button>
+              </div>
+            </div>
+            <div className="relative w-full aspect-video bg-black">
+              <iframe
+                title="YouTube video"
+                src={`https://www.youtube.com/embed/${youtubeModal.id}?autoplay=1&rel=0`}
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </div>
         </div>,
         document.body,
       )}

@@ -263,7 +263,18 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
 
       if (claimed) {
         try {
-          const { settlePayment } = require('../services/ledgerService');
+          if (String(claimed.kind || 'tuition') === 'video_course') {
+            const { fulfillVideoCoursePurchase } = require('../services/videoCoursePurchaseService');
+            await fulfillVideoCoursePurchase({
+              session: claimed,
+              amount,
+              io: req.app.get('io'),
+            });
+            matched = true;
+            matchedRef = claimed.ref;
+            logger.info(`[SEPAY] Video-course session ${claimed.sessionId} — ${amount}đ`);
+          } else {
+            const { settlePayment } = require('../services/ledgerService');
           await settlePayment({
             student: claimed.studentId
               ? { _id: claimed.studentId, branchId: claimed.branchId || null }
@@ -345,6 +356,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
               message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
             });
           }
+          } // end else tuition session
         } catch (ledgerErr) {
           logger.error('[SEPAY] session ledger FAILED — rollback session: %s', ledgerErr.message);
           try {

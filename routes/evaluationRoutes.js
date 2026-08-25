@@ -228,6 +228,12 @@ router.post('/', authMiddleware, ...evaluationsGuard('create'), async (req, res)
              link: `/teacher?evaluationId=${encodeURIComponent(evalId)}`,
            });
 
+           // Fire-and-forget: đủ mốc thưởng sao thì báo GV (idempotent theo tháng)
+           try {
+             const { maybeNotifyStarBonusEligibility } = require('../services/teacherAdminNotifier');
+             maybeNotifyStarBonusEligibility(io, targetTeacherId).catch(() => {});
+           } catch (_) { /* ignore */ }
+
            const teacherDoc = await Teacher.findById(targetTeacherId).select('branchId').lean();
            emitDataRefresh(io, { type: 'evaluation', targetId: targetTeacherId }, {
              branchId: teacherDoc?.branchId || studentInfo?.branchId || null,
