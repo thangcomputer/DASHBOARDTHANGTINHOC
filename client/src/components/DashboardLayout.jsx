@@ -727,14 +727,15 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const myNotifications = allNotifications.filter(n => {
     // Nếu có mảng receivers, kiểm tra quyền
     if (Array.isArray(n.receivers) && n.receivers.length > 0) {
-      const recs = n.receivers;
+      const recs = n.receivers.map((r) => String(r));
+      const myIdStr = myId != null ? String(myId) : '';
       const isAdminRole = role === 'admin' || role === 'staff';
       if (recs.includes('ALL_ADMIN') && !isAdminRole) return false;
       if (recs.includes('ALL_TEACHER') && role !== 'teacher') return false;
       if (recs.includes('ALL_STUDENT') && role !== 'student') return false;
 
-      const isForMe = (myId && recs.includes(myId)) ||
-                      recs.includes(role) ||
+      const isForMe = (myIdStr && recs.includes(myIdStr)) ||
+                      (role && recs.includes(String(role))) ||
                       (isAdminRole && recs.includes('ALL_ADMIN')) ||
                       (role === 'teacher' && recs.includes('ALL_TEACHER')) ||
                       (role === 'student' && recs.includes('ALL_STUDENT')) ||
@@ -742,7 +743,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                       recs.includes('ALL');
       if (!isForMe) return false;
     }
-    return ((myId && String(n.userId) === myId) || !n.userId) && 
+    return ((myId && String(n.userId) === String(myId)) || !n.userId) && 
            (n.role === role || !n.role);
   }).sort((a, b) => new Date(b.time || Date.now()) - new Date(a.time || Date.now()));
 

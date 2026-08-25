@@ -119,6 +119,86 @@ function studentDataRefresh(io, studentLike, payload) {
   emitDataRefresh(io, payload, { branchId, userIds });
 }
 
+/**
+ * Chuông + sync danh bạ khi HV được gán GV lúc tạo / thêm khóa
+ * (cùng nội dung với PUT assign-teacher — tránh lệch UX).
+ * Lưu DB luôn; socket chỉ khi có io.
+ */
+async function notifyTeacherAssignedOnEnroll(io, {
+  student,
+  teacherId,
+  teacherName = '',
+  courseName = '',
+}) {
+  if (!student?._id || !teacherId) return;
+  const tid = String(teacherId._id || teacherId || '').trim();
+  if (!tid || tid === 'null' || tid === 'undefined') return;
+  const studentId = String(student._id);
+
+  const NotificationService = require('../services/NotificationService');
+  const hvLabel = `⟦student_detail:${studentId}:profile|${student.name}⟧`;
+  const course = String(courseName || student.course || '').trim() || 'khóa học';
+
+  let gvName = String(teacherName || student.teacherName || '').trim();
+  if (!gvName) {
+    try {
+      const Teacher = require('../models/Teacher');
+      const t = await Teacher.findById(tid).select('name').lean();
+      gvName = t?.name || '';
+    } catch { /* ignore */ }
+  }
+  if (!gvName) gvName = 'Giảng viên';
+
+  try {
+    await NotificationService.send(io, {
+      type: 'COURSE',
+      title: '📚 Học viên mới được giao',
+      content: `Học viên ${hvLabel} (${course}) đã được giao cho bạn.`,
+      receivers: tid,
+      payload: {
+        studentId,
+        type: 'student',
+        targetAudience: 'teacher',
+        reassign: false,
+      },
+      link: `/teacher#students?studentId=${studentId}`,
+    });
+  } catch (err) {
+    logger.error('[STUDENTS] notify teacher on enroll: %s', err?.message || err);
+  }
+
+  try {
+    await NotificationService.send(io, {
+      type: 'COURSE',
+      title: '👨‍🏫 Phân công giảng viên phụ trách',
+      content: `Bạn đã được phân công Giảng viên ${gvName} phụ trách khóa "${course}".`,
+      receivers: studentId,
+      payload: {
+        teacherId: tid,
+        teacherName: gvName,
+        courseName: course,
+        targetAudience: 'student',
+        kind: 'teacher_assigned',
+      },
+      link: '/student#profile',
+    });
+  } catch (err) {
+    logger.error('[STUDENTS] notify student on enroll: %s', err?.message || err);
+  }
+
+  if (!io) return;
+  try {
+    io.to(tid).emit('CONTACT_LIST_UPDATED', { studentId });
+    io.to(studentId).emit('CONTACT_LIST_UPDATED', { teacherId: tid });
+    studentRealtime(io, student, 'student:assigned', {
+      teacherId: tid,
+      studentId,
+    });
+  } catch (err) {
+    logger.warn('[STUDENTS] assign socket sync: %s', err?.message || err);
+  }
+}
+
 async function nextInvoiceCode() {
   const now = new Date();
   const yy = now.getFullYear().toString().slice(-2);
@@ -1010,6 +1090,16 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
       if (createdInvoice) {
         studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: price, studentName: student.name });
       }
+    }
+
+    // Phân công GV lúc đăng ký → chuông GV + HV (lưu DB kể cả khi tạm không có socket)
+    if (student.teacherId) {
+      await notifyTeacherAssignedOnEnroll(io, {
+        student,
+        teacherId: student.teacherId,
+        teacherName: student.teacherName || teacherName || '',
+        courseName: student.course || courseName || '',
+      });
     }
 
     const welcome = await sendAccountWelcome(io, {
@@ -2179,7 +2269,17 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
     await syncCertPrepFromEnrollment(student, req);
 
     const io = req.app.get('io');
-    if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+    if (io) {
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
+    }
+    if (teacherId) {
+      await notifyTeacherAssignedOnEnroll(io, {
+        student,
+        teacherId,
+        teacherName,
+        courseName: resolvedName,
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -2942,7 +3042,7 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
             ? `Học viên ${hvLabel} (${targetCourse || student.course}) đã được giao cho bạn.`
             : `Bạn được phân công tiếp khóa "${targetCourse || student.course}" của ${hvLabel} (từ buổi ${completedSessionsAtSwitch + 1}).`,
           receivers: teacherId.toString(),
-          payload: { studentId: student._id, type: 'student', reassign: isReassign },
+          payload: { studentId: student._id, type: 'student', targetAudience: 'teacher', reassign: isReassign },
           link: `/teacher#students?studentId=${student._id}`,
         });
 
@@ -2952,6 +3052,13 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
             title: '👨‍🏫 Giảng viên khóa học đã đổi',
             content: `Khóa "${targetCourse || student.course}" chuyển sang GV ${teacherName}. Tiến độ đã học: ${completedSessionsAtSwitch} buổi (không mất lịch).`,
             receivers: String(student._id),
+            payload: {
+              teacherId: String(teacherId),
+              teacherName,
+              courseName: targetCourse || student.course || '',
+              targetAudience: 'student',
+              kind: 'teacher_reassigned',
+            },
             link: '/student#profile',
           });
         } else {
@@ -2960,6 +3067,13 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
             title: '👨‍🏫 Phân công giảng viên phụ trách',
             content: `Bạn đã được phân công Giảng viên ${teacherName} phụ trách khóa "${targetCourse || student.course}".`,
             receivers: String(student._id),
+            payload: {
+              teacherId: String(teacherId),
+              teacherName,
+              courseName: targetCourse || student.course || '',
+              targetAudience: 'student',
+              kind: 'teacher_assigned',
+            },
             link: '/student#profile',
           });
         }
