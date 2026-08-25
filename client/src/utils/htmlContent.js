@@ -62,6 +62,8 @@ export function htmlToPlainText(html) {
 const PURIFY_CONFIG = {
   USE_PROFILES: { html: true },
   ADD_ATTR: ['target', 'rel'],
+  /** Cho phép ảnh data: (nội dung cũ) — ảnh mới nên upload /uploads. */
+  ADD_DATA_URI_TAGS: ['img'],
   FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
 };
 
@@ -88,6 +90,19 @@ export function sanitizeRichHtml(html) {
   }
 
   return rewriteAnchorsOpenInNewTab(cleaned);
+}
+
+/**
+ * Sau sanitize: gắn resolveMediaUrl cho src ảnh /uploads (SPA khác origin API).
+ * @param {string} html
+ * @param {(url: string) => string} resolveUrl
+ */
+export function resolveRichHtmlMedia(html, resolveUrl) {
+  if (!html || typeof html !== 'string' || typeof resolveUrl !== 'function') return html || '';
+  return html.replace(
+    /(<img\b[^>]*\bsrc=["'])([^"']+)(["'])/gi,
+    (_, pre, src, post) => `${pre}${resolveUrl(src) || src}${post}`,
+  );
 }
 
 /** Phan cau hoi admin khop mon thi (coban <-> computer, ppt <-> powerpoint). */

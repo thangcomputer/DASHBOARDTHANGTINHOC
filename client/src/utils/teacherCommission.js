@@ -1,9 +1,10 @@
 /**
  * Lương cứng GV = baseSalaryPerSession × số buổi completed.
- * Thưởng sao tách riêng: ≥5 HV/tháng + ≥5★ (cộng dồn từ đánh giá HV) → +200.000đ/tháng.
+ * Thưởng sao tách riêng: ≥15 HV/tháng + ≥5★ (cộng dồn từ đánh giá HV)
+ * → +customStarBonusAmount (mặc định 200.000đ)/tháng.
  */
 
-export const STAR_BONUS_MIN_STUDENTS = 5;
+export const STAR_BONUS_MIN_STUDENTS = 15;
 export const STAR_BONUS_MIN_STARS = 5;
 export const STAR_BONUS_AMOUNT = 200000;
 

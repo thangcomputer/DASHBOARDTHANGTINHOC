@@ -14,6 +14,7 @@ import { useModal } from '../../utils/Modal.jsx';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { formatLocalDateKey, isScheduleOngoingNow, normalizeScheduleDate } from '../../utils/scheduleTime';
+import { countEnrollmentCompleted } from '../../utils/schedulingLimits';
 import { showGlossyAlert } from './TeacherShared';
 import TeacherQuizManager from './TeacherQuizManager';
 import { useData } from '../../context/DataContext';
@@ -160,7 +161,7 @@ export const StudentCard = ({
 }) => {
   const toast = useToast();
   const { showModal } = useModal();
-  const { onDataRefresh, socket } = useSocket();
+  const { onDataRefresh, socket, onlineUsers = [], lastSeenUsers = {} } = useSocket();
   const {
     privateEvaluations = [],
     schedules: allSchedules = [],
@@ -179,6 +180,19 @@ export const StudentCard = ({
   const [sendingMakeup, setSendingMakeup] = useState(false);
   const [showQuickSchedule, setShowQuickSchedule] = useState(false);
   const confirmKey = attendanceConfirmKey(student);
+  const studentPresenceId = String(student._id || student.id || '');
+  const isStudentOnline = onlineUsers.some((u) => String(u.userId) === studentPresenceId);
+  const lastSeenAt = lastSeenUsers[studentPresenceId];
+  const lastSeenLabel = (() => {
+    if (!lastSeenAt) return 'Chưa online';
+    const d = new Date(lastSeenAt);
+    if (Number.isNaN(d.getTime())) return 'Chưa online';
+    const diff = Date.now() - d.getTime();
+    if (diff < 60_000) return 'Vừa xong';
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} phút trước`;
+    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} giờ trước`;
+    return d.toLocaleDateString('vi-VN');
+  })();
   /** Chờ 30s sau "Xác nhận Điểm danh" — persist sessionStorage để đổi tab không mất */
   const [pendingAttendance, setPendingAttendance] = useState(() => {
     const stored = getAttendanceConfirm(confirmKey);
@@ -195,7 +209,18 @@ export const StudentCard = ({
   const [studentQuizzes, setStudentQuizzes] = useState([]);
   const [studentEvals, setStudentEvals] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  const done = student.completedSessions != null ? student.completedSessions : (student.totalSessions - student.remainingSessions);
+  const sessionTotal = Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12;
+  // Chuẩn Admin: enrollment.completedSessions (gồm buổi ghi nhận trước / chỉnh tay).
+  const done = student.completedSessions != null
+    ? Math.max(0, Number(student.completedSessions) || 0)
+    : Math.max(0, sessionTotal - (Number(student.remainingSessions) || 0));
+  const onCalendarDone = useMemo(() => {
+    const sid = String(student._id || student.id || '');
+    if (!sid || !Array.isArray(allSchedules) || allSchedules.length === 0) return 0;
+    return countEnrollmentCompleted(allSchedules, sid, student.course);
+  }, [allSchedules, student._id, student.id, student.course]);
+  const priorCredit = Math.max(0, done - onCalendarDone);
+  const remainingSessions = Math.max(0, sessionTotal - done);
   const nextSessionNumber = Math.max(0, Number(done) || 0) + 1;
   const defaultAttendanceNote = `Buổi ${nextSessionNumber}: Đã điểm danh hoàn thành buổi học`;
   const [attForm, setAttForm] = useState({
@@ -257,8 +282,8 @@ export const StudentCard = ({
     }
   };
 
-  const progressPct = Math.round((done / student.totalSessions) * 100);
-  const isCompleted = student.remainingSessions === 0;
+  const progressPct = sessionTotal > 0 ? Math.round((done / sessionTotal) * 100) : 0;
+  const isCompleted = remainingSessions === 0;
 
   const todayStr = new Date().toLocaleDateString('vi-VN');
   const hasAttendedToday = (student.grades || []).some(g => g.date === todayStr);
@@ -328,6 +353,28 @@ export const StudentCard = ({
     });
   }, [allSchedules, student._id, student.id, student.course, attendanceTick]);
 
+  /** Chờ HV xác nhận / tranh chấp (chưa completed) */
+  const studentConfirmPhase = useMemo(() => {
+    const sid = String(student._id || student.id || '');
+    const course = String(student.course || '').trim();
+    const todayKey = formatLocalDateKey(new Date());
+    const hit = (allSchedules || []).find((sch) => {
+      if (String(sch.status || '') !== 'scheduled') return false;
+      const conf = String(sch.studentConfirmStatus || 'none');
+      if (conf !== 'pending' && conf !== 'disputed') return false;
+      const schSid = String(sch.studentId?._id || sch.studentId?.id || sch.studentId || '');
+      if (schSid !== sid) return false;
+      if (course && sch.course && String(sch.course) !== course) return false;
+      return normalizeScheduleDate(sch.date) === todayKey
+        || conf === 'disputed'; // tranh chấp có thể qua ngày
+    });
+    if (!hit) return null;
+    return String(hit.studentConfirmStatus);
+  }, [allSchedules, student._id, student.id, student.course, attendanceTick]);
+
+  const awaitingStudentConfirm = studentConfirmPhase === 'pending';
+  const attendanceDisputed = studentConfirmPhase === 'disputed';
+
   const hasLastAttendanceToday = useMemo(() => {
     if (!student.last_attendance_at) return false;
     const d = new Date(student.last_attendance_at);
@@ -336,11 +383,14 @@ export const StudentCard = ({
   }, [student.last_attendance_at, attendanceTick]);
 
   // Đã điểm danh hôm nay — KHÔNG dùng !canCheckIn (cooldown 12h có thể từ hôm trước)
+  // pending/disputed: coi như đã thao tác điểm danh (không cho bấm lại)
   const alreadyAttendedToday = Boolean(
     hasAttendedToday
     || attendanceGate?.status === 'done'
     || hasCompletedScheduleToday
-    || hasLastAttendanceToday,
+    || hasLastAttendanceToday
+    || awaitingStudentConfirm
+    || attendanceDisputed,
   );
   const isPendingConfirm = Boolean(pendingAttendance);
   const isCommittingAttendance = Boolean(pendingAttendance?.committing);
@@ -899,7 +949,8 @@ export const StudentCard = ({
         <div className="bg-slate-50/80 px-3 py-3 sm:px-8 sm:py-6 md:px-10 md:py-8 border-b border-slate-100">
           <div className="bg-white border border-slate-100 shadow-sm rounded-2xl sm:rounded-[28px] p-3 sm:p-6 min-w-0">
             <div className="flex items-start gap-3 sm:gap-6 min-w-0">
-            <div className="w-11 h-11 sm:w-20 sm:h-20 rounded-xl sm:rounded-[28px] overflow-hidden shadow-sm border border-slate-200 bg-white shrink-0">
+            <div className="relative w-11 h-11 sm:w-20 sm:h-20 shrink-0">
+            <div className="w-full h-full rounded-xl sm:rounded-[28px] overflow-hidden shadow-sm border border-slate-200 bg-white">
               <img
                 src={resolveAvatarUrl({
                   avatar: student.avatarUrl || student.avatar || student.photo,
@@ -909,6 +960,10 @@ export const StudentCard = ({
                 alt={getDisplayName(student)}
                 className="w-full h-full object-cover"
               />
+            </div>
+            {isStudentOnline ? (
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 border-2 border-white rounded-full" title="Đang online" />
+            ) : null}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start gap-2 min-w-0">
@@ -961,8 +1016,18 @@ export const StudentCard = ({
                 }`}>
                   {isCompleted ? 'Hoàn thành' : 'Đang học'}
                 </span>
-                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-slate-100 text-slate-500 border border-slate-200 uppercase whitespace-nowrap">
-                  {student.learningMode || 'OFFLINE'}
+                <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase whitespace-nowrap border ${
+                  isStudentOnline
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                }`}>
+                  {isStudentOnline ? 'Đang online' : 'Offline'}
+                </span>
+                {!isStudentOnline && lastSeenAt ? (
+                  <span className="text-[10px] font-medium text-slate-400">{lastSeenLabel}</span>
+                ) : null}
+                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide bg-white text-slate-400 border border-slate-100 whitespace-nowrap">
+                  {student.learningMode === 'ONLINE' ? 'Học online' : 'Học tại trung tâm'}
                 </span>
               </div>
             </div>
@@ -971,7 +1036,7 @@ export const StudentCard = ({
           <div className="mt-4 pt-3 border-t border-slate-100">
             <div className="flex justify-between items-center mb-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide text-slate-400">
               <span>Tiến độ khóa học</span>
-              <span className="text-slate-700 tabular-nums">{done}/{student.totalSessions} buổi ({progressPct}%)</span>
+              <span className="text-slate-700 tabular-nums">{done}/{sessionTotal} buổi ({progressPct}%)</span>
             </div>
             <div className="h-1.5 sm:h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
               <div
@@ -979,6 +1044,13 @@ export const StudentCard = ({
                 style={{ width: `${progressPct}%` }}
               />
             </div>
+            {priorCredit > 0 ? (
+              <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1.5 leading-snug">
+                Trên lịch: <span className="font-semibold text-slate-700">{onCalendarDone}</span>
+                {' · '}
+                Ghi nhận trước: <span className="font-semibold text-slate-700">{priorCredit}</span>
+              </p>
+            ) : null}
           </div>
         </div>
         </div>
@@ -1029,7 +1101,7 @@ export const StudentCard = ({
                     </div>
                     <div className="bg-amber-50/60 border border-amber-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
                        <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wide mb-1 text-amber-600 truncate max-w-full">Còn lại</p>
-                       <h4 className="text-lg sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{student.remainingSessions}</h4>
+                       <h4 className="text-lg sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{remainingSessions}</h4>
                        <p className="text-[10px] sm:text-xs font-bold mt-1 uppercase text-amber-400">buổi</p>
                     </div>
                     <div className="bg-purple-50/60 border border-purple-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
@@ -1041,6 +1113,14 @@ export const StudentCard = ({
                        <p className="text-xs font-bold text-purple-400 mt-1 uppercase hidden sm:block">Đánh giá chung</p>
                     </div>
                  </div>
+                 {priorCredit > 0 ? (
+                   <p className="text-[11px] sm:text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 leading-snug">
+                     Đã học gồm <span className="font-semibold text-slate-700">{onCalendarDone} buổi trên lịch</span>
+                     {' + '}
+                     <span className="font-semibold text-slate-700">{priorCredit} buổi ghi nhận trước</span>
+                     {' '}(Admin / chuyển khóa) — khớp số hệ thống.
+                   </p>
+                 ) : null}
 
                  {/* Actions: Điểm danh | Hủy ca / Hủy điểm danh — ẩn khi không còn lịch */}
                  {showSessionActionRow ? (
@@ -1060,6 +1140,8 @@ export const StudentCard = ({
                          isOverdueMakeup ? 'Quá hạn điểm danh — gửi yêu cầu điểm danh bù tới Admin' :
                          isCommittingAttendance ? 'Đang ghi nhận điểm danh lên hệ thống' :
                          isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
+                         attendanceDisputed ? 'Học viên không đồng ý — đang giải quyết (chờ Admin)' :
+                         awaitingStudentConfirm ? 'Đã gửi điểm danh — đang chờ học viên xác nhận' :
                          alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                          'Bấm để điểm danh buổi học hôm nay'
                        }
@@ -1070,6 +1152,10 @@ export const StudentCard = ({
                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
                          : isOverdueMakeup
                            ? 'bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] shadow-sm'
+                         : attendanceDisputed
+                           ? 'bg-amber-100 text-amber-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
+                         : awaitingStudentConfirm
+                           ? 'bg-blue-100 text-blue-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
                          : leftAttendanceLocked
                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
@@ -1087,6 +1173,10 @@ export const StudentCard = ({
                                ? 'Đang ghi nhận'
                              : isPendingConfirm
                                ? 'Đang xác nhận'
+                               : attendanceDisputed
+                                 ? 'Đang giải quyết'
+                               : awaitingStudentConfirm
+                                 ? 'Chờ HV xác nhận'
                                : alreadyAttendedToday
                                  ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
                                  : 'Điểm danh'}
@@ -1660,7 +1750,7 @@ export const StudentCard = ({
                 <div className="bg-emerald-50 rounded-3xl p-6 border border-emerald-100">
                   <p className="text-xs font-black text-emerald-800 uppercase tracking-widest mb-1">Học viên</p>
                   <p className="text-lg font-black text-emerald-600">{getDisplayName(student)}</p>
-                  <p className="text-xs font-bold text-emerald-400 mt-2">Tiến độ hiện tại: {done}/{student.totalSessions} buổi</p>
+                  <p className="text-xs font-bold text-emerald-400 mt-2">Tiến độ hiện tại: {done}/{sessionTotal} buổi</p>
                 </div>
                 
                 <div>
@@ -1734,8 +1824,13 @@ export const StudentCard = ({
               <p className="text-white font-bold text-lg tracking-wide truncate">{getDisplayName(student)}</p>
               <p className="text-slate-300 text-xs mt-0.5 flex flex-wrap items-center gap-2">
                 {student.course} · {student.age} tuổi
-                <span className={`inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-black tracking-wider uppercase ${student.learningMode === 'ONLINE' ? 'bg-red-500/20 text-blue-300' : 'bg-white/10 text-slate-300'}`}>
-                  {student.learningMode === 'ONLINE' ? '🌐 ONLINE' : '🏢 OFFLINE'}
+                <span className={`inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-black tracking-wider uppercase ${
+                  isStudentOnline ? 'bg-emerald-500/25 text-emerald-200' : 'bg-white/10 text-slate-300'
+                }`}>
+                  {isStudentOnline ? 'Đang online' : 'Offline'}
+                </span>
+                <span className="inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-semibold tracking-wider uppercase bg-white/10 text-slate-400">
+                  {student.learningMode === 'ONLINE' ? 'Học online' : 'Học tại trung tâm'}
                 </span>
               </p>
             </div>
@@ -1756,13 +1851,18 @@ export const StudentCard = ({
         <div className="mt-4">
           <div className="flex justify-between items-center mb-1.5 text-xs">
             <span className="text-slate-400">Tiến độ khóa học</span>
-            <span className="text-white font-bold">{done}/{student.totalSessions} buổi ({progressPct}%)</span>
+            <span className="text-white font-bold">{done}/{sessionTotal} buổi ({progressPct}%)</span>
           </div>
           <div className="h-2 bg-slate-600 rounded-full overflow-hidden">
             <div className={`h-full rounded-full transition-all duration-700 ${
               progressPct >= 70 ? 'bg-green-400' : progressPct >= 40 ? 'bg-yellow-400' : 'bg-blue-400'
             }`} style={{ width: `${progressPct}%` }} />
           </div>
+          {priorCredit > 0 ? (
+            <p className="text-[10px] text-slate-400 mt-1.5">
+              Trên lịch: {onCalendarDone} · Ghi nhận trước: {priorCredit}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -1807,7 +1907,7 @@ export const StudentCard = ({
               </div>
               <div className={`rounded-2xl p-4 text-center border ${isCompleted ? 'bg-green-50 border-green-100' : 'bg-orange-50 border-orange-100'}`}>
                 <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${isCompleted ? 'text-green-500' : 'text-orange-500'}`}>Còn lại</p>
-                <p className={`text-3xl font-black ${isCompleted ? 'text-green-700' : 'text-orange-700'}`}>{student.remainingSessions}</p>
+                <p className={`text-3xl font-black ${isCompleted ? 'text-green-700' : 'text-orange-700'}`}>{remainingSessions}</p>
                 <p className={`text-xs ${isCompleted ? 'text-green-400' : 'text-orange-400'}`}>buổi</p>
               </div>
               <div className="bg-purple-50 rounded-2xl p-4 text-center border border-purple-100">
@@ -1816,6 +1916,14 @@ export const StudentCard = ({
                 <p className="text-xs text-purple-400">/ 10</p>
               </div>
             </div>
+            {priorCredit > 0 ? (
+              <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 leading-snug">
+                Đã học gồm <span className="font-semibold text-slate-700">{onCalendarDone} buổi trên lịch</span>
+                {' + '}
+                <span className="font-semibold text-slate-700">{priorCredit} buổi ghi nhận trước</span>
+                {' '}(Admin / chuyển khóa).
+              </p>
+            ) : null}
             {/* === 2-COLUMN LAYOUT: Điểm danh | Hủy ca / Hủy điểm danh === */}
             {showSessionActionRow ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1832,6 +1940,8 @@ export const StudentCard = ({
                     isOverdueMakeup ? 'Quá hạn — gửi yêu cầu điểm danh bù tới Admin' :
                     isCommittingAttendance ? 'Đang ghi nhận điểm danh lên hệ thống' :
                     isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
+                    attendanceDisputed ? 'Học viên không đồng ý — đang giải quyết (chờ Admin)' :
+                    awaitingStudentConfirm ? 'Đã gửi điểm danh — đang chờ học viên xác nhận' :
                     alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
                     'Bấm để điểm danh'
                   }
@@ -1842,6 +1952,10 @@ export const StudentCard = ({
                       ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
                     : isOverdueMakeup
                       ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:shadow-amber-200 shadow-amber-100 active:scale-[0.97] border-2 border-transparent'
+                    : attendanceDisputed
+                      ? 'bg-amber-100 text-amber-800 cursor-not-allowed pointer-events-none select-none border-2 border-amber-200'
+                    : awaitingStudentConfirm
+                      ? 'bg-blue-100 text-blue-800 cursor-not-allowed pointer-events-none select-none border-2 border-blue-200'
                     : leftAttendanceLocked
                       ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
                       : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
@@ -1858,6 +1972,10 @@ export const StudentCard = ({
                           ? <>ĐANG<br/>GHI NHẬN</>
                         : isPendingConfirm
                           ? <>ĐANG<br/>XÁC NHẬN</>
+                          : attendanceDisputed
+                            ? <>ĐANG<br/>GIẢI QUYẾT</>
+                          : awaitingStudentConfirm
+                            ? <>CHỜ HV<br/>XÁC NHẬN</>
                           : alreadyAttendedToday
                             ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
                             : 'ĐIỂM DANH'}
@@ -2031,7 +2149,7 @@ export const StudentCard = ({
               <div className="bg-emerald-50 rounded-3xl p-6 border border-emerald-100">
                 <p className="text-xs font-black text-emerald-800 uppercase tracking-widest mb-1">Học viên</p>
                 <p className="text-lg font-black text-emerald-600">{getDisplayName(student)}</p>
-                <p className="text-xs font-bold text-emerald-400 mt-2">Tiến độ hiện tại: {done}/{student.totalSessions} buổi</p>
+                <p className="text-xs font-bold text-emerald-400 mt-2">Tiến độ hiện tại: {done}/{sessionTotal} buổi</p>
               </div>
               
               <div>

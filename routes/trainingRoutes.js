@@ -754,7 +754,7 @@ router.post('/qa', lmsGuard('lms_qa_create'), async (req, res) => {
 
     await NotificationService.send(io, {
       type: 'COURSE',
-      title: 'Học viên có câu hỏi mới',
+      title: role === 'teacher' ? 'Giảng viên có câu hỏi mới' : 'Học viên có câu hỏi mới',
       content: `${askerName}: "${preview}"${doc.lessonTitle ? ` · Bài: ${doc.lessonTitle}` : ''}`,
       sender_id: userId,
       receivers: ['ALL_ADMIN'],
@@ -830,6 +830,123 @@ router.post('/qa/:id/answer', lmsGuard('lms_qa_answer'), async (req, res) => {
     res.json({ success: true, data: mapQaDoc(doc) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── LMS Course Reviews ─────────────────────────────────────────────────────
+const LmsCourseReview = require('../models/LmsCourseReview');
+
+function mapReviewDoc(doc) {
+  const o = doc.toObject ? doc.toObject() : { ...doc };
+  return {
+    id: String(o._id),
+    courseId: String(o.courseId || ''),
+    courseTitle: o.courseTitle || '',
+    audience: o.audience || 'student',
+    rating: Number(o.rating) || 0,
+    comment: o.comment || '',
+    author: o.reviewerName || 'Học viên',
+    reviewerId: String(o.reviewerId || ''),
+    reviewerRole: o.reviewerRole || 'student',
+    createdAt: o.createdAt ? new Date(o.createdAt).getTime() : Date.now(),
+  };
+}
+
+// GET /reviews?courseId=&audience=
+router.get('/reviews', lmsGuard('lms_qa_list'), async (req, res) => {
+  try {
+    const courseId = String(req.query.courseId || '').trim();
+    if (!courseId) {
+      return res.status(400).json({ success: false, message: 'Thiếu courseId' });
+    }
+    const audience = req.query.audience === 'teacher' ? 'teacher' : 'student';
+    const rows = await LmsCourseReview.find({ courseId, audience })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+    const data = rows.map((r) => mapReviewDoc(r));
+    const avg = data.length
+      ? data.reduce((s, r) => s + (Number(r.rating) || 0), 0) / data.length
+      : 0;
+    return res.json({ success: true, data, avg, count: data.length });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /reviews — HV/GV đánh giá khóa học → thông báo admin
+router.post('/reviews', lmsGuard('lms_qa_create'), async (req, res) => {
+  try {
+    const userId = String(req.user.id || req.user._id || '');
+    const role = String(req.user.role || 'student').toLowerCase();
+    const {
+      courseId,
+      courseTitle,
+      rating,
+      comment,
+      audience,
+    } = req.body || {};
+
+    if (!courseId) {
+      return res.status(400).json({ success: false, message: 'Thiếu courseId' });
+    }
+    const stars = Math.min(5, Math.max(1, Math.round(Number(rating) || 0)));
+    if (!stars) {
+      return res.status(400).json({ success: false, message: 'Chọn số sao từ 1–5' });
+    }
+    const text = String(comment || '').trim().slice(0, 2000);
+    if (!text) {
+      return res.status(400).json({ success: false, message: 'Nhập nội dung đánh giá' });
+    }
+
+    const aud = audience === 'teacher' || role === 'teacher' ? 'teacher' : 'student';
+    const reviewerName =
+      req.user.name || req.user.fullName || (aud === 'teacher' ? 'Giảng viên' : 'Học viên');
+
+    const doc = await LmsCourseReview.findOneAndUpdate(
+      { courseId: String(courseId), audience: aud, reviewerId: userId },
+      {
+        $set: {
+          courseTitle: String(courseTitle || '').slice(0, 300),
+          reviewerRole: ['teacher', 'admin', 'staff'].includes(role) ? role : 'student',
+          reviewerName,
+          rating: stars,
+          comment: text,
+        },
+        $setOnInsert: {
+          courseId: String(courseId),
+          audience: aud,
+          reviewerId: userId,
+        },
+      },
+      { upsert: true, returnDocument: 'after', new: true }
+    );
+
+    const io = req.app.get('io');
+    const preview = text.length > 100 ? `${text.slice(0, 100)}…` : text;
+    const who = aud === 'teacher' ? 'Giảng viên' : 'Học viên';
+    await NotificationService.send(io, {
+      type: 'COURSE',
+      title: `${who} đánh giá khóa học`,
+      content: `${reviewerName} · ${stars}★ · ${doc.courseTitle || 'Khóa học'}: "${preview}"`,
+      sender_id: userId,
+      receivers: ['ALL_ADMIN'],
+      payload: {
+        kind: 'lms_review',
+        reviewId: String(doc._id),
+        courseId: String(doc.courseId),
+        audience: aud,
+        rating: stars,
+      },
+      link: `/admin/notifications?reviewId=${encodeURIComponent(String(doc._id))}`,
+    });
+
+    return res.json({ success: true, data: mapReviewDoc(doc) });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Bạn đã đánh giá khóa này' });
+    }
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

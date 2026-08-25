@@ -19,6 +19,8 @@ const PERMISSIONS = {
   VIEW_BRANCH_REVENUE: 'view_branch_revenue',
   VIEW_TEACHERS: 'view_teachers',
   MANAGE_TEACHERS: 'manage_teachers',
+  VIEW_CENTER_INFO: 'view_center_info',
+  MANAGE_CENTER_INFO: 'manage_center_info',
 };
 
 /** Enum các adminRole — dùng chung thay vì hard-code string */

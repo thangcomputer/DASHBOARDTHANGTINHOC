@@ -31,6 +31,8 @@ const TenantManagementPage = lazy(() => import('./components/TenantManagementPag
 const PublicPaymentPage = lazy(() => import('./components/PublicPaymentPage'));
 const FeedBoard = lazy(() => import('./components/FeedBoard'));
 const NewsPage = lazy(() => import('./components/NewsPage'));
+const CenterInfoPage = lazy(() => import('./components/centerInfo/CenterInfoPage'));
+const CenterInfoManagePage = lazy(() => import('./components/centerInfo/CenterInfoManagePage'));
 const CertPrepCatalogPage = lazy(() => import('./components/student/certPrep/CertPrepCatalogPage'));
 const CertPrepLevelPage = lazy(() => import('./components/student/certPrep/CertPrepLevelPage'));
 const CertPrepStudentPlayer = lazy(() => import('./components/student/certPrep/CertPrepStudentPlayer'));
@@ -351,6 +353,14 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
             <ErrorBoundary inline><NewsPage session={session} role="admin" /></ErrorBoundary>
           </PermissionGuard>
         } />
+        <Route path="/admin/center-info" element={
+          <ErrorBoundary inline><CenterInfoPage session={session} role="admin" /></ErrorBoundary>
+        } />
+        <Route path="/admin/center-info/manage" element={
+          <PermissionGuard session={session} anyOf={[PERMISSIONS.MANAGE_CENTER_INFO]}>
+            <ErrorBoundary inline><CenterInfoManagePage /></ErrorBoundary>
+          </PermissionGuard>
+        } />
       </Route>
 
       {/* ═══ Teacher ═══ */}
@@ -377,6 +387,9 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         } />
         <Route path="/teacher/news/:slug" element={
           <ErrorBoundary inline><NewsPage session={session} role="teacher" /></ErrorBoundary>
+        } />
+        <Route path="/teacher/center-info" element={
+          <ErrorBoundary inline><CenterInfoPage session={session} role="teacher" /></ErrorBoundary>
         } />
         <Route path="/teacher/test"    element={
           <ErrorBoundary>
@@ -421,6 +434,9 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         } />
         <Route path="/student/news/:slug" element={
           <ErrorBoundary inline><NewsPage session={session} role="student" /></ErrorBoundary>
+        } />
+        <Route path="/student/center-info" element={
+          <ErrorBoundary inline><CenterInfoPage session={session} role="student" /></ErrorBoundary>
         } />
         <Route path="/student/cert-prep" element={
           <ErrorBoundary inline>

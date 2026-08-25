@@ -336,9 +336,25 @@ router.get('/training-data', authMiddleware, ...settingsGuard('auth_only'), asyn
 // ── PUT /api/settings/training-data ── Cập nhật training data (Admin) ─────────────
 router.put('/training-data', authMiddleware, ...settingsGuard('training_write'), async (req, res) => {
   try {
-    await updateMainSettings({ $set: { trainingRawData: req.body.trainingData } });
+    const prev = await SystemSettings.findOne({ _key: 'main' }).select('trainingRawData').lean();
+    const oldData = prev?.trainingRawData || {};
+    const newData = req.body.trainingData || {};
+    await updateMainSettings({ $set: { trainingRawData: newData } });
     const io = req.app.get('io');
     if (io) emitSettingsRefresh(io);
+
+    const senderId = String(req.user?.id || req.user?._id || 'SYSTEM');
+    const { notifyTrainingVideoChanges } = require('../services/lmsTrainingNotify');
+    notifyTrainingVideoChanges(io, {
+      audience: 'teacher',
+      oldData,
+      newData,
+      senderId,
+      actorName: req.user?.name || req.user?.fullName || 'Admin',
+      actorRole: req.user?.role || 'admin',
+      ip: req.ip || req.headers['x-forwarded-for'] || '',
+      userAgent: req.headers['user-agent'] || '',
+    }).catch((err) => logger.error('[training-data] notify:', err));
 
     return res.json({ success: true, message: 'Đã cập nhật training data' });
   } catch (err) {
@@ -360,9 +376,25 @@ router.get('/student-training-data', authMiddleware, ...settingsGuard('auth_only
 // ── PUT /api/settings/student-training-data ── Cập nhật student training data (Admin) ─────────────
 router.put('/student-training-data', authMiddleware, ...settingsGuard('student_training_write'), async (req, res) => {
   try {
-    await updateMainSettings({ $set: { studentTrainingRawData: req.body.studentTrainingData } });
+    const prev = await SystemSettings.findOne({ _key: 'main' }).select('studentTrainingRawData').lean();
+    const oldData = prev?.studentTrainingRawData || {};
+    const newData = req.body.studentTrainingData || {};
+    await updateMainSettings({ $set: { studentTrainingRawData: newData } });
     const io = req.app.get('io');
     if (io) emitSettingsRefresh(io);
+
+    const senderId = String(req.user?.id || req.user?._id || 'SYSTEM');
+    const { notifyTrainingVideoChanges } = require('../services/lmsTrainingNotify');
+    notifyTrainingVideoChanges(io, {
+      audience: 'student',
+      oldData,
+      newData,
+      senderId,
+      actorName: req.user?.name || req.user?.fullName || 'Admin',
+      actorRole: req.user?.role || 'admin',
+      ip: req.ip || req.headers['x-forwarded-for'] || '',
+      userAgent: req.headers['user-agent'] || '',
+    }).catch((err) => logger.error('[student-training-data] notify:', err));
 
     return res.json({ success: true, message: 'Đã cập nhật dữ liệu học viên' });
   } catch (err) {

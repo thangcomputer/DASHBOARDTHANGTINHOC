@@ -45,7 +45,7 @@ const TeacherDashboard = ({ onNavigate }) => {
     getSchedulesByTeacher, getTeacherRating, RATING_CRITERIA, getTransactionsByTeacher,
     addSchedule, updateSchedule, cancelSchedule,
     revokeStudentExam, updateStudent, updateTeacher, failStudentExam,
-    studentTrainingData, trainingData,
+    trainingData,
   } = useData();
 
   const { socket, onlineUsers, lastSeenUsers } = useSocket();
@@ -579,10 +579,7 @@ const TeacherDashboard = ({ onNavigate }) => {
         ) : currentHash === 'software-links' ? (
           <div className="cms-sd cms-sd-page bg-slate-50 min-h-full py-2 sm:py-4">
             <SoftwareLinksTable
-              items={[
-                ...(Array.isArray(studentTrainingData?.softwareLinks) ? studentTrainingData.softwareLinks : []),
-                ...(Array.isArray(trainingData?.softwareLinks) ? trainingData.softwareLinks : []),
-              ].filter((item, idx, arr) => arr.findIndex((x) => String(x.id) === String(item.id)) === idx)}
+              items={Array.isArray(trainingData?.softwareLinks) ? trainingData.softwareLinks : []}
             />
           </div>
         ) : currentHash === 'students' ? (

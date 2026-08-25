@@ -32,6 +32,27 @@ const scheduleSchema = new mongoose.Schema({
     default: 'scheduled',
   },
 
+  /**
+   * Xác nhận điểm danh của HV (sau cửa sổ 30s hủy của GV).
+   * none → pending (chờ HV) → accepted | disputed → admin_approved | admin_rejected
+   * Chỉ khi accepted/admin_approved (kèm status=completed) mới tính buổi/lương.
+   */
+  studentConfirmStatus: {
+    type: String,
+    enum: ['none', 'pending', 'accepted', 'disputed', 'admin_approved', 'admin_rejected'],
+    default: 'none',
+  },
+  studentConfirmRequestedAt: { type: Date, default: null },
+  studentConfirmedAt: { type: Date, default: null },
+  attendanceDisputeResolvedAt: { type: Date, default: null },
+  attendanceDisputeResolvedBy: { type: String, default: '' },
+  /** Điểm / ghi chú tạm khi chờ HV xác nhận (chưa ghi enrollment). */
+  attendancePendingGrade: { type: Number, default: null },
+  attendancePendingNote: { type: String, default: '' },
+  /** Buổi thứ N dự kiến (preview) lúc GV gửi xác nhận. */
+  sessionOrdinalPreview: { type: Number, default: null },
+  sessionTotalPreview: { type: Number, default: null },
+
   // Thanh toán
   is_paid_to_teacher: { type: Boolean, default: false }, 
   paymentStatus: {
@@ -59,6 +80,8 @@ scheduleSchema.index({ teacherId: 1, date: 1 });
 scheduleSchema.index({ studentId: 1, date: 1 });
 scheduleSchema.index({ studentId: 1, status: 1 });
 scheduleSchema.index({ studentId: 1, status: 1, createdAt: -1 });
+scheduleSchema.index({ studentId: 1, studentConfirmStatus: 1 });
+scheduleSchema.index({ studentConfirmStatus: 1, status: 1 });
 scheduleSchema.index({ branchId: 1, date: 1 });
 scheduleSchema.index({ branchId: 1, status: 1 });
 scheduleSchema.index({ status: 1, date: 1 });

@@ -1,6 +1,25 @@
 import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
+import api, { resolveMediaUrl } from '../../../services/api';
+
+function hydrateEditorHtml(html) {
+  return String(html || '').replace(
+    /(<img\b[^>]*\bsrc=["'])([^"']+)(["'])/gi,
+    (_, pre, src, post) => `${pre}${resolveMediaUrl(src) || src}${post}`,
+  );
+}
+
+/** Giữ path /uploads/... khi lưu (payload nhỏ, không phụ thuộc origin). */
+function normalizeEditorHtmlForSave(root) {
+  if (!root) return '';
+  root.querySelectorAll('img[src]').forEach((img) => {
+    const src = img.getAttribute('src') || '';
+    const m = src.match(/\/uploads\/[^\s?#]+/i);
+    if (m) img.setAttribute('src', m[0]);
+  });
+  return root.innerHTML;
+}
 
 export default function RichTextEditor({ value, onChange, placeholder }) {
   const editorRef = React.useRef(null);
@@ -8,11 +27,12 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
   const [showLinkInput, setShowLinkInput] = React.useState(false);
   const [linkUrl, setLinkUrl] = React.useState('');
   const [headingPick, setHeadingPick] = React.useState('');
+  const [imageUploading, setImageUploading] = React.useState(false);
   const savedSelection = React.useRef(null);
 
   React.useEffect(() => {
     if (editorRef.current && !hasInitialized.current) {
-      editorRef.current.innerHTML = value || '';
+      editorRef.current.innerHTML = hydrateEditorHtml(value || '');
       hasInitialized.current = true;
     }
   }, []);
@@ -20,7 +40,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
   React.useEffect(() => {
     if (editorRef.current && value !== editorRef.current.innerHTML) {
       if (!hasInitialized.current || value === '') {
-        editorRef.current.innerHTML = value || '';
+        editorRef.current.innerHTML = hydrateEditorHtml(value || '');
         hasInitialized.current = true;
       }
     }
@@ -50,9 +70,10 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
   };
 
   const handleInput = () => {
-    if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
-    }
+    if (!editorRef.current) return;
+    // Không đổi src trên DOM đang hiện — chỉ normalize bản clone khi lưu
+    const clone = editorRef.current.cloneNode(true);
+    onChange(normalizeEditorHtmlForSave(clone));
   };
 
   // Color picker handlers
@@ -65,19 +86,32 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
     exec('hiliteColor', e.target.value);
   };
 
-  // Image upload → base64
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
+  // Image → upload /uploads (tránh base64 vượt JSON 50kb khi lưu training)
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+    if (!String(file.type || '').startsWith('image/')) {
+      window.alert?.('Chỉ chọn file ảnh (JPG, PNG, WEBP, GIF).');
+      return;
+    }
+    setImageUploading(true);
+    try {
+      const data = await api.settings.uploadTrainingFile(file);
+      const storedUrl = String(data?.fileUrl || '').trim();
+      if (!data?.success || !storedUrl) {
+        throw new Error(data?.message || 'Upload ảnh thất bại');
+      }
       restoreSelection();
       editorRef.current?.focus();
-      document.execCommand('insertImage', false, ev.target.result);
+      const displayUrl = resolveMediaUrl(storedUrl) || storedUrl;
+      document.execCommand('insertImage', false, displayUrl);
       handleInput();
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    } catch (err) {
+      window.alert?.(err?.message || 'Không tải được ảnh');
+    } finally {
+      setImageUploading(false);
+    }
   };
 
   // Link insertion
@@ -161,9 +195,14 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
         <button type="button" onClick={openLinkInput} className={btnClass} title="Chèn liên kết">🔗</button>
 
         {/* Image upload */}
-        <label className={btnClass + " relative overflow-hidden"} title="Chèn hình ảnh" onMouseDown={e => e.stopPropagation()}>
-          🖼️
-          <input type="file" accept="image/*"
+        <label
+          className={btnClass + ` relative overflow-hidden ${imageUploading ? 'opacity-50 pointer-events-none' : ''}`}
+          title={imageUploading ? 'Đang tải ảnh...' : 'Chèn hình ảnh'}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {imageUploading ? '…' : '🖼️'}
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+            disabled={imageUploading}
             onMouseDown={e => { e.stopPropagation(); saveSelection(); }}
             onChange={handleImageUpload}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />

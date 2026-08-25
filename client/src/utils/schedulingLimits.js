@@ -60,13 +60,56 @@ export function countEnrollmentUsage(schedules, studentId, courseName, excludeSc
   }).length;
 }
 
+/** Số buổi đã điểm danh xong trên lịch (status=completed). */
+export function countEnrollmentCompleted(schedules, studentId, courseName) {
+  const sid = String(studentId || '');
+  const course = normCourse(courseName);
+  return (schedules || []).filter((sch) => {
+    if (String(sch?.status || '') !== 'completed') return false;
+    const schSid = String(sch.studentId?._id || sch.studentId?.id || sch.studentId || '');
+    if (schSid !== sid) return false;
+    if (course && normCourse(sch.course) !== course) return false;
+    return true;
+  }).length;
+}
+
+/**
+ * Tiến độ chuẩn = enrollment.completedSessions (Admin).
+ * priorCredit = buổi ghi nhận trước / chỉnh tay chưa có đủ lịch completed.
+ * effectiveUsed = ca trên lịch + prior → khớp «còn lại» Admin khi xếp lịch.
+ */
+export function resolveEnrollmentProgress(student, schedules, excludeScheduleId) {
+  const studentId = String(student?._id || student?.id || '');
+  const course = student?.course || '';
+  const totalSessions = Number(student?.totalSessions) > 0 ? Number(student.totalSessions) : 12;
+  const storedDone = student?.completedSessions != null
+    ? Math.max(0, Number(student.completedSessions) || 0)
+    : Math.max(0, totalSessions - (Number(student?.remainingSessions) || 0));
+  const onCalendar = countEnrollmentCompleted(schedules, studentId, course);
+  const used = countEnrollmentUsage(schedules, studentId, course, excludeScheduleId);
+  const priorCredit = Math.max(0, storedDone - onCalendar);
+  const displayDone = storedDone;
+  const effectiveUsed = used + priorCredit;
+  return {
+    studentId,
+    course,
+    totalSessions,
+    storedDone,
+    onCalendar,
+    priorCredit,
+    used,
+    effectiveUsed,
+    displayDone,
+    remaining: Math.max(0, totalSessions - effectiveUsed),
+    remainingLearned: Math.max(0, totalSessions - displayDone),
+  };
+}
+
 /**
  * Build UX gate for one student enrollment row.
  */
 export function getStudentScheduleGate(student, schedules, date, excludeScheduleId) {
-  const studentId = String(student?._id || student?.id || '');
   const course = student?.course || '';
-  const totalSessions = Number(student?.totalSessions) > 0 ? Number(student.totalSessions) : 12;
   const enrStatus = String(
     student?.enrollmentStatus
     || (Array.isArray(student?.enrollments)
@@ -76,13 +119,24 @@ export function getStudentScheduleGate(student, schedules, date, excludeSchedule
     || 'active',
   );
 
-  const used = countEnrollmentUsage(schedules, studentId, course, excludeScheduleId);
-  const remaining = Math.max(0, totalSessions - used);
+  const progress = resolveEnrollmentProgress(student, schedules, excludeScheduleId);
+  const {
+    studentId,
+    totalSessions,
+    used,
+    effectiveUsed,
+    displayDone,
+    onCalendar,
+    priorCredit,
+    remaining,
+    remainingLearned,
+  } = progress;
   const todayCount = countStudentSessionsOnDate(schedules, studentId, date, excludeScheduleId);
 
   const completedLike = enrStatus === 'completed'
     || enrStatus === 'Hoàn thành'
-    || used >= totalSessions;
+    || effectiveUsed >= totalSessions
+    || displayDone >= totalSessions;
   const notActive = enrStatus === 'cancelled'
     || enrStatus === 'refunded'
     || enrStatus === 'paused'
@@ -107,12 +161,17 @@ export function getStudentScheduleGate(student, schedules, date, excludeSchedule
     course,
     totalSessions,
     used,
+    effectiveUsed,
+    completed: displayDone,
+    onCalendar,
+    priorCredit,
     remaining,
+    remainingLearned,
     todayCount,
     todayMax: MAX_STUDENT_SESSIONS_PER_DAY,
     canSchedule,
     reason,
-    progressLabel: `${used}/${totalSessions} buổi`,
+    progressLabel: `${displayDone}/${totalSessions} buổi`,
     todayLabel: `${todayCount}/${MAX_STUDENT_SESSIONS_PER_DAY} ca`,
   };
 }

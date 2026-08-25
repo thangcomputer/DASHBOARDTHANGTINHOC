@@ -188,7 +188,7 @@ export function useAttendanceConfirmFlush({ enabled, teacherId }) {
           entry.courseName,
           entry.scheduleId || undefined,
         );
-        toastRef.current.success('Đã điểm danh thành công!');
+        toastRef.current.success('Đã gửi điểm danh — đang chờ học viên xác nhận.');
       } catch (err) {
         if (err?.cooldown) {
           toastRef.current.error(err.message || 'Học viên này đã được điểm danh. Vui lòng thử lại sau 12 tiếng.');

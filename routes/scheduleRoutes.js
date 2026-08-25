@@ -512,6 +512,98 @@ router.get('/teacher/:teacherId', [authMiddleware, ...schedulesGuard('get_teache
   }
 });
 
+function buildAttendanceConfirmPayload(sch) {
+  const d = sch.date ? new Date(sch.date) : null;
+  const weekday = d && !Number.isNaN(d.getTime())
+    ? d.toLocaleDateString('vi-VN', { weekday: 'long', timeZone: 'Asia/Ho_Chi_Minh' })
+    : '';
+  const dateLabel = d && !Number.isNaN(d.getTime())
+    ? d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
+    : '';
+  const start = sch.startTime || '';
+  const end = sch.endTime || '';
+  return {
+    scheduleId: String(sch._id || sch.id),
+    studentId: String(sch.studentId?._id || sch.studentId || ''),
+    teacherId: String(sch.teacherId?._id || sch.teacherId || ''),
+    teacherName: sch.teacherName || sch.teacherId?.name || 'Giảng viên',
+    studentName: sch.studentName || sch.studentId?.name || '',
+    course: sch.course || '',
+    date: sch.date,
+    dateLabel,
+    weekday,
+    startTime: start,
+    endTime: end,
+    timeRange: end ? `${start} - ${end}` : start,
+    sessionNumber: sch.sessionOrdinalPreview || null,
+    totalSessions: sch.sessionTotalPreview || null,
+    studentConfirmStatus: sch.studentConfirmStatus || 'none',
+    note: sch.attendancePendingNote || sch.note || '',
+  };
+}
+
+async function emitAttendanceConfirmEvents(io, sch, eventName) {
+  if (!io || !sch) return;
+  const payload = buildAttendanceConfirmPayload(sch);
+  const sid = payload.studentId;
+  const tid = payload.teacherId;
+  try {
+    if (sid) {
+      io.to(sid).emit(eventName, payload);
+      io.to(`student_${sid}`).emit(eventName, payload);
+    }
+    if (tid) {
+      io.to(tid).emit(eventName, payload);
+      io.to(`teacher_${tid}`).emit(eventName, payload);
+    }
+    emitScheduleEvent(io, {
+      branchId: sch.branchId,
+      teacherId: sch.teacherId,
+      studentId: sch.studentId,
+    }, eventName, payload);
+  } catch (e) {
+    logger.warn('[SCHEDULE] confirm emit:', e.message);
+  }
+}
+
+// HV: lịch đang chờ xác nhận điểm danh
+router.get('/pending-confirm', [authMiddleware], async (req, res) => {
+  try {
+    const role = String(req.user.role || '').toLowerCase();
+    if (role !== 'student') {
+      return res.status(403).json({ success: false, message: 'Chỉ học viên' });
+    }
+    const uid = req.user.id || req.user._id;
+    const list = await Schedule.find({
+      studentId: uid,
+      status: 'scheduled',
+      studentConfirmStatus: 'pending',
+    }).sort({ studentConfirmRequestedAt: -1 }).limit(5).lean();
+    res.json({
+      success: true,
+      data: list.map(buildAttendanceConfirmPayload),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Admin: danh sách tranh chấp điểm danh
+router.get('/disputes', [authMiddleware], async (req, res) => {
+  try {
+    if (!isAdminOrStaff(req.user)) {
+      return res.status(403).json({ success: false, message: 'Chỉ Admin/Staff' });
+    }
+    const list = await Schedule.find({
+      status: 'scheduled',
+      studentConfirmStatus: 'disputed',
+    }).sort({ studentConfirmedAt: -1 }).limit(100).lean();
+    res.json({ success: true, data: list.map(buildAttendanceConfirmPayload) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ─── GET /api/schedules/student/:studentId ─────────────────────────────────────
 // Học viên xem lịch học của mình
 router.get('/student/:studentId', [authMiddleware, ...schedulesGuard('get_student')], async (req, res) => {
@@ -849,22 +941,79 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       return res.status(403).json({ success: false, message: 'Bạn chỉ được chỉnh sửa lịch của chính mình' });
     }
 
-    // ── Canonical attendance completion (teacher window / admin makeup) ──
+    // ── Canonical attendance: GV → chờ HV xác nhận; Admin makeup → completed ngay ──
     if (status === 'completed' && schedule.status !== 'completed') {
       try {
-        const { completeScheduleAttendance } = require('../services/attendanceService');
         const ioAttend = req.app.get('io');
+        const actor = {
+          id: req.user.id || req.user._id,
+          role: req.user.role,
+          name: req.user.name,
+        };
+        const isAdminMakeup = Boolean(req.body.adminMakeup || req.body.makeup);
+        const teacherNeedsStudentConfirm = role === 'teacher' && !isAdminMakeup;
+
+        if (teacherNeedsStudentConfirm || req.body.awaitStudentConfirm) {
+          const { requestStudentAttendanceConfirm } = require('../services/attendanceService');
+          const NotificationService = require('../services/NotificationService');
+          const result = await requestStudentAttendanceConfirm({
+            schedule,
+            actor,
+            lateReason: lateReason || note,
+            note: note !== undefined ? note : undefined,
+            grade: req.body.grade,
+          });
+
+          if (ioAttend && result.schedule?.studentId) {
+            const payload = buildAttendanceConfirmPayload(result.schedule);
+            await NotificationService.send(ioAttend, {
+              type: 'SCHEDULE',
+              title: '📋 Xác nhận điểm danh buổi học',
+              content: `${payload.teacherName} đã điểm danh buổi ${payload.sessionNumber || '?'} — vui lòng xác nhận Đồng ý / Không đồng ý.`,
+              receivers: String(payload.studentId),
+              payload: { kind: 'attendance_confirm_pending', ...payload },
+              link: '/student',
+            }).catch((e) => logger.warn('[SCHEDULE] confirm notif:', e.message));
+
+            emitAttendanceConfirmEvents(ioAttend, result.schedule, 'attendance:awaiting-confirm')
+              .catch((e) => logger.warn('[SCHEDULE] confirm socket:', e.message));
+
+            emitScheduleEvent(ioAttend, {
+              branchId: result.schedule.branchId,
+              teacherId: result.schedule.teacherId,
+              studentId: result.schedule.studentId,
+            }, 'schedule:updated', result.schedule);
+
+            // Khóa điểm danh lại (chưa tính buổi)
+            emitScheduleEvent(ioAttend, {
+              branchId: result.schedule.branchId,
+              teacherId: result.schedule.teacherId,
+              studentId: result.schedule.studentId,
+            }, 'attendance:locked', {
+              studentId: String(result.schedule.studentId._id || result.schedule.studentId),
+              course: result.schedule.course,
+              can_check_in: false,
+              awaitingConfirm: true,
+              meta: result.meta,
+            });
+          }
+
+          return res.json({
+            success: true,
+            data: result.schedule,
+            awaitingStudentConfirm: true,
+            meta: result.meta,
+          });
+        }
+
+        const { completeScheduleAttendance } = require('../services/attendanceService');
         const result = await completeScheduleAttendance({
           schedule,
-          actor: {
-            id: req.user.id || req.user._id,
-            role: req.user.role,
-            name: req.user.name,
-          },
+          actor,
           lateReason: lateReason || note,
           note: note !== undefined ? note : undefined,
           io: ioAttend,
-          forceAdminMakeup: Boolean(req.body.adminMakeup || req.body.makeup),
+          forceAdminMakeup: isAdminMakeup,
         });
 
         if (ioAttend && result.schedule?.studentId) {
@@ -876,10 +1025,12 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
             date: result.schedule.date,
           }).catch((e) => logger.warn('[SCHEDULE] attendance notify:', e.message));
 
-          const isAdminMakeup = Boolean(req.body.adminMakeup || req.body.makeup);
           if (isAdminMakeup && result.schedule.teacherId) {
             const { notifyTeacherAdminMakeup } = require('../services/teacherAdminNotifier');
-            notifyTeacherAdminMakeup(ioAttend, result.schedule, req.user)
+            notifyTeacherAdminMakeup(ioAttend, result.schedule, req.user, {
+              completedSessions: result.meta?.completedSessions,
+              totalSessions: result.meta?.totalSessions,
+            })
               .catch((e) => logger.warn('[SCHEDULE] makeup teacher notify:', e.message));
           }
           if (result.schedule.teacherId) {
@@ -1173,6 +1324,264 @@ router.delete('/:scheduleId', [authMiddleware, ...schedulesGuard('delete')], asy
     }
     res.json({ success: true, message: 'Đã xóa lịch học' });
   } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── POST /api/schedules/:scheduleId/student-confirm ──────────────────────────
+// HV: đồng ý / không đồng ý điểm danh
+router.post('/:scheduleId/student-confirm', [authMiddleware], async (req, res) => {
+  try {
+    const role = String(req.user.role || '').toLowerCase();
+    if (role !== 'student') {
+      return res.status(403).json({ success: false, message: 'Chỉ học viên xác nhận điểm danh' });
+    }
+    const schedule = await Schedule.findById(req.params.scheduleId);
+    if (!schedule) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
+    }
+    const { respondStudentAttendanceConfirm } = require('../services/attendanceService');
+    const NotificationService = require('../services/NotificationService');
+    const io = req.app.get('io');
+    const result = await respondStudentAttendanceConfirm({
+      schedule,
+      actor: { id: req.user.id || req.user._id, role: req.user.role, name: req.user.name },
+      decision: req.body.decision || req.body.action,
+    });
+
+    const sch = result.schedule;
+    const payload = buildAttendanceConfirmPayload(sch);
+    const tid = payload.teacherId;
+    const sid = payload.studentId;
+
+    if (result.meta?.disputed) {
+      if (io) {
+        await NotificationService.notifyAdmins(
+          io,
+          '⚠️ Tranh chấp điểm danh buổi học',
+          `HV ${payload.studentName} không đồng ý điểm danh buổi ${payload.sessionNumber || '?'} — GV ${payload.teacherName} · ${payload.course} · ${payload.dateLabel} ${payload.timeRange}.`,
+          { kind: 'attendance_dispute', ...payload },
+          '/admin/students',
+        ).catch((e) => logger.warn('[SCHEDULE] dispute admin notif:', e.message));
+
+        if (tid) {
+          await NotificationService.send(io, {
+            type: 'SCHEDULE',
+            title: '⚠️ Học viên không đồng ý điểm danh',
+            content: `HV ${payload.studentName} không xác nhận buổi ${payload.sessionNumber || '?'} — đang giải quyết (chờ Admin).`,
+            receivers: tid,
+            payload: { kind: 'attendance_dispute', ...payload },
+            link: '/teacher#students',
+          }).catch(() => {});
+        }
+        if (sid) {
+          await NotificationService.send(io, {
+            type: 'SCHEDULE',
+            title: 'Đã gửi tranh chấp điểm danh',
+            content: `Buổi ${payload.sessionNumber || '?'} đang được Admin giải quyết. Chưa tính vào tiến độ.`,
+            receivers: sid,
+            payload: { kind: 'attendance_dispute', ...payload },
+            link: '/student#schedule',
+          }).catch(() => {});
+        }
+        await emitAttendanceConfirmEvents(io, sch, 'attendance:disputed');
+      }
+      return res.json({ success: true, disputed: true, data: sch, meta: result.meta });
+    }
+
+    // Accepted → completed
+    if (io && sch?.studentId) {
+      notifyAttendanceTaken(io, {
+        studentId: sch.studentId._id || sch.studentId,
+        studentName: sch.studentName || sch.studentId?.name,
+        teacherName: sch.teacherName || sch.teacherId?.name,
+        course: sch.course,
+        date: sch.date,
+      }).catch(() => {});
+
+      if (tid) {
+        await NotificationService.send(io, {
+          type: 'SCHEDULE',
+          title: '✅ Học viên đã xác nhận điểm danh',
+          content: `HV ${payload.studentName} đồng ý buổi ${payload.sessionNumber || '?'} — buổi đã được tính.`,
+          receivers: tid,
+          payload: { kind: 'attendance_confirmed', ...payload },
+          link: '/teacher#students',
+        }).catch(() => {});
+      }
+
+      if (sch.teacherId) {
+        const { maybeNotifyStarBonusEligibility } = require('../services/teacherAdminNotifier');
+        maybeNotifyStarBonusEligibility(io, sch.teacherId).catch(() => {});
+      }
+      checkAndUnlockExam(String(sch.studentId._id || sch.studentId), io, sch.course).catch(() => {});
+      await emitAttendanceConfirmEvents(io, sch, 'attendance:confirmed');
+      emitScheduleEvent(io, {
+        branchId: sch.branchId,
+        teacherId: sch.teacherId,
+        studentId: sch.studentId,
+      }, 'schedule:updated', sch);
+    }
+
+    if (result.student?.teacher_payment_status === 'PAID_IN_ADVANCE') {
+      await Schedule.findByIdAndUpdate(sch._id, { is_paid_to_teacher: true, paymentStatus: 'paid' });
+    }
+
+    return res.json({
+      success: true,
+      disputed: false,
+      data: sch,
+      student: result.student
+        ? {
+          _id: result.student._id,
+          completedSessions: result.student.completedSessions,
+          remainingSessions: result.student.remainingSessions,
+          totalSessions: result.student.totalSessions,
+          enrollments: result.student.enrollments,
+          courses: result.student.courses,
+          status: result.student.status,
+        }
+        : undefined,
+      meta: result.meta,
+    });
+  } catch (err) {
+    if (err.code) {
+      return res.status(err.status || 409).json({ success: false, code: err.code, message: err.message });
+    }
+    logger.error('[SCHEDULE] student-confirm:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── POST /api/schedules/:scheduleId/resolve-dispute ──────────────────────────
+// Admin: chấp thuận / không chấp thuận buổi tranh chấp
+router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) => {
+  try {
+    if (!isAdminOrStaff(req.user)) {
+      return res.status(403).json({ success: false, message: 'Chỉ Admin/Staff xử lý tranh chấp' });
+    }
+    const schedule = await Schedule.findById(req.params.scheduleId);
+    if (!schedule) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
+    }
+    const { resolveAttendanceDispute } = require('../services/attendanceService');
+    const NotificationService = require('../services/NotificationService');
+    const io = req.app.get('io');
+    const result = await resolveAttendanceDispute({
+      schedule,
+      actor: { id: req.user.id || req.user._id, role: req.user.role, name: req.user.name },
+      decision: req.body.decision || req.body.action,
+    });
+
+    const sch = result.schedule;
+    const payload = buildAttendanceConfirmPayload(sch);
+    const tid = payload.teacherId;
+    const sid = payload.studentId;
+
+    if (result.meta?.rejected) {
+      if (io) {
+        const msg = `Buổi ${payload.sessionNumber || '?'} (${payload.course}) ngày ${payload.dateLabel} không được chấp thuận — không tính vào tiến độ và lương buổi.`;
+        if (tid) {
+          await NotificationService.send(io, {
+            type: 'SCHEDULE',
+            title: '❌ Buổi học không được tính',
+            content: msg,
+            receivers: tid,
+            payload: { kind: 'attendance_rejected', ...payload },
+            link: '/teacher#students',
+          }).catch(() => {});
+        }
+        if (sid) {
+          await NotificationService.send(io, {
+            type: 'SCHEDULE',
+            title: '❌ Buổi học không được tính',
+            content: msg,
+            receivers: sid,
+            payload: { kind: 'attendance_rejected', ...payload },
+            link: '/student#schedule',
+          }).catch(() => {});
+        }
+        await emitAttendanceConfirmEvents(io, sch, 'attendance:rejected');
+        emitScheduleEvent(io, {
+          branchId: sch.branchId,
+          teacherId: sch.teacherId,
+          studentId: sch.studentId,
+        }, 'schedule:updated', sch);
+      }
+      return res.json({ success: true, rejected: true, data: sch, meta: result.meta });
+    }
+
+    // Approved
+    if (io && sch?.studentId) {
+      notifyAttendanceTaken(io, {
+        studentId: sch.studentId._id || sch.studentId,
+        studentName: sch.studentName || sch.studentId?.name,
+        teacherName: sch.teacherName || sch.teacherId?.name,
+        course: sch.course,
+        date: sch.date,
+      }).catch(() => {});
+
+      const okMsg = `Admin đã chấp thuận buổi ${payload.sessionNumber || '?'} — buổi được tính vào tiến độ và lương.`;
+      if (tid) {
+        await NotificationService.send(io, {
+          type: 'SCHEDULE',
+          title: '✅ Admin chấp thuận điểm danh',
+          content: okMsg,
+          receivers: tid,
+          payload: { kind: 'attendance_admin_approved', ...payload },
+          link: '/teacher#students',
+        }).catch(() => {});
+      }
+      if (sid) {
+        await NotificationService.send(io, {
+          type: 'SCHEDULE',
+          title: '✅ Điểm danh đã được chấp thuận',
+          content: okMsg,
+          receivers: sid,
+          payload: { kind: 'attendance_admin_approved', ...payload },
+          link: '/student#schedule',
+        }).catch(() => {});
+      }
+
+      if (sch.teacherId) {
+        const { maybeNotifyStarBonusEligibility } = require('../services/teacherAdminNotifier');
+        maybeNotifyStarBonusEligibility(io, sch.teacherId).catch(() => {});
+      }
+      checkAndUnlockExam(String(sch.studentId._id || sch.studentId), io, sch.course).catch(() => {});
+      await emitAttendanceConfirmEvents(io, sch, 'attendance:confirmed');
+      emitScheduleEvent(io, {
+        branchId: sch.branchId,
+        teacherId: sch.teacherId,
+        studentId: sch.studentId,
+      }, 'schedule:updated', sch);
+    }
+
+    if (result.student?.teacher_payment_status === 'PAID_IN_ADVANCE') {
+      await Schedule.findByIdAndUpdate(sch._id, { is_paid_to_teacher: true, paymentStatus: 'paid' });
+    }
+
+    return res.json({
+      success: true,
+      rejected: false,
+      data: sch,
+      student: result.student
+        ? {
+          _id: result.student._id,
+          completedSessions: result.student.completedSessions,
+          remainingSessions: result.student.remainingSessions,
+          totalSessions: result.student.totalSessions,
+          enrollments: result.student.enrollments,
+          courses: result.student.courses,
+          status: result.student.status,
+        }
+        : undefined,
+      meta: result.meta,
+    });
+  } catch (err) {
+    if (err.code) {
+      return res.status(err.status || 409).json({ success: false, code: err.code, message: err.message });
+    }
+    logger.error('[SCHEDULE] resolve-dispute:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

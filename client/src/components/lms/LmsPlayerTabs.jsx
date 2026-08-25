@@ -550,38 +550,89 @@ function QaPanel({
   );
 }
 
-function ReviewsPanel({ storageKey, userName }) {
-  const [items, setItems] = useLmsLocalStore(storageKey, []);
+function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' }) {
+  const [items, setItems] = useState([]);
+  const [avg, setAvg] = useState(0);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [okMsg, setOkMsg] = useState('');
 
-  const avg = useMemo(() => {
-    const list = Array.isArray(items) ? items : [];
-    if (!list.length) return 0;
-    return list.reduce((s, r) => s + (Number(r.rating) || 0), 0) / list.length;
-  }, [items]);
+  const load = useCallback(async () => {
+    if (!courseId) {
+      setItems([]);
+      setAvg(0);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await apiFetch(
+        `/training-lms/reviews?courseId=${encodeURIComponent(courseId)}&audience=${encodeURIComponent(audience)}`
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!json?.success) {
+        setError(json?.message || 'Không tải được đánh giá');
+        return;
+      }
+      setItems(Array.isArray(json.data) ? json.data : []);
+      setAvg(Number(json.avg) || 0);
+    } catch {
+      setError('Lỗi kết nối khi tải đánh giá');
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId, audience]);
 
-  const submit = () => {
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const submit = async () => {
     const text = comment.trim();
-    if (!text) return;
-    setItems((prev) => [
-      {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        rating: Math.min(5, Math.max(1, Number(rating) || 5)),
-        comment: text,
-        author: userName || 'Học viên',
-        createdAt: Date.now(),
-      },
-      ...(Array.isArray(prev) ? prev : []),
-    ]);
-    setComment('');
-    setRating(5);
+    if (!text || !courseId || sending) return;
+    setSending(true);
+    setError('');
+    setOkMsg('');
+    try {
+      const res = await apiFetch('/training-lms/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId,
+          courseTitle: courseTitle || '',
+          rating: Math.min(5, Math.max(1, Number(rating) || 5)),
+          comment: text,
+          audience,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!json?.success) {
+        setError(json?.message || 'Gửi đánh giá thất bại');
+        return;
+      }
+      setComment('');
+      setRating(5);
+      setOkMsg('Đã gửi đánh giá — Admin sẽ nhận thông báo.');
+      await load();
+    } catch {
+      setError('Lỗi kết nối khi gửi đánh giá');
+    } finally {
+      setSending(false);
+    }
   };
 
   const list = [...(Array.isArray(items) ? items : [])].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto w-full">
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3.5 py-3 text-[12px] text-slate-300">
+        Đánh giá lưu trên server — Admin nhận thông báo chuông khi bạn gửi / cập nhật.
+      </div>
+
       <div className="flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
         <div>
           <p className="text-3xl font-extrabold text-white tabular-nums">{avg ? avg.toFixed(1) : '—'}</p>
@@ -620,40 +671,50 @@ function ReviewsPanel({ storageKey, userName }) {
           placeholder="Chia sẻ trải nghiệm học của bạn..."
           className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/40 resize-y"
         />
+        {error ? <p className="text-xs text-red-400 font-semibold">{error}</p> : null}
+        {okMsg ? <p className="text-xs text-emerald-400 font-semibold">{okMsg}</p> : null}
         <button
           type="button"
           onClick={submit}
-          className="px-4 min-h-10 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+          disabled={sending || !comment.trim()}
+          className="px-4 min-h-10 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold"
         >
-          Gửi đánh giá
+          {sending ? 'Đang gửi...' : 'Gửi đánh giá'}
         </button>
       </div>
 
-      <ul className="space-y-3">
-        {list.map((r) => (
-          <li key={r.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-full bg-slate-700 text-[10px] font-bold text-white flex items-center justify-center">
-                {initials(r.author)}
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-200">{r.author}</p>
-                <div className="flex gap-0.5">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star
-                      key={s}
-                      size={11}
-                      className={r.rating >= s ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}
-                    />
-                  ))}
+      {loading ? (
+        <p className="text-sm text-slate-500 text-center py-6">Đang tải đánh giá...</p>
+      ) : (
+        <ul className="space-y-3">
+          {list.map((r) => (
+            <li key={r.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-slate-700 text-[10px] font-bold text-white flex items-center justify-center">
+                  {initials(r.author)}
                 </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-200">{r.author}</p>
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        size={11}
+                        className={r.rating >= s ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <span className="ml-auto text-[11px] text-slate-500">{timeAgo(r.createdAt)}</span>
               </div>
-              <span className="ml-auto text-[11px] text-slate-500">{timeAgo(r.createdAt)}</span>
-            </div>
-            <p className="text-[13px] text-slate-300 whitespace-pre-wrap">{r.comment}</p>
-          </li>
-        ))}
-      </ul>
+              <p className="text-[13px] text-slate-300 whitespace-pre-wrap">{r.comment}</p>
+            </li>
+          ))}
+          {!list.length ? (
+            <li className="text-center text-sm text-slate-500 py-6">Chưa có đánh giá nào</li>
+          ) : null}
+        </ul>
+      )}
     </div>
   );
 }
@@ -849,7 +910,6 @@ export default function LmsPlayerPanels({
     : '';
 
   const notesKey = lmsStoreKey('notes', userId, courseId);
-  const reviewsKey = lmsStoreKey('reviews', userId, courseId);
 
   if (courseTab === 'overview' || courseTab === 'announcements') {
     return (
@@ -888,7 +948,14 @@ export default function LmsPlayerPanels({
     );
   }
   if (courseTab === 'reviews') {
-    return <ReviewsPanel storageKey={reviewsKey} userName={userName} />;
+    return (
+      <ReviewsPanel
+        courseId={courseId}
+        courseTitle={selectedCourse?.title || ''}
+        userName={userName}
+        audience={audience}
+      />
+    );
   }
   if (courseTab === 'resources') {
     return <ResourcesPanel files={selectedCourse?.files} />;

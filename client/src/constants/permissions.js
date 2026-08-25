@@ -20,6 +20,8 @@ export const PERMISSIONS = {
   VIEW_BRANCH_REVENUE:'view_branch_revenue',  // ⭐ Xem báo cáo doanh thu (chỉ chi nhánh)
   VIEW_TEACHERS:      'view_teachers',        // ⭐ Xem danh sách giảng viên (read-only)
   MANAGE_TEACHERS:    'manage_teachers',      // Duyệt / chấm / từ chối giảng viên
+  VIEW_CENTER_INFO:   'view_center_info',     // Xem Thông tin trung tâm
+  MANAGE_CENTER_INFO: 'manage_center_info',   // Quản trị Thông tin trung tâm (Super)
 };
 
 /** Enum các adminRole — dùng chung thay vì hard-code string */
@@ -56,6 +58,8 @@ export const ALL_PERMISSIONS = [
   { key: PERMISSIONS.MANAGE_CERT_PREP,    label: 'Ôn thi MOS/IC3',         desc: 'Quản lý ngân hàng ôn thi chứng chỉ MOS/IC3' },
   { key: PERMISSIONS.MANAGE_HR,            label: '👤 Nhân sự & Lương',         desc: 'Quản lý hồ sơ nhân viên, trả lương hàng tháng' },
   { key: PERMISSIONS.MANAGE_BLOG,          label: '📰 Tin tức / Blog',           desc: 'Đăng, sửa, ẩn, xóa bài viết tin tức trung tâm' },
+  { key: PERMISSIONS.VIEW_CENTER_INFO,    label: 'ℹ️ Xem Thông tin trung tâm', desc: 'Xem trang giới thiệu trung tâm' },
+  { key: PERMISSIONS.MANAGE_CENTER_INFO,  label: '✏️ Quản trị Thông tin trung tâm', desc: 'Thêm/sửa/xóa/publish nội dung Thông tin trung tâm' },
   { key: PERMISSIONS.SYSTEM_SETTINGS,     label: 'Cài đặt hệ thống',          desc: 'Cấu hình ngân hàng, chi nhánh, thông báo' },
   { key: PERMISSIONS.VIEW_LOGS,           label: 'Nhật ký hệ thống',          desc: 'Xem log hoạt động hệ thống' },
   { key: PERMISSIONS.VIEW_EVALUATIONS,    label: 'Đánh giá nội bộ',           desc: 'Xem đánh giá và kiểm tra nội bộ' },

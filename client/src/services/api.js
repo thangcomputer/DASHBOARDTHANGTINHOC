@@ -1271,6 +1271,28 @@ export const schedulesAPI = {
     });
     return res.json();
   },
+  getPendingConfirm: async () => {
+    const res = await apiFetch('/schedules/pending-confirm');
+    return res.json();
+  },
+  getDisputes: async () => {
+    const res = await apiFetch('/schedules/disputes');
+    return res.json();
+  },
+  studentConfirm: async (id, decision) => {
+    const res = await apiFetch(`/schedules/${id}/student-confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+    });
+    return res.json();
+  },
+  resolveDispute: async (id, decision) => {
+    const res = await apiFetch(`/schedules/${id}/resolve-dispute`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+    });
+    return res.json();
+  },
   cancel: async (id, reason = '') => {
     const res = await apiFetch(`/schedules/${id}/cancel`, {
       method: 'PATCH',
@@ -1999,6 +2021,73 @@ export const trainingLmsAPI = {
     });
     return res.json();
   },
+  listReviews: async ({ courseId, audience } = {}) => {
+    const q = new URLSearchParams();
+    if (courseId) q.set('courseId', courseId);
+    if (audience) q.set('audience', audience);
+    const res = await apiFetch(`/training-lms/reviews?${q.toString()}`);
+    return res.json();
+  },
+  createReview: async (payload) => {
+    const res = await apiFetch('/training-lms/reviews', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+};
+
+// ─── THÔNG TIN TRUNG TÂM (nhập tay) ──────────────────────────────────────────
+export const centerInfoAPI = {
+  getPublic: async () => {
+    const res = await apiFetch('/center-info');
+    return res.json();
+  },
+  getOverview: async () => {
+    const res = await apiFetch('/center-info/manage/overview');
+    return res.json();
+  },
+  saveOverview: async (payload) => {
+    const res = await apiFetch('/center-info/manage/overview', {
+      method: 'PUT',
+      body: JSON.stringify(payload || {}),
+    });
+    return res.json();
+  },
+  listItems: async (section) => {
+    const res = await apiFetch(`/center-info/manage/items?section=${encodeURIComponent(section)}`);
+    return res.json();
+  },
+  createItem: async (payload) => {
+    const res = await apiFetch('/center-info/manage/items', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    });
+    return res.json();
+  },
+  updateItem: async (id, payload) => {
+    const res = await apiFetch(`/center-info/manage/items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload || {}),
+    });
+    return res.json();
+  },
+  removeItem: async (id) => {
+    const res = await apiFetch(`/center-info/manage/items/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+  reorderItems: async (section, ids) => {
+    const res = await apiFetch('/center-info/manage/items/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ section, ids }),
+    });
+    return res.json();
+  },
+  uploadImage: async (file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return uploadWithAuth('/center-info/manage/upload', fd);
+  },
 };
 
 // ─── FINANCE (Ledger SoT) ────────────────────────────────────────────────────
@@ -2268,6 +2357,7 @@ export default {
   trainingLms:   trainingLmsAPI,
   feed:          feedAPI,
   blog:          blogAPI,
+  centerInfo:    centerInfoAPI,
 };
 
 

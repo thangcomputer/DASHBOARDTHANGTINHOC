@@ -401,8 +401,11 @@ export default function TeacherOverviewTab({
 
             <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
               {students.map((s) => {
-                const done = s.totalSessions - s.remainingSessions;
-                const pct = Math.round((done / s.totalSessions) * 100) || 0;
+                const done = s.completedSessions != null
+                  ? Math.max(0, Number(s.completedSessions) || 0)
+                  : Math.max(0, (Number(s.totalSessions) || 12) - (Number(s.remainingSessions) || 0));
+                const total = Number(s.totalSessions) > 0 ? Number(s.totalSessions) : 12;
+                const pct = total > 0 ? Math.round((done / total) * 100) || 0 : 0;
                 const studentId = s._id || s.id;
                 const enrollmentKey = s._enrollmentKey || studentId;
                 const openStudent = () => {
@@ -434,7 +437,7 @@ export default function TeacherOverviewTab({
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-xs sm:text-sm font-black text-slate-800 tabular-nums">{pct}%</p>
-                      <p className="text-[10px] text-slate-400 tabular-nums">{done}/{s.totalSessions} buổi</p>
+                      <p className="text-[10px] text-slate-400 tabular-nums">{done}/{total} buổi</p>
                     </div>
                     <ChevronRight size={15} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition shrink-0" />
                   </button>

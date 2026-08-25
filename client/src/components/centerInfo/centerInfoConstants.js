@@ -1,0 +1,55 @@
+export const CENTER_SECTIONS = [
+  { key: 'overview', label: 'Tổng quan' },
+  { key: 'staff', label: 'Nhân sự' },
+  { key: 'branch', label: 'Chi nhánh' },
+  { key: 'social', label: 'Mạng xã hội' },
+  { key: 'service', label: 'Dịch vụ đào tạo' },
+  { key: 'exam_venue', label: 'Địa điểm thi' },
+  { key: 'certificate', label: 'Chứng chỉ' },
+];
+
+export const SECTION_ITEM_KEYS = [
+  'staff', 'branch', 'social', 'service', 'exam_venue', 'certificate',
+];
+
+export function blankItem(section) {
+  return {
+    section,
+    title: '',
+    subtitle: '',
+    description: '',
+    detailHtml: '',
+    imageUrl: '',
+    icon: '',
+    url: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    mapsUrl: '',
+    code: '',
+    managerName: '',
+    hours: '',
+    department: '',
+    expertise: '',
+    experience: '',
+    audience: '',
+    curriculum: '',
+    duration: '',
+    learningMode: '',
+    priceInfo: '',
+    examType: '',
+    scheduleInfo: '',
+    capacity: '',
+    issuer: '',
+    requirements: '',
+    relatedExam: '',
+    validity: '',
+    verifyInfo: '',
+    verifyUrl: '',
+    showEmail: false,
+    isActive: true,
+    status: 'published',
+    sortOrder: 0,
+  };
+}

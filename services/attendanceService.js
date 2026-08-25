@@ -47,6 +47,7 @@ async function syncEnrollmentProgressAfterAttendance(studentId, {
   courseName,
   logNote,
   logDate,
+  grade = 0,
 } = {}) {
   if (!studentId) return null;
   const student = await Student.findById(studentId);
@@ -107,7 +108,7 @@ async function syncEnrollmentProgressAfterAttendance(studentId, {
     recordAttendanceGrade(student, {
       courseName: courseName || student.course,
       note: logNote,
-      grade: 0,
+      grade: Number.isFinite(Number(grade)) ? Number(grade) : 0,
       date: logDate || new Date(),
       actedAt: new Date(),
     });
@@ -190,7 +191,7 @@ async function maybeNotifyOverdueAttendance(io, schedule) {
 }
 
 /**
- * Complete a scheduled session (teacher window OR admin makeup).
+ * Complete a scheduled session (teacher window OR admin makeup OR finalize after HV/Admin confirm).
  * Atomic: only transitions scheduled → completed once.
  */
 async function completeScheduleAttendance({
@@ -200,6 +201,9 @@ async function completeScheduleAttendance({
   note,
   io = null,
   forceAdminMakeup = false,
+  /** Kết thúc sau khi HV đồng ý / Admin duyệt tranh chấp — bỏ qua cửa sổ giờ. */
+  forceFinalizeConfirm = false,
+  confirmOutcome = null, // 'accepted' | 'admin_approved'
 }) {
   if (!schedule) {
     throw attendanceError('Không tìm thấy lịch học', 'ATTENDANCE_NOT_FOUND', 404);
@@ -207,6 +211,7 @@ async function completeScheduleAttendance({
 
   const role = actorRole(actor);
   const admin = isAdminActor(actor);
+  const confirmStatus = String(schedule.studentConfirmStatus || 'none');
   const state = resolveAttendanceState(schedule);
 
   if (state.state === 'COMPLETED') {
@@ -218,8 +223,16 @@ async function completeScheduleAttendance({
 
   let attendanceMethod = 'teacher';
   let noteStamp = '';
+  /** Buổi thứ N sau khi điểm danh (cùng rule đếm Schedule.completed với notifyAttendanceTaken). */
+  let sessionOrdinal = null;
+  let sessionTotal = null;
 
-  if (role === 'teacher') {
+  if (forceFinalizeConfirm) {
+    if (!['pending', 'disputed'].includes(confirmStatus)) {
+      throw attendanceError('Buổi học không ở trạng thái chờ xác nhận.', 'ATTENDANCE_CONFIRM_INVALID', 409);
+    }
+    attendanceMethod = confirmOutcome === 'admin_approved' ? 'admin_dispute_approve' : 'student_confirm';
+  } else if (role === 'teacher') {
     assertTeacherAttendanceAllowed(schedule, { lateReason });
     if (state.state === 'PENDING_ATTENDANCE' && String(lateReason || '').trim()) {
       noteStamp = `[LATE] ${String(lateReason).trim()}`;
@@ -230,8 +243,6 @@ async function completeScheduleAttendance({
     }
     if (state.state === 'OVERDUE_ATTENDANCE' || forceAdminMakeup) {
       attendanceMethod = 'admin_makeup';
-      const who = actor?.name || actor?.id || 'Admin';
-      noteStamp = `[ADMIN_MAKEUP] ${who} @ ${new Date().toISOString()}`;
     } else if (state.state === 'IN_PROGRESS' || state.state === 'PENDING_ATTENDANCE') {
       attendanceMethod = 'admin';
     }
@@ -271,7 +282,18 @@ async function completeScheduleAttendance({
           409,
         );
       }
+      sessionOrdinal = Number(schedule.sessionOrdinalPreview) || (completedCount + 1);
+      sessionTotal = Number(schedule.sessionTotalPreview) || total;
     }
+  }
+
+  // Makeup stamp sau khi đã biết buổi thứ N (khớp số buổi HV)
+  if (attendanceMethod === 'admin_makeup') {
+    const who = actor?.name || actor?.id || 'Admin';
+    const progress = (sessionOrdinal != null && sessionTotal != null)
+      ? ` · buổi ${sessionOrdinal}/${sessionTotal}`
+      : (sessionOrdinal != null ? ` · buổi ${sessionOrdinal}` : '');
+    noteStamp = `[ADMIN_MAKEUP] ${who} @ ${new Date().toISOString()}${progress}`;
   }
 
   const prevNote = String(schedule.note || '').trim();
@@ -282,17 +304,29 @@ async function completeScheduleAttendance({
       : (prevNote || noteStamp);
   } else if (note !== undefined && note !== null) {
     nextNote = String(note).trim();
+  } else if (forceFinalizeConfirm && schedule.attendancePendingNote) {
+    nextNote = String(schedule.attendancePendingNote).trim() || prevNote;
   }
 
+  const confirmFinal = forceFinalizeConfirm
+    ? (confirmOutcome === 'admin_approved' ? 'admin_approved' : 'accepted')
+    : (attendanceMethod === 'admin_makeup' || attendanceMethod === 'admin' ? 'accepted' : 'accepted');
+
   const scheduleId = schedule._id || schedule.id;
+  const setDoc = {
+    status: 'completed',
+    note: nextNote,
+    studentConfirmStatus: confirmFinal,
+    studentConfirmedAt: new Date(),
+  };
+  if (forceFinalizeConfirm && confirmOutcome === 'admin_approved') {
+    setDoc.attendanceDisputeResolvedAt = new Date();
+    setDoc.attendanceDisputeResolvedBy = String(actor?.name || actor?.id || 'Admin');
+  }
+
   const updated = await Schedule.findOneAndUpdate(
     { _id: scheduleId, status: 'scheduled' },
-    {
-      $set: {
-        status: 'completed',
-        note: nextNote,
-      },
-    },
+    { $set: setDoc },
     { new: true, runValidators: true },
   ).populate([
     { path: 'teacherId', select: 'name phone' },
@@ -308,18 +342,29 @@ async function completeScheduleAttendance({
   }
 
   const actorName = String(actor?.name || '').trim() || (admin ? 'Admin' : 'Giảng viên');
+  const buoiLabel = (sessionOrdinal != null && sessionTotal != null)
+    ? ` buổi thứ ${sessionOrdinal}/${sessionTotal}`
+    : (sessionOrdinal != null ? ` buổi thứ ${sessionOrdinal}` : '');
   let logNote;
   if (attendanceMethod === 'admin_makeup') {
-    logNote = `Điểm danh bù bởi ${actorName}`;
+    logNote = `Điểm danh bù${buoiLabel} bởi ${actorName}`;
+  } else if (attendanceMethod === 'admin_dispute_approve') {
+    logNote = `Admin duyệt tranh chấp điểm danh${buoiLabel} (${actorName})`;
+  } else if (attendanceMethod === 'student_confirm') {
+    logNote = `HV xác nhận điểm danh${buoiLabel}`;
   } else if (attendanceMethod === 'admin') {
     logNote = `Điểm danh bởi Admin (${actorName})`;
   } else if (state.state === 'PENDING_ATTENDANCE' && String(lateReason || '').trim()) {
     logNote = `Điểm danh bổ sung: ${String(lateReason).trim()}`;
-  } else if (String(note || '').trim() && !String(note).startsWith('[')) {
-    logNote = String(note).trim();
+  } else if (String(note || schedule.attendancePendingNote || '').trim() && !String(note || schedule.attendancePendingNote || '').startsWith('[')) {
+    logNote = String(note || schedule.attendancePendingNote).trim();
   } else {
     logNote = 'Đã điểm danh hoàn thành buổi học';
   }
+
+  const gradeForLog = schedule.attendancePendingGrade != null
+    ? Number(schedule.attendancePendingGrade)
+    : undefined;
 
   const student = await syncEnrollmentProgressAfterAttendance(
     updated.studentId || schedule.studentId,
@@ -327,6 +372,7 @@ async function completeScheduleAttendance({
       courseName: updated.course || schedule.course,
       logNote,
       logDate: updated.date || schedule.date || new Date(),
+      ...(Number.isFinite(gradeForLog) ? { grade: gradeForLog } : {}),
     },
   );
 
@@ -339,13 +385,265 @@ async function completeScheduleAttendance({
       actorId: String(actor?.id || actor?._id || ''),
       stateBefore: state.state,
       logNote,
+      completedSessions: sessionOrdinal,
+      totalSessions: sessionTotal,
     },
   };
+}
+
+/**
+ * GV (sau 30s hủy) → gửi điểm danh chờ HV xác nhận. Chưa completed, chưa tính buổi.
+ */
+async function requestStudentAttendanceConfirm({
+  schedule,
+  actor,
+  lateReason = '',
+  note = '',
+  grade = null,
+}) {
+  if (!schedule) {
+    throw attendanceError('Không tìm thấy lịch học', 'ATTENDANCE_NOT_FOUND', 404);
+  }
+  const role = actorRole(actor);
+  if (role !== 'teacher' && !isAdminActor(actor)) {
+    throw attendanceError('Không có quyền gửi xác nhận điểm danh', 'ATTENDANCE_FORBIDDEN', 403);
+  }
+  if (String(schedule.status) !== 'scheduled') {
+    throw attendanceError('Buổi học không thể gửi xác nhận.', 'ATTENDANCE_CONFIRM_INVALID', 409);
+  }
+  const confirm = String(schedule.studentConfirmStatus || 'none');
+  if (confirm === 'pending') {
+    throw attendanceError('Đã gửi xác nhận — đang chờ học viên.', 'ATTENDANCE_AWAITING_STUDENT', 409);
+  }
+  if (confirm === 'disputed') {
+    throw attendanceError('Buổi đang tranh chấp — chờ Admin xử lý.', 'ATTENDANCE_DISPUTED', 409);
+  }
+  if (['accepted', 'admin_approved'].includes(confirm) || schedule.status === 'completed') {
+    throw attendanceError('Buổi học đã được điểm danh.', ATTENDANCE_CODES.ALREADY_COMPLETED, 409);
+  }
+
+  if (role === 'teacher') {
+    assertTeacherAttendanceAllowed(schedule, { lateReason });
+  }
+
+  let sessionOrdinal = null;
+  let sessionTotal = null;
+  if (schedule.studentId) {
+    const studentForEnr = await Student.findById(schedule.studentId)
+      .select('enrollments course status totalSessions')
+      .lean();
+    if (studentForEnr) {
+      const courseKey = normCourseName(schedule.course);
+      const enrs = Array.isArray(studentForEnr.enrollments) ? studentForEnr.enrollments : [];
+      const enr = courseKey
+        ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
+        : enrs.find((e) => String(e.status || '').toLowerCase() === 'active') || enrs[0];
+      const enrStatus = String(enr?.status || '').toLowerCase();
+      if (enr && ['cancelled', 'refunded', 'completed'].includes(enrStatus)) {
+        throw attendanceError(
+          'Enrollment không còn active — không thể điểm danh buổi mới.',
+          ATTENDANCE_CODES.ENROLLMENT_COMPLETED,
+          409,
+        );
+      }
+      const total = Number(enr?.totalSessions || studentForEnr.totalSessions || 12);
+      const completedCount = await Schedule.countDocuments({
+        studentId: schedule.studentId,
+        status: 'completed',
+        ...(schedule.course ? { course: schedule.course } : {}),
+      });
+      if (completedCount >= total) {
+        throw attendanceError(
+          'Học viên đã hoàn thành đủ số buổi của khóa học.',
+          ATTENDANCE_CODES.SESSION_LIMIT,
+          409,
+        );
+      }
+      sessionOrdinal = completedCount + 1;
+      sessionTotal = total;
+    }
+  }
+
+  let pendingNote = String(note || '').trim();
+  if (!pendingNote && String(lateReason || '').trim()) {
+    pendingNote = `[LATE] ${String(lateReason).trim()}`;
+  }
+  if (!pendingNote) {
+    pendingNote = sessionOrdinal
+      ? `Buổi ${sessionOrdinal}: Đã điểm danh hoàn thành buổi học`
+      : 'Đã điểm danh hoàn thành buổi học';
+  }
+
+  const scheduleId = schedule._id || schedule.id;
+  const updated = await Schedule.findOneAndUpdate(
+    {
+      _id: scheduleId,
+      status: 'scheduled',
+      $or: [
+        { studentConfirmStatus: { $exists: false } },
+        { studentConfirmStatus: null },
+        { studentConfirmStatus: 'none' },
+        { studentConfirmStatus: '' },
+      ],
+    },
+    {
+      $set: {
+        studentConfirmStatus: 'pending',
+        studentConfirmRequestedAt: new Date(),
+        attendancePendingNote: pendingNote,
+        attendancePendingGrade: grade != null && Number.isFinite(Number(grade)) ? Number(grade) : null,
+        sessionOrdinalPreview: sessionOrdinal,
+        sessionTotalPreview: sessionTotal,
+      },
+    },
+    { new: true, runValidators: true },
+  ).populate([
+    { path: 'teacherId', select: 'name phone' },
+    { path: 'studentId', select: 'name course totalSessions' },
+  ]);
+
+  if (!updated) {
+    const again = await Schedule.findById(scheduleId).lean();
+    if (again && String(again.studentConfirmStatus) === 'pending') {
+      throw attendanceError('Đã gửi xác nhận — đang chờ học viên.', 'ATTENDANCE_AWAITING_STUDENT', 409);
+    }
+    throw attendanceError('Không thể gửi xác nhận điểm danh', 'ATTENDANCE_UPDATE_FAILED', 500);
+  }
+
+  return {
+    schedule: updated,
+    meta: {
+      attendanceMethod: 'awaiting_student_confirm',
+      completedSessions: sessionOrdinal,
+      totalSessions: sessionTotal,
+    },
+  };
+}
+
+async function respondStudentAttendanceConfirm({ schedule, actor, decision }) {
+  if (!schedule) {
+    throw attendanceError('Không tìm thấy lịch học', 'ATTENDANCE_NOT_FOUND', 404);
+  }
+  if (actorRole(actor) !== 'student') {
+    throw attendanceError('Chỉ học viên xác nhận điểm danh', 'ATTENDANCE_FORBIDDEN', 403);
+  }
+  const sid = String(schedule.studentId?._id || schedule.studentId || '');
+  const actorId = String(actor?.id || actor?._id || '');
+  if (!sid || sid !== actorId) {
+    throw attendanceError('Bạn chỉ xác nhận được lịch của mình', 'ATTENDANCE_FORBIDDEN', 403);
+  }
+  if (String(schedule.status) !== 'scheduled' || String(schedule.studentConfirmStatus) !== 'pending') {
+    throw attendanceError('Không còn yêu cầu xác nhận điểm danh.', 'ATTENDANCE_CONFIRM_INVALID', 409);
+  }
+
+  const dec = String(decision || '').toLowerCase();
+  if (dec === 'accept' || dec === 'agree' || dec === 'dong_y') {
+    return completeScheduleAttendance({
+      schedule,
+      actor,
+      note: schedule.attendancePendingNote || undefined,
+      forceFinalizeConfirm: true,
+      confirmOutcome: 'accepted',
+    });
+  }
+  if (dec === 'dispute' || dec === 'reject' || dec === 'khong_dong_y') {
+    const scheduleId = schedule._id || schedule.id;
+    const updated = await Schedule.findOneAndUpdate(
+      { _id: scheduleId, status: 'scheduled', studentConfirmStatus: 'pending' },
+      {
+        $set: {
+          studentConfirmStatus: 'disputed',
+          studentConfirmedAt: new Date(),
+        },
+      },
+      { new: true, runValidators: true },
+    ).populate([
+      { path: 'teacherId', select: 'name phone' },
+      { path: 'studentId', select: 'name course' },
+    ]);
+    if (!updated) {
+      throw attendanceError('Không thể ghi nhận tranh chấp', 'ATTENDANCE_UPDATE_FAILED', 500);
+    }
+    return {
+      schedule: updated,
+      student: null,
+      meta: {
+        attendanceMethod: 'student_dispute',
+        disputed: true,
+        completedSessions: updated.sessionOrdinalPreview,
+        totalSessions: updated.sessionTotalPreview,
+      },
+    };
+  }
+  throw attendanceError('Quyết định không hợp lệ (accept/dispute)', 'ATTENDANCE_CONFIRM_INVALID', 400);
+}
+
+async function resolveAttendanceDispute({ schedule, actor, decision }) {
+  if (!schedule) {
+    throw attendanceError('Không tìm thấy lịch học', 'ATTENDANCE_NOT_FOUND', 404);
+  }
+  if (!isAdminActor(actor)) {
+    throw attendanceError('Chỉ Admin xử lý tranh chấp điểm danh', 'ATTENDANCE_FORBIDDEN', 403);
+  }
+  if (String(schedule.studentConfirmStatus) !== 'disputed' || String(schedule.status) !== 'scheduled') {
+    throw attendanceError('Buổi học không ở trạng thái tranh chấp.', 'ATTENDANCE_CONFIRM_INVALID', 409);
+  }
+
+  const dec = String(decision || '').toLowerCase();
+  if (dec === 'approve' || dec === 'accept' || dec === 'chap_thuan') {
+    return completeScheduleAttendance({
+      schedule,
+      actor,
+      note: schedule.attendancePendingNote || undefined,
+      forceFinalizeConfirm: true,
+      confirmOutcome: 'admin_approved',
+    });
+  }
+  if (dec === 'reject' || dec === 'deny' || dec === 'khong_chap_thuan') {
+    const scheduleId = schedule._id || schedule.id;
+    const who = String(actor?.name || actor?.id || 'Admin');
+    const updated = await Schedule.findOneAndUpdate(
+      { _id: scheduleId, status: 'scheduled', studentConfirmStatus: 'disputed' },
+      {
+        $set: {
+          status: 'cancelled',
+          studentConfirmStatus: 'admin_rejected',
+          attendanceDisputeResolvedAt: new Date(),
+          attendanceDisputeResolvedBy: who,
+          note: [
+            `[ADMIN_REJECT_ATTENDANCE] ${who} @ ${new Date().toISOString()}`,
+            String(schedule.note || '').trim(),
+          ].filter(Boolean).join(' | '),
+        },
+      },
+      { new: true, runValidators: true },
+    ).populate([
+      { path: 'teacherId', select: 'name phone' },
+      { path: 'studentId', select: 'name course' },
+    ]);
+    if (!updated) {
+      throw attendanceError('Không thể từ chối buổi học', 'ATTENDANCE_UPDATE_FAILED', 500);
+    }
+    return {
+      schedule: updated,
+      student: null,
+      meta: {
+        attendanceMethod: 'admin_dispute_reject',
+        rejected: true,
+        completedSessions: updated.sessionOrdinalPreview,
+        totalSessions: updated.sessionTotalPreview,
+      },
+    };
+  }
+  throw attendanceError('Quyết định không hợp lệ (approve/reject)', 'ATTENDANCE_CONFIRM_INVALID', 400);
 }
 
 module.exports = {
   syncEnrollmentProgressAfterAttendance,
   maybeNotifyOverdueAttendance,
   completeScheduleAttendance,
+  requestStudentAttendanceConfirm,
+  respondStudentAttendanceConfirm,
+  resolveAttendanceDispute,
   isAdminActor,
 };

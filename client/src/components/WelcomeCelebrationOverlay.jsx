@@ -1,8 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, Star } from 'lucide-react';
+import { formatHoaHong, STAR_BONUS_MIN_STARS, STAR_BONUS_MIN_STUDENTS } from '../utils/teacherCommission';
 
 /**
- * Pháo hoa chào mừng lần đầu — canvas nằm trên overlay + card (pointer-events: none).
+ * Pháo hoa chào mừng / hoàn thành khóa / thưởng sao GV — canvas trên overlay (pointer-events: none).
  */
 export default function WelcomeCelebrationOverlay({
   open,
@@ -10,6 +11,8 @@ export default function WelcomeCelebrationOverlay({
   name = '',
   variant = 'welcome',
   courseName = '',
+  /** Thưởng sao: { month, monthLabel, amount, minStudents, minStars } */
+  starBonus = null,
   onClose,
 }) {
   const canvasRef = useRef(null);
@@ -282,6 +285,123 @@ export default function WelcomeCelebrationOverlay({
 
   const isTeacher = role === 'teacher';
   const isCourseComplete = variant === 'course_complete';
+  const isStarBonus = variant === 'star_bonus';
+
+  const bonusAmount = Number(starBonus?.amount) || 0;
+  const monthLabel = starBonus?.monthLabel
+    || (starBonus?.month
+      ? (() => {
+        const [y, m] = String(starBonus.month).split('-');
+        return y && m ? `tháng ${Number(m)}/${y}` : String(starBonus.month);
+      })()
+      : '');
+  const minHv = Number(starBonus?.minStudents) || STAR_BONUS_MIN_STUDENTS;
+  const minStars = Number(starBonus?.minStars) || STAR_BONUS_MIN_STARS;
+
+  if (isStarBonus) {
+    return (
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="star-bonus-celebration-title"
+      >
+        <div
+          className="absolute inset-0 z-0 bg-gradient-to-b from-slate-950/80 via-amber-950/50 to-slate-950/85"
+          onClick={() => onClose?.()}
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-amber-200/40 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.55)]">
+          <div className="relative overflow-hidden bg-gradient-to-br from-amber-500 via-amber-400 to-yellow-500 px-6 pt-10 pb-12 text-center text-amber-950">
+            <div className="pointer-events-none absolute -top-16 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-white/30 blur-3xl" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="absolute top-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/10 text-amber-950/80 hover:bg-black/15 transition"
+              aria-label="Đóng"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Sao to giữa màn hình popup */}
+            <div className="relative mx-auto mb-2 flex h-28 w-28 sm:h-32 sm:w-32 items-center justify-center">
+              <span
+                className="absolute inset-0 rounded-full bg-amber-200/50 animate-ping opacity-40"
+                style={{ animationDuration: '2.2s' }}
+                aria-hidden="true"
+              />
+              <span
+                className="absolute inset-2 rounded-full bg-gradient-to-br from-yellow-200 to-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.85)] animate-pulse"
+                aria-hidden="true"
+              />
+              <Star
+                size={72}
+                className="relative text-amber-600 fill-amber-500 drop-shadow-[0_4px_12px_rgba(180,83,9,0.45)]"
+                strokeWidth={1.25}
+                aria-hidden="true"
+              />
+            </div>
+
+            <p className="relative text-[11px] font-bold uppercase tracking-[0.28em] text-amber-900/70">
+              Trung tâm Tin học Thắng Tin Học
+            </p>
+            <h2
+              id="star-bonus-celebration-title"
+              className="relative mt-3 text-2xl sm:text-[1.75rem] font-black tracking-tight leading-tight text-amber-950"
+            >
+              Chúc mừng đạt thưởng sao!
+            </h2>
+            {name ? (
+              <p className="relative mt-2 text-sm font-semibold text-amber-900/85">
+                Giảng viên <span className="font-black text-amber-950">{name}</span>
+              </p>
+            ) : null}
+            {monthLabel ? (
+              <p className="relative mt-2 text-sm font-bold text-amber-900/90 capitalize">
+                {monthLabel}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="px-6 sm:px-8 py-6 sm:py-7 text-center space-y-4">
+            <p className="text-[15px] leading-relaxed text-slate-600">
+              Bạn đã đủ điều kiện thưởng sao
+              {monthLabel ? ` ${monthLabel}` : ''}
+              {' '}
+              (≥{minHv} HV · ≥{minStars}★).
+            </p>
+
+            <div className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-yellow-50 px-4 py-5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700/80">
+                Sẽ được cộng vào lương
+              </p>
+              <p className="mt-1 text-3xl sm:text-4xl font-black tabular-nums text-amber-700 tracking-tight">
+                +{formatHoaHong(bonusAmount)}
+              </p>
+              <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+                Số tiền này được cộng khi Admin chi lương tháng tương ứng.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="w-full min-h-12 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-amber-950 text-sm font-bold shadow-lg shadow-amber-500/30 transition tracking-wide"
+            >
+              Tuyệt vời!
+            </button>
+          </div>
+        </div>
+
+        <canvas
+          ref={canvasRef}
+          className="pointer-events-none absolute inset-0 z-20"
+          aria-hidden="true"
+        />
+      </div>
+    );
+  }
 
   const title = isCourseComplete
     ? 'Hoàn thành khóa học'

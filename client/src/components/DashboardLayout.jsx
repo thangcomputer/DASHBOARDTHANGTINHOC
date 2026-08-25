@@ -17,6 +17,8 @@ import {
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { getMessagingRole } from '../lib/messagingRoles';
 import StudentQuizInviteHost from './student/StudentQuizInviteHost';
+import StudentAttendanceConfirmModal from './student/StudentAttendanceConfirmModal';
+import AdminAttendanceDisputeModal from './admin/shared/AdminAttendanceDisputeModal';
 import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
 import TeacherRatingDetailModal, {
@@ -306,6 +308,51 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const welcomeMarkedRef = React.useRef(false);
   const [courseCelebration, setCourseCelebration] = useState(null);
   const courseCelebrationTimerRef = React.useRef(null);
+  const [starBonusCelebration, setStarBonusCelebration] = useState(null);
+  const starBonusShownRef = React.useRef(new Set());
+  const [attendanceConfirm, setAttendanceConfirm] = useState(null);
+  const [attendanceConfirmBusy, setAttendanceConfirmBusy] = useState(false);
+  const [attendanceDispute, setAttendanceDispute] = useState(null);
+  const [attendanceDisputeBusy, setAttendanceDisputeBusy] = useState(false);
+
+  const starBonusSeenKey = React.useCallback((teacherId, month) => (
+    `star_bonus_celeb_${teacherId}_${month}`
+  ), []);
+
+  const markStarBonusSeen = React.useCallback((teacherId, month) => {
+    if (!teacherId || !month) return;
+    const key = starBonusSeenKey(teacherId, month);
+    starBonusShownRef.current.add(key);
+    try { localStorage.setItem(key, '1'); } catch { /* ignore */ }
+  }, [starBonusSeenKey]);
+
+  const hasSeenStarBonus = React.useCallback((teacherId, month) => {
+    if (!teacherId || !month) return true;
+    const key = starBonusSeenKey(teacherId, month);
+    if (starBonusShownRef.current.has(key)) return true;
+    try {
+      if (localStorage.getItem(key) === '1') {
+        starBonusShownRef.current.add(key);
+        return true;
+      }
+    } catch { /* ignore */ }
+    return false;
+  }, [starBonusSeenKey]);
+
+  const queueStarBonusCelebration = React.useCallback((raw) => {
+    if (!raw?.month) return;
+    const teacherId = String(raw.teacherId || myId || '');
+    if (teacherId && myId && teacherId !== myId) return;
+    if (hasSeenStarBonus(myId || teacherId, raw.month)) return;
+    setStarBonusCelebration({
+      month: String(raw.month),
+      monthLabel: raw.monthLabel || '',
+      amount: Number(raw.amount) || 0,
+      minStudents: raw.minStudents,
+      minStars: raw.minStars,
+      teacherId: myId || teacherId,
+    });
+  }, [myId, hasSeenStarBonus]);
 
   const queueCourseCelebration = React.useCallback((raw) => {
     if (!raw) return;
@@ -361,6 +408,119 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     return () => { socket.off('course:celebration', onCourseCelebration); };
   }, [socket, role, myId, queueCourseCelebration]);
 
+  useEffect(() => {
+    if (!socket || role !== 'teacher') return undefined;
+    const onStarBonus = (payload) => {
+      if (!payload) return;
+      queueStarBonusCelebration(payload);
+    };
+    socket.on('teacher:star-bonus-celebration', onStarBonus);
+    return () => { socket.off('teacher:star-bonus-celebration', onStarBonus); };
+  }, [socket, role, queueStarBonusCelebration]);
+
+  // HV: modal xác nhận điểm danh (blocking)
+  useEffect(() => {
+    if (role !== 'student' || !myId) return undefined;
+    let cancelled = false;
+    const loadPending = async () => {
+      try {
+        const res = await api.schedules.getPendingConfirm();
+        if (cancelled) return;
+        const first = Array.isArray(res?.data) ? res.data[0] : null;
+        if (first?.scheduleId) setAttendanceConfirm(first);
+      } catch { /* ignore */ }
+    };
+    loadPending();
+
+    if (!socket) return () => { cancelled = true; };
+    const onAwait = (payload) => {
+      if (!payload) return;
+      if (payload.studentId && String(payload.studentId) !== myId) return;
+      setAttendanceConfirm(payload);
+    };
+    const onCleared = (payload) => {
+      if (!payload?.scheduleId) return;
+      setAttendanceConfirm((prev) => (
+        prev && String(prev.scheduleId) === String(payload.scheduleId) ? null : prev
+      ));
+    };
+    socket.on('attendance:awaiting-confirm', onAwait);
+    socket.on('attendance:confirmed', onCleared);
+    socket.on('attendance:disputed', onCleared);
+    socket.on('attendance:rejected', onCleared);
+    return () => {
+      cancelled = true;
+      socket.off('attendance:awaiting-confirm', onAwait);
+      socket.off('attendance:confirmed', onCleared);
+      socket.off('attendance:disputed', onCleared);
+      socket.off('attendance:rejected', onCleared);
+    };
+  }, [socket, role, myId]);
+
+  // Admin: nhận socket tranh chấp
+  useEffect(() => {
+    if (!socket || (role !== 'admin' && role !== 'staff')) return undefined;
+    const onDispute = (payload) => {
+      if (!payload?.scheduleId) return;
+      toast.info(`Tranh chấp điểm danh: ${payload.studentName || 'HV'} — buổi ${payload.sessionNumber || '?'}`);
+      setAttendanceDispute(payload);
+    };
+    socket.on('attendance:disputed', onDispute);
+    return () => { socket.off('attendance:disputed', onDispute); };
+  }, [socket, role, toast]);
+
+  const handleStudentAttendanceDecision = React.useCallback(async (decision) => {
+    const sid = attendanceConfirm?.scheduleId;
+    if (!sid) return;
+    setAttendanceConfirmBusy(true);
+    try {
+      const res = await api.schedules.studentConfirm(sid, decision);
+      if (!res?.success) {
+        toast.error(res?.message || 'Không gửi được xác nhận');
+        return;
+      }
+      setAttendanceConfirm(null);
+      if (res.disputed) {
+        toast.info('Đã gửi tranh chấp — chờ Admin giải quyết. Buổi chưa được tính.');
+      } else {
+        toast.success('Đã xác nhận điểm danh — buổi học được tính.');
+      }
+      if (typeof triggerBackgroundSync === 'function') {
+        Promise.resolve(triggerBackgroundSync()).catch(() => {});
+      }
+    } catch (e) {
+      toast.error(e?.message || 'Lỗi kết nối');
+    } finally {
+      setAttendanceConfirmBusy(false);
+    }
+  }, [attendanceConfirm, toast, triggerBackgroundSync]);
+
+  const handleAdminDisputeDecision = React.useCallback(async (decision) => {
+    const sid = attendanceDispute?.scheduleId;
+    if (!sid) return;
+    setAttendanceDisputeBusy(true);
+    try {
+      const res = await api.schedules.resolveDispute(sid, decision);
+      if (!res?.success) {
+        toast.error(res?.message || 'Không xử lý được tranh chấp');
+        return;
+      }
+      setAttendanceDispute(null);
+      if (res.rejected) {
+        toast.success('Đã từ chối — buổi không tính. Đã báo GV và HV.');
+      } else {
+        toast.success('Đã chấp thuận — buổi được tính.');
+      }
+      if (typeof triggerBackgroundSync === 'function') {
+        Promise.resolve(triggerBackgroundSync()).catch(() => {});
+      }
+    } catch (e) {
+      toast.error(e?.message || 'Lỗi kết nối');
+    } finally {
+      setAttendanceDisputeBusy(false);
+    }
+  }, [attendanceDispute, toast, triggerBackgroundSync]);
+
   const dismissWelcomeCelebration = React.useCallback(async () => {
     setShowWelcomeCelebration(false);
     if (welcomeMarkedRef.current) return;
@@ -389,6 +549,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       localStorage.setItem(`${key}_user`, JSON.stringify({ ...stored, pendingCourseCelebration: null }));
     } catch { /* lần sau /me sẽ hiện lại nếu chưa lưu */ }
   }, [courseCelebration]);
+
+  const dismissStarBonusCelebration = React.useCallback(() => {
+    const current = starBonusCelebration;
+    setStarBonusCelebration(null);
+    if (!current?.month) return;
+    markStarBonusSeen(current.teacherId || myId, current.month);
+    // Đánh dấu notif thưởng sao tháng đó đã đọc (nếu còn unread)
+    try {
+      const hit = (allNotifications || []).find((n) => (
+        n?.payload?.kind === 'star_bonus_eligible'
+        && String(n.payload?.month) === String(current.month)
+        && !n.read
+      ));
+      if (hit && typeof markNotificationRead === 'function') {
+        markNotificationRead(hit.id || hit._id);
+      }
+    } catch { /* ignore */ }
+  }, [starBonusCelebration, markStarBonusSeen, myId, allNotifications, markNotificationRead]);
 
   const handleLogout = () => onLogout?.();
 
@@ -459,6 +637,35 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
 
   const unreadCount = myNotifications.filter(n => !n.read).length;
+
+  // GV offline lúc đạt mốc → hiện popup khi vào lại (notif chưa xem + chưa celeb)
+  useEffect(() => {
+    if (role !== 'teacher' || !myId) return;
+    if (showWelcomeCelebration || starBonusCelebration) return;
+    const hit = myNotifications.find((n) => (
+      n?.payload?.kind === 'star_bonus_eligible'
+      && n?.payload?.month
+      && !n.read
+      && !hasSeenStarBonus(myId, n.payload.month)
+    ));
+    if (!hit) return;
+    queueStarBonusCelebration({
+      teacherId: myId,
+      month: hit.payload.month,
+      monthLabel: hit.payload.monthLabel,
+      amount: hit.payload.amount,
+      minStudents: hit.payload.minStudents,
+      minStars: hit.payload.minStars,
+    });
+  }, [
+    role,
+    myId,
+    myNotifications,
+    showWelcomeCelebration,
+    starBonusCelebration,
+    hasSeenStarBonus,
+    queueStarBonusCelebration,
+  ]);
 
   useEffect(() => {
     triggerBackgroundSync();
@@ -628,6 +835,29 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         courseName={courseCelebration?.courseName || ''}
         onClose={dismissCourseCelebration}
       />
+      <WelcomeCelebrationOverlay
+        open={!showWelcomeCelebration && !courseCelebration && !!starBonusCelebration}
+        role="teacher"
+        name={displayName || session?.name || ''}
+        variant="star_bonus"
+        starBonus={starBonusCelebration}
+        onClose={dismissStarBonusCelebration}
+      />
+      <StudentAttendanceConfirmModal
+        open={role === 'student' && !!attendanceConfirm}
+        payload={attendanceConfirm}
+        busy={attendanceConfirmBusy}
+        onAccept={() => handleStudentAttendanceDecision('accept')}
+        onDispute={() => handleStudentAttendanceDecision('dispute')}
+      />
+      <AdminAttendanceDisputeModal
+        open={(role === 'admin' || role === 'staff') && !!attendanceDispute}
+        payload={attendanceDispute}
+        busy={attendanceDisputeBusy}
+        onApprove={() => handleAdminDisputeDecision('approve')}
+        onReject={() => handleAdminDisputeDecision('reject')}
+        onClose={() => setAttendanceDispute(null)}
+      />
 
       {showNotif && typeof document !== 'undefined' && createPortal(
         <>
@@ -694,6 +924,48 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               const p = n.path || `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`;
                               navigate(p.includes('#') ? p : `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`);
                             }
+                          } else if (n.payload?.kind === 'attendance_dispute' && (role === 'admin' || role === 'staff')) {
+                            setShowNotif(false);
+                            setAttendanceDispute({
+                              scheduleId: n.payload.scheduleId,
+                              studentName: n.payload.studentName,
+                              teacherName: n.payload.teacherName,
+                              course: n.payload.course,
+                              sessionNumber: n.payload.sessionNumber,
+                              totalSessions: n.payload.totalSessions,
+                              weekday: n.payload.weekday,
+                              dateLabel: n.payload.dateLabel,
+                              timeRange: n.payload.timeRange,
+                            });
+                          } else if (n.payload?.kind === 'attendance_confirm_pending' && role === 'student') {
+                            setShowNotif(false);
+                            setAttendanceConfirm(n.payload);
+                          } else if (n.payload?.kind === 'star_bonus_eligible' && role === 'teacher') {
+                            setShowNotif(false);
+                            setStarBonusCelebration({
+                              month: String(n.payload.month || ''),
+                              monthLabel: n.payload.monthLabel || '',
+                              amount: Number(n.payload.amount) || 0,
+                              minStudents: n.payload.minStudents,
+                              minStars: n.payload.minStars,
+                              teacherId: myId,
+                            });
+                          } else if (n.payload?.kind === 'lms_course_update') {
+                            const action = n.payload?.action || '';
+                            const isSoftware = String(action).startsWith('software_link');
+                            const fallback = role === 'teacher'
+                              ? (isSoftware ? '/teacher#software-links' : `/teacher#training?courseId=${encodeURIComponent(n.payload?.courseId || '')}`)
+                              : (isSoftware ? '/student#materials-software' : `/student#materials-videos?courseId=${encodeURIComponent(n.payload?.courseId || '')}`);
+                            const p = n.path || fallback;
+                            if (String(p).includes('#')) {
+                              const [pathPart, hashPart] = String(p).split('#');
+                              navigate(pathPart || (role === 'teacher' ? '/teacher' : '/student'));
+                              window.location.hash = hashPart || '';
+                            } else {
+                              navigate(p);
+                            }
+                          } else if (n.payload?.kind === 'lms_review') {
+                            navigate(n.path || `/admin/notifications?reviewId=${encodeURIComponent(n.payload?.reviewId || '')}`);
                           } else if (role === 'teacher' && isTeacherRatingNotif(n)) {
                             openTeacherRatingDetail({
                               evaluationId: getEvaluationIdFromNotif(n),

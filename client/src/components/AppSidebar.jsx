@@ -68,6 +68,7 @@ const MENU_CONFIG = {
           { key: 'evaluation', icon: Star,     label: 'Đánh giá', path: '/student', hash: 'evaluation', requiresLearningAccess: true },
         ],
       },
+      { key: 'center-info', icon: Building2, label: 'Thông tin trung tâm', path: '/student/center-info' },
     ],
     bottomItems: [
       { key: 'profile',   icon: User,    label: 'Hồ sơ',      path: '/student', hash: 'profile' },
@@ -105,6 +106,7 @@ const MENU_CONFIG = {
           { key: 'software-links', icon: Link2, label: 'Tải phần mềm', path: '/teacher', hash: 'software-links' },
         ],
       },
+      { key: 'center-info', icon: Building2, label: 'Thông tin trung tâm', path: '/teacher/center-info' },
     ],
     bottomItems: [
       { key: 'profile', icon: User,   label: 'Hồ sơ', path: '/teacher', hash: 'profile' },
@@ -192,6 +194,7 @@ const MENU_CONFIG = {
           { key: 'tenants',    icon: Building2, label: 'Multi-tenant',     path: '/admin/tenants',           superAdminOnly: true },
         ],
       },
+      { key: 'center-info', icon: Building2, label: 'Thông tin trung tâm', path: '/admin/center-info' },
     ],
     bottomItems: [
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
@@ -967,14 +970,14 @@ const AppSidebar = ({
             // Sidebar thu gọn: hiện thẳng các lá (icon)
             if (collapsed && !mobileOpen) {
               return (
-                <div key={item.key} className="space-y-1 pt-1 mt-1 border-t border-white/10">
+                <div key={item.key} className="space-y-1 pb-1 mb-1 border-b border-white/10 last:border-b-0 last:mb-0 last:pb-0">
                   {flattenLeaves(item.children).map((leaf) => renderNavButton(leaf, { nested: true }))}
                 </div>
               );
             }
 
             return (
-              <div key={item.key} className="pt-1 mt-1 border-t border-white/10">
+              <div key={item.key} className="pb-1 mb-1 border-b border-white/10 last:border-b-0 last:mb-0 last:pb-0">
                 <button
                   type="button"
                   onClick={() => toggleGroup(item.key)}
@@ -1009,7 +1012,11 @@ const AppSidebar = ({
             );
           }
 
-          return renderNavButton(item);
+          return (
+            <div key={item.key} className="pb-1 mb-1 border-b border-white/10 last:border-b-0 last:mb-0 last:pb-0">
+              {renderNavButton(item)}
+            </div>
+          );
         })}
 
       </nav>

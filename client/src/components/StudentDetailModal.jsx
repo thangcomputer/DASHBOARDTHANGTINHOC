@@ -205,17 +205,41 @@ const fmtScheduleTimeRange = (sch) => {
 const formatScheduleNote = (note) => {
   if (!note) return null;
   const raw = String(note);
-  // [ADMIN_MAKEUP] Tên @ ISO_DATE
-  const makeupMatch = raw.match(/^\[ADMIN_MAKEUP\]\s*(.+?)\s*@\s*(.+)$/);
+  // [ADMIN_MAKEUP] Tên @ ISO[ · buổi N/T] [| ghi chú cũ]
+  const makeupMatch = raw.match(
+    /^\[ADMIN_MAKEUP\]\s*(.+?)\s*@\s*([^\s|]+)(?:\s*·\s*buổi\s+(\d+)(?:\/(\d+))?)?(?:\s*\|\s*(.*))?$/s,
+  );
   if (makeupMatch) {
     const who = makeupMatch[1].trim();
     const when = new Date(makeupMatch[2].trim());
     const whenFmt = Number.isNaN(when.getTime()) ? makeupMatch[2] : when.toLocaleString('vi-VN', {
       timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric',
     });
-    return `Điểm danh bù bởi ${who} lúc ${whenFmt}`;
+    const ordinal = makeupMatch[3];
+    const total = makeupMatch[4];
+    const rest = (makeupMatch[5] || '').trim();
+    const buoi = ordinal
+      ? (total ? ` buổi thứ ${ordinal}/${total}` : ` buổi thứ ${ordinal}`)
+      : '';
+    const base = `Điểm danh bù${buoi} bởi ${who} lúc ${whenFmt}`;
+    return rest ? `${base} | ${rest}` : base;
   }
   return raw;
+};
+
+/** Ước lượng buổi thứ N sau điểm danh bù (preview UI — server là nguồn chuẩn). */
+const previewMakeupSession = (sch, student) => {
+  if (!sch || !student) return null;
+  const courseKey = String(sch.course || '').trim().toLowerCase();
+  const enrs = Array.isArray(student.enrollments) ? student.enrollments : [];
+  const enr = courseKey
+    ? enrs.find((e) => String(e.courseName || e.course || '').trim().toLowerCase() === courseKey)
+    : (enrs.find((e) => e.isPrimary) || enrs[0]);
+  const total = Number(enr?.totalSessions ?? student.totalSessions) || 0;
+  const completed = Number(enr?.completedSessions ?? student.completedSessions) || 0;
+  const next = completed + 1;
+  if (next <= 0) return null;
+  return total > 0 ? { next, total } : { next, total: null };
 };
 const fmtDateTimeVN = (input) => {
   if (!input) return '';
@@ -259,9 +283,15 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     const action = getAttendanceAction(sch);
     if (!action.canAdminMakeup || action.state === 'COMPLETED' || action.state === 'CANCELLED') return;
     const sid = sch._id || sch.id;
+    const preview = previewMakeupSession(sch, data?.student);
+    const buoiPreview = preview
+      ? (preview.total != null
+        ? ` buổi thứ ${preview.next}/${preview.total}`
+        : ` buổi thứ ${preview.next}`)
+      : '';
     showModal({
       title: 'Xác nhận điểm danh bù',
-      content: `Học viên: ${sch.studentName || data?.student?.name || '—'}\nKhóa học: ${sch.course || '—'}\nGiảng viên: ${sch.teacherName || '—'}\nThời gian: ${sch.startTime || '?'} - ${sch.endTime || '?'}\n\nThao tác này sẽ hoàn thành buổi học và cộng 1 buổi vào tiến độ khóa học.`,
+      content: `Học viên: ${sch.studentName || data?.student?.name || '—'}\nKhóa học: ${sch.course || '—'}\nGiảng viên: ${sch.teacherName || '—'}\nThời gian: ${sch.startTime || '?'} - ${sch.endTime || '?'}\n\nThao tác này sẽ hoàn thành buổi học và cộng 1 buổi vào tiến độ khóa học${buoiPreview ? ` (${buoiPreview.trim()})` : ''}.`,
       type: 'warning',
       confirmText: 'Xác nhận điểm danh bù',
       onConfirm: async () => {
@@ -276,7 +306,12 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             toast.error(res?.message || 'Không thể điểm danh bù');
             return;
           }
-          toast.success('Đã điểm danh bù — buổi học hoàn thành');
+          const done = Number(res?.meta?.completedSessions);
+          const tot = Number(res?.meta?.totalSessions);
+          const buoiDone = Number.isFinite(done) && done > 0
+            ? (Number.isFinite(tot) && tot > 0 ? ` buổi thứ ${done}/${tot}` : ` buổi thứ ${done}`)
+            : '';
+          toast.success(`Đã điểm danh bù${buoiDone} — buổi học hoàn thành`);
           // Cập nhật số buổi trên danh sách Admin/GV ngay (không chờ socket)
           if (res.student && typeof updateStudent === 'function') {
             try {

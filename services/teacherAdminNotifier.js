@@ -88,8 +88,9 @@ async function notifyTeacherAdminUpdates(io, {
 
 /**
  * Admin điểm danh bù buổi của HV → báo GV phụ trách.
+ * @param {object} [sessionInfo] - { completedSessions, totalSessions } buổi thứ mấy sau điểm danh bù
  */
-async function notifyTeacherAdminMakeup(io, schedule, actor = {}) {
+async function notifyTeacherAdminMakeup(io, schedule, actor = {}, sessionInfo = {}) {
   if (!io || !schedule?.teacherId) return;
   try {
     const teacherId = String(schedule.teacherId._id || schedule.teacherId);
@@ -104,17 +105,26 @@ async function notifyTeacherAdminMakeup(io, schedule, actor = {}) {
     const hvLabel = studentId
       ? `⟦student_detail:${studentId}:profile|${studentName}⟧`
       : studentName;
+    const completed = Number(sessionInfo?.completedSessions);
+    const total = Number(sessionInfo?.totalSessions);
+    const buoiPart = Number.isFinite(completed) && completed > 0
+      ? (Number.isFinite(total) && total > 0
+        ? ` buổi thứ ${completed}/${total}`
+        : ` buổi thứ ${completed}`)
+      : '';
 
     await NotificationService.send(io, {
       type: 'SCHEDULE',
       title: '📋 Admin đã điểm danh bù',
-      content: `Admin${actorName} đã điểm danh bù cho ${hvLabel} — ${course}, ngày ${dateLabel}. Buổi học được tính vào tiến độ và lương buổi.`,
+      content: `Admin${actorName} đã điểm danh bù${buoiPart} cho ${hvLabel} — ${course}, ngày ${dateLabel}. Buổi học được tính vào tiến độ và lương buổi.`,
       receivers: teacherId,
       payload: {
         kind: 'admin_makeup_attendance',
         scheduleId: String(schedule._id || schedule.id || ''),
         studentId: studentId ? String(studentId) : null,
         course,
+        completedSessions: Number.isFinite(completed) ? completed : undefined,
+        totalSessions: Number.isFinite(total) ? total : undefined,
       },
       link: studentId
         ? `/teacher#students?studentId=${studentId}`
@@ -158,10 +168,11 @@ async function maybeNotifyStarBonusEligibility(io, teacherId) {
       const ym = String(row.month);
       if (already.has(ym)) continue;
       const amount = Number(row.amount) || summary.bonusPerMonth || 0;
+      const monthLabel = formatMonthLabel(ym);
       await NotificationService.send(io, {
         type: 'FINANCE',
         title: '⭐ Đã đạt mốc thưởng sao',
-        content: `Bạn đã đủ điều kiện thưởng sao ${formatMonthLabel(ym)}`
+        content: `Bạn đã đủ điều kiện thưởng sao ${monthLabel}`
           + ` (≥${summary.minStudents} HV + ≥${summary.minStars}★).`
           + ` Mức ${formatVnd(amount)} sẽ được cộng khi Admin chi lương tháng đó.`,
         receivers: tid,
@@ -172,9 +183,29 @@ async function maybeNotifyStarBonusEligibility(io, teacherId) {
           studentsCount: row.studentsCount,
           avgStars: row.avgStars,
           teacherId: tid,
+          minStudents: summary.minStudents,
+          minStars: summary.minStars,
         },
         link: '/teacher/finance',
       });
+
+      // Popup pháo hoa realtime (GV online)
+      try {
+        const celebPayload = {
+          teacherId: tid,
+          month: ym,
+          monthLabel,
+          amount,
+          minStudents: summary.minStudents,
+          minStars: summary.minStars,
+          studentsCount: row.studentsCount,
+          avgStars: row.avgStars,
+        };
+        io.to(tid).emit('teacher:star-bonus-celebration', celebPayload);
+        io.to(`teacher_${tid}`).emit('teacher:star-bonus-celebration', celebPayload);
+      } catch (emitErr) {
+        logger.warn('[teacherAdminNotifier] starBonus emit: %s', emitErr.message);
+      }
     }
   } catch (err) {
     logger.warn('[teacherAdminNotifier] starBonus: %s', err.message);

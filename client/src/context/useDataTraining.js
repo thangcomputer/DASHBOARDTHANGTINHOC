@@ -346,7 +346,7 @@ export function useDataTraining(currentUser) {
     setStudentTrainingData((prev) => {
       const newData = {
         ...prev,
-        [category]: [...(prev[category] || []), { ...item, id: Date.now() }],
+        [category]: [...(prev[category] || []), { ...item, id: item.id || Date.now() }],
       };
       api.settings?.updateStudentTrainingData(newData).catch(console.error);
       return newData;
@@ -355,10 +355,14 @@ export function useDataTraining(currentUser) {
 
   const updateStudentTrainingItem = useCallback((category, id, updates) => {
     setStudentTrainingData((prev) => {
+      const list = prev[category] || [];
+      const exists = list.some((item) => String(item.id) === String(id));
       const newData = {
         ...prev,
-        [category]: (prev[category] || []).map((item) =>
-          String(item.id) === String(id) ? { ...item, ...updates } : item),
+        [category]: exists
+          ? list.map((item) =>
+              String(item.id) === String(id) ? { ...item, ...updates } : item)
+          : [...list, { ...updates, id: id || Date.now() }],
       };
       api.settings?.updateStudentTrainingData(newData).catch(console.error);
       return newData;
@@ -380,7 +384,7 @@ export function useDataTraining(currentUser) {
     setTrainingData((prev) => {
       const newData = {
         ...prev,
-        [category]: [...(prev[category] || []), { ...item, id: Date.now() }],
+        [category]: [...(prev[category] || []), { ...item, id: item.id || Date.now() }],
       };
       api.settings?.updateTrainingData(newData).catch(console.error);
       return newData;
@@ -389,10 +393,14 @@ export function useDataTraining(currentUser) {
 
   const updateTrainingItem = useCallback((category, id, updates) => {
     setTrainingData((prev) => {
+      const list = prev[category] || [];
+      const exists = list.some((item) => String(item.id) === String(id));
       const newData = {
         ...prev,
-        [category]: (prev[category] || []).map((item) =>
-          String(item.id) === String(id) ? { ...item, ...updates } : item),
+        [category]: exists
+          ? list.map((item) =>
+              String(item.id) === String(id) ? { ...item, ...updates } : item)
+          : [...list, { ...updates, id: id || Date.now() }],
       };
       api.settings?.updateTrainingData(newData).catch(console.error);
       return newData;

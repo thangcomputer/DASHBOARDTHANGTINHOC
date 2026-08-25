@@ -2,14 +2,14 @@
  * Thưởng sao GV (tách khỏi lương cứng / buổi):
  * - Trong 1 tháng: hướng dẫn ≥ MIN_STUDENTS học viên (distinct, lịch completed)
  * - VÀ điểm sao trung bình cộng dồn từ đánh giá HV ≥ MIN_STARS
- * → thưởng BONUS_PER_MONTH (VNĐ) cho tháng đó (có thể tích nhiều tháng chưa chi).
+ * → thưởng theo customStarBonusAmount của GV (fallback BONUS_PER_MONTH) / tháng.
  */
 
 const mongoose = require('mongoose');
 const Schedule = require('../../attendance/models/Schedule');
 const Evaluation = require('../../exam/models/Evaluation');
 
-const MIN_STUDENTS = 10;
+const MIN_STUDENTS = 15;
 const MIN_STARS = 5;
 const BONUS_PER_MONTH = 200000;
 const MAX_LOOKBACK_MONTHS = 24;
@@ -18,6 +18,13 @@ function toObjectId(id) {
   if (id instanceof mongoose.Types.ObjectId) return id;
   if (mongoose.Types.ObjectId.isValid(id)) return new mongoose.Types.ObjectId(String(id));
   return null;
+}
+
+/** Số tiền thưởng/tháng: ưu tiên customStarBonusAmount trên hồ sơ GV. */
+function resolveBonusAmount(teacher) {
+  const custom = Number(teacher?.customStarBonusAmount);
+  if (Number.isFinite(custom) && custom >= 0) return custom;
+  return BONUS_PER_MONTH;
 }
 
 function monthKey(d) {
@@ -139,6 +146,7 @@ async function computeStarBonusSummary(teacher) {
 
   const { avgStars, ratingCount } = await getCumulativeRating(teacherId);
   const starsOk = avgStars >= MIN_STARS;
+  const bonusPerMonth = resolveBonusAmount(teacher);
 
   const from = await resolveLookbackStart(teacherId, teacher);
   const now = new Date();
@@ -156,7 +164,7 @@ async function computeStarBonusSummary(teacher) {
       month: ym,
       studentsCount,
       avgStars,
-      amount: BONUS_PER_MONTH,
+      amount: bonusPerMonth,
       eligible: true,
     });
   }
@@ -168,10 +176,10 @@ async function computeStarBonusSummary(teacher) {
     ratingCount,
     minStudents: MIN_STUDENTS,
     minStars: MIN_STARS,
-    bonusPerMonth: BONUS_PER_MONTH,
+    bonusPerMonth,
     unpaidMonths,
     unpaidBonusTotal,
-    ruleLabel: `≥${MIN_STUDENTS} HV/tháng và ≥${MIN_STARS}★ (cộng dồn) → thưởng ${BONUS_PER_MONTH.toLocaleString('vi-VN')}đ/tháng`,
+    ruleLabel: `≥${MIN_STUDENTS} HV/tháng và ≥${MIN_STARS}★ (cộng dồn) → thưởng ${bonusPerMonth.toLocaleString('vi-VN')}đ/tháng`,
   };
 }
 
@@ -202,4 +210,5 @@ module.exports = {
   resolveBonusForPayout,
   getCumulativeRating,
   monthKey,
+  resolveBonusAmount,
 };

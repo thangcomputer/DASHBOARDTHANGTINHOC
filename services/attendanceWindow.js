@@ -69,6 +69,8 @@ function scheduleBounds(schedule, now = new Date()) {
  */
 function resolveAttendanceState(schedule, now = new Date()) {
   const status = String(schedule?.status || 'scheduled');
+  const confirm = String(schedule?.studentConfirmStatus || 'none');
+
   if (status === 'completed') {
     return {
       state: 'COMPLETED',
@@ -87,6 +89,34 @@ function resolveAttendanceState(schedule, now = new Date()) {
       state: 'CANCELLED',
       kind: 'CANCELLED',
       code: ATTENDANCE_CODES.CANCELLED,
+      canTeacherAttend: false,
+      canAdminMakeup: false,
+      canAttend: false,
+      canLateAttend: false,
+      canRequestCorrection: false,
+      remainingGraceMs: 0,
+    };
+  }
+
+  // Chờ HV xác nhận / tranh chấp — GV không điểm danh lại; Admin có thể xử lý dispute
+  if (confirm === 'pending') {
+    return {
+      state: 'AWAITING_STUDENT_CONFIRM',
+      kind: 'AWAITING_STUDENT_CONFIRM',
+      code: 'ATTENDANCE_AWAITING_STUDENT',
+      canTeacherAttend: false,
+      canAdminMakeup: false,
+      canAttend: false,
+      canLateAttend: false,
+      canRequestCorrection: false,
+      remainingGraceMs: 0,
+    };
+  }
+  if (confirm === 'disputed') {
+    return {
+      state: 'ATTENDANCE_DISPUTED',
+      kind: 'ATTENDANCE_DISPUTED',
+      code: 'ATTENDANCE_DISPUTED',
       canTeacherAttend: false,
       canAdminMakeup: false,
       canAttend: false,

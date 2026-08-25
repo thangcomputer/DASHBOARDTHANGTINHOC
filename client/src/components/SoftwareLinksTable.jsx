@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ExternalLink, Download, Link2, BookOpen, ChevronLeft } from 'lucide-react';
-import { sanitizeRichHtml, htmlToPlainText } from '../utils/htmlContent';
+import { sanitizeRichHtml, htmlToPlainText, resolveRichHtmlMedia } from '../utils/htmlContent';
+import { resolveMediaUrl } from '../services/api';
 
 function hasInstallGuide(raw) {
   const s = String(raw || '');
@@ -20,15 +21,15 @@ function escapeHtml(text) {
 function toArticleHtml(raw) {
   const s = String(raw || '').trim();
   if (!s) return '';
-  if (/<[a-z][\s\S]*>/i.test(s)) return sanitizeRichHtml(s);
-  return sanitizeRichHtml(
-    s
+  const html = /<[a-z][\s\S]*>/i.test(s)
+    ? s
+    : s
       .split(/\n+/)
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => `<p>${escapeHtml(line)}</p>`)
-      .join('')
-  );
+      .join('');
+  return resolveRichHtmlMedia(sanitizeRichHtml(html), resolveMediaUrl);
 }
 
 /**

@@ -5,7 +5,8 @@
  * Backend SoT — do not trust FE progress/status.
  *
  * RULE A: MAX_STUDENT_SESSIONS_PER_DAY per studentId+date (not teacherId).
- * RULE B: enrollment used sessions (scheduled+completed) < totalSessions; status active.
+ * RULE B: enrollment capacity = lịch (scheduled+completed) + buổi ghi nhận trước
+ *         (completedSessions DB − completed trên lịch) < totalSessions; status active.
  * Teacher conflict is independent (time overlap on teacherId+date).
  */
 
@@ -168,11 +169,25 @@ async function assertEnrollmentCanSchedule({ studentId, courseName, excludeSched
     excludeScheduleId,
   });
 
-  if (used >= totalSessions) {
+  // Buổi ghi nhận trước (Admin chỉnh completedSessions cao hơn số ca completed trên lịch)
+  // vẫn chiếm slot — tránh xếp vượt «còn lại» trên hồ sơ.
+  const calendarCompleted = await Schedule.countDocuments({
+    studentId,
+    status: 'completed',
+    ...(courseKey ? { course: courseKey } : {}),
+    ...(excludeScheduleId ? { _id: { $ne: excludeScheduleId } } : {}),
+  });
+  const storedDone = enr.completedSessions != null
+    ? Math.max(0, Number(enr.completedSessions) || 0)
+    : Math.max(0, totalSessions - (Number(enr.remainingSessions) || 0));
+  const priorCredit = Math.max(0, storedDone - calendarCompleted);
+  const effectiveUsed = used + priorCredit;
+
+  if (effectiveUsed >= totalSessions) {
     throw schedulingError(
       ERROR_CODES.ENROLLMENT_SESSION_LIMIT_REACHED,
       `Khóa học đã hoàn thành đủ ${totalSessions}/${totalSessions} buổi, không thể xếp thêm lịch.`,
-      { totalSessions, used, course: courseKey },
+      { totalSessions, used: effectiveUsed, course: courseKey },
     );
   }
 
@@ -180,8 +195,8 @@ async function assertEnrollmentCanSchedule({ studentId, courseName, excludeSched
     student,
     enrollment: enr,
     totalSessions,
-    used,
-    remaining: Math.max(0, totalSessions - used),
+    used: effectiveUsed,
+    remaining: Math.max(0, totalSessions - effectiveUsed),
     course: courseKey,
   };
 }

@@ -77,62 +77,19 @@ export function useDataSchedule({
     const previousSchedules = [...schedules];
 
     try {
-      const todayVN = new Date().toLocaleDateString('vi-VN');
       const todayISO = localDateISO();
 
-      const newGrade = {
-        date: todayVN,
-        note: note || 'Đã điểm danh',
-        grade: grade || 0,
-      };
-
-      const newGrades = [newGrade, ...(targetStudentSync.grades || [])];
-      const validGrades = newGrades.filter(g => g.grade > 0);
-      const avg = validGrades.length > 0
-        ? Math.round((validGrades.reduce((sum, g) => sum + g.grade, 0) / validGrades.length) * 10) / 10
-        : 0;
-
-      const newCompleted = (targetStudentSync.completedSessions || 0) + 1;
-      const newRemaining = targetStudentSync.remainingSessions - 1;
-      const enrollmentStatus = attendanceStatusForApi(newRemaining);
-      const displayStatus = attendanceStatusForDisplay(newRemaining);
-
-      // Optimistic Student Update
+      // Optimistic: khóa điểm danh lại, CHƯA cộng buổi (chờ HV xác nhận)
       setStudents(prev => prev.map(s => {
         if (String(s._id || s.id) !== String(studentId)) return s;
-        const patch = {
-          completedSessions: newCompleted,
-          remainingSessions: newRemaining,
-          lastGrade: grade || s.lastGrade,
-          avgGrade: avg,
-          grades: newGrades,
-          status: displayStatus,
+        return {
+          ...s,
           can_check_in: false,
           remaining_cooldown_hours: 12,
           last_attendance_at: new Date().toISOString(),
         };
-        if (courseName && Array.isArray(s.enrollments) && s.enrollments.length) {
-          return {
-            ...s,
-            ...patch,
-            enrollments: s.enrollments.map((e) =>
-              e.courseName === courseName
-                ? {
-                  ...e,
-                  completedSessions: newCompleted,
-                  remainingSessions: newRemaining,
-                  grades: newGrades,
-                  avgGrade: avg,
-                  status: enrollmentStatus,
-                }
-                : e
-            ),
-          };
-        }
-        return { ...s, ...patch };
       }));
 
-      // Check if schedule exists today (or use explicit scheduleId from confirm/popup)
       let existSch = scheduleId
         ? schedules.find((sch) => String(sch._id || sch.id) === String(scheduleId))
         : null;
@@ -145,24 +102,33 @@ export function useDataSchedule({
         });
       }
 
-      if (existSch) {
-        // Optimistic Schedule Update
-        setSchedules(prev => prev.map(s => (s._id || s.id) === (existSch._id || existSch.id) ? { ...s, status: 'completed' } : s));
+      const schedulePayload = {
+        status: 'completed',
+        note: note || undefined,
+        grade: grade || 0,
+      };
+      const late = String(lateReason || '').trim();
+      if (late) {
+        schedulePayload.lateReason = late;
+        schedulePayload.note = note || late;
+      }
 
-        const schedulePayload = { status: 'completed' };
-        const late = String(lateReason || '').trim();
-        if (late) {
-          schedulePayload.lateReason = late;
-          schedulePayload.note = note || late;
-        }
-        const resSch = await api.schedules?.update(existSch._id || existSch.id, schedulePayload);
+      if (existSch) {
+        const sid = existSch._id || existSch.id;
+        setSchedules(prev => prev.map(s => (s._id || s.id) === sid
+          ? { ...s, studentConfirmStatus: 'pending', status: 'scheduled' }
+          : s));
+
+        const resSch = await api.schedules?.update(sid, schedulePayload);
         if (!resSch?.success) {
           const err = new Error(resSch?.message || 'Lỗi cập nhật lịch học');
           if (resSch?.code) err.code = resSch.code;
           throw err;
         }
+        if (resSch.data) {
+          setSchedules(prev => prev.map(s => (s._id || s.id) === sid ? { ...s, ...resSch.data } : s));
+        }
       } else {
-        // Create new schedule
         const getActiveSession = () => {
           try {
             return JSON.parse(localStorage.getItem('teacher_user') || localStorage.getItem('admin_user') || '{}');
@@ -182,46 +148,41 @@ export function useDataSchedule({
           startTime: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           endTime: new Date(now.getTime() + 90 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           course: courseName || targetStudentSync.course || '',
-          status: 'completed',
+          status: 'scheduled',
           paymentStatus: 'pending',
         };
 
         setSchedules(prev => [...prev, newSch]);
         const resCreate = await api.schedules?.create(newSch);
-        if (resCreate?.success) {
-          setSchedules(prev => prev.map(s => s.id === tempId ? { ...resCreate.data, id: resCreate.data._id } : s));
-        } else {
+        if (!resCreate?.success) {
           throw new Error(resCreate?.message || 'Lỗi tạo lịch học mới');
+        }
+        const createdId = resCreate.data?._id || resCreate.data?.id;
+        setSchedules(prev => prev.map(s => s.id === tempId ? { ...resCreate.data, id: createdId } : s));
+
+        const resSch = await api.schedules?.update(createdId, schedulePayload);
+        if (!resSch?.success) {
+          const err = new Error(resSch?.message || 'Lỗi gửi xác nhận điểm danh');
+          if (resSch?.code) err.code = resSch.code;
+          throw err;
+        }
+        if (resSch.data) {
+          setSchedules(prev => prev.map(s => String(s._id || s.id) === String(createdId)
+            ? { ...s, ...resSch.data }
+            : s));
         }
       }
 
-      // Finalize Student on Server (Already did optimistic UI)
-      // With courseName: enrollment enum (active/completed); root mapped server-side when primary.
-      // Without courseName: root Vietnamese labels.
-      const resStud = await api.students?.update(studentId, {
-        lastGrade: grade || targetStudentSync.lastGrade,
-        avgGrade: avg,
-        grades: newGrades,
-        completedSessions: newCompleted,
-        remainingSessions: newRemaining,
-        status: courseName ? enrollmentStatus : displayStatus,
-        ...(courseName ? { courseName } : {}),
-      });
-
-      if (!resStud?.success) throw new Error(resStud?.message || 'Lỗi đồng bộ thông tin học viên');
-
-      addNotification(studentId, 'student', `Giảng viên đã điểm danh buổi học. Điểm: ${grade || 0}/10`);
       triggerBackgroundSync();
       return true;
 
     } catch (err) {
       console.error('[DataContext] markAttendance error:', err);
-      // Rollback
       setStudents(previousStudents);
       setSchedules(previousSchedules);
       throw err;
     }
-  }, [students, schedules, setStudents, triggerBackgroundSync, addNotification]);
+  }, [students, schedules, setStudents, setSchedules, triggerBackgroundSync]);
 
   const addSchedule = useCallback((schedule) => {
     const student = students.find(s => String(s.id) === String(schedule.studentId) || String(s._id) === String(schedule.studentId));

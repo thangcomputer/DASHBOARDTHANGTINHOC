@@ -168,39 +168,48 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
           <button onClick={onClose}><X size={20}/></button>
         </div>
         <div className="p-6 space-y-4 overflow-y-auto">
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chọn học viên</label>
-            {isStudentLocked && (
-              <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-1.5 mb-2 flex items-center justify-between text-xs text-indigo-700 font-bold">
-                <span>📌 Đã khóa theo học viên trong hội thoại</span>
-                <span className="bg-indigo-200/60 text-indigo-900 text-[10px] px-2 py-0.5 rounded-md uppercase">Cố định</span>
-              </div>
-            )}
-            <CmsSelect name="enrollmentKey" value={form.enrollmentKey} onChange={handleChange} disabled={lockedPast || isStudentLocked} className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none disabled:opacity-80 disabled:bg-slate-100">
-              {(students || []).map((s) => {
-                const key = studentKey(s);
-                const sid = String(s.id || s._id || '');
-                const displayName = (s.name && !/^\d{5,}$/.test(s.name)) ? s.name : (s.email || s.phone || `HV-${sid.slice(-4)}`);
-                const g = getStudentScheduleGate(s, allSchedules, form.date, isEdit ? excludeId : null);
-                const suffix = g.canSchedule
-                  ? `${g.progressLabel} · còn ${g.remaining}`
-                  : g.reason;
-                return (
-                  <option key={key} value={key} disabled={!g.canSchedule && !isEdit}>
-                    {displayName} ({s.course || 'Học viên'}) — {suffix}
-                  </option>
-                );
-              })}
-            </CmsSelect>
-          </div>
+          {/* Từ hồ sơ HV: đã biết HV → không hiện chọn / banner khóa. Từ lịch: mới hiện dropdown. */}
+          {!isStudentLocked && (
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chọn học viên</label>
+              <CmsSelect
+                name="enrollmentKey"
+                value={form.enrollmentKey}
+                onChange={handleChange}
+                disabled={lockedPast}
+                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 text-sm focus:border-blue-400 outline-none disabled:opacity-80 disabled:bg-slate-100"
+              >
+                {(students || []).map((s) => {
+                  const key = studentKey(s);
+                  const sid = String(s.id || s._id || '');
+                  const displayName = (s.name && !/^\d{5,}$/.test(s.name))
+                    ? s.name
+                    : (s.email || s.phone || `HV-${sid.slice(-4)}`);
+                  const g = getStudentScheduleGate(s, allSchedules, form.date, isEdit ? excludeId : null);
+                  return (
+                    <option key={key} value={key} disabled={!g.canSchedule && !isEdit}>
+                      {displayName}{s.course ? ` · ${s.course}` : ''}
+                    </option>
+                  );
+                })}
+              </CmsSelect>
+            </div>
+          )}
 
           {selectedStudent && (
             <div className={`rounded-2xl border px-4 py-3 text-sm ${gate.canSchedule ? 'bg-slate-50 border-slate-100' : 'bg-amber-50 border-amber-100'}`}>
               <p className="font-bold text-slate-800">{selectedStudent.name || 'Học viên'}</p>
               <p className="text-slate-500 mt-0.5">Khóa: <span className="font-semibold text-blue-700">{gate.course || '—'}</span></p>
               <p className="text-slate-600 mt-1">Tiến độ: <span className="font-black">{gate.progressLabel}</span>
-                {gate.remaining > 0 ? <> · Còn <span className="font-black text-emerald-700">{gate.remaining}</span> buổi</> : null}
+                {(gate.remainingLearned ?? gate.remaining) > 0 ? <> · Còn <span className="font-black text-emerald-700">{gate.remainingLearned ?? gate.remaining}</span> buổi</> : null}
               </p>
+              {gate.priorCredit > 0 ? (
+                <p className="text-xs text-slate-500 mt-1">
+                  Trên lịch: <span className="font-semibold text-slate-700">{gate.onCalendar}</span>
+                  {' · '}
+                  Ghi nhận trước: <span className="font-semibold text-slate-700">{gate.priorCredit}</span>
+                </p>
+              ) : null}
               <p className="text-slate-600">Hôm nay: <span className="font-black">{gate.todayLabel}</span>
                 {' '}(tối đa {MAX_STUDENT_SESSIONS_PER_DAY} ca/HV)
               </p>
@@ -212,7 +221,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
 
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Ngày học (Ngày / Tháng / Năm)</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
+            <div className="grid grid-cols-3 gap-2">
               <CmsSelect
                 disabled={lockedPast}
                 value={parseInt(form.date.split('-')[2], 10)}
@@ -270,7 +279,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
               </p>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Bắt đầu</label>
               <input
