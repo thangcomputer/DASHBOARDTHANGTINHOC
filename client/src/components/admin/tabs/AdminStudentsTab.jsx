@@ -308,8 +308,9 @@ function PaidBadge({ paid }) {
 function ModeBranchBadges({ s, safeBranches }) {
   const mode = String(s?.learningMode || '').toUpperCase() === 'ONLINE' ? 'ONLINE' : 'OFFLINE';
   const modeLabel = resolveLearningModeLabel(mode);
-  const branch = s?.branchId
-    ? (safeBranches || []).find((b) => String(b._id) === String(s.branchId))
+  const studentBid = toBranchId(s?.branchId);
+  const branch = studentBid
+    ? (safeBranches || []).find((b) => toBranchId(b._id || b.id) === studentBid)
     : null;
   const branchLabel = resolveBranchDisplayName(branch, mode);
 
@@ -847,7 +848,7 @@ export default function AdminStudentsTab() {
                         const enrId = enr.enrollmentId || enr.id;
                         const enrTeacherVal = enr.teacherId || '';
                         const courseLabel = enr.courseName || enr.name || '';
-                        const { matched, other } = teachersForCourse(enr, enrTeacherVal);
+                        const { matched, other } = teachersForCourse(enr, enrTeacherVal, s?.branchId);
                         return (
                           <div key={enrId} className="contents">
                             <div className="min-w-0 space-y-1">
@@ -871,7 +872,7 @@ export default function AdminStudentsTab() {
                                 ))}
                                 {other.map((t) => (
                                   <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
-                                    {t.name} (khác môn)
+                                    {t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}
                                   </option>
                                 ))}
                               </CmsSelect>

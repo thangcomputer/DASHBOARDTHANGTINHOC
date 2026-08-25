@@ -399,7 +399,7 @@ export function MessagesProvider({ user, children }) {
               online: true,
             },
             lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
+            lastTime: null,
             unread: 0,
           };
         }
@@ -410,7 +410,7 @@ export function MessagesProvider({ user, children }) {
           id: adminConvId,
           user: { id: 'admin', name: 'Admin Thắng Tin Học', role: 'admin', avatar: 'AD', online: true },
           lastMessage: 'Chưa có tin nhắn',
-          lastTime: new Date(0),
+          lastTime: null,
           unread: 0,
         };
       }
@@ -428,7 +428,7 @@ export function MessagesProvider({ user, children }) {
               online: true,
             },
             lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
+            lastTime: null,
             unread: 0,
           };
         }
@@ -439,7 +439,7 @@ export function MessagesProvider({ user, children }) {
           id: adminConvId,
           user: { id: 'admin', name: 'Admin Thắng Tin Học', role: 'admin', avatar: 'AD', online: true },
           lastMessage: 'Chưa có tin nhắn',
-          lastTime: new Date(0),
+          lastTime: null,
           unread: 0,
         };
       }
@@ -457,7 +457,7 @@ export function MessagesProvider({ user, children }) {
               online: true,
             },
             lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
+            lastTime: null,
             unread: 0,
           };
         }
@@ -475,7 +475,7 @@ export function MessagesProvider({ user, children }) {
               online: true,
             },
             lastMessage: 'Chưa có tin nhắn',
-            lastTime: new Date(0),
+            lastTime: null,
             unread: 0,
           };
         }
@@ -495,7 +495,7 @@ export function MessagesProvider({ user, children }) {
           isGroup: true,
           user: { id: g._id, name: g.name, role: 'group', avatar: 'GN', online: true },
           lastMessage: lastMsg ? lastMsg.content : 'Bắt đầu cuộc trò chuyện nhóm',
-          lastTime: lastMsg ? lastMsg.time : new Date(g.createdAt || 0),
+          lastTime: lastMsg ? lastMsg.time : (g.createdAt ? new Date(g.createdAt) : null),
           unread: groupMsgs.filter((m) => m.read !== true && String(m.senderId) !== sId).length,
         };
       });

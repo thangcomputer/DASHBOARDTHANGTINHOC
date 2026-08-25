@@ -49,15 +49,28 @@ const formatDisplayName = (name) => {
     .join('');
 };
 
+/** Bỏ epoch / ngày rác (tránh hiện "01/01" khi chưa có tin nhắn). */
+const MIN_ACTIVITY_MS = Date.UTC(2000, 0, 1);
+
+function toValidActivityDate(date) {
+  if (date == null || date === '') return null;
+  const d = date instanceof Date ? date : new Date(date);
+  const t = d.getTime();
+  if (!Number.isFinite(t) || t < MIN_ACTIVITY_MS) return null;
+  return d;
+}
+
 const formatTime = (date) => {
-    if (!date) return '';
-    const d = new Date(date);
+  const d = toValidActivityDate(date);
+  if (!d) return '';
   const now = new Date();
   const diffMs = now - d;
+  if (diffMs < 0) return '';
   if (diffMs < 60000) return 'Vừa xong';
   if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)} phút`;
   if (diffMs < 86400000) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+  if (diffMs < 86400000 * 7) return d.toLocaleDateString('vi-VN', { weekday: 'short' });
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' });
 };
 
 function findCurrentAiSessionStartIndex(messages, escalateIdx) {
@@ -618,7 +631,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           online: isUserOnline(c.id),
         },
         lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
-        lastTime: existingConv?.lastTime || new Date(0),
+        lastTime: toValidActivityDate(existingConv?.lastTime),
         unread: existingConv?.unread || 0,
       });
     });
@@ -673,7 +686,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 online: isUserOnline(seedContact.id),
               },
               lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
-              lastTime: existingConv?.lastTime || (gate.mode === 'AUTHORIZED_CONTACT' || seedContact.trusted ? new Date(0) : new Date()),
+              lastTime: toValidActivityDate(existingConv?.lastTime)
+                || (gate.mode === 'AUTHORIZED_CONTACT' || seedContact.trusted ? null : new Date()),
               unread: existingConv?.unread || 0,
             });
           }
@@ -1842,7 +1856,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               </div>
                             )}
                           </div>
-                        <span className="text-xs text-slate-400 font-medium tabular-nums">{formatTime(conv.lastTime)}</span>
+                        <span className="text-xs text-slate-400 font-medium tabular-nums">
+                          {formatTime(
+                            toValidActivityDate(conv.lastTime)
+                            || (!conv.isGroup && lastSeenUsers?.[String(conv.user?.id)])
+                            || null,
+                          )}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-1 overflow-hidden">

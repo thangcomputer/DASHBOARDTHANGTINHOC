@@ -4,9 +4,12 @@
  */
 
 export function conversationActivityTime(conv) {
-  const raw = conv?.lastTime ?? conv?.lastMessageAt ?? 0;
+  const raw = conv?.lastTime ?? conv?.lastMessageAt ?? null;
+  if (raw == null || raw === '') return 0;
   const t = new Date(raw).getTime();
-  return Number.isFinite(t) ? t : 0;
+  // Epoch / pre-2000 = placeholder “chưa có tin”, không dùng để xếp thứ tự như hoạt động thật
+  if (!Number.isFinite(t) || t < Date.UTC(2000, 0, 1)) return 0;
+  return t;
 }
 
 /** Immutable sort: newest activity first. */

@@ -2736,10 +2736,10 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
           if (id === 'coban') return;
           if (office.includes(id) || id === 'canva') focuses.add(id);
         });
-        // Đủ Word+Excel+PowerPoint → focus THVP (khớp khóa Tin học văn phòng)
-        const hasCanva = focuses.has('canva') || teacherSubs.includes('canva');
+        // Đủ Word+Excel+PowerPoint → focus THVP (khớp khóa Tin học văn phòng).
+        // Canva không chặn quy đổi — tránh GV Office+Canva bị từ chối gán THVP.
         const hasFullOffice = ['word', 'excel', 'powerpoint'].every((id) => focuses.has(id));
-        if (hasFullOffice && !hasCanva) {
+        if (hasFullOffice) {
           focuses.delete('word');
           focuses.delete('excel');
           focuses.delete('powerpoint');
@@ -2753,6 +2753,10 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       if (courseFocus.length && teacherFocus.length) {
         const set = new Set(teacherFocus);
         matched = courseFocus.some((f) => set.has(f));
+        if (!matched && courseFocus.includes('thvp')) {
+          const officeHits = ['word', 'excel', 'powerpoint'].filter((id) => set.has(id));
+          matched = officeHits.length >= 2;
+        }
       }
       if (!matched && specialty && courseName) {
         matched = specialty.includes(courseName) || courseName.includes(specialty)

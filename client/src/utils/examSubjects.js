@@ -258,10 +258,10 @@ export function getTeacherTeachingFocus(teacher, catalog) {
 
   // Đủ Word + Excel + PowerPoint (specialty hoặc subjectIds) → focus THVP
   // để khớp khóa "Tin học văn phòng". Giữ môn ngoài Office (MOS, Design, Sư phạm…).
-  // Trước đây điều kiện !focuses.size khiến GV liệt kê Word/Excel/PPT bị coi "khác môn".
-  const hasCanva = focuses.has('canva') || ids.includes('canva');
+  // Canva (hoặc môn design khác) KHÔNG chặn quy đổi THVP — trước đây !hasCanva khiến
+  // GV dạy Office+Canva bị coi "khác môn" với khóa THVP.
   const hasFullOffice = ['word', 'excel', 'powerpoint'].every((id) => focuses.has(id));
-  if (hasFullOffice && !hasCanva) {
+  if (hasFullOffice) {
     focuses.delete('word');
     focuses.delete('excel');
     focuses.delete('powerpoint');
@@ -291,8 +291,11 @@ export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
   if (courseFocus.length && teacherFocus.length) {
     const set = new Set(teacherFocus.map(String));
     if (courseFocus.some((f) => set.has(String(f)))) return true;
-    // THVP teacher chỉ khớp khóa THVP/văn phòng, không khớp Excel/Word đơn lẻ
-    // (đã tách focus ở trên)
+    // THVP: GV đủ ≥2 môn Office (Word/Excel/PPT) vẫn gán được — tránh kẹt khi chưa khai báo đủ bộ
+    if (courseFocus.map(String).includes('thvp')) {
+      const officeHits = ['word', 'excel', 'powerpoint'].filter((id) => set.has(id));
+      if (officeHits.length >= 2) return true;
+    }
   }
 
   // Chưa khai báo môn → không khớp

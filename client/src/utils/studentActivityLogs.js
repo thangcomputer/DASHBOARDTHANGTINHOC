@@ -72,6 +72,41 @@ function normCourse(s) {
   return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+/** Đổi mã kỹ thuật trong ghi chú lịch sang tiếng Việt (kể cả bản ghi cũ). */
+function localizeScheduleNote(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  s = s.replace(
+    /\[ADMIN_REJECT_ATTENDANCE\]\s*([^\s@|]+(?:\s+[^\s@|]+)*)?\s*@\s*([^\s|]+)/gi,
+    (_, who, iso) => {
+      const name = String(who || 'Admin').trim();
+      const whenMs = parseDateToMs(iso);
+      const when = whenMs
+        ? new Date(whenMs).toLocaleString('vi-VN')
+        : String(iso || '').trim();
+      return when
+        ? `Admin từ chối điểm danh — ${name} · ${when}`
+        : `Admin từ chối điểm danh — ${name}`;
+    },
+  );
+  s = s.replace(/\[ADMIN_REJECT_ATTENDANCE\]/gi, 'Admin từ chối điểm danh');
+  s = s.replace(
+    /\[ADMIN_MAKEUP\]\s*([^\s@|]+(?:\s+[^\s@|]+)*)?\s*@\s*([^\s|]+)/gi,
+    (_, who, iso) => {
+      const name = String(who || 'Admin').trim();
+      const whenMs = parseDateToMs(iso);
+      const when = whenMs
+        ? new Date(whenMs).toLocaleString('vi-VN')
+        : String(iso || '').trim();
+      return when
+        ? `Admin điểm danh bù — ${name} · ${when}`
+        : `Admin điểm danh bù — ${name}`;
+    },
+  );
+  s = s.replace(/\[ADMIN_MAKEUP\]/gi, 'Admin điểm danh bù');
+  return s;
+}
+
 /** Lấy timestamp thao tác từ grade / note / lịch completed cùng ngày */
 function resolveGradeActedAt(g, schedules = [], sid = '', course = '') {
   if (g?.at) return g.at;
@@ -119,9 +154,20 @@ function classifyGradeNote(note) {
 
 function normalizeAttendanceNote(note, sessionNumber) {
   const raw = String(note || '').trim();
+  // Đã có số buổi trong note (lúc điểm danh) → giữ nguyên, không tính lại theo tiến độ hiện tại
   if (/buổi\s*\d+/i.test(raw)) return raw || 'Đã điểm danh hoàn thành buổi học';
   if (sessionNumber) return `Buổi ${sessionNumber}: ${raw || 'Đã điểm danh hoàn thành buổi học'}`;
   return raw || 'Đã điểm danh hoàn thành buổi học';
+}
+
+/** Ghi chú điểm danh: localize mã kỹ thuật, giữ số buổi đã lưu lúc điểm danh. */
+export function formatStudentGradeNote(g) {
+  if (!g) return 'Đã điểm danh hoàn thành buổi học';
+  const type = classifyGradeNote(g.note);
+  if (type !== 'attendance') {
+    return localizeScheduleNote(g.note || 'Đã điểm danh hoàn thành buổi học');
+  }
+  return normalizeAttendanceNote(localizeScheduleNote(g.note || ''), null);
 }
 
 /**
@@ -178,7 +224,7 @@ export function buildStudentActivityLogs({
     const type = ev.type || classifyGradeNote(ev.note);
     const at = ev.at || ev.date;
     const sessionNumber = ev.sessionNumber;
-    let note = ev.note || '';
+    let note = localizeScheduleNote(ev.note || '');
     if (type === 'attendance') note = normalizeAttendanceNote(note, sessionNumber);
     else if (type === 'attendance_cancel' && sessionNumber && !/buổi\s*\d+/i.test(note)) {
       note = `Hủy điểm danh buổi ${sessionNumber}${note ? ` — ${note}` : ''}`;
@@ -197,11 +243,12 @@ export function buildStudentActivityLogs({
   });
 
   // 1) Điểm danh / ghi chú đã sync vào grades (kể cả BT đã chấm)
+  // Số buổi trong note = lúc điểm danh (không tính lại khi Admin sau đó tăng buổi)
   (student?.grades || []).forEach((g, idx) => {
     const type = classifyGradeNote(g.note);
     const actedAt = resolveGradeActedAt(g, schedules, sid, course);
     const ts = parseDateToMs(actedAt) || parseDateToMs(g.date) || Date.now() - idx * 1000;
-    const sessionMatch = /buổi\s*(\d+)/i.exec(String(g.note || ''));
+    const sessionMatch = /buổi\s*(?:thứ\s*)?(\d+)/i.exec(String(g.note || ''));
     const sessionNumber = sessionMatch ? Number(sessionMatch[1]) : null;
     push({
       id: `grade_${g.assignmentId || ''}_${g.date || ''}_${idx}_${(g.note || '').slice(0, 40)}`,
@@ -209,8 +256,8 @@ export function buildStudentActivityLogs({
       date: formatDateVi(g.date),
       time: g.time || formatTimeVi(actedAt) || '',
       note: type === 'attendance'
-        ? normalizeAttendanceNote(g.note, sessionNumber)
-        : (g.note || 'Đã điểm danh hoàn thành buổi học'),
+        ? normalizeAttendanceNote(localizeScheduleNote(g.note), sessionNumber)
+        : localizeScheduleNote(g.note || 'Đã điểm danh hoàn thành buổi học'),
       grade: g.grade != null && g.grade !== '' ? Number(g.grade) : null,
       timestamp: ts,
       actedAt: actedAt || g.date,
@@ -228,7 +275,7 @@ export function buildStudentActivityLogs({
     const at = sch.updatedAt || sch.cancelledAt || sch.date;
     const d = formatDateVi(sch.date);
     const timeRange = [sch.startTime, sch.endTime].filter(Boolean).join('–');
-    const reasonBit = sch.note ? ` — ${sch.note}` : '';
+    const reasonBit = sch.note ? ` — ${localizeScheduleNote(sch.note)}` : '';
     const note = timeRange
       ? `Hủy ca ngày ${d} · ${timeRange}${reasonBit}`
       : `Hủy ca ngày ${d}${reasonBit}`;

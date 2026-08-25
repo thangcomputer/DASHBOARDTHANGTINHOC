@@ -5,6 +5,7 @@
  * Progress SoT: Schedule.status=completed → applyEnrollmentStats (recount).
  */
 
+const mongoose = require('mongoose');
 const Schedule = require('../models/Schedule');
 const Student = require('../models/Student');
 const Notification = require('../models/Notification');
@@ -23,6 +24,13 @@ const {
   ATTENDANCE_CODES,
 } = require('./attendanceWindow');
 
+function scheduleStudentId(schedule) {
+  const raw = schedule?.studentId?._id || schedule?.studentId;
+  if (!raw) return null;
+  if (mongoose.Types.ObjectId.isValid(raw)) return new mongoose.Types.ObjectId(raw);
+  return raw;
+}
+
 function attendanceError(message, code, status = 409) {
   const err = new Error(message);
   err.code = code;
@@ -37,6 +45,95 @@ function actorRole(actor) {
 function isAdminActor(actor) {
   const r = actorRole(actor);
   return r === 'admin' || r === 'staff';
+}
+
+/**
+ * Buổi thứ N = max(lịch completed, enrollment/root completedSessions Admin) + 1.
+ * Đếm lịch theo tên khóa đã chuẩn hóa (tránh lệch hoa/thường/dấu).
+ */
+async function resolveSessionOrdinalForSchedule(studentDoc, schedule) {
+  const courseKey = normCourseName(schedule?.course);
+  const enrs = Array.isArray(studentDoc?.enrollments) ? studentDoc.enrollments : [];
+  let enr = courseKey
+    ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
+    : null;
+  if (!enr) {
+    enr = enrs.find((e) => !['cancelled', 'refunded'].includes(String(e.status || '').toLowerCase()))
+      || enrs[0];
+  }
+  const total = Number(enr?.totalSessions || studentDoc?.totalSessions || 12) || 12;
+
+  let calendarCompleted = 0;
+  const sid = scheduleStudentId(schedule);
+  if (sid) {
+    const rows = await Schedule.aggregate([
+      { $match: { studentId: sid, status: 'completed' } },
+      { $group: { _id: '$course', completed: { $sum: 1 } } },
+    ]);
+    rows.forEach((r) => {
+      const key = normCourseName(r._id);
+      if (courseKey && key !== courseKey) return;
+      calendarCompleted += Number(r.completed) || 0;
+    });
+  }
+
+  const enrDone = enr?.completedSessions != null
+    ? Math.max(0, Number(enr.completedSessions) || 0)
+    : 0;
+  const rootDone = Math.max(0, Number(studentDoc?.completedSessions) || 0);
+  // Cùng khóa (hoặc không tìm thấy enr) → lấy max với root; khác khóa thì chỉ tin enr
+  const sameAsRoot = !courseKey
+    || !studentDoc?.course
+    || courseKey === normCourseName(studentDoc.course)
+    || !enr;
+  const storedDone = sameAsRoot ? Math.max(enrDone, rootDone) : enrDone;
+  const effectiveDone = Math.max(calendarCompleted, storedDone);
+  return {
+    enr,
+    total,
+    calendarCompleted,
+    storedDone,
+    effectiveDone,
+    sessionOrdinal: effectiveDone + 1,
+    sessionTotal: total,
+    atLimit: effectiveDone >= total,
+  };
+}
+
+/**
+ * Cập nhật sessionOrdinalPreview theo tiến độ thật (không để kẹt ở 1 khi Admin đã ghi buổi).
+ * Trả về schedule đã gắn preview mới (in-memory + persist nếu đổi).
+ */
+async function refreshScheduleSessionPreview(schedule) {
+  if (!schedule) return schedule;
+  const sid = schedule.studentId?._id || schedule.studentId;
+  if (!sid) return schedule;
+  const student = await Student.findById(sid)
+    .select('enrollments course status totalSessions completedSessions')
+    .lean();
+  if (!student) return schedule;
+  const progress = await resolveSessionOrdinalForSchedule(student, schedule);
+  const nextOrdinal = Math.max(
+    Number(schedule.sessionOrdinalPreview) || 0,
+    progress.sessionOrdinal,
+  );
+  const nextTotal = Number(progress.sessionTotal) > 0
+    ? progress.sessionTotal
+    : (Number(schedule.sessionTotalPreview) || 12);
+  const prevO = Number(schedule.sessionOrdinalPreview) || 0;
+  const prevT = Number(schedule.sessionTotalPreview) || 0;
+  schedule.sessionOrdinalPreview = nextOrdinal;
+  schedule.sessionTotalPreview = nextTotal;
+  if (nextOrdinal !== prevO || nextTotal !== prevT) {
+    const id = schedule._id || schedule.id;
+    if (id) {
+      await Schedule.updateOne(
+        { _id: id },
+        { $set: { sessionOrdinalPreview: nextOrdinal, sessionTotalPreview: nextTotal } },
+      ).catch(() => {});
+    }
+  }
+  return schedule;
 }
 
 /**
@@ -253,7 +350,7 @@ async function completeScheduleAttendance({
   // Enrollment gate
   if (schedule.studentId) {
     const studentForEnr = await Student.findById(schedule.studentId)
-      .select('enrollments course status totalSessions')
+      .select('enrollments course status totalSessions completedSessions')
       .lean();
     if (studentForEnr) {
       const courseKey = normCourseName(schedule.course);
@@ -269,21 +366,22 @@ async function completeScheduleAttendance({
           409,
         );
       }
-      const total = Number(enr?.totalSessions || studentForEnr.totalSessions || 12);
-      const completedCount = await Schedule.countDocuments({
-        studentId: schedule.studentId,
-        status: 'completed',
-        ...(schedule.course ? { course: schedule.course } : {}),
-      });
-      if (completedCount >= total) {
+      const progress = await resolveSessionOrdinalForSchedule(studentForEnr, schedule);
+      if (progress.atLimit) {
         throw attendanceError(
           'Học viên đã hoàn thành đủ số buổi của khóa học.',
           ATTENDANCE_CODES.SESSION_LIMIT,
           409,
         );
       }
-      sessionOrdinal = Number(schedule.sessionOrdinalPreview) || (completedCount + 1);
-      sessionTotal = Number(schedule.sessionTotalPreview) || total;
+      // Không kẹt preview sai (vd. 1): lấy max(preview đã gửi, tiến độ thật hiện tại)
+      sessionOrdinal = Math.max(
+        Number(schedule.sessionOrdinalPreview) || 0,
+        progress.sessionOrdinal,
+      );
+      sessionTotal = Number(schedule.sessionTotalPreview) > 0
+        ? Number(schedule.sessionTotalPreview)
+        : progress.sessionTotal;
     }
   }
 
@@ -341,10 +439,43 @@ async function completeScheduleAttendance({
     throw attendanceError('Không thể cập nhật lịch học', 'ATTENDANCE_UPDATE_FAILED', 500);
   }
 
+  const gradeForLog = schedule.attendancePendingGrade != null
+    ? Number(schedule.attendancePendingGrade)
+    : undefined;
+
+  // Sync tiến độ trước — số buổi nhật ký = completedSessions SAU điểm danh (gồm ghi nhận trước)
+  const student = await syncEnrollmentProgressAfterAttendance(
+    updated.studentId || schedule.studentId,
+    {
+      courseName: updated.course || schedule.course,
+      logDate: updated.date || schedule.date || new Date(),
+      ...(Number.isFinite(gradeForLog) ? { grade: gradeForLog } : {}),
+      // chưa ghi note — ghi sau khi biết số buổi thật
+    },
+  );
+
+  const courseKey = normCourseName(updated.course || schedule.course);
+  let finalDone = Math.max(0, Number(sessionOrdinal) || 0);
+  let finalTotal = Math.max(1, Number(sessionTotal) || 12);
+  if (student) {
+    const enrs = Array.isArray(student.enrollments) ? student.enrollments : [];
+    const enr = courseKey
+      ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
+      : null;
+    if (enr) {
+      finalDone = Math.max(finalDone, Number(enr.completedSessions) || 0);
+      if (Number(enr.totalSessions) > 0) finalTotal = Number(enr.totalSessions);
+    } else {
+      finalDone = Math.max(finalDone, Number(student.completedSessions) || 0);
+      if (Number(student.totalSessions) > 0) finalTotal = Number(student.totalSessions);
+    }
+  }
+  if (finalDone < 1 && sessionOrdinal) finalDone = sessionOrdinal;
+
   const actorName = String(actor?.name || '').trim() || (admin ? 'Admin' : 'Giảng viên');
-  const buoiLabel = (sessionOrdinal != null && sessionTotal != null)
-    ? ` buổi thứ ${sessionOrdinal}/${sessionTotal}`
-    : (sessionOrdinal != null ? ` buổi thứ ${sessionOrdinal}` : '');
+  const buoiLabel = finalDone > 0
+    ? ` buổi thứ ${finalDone}/${finalTotal}`
+    : '';
   let logNote;
   if (attendanceMethod === 'admin_makeup') {
     logNote = `Điểm danh bù${buoiLabel} bởi ${actorName}`;
@@ -353,28 +484,37 @@ async function completeScheduleAttendance({
   } else if (attendanceMethod === 'student_confirm') {
     logNote = `HV xác nhận điểm danh${buoiLabel}`;
   } else if (attendanceMethod === 'admin') {
-    logNote = `Điểm danh bởi Admin (${actorName})`;
+    logNote = `Điểm danh bởi Admin (${actorName})${buoiLabel}`;
   } else if (state.state === 'PENDING_ATTENDANCE' && String(lateReason || '').trim()) {
-    logNote = `Điểm danh bổ sung: ${String(lateReason).trim()}`;
+    logNote = `Điểm danh bổ sung${buoiLabel}: ${String(lateReason).trim()}`;
   } else if (String(note || schedule.attendancePendingNote || '').trim() && !String(note || schedule.attendancePendingNote || '').startsWith('[')) {
-    logNote = String(note || schedule.attendancePendingNote).trim();
+    const raw = String(note || schedule.attendancePendingNote).trim();
+    logNote = /buổi\s*\d+/i.test(raw) ? raw : `${raw}${buoiLabel}`;
   } else {
-    logNote = 'Đã điểm danh hoàn thành buổi học';
+    logNote = finalDone > 0
+      ? `Buổi ${finalDone}/${finalTotal}: Đã điểm danh hoàn thành buổi học`
+      : 'Đã điểm danh hoàn thành buổi học';
   }
 
-  const gradeForLog = schedule.attendancePendingGrade != null
-    ? Number(schedule.attendancePendingGrade)
-    : undefined;
+  if (student && logNote) {
+    recordAttendanceGrade(student, {
+      courseName: updated.course || schedule.course || student.course,
+      note: logNote,
+      grade: Number.isFinite(gradeForLog) ? gradeForLog : 0,
+      date: updated.date || schedule.date || new Date(),
+      actedAt: new Date(),
+    });
+    await student.save();
+  }
 
-  const student = await syncEnrollmentProgressAfterAttendance(
-    updated.studentId || schedule.studentId,
-    {
-      courseName: updated.course || schedule.course,
-      logNote,
-      logDate: updated.date || schedule.date || new Date(),
-      ...(Number.isFinite(gradeForLog) ? { grade: gradeForLog } : {}),
-    },
-  );
+  if (finalDone > 0) {
+    await Schedule.updateOne(
+      { _id: scheduleId },
+      { $set: { sessionOrdinalPreview: finalDone, sessionTotalPreview: finalTotal } },
+    ).catch(() => {});
+    updated.sessionOrdinalPreview = finalDone;
+    updated.sessionTotalPreview = finalTotal;
+  }
 
   return {
     schedule: updated,
@@ -385,8 +525,8 @@ async function completeScheduleAttendance({
       actorId: String(actor?.id || actor?._id || ''),
       stateBefore: state.state,
       logNote,
-      completedSessions: sessionOrdinal,
-      totalSessions: sessionTotal,
+      completedSessions: finalDone || sessionOrdinal,
+      totalSessions: finalTotal || sessionTotal,
     },
   };
 }
@@ -430,7 +570,7 @@ async function requestStudentAttendanceConfirm({
   let sessionTotal = null;
   if (schedule.studentId) {
     const studentForEnr = await Student.findById(schedule.studentId)
-      .select('enrollments course status totalSessions')
+      .select('enrollments course status totalSessions completedSessions')
       .lean();
     if (studentForEnr) {
       const courseKey = normCourseName(schedule.course);
@@ -446,21 +586,16 @@ async function requestStudentAttendanceConfirm({
           409,
         );
       }
-      const total = Number(enr?.totalSessions || studentForEnr.totalSessions || 12);
-      const completedCount = await Schedule.countDocuments({
-        studentId: schedule.studentId,
-        status: 'completed',
-        ...(schedule.course ? { course: schedule.course } : {}),
-      });
-      if (completedCount >= total) {
+      const progress = await resolveSessionOrdinalForSchedule(studentForEnr, schedule);
+      if (progress.atLimit) {
         throw attendanceError(
           'Học viên đã hoàn thành đủ số buổi của khóa học.',
           ATTENDANCE_CODES.SESSION_LIMIT,
           409,
         );
       }
-      sessionOrdinal = completedCount + 1;
-      sessionTotal = total;
+      sessionOrdinal = progress.sessionOrdinal;
+      sessionTotal = progress.sessionTotal;
     }
   }
 
@@ -611,7 +746,7 @@ async function resolveAttendanceDispute({ schedule, actor, decision }) {
           attendanceDisputeResolvedAt: new Date(),
           attendanceDisputeResolvedBy: who,
           note: [
-            `[ADMIN_REJECT_ATTENDANCE] ${who} @ ${new Date().toISOString()}`,
+            `Admin từ chối điểm danh — ${who} · ${new Date().toLocaleString('vi-VN')}`,
             String(schedule.note || '').trim(),
           ].filter(Boolean).join(' | '),
         },
@@ -645,5 +780,7 @@ module.exports = {
   requestStudentAttendanceConfirm,
   respondStudentAttendanceConfirm,
   resolveAttendanceDispute,
+  resolveSessionOrdinalForSchedule,
+  refreshScheduleSessionPreview,
   isAdminActor,
 };

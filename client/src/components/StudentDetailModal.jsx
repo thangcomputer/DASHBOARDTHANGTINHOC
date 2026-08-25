@@ -18,6 +18,7 @@ import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
 import { useToast } from '../utils/toast';
 import { getAttendanceAction, attendanceToneClass } from '../utils/attendanceAction';
 import ZaloIcon from './ZaloIcon';
+import { formatStudentGradeNote } from '../utils/studentActivityLogs';
 
 const fmt = (n) => n ? Number(n).toLocaleString('vi-VN') + 'đ' : '0đ';
 const fmtTuition = (n) => {
@@ -2249,7 +2250,9 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                      <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">
                                        {g.date ? fmtDateTimeVN(g.date) : 'Giai đoạn học'}
                                      </p>
-                                      <p className="text-xs text-slate-700 font-semibold leading-relaxed">{g.note || 'Đã điểm danh hoàn thành buổi học'}</p>
+                                      <p className="text-xs text-slate-700 font-semibold leading-relaxed">
+                                        {formatStudentGradeNote(g)}
+                                      </p>
                                    </div>
                                 </div>
                               ))

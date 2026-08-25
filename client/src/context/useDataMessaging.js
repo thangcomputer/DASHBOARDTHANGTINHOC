@@ -614,7 +614,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             isGroup: true,
             user: { id: gid, name: g.name, role: 'group', avatar: 'GN', online: true },
             lastMessage: lastMsg ? lastMsg.content : 'Bắt đầu cuộc trò chuyện nhóm',
-            lastTime: lastMsg ? lastMsg.time : new Date(g.createdAt || 0),
+            lastTime: lastMsg ? lastMsg.time : (g.createdAt ? new Date(g.createdAt) : null),
             unread: groupMsgs.filter(m => m.read !== true && !userTargetIds.has(String(m.senderId))).length,
           };
         });

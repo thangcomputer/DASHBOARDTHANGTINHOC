@@ -1,5 +1,6 @@
 const express  = require('express');
 const router   = express.Router();
+const mongoose = require('mongoose');
 const Schedule = require('../models/Schedule');
 const Student  = require('../models/Student');
 const Teacher  = require('../models/Teacher');
@@ -117,24 +118,47 @@ async function notifyAttendanceTaken(io, {
 }) {
   if (!io || !studentId) return;
   const NotificationService = require('../services/NotificationService');
+  const { normCourseName } = require('../services/enrollmentService');
   const courseName = String(course || '').trim();
-  const match = {
-    studentId,
-    status: 'completed',
-    ...(courseName ? { course: courseName } : {}),
-  };
-  const completedSessions = await Schedule.countDocuments(match);
+  const courseKey = normCourseName(courseName);
+  const sid = mongoose.Types.ObjectId.isValid(studentId)
+    ? new mongoose.Types.ObjectId(studentId)
+    : studentId;
+  let completedCalendar = 0;
+  try {
+    const rows = await Schedule.aggregate([
+      { $match: { studentId: sid, status: 'completed' } },
+      { $group: { _id: '$course', completed: { $sum: 1 } } },
+    ]);
+    rows.forEach((r) => {
+      const key = normCourseName(r._id);
+      if (courseKey && key !== courseKey) return;
+      completedCalendar += Number(r.completed) || 0;
+    });
+  } catch {
+    completedCalendar = await Schedule.countDocuments({
+      studentId: sid,
+      status: 'completed',
+      ...(courseName ? { course: courseName } : {}),
+    });
+  }
   const student = await Student.findById(studentId)
-    .select('name course totalSessions enrollments')
+    .select('name course totalSessions enrollments completedSessions')
     .lean();
   const name = studentName || student?.name || 'Học viên';
   let totalRequired = student?.totalSessions || 12;
-  if (courseName && Array.isArray(student?.enrollments)) {
+  let storedDone = Number(student?.completedSessions) || 0;
+  if (courseKey && Array.isArray(student?.enrollments)) {
     const enr = student.enrollments.find(
-      (e) => String(e.courseName || e.course || '').trim().toLowerCase() === courseName.toLowerCase(),
+      (e) => normCourseName(e.courseName || e.course) === courseKey,
     );
     if (enr?.totalSessions) totalRequired = enr.totalSessions;
+    if (enr?.completedSessions != null) {
+      storedDone = Math.max(storedDone, Number(enr.completedSessions) || 0);
+    }
   }
+  // Tiến độ hiển thị = max(lịch completed, buổi Admin ghi trên hồ sơ)
+  const completedSessions = Math.max(completedCalendar, storedDone);
   const notifDate = date
     ? new Date(date).toLocaleDateString('vi-VN')
     : new Date().toLocaleDateString('vi-VN');
@@ -147,7 +171,15 @@ async function notifyAttendanceTaken(io, {
     title: '✅ Đã điểm danh buổi học',
     content: `${gv} đã điểm danh bạn ngày ${notifDate} (${courseLabel} · buổi ${progress}).`,
     receivers: String(studentId),
-    payload: { studentId: String(studentId), course: courseLabel, completedSessions, totalRequired },
+    payload: {
+      kind: 'attendance_taken',
+      studentId: String(studentId),
+      course: courseLabel,
+      completedSessions,
+      totalRequired,
+      sessionNumber: completedSessions,
+      totalSessions: totalRequired,
+    },
     link: '/student#schedule',
   });
 
@@ -566,7 +598,7 @@ async function emitAttendanceConfirmEvents(io, sch, eventName) {
   }
 }
 
-// HV: lịch đang chờ xác nhận điểm danh
+// HV: lịch đang chờ xác nhận / đang tranh chấp (để mở đúng modal khi bấm thông báo cũ)
 router.get('/pending-confirm', [authMiddleware], async (req, res) => {
   try {
     const role = String(req.user.role || '').toLowerCase();
@@ -577,11 +609,17 @@ router.get('/pending-confirm', [authMiddleware], async (req, res) => {
     const list = await Schedule.find({
       studentId: uid,
       status: 'scheduled',
-      studentConfirmStatus: 'pending',
-    }).sort({ studentConfirmRequestedAt: -1 }).limit(5).lean();
+      studentConfirmStatus: { $in: ['pending', 'disputed'] },
+    }).sort({ studentConfirmRequestedAt: -1 }).limit(10).lean();
+    const { refreshScheduleSessionPreview } = require('../services/attendanceService');
+    const enriched = [];
+    for (const sch of list) {
+      // eslint-disable-next-line no-await-in-loop
+      enriched.push(await refreshScheduleSessionPreview(sch));
+    }
     res.json({
       success: true,
-      data: list.map(buildAttendanceConfirmPayload),
+      data: enriched.map(buildAttendanceConfirmPayload),
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -598,7 +636,13 @@ router.get('/disputes', [authMiddleware], async (req, res) => {
       status: 'scheduled',
       studentConfirmStatus: 'disputed',
     }).sort({ studentConfirmedAt: -1 }).limit(100).lean();
-    res.json({ success: true, data: list.map(buildAttendanceConfirmPayload) });
+    const { refreshScheduleSessionPreview } = require('../services/attendanceService');
+    const enriched = [];
+    for (const sch of list) {
+      // eslint-disable-next-line no-await-in-loop
+      enriched.push(await refreshScheduleSessionPreview(sch));
+    }
+    res.json({ success: true, data: enriched.map(buildAttendanceConfirmPayload) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -1350,6 +1394,8 @@ router.post('/:scheduleId/student-confirm', [authMiddleware], async (req, res) =
     });
 
     const sch = result.schedule;
+    const { refreshScheduleSessionPreview } = require('../services/attendanceService');
+    await refreshScheduleSessionPreview(sch);
     const payload = buildAttendanceConfirmPayload(sch);
     const tid = payload.teacherId;
     const sid = payload.studentId;
@@ -1474,6 +1520,8 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
     });
 
     const sch = result.schedule;
+    const { refreshScheduleSessionPreview } = require('../services/attendanceService');
+    await refreshScheduleSessionPreview(sch);
     const payload = buildAttendanceConfirmPayload(sch);
     const tid = payload.teacherId;
     const sid = payload.studentId;

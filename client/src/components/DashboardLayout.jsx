@@ -21,6 +21,7 @@ import StudentAttendanceConfirmModal from './student/StudentAttendanceConfirmMod
 import AdminAttendanceDisputeModal from './admin/shared/AdminAttendanceDisputeModal';
 import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
+import { useAttendanceRealtimeSync } from '../hooks/useAttendanceRealtimeSync';
 import TeacherRatingDetailModal, {
   getEvaluationIdFromNotif,
   isTeacherRatingNotif,
@@ -135,6 +136,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   useAttendanceConfirmFlush({
     enabled: role === 'teacher',
     teacherId: myId,
+  });
+  useAttendanceRealtimeSync({
+    enabled: role === 'teacher' || role === 'admin' || role === 'staff',
+    myId,
+    role,
   });
 
   const openTeacherRatingDetail = async (notifOrIds = {}) => {
@@ -426,8 +432,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       try {
         const res = await api.schedules.getPendingConfirm();
         if (cancelled) return;
-        const first = Array.isArray(res?.data) ? res.data[0] : null;
-        if (first?.scheduleId) setAttendanceConfirm(first);
+        const list = Array.isArray(res?.data) ? res.data : [];
+        // Chỉ auto-mở khi còn bắt buộc xác nhận (pending). Disputed → không chặn.
+        const firstPending = list.find((p) => (
+          String(p?.studentConfirmStatus || '').toLowerCase() === 'pending'
+        ));
+        if (firstPending?.scheduleId) {
+          setAttendanceConfirm({ ...firstPending, resolved: false, waiting: false });
+        }
       } catch { /* ignore */ }
     };
     loadPending();
@@ -436,34 +448,61 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     const onAwait = (payload) => {
       if (!payload) return;
       if (payload.studentId && String(payload.studentId) !== myId) return;
-      setAttendanceConfirm(payload);
+      setAttendanceConfirm({ ...payload, resolved: false, waiting: false });
     };
-    const onCleared = (payload) => {
+    const onResolved = (payload, outcome) => {
       if (!payload?.scheduleId) return;
+      if (payload.studentId && String(payload.studentId) !== myId) return;
+      setAttendanceConfirm((prev) => {
+        const same = prev && String(prev.scheduleId) === String(payload.scheduleId);
+        const st = String(payload.studentConfirmStatus || '').toLowerCase();
+        const isAdminResolve = outcome === 'rejected'
+          || st === 'admin_approved'
+          || st === 'admin_rejected';
+        // HV tự Đồng ý: đã đóng modal → không mở lại «Đã giải quyết»
+        if (!same && !isAdminResolve) return prev || null;
+        return {
+          ...payload,
+          resolved: true,
+          waiting: false,
+          resolveOutcome: outcome === 'rejected' ? 'rejected' : 'approved',
+          studentConfirmStatus: outcome === 'rejected'
+            ? 'admin_rejected'
+            : (payload.studentConfirmStatus || 'admin_approved'),
+        };
+      });
+    };
+    const onConfirmed = (p) => onResolved(p, 'approved');
+    const onRejected = (p) => onResolved(p, 'rejected');
+    const onDisputed = (payload) => {
+      if (!payload?.scheduleId) return;
+      if (payload.studentId && String(payload.studentId) !== myId) return;
+      // Sau khi HV gửi tranh chấp: đóng modal chặn; có thể mở lại dạng chờ khi bấm thông báo
       setAttendanceConfirm((prev) => (
         prev && String(prev.scheduleId) === String(payload.scheduleId) ? null : prev
       ));
     };
     socket.on('attendance:awaiting-confirm', onAwait);
-    socket.on('attendance:confirmed', onCleared);
-    socket.on('attendance:disputed', onCleared);
-    socket.on('attendance:rejected', onCleared);
+    socket.on('attendance:confirmed', onConfirmed);
+    socket.on('attendance:disputed', onDisputed);
+    socket.on('attendance:rejected', onRejected);
     return () => {
       cancelled = true;
       socket.off('attendance:awaiting-confirm', onAwait);
-      socket.off('attendance:confirmed', onCleared);
-      socket.off('attendance:disputed', onCleared);
-      socket.off('attendance:rejected', onCleared);
+      socket.off('attendance:confirmed', onConfirmed);
+      socket.off('attendance:disputed', onDisputed);
+      socket.off('attendance:rejected', onRejected);
     };
   }, [socket, role, myId]);
 
-  // Admin: nhận socket tranh chấp
+  // Admin: tranh chấp → chỉ toast + badge chuông (không auto-mở modal, tránh chen thao tác)
   useEffect(() => {
     if (!socket || (role !== 'admin' && role !== 'staff')) return undefined;
     const onDispute = (payload) => {
       if (!payload?.scheduleId) return;
-      toast.info(`Tranh chấp điểm danh: ${payload.studentName || 'HV'} — buổi ${payload.sessionNumber || '?'}`);
-      setAttendanceDispute(payload);
+      toast.info(
+        `Tranh chấp điểm danh: ${payload.studentName || 'HV'} — buổi ${payload.sessionNumber || '?'}. Bấm chuông để xử lý.`,
+      );
     };
     socket.on('attendance:disputed', onDispute);
     return () => { socket.off('attendance:disputed', onDispute); };
@@ -486,7 +525,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         toast.success('Đã xác nhận điểm danh — buổi học được tính.');
       }
       if (typeof triggerBackgroundSync === 'function') {
-        Promise.resolve(triggerBackgroundSync()).catch(() => {});
+        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
       }
     } catch (e) {
       toast.error(e?.message || 'Lỗi kết nối');
@@ -494,6 +533,78 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       setAttendanceConfirmBusy(false);
     }
   }, [attendanceConfirm, toast, triggerBackgroundSync]);
+
+  /** Mở modal HV từ thông báo: luôn check trạng thái thật (tránh mở Đồng ý khi đã xong). */
+  const openStudentAttendanceFromNotif = React.useCallback(async (rawPayload, opts = {}) => {
+    const base = rawPayload && typeof rawPayload === 'object' ? { ...rawPayload } : {};
+    const scheduleId = base.scheduleId || opts.scheduleId;
+    const forceResolved = opts.forceResolved === true;
+    const forceRejected = opts.forceRejected === true;
+
+    if (forceResolved || forceRejected) {
+      setAttendanceConfirm({
+        ...base,
+        scheduleId,
+        sessionNumber: base.sessionNumber || base.completedSessions || '?',
+        totalSessions: base.totalSessions || base.totalRequired,
+        resolved: true,
+        waiting: false,
+        resolveOutcome: forceRejected ? 'rejected' : 'approved',
+        studentConfirmStatus: forceRejected
+          ? 'admin_rejected'
+          : (base.studentConfirmStatus || 'admin_approved'),
+        kind: forceRejected ? 'attendance_rejected' : (base.kind || 'attendance_taken'),
+      });
+      return;
+    }
+
+    if (!scheduleId) {
+      // Không có scheduleId (vd. «Đã điểm danh buổi học») → chỉ xem đã giải quyết + thoát
+      setAttendanceConfirm({
+        ...base,
+        sessionNumber: base.sessionNumber || base.completedSessions || '?',
+        totalSessions: base.totalSessions || base.totalRequired,
+        resolved: true,
+        waiting: false,
+        kind: base.kind || 'attendance_taken',
+        studentConfirmStatus: 'accepted',
+      });
+      return;
+    }
+
+    try {
+      const res = await api.schedules.getPendingConfirm();
+      const list = Array.isArray(res?.data) ? res.data : [];
+      const live = list.find((p) => String(p?.scheduleId) === String(scheduleId));
+      const st = String(live?.studentConfirmStatus || '').toLowerCase();
+      if (live && st === 'pending') {
+        setAttendanceConfirm({ ...live, resolved: false, waiting: false });
+        return;
+      }
+      if (live && st === 'disputed') {
+        setAttendanceConfirm({ ...live, resolved: false, waiting: true });
+        return;
+      }
+      setAttendanceConfirm({
+        ...base,
+        ...(live || {}),
+        scheduleId,
+        sessionNumber: base.completedSessions
+          || live?.sessionNumber
+          || base.sessionNumber
+          || '?',
+        totalSessions: base.totalRequired
+          || base.totalSessions
+          || live?.totalSessions,
+        resolved: true,
+        waiting: false,
+        studentConfirmStatus: base.studentConfirmStatus || 'accepted',
+        kind: base.kind || 'attendance_taken',
+      });
+    } catch {
+      setAttendanceConfirm({ ...base, scheduleId, resolved: false, waiting: false });
+    }
+  }, []);
 
   const handleAdminDisputeDecision = React.useCallback(async (decision) => {
     const sid = attendanceDispute?.scheduleId;
@@ -512,7 +623,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         toast.success('Đã chấp thuận — buổi được tính.');
       }
       if (typeof triggerBackgroundSync === 'function') {
-        Promise.resolve(triggerBackgroundSync()).catch(() => {});
+        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
       }
     } catch (e) {
       toast.error(e?.message || 'Lỗi kết nối');
@@ -849,6 +960,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         busy={attendanceConfirmBusy}
         onAccept={() => handleStudentAttendanceDecision('accept')}
         onDispute={() => handleStudentAttendanceDecision('dispute')}
+        onDismiss={() => setAttendanceConfirm(null)}
       />
       <AdminAttendanceDisputeModal
         open={(role === 'admin' || role === 'staff') && !!attendanceDispute}
@@ -926,20 +1038,70 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                             }
                           } else if (n.payload?.kind === 'attendance_dispute' && (role === 'admin' || role === 'staff')) {
                             setShowNotif(false);
-                            setAttendanceDispute({
-                              scheduleId: n.payload.scheduleId,
-                              studentName: n.payload.studentName,
-                              teacherName: n.payload.teacherName,
-                              course: n.payload.course,
-                              sessionNumber: n.payload.sessionNumber,
-                              totalSessions: n.payload.totalSessions,
-                              weekday: n.payload.weekday,
-                              dateLabel: n.payload.dateLabel,
-                              timeRange: n.payload.timeRange,
-                            });
+                            (async () => {
+                              const fallback = {
+                                scheduleId: n.payload.scheduleId,
+                                studentName: n.payload.studentName,
+                                teacherName: n.payload.teacherName,
+                                course: n.payload.course,
+                                sessionNumber: n.payload.sessionNumber,
+                                totalSessions: n.payload.totalSessions,
+                                weekday: n.payload.weekday,
+                                dateLabel: n.payload.dateLabel,
+                                timeRange: n.payload.timeRange,
+                              };
+                              try {
+                                const res = await api.schedules.getDisputes();
+                                const live = (Array.isArray(res?.data) ? res.data : []).find(
+                                  (p) => String(p?.scheduleId) === String(n.payload.scheduleId),
+                                );
+                                setAttendanceDispute(live || fallback);
+                              } catch {
+                                setAttendanceDispute(fallback);
+                              }
+                            })();
                           } else if (n.payload?.kind === 'attendance_confirm_pending' && role === 'student') {
                             setShowNotif(false);
-                            setAttendanceConfirm(n.payload);
+                            openStudentAttendanceFromNotif(n.payload);
+                          } else if (
+                            role === 'student'
+                            && (n.payload?.kind === 'attendance_admin_approved'
+                              || n.payload?.kind === 'attendance_confirmed'
+                              || n.payload?.kind === 'attendance_taken')
+                          ) {
+                            setShowNotif(false);
+                            openStudentAttendanceFromNotif(n.payload, { forceResolved: true });
+                          } else if (
+                            role === 'student'
+                            && n.payload?.kind === 'attendance_rejected'
+                          ) {
+                            setShowNotif(false);
+                            openStudentAttendanceFromNotif(n.payload, { forceRejected: true });
+                          } else if (
+                            role === 'student'
+                            && n.payload?.kind === 'attendance_dispute'
+                          ) {
+                            setShowNotif(false);
+                            openStudentAttendanceFromNotif({
+                              ...n.payload,
+                              studentConfirmStatus: 'disputed',
+                              waiting: true,
+                            });
+                          } else if (
+                            role === 'student'
+                            && (
+                              String(n.title || '').includes('Đã điểm danh buổi học')
+                              || String(n.title || '').includes('Điểm danh đã được chấp thuận')
+                            )
+                          ) {
+                            setShowNotif(false);
+                            openStudentAttendanceFromNotif({
+                              ...(n.payload || {}),
+                              course: n.payload?.course,
+                              sessionNumber: n.payload?.completedSessions || n.payload?.sessionNumber,
+                              totalSessions: n.payload?.totalRequired || n.payload?.totalSessions,
+                              teacherName: n.payload?.teacherName,
+                            }, { forceResolved: true });
                           } else if (n.payload?.kind === 'star_bonus_eligible' && role === 'teacher') {
                             setShowNotif(false);
                             setStarBonusCelebration({
