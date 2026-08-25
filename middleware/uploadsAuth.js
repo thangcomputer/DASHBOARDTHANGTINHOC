@@ -16,6 +16,7 @@ const PUBLIC_UPLOAD_PREFIXES = [
   '/invoice_logo/',
   '/feed/',
   '/blog/', // ảnh/file tin tức — cần public để <img> trong HTML hiển thị
+  '/center-info/', // logo/banner/gallery Thông tin trung tâm — <img> không gửi Bearer
 ];
 
 function isPublicUploadPath(urlPath) {

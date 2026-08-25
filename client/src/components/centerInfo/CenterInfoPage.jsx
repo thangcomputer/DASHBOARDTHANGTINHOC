@@ -5,7 +5,11 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api, { resolveMediaUrl } from '../../services/api';
-import { sanitizeRichHtml } from '../../utils/htmlContent';
+import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../utils/htmlContent';
+
+function renderRichHtml(html) {
+  return resolveRichHtmlMedia(sanitizeRichHtml(html), resolveMediaUrl);
+}
 import { CENTER_SECTIONS } from './centerInfoConstants';
 import { hasPermission, PERMISSIONS } from '../../constants/permissions';
 
@@ -91,7 +95,7 @@ function OverviewView({ overview }) {
         <div
           className="prose prose-slate max-w-none rounded-2xl border border-slate-100 bg-white p-4 sm:p-6 text-[15px]
             [&_img]:rounded-xl [&_img]:max-w-full"
-          dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(overview.detailHtml) }}
+          dangerouslySetInnerHTML={{ __html: renderRichHtml(overview.detailHtml) }}
         />
       ) : null}
 
@@ -154,7 +158,7 @@ function ItemCard({ item, section }) {
       {item.detailHtml ? (
         <div
           className="prose prose-sm prose-slate max-w-none text-slate-700 [&_img]:rounded-lg [&_img]:max-w-full"
-          dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(item.detailHtml) }}
+          dangerouslySetInnerHTML={{ __html: renderRichHtml(item.detailHtml) }}
         />
       ) : null}
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">

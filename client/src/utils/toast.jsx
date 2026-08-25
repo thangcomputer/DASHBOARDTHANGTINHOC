@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOAST CONTEXT — Thông báo nổi toàn cục (không icon, card + typography + shadow)
@@ -82,14 +82,14 @@ export const ToastProvider = ({ children }) => {
     return id;
   }, [dismiss]);
 
-  const toast = {
+  const toast = useMemo(() => ({
     success: (msg, d)  => show(msg, 'success', d),
     error:   (msg, d)  => show(msg, 'error',   d ?? 6000),
     warning: (msg, d)  => show(msg, 'warning', d),
     info:    (msg, d)  => show(msg, 'info',     d),
     loading: (msg)     => show(msg, 'loading',  0),
     dismiss,
-  };
+  }), [show, dismiss]);
 
   return (
     <ToastContext.Provider value={toast}>

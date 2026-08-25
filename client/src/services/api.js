@@ -181,7 +181,7 @@ export const getRolePrefix = (overrideRole = null) => {
 };
 
 /** Chuẩn hóa URL file upload (IP/http cũ → domain hiện tại) */
-const PUBLIC_UPLOAD_RE = /\/uploads\/(logo|favicon|popup|images|avatars|invoice_logo|feed|blog)(\/|$)/i;
+const PUBLIC_UPLOAD_RE = /\/uploads\/(logo|favicon|popup|images|avatars|invoice_logo|feed|blog|center-info)(\/|$)/i;
 
 /** Origin API (VITE_API_URL) hoặc origin hiện tại — tránh /uploads/ trỏ nhầm SPA. */
 function mediaOrigin() {
@@ -192,6 +192,9 @@ function mediaOrigin() {
 
 function toAbsoluteUploadsPath(uploadsPath) {
   const path = uploadsPath.startsWith('/') ? uploadsPath : `/${uploadsPath}`;
+  // Dev Vite (không có VITE_API_URL): giữ path tương đối để /uploads đi đúng proxy,
+  // tránh lệch localhost vs 127.0.0.1 / [::1] làm <img> lỗi tải.
+  if (!SOCKET_BASE) return path;
   const origin = mediaOrigin();
   return origin ? `${origin}${path}` : path;
 }
