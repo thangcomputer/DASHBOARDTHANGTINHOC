@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom';
 import { X, Star, Award, Mic2, User } from 'lucide-react';
-import { resolveAvatarUrl } from '../utils/defaultAvatars';
-import { voiceRegionLabel } from '../constants/voiceRegions';
+import { resolveAvatarUrl } from '../../utils/defaultAvatars';
+import { voiceRegionLabel } from '../../constants/voiceRegions';
 
 /**
  * Modal thẻ GV khi HV bấm thông báo phân công.
