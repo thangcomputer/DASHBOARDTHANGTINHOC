@@ -241,6 +241,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
       read: false,
       isRecalled: false,
       reactions: [],
+      payload: msg.payload && typeof msg.payload === 'object' ? msg.payload : null,
     };
     setMessages(prev => [...prev, newMsg]);
 
@@ -260,6 +261,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
         fileName: msg.fileName || '',
         isGroup: inferredGroup,
         groupId: inferredGroup ? groupId : null,
+        payload: msg.payload && typeof msg.payload === 'object' ? msg.payload : undefined,
       });
       if (res?.success && res?.data?._id) {
         const d = res.data;
@@ -301,6 +303,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
                   messageType: n.messageType || m.messageType,
                   fileUrl: n.fileUrl || m.fileUrl,
                   fileName: n.fileName || m.fileName,
+                  payload: n.payload != null ? n.payload : m.payload,
                   aiImageRemaining: n.aiImageRemaining ?? m.aiImageRemaining,
                   time: n.time instanceof Date ? n.time : new Date(n.time || m.time),
                   read: n.read ?? m.read,

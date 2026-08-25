@@ -268,6 +268,7 @@ export function normalizeMessage(raw = {}) {
     fileUrl: raw.fileUrl || '',
     fileName: raw.fileName || '',
     fileExpired: Boolean(raw.fileExpired),
+    payload: raw.payload && typeof raw.payload === 'object' ? raw.payload : null,
     aiImageRemaining: raw.aiImageRemaining == null ? null : Number(raw.aiImageRemaining),
     time: raw.time || (raw.createdAt ? new Date(raw.createdAt) : new Date()),
     createdAt: raw.createdAt,

@@ -22,7 +22,11 @@ import {
   existingPeerIdsFromConversations,
 } from '../utils/messagingDeepLink';
 import { MessageRichText } from '../utils/messageRichText';
+import ScheduleMessagePreviewModal, {
+  resolveScheduleMessagePayload,
+} from './ScheduleMessagePreviewModal';
 import SupportAiHandoffPanel from './support/SupportAiHandoffPanel';
+import ScreenCaptureButton from './ScreenCaptureButton';
 import {
   isAiSupportConversationId,
   AI_ESCALATE_MARKER,
@@ -471,6 +475,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (!activeConv) return;
     try {
       const isCurrentlyPinned = activeConv?.metadata?.pinnedMessageId === String(msgId);
+      const targetMsg = messages.find((m) => String(m.id) === String(msgId));
+      const isSchedulePin = Boolean(resolveScheduleMessagePayload(targetMsg));
       const res = await messagesAPI.pinMessage(activeConv.id, msgId);
       if (res?.success) {
         toast.success(res.message || 'Đã cập nhật ghim');
@@ -483,6 +489,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         }));
         if (activeConv && activeConv.user && activeConv.user.id) {
           const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
+          const pinLabel = isSchedulePin ? 'lịch học' : 'một tin nhắn';
           const properMsg = {
             conversationId: activeConv.id,
             senderId: currentUserId,
@@ -492,8 +499,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             receiverName: activeConv.user.name,
             receiverRole: sendIsGroup ? 'group' : activeConv.user.role,
             content: !isCurrentlyPinned 
-              ? `${currentUserName || 'Người dùng'} đã ghim một tin nhắn.` 
-              : `${currentUserName || 'Người dùng'} đã bỏ ghim một tin nhắn.`,
+              ? `${currentUserName || 'Người dùng'} đã ghim ${pinLabel}.` 
+              : `${currentUserName || 'Người dùng'} đã bỏ ghim ${pinLabel}.`,
             messageType: 'system',
             isGroup: sendIsGroup,
             groupId: sendGroupId,
@@ -524,6 +531,25 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           }
         } catch (e) {}
 
+        let weekday = '';
+        try {
+          const rawDate = formData.date
+            ? (String(formData.date).includes('-')
+              ? new Date(`${String(formData.date).slice(0, 10)}T12:00:00`)
+              : new Date(formData.date))
+            : null;
+          if (rawDate && !Number.isNaN(rawDate.getTime())) {
+            weekday = rawDate.toLocaleDateString('vi-VN', {
+              weekday: 'long',
+              timeZone: 'Asia/Ho_Chi_Minh',
+            });
+          }
+        } catch { /* ignore */ }
+
+        const created = res.data || {};
+        const scheduleId = created._id || created.id || null;
+        const courseLabel = formData.course || created.course || activeConv.user?.course || '';
+
         const properMsg = {
           conversationId: activeConv.id,
           senderId: currentUserId,
@@ -536,6 +562,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           messageType: 'system',
           isGroup: false,
           groupId: null,
+          payload: {
+            kind: 'schedule_created',
+            scheduleId: scheduleId ? String(scheduleId) : null,
+            date: formData.date || created.date || null,
+            dateLabel: displayDate,
+            weekday,
+            startTime: formData.startTime || created.startTime || '',
+            endTime: formData.endTime || created.endTime || '',
+            course: courseLabel,
+            studentName: formData.studentName || activeConv.user?.name || '',
+            teacherName: formData.teacherName || currentUserName || '',
+          },
         };
         await ctxSendMessage(properMsg);
       }
@@ -753,6 +791,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [broadcastContent, setBroadcastContent] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [schedulePreview, setSchedulePreview] = useState(null);
 
   const EMOJIS = ['😊', '👍', '❤️', '👏', '🔥', '✅', '🆘', '📚', '💻', '💡'];
 
@@ -883,6 +922,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       fileExpired: m.fileExpired || false,
       reactions: m.reactions || [],
         isPinned: m.isPinned || false,
+      payload: m.payload && typeof m.payload === 'object' ? m.payload : null,
     };
   }, [resolveSenderMeta, currentUserId, currentUserName, activeConv?.user?.role]);
 
@@ -1251,6 +1291,35 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setIsUploading(false);
     }
   };
+
+  /** Chụp màn hình → pending (giống dán ảnh), Enter mới gửi. */
+  const stageScreenshotForSend = useCallback(async (file) => {
+    if (!file || !activeConv) return;
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setUploadError('Ảnh quá lớn. Giới hạn 5MB.');
+      setTimeout(() => setUploadError(''), 4000);
+      return;
+    }
+    setIsUploading(true);
+    setUploadError('');
+    try {
+      const uploadRes = await messagesAPI.uploadMessageFile(file);
+      if (!uploadRes.success) throw new Error(uploadRes.message || 'Lỗi lưu trữ ảnh');
+      setPendingImage({
+        url: uploadRes.url,
+        fileName: file.name || 'screenshot.png',
+      });
+      toast.success('Đã gắn ảnh chụp màn hình. Nhấn Enter hoặc nút Gửi để gửi.');
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } catch (err) {
+      setUploadError('Tải ảnh thất bại: ' + (err.message || ''));
+      setTimeout(() => setUploadError(''), 4000);
+      toast.error(err.message || 'Không gắn được ảnh chụp');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [activeConv, toast]);
 
   const startInboxTyping = () => {
     if (!activeConvId || !emitTypingStart || typingActiveRef.current) return;
@@ -2059,7 +2128,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   
                 </div>
 
-                {pinnedMessageObj && (
+                {pinnedMessageObj && (() => {
+                  const pinnedSchedule = resolveScheduleMessagePayload(pinnedMessageObj);
+                  return (
                   <div 
                       onClick={() => {
                         const el = document.getElementById(`msg-${pinnedMessageObj.id || pinnedMessageObj._id}`);
@@ -2069,30 +2140,69 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           setTimeout(() => el.classList.remove('animate-pulse', 'bg-blue-50/50'), 2000);
                         }
                       }}
-                      className="mx-3 mt-2 px-4 py-2.5 bg-blue-50/50 hover:bg-blue-50 cursor-pointer transition-colors border border-blue-100/50 rounded-xl flex items-center justify-between gap-3 shadow-sm relative group overflow-hidden shrink-0">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400 rounded-l-xl"></div>
+                      className={`mx-3 mt-2 px-4 py-2.5 cursor-pointer transition-colors rounded-xl flex items-center justify-between gap-3 shadow-sm relative group overflow-hidden shrink-0 ${
+                        pinnedSchedule
+                          ? 'bg-violet-50/70 hover:bg-violet-50 border border-violet-100/80'
+                          : 'bg-blue-50/50 hover:bg-blue-50 border border-blue-100/50'
+                      }`}>
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${pinnedSchedule ? 'bg-violet-500' : 'bg-blue-400'}`}></div>
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                        <Pin size={12} className="rotate-45" />
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                        pinnedSchedule ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-600'
+                      }`}>
+                        {pinnedSchedule ? <Calendar size={12} /> : <Pin size={12} className="rotate-45" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold text-blue-800 uppercase tracking-widest mb-0.5">Tin nhắn đã ghim</p>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${
+                          pinnedSchedule ? 'text-violet-800' : 'text-blue-800'
+                        }`}>
+                          {pinnedSchedule ? 'Lịch học đã ghim' : 'Tin nhắn đã ghim'}
+                        </p>
                         <p className="text-xs text-slate-700 font-medium truncate">
-                          {pinnedMessageObj.messageType === 'system' ? pinnedMessageObj.content : 
-                           (isImageMessage(pinnedMessageObj) ? '[Hình ảnh] ' + attachmentCaption(pinnedMessageObj) : 
-                            pinnedMessageObj.messageType === 'file' ? '[Tệp đính kèm]' : pinnedMessageObj.content)}
+                          {pinnedSchedule
+                            ? [
+                                [pinnedSchedule.weekday, pinnedSchedule.dateLabel].filter(Boolean).join(' · '),
+                                pinnedSchedule.startTime && pinnedSchedule.endTime
+                                  ? `${pinnedSchedule.startTime}–${pinnedSchedule.endTime}`
+                                  : '',
+                                pinnedSchedule.course,
+                              ].filter(Boolean).join(' · ') || pinnedMessageObj.content
+                            : (pinnedMessageObj.messageType === 'system' ? pinnedMessageObj.content
+                              : (isImageMessage(pinnedMessageObj) ? '[Hình ảnh] ' + attachmentCaption(pinnedMessageObj)
+                                : pinnedMessageObj.messageType === 'file' ? '[Tệp đính kèm]' : pinnedMessageObj.content))}
                         </p>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => handlePinMessage(pinnedMessageObj.id || pinnedMessageObj._id)}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-white transition-colors opacity-0 group-hover:opacity-100 shrink-0 shadow-sm"
-                      title="Bỏ ghim"
-                    >
-                      <PinOff size={14} />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {pinnedSchedule ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSchedulePreview(pinnedSchedule);
+                          }}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-violet-600 hover:bg-white transition-colors shadow-sm"
+                          title="Xem chi tiết lịch"
+                          aria-label="Xem chi tiết lịch"
+                        >
+                          <Calendar size={14} />
+                        </button>
+                      ) : null}
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePinMessage(pinnedMessageObj.id || pinnedMessageObj._id);
+                        }}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-white transition-colors opacity-0 group-hover:opacity-100 shrink-0 shadow-sm"
+                        title="Bỏ ghim"
+                      >
+                        <PinOff size={14} />
+                      </button>
+                    </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {showHandoffSummaryPanel ? (
                 <div className="mx-3 mt-2 mb-0 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-950 leading-snug">
@@ -2188,10 +2298,48 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   const myReactions = (msg.reactions || []).filter(r => r.userId === currentUserId).map(r => r.type);
 
                   if (msg.messageType === 'system') {
+                    const scheduleInfo = resolveScheduleMessagePayload(msg);
+                    const isSchedulePinned = activeConv?.metadata?.pinnedMessageId === String(msg.id);
+                    const canPinSchedule = scheduleInfo && !String(msg.id).startsWith('temp_');
                     return (
-                      <div id={`msg-${msg.id}`} key={msg.id} className="flex justify-center my-3">
-                        <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full shadow-sm">
-                          {msg.content}
+                      <div id={`msg-${msg.id}`} key={msg.id} className="flex justify-center my-3 group/sysmsg">
+                        <span className={`inline-flex items-center gap-1.5 max-w-[92%] px-3 py-1.5 text-xs font-medium rounded-full shadow-sm ${
+                          isSchedulePinned
+                            ? 'bg-violet-50 text-violet-800 border border-violet-200'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {isSchedulePinned ? (
+                            <Pin size={11} className="shrink-0 rotate-45 text-violet-600" aria-hidden="true" />
+                          ) : null}
+                          <span className="min-w-0 leading-snug">{msg.content}</span>
+                          {scheduleInfo ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setSchedulePreview(scheduleInfo)}
+                                className="shrink-0 w-7 h-7 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 flex items-center justify-center transition"
+                                title="Xem chi tiết lịch"
+                                aria-label="Xem chi tiết lịch"
+                              >
+                                <Calendar size={14} />
+                              </button>
+                              {canPinSchedule ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePinMessage(msg.id)}
+                                  className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition ${
+                                    isSchedulePinned
+                                      ? 'bg-violet-200 text-violet-800'
+                                      : 'bg-white/80 text-slate-400 hover:bg-violet-100 hover:text-violet-700 opacity-100 sm:opacity-0 sm:group-hover/sysmsg:opacity-100'
+                                  }`}
+                                  title={isSchedulePinned ? 'Bỏ ghim lịch này' : 'Ghim lịch này'}
+                                  aria-label={isSchedulePinned ? 'Bỏ ghim lịch này' : 'Ghim lịch này'}
+                                >
+                                  <Pin size={14} className={isSchedulePinned ? 'text-violet-700' : ''} />
+                                </button>
+                              ) : null}
+                            </>
+                          ) : null}
                         </span>
                       </div>
                     );
@@ -2455,6 +2603,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     >
                       {isUploading ? <span className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
                     </button>
+                    <ScreenCaptureButton
+                      size={20}
+                      disabled={isUploading || !activeConv}
+                      buttonClassName="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Chụp màn hình"
+                      onCaptured={stageScreenshotForSend}
+                      onError={(msg) => toast.error(msg)}
+                    />
                       {(!activeConv?.isGroup && currentUserRole === 'teacher' && activeConv?.user?.role === 'student') && (
                         <button
                           onClick={() => setShowScheduleModal(true)}
@@ -2944,6 +3100,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           );
         })()
       )}
+
+      <ScheduleMessagePreviewModal
+        open={!!schedulePreview}
+        data={schedulePreview}
+        onClose={() => setSchedulePreview(null)}
+      />
     </div>
   );
 };

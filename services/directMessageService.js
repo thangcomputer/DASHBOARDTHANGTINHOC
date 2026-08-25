@@ -64,6 +64,7 @@ async function sendCanonicalMessageInner({
   isGroup = false,
   groupId = null,
   conversationId: clientConversationId = null,
+  payload = null,
   notifyUser,
   io,
 } = {}) {
@@ -238,6 +239,7 @@ async function sendCanonicalMessageInner({
     const {
       ensureSession,
       consumeAiImageQuota,
+      peekImageQuota,
     } = require('./aiSupportService');
     const sessionDoc = await ensureSession({
       conversationId,
@@ -245,18 +247,31 @@ async function sendCanonicalMessageInner({
       userRole: senderRole,
       branchId: sender.branchId || '',
     });
-    const quota = await consumeAiImageQuota(sessionDoc);
-    if (quota.blocked) {
-      return {
-        ok: false,
-        status: 403,
-        code: 'AI_IMAGE_QUOTA',
-        message: 'Bạn đã gửi đủ 5 ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.',
-        remaining: 0,
-        limit: quota.limit,
-      };
+    // Hỏi lại cùng URL ảnh đã gửi trước đó → không trừ thêm quota ảnh trong ngày
+    const reusedSameImage = await Message.exists({
+      conversationId,
+      senderId: String(senderId),
+      fileUrl: String(fileUrl).trim(),
+      messageType: 'image',
+      isRecalled: { $ne: true },
+    });
+    if (reusedSameImage) {
+      const peek = peekImageQuota(sessionDoc);
+      if (peek.limit) aiImageRemaining = peek.remaining;
+    } else {
+      const quota = await consumeAiImageQuota(sessionDoc);
+      if (quota.blocked) {
+        return {
+          ok: false,
+          status: 403,
+          code: 'AI_IMAGE_QUOTA',
+          message: 'Bạn đã gửi đủ 5 ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.',
+          remaining: 0,
+          limit: quota.limit,
+        };
+      }
+      if (quota.applies) aiImageRemaining = quota.remaining;
     }
-    if (quota.applies) aiImageRemaining = quota.remaining;
   }
 
   const messagePayload = {
@@ -277,6 +292,9 @@ async function sendCanonicalMessageInner({
     groupId: isGroupFinal ? groupIdFinal : null,
   };
   if (aiImageRemaining != null) messagePayload.aiImageRemaining = aiImageRemaining;
+  if (payload != null && typeof payload === 'object') {
+    messagePayload.payload = payload;
+  }
 
   const message = await Message.create(messagePayload);
 

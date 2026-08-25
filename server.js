@@ -564,6 +564,7 @@ io.on('connection', (socket) => {
         isGroup: Boolean(data.isGroup),
         groupId: data.groupId || null,
         conversationId: data.conversationId || null,
+        payload: data.payload && typeof data.payload === 'object' ? data.payload : null,
         notifyUser: app.notifyUser,
         io,
       });

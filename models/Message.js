@@ -62,6 +62,8 @@ const messageSchema = new mongoose.Schema({
   fileName: { type: String, default: '' },
   fileExpired: { type: Boolean, default: false },
   fileExpiredAt: { type: Date },
+  /** Metadata tùy chọn (vd. xếp lịch: scheduleId, date, course…). */
+  payload: { type: mongoose.Schema.Types.Mixed, default: null },
   /** Số lượt ảnh AI còn lại sau tin này (chỉ tin ảnh gửi Trợ lý AI). */
   aiImageRemaining: { type: Number, default: null },
 

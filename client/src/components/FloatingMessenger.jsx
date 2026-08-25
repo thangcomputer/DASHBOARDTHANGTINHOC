@@ -8,8 +8,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
   ImagePlus, Link2, Loader2, MoreVertical, Edit3, RotateCcw, Bot, UserRound, Check,
-  Copy, Scaling,
+  Copy, Scaling, Calendar,
 } from 'lucide-react';
+import ScheduleMessagePreviewModal, {
+  resolveScheduleMessagePayload,
+} from './ScheduleMessagePreviewModal';
 import { useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { useData } from '../context/DataContext';
@@ -41,6 +44,7 @@ import {
 } from '../utils/aiSupport';
 import SupportMascot from './SupportMascot';
 import { MessageRichText, copyableTextFromMessage } from '../utils/messageRichText';
+import ScreenCaptureButton from './ScreenCaptureButton';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
@@ -157,7 +161,7 @@ function isOutgoingMessengerMessage(m, meId) {
   return sid === me;
 }
 
-function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '', chips = null, onChip }) {
+function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '', chips = null, onChip, onSchedulePreview }) {
   if (m.isRecalled) {
     return (
       <div className={`cms-fm-bubble ${mine ? 'is-mine' : 'is-theirs'} opacity-70 italic w-fit max-w-[88%]`}>
@@ -167,10 +171,24 @@ function MessageBubble({ m, mine, showAiImageQuota = false, senderLabel = '', ch
   }
 
   if (m.messageType === 'system') {
+    const scheduleInfo = resolveScheduleMessagePayload(m);
     return (
-      <p className="w-full text-[11px] text-center text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 font-semibold leading-snug">
-        {m.content}
-      </p>
+      <div className="w-full flex justify-center">
+        <span className="inline-flex items-center gap-1.5 max-w-[95%] text-[11px] text-center text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 font-semibold leading-snug">
+          <span className="min-w-0">{m.content}</span>
+          {scheduleInfo ? (
+            <button
+              type="button"
+              onClick={() => onSchedulePreview?.(scheduleInfo)}
+              className="shrink-0 w-6 h-6 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 flex items-center justify-center transition"
+              title="Xem chi tiết lịch"
+              aria-label="Xem chi tiết lịch"
+            >
+              <Calendar size={12} />
+            </button>
+          ) : null}
+        </span>
+      </div>
     );
   }
 
@@ -306,7 +324,7 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
 }
 
 function ChatWindow({
-  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendLink, onRecall, onlineUsers = [], isSuper = false,
+  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendExistingImage, onSendLink, onRecall, onlineUsers = [], isSuper = false,
   peerTyping = false, isAiPeer = false, aiStatus = AI_SUPPORT_STATUS.AI_ACTIVE,
   canShowEscalate = false, feedbackPhase = '', supportOnline = false,
   onEscalate, onResetAi, onAgree, onDisagree, onMoreYes, onMoreNo,
@@ -323,6 +341,7 @@ function ChatWindow({
   const [pendingImage, setPendingImage] = useState(null);
   const pendingUrlRef = useRef('');
   const [activeMsgOptions, setActiveMsgOptions] = useState(null);
+  const [schedulePreview, setSchedulePreview] = useState(null);
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const imageRef = useRef(null);
@@ -433,11 +452,32 @@ function ChatWindow({
     }
   };
 
-  const handleEditMessage = (msgContent) => {
-    if (msgContent && msgContent !== '[Hình ảnh]') {
-      setText(msgContent);
-      setTimeout(() => inputRef.current?.focus(), 100);
+  const handleEditMessage = (msg) => {
+    const raw = typeof msg === 'string' ? { content: msg } : (msg || {});
+    const content = String(raw.content || '').trim();
+    const caption = content && content !== '[Hình ảnh]' ? content : '';
+    const hasImage = isImageMessage(raw) && Boolean(raw.fileUrl);
+
+    if (!caption && !hasImage) return;
+
+    if (pendingUrlRef.current) {
+      URL.revokeObjectURL(pendingUrlRef.current);
+      pendingUrlRef.current = '';
     }
+
+    if (hasImage) {
+      setPendingImage({
+        file: null,
+        url: resolveMediaUrl(raw.fileUrl),
+        name: raw.fileName || 'ảnh',
+        existingFileUrl: String(raw.fileUrl),
+      });
+    } else {
+      setPendingImage(null);
+    }
+
+    setText(caption);
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const talkingToHuman = isAiPeer && (
@@ -531,6 +571,26 @@ function ChatWindow({
       setUploading(true);
       try {
         const ok = await onSendFile(tab, pendingImage.file, body);
+        if (ok !== false) {
+          setText('');
+          clearPendingImage();
+        }
+      } catch (err) {
+        toast?.error(err?.message || 'Gửi ảnh thất bại');
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+    if (pendingImage?.existingFileUrl && onSendExistingImage) {
+      setUploading(true);
+      try {
+        const ok = await onSendExistingImage(
+          tab,
+          pendingImage.existingFileUrl,
+          body,
+          pendingImage.name || '',
+        );
         if (ok !== false) {
           setText('');
           clearPendingImage();
@@ -697,7 +757,7 @@ function ChatWindow({
                   <div className="relative shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                     <button
                       type="button"
-                      onClick={() => handleEditMessage(m.content)}
+                      onClick={() => handleEditMessage(m)}
                       className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
                       title="Chỉnh sửa / Hỏi lại"
                     >
@@ -747,6 +807,7 @@ function ChatWindow({
                       : null
                   }
                   onChip={(chip) => onSend(tab, chip.label)}
+                  onSchedulePreview={setSchedulePreview}
                 />
                 {!m.isRecalled && m.messageType !== 'system' ? (
                   <CopyHoverButton text={m.content} />
@@ -920,7 +981,9 @@ function ChatWindow({
           <div className="cms-fm-pending">
             <img src={pendingImage.url} alt="" className="cms-fm-pending__thumb" />
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-800 truncate">Ảnh đã chọn</p>
+              <p className="text-[11px] font-bold text-slate-800 truncate">
+                {pendingImage.existingFileUrl ? 'Ảnh kèm câu hỏi' : 'Ảnh đã chọn'}
+              </p>
               <p className="text-[10px] text-slate-500 truncate">{pendingImage.name || 'ảnh'}</p>
             </div>
             <button
@@ -952,6 +1015,14 @@ function ChatWindow({
               >
                 <ImagePlus size={16} />
               </button>
+              <ScreenCaptureButton
+                size={16}
+                disabled={uploading || imageBlocked || questionBlocked}
+                buttonClassName="cms-fm-attach"
+                title={imageBlocked ? 'Hết 5 ảnh hôm nay — ngày mai gửi tiếp' : 'Chụp màn hình'}
+                onCaptured={(file) => stageImage(file)}
+                onError={(msg) => toast.error(msg)}
+              />
               {!isAiPeer ? (
                 <button
                   type="button"
@@ -1010,6 +1081,12 @@ function ChatWindow({
             : `Ảnh gửi Trợ lý AI: còn ${Number.isFinite(aiImageLeft) ? aiImageLeft : 5}/5 lượt hôm nay`}
         </p>
       ) : null}
+
+      <ScheduleMessagePreviewModal
+        open={!!schedulePreview}
+        data={schedulePreview}
+        onClose={() => setSchedulePreview(null)}
+      />
     </div>
   );
 }
@@ -1629,6 +1706,46 @@ export default function FloatingMessenger({ session, role }) {
     }
   };
 
+  /** Gửi lại ảnh đã có (Hỏi lại) — không upload mới, không trừ thêm quota ảnh. */
+  const handleSendExistingImage = async (tab, fileUrl, caption = '', fileName = '') => {
+    const url = String(fileUrl || '').trim();
+    if (!url) return false;
+    const isAi = isAiSupportPeer(tab.user);
+    const status = aiStatusMap[tab.id] || AI_SUPPORT_STATUS.AI_ACTIVE;
+    const quotaApplies = isAi && status === AI_SUPPORT_STATUS.AI_ACTIVE;
+    if (quotaApplies && aiQuestionQuota.applies && !(Number(aiQuestionQuota.remaining) > 0)) {
+      const lim = Number(aiQuestionQuota.limit) || (meRole === 'teacher' ? 25 : 15);
+      toast.error(`Hết ${lim} lượt hỏi AI hôm nay. Bấm Cần nhân viên hỗ trợ nếu vẫn cần giúp.`);
+      return false;
+    }
+    const content = String(caption || '').trim() || '[Hình ảnh]';
+    try {
+      if (isAi) clearAiFeedbackPrompt(tab);
+      const sent = await sendMessage({
+        conversationId: isAi ? buildAiSupportConversationId(meRole, meId) : tab.id,
+        senderId: meId,
+        senderName: meName,
+        senderRole: meRole,
+        receiverId: isAi ? AI_SUPPORT_PEER.id : tab.user.id,
+        receiverName: isAi ? AI_SUPPORT_PEER.name : tab.user.name,
+        receiverRole: isAi ? AI_SUPPORT_PEER.role : tab.user.role,
+        content,
+        messageType: 'image',
+        fileUrl: url,
+        fileName: fileName || 'ảnh',
+        isGroup: false,
+      });
+      if (sent?.failed) {
+        toast.error(sent.failReason || 'Gửi ảnh thất bại');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      toast.error(err.message || 'Gửi ảnh thất bại');
+      return false;
+    }
+  };
+
   const badgeCount = unreadTotal > 0 ? unreadTotal : 0;
   const badgeLabel = badgeCount > 99 ? '99+' : String(badgeCount);
 
@@ -1664,6 +1781,7 @@ export default function FloatingMessenger({ session, role }) {
             onMinimize={minimizeChat}
             onSend={handleSend}
             onSendFile={handleSendFile}
+            onSendExistingImage={handleSendExistingImage}
             onSendLink={handleSendLink}
             onRecall={recallMessage}
             peerTyping={!!peerTypingMap[openWindow.id]}

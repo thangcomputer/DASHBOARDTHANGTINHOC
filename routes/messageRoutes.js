@@ -427,7 +427,7 @@ router.post('/', messagesGuard('send'), async (req, res) => {
     const senderRole = getMessagingRole(req.user);
     const senderName = req.user.name;
 
-    const { receiverId, receiverName, receiverRole, content, isGroup, groupId, messageType, fileUrl, fileName, conversationId: bodyConversationId } = req.body;
+    const { receiverId, receiverName, receiverRole, content, isGroup, groupId, messageType, fileUrl, fileName, conversationId: bodyConversationId, payload } = req.body;
 
     const isBroadcast = receiverId === 'ALL_USERS' || receiverId === 'ALL_STUDENTS' || receiverId === 'ALL_TEACHERS';
     if (isBroadcast && !(req.user.role === 'admin' || req.user.role === 'staff')) {
@@ -491,6 +491,7 @@ router.post('/', messagesGuard('send'), async (req, res) => {
       isGroup,
       groupId,
       conversationId: bodyConversationId || null,
+      payload: payload && typeof payload === 'object' ? payload : null,
       notifyUser: req.app.notifyUser,
       io: req.app.get('io'),
     }));
