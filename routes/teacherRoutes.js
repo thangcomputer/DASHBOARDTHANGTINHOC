@@ -23,6 +23,7 @@ const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
 const { emitTeacherEvent, emitDataRefresh, emitFinanceEvent, emitUser } = require('../utils/realtimeEmit');
 const { purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
+const { normalizeVoiceRegion } = require('../constants/voiceRegions');
 
 const router = express.Router();
 
@@ -122,7 +123,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       return CQRSTeacherController.post_root(req, res, next);
     }
 
-    const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession } = req.body;
+    const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession, voiceRegion } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
     }
@@ -171,6 +172,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       email,
       specialty: specialty || normalizedSubjectIds.join(', '),
       subjectIds: normalizedSubjectIds,
+      voiceRegion: normalizeVoiceRegion(voiceRegion),
       startDate: startDate || Date.now(),
       address:   address   || '',
       password:  plainPassword,
@@ -375,6 +377,67 @@ router.get('/stats/summary', [authMiddleware, branchFilter, ...teacherRouteGuard
   }
 });
 
+// ─── GET /api/teachers/:id/public-card ───────────────────────────────────────
+// HV xem thẻ GV được phân công (không lộ SĐT/bank). Admin/GV cũng dùng được.
+router.get('/:id/public-card', [authMiddleware, branchFilter], async (req, res) => {
+  try {
+    const teacherId = String(req.params.id || '');
+    if (!mongoose.Types.ObjectId.isValid(teacherId)) {
+      return res.status(400).json({ success: false, message: 'ID giảng viên không hợp lệ' });
+    }
+
+    const role = String(req.user?.role || '').toLowerCase();
+    if (role === 'student') {
+      const Student = require('../models/Student');
+      const student = await Student.findById(req.user.id)
+        .select('teacherId enrollments.teacherId')
+        .lean();
+      if (!student) {
+        return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
+      }
+      const assigned = new Set();
+      const rootTid = student.teacherId?._id || student.teacherId;
+      if (rootTid) assigned.add(String(rootTid));
+      (student.enrollments || []).forEach((e) => {
+        const tid = e?.teacherId?._id || e?.teacherId;
+        if (tid) assigned.add(String(tid));
+      });
+      if (!assigned.has(teacherId)) {
+        return res.status(403).json({ success: false, message: 'Bạn chỉ xem được giảng viên đang phụ trách mình' });
+      }
+    } else if (role === 'teacher' && String(req.user.id) !== teacherId) {
+      return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
+    } else if (role !== 'admin' && role !== 'staff' && role !== 'teacher') {
+      return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
+    }
+
+    const teacher = await Teacher.findById(teacherId)
+      .select('name specialty averageRating ratingCount voiceRegion avatar subjectIds')
+      .lean();
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        id: String(teacher._id),
+        _id: String(teacher._id),
+        name: teacher.name || '',
+        specialty: teacher.specialty || '',
+        subjectIds: Array.isArray(teacher.subjectIds) ? teacher.subjectIds : [],
+        averageRating: Number(teacher.averageRating) || 0,
+        ratingCount: Number(teacher.ratingCount) || 0,
+        voiceRegion: normalizeVoiceRegion(teacher.voiceRegion),
+        avatar: teacher.avatar || '',
+      },
+    });
+  } catch (error) {
+    logger.error('[TEACHERS] public-card: %s', error.message);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
 // ─── GET /api/teachers/:id ────────────────────────────────────────────────────
 router.get('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('get_one')], async (req, res) => {
   try {
@@ -471,7 +534,7 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
     // Self-edit: profile + kết quả thi onboarding (client-side grade rồi sync)
     const allowedFields = isAdminRole 
       ? [
-          'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'bio', 'startDate', 'address',
+          'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio', 'startDate', 'address',
           'bankAccount', 'avatar', 'status', 'baseSalaryPerSession', 'customStarBonusAmount',
           'assignedClasses', 'assignedStudents',
           'testScore', 'testStatus', 'testDate', 'testNotes', 'faceViolationCount',
@@ -481,18 +544,21 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
         ]
       : isSelfEdit
         ? [
-            'zalo', 'email', 'bio', 'bankAccount', 'avatar', 'address',
+            'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address',
             'testScore', 'testStatus', 'testDate', 'testNotes', 'faceViolationCount',
             'testMcCorrect', 'testMcWrong', 'testMcTotal',
             'lockReason', 'practicalFile', 'practicalStatus', 'status',
           ]
         : [
-          'zalo', 'email', 'bio', 'bankAccount', 'avatar', 'address',
+          'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address',
         ];
 
     const updates = {};
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'voiceRegion')) {
+      updates.voiceRegion = normalizeVoiceRegion(updates.voiceRegion);
     }
     // Chuyên môn / subjectIds: chỉ Admin / Staff được sửa
     if (isAdminRole && req.body.subjectIds !== undefined) {

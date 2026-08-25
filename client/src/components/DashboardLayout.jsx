@@ -18,6 +18,7 @@ import { formatNotificationStudentMask } from '../utils/studentMask';
 import { getMessagingRole } from '../lib/messagingRoles';
 import StudentQuizInviteHost from './student/StudentQuizInviteHost';
 import StudentAttendanceConfirmModal from './student/StudentAttendanceConfirmModal';
+import StudentAssignedTeacherModal from './student/StudentAssignedTeacherModal';
 import AdminAttendanceDisputeModal from './admin/shared/AdminAttendanceDisputeModal';
 import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
@@ -684,8 +685,43 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [showNotif, setShowNotif] = React.useState(false);
   const [notifLimit, setNotifLimit] = React.useState(5);
   const [notifPos, setNotifPos] = React.useState({ top: 72, right: 16 });
+  const [assignedTeacherModal, setAssignedTeacherModal] = React.useState({
+    open: false,
+    loading: false,
+    teacher: null,
+  });
   const notifRef = React.useRef(null);
   const bellRef = React.useRef(null);
+
+  const openAssignedTeacherFromNotif = React.useCallback(async (payload = {}) => {
+    const teacherId = String(payload?.teacherId || '').trim();
+    const fallback = {
+      id: teacherId,
+      name: payload?.teacherName || 'Giảng viên',
+      specialty: payload?.specialty || '',
+      averageRating: Number(payload?.averageRating) || 0,
+      ratingCount: Number(payload?.ratingCount) || 0,
+      voiceRegion: payload?.voiceRegion || '',
+      avatar: payload?.avatar || '',
+    };
+    setAssignedTeacherModal({ open: true, loading: Boolean(teacherId), teacher: fallback });
+    if (!teacherId) {
+      setAssignedTeacherModal({ open: true, loading: false, teacher: fallback });
+      return;
+    }
+    try {
+      const res = await api.teachers.getPublicCard(teacherId);
+      if (res?.success && res?.data) {
+        setAssignedTeacherModal({
+          open: true,
+          loading: false,
+          teacher: { ...fallback, ...res.data },
+        });
+        return;
+      }
+    } catch { /* keep fallback */ }
+    setAssignedTeacherModal({ open: true, loading: false, teacher: fallback });
+  }, []);
 
   useLayoutEffect(() => {
     if (!showNotif) return undefined;
@@ -963,6 +999,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         onDispute={() => handleStudentAttendanceDecision('dispute')}
         onDismiss={() => setAttendanceConfirm(null)}
       />
+      <StudentAssignedTeacherModal
+        open={role === 'student' && assignedTeacherModal.open}
+        teacher={assignedTeacherModal.teacher}
+        loading={assignedTeacherModal.loading}
+        onClose={() => setAssignedTeacherModal({ open: false, loading: false, teacher: null })}
+      />
       <AdminAttendanceDisputeModal
         open={(role === 'admin' || role === 'staff') && !!attendanceDispute}
         payload={attendanceDispute}
@@ -1103,6 +1145,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               totalSessions: n.payload?.totalRequired || n.payload?.totalSessions,
                               teacherName: n.payload?.teacherName,
                             }, { forceResolved: true });
+                          } else if (
+                            role === 'student'
+                            && (
+                              n.payload?.kind === 'teacher_assigned'
+                              || n.payload?.kind === 'teacher_reassigned'
+                              || String(n.title || '').includes('Phân công giảng viên')
+                              || String(n.title || '').includes('Giảng viên khóa học đã đổi')
+                            )
+                          ) {
+                            setShowNotif(false);
+                            openAssignedTeacherFromNotif(n.payload || {});
                           } else if (n.payload?.kind === 'star_bonus_eligible' && role === 'teacher') {
                             setShowNotif(false);
                             setStarBonusCelebration({

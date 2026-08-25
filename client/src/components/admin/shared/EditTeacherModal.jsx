@@ -13,6 +13,7 @@ import {
   STAR_BONUS_MIN_STARS,
   STAR_BONUS_MIN_STUDENTS,
 } from '../../../utils/teacherCommission';
+import { VOICE_REGION_OPTIONS } from '../../../constants/voiceRegions';
 
 const SALARY_PRESETS = [100000, 130000, 150000, 180000];
 
@@ -174,15 +175,28 @@ export default function EditTeacherModal({
                       />
                     </div>
                     <div>
-                      <label className="cms-label">Giới thiệu (Bio)</label>
-                      <input
-                        type="text"
-                        value={editTeacher.bio || ''}
-                        onChange={(e) => setEditTeacher((p) => ({ ...p, bio: e.target.value }))}
-                        className="cms-input"
-                        placeholder="Kinh nghiệm, bằng cấp..."
-                      />
+                      <label className="cms-label">Giọng (vùng miền)</label>
+                      <CmsSelect
+                        value={editTeacher.voiceRegion || ''}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, voiceRegion: e.target.value }))}
+                        className="cms-input cursor-pointer"
+                      >
+                        <option value="">— Chưa chọn —</option>
+                        {VOICE_REGION_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </CmsSelect>
                     </div>
+                  </div>
+                  <div>
+                    <label className="cms-label">Giới thiệu (Bio)</label>
+                    <input
+                      type="text"
+                      value={editTeacher.bio || ''}
+                      onChange={(e) => setEditTeacher((p) => ({ ...p, bio: e.target.value }))}
+                      className="cms-input"
+                      placeholder="Kinh nghiệm, bằng cấp..."
+                    />
                   </div>
                 </div>
               </section>

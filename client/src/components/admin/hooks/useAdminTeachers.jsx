@@ -41,7 +41,7 @@ export function useAdminTeachers({
   const [teacherForm, setTeacherForm] = useState({
     name: '', phone: '', email: '', specialty: '', subjectIds: [],
     startDate: new Date().toISOString().split('T')[0],
-    address: '', branchId: '', branchCode: '',
+    address: '', voiceRegion: '', branchId: '', branchCode: '',
     baseSalaryPerSession: 150000,
   });
   const [editTeacher, setEditTeacher] = useState(null);

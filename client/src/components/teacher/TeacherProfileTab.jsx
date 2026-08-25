@@ -10,6 +10,8 @@ import { useToast } from '../../utils/toast';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import EditableAvatar from '../EditableAvatar';
 import { showGlossyAlert } from './TeacherShared';
+import CmsSelect from '../ui/CmsSelect';
+import { VOICE_REGION_OPTIONS, voiceRegionLabel } from '../../constants/voiceRegions';
 
 export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
   const { updateTeacher } = useData();
@@ -26,6 +28,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
     specialty: '',
     address: '',
     zalo: '',
+    voiceRegion: '',
   });
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
@@ -54,6 +57,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         specialty: currentTeacher.specialty || '',
         address: currentTeacher.address || '',
         zalo: currentTeacher.zalo || '',
+        voiceRegion: currentTeacher.voiceRegion || '',
       });
     }
   }, [currentTeacher]);
@@ -95,6 +99,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         email: profileForm.email,
         bio: profileForm.bio,
         address: profileForm.address,
+        voiceRegion: profileForm.voiceRegion || '',
       });
       if (result && result.success) {
         setSaveMsg('✅ Đã cập nhật thông tin cá nhân!');
@@ -335,6 +340,30 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
                 <Shield size={12} className="text-blue-400 ml-auto flex-shrink-0" title="Chỉ Admin có thể thay đổi" />
               </div>
               <p className="text-xs cms-min-text-xs text-red-500 mt-1 pl-1 italic">* Liên hệ Admin để đổi chuyên môn.</p>
+            </div>
+
+            {/* Giọng vùng miền */}
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Giọng (vùng miền)</label>
+              {editingProfile ? (
+                <CmsSelect
+                  value={profileForm.voiceRegion || ''}
+                  onChange={(e) => setProfileForm({ ...profileForm, voiceRegion: e.target.value })}
+                  className="w-full text-sm bg-white rounded-xl px-4 py-3 border-2 border-blue-200 focus:border-blue-400 outline-none"
+                >
+                  <option value="">— Chưa chọn —</option>
+                  {VOICE_REGION_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </CmsSelect>
+              ) : (
+                <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                  <MapPin size={16} className="text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">
+                    {voiceRegionLabel(profileForm.voiceRegion) || 'Chưa cập nhật'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Bio */}

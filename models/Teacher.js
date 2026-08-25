@@ -139,6 +139,12 @@ const TeacherSchema = new mongoose.Schema(
     // ── Thông tin thêm ────────────────────────────────────────────
     specialty: { type: String, default: '' }, // Chuyên môn: "THVP, Excel, ..."
     subjectIds: { type: [String], default: [] }, // Môn phụ trách: coban, word, excel...
+    /** Giọng giảng dạy theo vùng miền */
+    voiceRegion: {
+      type: String,
+      enum: ['', 'bac', 'trung', 'nam', 'tay'],
+      default: '',
+    },
     bio: { type: String, default: '' },
     startDate: { type: Date, default: Date.now }, // Ngày bắt đầu làm việc
     address: { type: String, default: '' },       // Địa chỉ thường trú

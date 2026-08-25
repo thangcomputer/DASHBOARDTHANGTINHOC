@@ -70,6 +70,7 @@ export function useDataAdminCrud({
       subjectIds: Array.isArray(teacher.subjectIds) ? teacher.subjectIds : [],
       startDate: teacher.startDate || undefined,
       address:   teacher.address || '',
+      voiceRegion: teacher.voiceRegion || '',
       password:  teacher.password || teacher.phone,
       status:    teacher.status || 'inactive',
       branchId:   teacher.branchId || undefined,

@@ -140,14 +140,35 @@ async function notifyTeacherAssignedOnEnroll(io, {
   const course = String(courseName || student.course || '').trim() || 'khóa học';
 
   let gvName = String(teacherName || student.teacherName || '').trim();
-  if (!gvName) {
-    try {
-      const Teacher = require('../models/Teacher');
-      const t = await Teacher.findById(tid).select('name').lean();
-      gvName = t?.name || '';
-    } catch { /* ignore */ }
-  }
-  if (!gvName) gvName = 'Giảng viên';
+  let teacherCard = {
+    teacherId: tid,
+    teacherName: gvName,
+    specialty: '',
+    averageRating: 0,
+    ratingCount: 0,
+    voiceRegion: '',
+    avatar: '',
+  };
+  try {
+    const Teacher = require('../models/Teacher');
+    const t = await Teacher.findById(tid)
+      .select('name specialty averageRating ratingCount voiceRegion avatar')
+      .lean();
+    if (t) {
+      if (!gvName) gvName = t.name || '';
+      teacherCard = {
+        teacherId: tid,
+        teacherName: gvName || t.name || 'Giảng viên',
+        specialty: t.specialty || '',
+        averageRating: Number(t.averageRating) || 0,
+        ratingCount: Number(t.ratingCount) || 0,
+        voiceRegion: String(t.voiceRegion || ''),
+        avatar: t.avatar || '',
+      };
+    }
+  } catch { /* ignore */ }
+  if (!gvName) gvName = teacherCard.teacherName || 'Giảng viên';
+  teacherCard.teacherName = gvName;
 
   try {
     await NotificationService.send(io, {
@@ -174,8 +195,7 @@ async function notifyTeacherAssignedOnEnroll(io, {
       content: `Bạn đã được phân công Giảng viên ${gvName} phụ trách khóa "${course}".`,
       receivers: studentId,
       payload: {
-        teacherId: tid,
-        teacherName: gvName,
+        ...teacherCard,
         courseName: course,
         targetAudience: 'student',
         kind: 'teacher_assigned',
@@ -2745,7 +2765,9 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
         return res.status(400).json({ success: false, message: 'ID giảng viên không hợp lệ' });
       }
       const Teacher = require('../models/Teacher');
-      const t = await Teacher.findById(teacherId).select('name status role specialty subjectIds branchId').lean();
+      const t = await Teacher.findById(teacherId)
+        .select('name status role specialty subjectIds branchId averageRating ratingCount voiceRegion avatar')
+        .lean();
       if (!t || t.role !== 'teacher') {
         return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
       }
@@ -3055,6 +3077,11 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
             payload: {
               teacherId: String(teacherId),
               teacherName,
+              specialty: teacherDoc?.specialty || '',
+              averageRating: Number(teacherDoc?.averageRating) || 0,
+              ratingCount: Number(teacherDoc?.ratingCount) || 0,
+              voiceRegion: String(teacherDoc?.voiceRegion || ''),
+              avatar: teacherDoc?.avatar || '',
               courseName: targetCourse || student.course || '',
               targetAudience: 'student',
               kind: 'teacher_reassigned',
@@ -3070,6 +3097,11 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
             payload: {
               teacherId: String(teacherId),
               teacherName,
+              specialty: teacherDoc?.specialty || '',
+              averageRating: Number(teacherDoc?.averageRating) || 0,
+              ratingCount: Number(teacherDoc?.ratingCount) || 0,
+              voiceRegion: String(teacherDoc?.voiceRegion || ''),
+              avatar: teacherDoc?.avatar || '',
               courseName: targetCourse || student.course || '',
               targetAudience: 'student',
               kind: 'teacher_assigned',

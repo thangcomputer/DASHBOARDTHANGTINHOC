@@ -938,6 +938,10 @@ export const teachersAPI = {
     const res = await apiFetch(`/teachers/${id}`);
     return parseApiJson(res, 'Không tải được thông tin giảng viên');
   },
+  getPublicCard: async (id) => {
+    const res = await apiFetch(`/teachers/${id}/public-card`);
+    return parseApiJson(res, 'Không tải được thông tin giảng viên');
+  },
   create: async (teacher) => {
     const res = await apiFetch('/teachers', {
       method: 'POST',

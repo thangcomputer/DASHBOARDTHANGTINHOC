@@ -11,6 +11,7 @@ import {
   STAR_BONUS_MIN_STARS,
   STAR_BONUS_MIN_STUDENTS,
 } from '../../../utils/teacherCommission';
+import { VOICE_REGION_OPTIONS } from '../../../constants/voiceRegions';
 
 const SALARY_PRESETS = [100000, 130000, 150000, 180000];
 
@@ -109,16 +110,31 @@ export default function AddTeacherModal({
                 </div>
               </div>
 
-              <div>
-                <label className="cms-label">Địa chỉ</label>
-                <input
-                  type="text"
-                  value={teacherForm.address}
-                  onChange={(e) => setTeacherForm((p) => ({ ...p, address: e.target.value }))}
-                  className="cms-input"
-                  placeholder="123 Đường ABC, Quận X..."
-                />
-              </div>
+                  <div className="cms-form-row">
+                    <div>
+                      <label className="cms-label">Địa chỉ</label>
+                      <input
+                        type="text"
+                        value={teacherForm.address}
+                        onChange={(e) => setTeacherForm((p) => ({ ...p, address: e.target.value }))}
+                        className="cms-input"
+                        placeholder="123 Đường ABC, Quận X..."
+                      />
+                    </div>
+                    <div>
+                      <label className="cms-label">Giọng (vùng miền)</label>
+                      <CmsSelect
+                        value={teacherForm.voiceRegion || ''}
+                        onChange={(e) => setTeacherForm((p) => ({ ...p, voiceRegion: e.target.value }))}
+                        className="cms-input cursor-pointer"
+                      >
+                        <option value="">— Chưa chọn —</option>
+                        {VOICE_REGION_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </CmsSelect>
+                    </div>
+                  </div>
             </div>
           </section>
 
