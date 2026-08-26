@@ -24,7 +24,7 @@ export function formatMaskedPhone(phoneStr, fallbackName = '', students = []) {
   return '098*******';
 }
 
-export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA, students = [] }) => {
+export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA, students = [], reviewsScrollLimit = 0 }) => {
   if (!rating || rating.count === 0) return null;
 
   const StarIcons = ({ count, max = 5 }) => (
@@ -39,6 +39,11 @@ export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA, students = [] })
       ))}
     </div>
   );
+
+  /** ~3 card đánh giá (có tag) rồi scroll; 0 = không giới hạn */
+  const reviewsListClass = reviewsScrollLimit > 0
+    ? 'space-y-2.5 sm:space-y-3 max-h-[22rem] overflow-y-auto overscroll-contain pr-1'
+    : 'space-y-2.5 sm:space-y-3';
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -75,7 +80,7 @@ export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA, students = [] })
           </div>
         </div>
 
-        <div className="space-y-2.5 sm:space-y-3">
+        <div className={reviewsListClass}>
           {rating.ratings.map((r, idx) => (
             <div key={idx} className="bg-slate-50 rounded-xl p-3 sm:p-4 shadow-sm border border-slate-100/80">
               <div className="flex items-center justify-between gap-2 mb-2">

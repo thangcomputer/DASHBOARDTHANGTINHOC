@@ -232,7 +232,11 @@ export default function AdminModalManager() {
       {showStudentDetailId && (
         <StudentDetailModal
           studentId={showStudentDetailId}
-          defaultTab={studentDetailTab || 'overview'}
+          initialTab={
+            !studentDetailTab || studentDetailTab === 'overview'
+              ? 'summary'
+              : studentDetailTab
+          }
           highlightScheduleId={studentDetailScheduleId || undefined}
           onClose={() => setShowStudentDetailId(null)}
         />

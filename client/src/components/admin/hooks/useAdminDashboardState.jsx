@@ -372,11 +372,11 @@ export function useAdminDashboardState() {
     
     const handleOpenStudentDetail = (e) => {
       const { id, tab, scheduleId } = e.detail || {};
-      if (id) {
-        setStudentDetailTab(tab || 'summary');
-        setStudentDetailScheduleId(scheduleId || null);
-        setShowStudentDetailId(id);
-      }
+      if (!id) return;
+      const safeTab = !tab || tab === 'overview' ? 'summary' : String(tab);
+      setStudentDetailTab(safeTab);
+      setStudentDetailScheduleId(scheduleId || null);
+      setShowStudentDetailId(id);
     };
 
     window.addEventListener('open-reset-pw', handleResetEvent);

@@ -315,10 +315,10 @@ export default function TeacherOverviewTab({
       </div>
 
       {/* ── 3 cột: HV / Lịch / Đánh giá ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 items-start">
 
-        {/* Cột 1: Học viên được phân công */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 flex flex-col min-w-0 h-full">
+        {/* Cột 1: Học viên được phân công — hiện ~5, scroll thêm */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
           <div className="flex items-center justify-between gap-2 min-w-0 pb-2 border-b border-slate-100 shrink-0">
             <h3 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2 min-w-0">
               <GraduationCap size={18} className="text-indigo-600 shrink-0" aria-hidden="true" />
@@ -333,7 +333,7 @@ export default function TeacherOverviewTab({
             </button>
           </div>
 
-          <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1 flex-1 min-h-0">
+          <div className="space-y-2.5 max-h-[25rem] overflow-y-auto overscroll-contain pr-1 min-h-0">
             {students.map((s) => {
               const done = s.completedSessions != null
                 ? Math.max(0, Number(s.completedSessions) || 0)
@@ -384,8 +384,8 @@ export default function TeacherOverviewTab({
           </div>
         </div>
 
-        {/* Cột 2: Lịch dạy sắp tới */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col min-w-0 h-full">
+        {/* Cột 2: Lịch dạy sắp tới — hiện ~7, scroll thêm */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col min-w-0 w-full">
           <div className="px-4 sm:px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0">
             <h4 className="font-bold text-slate-700 text-xs sm:text-sm flex items-center gap-2 min-w-0">
               <Calendar size={14} className="text-indigo-500 shrink-0" aria-hidden="true" />
@@ -399,11 +399,11 @@ export default function TeacherOverviewTab({
               Xem tất cả →
             </button>
           </div>
-          <div className="divide-y divide-slate-50 max-h-[320px] overflow-y-auto pr-1 flex-1 min-h-0">
-            {mySchedules.filter((s) => s.status === 'scheduled').slice(0, 8).length === 0 && (
+          <div className="divide-y divide-slate-50 max-h-[25.5rem] overflow-y-auto overscroll-contain pr-1 min-h-0">
+            {mySchedules.filter((s) => s.status === 'scheduled').length === 0 && (
               <p className="px-4 sm:px-5 py-4 text-xs text-slate-400 text-center">Chưa có lịch dạy sắp tới.</p>
             )}
-            {mySchedules.filter((s) => s.status === 'scheduled').slice(0, 8).map((s) => (
+            {mySchedules.filter((s) => s.status === 'scheduled').map((s) => (
               <div key={s._id || s.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 hover:bg-indigo-50/30 transition">
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 flex flex-col items-center justify-center text-indigo-600 flex-shrink-0">
                   <span className="text-xs font-black tabular-nums">{new Date(s.date).getDate()}</span>
@@ -421,9 +421,9 @@ export default function TeacherOverviewTab({
           </div>
         </div>
 
-        {/* Cột 3: Đánh giá từ học viên */}
-        <div className="min-w-0 h-full md:col-span-2 xl:col-span-1">
-          <TeacherRatingDisplay rating={teacherRating} RATING_CRITERIA={RATING_CRITERIA} students={students} />
+        {/* Cột 3: Đánh giá từ học viên — list hiện ~3, scroll thêm */}
+        <div className="min-w-0 w-full md:col-span-2 xl:col-span-1">
+          <TeacherRatingDisplay rating={teacherRating} RATING_CRITERIA={RATING_CRITERIA} students={students} reviewsScrollLimit={3} />
         </div>
       </div>
     </div>

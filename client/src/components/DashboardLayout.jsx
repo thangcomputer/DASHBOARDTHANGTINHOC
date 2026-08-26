@@ -819,6 +819,25 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     triggerBackgroundSync();
   }, [triggerBackgroundSync]);
 
+  /** Deep-link hồ sơ HV từ chat (điểm danh bù…): hoạt động cả khi đang ở /admin/inbox (AdminDashboard chưa mount). */
+  useEffect(() => {
+    if (role !== 'admin' && role !== 'staff') return undefined;
+    const onOpenStudentDetail = (e) => {
+      const { id, tab, scheduleId } = e.detail || {};
+      const sid = String(id || '').trim();
+      if (!sid) return;
+      const q = new URLSearchParams();
+      q.set('studentId', sid);
+      const safeTab = String(tab || 'summary').trim();
+      if (safeTab) q.set('tab', safeTab === 'overview' ? 'summary' : safeTab);
+      const sch = String(scheduleId || '').trim();
+      if (sch) q.set('scheduleId', sch);
+      navigate(`/admin#students?${q.toString()}`);
+    };
+    window.addEventListener('open-student-detail', onOpenStudentDetail);
+    return () => window.removeEventListener('open-student-detail', onOpenStudentDetail);
+  }, [role, navigate]);
+
   const displayName = role === 'teacher'
     ? (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name)
         ? currentTeacher.name
