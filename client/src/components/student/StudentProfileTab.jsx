@@ -7,9 +7,28 @@ import {
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import EditableAvatar from '../EditableAvatar';
 import api from '../../services/api';
+import { readOwnedVideoCourseCache } from '../../utils/lmsDeepLink';
 
 function openChangePassword() {
   window.dispatchEvent(new CustomEvent('open-change-password-modal'));
+}
+
+function normalizeVideoOrders(rows) {
+  const byCourse = new Map();
+  for (const o of rows || []) {
+    const cid = String(o.courseId || '');
+    if (!cid) continue;
+    const prev = byCourse.get(cid);
+    if (!prev) {
+      byCourse.set(cid, o);
+      continue;
+    }
+    if (o.status === 'paid') byCourse.set(cid, o);
+    else if (prev.status !== 'paid') byCourse.set(cid, o);
+  }
+  return [...byCourse.values()].sort(
+    (a, b) => new Date(b.paidAt || b.createdAt || 0) - new Date(a.paidAt || a.createdAt || 0),
+  );
 }
 
 export default function StudentProfileTab({
@@ -26,18 +45,72 @@ export default function StudentProfileTab({
     videoOrders: true,
   });
   const [videoOrders, setVideoOrders] = useState([]);
+  const studentId = String(
+    studentData?.id || studentData?._id || (() => {
+      try { return JSON.parse(localStorage.getItem('student_user') || '{}').id; } catch { return ''; }
+    })(),
+  );
+  const [ownedCourseIds, setOwnedCourseIds] = useState(() => readOwnedVideoCourseCache(studentId));
+
+  const syncOwnedFromServer = async (orders) => {
+    const owned = readOwnedVideoCourseCache(studentId);
+    const pending = (orders || []).filter((o) => o.status !== 'paid');
+    await Promise.all(pending.map(async (o) => {
+      const cid = String(o.courseId || '');
+      if (!cid || owned.has(cid)) return;
+      try {
+        const res = await api.trainingLms.getLessons(cid);
+        if (res?.meta?.owned) owned.add(cid);
+      } catch { /* ignore */ }
+    }));
+    setOwnedCourseIds(new Set(owned));
+    return owned;
+  };
+
+  const isOrderPaid = (order, ownedSet = ownedCourseIds) => {
+    const cid = String(order?.courseId || '');
+    return order?.status === 'paid' || (cid && ownedSet.has(cid));
+  };
+
+  useEffect(() => {
+    setOwnedCourseIds(readOwnedVideoCourseCache(studentId));
+  }, [studentId]);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       try {
         const res = await api.trainingLms.listVideoPurchases();
-        if (!cancelled && res?.success) setVideoOrders(res.data || []);
+        if (cancelled || !res?.success) return;
+        const rows = normalizeVideoOrders(res.data);
+        await syncOwnedFromServer(rows);
+        if (!cancelled) setVideoOrders(rows);
       } catch { /* ignore */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    };
+    const onRefresh = () => {
+      setOwnedCourseIds(readOwnedVideoCourseCache(studentId));
+      load();
+    };
+    load();
+    window.addEventListener('focus', onRefresh);
+    window.addEventListener('lms-video-owned-updated', onRefresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onRefresh);
+      window.removeEventListener('lms-video-owned-updated', onRefresh);
+    };
+  }, [studentId]);
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const handleResumeVideoPay = (order) => {
+    if (!order?.courseId) return;
+    window.location.hash = `materials-videos?courseId=${encodeURIComponent(order.courseId)}&resumePay=1`;
+  };
+
+  const handleContinueVideoLearning = (order) => {
+    if (!order?.courseId) return;
+    window.location.hash = `materials-videos?courseId=${encodeURIComponent(order.courseId)}`;
+  };
 
   // Cùng thứ tự với sidebar: ưu tiên gender đã hydrate trên session, rồi gender hồ sơ
   const profileGender = sessionGender || studentData?.gender || '';
@@ -317,24 +390,49 @@ export default function StudentProfileTab({
                 </span>
               </div>
               <ul className={`${openSections.videoOrders ? 'block' : 'hidden lg:block'} divide-y divide-slate-100`}>
-                {videoOrders.map((o) => (
+                {videoOrders.map((o) => {
+                  const paid = isOrderPaid(o);
+                  return (
                   <li key={o._id} className="px-4 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-800 truncate">{o.courseTitle || 'Khóa video'}</p>
                       <p className="text-[11px] text-slate-500 tabular-nums">
-                        {o.paidAt ? new Date(o.paidAt).toLocaleString('vi-VN') : (o.createdAt ? new Date(o.createdAt).toLocaleString('vi-VN') : '')}
+                        {paid && o.paidAt
+                          ? new Date(o.paidAt).toLocaleString('vi-VN')
+                          : (o.createdAt ? new Date(o.createdAt).toLocaleString('vi-VN') : '')}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                       <p className="text-sm font-extrabold text-slate-800 tabular-nums">
                         {Number(o.amount || 0).toLocaleString('vi-VN')}₫
                       </p>
-                      <p className={`text-[10px] font-bold uppercase ${o.status === 'paid' ? 'text-emerald-600' : o.status === 'pending' ? 'text-amber-600' : 'text-slate-400'}`}>
-                        {o.status === 'paid' ? 'Đã thanh toán' : o.status === 'pending' ? 'Chờ thanh toán' : o.status}
-                      </p>
+                      {paid ? (
+                        <>
+                          <p className="text-[10px] font-bold uppercase text-emerald-600">Đã thanh toán</p>
+                          <button
+                            type="button"
+                            onClick={() => handleContinueVideoLearning(o)}
+                            className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white whitespace-nowrap"
+                          >
+                            Tiếp tục học
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[10px] font-bold uppercase text-amber-600">Chờ thanh toán</p>
+                          <button
+                            type="button"
+                            onClick={() => handleResumeVideoPay(o)}
+                            className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white whitespace-nowrap"
+                          >
+                            Tiếp tục thanh toán
+                          </button>
+                        </>
+                      )}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </section>
           )}

@@ -1199,6 +1199,19 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                             } else {
                               navigate(p);
                             }
+                          } else if (role === 'student' && n.payload?.kind === 'video_course_paid') {
+                            setShowNotif(false);
+                            const cid = String(n.payload?.courseId || '').trim();
+                            const p = n.path || (cid
+                              ? `/student#materials-videos?courseId=${encodeURIComponent(cid)}`
+                              : '/student#materials-videos');
+                            if (String(p).includes('#')) {
+                              const [pathPart, hashPart] = String(p).split('#');
+                              navigate(pathPart || '/student');
+                              window.location.hash = hashPart || '';
+                            } else {
+                              navigate(p);
+                            }
                           } else if (n.payload?.kind === 'lms_review') {
                             navigate(n.path || `/admin/notifications?reviewId=${encodeURIComponent(n.payload?.reviewId || '')}`);
                           } else if (role === 'teacher' && isTeacherRatingNotif(n)) {

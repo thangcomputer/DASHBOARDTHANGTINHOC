@@ -15,6 +15,7 @@ import {
 } from '../utils/examSubjects';
 import StudentExamRoom from './StudentExamRoom';
 import VideoCoursePayModal from './VideoCoursePayModal';
+import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
 import api, { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, csrfFetch } from '../services/api';
 import { useToast } from '../utils/toast';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
@@ -39,7 +40,7 @@ import {
   LESSON_COMPLETION_REQUIREMENT_MESSAGE,
   PREV_LESSON_REQUIRED_CODE,
 } from '../utils/antiSeekPolicy';
-import { parseLmsHashQuery } from '../utils/lmsDeepLink';
+import { parseLmsHashQuery, clearResumePayFromHash, courseKey, courseIdAliases, readOwnedVideoCourseCache, writeOwnedVideoCourseCache } from '../utils/lmsDeepLink';
 import {
   readYouTubeDuration,
   resolveYouTubeDisplayDuration,
@@ -929,8 +930,19 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   const [uploadingAssignId, setUploadingAssignId] = useState(null);
   const [expandedFileDescKey, setExpandedFileDescKey] = useState(null);
   const [expandedAssignKey, setExpandedAssignKey] = useState(null);
-  const [ownedCourseIds, setOwnedCourseIds] = useState(() => new Set());
+  const [ownedCourseIds, setOwnedCourseIds] = useState(() => {
+    try {
+      const session = JSON.parse(localStorage.getItem('student_user') || '{}');
+      return readOwnedVideoCourseCache(session.id || session._id);
+    } catch {
+      return new Set();
+    }
+  });
+  const [pendingByCourseId, setPendingByCourseId] = useState({});
   const [payCheckout, setPayCheckout] = useState(null);
+  const [purchasesLoaded, setPurchasesLoaded] = useState(false);
+  const [videoPurchaseCelebration, setVideoPurchaseCelebration] = useState(null);
+  const resumePayCourseIdRef = useRef(null);
   const [courseFilterStatus, setCourseFilterStatus] = useState('all'); // all | done | learning | new
   const [courseFilterPrice, setCourseFilterPrice] = useState('all'); // all | paid | free
   const [courseFilterSubject, setCourseFilterSubject] = useState('all');
@@ -967,6 +979,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       /* ignore */
     }
     const { params } = parseLmsHashQuery();
+    if (params.resumePay === '1' && params.courseId) {
+      resumePayCourseIdRef.current = String(params.courseId);
+    }
     if (params.courseId || params.lessonId || params.tab || params.qaId) {
       deepLinkRef.current = params;
       if (params.tab) setCourseTab(normalizeLmsPlayerTab(params.tab));
@@ -1012,6 +1027,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   const { students, examSubjectsCatalog } = useData();
   const session = (() => { try { return JSON.parse(localStorage.getItem('student_user') || '{}'); } catch { return {}; } })();
   const student = (students || []).find(s => s.id === session.id) || {};
+  const studentCacheId = student?.id || session.id || session._id || '';
+
+  useEffect(() => {
+    if (!studentCacheId) return;
+    writeOwnedVideoCourseCache(studentCacheId, ownedCourseIds);
+  }, [ownedCourseIds, studentCacheId]);
 
   const enrollments = useMemo(() => getClientEnrollments(student), [student]);
   const examScoreSubjectIds = useMemo(
@@ -1054,22 +1075,50 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
     }
   }, [trainingData]);
 
+  const refreshVideoPurchases = useCallback(async () => {
+    try {
+      const res = await api.trainingLms.listVideoPurchases();
+      if (!res?.success) return;
+      const paidIds = new Set();
+      (res.data || [])
+        .filter((p) => p.status === 'paid')
+        .forEach((p) => {
+          const cid = String(p.courseId);
+          paidIds.add(cid);
+          courses.forEach((c) => {
+            const aliases = courseIdAliases(c);
+            if (aliases.some((a) => a === cid || cid === courseKey(c))) {
+              aliases.forEach((a) => paidIds.add(a));
+            }
+          });
+        });
+      setOwnedCourseIds((prev) => {
+        const merged = new Set(prev);
+        paidIds.forEach((id) => merged.add(id));
+        return merged;
+      });
+      const pending = {};
+      (res.data || []).forEach((p) => {
+        const cid = String(p.courseId);
+        if (p.status === 'pending' && !paidIds.has(cid)) pending[cid] = p;
+      });
+      setPendingByCourseId(pending);
+    } catch { /* ignore */ }
+    finally {
+      setPurchasesLoaded(true);
+    }
+  }, [courses]);
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.trainingLms.listVideoPurchases();
-        if (cancelled || !res?.success) return;
-        const ids = new Set(
-          (res.data || [])
-            .filter((p) => p.status === 'paid')
-            .map((p) => String(p.courseId)),
-        );
-        setOwnedCourseIds(ids);
-      } catch { /* ignore */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    refreshVideoPurchases();
+  }, [refreshVideoPurchases]);
+
+  // Quay lại danh sách khóa → refresh trạng thái đã mua (nút "Vào học")
+  useEffect(() => {
+    if (mainTab === 'courses' && !selectedCourse) {
+      refreshVideoPurchases();
+    }
+  }, [mainTab, selectedCourse, refreshVideoPurchases]);
 
   // Deep-link: mở đúng khóa từ hash (?courseId=)
   useEffect(() => {
@@ -1095,7 +1144,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   // Load lessons khi chọn khoá học — ưu tiên API server (completed/unlocked)
   useEffect(() => {
     if (!selectedCourse) return;
-    const courseId = selectedCourse._id || selectedCourse.id;
+    const courseId = courseKey(selectedCourse);
     if (!courseId) return;
     let cancelled = false;
     (async () => {
@@ -1107,6 +1156,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           setLessons(res.data);
           if (res.meta?.owned && courseId) {
             setOwnedCourseIds((prev) => new Set(prev).add(String(courseId)));
+            setPendingByCourseId((prev) => {
+              if (!prev[String(courseId)]) return prev;
+              const next = { ...prev };
+              delete next[String(courseId)];
+              return next;
+            });
           }
           const chapters = {};
           res.data.forEach((l) => { chapters[l.chapterTitle || 'Danh mục'] = true; });
@@ -1149,8 +1204,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   // ── Persist session khi reload (Issue #3) ──
   // Lưu courseId đang mở vào sessionStorage
   useEffect(() => {
-    if (selectedCourse?._id) {
-      sessionStorage.setItem('lms_courseId', selectedCourse._id);
+    if (selectedCourse?._id || selectedCourse?.id) {
+      sessionStorage.setItem('lms_courseId', courseKey(selectedCourse));
       sessionStorage.setItem('lms_courseTitle', selectedCourse.title || '');
     } else {
       sessionStorage.removeItem('lms_courseId');
@@ -1171,6 +1226,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         setLessons(res.data);
         if (res.meta?.owned && courseId) {
           setOwnedCourseIds((prev) => new Set(prev).add(String(courseId)));
+          setPendingByCourseId((prev) => {
+            if (!prev[String(courseId)]) return prev;
+            const next = { ...prev };
+            delete next[String(courseId)];
+            return next;
+          });
         }
         const savedLessonId = sessionStorage.getItem('lms_lessonId');
         const firstActive = (savedLessonId && res.data.find(l => String(l._id) === savedLessonId && l.isUnlocked))
@@ -1190,10 +1251,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
     const savedCourseId = sessionStorage.getItem('lms_courseId');
     if (!savedCourseId || selectedCourse) return; // Đã có course rồi
     if (courses.length === 0) return;
-    const course = courses.find(c => String(c._id || c.id) === String(savedCourseId));
+    const course = courses.find((c) => courseKey(c) === String(savedCourseId));
     if (course) {
       setSelectedCourse(course);
-      fetchLessons(course._id || course.id);
+      fetchLessons(courseKey(course));
     }
   }, [courses, selectedCourse]);
 
@@ -1354,51 +1415,8 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
     ? Math.round((lessons.filter(l => l.isCompleted).length / lessons.length) * 100)
     : 0;
 
-  const selectedCoursePrice = Math.max(0, Number(selectedCourse?.price) || 0);
-  const selectedCourseOwned = !selectedCourse
-    || selectedCoursePrice <= 0
-    || ownedCourseIds.has(String(selectedCourse.id || selectedCourse._id || ''));
-
-  const startVideoCheckout = async (course) => {
-    const id = course?.id || course?._id;
-    if (!id) return;
-    try {
-      const res = await api.trainingLms.checkoutVideoCourse(id);
-      if (!res?.success) {
-        toast.error(res?.message || 'Không tạo được thanh toán');
-        return;
-      }
-      if (res.data?.owned) {
-        setOwnedCourseIds((prev) => new Set(prev).add(String(id)));
-        await fetchLessons(id);
-        toast.success('Bạn đã sở hữu khóa này');
-        return;
-      }
-      setPayCheckout({ ...res.data, courseId: String(id), courseTitle: course.title });
-    } catch (e) {
-      toast.error(e?.message || 'Lỗi thanh toán');
-    }
-  };
-
-  const handleVideoCoursePaid = (courseId) => {
-    if (!courseId) return;
-    setOwnedCourseIds((prev) => new Set(prev).add(String(courseId)));
-    fetchLessons(courseId);
-  };
-
-  const videoPayModal = payCheckout ? (
-    <VideoCoursePayModal
-      courseTitle={payCheckout.courseTitle}
-      sessionId={payCheckout.sessionId}
-      refCode={payCheckout.ref}
-      amount={payCheckout.amount}
-      onClose={() => setPayCheckout(null)}
-      onPaid={() => handleVideoCoursePaid(payCheckout.courseId)}
-    />
-  ) : null;
-
   const courseProgressOf = useCallback((course) => {
-    const id = course?.id || course?._id;
+    const id = courseKey(course);
     return Math.max(
       0,
       Math.min(
@@ -1407,6 +1425,182 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       ),
     );
   }, [courseProgressMap]);
+
+  const courseIdAliasesMemo = useCallback((course) => courseIdAliases(course), []);
+
+  const isCourseOwned = useCallback((course) => {
+    if (!course) return false;
+    const price = Math.max(0, Number(course.price) || 0);
+    if (price <= 0) return true;
+    return courseIdAliasesMemo(course).some((id) => ownedCourseIds.has(id));
+  }, [courseIdAliasesMemo, ownedCourseIds]);
+
+  const addOwnedCourseIds = useCallback((courseOrId, prev) => {
+    const merged = new Set(prev);
+    if (typeof courseOrId === 'object' && courseOrId) {
+      courseIdAliasesMemo(courseOrId).forEach((a) => merged.add(a));
+    } else if (courseOrId) {
+      merged.add(String(courseOrId));
+    }
+    return merged;
+  }, [courseIdAliasesMemo]);
+
+  const ownedProbeRef = useRef(new Set());
+
+  // Sau reload: xác minh quyền sở hữu từ API lessons (meta.owned) — server là nguồn tin cậy
+  useEffect(() => {
+    if (!courses.length) return undefined;
+    let cancelled = false;
+    (async () => {
+      const priced = courses.filter((c) => Math.max(0, Number(c.price) || 0) > 0);
+      await Promise.all(priced.map(async (c) => {
+        const id = courseKey(c);
+        if (!id || ownedProbeRef.current.has(id)) return;
+        ownedProbeRef.current.add(id);
+        try {
+          const res = await lmsApiFetch(`/courses/${id}/lessons`);
+          if (cancelled || !res?.meta?.owned) return;
+          setOwnedCourseIds((prev) => addOwnedCourseIds(c, prev));
+        } catch { /* ignore */ }
+      }));
+    })();
+    return () => { cancelled = true; };
+  }, [courses, addOwnedCourseIds]);
+
+  const selectedCoursePrice = Math.max(0, Number(selectedCourse?.price) || 0);
+  const selectedCourseId = selectedCourse ? courseKey(selectedCourse) : '';
+  const lessonsIndicateOwned = useMemo(() => {
+    if (!lessons.length) return false;
+    return lessons.some((l) => l.isUnlocked && !l.paywallLocked && !l.isPreview);
+  }, [lessons]);
+  const selectedCourseOwned = !selectedCourse
+    || isCourseOwned(selectedCourse)
+    || lessonsIndicateOwned;
+  const selectedCoursePending = !selectedCourseOwned && Boolean(pendingByCourseId[selectedCourseId]);
+  const selectedCourseHasProgress = selectedCourse ? courseProgressOf(selectedCourse) > 0 : false;
+  const canContinueLearning = selectedCourseOwned || selectedCourseHasProgress;
+
+  const enterCourseLearning = useCallback(() => {
+    if (!selectedCourse) return;
+    setOwnedCourseIds((prev) => addOwnedCourseIds(selectedCourse, prev));
+    const id = courseKey(selectedCourse);
+    if (id) {
+      setPendingByCourseId((prev) => {
+        if (!prev[id]) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+    setCourseTab('overview');
+    setCatalogInfoTab('content');
+    const first = lessons.find((l) => l.isUnlocked && !l.isCompleted)
+      || lessons.find((l) => l.isUnlocked)
+      || lessons[0];
+    if (first) setCurrentLesson(first);
+  }, [selectedCourse, lessons, addOwnedCourseIds]);
+
+  const startVideoCheckout = async (course) => {
+    const id = courseKey(course);
+    if (!id) return;
+    try {
+      const res = await api.trainingLms.checkoutVideoCourse(id);
+      if (!res?.success) {
+        toast.error(res?.message || 'Không tạo được thanh toán');
+        return;
+      }
+      clearResumePayFromHash();
+      if (res.data?.owned) {
+        setOwnedCourseIds((prev) => addOwnedCourseIds(course, prev));
+        await fetchLessons(id);
+        enterCourseLearning();
+        toast.success('Bạn đã sở hữu khóa này');
+        return;
+      }
+      setPayCheckout({ ...res.data, courseId: String(id), courseTitle: course.title });
+      refreshVideoPurchases();
+    } catch (e) {
+      toast.error(e?.message || 'Lỗi thanh toán');
+    }
+  };
+
+  const handleVideoCoursePaid = async (courseId, { celebrate = false, courseTitle } = {}) => {
+    if (!courseId) return;
+    const id = String(courseId);
+    clearResumePayFromHash();
+    setPayCheckout(null);
+    setOwnedCourseIds((prev) => {
+      const merged = addOwnedCourseIds(id, prev);
+      if (selectedCourse && courseKey(selectedCourse) === id) {
+        return addOwnedCourseIds(selectedCourse, merged);
+      }
+      const hit = courses.find((c) => courseIdAliasesMemo(c).includes(id));
+      return hit ? addOwnedCourseIds(hit, merged) : merged;
+    });
+    setPendingByCourseId((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    await fetchLessons(courseId);
+    await refreshVideoPurchases();
+    try {
+      window.dispatchEvent(new CustomEvent('lms-video-owned-updated', { detail: { courseId: id } }));
+    } catch { /* ignore */ }
+    if (celebrate) {
+      setVideoPurchaseCelebration({
+        courseTitle: courseTitle || selectedCourse?.title || '',
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!purchasesLoaded) return;
+    const resumeId = resumePayCourseIdRef.current;
+    if (!resumeId || !selectedCourse) return;
+    if (selectedCourseId !== resumeId) return;
+    resumePayCourseIdRef.current = null;
+    clearResumePayFromHash();
+    if (selectedCourseOwned) return;
+    if (!pendingByCourseId[selectedCourseId]) return;
+    startVideoCheckout(selectedCourse);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ khi deep-link resumePay + purchases đã load
+  }, [purchasesLoaded, selectedCourse, selectedCourseId, selectedCourseOwned, pendingByCourseId]);
+
+  const videoPayModal = payCheckout ? (
+    <VideoCoursePayModal
+      courseTitle={payCheckout.courseTitle}
+      sessionId={payCheckout.sessionId}
+      refCode={payCheckout.ref}
+      amount={payCheckout.amount}
+      onClose={() => {
+        setPayCheckout(null);
+        clearResumePayFromHash();
+        refreshVideoPurchases();
+      }}
+      onPaid={() => handleVideoCoursePaid(payCheckout.courseId, {
+        celebrate: true,
+        courseTitle: payCheckout.courseTitle,
+      })}
+      onSessionAlreadyPaid={() => handleVideoCoursePaid(payCheckout.courseId, {
+        celebrate: false,
+        courseTitle: payCheckout.courseTitle,
+      })}
+    />
+  ) : null;
+
+  const videoPurchaseCelebrationModal = videoPurchaseCelebration ? (
+    <WelcomeCelebrationOverlay
+      open
+      variant="video_purchase"
+      courseName={videoPurchaseCelebration.courseTitle}
+      onClose={() => {
+        setVideoPurchaseCelebration(null);
+        enterCourseLearning();
+      }}
+    />
+  ) : null;
 
   const courseSubjectOptions = useMemo(() => {
     const ids = new Set();
@@ -1465,7 +1659,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       ? course.chapters.reduce((acc, ch) => acc + (ch.lessons ? ch.lessons.length : 0), 0)
       : ((course.lessons || course.videos || [1]).length);
     const price = Math.max(0, Number(course.price) || 0);
-    const owned = price <= 0 || ownedCourseIds.has(String(course.id || course._id || ''));
+    const owned = isCourseOwned(course);
     const coverSrc = course.coverImage ? resolveMediaUrl(course.coverImage) : '';
     return (
       <div
@@ -1473,7 +1667,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           setSelectedCourse(course);
           setCourseTab('overview');
           setCatalogInfoTab('content');
-          fetchLessons(course.id || course._id);
+          fetchLessons(courseKey(course));
         }}
         key={course.id || course._id}
         className="bg-white rounded-2xl border border-slate-100/90 shadow-sm ring-1 ring-slate-900/5 transition-all duration-200 cursor-pointer group flex flex-col overflow-hidden hover:shadow-xl hover:ring-red-100 lg:hover:-translate-y-1"
@@ -1556,12 +1750,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
             <span
               className={`inline-flex items-center gap-1 shrink-0 min-h-9 px-3 rounded-xl text-[11px] font-black uppercase tracking-wide shadow-sm transition-all ${
-                price > 0 && !owned
-                  ? 'bg-red-600 text-white group-hover:bg-red-700 group-hover:shadow-md'
-                  : 'bg-slate-900 text-white group-hover:bg-red-600 group-hover:shadow-md'
+                owned
+                  ? 'bg-emerald-600 text-white group-hover:bg-emerald-700 group-hover:shadow-md'
+                  : 'bg-red-600 text-white group-hover:bg-red-700 group-hover:shadow-md'
               }`}
             >
-              {price > 0 && !owned ? 'Xem / Mua' : 'Vào học'}
+              {owned ? 'Vào học' : 'Xem / Mua'}
               <ChevronRight size={14} className="opacity-90 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
             </span>
           </div>
@@ -2124,11 +2318,25 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
       </div>
       {videoPayModal}
+      {videoPurchaseCelebrationModal}
       </>
     );
   }
 
   // ── CATALOG / PAYWALL (chưa mua khóa trả phí) ──────────────────────────────
+  if (selectedCourse && !selectedCourseOwned && selectedCoursePrice > 0 && !purchasesLoaded) {
+    return (
+      <div className="w-full min-h-full bg-slate-50 flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <RefreshCw size={28} className="animate-spin text-red-500" />
+          <p className="text-sm font-semibold">Đang kiểm tra quyền truy cập khóa học…</p>
+        </div>
+        {videoPayModal}
+        {videoPurchaseCelebrationModal}
+      </div>
+    );
+  }
+
   if (selectedCourse && !selectedCourseOwned) {
     const canPlayPreview = (l) => {
       if (!l) return false;
@@ -2325,15 +2533,24 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
               </ul>
               <button
                 type="button"
-                onClick={() => startVideoCheckout(selectedCourse)}
-                className="w-full min-h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm"
+                onClick={() => (canContinueLearning ? enterCourseLearning() : startVideoCheckout(selectedCourse))}
+                className={`w-full min-h-12 rounded-xl text-white font-bold text-sm ${
+                  canContinueLearning
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
               >
-                Đăng ký / Thanh toán
+                {canContinueLearning
+                  ? 'Tiếp tục học'
+                  : selectedCoursePending
+                    ? 'Tiếp tục thanh toán'
+                    : 'Đăng ký / Thanh toán'}
               </button>
             </div>
           </aside>
         </div>
         {videoPayModal}
+        {videoPurchaseCelebrationModal}
       </div>
     );
   }
@@ -2573,6 +2790,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       </div>
 
       {videoPayModal}
+      {videoPurchaseCelebrationModal}
 
       <style dangerouslySetInnerHTML={{
         __html: `

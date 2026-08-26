@@ -172,21 +172,43 @@ async function fulfillVideoCoursePurchase({ session, amount, io }) {
 
   const title = purchase?.courseTitle || session.courseName || 'khóa video';
   const studentId = String(sid || purchase?.studentId || '');
+  const paidAmount = Number(amount || session.amount || purchase?.paidAmount || purchase?.amount || 0);
+  const orderRef = String(purchase?.ref || session.ref || '').trim();
+  const orderLabel = String(title || 'Khóa video').trim();
+  const amountText = paidAmount.toLocaleString('vi-VN');
+  const courseIdForLink = String(purchase?.courseId || '');
   try {
     if (io && studentId) {
       await NotificationService.send(io, {
-        type: 'COURSE',
-        title: 'Đăng ký khóa học thành công',
-        content: `Bạn đã thanh toán và mở khóa "${title}". Vào Video học tập để xem.`,
+        type: 'FINANCE',
+        title: 'Thanh toán khóa video thành công',
+        content: `Đã thanh toán đơn mua «${orderLabel}» — ${amountText}đ${orderRef ? ` · Mã CK: ${orderRef}` : ''}. Bấm để vào học ngay.`,
         receivers: studentId,
-        payload: { kind: 'video_course_paid', courseId: purchase?.courseId, purchaseId: String(purchase?._id || '') },
-        link: '/student#materials-videos',
+        payload: {
+          kind: 'video_course_paid',
+          courseId: courseIdForLink,
+          purchaseId: String(purchase?._id || ''),
+          courseTitle: orderLabel,
+          amount: paidAmount,
+          ref: orderRef,
+        },
+        link: courseIdForLink
+          ? `/student#materials-videos?courseId=${encodeURIComponent(courseIdForLink)}`
+          : '/student#materials-videos',
       });
       await NotificationService.notifyAdmins(
         io,
-        'HV đăng ký khóa video',
-        `${session.studentName || 'Học viên'} đã mua khóa "${title}" (${Number(amount || session.amount || 0).toLocaleString('vi-VN')}đ).`,
-        { kind: 'video_course_paid', studentId, courseId: purchase?.courseId },
+        'HV thanh toán khóa video',
+        `${session.studentName || 'Học viên'} đã thanh toán đơn «${orderLabel}» — ${amountText}đ${orderRef ? ` (${orderRef})` : ''}.`,
+        {
+          kind: 'video_course_paid',
+          studentId,
+          courseId: courseIdForLink,
+          courseTitle: orderLabel,
+          amount: paidAmount,
+          ref: orderRef,
+          purchaseId: String(purchase?._id || ''),
+        },
         '/admin#student-training',
       );
       io.to(studentId).emit('videoCourse:paid', {

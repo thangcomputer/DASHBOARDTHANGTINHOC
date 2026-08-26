@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { Sparkles, X, Star } from 'lucide-react';
+import { Sparkles, X, Star, Video } from 'lucide-react';
 import { formatHoaHong, STAR_BONUS_MIN_STARS, STAR_BONUS_MIN_STUDENTS } from '../utils/teacherCommission';
 
 /**
@@ -286,6 +286,7 @@ export default function WelcomeCelebrationOverlay({
   const isTeacher = role === 'teacher';
   const isCourseComplete = variant === 'course_complete';
   const isStarBonus = variant === 'star_bonus';
+  const isVideoPurchase = variant === 'video_purchase';
 
   const bonusAmount = Number(starBonus?.amount) || 0;
   const monthLabel = starBonus?.monthLabel
@@ -297,6 +298,86 @@ export default function WelcomeCelebrationOverlay({
       : '');
   const minHv = Number(starBonus?.minStudents) || STAR_BONUS_MIN_STUDENTS;
   const minStars = Number(starBonus?.minStars) || STAR_BONUS_MIN_STARS;
+
+  if (isVideoPurchase) {
+    return (
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="video-purchase-celebration-title"
+      >
+        <div
+          className="absolute inset-0 z-0 bg-gradient-to-b from-slate-950/80 via-red-950/45 to-slate-950/85"
+          onClick={() => onClose?.()}
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-red-200/35 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.55)]">
+          <div className="relative overflow-hidden bg-gradient-to-br from-red-600 via-rose-600 to-indigo-700 px-6 pt-10 pb-12 text-center text-white">
+            <div className="pointer-events-none absolute -top-16 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-white/20 blur-3xl" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="absolute top-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white/90 hover:bg-white/25 transition"
+              aria-label="Đóng"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="relative mx-auto mb-2 flex h-24 w-24 sm:h-28 sm:w-28 items-center justify-center">
+              <span
+                className="absolute inset-0 rounded-full bg-emerald-300/30 animate-ping opacity-40"
+                style={{ animationDuration: '2s' }}
+                aria-hidden="true"
+              />
+              <span className="absolute inset-2 rounded-full bg-white/20 backdrop-blur-sm" aria-hidden="true" />
+              <Video
+                size={52}
+                className="relative text-white drop-shadow-lg"
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
+            </div>
+
+            <p className="relative text-[11px] font-bold uppercase tracking-[0.28em] text-red-100/90">
+              Trung tâm Tin học Thắng Tin Học
+            </p>
+            <h2
+              id="video-purchase-celebration-title"
+              className="relative mt-3 text-2xl sm:text-[1.75rem] font-black tracking-tight leading-tight"
+            >
+              Chúc mừng đã mua khóa học!
+            </h2>
+            {courseName ? (
+              <p className="relative mt-2 text-sm font-bold text-amber-100 line-clamp-2">
+                {courseName}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="px-6 sm:px-8 py-6 sm:py-7 text-center space-y-4">
+            <p className="text-[15px] leading-relaxed text-slate-600">
+              Thanh toán thành công — toàn bộ bài học đã được mở khóa. Hãy bắt đầu học ngay hôm nay!
+            </p>
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="w-full min-h-12 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-sm font-bold shadow-lg shadow-red-600/25 transition"
+            >
+              Vào học ngay
+            </button>
+          </div>
+        </div>
+
+        <canvas
+          ref={canvasRef}
+          className="pointer-events-none absolute inset-0 z-20"
+          aria-hidden="true"
+        />
+      </div>
+    );
+  }
 
   if (isStarBonus) {
     return (

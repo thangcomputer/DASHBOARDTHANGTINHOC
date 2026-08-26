@@ -13,6 +13,55 @@ export function parseLmsHashQuery(hash = typeof window !== 'undefined' ? window.
   return { section, params };
 }
 
+/** Khóa id thống nhất — tránh lệch giữa course.id và course._id. */
+export function courseKey(courseOrId) {
+  if (courseOrId == null || courseOrId === '') return '';
+  if (typeof courseOrId === 'object') {
+    return String(courseOrId.id || courseOrId._id || '');
+  }
+  return String(courseOrId);
+}
+
+export function courseIdAliases(course) {
+  if (!course) return [];
+  return [...new Set([
+    courseKey(course),
+    String(course.id || ''),
+    String(course._id || ''),
+  ].filter(Boolean))];
+}
+
+const OWNED_CACHE_PREFIX = 'lms_video_owned_';
+
+export function readOwnedVideoCourseCache(studentId) {
+  if (!studentId) return new Set();
+  try {
+    const arr = JSON.parse(localStorage.getItem(`${OWNED_CACHE_PREFIX}${studentId}`) || '[]');
+    return new Set(Array.isArray(arr) ? arr.filter(Boolean) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function writeOwnedVideoCourseCache(studentId, ids) {
+  if (!studentId) return;
+  try {
+    localStorage.setItem(`${OWNED_CACHE_PREFIX}${studentId}`, JSON.stringify([...ids]));
+  } catch { /* ignore */ }
+}
+
+/** Xóa resumePay khỏi hash sau khi đã xử lý — tránh mở lại modal khi reload. */
+export function clearResumePayFromHash(hash = typeof window !== 'undefined' ? window.location.hash : '') {
+  const { section, params } = parseLmsHashQuery(hash);
+  if (params.resumePay !== '1') return;
+  delete params.resumePay;
+  const qs = new URLSearchParams(params).toString();
+  const next = `#${section}${qs ? `?${qs}` : ''}`;
+  if (typeof window !== 'undefined') {
+    window.history.replaceState(null, '', next);
+  }
+}
+
 export function buildLmsDeepLink({ role, courseId, lessonId, qaId, tab = 'qa' }) {
   const q = new URLSearchParams();
   if (courseId) q.set('courseId', String(courseId));
