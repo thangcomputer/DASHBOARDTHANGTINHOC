@@ -1,55 +1,119 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Calendar, ChevronRight, BookOpen, Award, Star, Zap, UserCheck, Clipboard,
-  MessageSquare, GraduationCap, Users, Activity, Video, AlertTriangle, Bell,
-  CheckCircle2, ArrowRight, History
+  Calendar, ChevronRight, Award, Star, Zap, UserCheck, Clipboard,
+  MessageSquare, GraduationCap, Users, Video, Bell, UserPlus,
+  CheckCircle2, ArrowRight, History,
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import api, { blogAPI, resolveMediaUrl } from '../../services/api';
+import { useData } from '../../context/DataContext';
 import TeacherRatingDisplay from './TeacherRatingDisplay';
 import { isScheduleOngoingNow } from '../../utils/scheduleTime';
+import { getClientEnrollments } from '../../utils/enrollments';
+import { STAR_BONUS_MIN_STARS } from '../../utils/teacherCommission';
+import { starsFromRating } from '../../context/useDataRatings';
+
+function formatNotifDate(raw) {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('vi-VN');
+}
+
+function notifTimestamp(n) {
+  const t = new Date(n.time || n.createdAt || n.updatedAt || 0).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
 
 export default function TeacherOverviewTab({
   navigate, totalMonthlyIncome, completed, totalDone, teacherName, currentTeacher,
   teacherRating, students, totalSess, avgGrade, mySchedules = [], myNotifs, RATING_CRITERIA,
+  teacherId,
 }) {
+  const { getNotifications, markNotificationRead, notifications: allNotifications } = useData();
   const [activityTab, setActivityTab] = useState('recent'); // 'recent' | 'announcements'
-  const [centerAnnouncements, setCenterAnnouncements] = useState([
-    {
-      id: 1,
-      title: 'Quy trình Điểm danh & Nhập điểm số tự động ghi nhận nhật ký học viên',
-      date: '01/08/2026',
-      tag: 'Quy định trung tâm',
-    },
-    {
-      id: 2,
-      title: 'Cập nhật tính năng Đổi lịch dạy & Ghi chú trao đổi 2 chiều',
-      date: '28/07/2026',
-      tag: 'Hệ thống LMS',
-    }
-  ]);
+  const [centerAnnouncements, setCenterAnnouncements] = useState([]);
   const [banners, setBanners] = useState([]);
   const [bannerSpeed, setBannerSpeed] = useState(5);
+
+  const meId = String(teacherId || currentTeacher?.id || currentTeacher?._id || '');
+
+  const systemNotifications = useMemo(() => {
+    const fromGet = typeof getNotifications === 'function' ? (getNotifications(meId, 'teacher') || []) : [];
+    const pool = (Array.isArray(allNotifications) && allNotifications.length)
+      ? allNotifications
+      : fromGet;
+
+    const filtered = (pool || []).filter((n) => {
+      if (!n) return false;
+      if (Array.isArray(n.receivers) && n.receivers.length > 0) {
+        const recs = n.receivers.map((r) => String(r));
+        const isForMe = (meId && recs.includes(meId))
+          || recs.includes('teacher')
+          || recs.includes('ALL_TEACHER')
+          || recs.includes('GLOBAL')
+          || recs.includes('ALL');
+        if (!isForMe) return false;
+      }
+      return ((meId && String(n.userId) === meId) || !n.userId)
+        && (n.role === 'teacher' || !n.role);
+    });
+
+    return filtered
+      .slice()
+      .sort((a, b) => notifTimestamp(b) - notifTimestamp(a))
+      .slice(0, 12)
+      .map((n) => ({
+        id: `notif-${n.id || n._id}`,
+        source: 'system',
+        title: n.title || n.message || 'Thông báo',
+        date: formatNotifDate(n.time || n.createdAt),
+        tag: n.read ? 'Đã xem' : 'Chưa đọc',
+        unread: !n.read,
+        path: n.path || '',
+        notifId: n.id || n._id,
+        payload: n.payload,
+        timestamp: notifTimestamp(n),
+      }));
+  }, [allNotifications, getNotifications, meId]);
 
   useEffect(() => {
     let unmounted = false;
     if (blogAPI?.list) {
       blogAPI.list({ limit: 6, target: 'teacher' })
         .then(res => {
-          if (!unmounted && res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          if (unmounted) return;
+          if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
             setCenterAnnouncements(res.data.map(p => ({
-              id: p.id || p._id,
+              id: `blog-${p.id || p._id}`,
+              source: 'blog',
               title: p.title,
               date: p.publishedAt ? new Date(p.publishedAt).toLocaleDateString('vi-VN') : '',
-              tag: p.targetAudience === 'teacher' ? 'Dành cho Giảng viên' : 'Thông báo chung',
+              tag: p.targetAudience === 'teacher' ? 'Tin trung tâm' : 'Thông báo chung',
               slug: p.slug,
+              timestamp: p.publishedAt ? new Date(p.publishedAt).getTime() : 0,
             })));
+          } else {
+            setCenterAnnouncements([]);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          if (!unmounted) setCenterAnnouncements([]);
+        });
     }
     return () => { unmounted = true; };
   }, []);
+
+  const announcementFeed = useMemo(() => {
+    return [...systemNotifications, ...centerAnnouncements]
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, 15);
+  }, [systemNotifications, centerAnnouncements]);
+
+  const unreadNotifCount = useMemo(
+    () => systemNotifications.filter((n) => n.unread).length,
+    [systemNotifications],
+  );
 
   // Fetch Banners
   useEffect(() => {
@@ -81,11 +145,6 @@ export default function TeacherOverviewTab({
   const ongoingSchedule = useMemo(() => {
     return (mySchedules || []).find(s => s.status === 'scheduled' && isScheduleOngoingNow(s));
   }, [mySchedules]);
-
-  // Filter students needing attention (grade < 5 or missing grade)
-  const attentionStudents = useMemo(() => {
-    return (students || []).filter(s => !s.lastGrade || s.lastGrade < 5);
-  }, [students]);
 
   // Generate real dynamic activity logs from teacher's actions
   const teacherActivities = useMemo(() => {
@@ -138,8 +197,71 @@ export default function TeacherOverviewTab({
     });
 
     // Sort by timestamp descending
-    return list.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+    return list.sort((a, b) => b.timestamp - a.timestamp).slice(0, 8);
   }, [mySchedules, students]);
+
+  /** HV mới gắn với GV trong 30 ngày (theo registeredAt enrollment / createdAt). */
+  const newStudents30d = useMemo(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const tid = String(teacherId || meId || '');
+    const seen = new Set();
+    let count = 0;
+    for (const s of students || []) {
+      const studentKey = String(s._id || s.id || '');
+      if (!studentKey || seen.has(studentKey)) continue;
+
+      const enrs = getClientEnrollments(s).filter((e) => {
+        if (!tid) return true;
+        return String(e.teacherId || '') === tid;
+      });
+      const times = enrs
+        .map((e) => new Date(e.registeredAt || 0).getTime())
+        .filter((t) => Number.isFinite(t) && t > 0);
+      const fallback = new Date(s.registeredAt || s.createdAt || 0).getTime();
+      if (Number.isFinite(fallback) && fallback > 0) times.push(fallback);
+      const newest = times.length ? Math.max(...times) : 0;
+      if (newest >= cutoff) {
+        seen.add(studentKey);
+        count += 1;
+      }
+    }
+    return count;
+  }, [students, teacherId, meId]);
+
+  /** Số lượt đánh giá ≥5★; Đạt khi đủ ngưỡng thưởng sao (mặc định 5). */
+  const fiveStarStats = useMemo(() => {
+    const ratings = Array.isArray(teacherRating?.ratings) ? teacherRating.ratings : [];
+    const fiveStarCount = ratings.filter((r) => starsFromRating(r) >= 5).length;
+    const need = STAR_BONUS_MIN_STARS;
+    return {
+      count: fiveStarCount,
+      need,
+      achieved: fiveStarCount >= need,
+    };
+  }, [teacherRating]);
+
+  const openAnnouncementItem = (item) => {
+    if (item.source === 'system') {
+      if (item.notifId && typeof markNotificationRead === 'function') {
+        markNotificationRead(item.notifId);
+      }
+      if (item.payload?.action === 'blog_published' && item.payload?.slug) {
+        navigate(`/teacher/news/${item.payload.slug}`);
+        return;
+      }
+      if (item.payload?.kind === 'teacher_assigned' || item.payload?.kind === 'student_assigned') {
+        navigate('/teacher#students');
+        return;
+      }
+      if (item.path) {
+        navigate(item.path);
+        return;
+      }
+      navigate('/teacher/notifications');
+      return;
+    }
+    navigate(item.slug ? `/teacher/news/${item.slug}` : '/teacher/news');
+  };
 
   return (
     <div className="py-3 sm:py-5 md:py-6 space-y-4 sm:space-y-5 md:space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0 max-w-full overflow-x-hidden pb-4">
@@ -287,14 +409,50 @@ export default function TeacherOverviewTab({
       {/* ── Stats Summary Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { icon: Users, label: 'Đang dạy', value: students.length, sub: 'học viên', color: 'from-indigo-500 to-indigo-600', bg: 'bg-indigo-50' },
-          { icon: BookOpen, label: 'Lộ trình', value: `${totalDone}/${totalSess}`, sub: 'tổng số buổi', color: 'from-violet-500 to-purple-600', bg: 'bg-violet-50' },
-          { icon: Award, label: 'Điểm TB', value: avgGrade, sub: '/ 10 điểm', color: 'from-amber-500 to-orange-500', bg: 'bg-orange-50' },
-          { icon: Star, label: 'Uy tín', value: teacherRating.avg, sub: `${teacherRating.count} đánh giá`, color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
-        ].map(({ icon: Icon, label, value, sub, color, bg }) => (
+          {
+            icon: Users,
+            label: 'Đang dạy',
+            value: students.length,
+            sub: 'học viên',
+            color: 'from-indigo-500 to-indigo-600',
+            bg: 'bg-indigo-50',
+            onClick: () => navigate('/teacher#students'),
+          },
+          {
+            icon: UserPlus,
+            label: 'HV mới',
+            value: newStudents30d,
+            sub: 'trong 30 ngày',
+            color: 'from-violet-500 to-purple-600',
+            bg: 'bg-violet-50',
+            onClick: () => navigate('/teacher#students'),
+          },
+          {
+            icon: Award,
+            label: '5 sao',
+            value: `${fiveStarStats.count}/${fiveStarStats.need}`,
+            sub: fiveStarStats.achieved ? 'Đạt ngưỡng thưởng' : 'Chưa đạt',
+            subClass: fiveStarStats.achieved ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold',
+            color: 'from-amber-500 to-orange-500',
+            bg: 'bg-orange-50',
+            onClick: () => navigate('/teacher#students'),
+          },
+          {
+            icon: Star,
+            label: 'Uy tín',
+            value: teacherRating.avg || '—',
+            sub: `${teacherRating.count || 0} đánh giá`,
+            color: 'from-emerald-500 to-teal-500',
+            bg: 'bg-emerald-50',
+          },
+        ].map(({ icon: Icon, label, value, sub, subClass, color, bg, onClick }) => (
           <div
             key={label}
-            className="bg-white rounded-2xl p-3.5 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all group overflow-hidden relative min-w-0"
+            role={onClick ? 'button' : undefined}
+            tabIndex={onClick ? 0 : undefined}
+            onClick={onClick}
+            onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+            className={`bg-white rounded-2xl p-3.5 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all group overflow-hidden relative min-w-0 ${onClick ? 'cursor-pointer' : ''}`}
           >
             <div className={`absolute -right-3 -bottom-3 w-14 h-14 sm:w-20 sm:h-20 ${bg} rounded-full opacity-40 group-hover:scale-125 transition-transform duration-500 pointer-events-none`} aria-hidden="true" />
             <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-2.5 sm:mb-3.5 shadow-sm relative z-10`}>
@@ -303,7 +461,7 @@ export default function TeacherOverviewTab({
             </div>
             <p className="text-xs sm:text-sm font-bold text-slate-600 uppercase tracking-wide mb-0.5 relative z-10">{label}</p>
             <p className="text-lg sm:text-2xl md:text-3xl font-black text-slate-800 relative z-10 truncate tabular-nums">{value}</p>
-            <p className="text-xs font-medium text-slate-500 mt-1 relative z-10">{sub}</p>
+            <p className={`text-xs font-medium mt-1 relative z-10 ${subClass || 'text-slate-500'}`}>{sub}</p>
           </div>
         ))}
       </div>
@@ -476,7 +634,7 @@ export default function TeacherOverviewTab({
                   onClick={() => setActivityTab('announcements')}
                   className={`flex-1 sm:flex-none px-2 py-1.5 rounded-md transition cursor-pointer whitespace-nowrap ${activityTab === 'announcements' ? 'bg-white text-indigo-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                  Thông báo ({centerAnnouncements.length})
+                  Thông báo ({announcementFeed.length}{unreadNotifCount > 0 ? ` · ${unreadNotifCount} mới` : ''})
                 </button>
               </div>
             </div>
@@ -515,19 +673,27 @@ export default function TeacherOverviewTab({
               </div>
             )}
 
-            {/* TAB 2: Center Announcements */}
+            {/* TAB 2: Thông báo hệ thống (chuông) + tin blog trung tâm */}
             {activityTab === 'announcements' && (
               <div className="flex-1 overflow-y-auto pr-1 space-y-2">
-                {centerAnnouncements.map((item) => (
+                {announcementFeed.map((item) => (
                   <div
                     key={item.id}
-                    onClick={() => navigate(item.slug ? `/teacher/news/${item.slug}` : '/teacher/news')}
-                    className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-300 hover:bg-blue-50/50 transition flex items-center justify-between gap-2 cursor-pointer group"
+                    onClick={() => openAnnouncementItem(item)}
+                    className={`p-2.5 rounded-xl border transition flex items-center justify-between gap-2 cursor-pointer group ${
+                      item.unread
+                        ? 'bg-amber-50/80 border-amber-200 hover:border-amber-300'
+                        : 'bg-slate-50 border-slate-100 hover:border-blue-300 hover:bg-blue-50/50'
+                    }`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700">
-                          {item.tag}
+                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                          item.source === 'system'
+                            ? (item.unread ? 'bg-amber-100 text-amber-800' : 'bg-violet-100 text-violet-700')
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {item.source === 'system' ? (item.unread ? 'Thông báo mới' : 'Hệ thống') : item.tag}
                         </span>
                         <span className="text-[10px] text-slate-400 font-medium">{item.date}</span>
                       </div>
@@ -536,29 +702,31 @@ export default function TeacherOverviewTab({
                     <ChevronRight size={14} className="text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition shrink-0" />
                   </div>
                 ))}
+                {announcementFeed.length === 0 && (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-xs font-medium py-4 gap-2">
+                    <Bell size={18} className="text-slate-300" />
+                    Chưa có thông báo nào.
+                    <button
+                      type="button"
+                      onClick={() => navigate('/teacher/notifications')}
+                      className="text-indigo-600 font-bold hover:underline"
+                    >
+                      Mở trung tâm thông báo
+                    </button>
+                  </div>
+                )}
+                {announcementFeed.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/teacher/notifications')}
+                    className="w-full text-center text-[11px] font-bold text-indigo-600 hover:underline py-1"
+                  >
+                    Xem tất cả thông báo →
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
-
-          {/* Card 3: Cảnh báo & Lưu ý học viên */}
-          {attentionStudents.length > 0 && (
-            <div className="bg-amber-50/80 rounded-2xl border border-amber-200/80 p-3.5 sm:p-4 space-y-2">
-              <div className="flex items-center gap-2 text-amber-800">
-                <AlertTriangle size={16} className="text-amber-600 shrink-0" />
-                <h4 className="text-xs sm:text-sm font-black">Học viên cần lưu ý điểm số ({attentionStudents.length})</h4>
-              </div>
-              <p className="text-[11px] text-amber-700 font-medium">
-                Các học viên sau chưa có điểm bài nộp hoặc điểm trung bình cần được cải thiện:
-              </p>
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {attentionStudents.map((st) => (
-                  <span key={`${st.id}_${st.courseId || st.course || ''}`} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 shadow-2xs">
-                    👤 {st.name} ({st.course})
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
         </div>
 
@@ -599,26 +767,6 @@ export default function TeacherOverviewTab({
                   <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg flex-shrink-0">
                     {s.startTime}
                   </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Tóm tắt hoạt động */}
-          <div className="bg-gradient-to-br from-slate-800 to-zinc-900 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <Activity size={15} className="text-sky-400 shrink-0" aria-hidden="true" />
-              <h4 className="font-bold text-xs sm:text-sm">Tóm tắt hoạt động</h4>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:gap-2.5">
-              {[
-                { label: 'Tổng buổi dạy đã hoàn thành', value: mySchedules.filter((s) => s.status === 'completed').length, color: 'text-emerald-400' },
-                { label: 'Đánh giá trung bình', value: `${teacherRating?.avg || '—'} ★`, color: 'text-amber-300' },
-                { label: 'HV đã hoàn thành KH', value: completed, color: 'text-sky-400' },
-              ].map((item) => (
-                <div key={item.label} className="flex justify-between items-center gap-3 text-[11px] sm:text-xs">
-                  <span className="text-slate-400 min-w-0">{item.label}</span>
-                  <span className={`font-black tabular-nums shrink-0 ${item.color}`}>{item.value}</span>
                 </div>
               ))}
             </div>

@@ -630,6 +630,7 @@ const TeacherDashboard = ({ onNavigate }) => {
             mySchedules={mySchedules}
             myNotifs={myNotifs}
             RATING_CRITERIA={RATING_CRITERIA}
+            teacherId={TEACHER_ID}
           />
         )}
       </div>
