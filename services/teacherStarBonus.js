@@ -1,15 +1,14 @@
 /**
  * Thưởng sao GV (tách khỏi lương cứng / buổi):
- * - Trong 1 tháng: hướng dẫn ≥ MIN_STUDENTS học viên (distinct, lịch completed)
- * - VÀ điểm sao trung bình cộng dồn từ đánh giá HV ≥ MIN_STARS
+ * - Trong 1 tháng: ≥ MIN_STUDENTS học viên distinct đánh giá ≥ MIN_STARS★
+ * - Điểm TB (avgStars) vẫn tính cộng dồn toàn thời gian — chỉ để hiển thị uy tín, không chặn thưởng
  * → thưởng theo customStarBonusAmount của GV (fallback BONUS_PER_MONTH) / tháng.
  */
 
 const mongoose = require('mongoose');
-const Schedule = require('../models/Schedule');
 const Evaluation = require('../models/Evaluation');
 
-const MIN_STUDENTS = 15;
+const MIN_STUDENTS = 5;
 const MIN_STARS = 5;
 const BONUS_PER_MONTH = 200000;
 const MAX_LOOKBACK_MONTHS = 24;
@@ -80,21 +79,37 @@ async function getCumulativeRating(teacherId) {
   return { avgStars, ratingCount: count };
 }
 
-async function countUniqueStudentsInMonth(teacherId, year, month) {
+/**
+ * Số HV distinct đã đánh giá ≥ MIN_STARS★ trong tháng (theo createdAt).
+ */
+async function countFiveStarStudentsInMonth(teacherId, year, month) {
   const oid = toObjectId(teacherId);
   if (!oid) return 0;
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 1);
 
-  const rows = await Schedule.aggregate([
+  const rows = await Evaluation.aggregate([
     {
       $match: {
-        teacherId: oid,
-        status: 'completed',
-        date: { $gte: start, $lt: end },
+        targetTeacherId: oid,
+        type: 'teacher_rating',
         studentId: { $ne: null },
+        createdAt: { $gte: start, $lt: end },
       },
     },
+    {
+      $addFields: {
+        _stars: {
+          $convert: {
+            input: '$criteria.stars',
+            to: 'double',
+            onError: null,
+            onNull: null,
+          },
+        },
+      },
+    },
+    { $match: { _stars: { $gte: MIN_STARS } } },
     { $group: { _id: '$studentId' } },
     { $count: 'n' },
   ]);
@@ -109,12 +124,12 @@ async function resolveLookbackStart(teacherId, teacher) {
   let start = teacher?.startDate ? new Date(teacher.startDate) : null;
   if (!start || Number.isNaN(start.getTime())) {
     const first = oid
-      ? await Schedule.findOne({ teacherId: oid, status: 'completed' })
-          .sort({ date: 1 })
-          .select('date')
+      ? await Evaluation.findOne({ targetTeacherId: oid, type: 'teacher_rating' })
+          .sort({ createdAt: 1 })
+          .select('createdAt')
           .lean()
       : null;
-    start = first?.date ? new Date(first.date) : fallback;
+    start = first?.createdAt ? new Date(first.createdAt) : fallback;
   }
 
   const minStart = new Date();
@@ -145,7 +160,6 @@ async function computeStarBonusSummary(teacher) {
   );
 
   const { avgStars, ratingCount } = await getCumulativeRating(teacherId);
-  const starsOk = avgStars >= MIN_STARS;
   const bonusPerMonth = resolveBonusAmount(teacher);
 
   const from = await resolveLookbackStart(teacherId, teacher);
@@ -157,8 +171,8 @@ async function computeStarBonusSummary(teacher) {
     if (paidSet.has(ym)) continue;
     const parsed = parseMonthKey(ym);
     if (!parsed) continue;
-    const studentsCount = await countUniqueStudentsInMonth(teacherId, parsed.year, parsed.month);
-    const eligible = studentsCount >= MIN_STUDENTS && starsOk;
+    const studentsCount = await countFiveStarStudentsInMonth(teacherId, parsed.year, parsed.month);
+    const eligible = studentsCount >= MIN_STUDENTS;
     if (!eligible) continue;
     unpaidMonths.push({
       month: ym,
@@ -179,7 +193,7 @@ async function computeStarBonusSummary(teacher) {
     bonusPerMonth,
     unpaidMonths,
     unpaidBonusTotal,
-    ruleLabel: `≥${MIN_STUDENTS} HV/tháng và ≥${MIN_STARS}★ (cộng dồn) → thưởng ${bonusPerMonth.toLocaleString('vi-VN')}đ/tháng`,
+    ruleLabel: `≥${MIN_STUDENTS} HV đạt ${MIN_STARS}★ trong tháng → thưởng ${bonusPerMonth.toLocaleString('vi-VN')}đ/tháng`,
   };
 }
 
@@ -209,6 +223,7 @@ module.exports = {
   computeStarBonusSummary,
   resolveBonusForPayout,
   getCumulativeRating,
+  countFiveStarStudentsInMonth,
   monthKey,
   resolveBonusAmount,
 };

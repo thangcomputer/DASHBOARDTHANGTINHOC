@@ -132,7 +132,7 @@ const TeacherSchema = new mongoose.Schema(
     // Mức tiền thưởng sao hàng tháng khi đạt mốc đánh giá
     customStarBonusAmount: { type: Number, default: 200000, min: 0 },
 
-    /** Các tháng YYYY-MM đã chi thưởng sao (≥10 HV + ≥5★ → 200k/tháng) */
+    /** Các tháng YYYY-MM đã chi thưởng sao (≥5 HV đạt 5★ trong tháng → thưởng/tháng) */
     starBonusPaidMonths: { type: [String], default: [] },
 
 

@@ -260,8 +260,7 @@ export default function AddTeacherModal({
                       })}
                     </p>
                     <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                      Dữ liệu lấy từ đánh giá học viên (sao cộng dồn) và số HV đã dạy trong tháng.
-                      Đủ điều kiện thì cộng thêm khi chi lương; chưa chi thì tích lại.
+                      Đếm số HV distinct đánh giá ≥5★ trong từng tháng. Đủ điều kiện thì cộng thêm khi chi lương; chưa chi thì tích lại. Điểm uy tín TB vẫn tính cộng dồn toàn thời gian.
                     </p>
                   </div>
                 </div>

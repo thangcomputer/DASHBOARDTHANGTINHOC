@@ -173,7 +173,7 @@ async function maybeNotifyStarBonusEligibility(io, teacherId) {
         type: 'FINANCE',
         title: '⭐ Đã đạt mốc thưởng sao',
         content: `Bạn đã đủ điều kiện thưởng sao ${monthLabel}`
-          + ` (≥${summary.minStudents} HV + ≥${summary.minStars}★).`
+          + ` (≥${summary.minStudents} HV đạt ${summary.minStars}★ trong tháng).`
           + ` Mức ${formatVnd(amount)} sẽ được cộng khi Admin chi lương tháng đó.`,
         receivers: tid,
         payload: {

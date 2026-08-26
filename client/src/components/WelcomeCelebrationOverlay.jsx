@@ -369,7 +369,7 @@ export default function WelcomeCelebrationOverlay({
               Bạn đã đủ điều kiện thưởng sao
               {monthLabel ? ` ${monthLabel}` : ''}
               {' '}
-              (≥{minHv} HV · ≥{minStars}★).
+              (≥{minHv} HV đạt {minStars}★ trong tháng).
             </p>
 
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-yellow-50 px-4 py-5">
