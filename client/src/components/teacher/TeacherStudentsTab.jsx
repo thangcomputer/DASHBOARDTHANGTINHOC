@@ -60,7 +60,7 @@ export default function TeacherStudentsTab({
   cancelSchedule,
 }) {
   return (
-          <div className="py-1 sm:py-4 md:py-6 min-h-0 flex-1 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:min-h-0 lg:overflow-hidden min-w-0 w-full max-w-full">
+          <div className="py-1 sm:py-4 md:py-6 min-h-0 flex-1 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:min-h-0 overflow-y-auto overscroll-y-contain lg:overflow-hidden min-w-0 w-full max-w-full">
             
             {/* CỘT 1: DANH SÁCH HỌC VIÊN (Sidebar) */}
             <div className="w-full lg:w-80 xl:w-96 lg:h-full flex flex-col bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden shrink-0 min-w-0 min-h-0 max-lg:flex-none">
