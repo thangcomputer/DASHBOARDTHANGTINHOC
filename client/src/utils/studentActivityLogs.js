@@ -37,6 +37,21 @@ function formatTimeVi(raw) {
   return new Date(ms).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 
+const MILESTONE_LABEL_VI = {
+  lesson_1: 'Buổi đầu tiên',
+  course_end: 'Đánh giá cuối khóa',
+  course_end_center: 'Đánh giá trung tâm (cuối khóa)',
+  course_end_teacher: 'Đánh giá giảng viên (cuối khóa)',
+  manual_feedback: 'Phản hồi tự nguyện',
+  mid_course: 'Mốc 50% khóa',
+};
+
+function milestoneLabelVi(milestone) {
+  const key = String(milestone || '').trim();
+  if (!key) return '';
+  return MILESTONE_LABEL_VI[key] || key;
+}
+
 /** Nhãn ngày giờ thao tác: "14:32 · 16/8/2026" (không bịa 00:00 khi chỉ có ngày) */
 function formatActedAtLabel(raw, fallbackTime = '') {
   const t = String(fallbackTime || '').trim();
@@ -389,7 +404,9 @@ export function buildStudentActivityLogs({
   (evaluations || []).forEach((ev, eIdx) => {
     if (String(ev.studentId?._id || ev.studentId || '') !== sid) return;
     const at = ev.updatedAt || ev.createdAt || ev.date;
-    const kind = ev.type === 'teacher_rating' ? 'HV đánh giá GV' : (ev.milestone ? `Cột mốc: ${ev.milestone}` : 'Đánh giá');
+    const kind = ev.type === 'teacher_rating'
+      ? 'HV đánh giá GV'
+      : (ev.milestone ? `Cột mốc: ${milestoneLabelVi(ev.milestone)}` : 'Đánh giá');
     const score = ev.criteria && typeof ev.criteria === 'object'
       ? (() => {
           const vals = Object.values(ev.criteria).map(Number).filter((n) => Number.isFinite(n));
