@@ -106,6 +106,9 @@ async function resolveSessionOrdinalForSchedule(studentDoc, schedule) {
  */
 async function refreshScheduleSessionPreview(schedule) {
   if (!schedule) return schedule;
+  // Ca đã completed: sessionOrdinalPreview = buổi vừa tính (finalDone).
+  // Không đẩy lên done+1 — đó là buổi kế tiếp, làm thông báo GV hiện 2 khi HV vừa xác nhận buổi 1.
+  if (String(schedule.status || '') === 'completed') return schedule;
   const sid = schedule.studentId?._id || schedule.studentId;
   if (!sid) return schedule;
   const student = await Student.findById(sid)
