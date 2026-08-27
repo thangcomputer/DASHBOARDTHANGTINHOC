@@ -7,6 +7,7 @@ import DOMPurify from 'dompurify';
 import {
   Newspaper, Search, Plus, Loader2, Eye, Calendar, User, ChevronLeft,
   ImagePlus, Paperclip, Send, Save, EyeOff, Trash2, RefreshCw, X, FileText,
+  LayoutGrid, List,
 } from 'lucide-react';
 import { resolveMediaUrl, blogAPI } from '../services/api';
 import { applyAnchorNewTabPolicy } from '../utils/htmlContent';
@@ -39,16 +40,31 @@ function statusClass(s) {
 }
 
 const selectClass = 'bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-red-100 focus-visible:border-red-500';
+const NEWS_VIEW_KEY = 'cms-news-view';
 
-function NewsCard({ post, basePath, onOpen }) {
+function readNewsView() {
+  try {
+    return localStorage.getItem(NEWS_VIEW_KEY) === 'list' ? 'list' : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
+
+function NewsCard({ post, onOpen, variant = 'grid' }) {
   const thumb = post.thumbnailUrl ? resolveMediaUrl(post.thumbnailUrl) : null;
+  const isList = variant === 'list';
   return (
     <button
       type="button"
       onClick={() => onOpen(post)}
-      className="group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-red-100 transition-all duration-200 flex flex-col h-full w-full"
+      className={`group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-red-100 transition-all duration-200 w-full ${
+        isList ? 'flex flex-row items-stretch min-h-[7.5rem]' : 'flex flex-col h-full'
+      }`}
     >
-      <div className="relative aspect-video bg-slate-100 overflow-hidden w-full">
+      <div className={`relative bg-slate-100 overflow-hidden shrink-0 ${
+        isList ? 'w-[7.5rem] sm:w-40 self-stretch min-h-[7.5rem]' : 'aspect-video w-full'
+      }`}
+      >
         {thumb ? (
           <img
             src={thumb}
@@ -56,34 +72,36 @@ function NewsCard({ post, basePath, onOpen }) {
             className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50/80 p-4">
-            <Newspaper size={36} strokeWidth={1.5} />
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50/80 p-3">
+            <Newspaper size={isList ? 22 : 36} strokeWidth={1.5} />
           </div>
         )}
         {post.isNew && (
-          <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black tracking-wide shadow-sm">
+          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black tracking-wide shadow-sm">
             NEW
           </span>
         )}
-        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black tracking-wide shadow-sm">
-          {post.targetAudience === 'teacher' ? '👨‍🏫 Giảng viên' : post.targetAudience === 'student' ? '🎓 Học viên' : '🌐 Tất cả'}
-        </span>
+        {!isList && (
+          <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black tracking-wide shadow-sm">
+            {post.targetAudience === 'teacher' ? '👨‍🏫 Giảng viên' : post.targetAudience === 'student' ? '🎓 Học viên' : '🌐 Tất cả'}
+          </span>
+        )}
         {post.topicName ? (
-          <span className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-white/90 text-slate-700 text-[10px] font-bold shadow-sm">
+          <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-white/90 text-slate-700 text-[10px] font-bold shadow-sm">
             {post.topicName}
           </span>
         ) : null}
       </div>
-      <div className="p-3.5 sm:p-4 flex flex-col flex-1 gap-2 min-w-0">
-        <h3 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-red-600 transition-colors">
+      <div className={`flex flex-col flex-1 gap-1.5 min-w-0 ${isList ? 'p-3' : 'p-3.5 sm:p-4 gap-2'}`}>
+        <h3 className={`font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-red-600 transition-colors ${isList ? 'text-sm' : 'text-sm sm:text-base'}`}>
           {post.title}
         </h3>
         {post.excerpt ? (
-          <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 leading-relaxed flex-1">{post.excerpt}</p>
+          <p className={`text-slate-500 line-clamp-2 leading-relaxed ${isList ? 'text-xs flex-1' : 'text-xs sm:text-sm flex-1'}`}>{post.excerpt}</p>
         ) : (
           <div className="flex-1" />
         )}
-        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 font-medium pt-2 border-t border-slate-100 min-w-0 mt-auto">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 font-medium pt-1.5 border-t border-slate-100 min-w-0 mt-auto">
           <span className="truncate flex items-center gap-1 min-w-0 flex-1">
             <User size={12} className="shrink-0 text-slate-400" />
             <span className="truncate">{post.authorName || 'Admin'}</span>
@@ -559,6 +577,7 @@ export default function NewsPage({ session, role = 'admin' }) {
   const [sortFilter, setSortFilter] = useState('newest');
   const [periodFilter, setPeriodFilter] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
+  const [newsView, setNewsView] = useState(readNewsView);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [detailError, setDetailError] = useState('');
@@ -963,7 +982,7 @@ export default function NewsPage({ session, role = 'admin' }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 w-full">
-        <div className="relative flex-1 min-w-[12rem]">
+        <div className="relative w-52 sm:w-56 shrink-0">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={qInput}
@@ -982,6 +1001,32 @@ export default function NewsPage({ session, role = 'admin' }) {
         >
           Tìm
         </button>
+        {mode !== 'manage' && (
+          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 shrink-0">
+            <button
+              type="button"
+              title="Xem lưới"
+              onClick={() => {
+                setNewsView('grid');
+                try { localStorage.setItem(NEWS_VIEW_KEY, 'grid'); } catch { /* ignore */ }
+              }}
+              className={`p-2 rounded-lg ${newsView === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              type="button"
+              title="Xem dọc"
+              onClick={() => {
+                setNewsView('list');
+                try { localStorage.setItem(NEWS_VIEW_KEY, 'list'); } catch { /* ignore */ }
+              }}
+              className={`p-2 rounded-lg ${newsView === 'list' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <List size={15} />
+            </button>
+          </div>
+        )}
         <CmsSelect
           value={topicFilter}
           onChange={(e) => setTopicFilter(e.target.value)}
@@ -1147,9 +1192,9 @@ export default function NewsPage({ session, role = 'admin' }) {
           </ul>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className={newsView === 'list' ? 'flex flex-col gap-3' : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'}>
           {items.map((p) => (
-            <NewsCard key={p.id} post={p} basePath={base} onOpen={openPost} />
+            <NewsCard key={p.id} post={p} onOpen={openPost} variant={newsView} />
           ))}
         </div>
       )}
