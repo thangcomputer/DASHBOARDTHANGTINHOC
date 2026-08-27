@@ -178,7 +178,14 @@ function EditorForm({ initial, onSaved, onCancel }) {
       const items = await uploadRaw(list);
       const imgs = items.filter((i) => i.kind === 'image');
       if (!imgs.length) throw new Error('Chỉ hỗ trợ ảnh để chèn vào bài');
-      imgs.forEach((img) => editorRef.current?.insertImage(img.url, img.name || ''));
+      imgs.forEach((img) => {
+        const inserted = editorRef.current?.insertImage?.(img.url, img.name || '');
+        if (!inserted) {
+          const src = String(img.url || '').replace(/"/g, '&quot;');
+          const alt = String(img.name || '').replace(/"/g, '&quot;');
+          setContentHtml((prev) => `${prev || ''}<p><img src="${src}" alt="${alt}" style="max-width:100%;height:auto;border-radius:12px" /></p><p><br></p>`);
+        }
+      });
       toast.success(`Đã chèn ${imgs.length} ảnh vào bài`);
     } catch (err) {
       toast.error(err.message || 'Chèn ảnh thất bại');
@@ -366,7 +373,6 @@ function EditorForm({ initial, onSaved, onCancel }) {
               ref={editorRef}
               value={contentHtml}
               onChange={setContentHtml}
-              disabled={busy}
               onRequestImage={() => inlineImgRef.current?.click()}
             />
             <input ref={inlineImgRef} type="file" accept="image/*" multiple className="hidden" onChange={onInlineImagePick} />

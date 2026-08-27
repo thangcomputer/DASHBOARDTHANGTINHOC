@@ -30,13 +30,6 @@ function ToolbarBtn({ onClick, title, children, disabled, active }) {
   );
 }
 
-function escAttr(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;');
-}
-
 function extractUploadsPath(src) {
   const raw = String(src || '').trim();
   if (!raw) return '';
@@ -184,39 +177,52 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
     setTimeout(checkActiveStates, 20);
   };
 
-  const insertFragment = (html) => {
+  const insertFragment = (frag) => {
     const el = elRef.current;
-    if (!el) return;
+    if (!el || !frag) return false;
+    el.setAttribute('contenteditable', 'true');
     el.focus();
     const sel = window.getSelection();
     const range = savedRange.current;
-    const canRestore = range && el.contains(range.commonAncestorContainer);
-    if (canRestore && sel) {
-      sel.removeAllRanges();
-      sel.addRange(range);
-      const temp = document.createElement('div');
-      temp.innerHTML = html;
-      const frag = document.createDocumentFragment();
-      while (temp.firstChild) frag.appendChild(temp.firstChild);
-      const live = sel.getRangeAt(0);
-      live.deleteContents();
-      live.insertNode(frag);
-      live.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(live);
-      savedRange.current = live.cloneRange();
-      return;
-    }
-    el.insertAdjacentHTML('beforeend', html);
+    const canRestore = !!(range && el.contains(range.commonAncestorContainer) && sel);
+    try {
+      if (canRestore) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+        const live = sel.getRangeAt(0);
+        live.deleteContents();
+        live.insertNode(frag);
+        live.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(live);
+        savedRange.current = live.cloneRange();
+        return true;
+      }
+    } catch { /* file dialog làm selection hỏng — chèn cuối bài */ }
+    el.appendChild(frag);
+    return true;
   };
 
   const insertImageAtCursor = (url, alt = '') => {
-    if (!url || disabled) return;
+    const el = elRef.current;
+    if (!url || !el) return false;
     const stored = extractUploadsPath(url) || String(url).trim();
     const display = resolveMediaUrl(stored) || stored;
-    const html = `<p><img src="${escAttr(display)}" data-cms-src="${escAttr(stored)}" alt="${escAttr(alt)}" style="max-width:100%;height:auto;border-radius:12px" /></p><p><br></p>`;
-    insertFragment(html);
+    const wrap = document.createElement('p');
+    const img = document.createElement('img');
+    img.setAttribute('src', display);
+    img.setAttribute('data-cms-src', stored);
+    if (alt) img.setAttribute('alt', alt);
+    img.setAttribute('style', 'max-width:100%;height:auto;border-radius:12px');
+    wrap.appendChild(img);
+    const after = document.createElement('p');
+    after.appendChild(document.createElement('br'));
+    const frag = document.createDocumentFragment();
+    frag.appendChild(wrap);
+    frag.appendChild(after);
+    insertFragment(frag);
     emit();
+    return true;
   };
 
   useImperativeHandle(ref, () => ({
