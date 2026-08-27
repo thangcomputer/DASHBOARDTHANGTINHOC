@@ -1,14 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { mutate } from 'swr';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { Printer, Download } from 'lucide-react';
+import { Printer, Download, Camera } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useModal } from '../../../utils/Modal.jsx';
 import InvoicePreviewFrame from '../../InvoicePreviewFrame';
-import exportPDF, { printInvoice } from '../../../utils/exportPDF';
+import exportPDF, { printInvoice, captureAndSendZalo } from '../../../utils/exportPDF';
 import { parseQuestionBankExcel } from '../../../utils/studentQuestionsExcel';
 import { studentToExcelRow } from '../../../utils/studentImportExportColumns';
 import api from '../../../services/api';
@@ -194,6 +194,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         teacherId: student.teacherId,
         branchId: student.branchId,
         reservedStudentCode: student.reservedStudentCode,
+        teacherAlert: student.teacherAlert,
       });
       toast.success('Đã thêm học viên thành công!');
 
@@ -232,6 +233,18 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
                   className="flex-1 min-w-[120px] py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all"
                 >
                   ĐÓNG
+                </button>
+                <button
+                  type="button"
+                  onClick={() => captureAndSendZalo({
+                    zalo: student.zalo,
+                    phone: student.phone,
+                    studentName: student.name,
+                    courseName: student.course,
+                  })}
+                  className="w-full py-3.5 bg-[#0068FF] text-white font-bold rounded-xl shadow-lg hover:bg-[#0054d1] transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                >
+                  <Camera size={18} /> Chụp và gửi Zalo
                 </button>
               </div>
             </div>

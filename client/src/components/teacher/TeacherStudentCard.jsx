@@ -1097,6 +1097,18 @@ export const StudentCard = ({
         </div>
         </div>
 
+        {String(student.teacherAlert || '').trim() ? (
+          <div className="mx-3 mb-0 sm:mx-8 md:mx-10 mt-3 rounded-xl sm:rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 sm:px-4 sm:py-3">
+            <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-wide text-amber-700 flex items-center gap-1.5">
+              <AlertCircle size={13} className="shrink-0" aria-hidden="true" />
+              Lưu ý từ Admin
+            </p>
+            <p className="text-xs sm:text-sm font-semibold text-amber-950 mt-1 whitespace-pre-wrap break-words leading-snug">
+              {String(student.teacherAlert).trim()}
+            </p>
+          </div>
+        ) : null}
+
         {/* Tabs — Tiến độ, Bài tập, Tạo TN, Link học, Đánh giá, Nhật ký */}
         <div className="grid grid-cols-6 w-full bg-white border-b border-slate-100 min-w-0">
           {panels.map(({ key, icon: Icon, label }) => (

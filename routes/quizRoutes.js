@@ -176,6 +176,21 @@ router.get('/:id', [authMiddleware, ...quizzesGuard('get')], async (req, res) =>
     const studentId = req.user.id || req.user._id;
     const mySub = (quiz.submissions || []).find(s => String(s.studentId) === String(studentId));
 
+    // Chỉ khi đã nộp (không phải thoát giữa giờ) mới gửi chi tiết xem lại
+    let detailedReview = [];
+    if (mySub && !mySub.forfeit) {
+      const answers = Array.isArray(mySub.answers) ? mySub.answers : [];
+      detailedReview = (quiz.questions || []).map((q, idx) => ({
+        _id: q._id,
+        questionText: q.questionText,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        userAnswer: answers[idx] ?? null,
+        isCorrect: answers[idx] === q.correctAnswer,
+        explanation: q.explanation || '',
+      }));
+    }
+
     return res.json({
       success: true,
       data: {
@@ -186,6 +201,7 @@ router.get('/:id', [authMiddleware, ...quizzesGuard('get')], async (req, res) =>
         timeLimitMinutes: quiz.timeLimitMinutes,
         questions: safeQuestions,
         mySubmission: mySub || null,
+        detailedReview,
       },
     });
   } catch (err) {

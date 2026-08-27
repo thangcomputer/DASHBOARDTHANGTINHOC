@@ -115,6 +115,7 @@ function assertEndAfterStart(startTime, endTime) {
 /** Thông báo điểm danh: HV + Admin (GV nào · HV nào · buổi thứ mấy). */
 async function notifyAttendanceTaken(io, {
   studentId, studentName, teacherName, course, date,
+  extraPayload = null,
 }) {
   if (!io || !studentId) return;
   const NotificationService = require('../services/NotificationService');
@@ -165,6 +166,7 @@ async function notifyAttendanceTaken(io, {
   const gv = teacherName || 'Giảng viên';
   const courseLabel = courseName || student?.course || 'khóa học';
   const progress = `${completedSessions}/${totalRequired}`;
+  const extras = extraPayload && typeof extraPayload === 'object' ? extraPayload : {};
 
   await NotificationService.send(io, {
     type: 'SCHEDULE',
@@ -172,13 +174,15 @@ async function notifyAttendanceTaken(io, {
     content: `${gv} đã điểm danh bạn ngày ${notifDate} (${courseLabel} · buổi ${progress}).`,
     receivers: String(studentId),
     payload: {
+      ...extras,
       kind: 'attendance_taken',
       studentId: String(studentId),
-      course: courseLabel,
+      course: extras.course || courseLabel,
       completedSessions,
       totalRequired,
-      sessionNumber: completedSessions,
-      totalSessions: totalRequired,
+      sessionNumber: extras.sessionNumber || completedSessions,
+      totalSessions: extras.totalSessions || totalRequired,
+      teacherName: extras.teacherName || gv,
     },
     link: '/student#schedule',
   });
@@ -570,6 +574,7 @@ function buildAttendanceConfirmPayload(sch) {
     sessionNumber: sch.sessionOrdinalPreview || null,
     totalSessions: sch.sessionTotalPreview || null,
     studentConfirmStatus: sch.studentConfirmStatus || 'none',
+    studentConfirmedAt: sch.studentConfirmedAt || null,
     note: sch.attendancePendingNote || sch.note || '',
   };
 }
@@ -895,6 +900,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
             teacherName: teacherName || schedule.teacherName || req.user?.name,
             course: courseFinal,
             date,
+            extraPayload: buildAttendanceConfirmPayload(schedule),
           }).catch((e) => logger.warn('[SCHEDULE] attendance notify:', e.message));
           checkAndUnlockExam(studentId.toString(), io, courseFinal)
             .catch((e) => logger.warn('[SCHEDULE] unlock after create:', e.message));
@@ -1067,6 +1073,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
             teacherName: result.schedule.teacherName || req.user?.name,
             course: result.schedule.course,
             date: result.schedule.date,
+            extraPayload: buildAttendanceConfirmPayload(result.schedule),
           }).catch((e) => logger.warn('[SCHEDULE] attendance notify:', e.message));
 
           if (isAdminMakeup && result.schedule.teacherId) {
@@ -1297,6 +1304,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
           teacherName: schedule.teacherName || req.user?.name,
           course: schedule.course,
           date: schedule.date,
+          extraPayload: buildAttendanceConfirmPayload(updated || schedule),
         }).catch((e) => logger.warn('[SCHEDULE] attendance notify:', e.message));
       }
       await checkAndUnlockExam(schedule.studentId.toString(), io, schedule.course);
@@ -1443,6 +1451,7 @@ router.post('/:scheduleId/student-confirm', [authMiddleware], async (req, res) =
         teacherName: sch.teacherName || sch.teacherId?.name,
         course: sch.course,
         date: sch.date,
+        extraPayload: payload,
       }).catch(() => {});
 
       if (tid) {
@@ -1567,6 +1576,7 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
         teacherName: sch.teacherName || sch.teacherId?.name,
         course: sch.course,
         date: sch.date,
+        extraPayload: payload,
       }).catch(() => {});
 
       const okMsg = `Admin đã chấp thuận buổi ${payload.sessionNumber || '?'} — buổi được tính vào tiến độ và lương.`;

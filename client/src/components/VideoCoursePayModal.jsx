@@ -187,7 +187,7 @@ export default function VideoCoursePayModal({
             </div>
           ) : !qrUrl ? (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3.5">
-              Chưa cấu hình tài khoản ngân hàng trung tâm (Admin → Cài đặt). Không tạo được QR.
+              Chưa cấu hình tài khoản ngân hàng trung tâm (Admin › Cài đặt). Không tạo được QR.
             </p>
           ) : (
             <div className="flex flex-col items-center">

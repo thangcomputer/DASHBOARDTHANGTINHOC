@@ -1109,7 +1109,7 @@ export default function AdminStudentsTab() {
               <div className="min-w-0">
                 <h3 className="text-base font-black text-slate-800">Hoàn học phí</h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5 leading-snug">
-                  Hủy khóa + hoàn tiền · HV vẫn hiện trong danh sách (mờ). Muốn mất hẳn: menu ⋮ → Xóa học viên, hoặc nút &quot;Dọn HV hủy khóa&quot;.
+                  Hủy khóa + hoàn tiền · HV vẫn hiện trong danh sách (mờ). Muốn mất hẳn: menu ⋮ › Xóa học viên, hoặc nút &quot;Dọn HV hủy khóa&quot;.
                 </p>
               </div>
             </div>

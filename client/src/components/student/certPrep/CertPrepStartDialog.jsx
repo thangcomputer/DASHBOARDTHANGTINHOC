@@ -41,7 +41,7 @@ export default function CertPrepStartDialog({
                 <p className="text-sm font-bold text-slate-900">Hiện đáp án đúng / sai khi làm bài</p>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                   {immediate
-                    ? 'Nút «Hiển thị đáp án» → xem đúng/sai, rồi đổi thành «Câu tiếp theo» để sang câu khác.'
+                    ? 'Nút «Hiển thị đáp án» › xem đúng/sai, rồi đổi thành «Câu tiếp theo» để sang câu khác.'
                     : 'Nút luôn là «Câu tiếp theo». Chỉ xem đúng/sai sau khi nộp bài.'}
                 </p>
               </div>

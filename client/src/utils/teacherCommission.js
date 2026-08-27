@@ -18,5 +18,5 @@ export function formatStarBonusRule(bonus = {}) {
   const minHv = Number(bonus.minStudents) || STAR_BONUS_MIN_STUDENTS;
   const minStars = Number(bonus.minStars) || STAR_BONUS_MIN_STARS;
   const amt = Number(bonus.bonusPerMonth) || STAR_BONUS_AMOUNT;
-  return `≥${minHv} HV đạt ${minStars}★ trong tháng → thưởng ${formatHoaHong(amt)}/tháng`;
+  return `≥${minHv} HV đạt ${minStars}★ trong tháng › thưởng ${formatHoaHong(amt)}/tháng`;
 }

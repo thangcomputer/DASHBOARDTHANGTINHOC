@@ -193,7 +193,7 @@ async function computeStarBonusSummary(teacher) {
     bonusPerMonth,
     unpaidMonths,
     unpaidBonusTotal,
-    ruleLabel: `≥${MIN_STUDENTS} HV đạt ${MIN_STARS}★ trong tháng → thưởng ${bonusPerMonth.toLocaleString('vi-VN')}đ/tháng`,
+    ruleLabel: `≥${MIN_STUDENTS} HV đạt ${MIN_STARS}★ trong tháng › thưởng ${bonusPerMonth.toLocaleString('vi-VN')}đ/tháng`,
   };
 }
 

@@ -1,15 +1,54 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   Calendar, ChevronRight, Award, Star, Zap, UserCheck, Clipboard,
-  MessageSquare, GraduationCap, Users, Video, UserPlus, Wallet,
+  MessageSquare, GraduationCap, Users, Video, UserPlus, Wallet, Clock, ExternalLink,
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import api, { resolveMediaUrl } from '../../services/api';
 import TeacherRatingDisplay from './TeacherRatingDisplay';
-import { isScheduleOngoingNow } from '../../utils/scheduleTime';
+import {
+  isScheduleOngoingNow,
+  getScheduleDisplayKind,
+  normalizeScheduleDate,
+} from '../../utils/scheduleTime';
 import { getClientEnrollments } from '../../utils/enrollments';
 import { STAR_BONUS_MIN_STUDENTS, STAR_BONUS_MIN_STARS } from '../../utils/teacherCommission';
 import { starsFromRating } from '../../context/useDataRatings';
+
+function scheduleStudentId(sch) {
+  return String(sch?.studentId?._id || sch?.studentId?.id || sch?.studentId || '');
+}
+
+function formatSessionDayLabel(date) {
+  const d = date ? new Date(date) : null;
+  if (!d || Number.isNaN(d.getTime())) return { weekday: '', dateLabel: '' };
+  return {
+    weekday: d.toLocaleDateString('vi-VN', { weekday: 'long', timeZone: 'Asia/Ho_Chi_Minh' }),
+    dateLabel: d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }),
+  };
+}
+
+function getNextScheduleForStudent(schedules, student, now = new Date()) {
+  const sid = String(student?._id || student?.id || '');
+  if (!sid) return null;
+  const course = String(student?.course || '').trim().toLowerCase();
+  const list = (schedules || []).filter((s) => {
+    if (String(s?.status || '') !== 'scheduled') return false;
+    if (scheduleStudentId(s) !== sid) return false;
+    if (course) {
+      const sc = String(s.course || '').trim().toLowerCase();
+      if (sc && sc !== course) return false;
+    }
+    const kind = getScheduleDisplayKind(s, now);
+    return kind === 'upcoming' || kind === 'ongoing';
+  });
+  list.sort((a, b) => {
+    const ka = `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`;
+    const kb = `${normalizeScheduleDate(b.date)}-${b.startTime || ''}`;
+    return ka.localeCompare(kb);
+  });
+  return list[0] || null;
+}
 
 export default function TeacherOverviewTab({
   navigate, totalMonthlyIncome, completed, totalDone, teacherName, currentTeacher,
@@ -18,8 +57,14 @@ export default function TeacherOverviewTab({
 }) {
   const [banners, setBanners] = useState([]);
   const [bannerSpeed, setBannerSpeed] = useState(5);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const meId = String(teacherId || currentTeacher?.id || currentTeacher?._id || '');
+
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   // Fetch Banners
   useEffect(() => {
@@ -46,8 +91,30 @@ export default function TeacherOverviewTab({
 
   // Check if there is a live schedule right now
   const ongoingSchedule = useMemo(() => {
-    return (mySchedules || []).find(s => s.status === 'scheduled' && isScheduleOngoingNow(s));
-  }, [mySchedules]);
+    void nowTick;
+    return (mySchedules || []).find((s) => s.status === 'scheduled' && isScheduleOngoingNow(s));
+  }, [mySchedules, nowTick]);
+
+  const nextSessions = useMemo(() => {
+    void nowTick;
+    const now = new Date();
+    return (students || [])
+      .map((student) => {
+        const sch = getNextScheduleForStudent(mySchedules, student, now);
+        if (!sch) return null;
+        const live = isScheduleOngoingNow(sch, now);
+        const { weekday, dateLabel } = formatSessionDayLabel(sch.date);
+        const joinUrl = sch.linkHoc || student.linkHoc || '';
+        return { student, sch, live, weekday, dateLabel, joinUrl };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.live !== b.live) return a.live ? -1 : 1;
+        const ka = `${normalizeScheduleDate(a.sch.date)}-${a.sch.startTime || ''}`;
+        const kb = `${normalizeScheduleDate(b.sch.date)}-${b.sch.startTime || ''}`;
+        return ka.localeCompare(kb);
+      });
+  }, [students, mySchedules, nowTick]);
 
   /** HV mới gắn với GV trong 30 ngày (theo registeredAt enrollment / createdAt). */
   const newStudents30d = useMemo(() => {
@@ -252,7 +319,12 @@ export default function TeacherOverviewTab({
             icon: Wallet,
             label: `Thu nhập tháng ${new Date().getMonth() + 1}`,
             value: `${(Number(totalMonthlyIncome) || 0).toLocaleString('vi-VN')}đ`,
-            sub: 'Chi tiết thu nhập →',
+            sub: (
+              <span className="inline-flex items-center gap-0.5">
+                Chi tiết thu nhập
+                <ChevronRight size={12} aria-hidden="true" />
+              </span>
+            ),
             color: 'from-sky-500 to-cyan-600',
             bg: 'bg-sky-50',
             onClick: () => navigate('/teacher/finance'),
@@ -315,7 +387,7 @@ export default function TeacherOverviewTab({
       </div>
 
       {/* ── 3 cột: HV / Lịch / Đánh giá ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 items-start">
 
         {/* Cột 1: Học viên được phân công — hiện ~5, scroll thêm */}
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
@@ -327,9 +399,10 @@ export default function TeacherOverviewTab({
             <button
               type="button"
               onClick={() => navigate('/teacher#students')}
-              className="text-[11px] font-bold text-indigo-600 hover:underline shrink-0 cursor-pointer"
+              className="text-[11px] font-bold text-indigo-600 hover:underline shrink-0 cursor-pointer inline-flex items-center gap-0.5"
             >
-              Xem chi tiết →
+              Xem chi tiết
+              <ChevronRight size={12} aria-hidden="true" />
             </button>
           </div>
 
@@ -384,7 +457,94 @@ export default function TeacherOverviewTab({
           </div>
         </div>
 
-        {/* Cột 2: Lịch dạy sắp tới — hiện ~7, scroll thêm */}
+        {/* Cột 2: Ca tiếp theo — giờ, thứ/ngày, link hướng dẫn, nhấp nháy khi đến ca */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
+          <div className="flex items-center justify-between gap-2 min-w-0 pb-2 border-b border-slate-100 shrink-0">
+            <h3 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2 min-w-0">
+              <Clock size={18} className="text-red-600 shrink-0" aria-hidden="true" />
+              <span className="truncate">Ca tiếp theo ({nextSessions.length})</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => navigate('/teacher#schedule')}
+              className="text-[11px] font-bold text-red-600 hover:underline shrink-0 cursor-pointer inline-flex items-center gap-0.5"
+            >
+              Lịch dạy
+              <ChevronRight size={12} aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="space-y-2.5 max-h-[25rem] overflow-y-auto overscroll-contain pr-1 min-h-0">
+            {nextSessions.map(({ student, sch, live, weekday, dateLabel, joinUrl }) => {
+              const enrollmentKey = student._enrollmentKey || student._id || student.id;
+              const timeRange = sch.endTime ? `${sch.startTime} - ${sch.endTime}` : (sch.startTime || '—');
+              return (
+                <div
+                  key={`${enrollmentKey}-${sch._id || sch.id}`}
+                  className={`rounded-xl p-3 border transition ${
+                    live
+                      ? 'bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white border-red-400/40 shadow-md shadow-red-500/20 animate-pulse'
+                      : 'bg-slate-50/80 border-slate-100 hover:border-red-200'
+                  }`}
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      {live && (
+                        <p className="text-[10px] font-black uppercase tracking-wider text-red-100 flex items-center gap-1.5 mb-1">
+                          <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                          </span>
+                          Đang diễn ra
+                        </p>
+                      )}
+                      <p className={`text-xs sm:text-sm font-bold truncate ${live ? 'text-white' : 'text-slate-800'}`}>
+                        {student.name || sch.studentName || 'Học viên'}
+                      </p>
+                      <p className={`text-[10px] sm:text-xs truncate ${live ? 'text-red-100' : 'text-slate-400'}`}>
+                        {student.course || sch.course || ''}
+                      </p>
+                      <p className={`text-xs font-black tabular-nums mt-1 ${live ? 'text-yellow-200' : 'text-red-600'}`}>
+                        {timeRange}
+                      </p>
+                      <p className={`text-[10px] font-semibold capitalize ${live ? 'text-red-100' : 'text-slate-500'}`}>
+                        {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}
+                      </p>
+                    </div>
+                    {joinUrl ? (
+                      <a
+                        href={joinUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide ${
+                          live
+                            ? 'bg-white text-red-600 hover:bg-red-50 shadow'
+                            : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
+                      >
+                        <ExternalLink size={11} aria-hidden="true" />
+                        Vào lớp
+                      </a>
+                    ) : (
+                      <span className={`shrink-0 text-[10px] font-semibold ${live ? 'text-red-100' : 'text-slate-400'}`}>
+                        Chưa có link
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {nextSessions.length === 0 && (
+              <div className="py-6 text-center text-slate-400 text-xs font-medium">
+                Chưa có ca dạy sắp tới.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Cột 3: Lịch dạy sắp tới — hiện ~7, scroll thêm */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col min-w-0 w-full">
           <div className="px-4 sm:px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0">
             <h4 className="font-bold text-slate-700 text-xs sm:text-sm flex items-center gap-2 min-w-0">
@@ -394,9 +554,10 @@ export default function TeacherOverviewTab({
             <button
               type="button"
               onClick={() => navigate('/teacher#schedule')}
-              className="text-[10px] sm:text-xs text-indigo-600 font-bold hover:underline shrink-0 cursor-pointer"
+              className="text-[10px] sm:text-xs text-indigo-600 font-bold hover:underline shrink-0 cursor-pointer inline-flex items-center gap-0.5"
             >
-              Xem tất cả →
+              Xem tất cả
+              <ChevronRight size={12} aria-hidden="true" />
             </button>
           </div>
           <div className="divide-y divide-slate-50 max-h-[25.5rem] overflow-y-auto overscroll-contain pr-1 min-h-0">

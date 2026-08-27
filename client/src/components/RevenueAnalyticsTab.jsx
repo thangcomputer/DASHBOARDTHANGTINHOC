@@ -520,7 +520,7 @@ export default function RevenueAnalyticsTab() {
           {enrollment?.byCourse?.length > 0 && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h3 className="font-black text-gray-700 mb-1">Đăng ký theo khóa học</h3>
-              <p className="text-[11px] text-gray-400 mb-4">Đếm lượt enrollment/khóa (một HV nhiều khóa → tổng có thể &gt; số HV)</p>
+              <p className="text-[11px] text-gray-400 mb-4">Đếm lượt enrollment/khóa (một HV nhiều khóa › tổng có thể &gt; số HV)</p>
               <div className="space-y-2">
                 {enrollment.byCourse.slice(0, 6).map((c, i) => {
                   const maxCount = enrollment.byCourse[0]?.count || 1;

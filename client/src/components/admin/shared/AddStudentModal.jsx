@@ -48,7 +48,8 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
   const [form, setForm] = useState({
     name: '', age: '', phone: '', zalo: '', gender: 'male',
     courseId: '', course: '', price: 0, totalSessions: 12,
-    paid: false, teacherId: '', learningMode: 'OFFLINE', branchId: '', branchCode: ''
+    paid: false, teacherId: '', learningMode: 'OFFLINE', branchId: '', branchCode: '',
+    teacherAlert: '',
   });
 
   // Fetch courses from DB
@@ -727,6 +728,20 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
                 {!toBranchId(form.branchId) && (teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').length === 0 && (
                   <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên Active để phân công.</p>
                 )}
+              </div>
+
+              <div>
+                <label className="cms-label">Lưu ý cho giảng viên</label>
+                <textarea
+                  name="teacherAlert"
+                  value={form.teacherAlert}
+                  onChange={handleChange}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="VD: Học chậm, cần ôn Word, học buổi tối..."
+                  className="cms-input min-h-[4.5rem] resize-y"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">GV thấy ngay khi mở hồ sơ học viên. Không bắt buộc.</p>
               </div>
             </section>
           </div>

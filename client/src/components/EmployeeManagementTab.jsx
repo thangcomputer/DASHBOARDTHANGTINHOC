@@ -10,6 +10,7 @@ import {
   CheckCircle2, Calendar, ClipboardList,
   Briefcase, Loader2, AlertCircle, X, CreditCard, QrCode
 } from 'lucide-react';
+import NavArrow from './ui/NavArrow';
 import { useBranch } from '../context/BranchContext';
 import { useSocket } from '../context/SocketContext';
 import { csrfFetch } from '../services/api';
@@ -865,8 +866,9 @@ export default function EmployeeManagementTab() {
                         Nhân viên này chưa cập nhật thông tin ngân hàng. Vui lòng cập nhật hồ sơ để sử dụng mã QR.
                       </p>
                       <button type="button" onClick={() => { setShowPayModal(null); openEdit(showPayModal); }}
-                        className="mt-3 min-h-11 text-xs text-red-600 font-bold hover:underline">
-                        → Cập nhật hồ sơ ngay
+                        className="mt-3 min-h-11 text-xs text-red-600 font-bold hover:underline inline-flex items-center justify-center gap-0.5 mx-auto">
+                        Cập nhật hồ sơ ngay
+                        <NavArrow size={14} className="text-red-600" />
                       </button>
                     </div>
                   )}

@@ -152,7 +152,7 @@ export default function CertPrepCourseList({
         </table>
       </div>
       <p className="text-xs text-slate-500 px-1">
-        Export/Import Excel theo môn (Level → Đề → Câu). Tick «Ghi đè» trước khi chọn file nếu muốn vô hiệu câu cũ rồi nhập lại.
+        Export/Import Excel theo môn (Level › Đề › Câu). Tick «Ghi đè» trước khi chọn file nếu muốn vô hiệu câu cũ rồi nhập lại.
       </p>
       <CertPrepConfirmDialog
         open={confirmReplace}

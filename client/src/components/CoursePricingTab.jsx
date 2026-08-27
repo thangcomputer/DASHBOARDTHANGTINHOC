@@ -754,7 +754,7 @@ export default function CoursePricingTab() {
         <AlertCircle size={15} className="flex-shrink-0 mt-0.5 text-amber-600" />
         <span>
           <strong className="font-semibold">Lưu ý giá cũ:</strong> Học viên đã đăng ký trước giữ nguyên giá cũ.
-          Điều chỉnh từng học viên → Quản lý Học viên.
+          Điều chỉnh từng học viên › Quản lý Học viên.
         </span>
       </div>
 

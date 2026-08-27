@@ -43,6 +43,7 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
     price: 0,
     totalSessions: 12,
     paid: false,
+    teacherAlert: '',
   });
 
   const [bankInfo, setBankInfo] = useState(null);
@@ -89,6 +90,7 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
       price: Number(form.price) || 0,
       totalSessions: Number(form.totalSessions) || courseDefaultSessions(selected),
       paid: !!paid,
+      teacherAlert: String(form.teacherAlert || '').trim(),
     };
   };
 
@@ -471,6 +473,19 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
                       );
                     })}
                 </CmsSelect>
+              </div>
+
+              <div>
+                <label className="cms-label">Lưu ý cho giảng viên</label>
+                <textarea
+                  value={form.teacherAlert}
+                  onChange={(e) => setForm((f) => ({ ...f, teacherAlert: e.target.value }))}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="VD: Học chậm, cần ôn Word, học buổi tối..."
+                  className="cms-input min-h-[4.5rem] resize-y"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">GV thấy ngay khi mở hồ sơ khóa này. Không bắt buộc.</p>
               </div>
 
               <div className="cms-form-row">

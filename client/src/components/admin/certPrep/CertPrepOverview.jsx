@@ -12,7 +12,7 @@ export default function CertPrepOverview({ courses }) {
       </div>
       <div className="cms-card col-span-2 sm:col-span-1">
         <p className="text-xs font-bold text-slate-500 uppercase">Luồng quản lý</p>
-        <p className="text-sm font-semibold text-slate-700 mt-1">Khóa → Level → Đề → Câu hỏi</p>
+        <p className="text-sm font-semibold text-slate-700 mt-1">Khóa › Level › Đề › Câu hỏi</p>
       </div>
     </div>
   );

@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 const { resolveExamSubjectsForCourse } = require('./examSubjectCatalog');
 
+function sanitizeTeacherAlert(raw) {
+  return String(raw || '').trim().slice(0, 500);
+}
+
 function teacherIdStr(teacherId) {
   if (!teacherId) return '';
   if (typeof teacherId === 'object') return String(teacherId._id || teacherId.id || '');
@@ -126,6 +130,7 @@ function toClientCourse(enrollment, index) {
     isPrimary: enrollment.isPrimary,
     requireWebcam: enrollment.requireWebcam !== false,
     examUnlocked: enrollment.examUnlocked === true,
+    teacherAlert: sanitizeTeacherAlert(enrollment.teacherAlert),
     cancelledAt: enrollment.cancelledAt || null,
     cancelReason: enrollment.cancelReason || '',
     refundedAmount: Number(enrollment.refundedAmount) || 0,
@@ -433,6 +438,7 @@ function expandStudentsForTeacher(students, teacherId) {
           linkHoc: enr.linkHoc || student.linkHoc,
           nextClass: enr.nextClass || student.nextClass,
           nextClassTime: enr.nextClassTime || student.nextClassTime,
+          teacherAlert: sanitizeTeacherAlert(enr.teacherAlert),
           avgGrade: enr.avgGrade ?? student.avgGrade,
           paid: enr.paid ?? student.paid,
           price: enr.price ?? student.price,
@@ -584,6 +590,7 @@ module.exports = {
   expandStudentsForTeacher,
   applyReEnrollmentAfterPayment,
   teacherIdStr,
+  sanitizeTeacherAlert,
   resolveEnrollmentExamSubjects,
   recordAttendanceGrade,
   normCourseName,

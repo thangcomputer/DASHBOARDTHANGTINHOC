@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CmsSelect from './ui/CmsSelect';
 import { Plus, Clipboard, FileText, Download, CheckCircle, Clock, XCircle, Search } from 'lucide-react';
+import NavArrow from './ui/NavArrow';
 import { useLocation } from 'react-router-dom';
 import api, { resolveMediaUrl, buildMediaDownloadUrl } from '../services/api';
 import { getGradeTextClasses } from '../utils/gradeColors';
@@ -362,7 +363,10 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
                 <p className="text-xs text-slate-500 font-semibold mb-1">Đang chấm cho:</p>
                 <p className="font-bold text-slate-800">{gradingSubmission.studentId?.name}</p>
-                <a href={gradingSubmission.submittedFileUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 hover:underline mt-2 inline-block">Xem bài làm &rarr;</a>
+                <a href={gradingSubmission.submittedFileUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 hover:underline mt-2 inline-flex items-center gap-0.5">
+                  Xem bài làm
+                  <NavArrow size={14} className="text-blue-600" />
+                </a>
               </div>
               
               <div>

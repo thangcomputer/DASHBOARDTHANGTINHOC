@@ -141,7 +141,7 @@ export function mapGetUserMediaError(err) {
     return {
       code: 'denied',
       message: 'Camera bị từ chối. Cho phép quyền camera trong trình duyệt rồi thử lại.',
-      guide: 'Chrome/Edge: biểu tượng khóa trên URL → Quyền trang web → Camera → Cho phép. Firefox: Quyền → Camera.',
+      guide: 'Chrome/Edge: biểu tượng khóa trên URL › Quyền trang web › Camera › Cho phép. Firefox: Quyền › Camera.',
     };
   }
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {

@@ -3,13 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import CmsSelect from './ui/CmsSelect';
 import {
   CreditCard, User, Phone, BookOpen, GraduationCap, CheckCircle,
-  Printer, Download, LayoutDashboard, ArrowLeft, Loader2, AlertCircle,
+  Printer, Download, Camera, LayoutDashboard, ArrowLeft, Loader2, AlertCircle,
   Clock, RefreshCw, XCircle
 } from 'lucide-react';
+import NavArrow from './ui/NavArrow';
 import { useData } from '../context/DataContext';
 import InvoiceTemplate from './InvoiceTemplate';
 import InvoicePreviewFrame from './InvoicePreviewFrame';
-import exportPDF, { printInvoice } from '../utils/exportPDF';
+import exportPDF, { printInvoice, captureAndSendZalo } from '../utils/exportPDF';
 import { generateVietQRUrl } from './BankSelect';
 import { useModal } from '../utils/Modal.jsx';
 import { useToast } from '../utils/toast.jsx';
@@ -77,9 +78,10 @@ function ExpiredOverlay({ onBack }) {
         </p>
         <button
           onClick={onBack}
-          className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3.5 rounded-2xl hover:from-red-700 transition shadow-lg"
+          className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3.5 rounded-2xl hover:from-red-700 transition shadow-lg inline-flex items-center justify-center gap-1"
         >
-          ← Quay lại nhập thông tin
+          <NavArrow size={18} direction="back" className="text-white" />
+          Quay lại nhập thông tin
         </button>
       </div>
     </div>
@@ -323,6 +325,18 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                         className="flex-1 min-w-[120px] py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center justify-center"
                       >
                         ĐÓNG
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => captureAndSendZalo({
+                          zalo: formData.zalo,
+                          phone: formData.zalo,
+                          studentName: formData.name,
+                          courseName: formData.course,
+                        })}
+                        className="w-full py-3.5 bg-[#0068FF] text-white font-bold rounded-xl shadow-lg hover:bg-[#0054d1] transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Camera size={18} /> Chụp và gửi Zalo
                       </button>
                     </div>
                   </div>
@@ -630,8 +644,9 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                 )}
 
                 <button onClick={handleNext} disabled={!formData.course || coursesLoading}
-                  className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50">
-                  TIẾP TỤC THANH TOÁN →
+                  className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
+                  TIẾP TỤC THANH TOÁN
+                  <NavArrow size={20} className="text-white" />
                 </button>
               </div>
             )}
@@ -674,7 +689,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                     <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold text-amber-800 text-sm">Chưa cấu hình ngân hàng</p>
-                      <p className="text-amber-600 text-xs mt-1">Admin vào <strong>Cài đặt hệ thống → Tài khoản Thu học phí</strong>.</p>
+                      <p className="text-amber-600 text-xs mt-1">Admin vào <strong>Cài đặt hệ thống › Tài khoản Thu học phí</strong>.</p>
                     </div>
                   </div>
                 ) : (

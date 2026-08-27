@@ -123,7 +123,7 @@ export default function ResetPasswordOtpModal({ modal, onClose }) {
   };
 
   const guideMessage = otpResult
-    ? `[THẮNG TIN HỌC] Admin đã cấp OTP đặt lại mật khẩu cho bạn.\n⏱ Hiệu lực 2 phút.\nVào: dashboard.thangtinhoc.edu.vn → Quên mật khẩu → Nhập OTP nhận được qua Zalo/email.`
+    ? `[THẮNG TIN HỌC] Admin đã cấp OTP đặt lại mật khẩu cho bạn.\n⏱ Hiệu lực 2 phút.\nVào: dashboard.thangtinhoc.edu.vn › Quên mật khẩu › Nhập OTP nhận được qua Zalo/email.`
     : '';
 
   const roleLabel = isTeacher ? 'giảng viên' : 'học viên';

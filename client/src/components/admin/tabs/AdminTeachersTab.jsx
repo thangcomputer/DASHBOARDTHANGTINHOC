@@ -527,7 +527,7 @@ export default function AdminTeachersTab() {
                   <li>Tải file về hoặc mở xem trực tiếp</li>
                   <li>Kiểm tra nội dung bài làm</li>
                   <li>Đối chiếu yêu cầu đề bài</li>
-                  <li>Nếu đạt → xác nhận bên dưới</li>
+                  <li>Nếu đạt › xác nhận bên dưới</li>
                 </ol>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">

@@ -7,6 +7,17 @@ import {
   isScreenCaptureSupported,
 } from '../utils/screenCapture';
 import ScreenCaptureRegionOverlay from './ScreenCaptureRegionOverlay';
+import ScreenCaptureGuideModal from './ScreenCaptureGuideModal';
+
+const GUIDE_SKIP_KEY = 'cms_screen_capture_guide_skip';
+
+function readGuideSkip() {
+  try {
+    return localStorage.getItem(GUIDE_SKIP_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Nút chụp màn hình:
@@ -20,12 +31,14 @@ export default function ScreenCaptureButton({
   disabled = false,
   className = '',
   buttonClassName = '',
-  title = 'Chụp màn hình (chọn màn → chụp ngay)',
+  title = 'Chụp màn hình (chọn màn › chụp ngay)',
   size = 16,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [regionJob, setRegionJob] = useState(null);
+  const [guideMode, setGuideMode] = useState(null);
+  const [skipGuideNext, setSkipGuideNext] = useState(false);
   const rootRef = useRef(null);
   const supported = isScreenCaptureSupported();
 
@@ -58,6 +71,28 @@ export default function ScreenCaptureButton({
     if (e?.code === 'SCREEN_CAPTURE_DENIED') return;
     const msg = e?.message || 'Không chụp được màn hình';
     if (typeof onError === 'function') onError(msg);
+  };
+
+  const requestCapture = (mode) => {
+    if (busy || disabled) return;
+    setMenuOpen(false);
+    if (readGuideSkip()) {
+      if (mode === 'region') runRegion();
+      else runFull();
+      return;
+    }
+    setSkipGuideNext(false);
+    setGuideMode(mode);
+  };
+
+  const confirmGuideAndCapture = () => {
+    const mode = guideMode || 'full';
+    setGuideMode(null);
+    if (skipGuideNext) {
+      try { localStorage.setItem(GUIDE_SKIP_KEY, '1'); } catch { /* ignore */ }
+    }
+    if (mode === 'region') runRegion();
+    else runFull();
   };
 
   const runFull = async () => {
@@ -116,7 +151,7 @@ export default function ScreenCaptureButton({
       <button
         type="button"
         disabled={disabled || busy}
-        onClick={() => { runFull(); }}
+        onClick={() => { requestCapture('full'); }}
         className={buttonClassName}
         title={title}
         aria-label={title}
@@ -145,23 +180,32 @@ export default function ScreenCaptureButton({
             type="button"
             role="menuitem"
             className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            onClick={() => { runFull(); }}
+            onClick={() => { requestCapture('full'); }}
           >
             <Monitor size={14} className="text-slate-500 shrink-0" />
             Chụp toàn màn hình
-            <span className="ml-auto text-[10px] font-medium text-slate-400">chọn màn → chụp</span>
+            <span className="ml-auto text-[10px] font-medium text-slate-400">chọn màn › chụp</span>
           </button>
           <button
             type="button"
             role="menuitem"
             className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            onClick={() => { runRegion(); }}
+            onClick={() => { requestCapture('region'); }}
           >
             <Crop size={14} className="text-slate-500 shrink-0" />
             Chụp một phần
           </button>
         </div>
       ) : null}
+
+      <ScreenCaptureGuideModal
+        open={!!guideMode}
+        mode={guideMode || 'full'}
+        skipNext={skipGuideNext}
+        onSkipNextChange={setSkipGuideNext}
+        onCancel={() => setGuideMode(null)}
+        onContinue={confirmGuideAndCapture}
+      />
 
       <ScreenCaptureRegionOverlay
         open={!!regionJob}

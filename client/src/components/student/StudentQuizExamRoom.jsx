@@ -134,6 +134,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
             submittedAt: res.data.mySubmission.submittedAt,
             forfeit: !!res.data.mySubmission.forfeit,
             exitReason: res.data.mySubmission.exitReason || '',
+            detailedReview: res.data.detailedReview || [],
           });
           return;
         }

@@ -121,6 +121,20 @@ class QuizApplicationService {
       const studentId = data.currentUser.id || data.currentUser._id;
       const mySub = (quiz.submissions || []).find(s => String(s.studentId) === String(studentId));
 
+      let detailedReview = [];
+      if (mySub && !mySub.forfeit) {
+        const answers = Array.isArray(mySub.answers) ? mySub.answers : [];
+        detailedReview = (quiz.questions || []).map((q, idx) => ({
+          _id: q._id,
+          questionText: q.questionText,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          userAnswer: answers[idx] ?? null,
+          isCorrect: answers[idx] === q.correctAnswer,
+          explanation: q.explanation || '',
+        }));
+      }
+
       return {
         _status: 200,
         _body: {
@@ -133,6 +147,7 @@ class QuizApplicationService {
             timeLimitMinutes: quiz.timeLimitMinutes,
             questions: safeQuestions,
             mySubmission: mySub || null,
+            detailedReview,
           },
         },
       };

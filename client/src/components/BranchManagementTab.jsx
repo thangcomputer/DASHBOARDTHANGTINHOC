@@ -221,7 +221,7 @@ export default function BranchManagementTab() {
           <code className="inline bg-white border border-sky-200 rounded-md px-1.5 py-0.5 font-mono text-[12px] text-sky-800 break-all">
             CS1 TTH123 Nop hoc phi
           </code>
-          {' '}→ SePay ghi doanh thu cho CS1.
+          {' '}› SePay ghi doanh thu cho CS1.
         </div>
       </div>
 

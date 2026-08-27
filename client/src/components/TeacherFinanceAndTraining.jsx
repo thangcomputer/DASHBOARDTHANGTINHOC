@@ -5,6 +5,7 @@ import {
   CheckCircle2, FileText, Video,
   BookOpen, AlertCircle, BarChart, FileSpreadsheet, FileBox
 } from 'lucide-react';
+import NavArrow from './ui/NavArrow';
 import { useLocation } from 'react-router-dom';
 import { useModal } from '../utils/Modal.jsx';
 import api, { getRolePrefix } from '../services/api';
@@ -374,8 +375,9 @@ const TeacherFinanceAndTraining = () => {
              {/* Header */}
              <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
                 <div>
-                   <button onClick={() => setActiveCourse(null)} className="text-slate-400 hover:text-slate-700 text-sm font-bold flex items-center gap-2 mb-2 transition-colors">
-                     ← Quay lại danh sách
+                   <button onClick={() => setActiveCourse(null)} className="text-slate-400 hover:text-slate-700 text-sm font-bold flex items-center gap-1 mb-2 transition-colors">
+                     <NavArrow size={16} direction="back" className="text-slate-400" />
+                     Quay lại danh sách
                    </button>
                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">{activeCourse.title}</h2>
                 </div>

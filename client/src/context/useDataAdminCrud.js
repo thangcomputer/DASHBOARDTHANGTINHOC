@@ -35,6 +35,7 @@ export function useDataAdminCrud({
       paid:          !!student.paid,
       paymentMethod: student.paymentMethod,
       notes:         student.notes || '',
+      teacherAlert:  String(student.teacherAlert || '').trim(),
       linkHoc:       student.linkHoc || '',
       teacherId:     student.teacherId || null,
       learningMode:  student.learningMode || 'OFFLINE',

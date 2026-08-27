@@ -48,7 +48,7 @@ export default function AdminAttendanceDisputeModal({
           <p><span className="font-semibold text-slate-500">GV:</span> {payload.teacherName || '—'}</p>
           <p><span className="font-semibold text-slate-500">Ca:</span> {[payload.weekday, payload.dateLabel, payload.timeRange].filter(Boolean).join(' · ') || '—'}</p>
           <p className="text-xs text-slate-500 pt-2">
-            Chấp thuận → tính buổi &amp; lương. Không chấp thuận → hủy buổi, không tính, báo GV + HV.
+            Chấp thuận › tính buổi &amp; lương. Không chấp thuận › hủy buổi, không tính, báo GV + HV.
           </p>
         </div>
         <div className="px-5 pb-5 grid grid-cols-2 gap-3">

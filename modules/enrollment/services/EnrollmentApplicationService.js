@@ -10,7 +10,7 @@ const { applyEnrollmentStats, resolveEnrollmentExamSubjects } = require('./enrol
 class EnrollmentApplicationService {
   async post_id_enrollments(data) {
   try {
-    const { courseName, courseId, teacherId, price, totalSessions, paid, paymentMethod } = data.body;
+    const { courseName, courseId, teacherId, price, totalSessions, paid, paymentMethod, teacherAlert } = data.body;
     if (!courseName?.trim() && !courseId) {
       return { _status: 400, _body: { success: false, message: 'Tên khóa học hoặc courseId là bắt buộc' } };
     }
@@ -89,6 +89,7 @@ class EnrollmentApplicationService {
       registeredAt: new Date(),
       requireWebcam: true,
       examUnlocked: false,
+      teacherAlert: String(teacherAlert || '').trim().slice(0, 500),
     });
 
     // Cộng doanh thu thực nhận khi khóa phụ được đánh dấu đã thanh toán

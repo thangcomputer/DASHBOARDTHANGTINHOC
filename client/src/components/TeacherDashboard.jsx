@@ -13,6 +13,7 @@ import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
 import PopupBanner from './PopupBanner';
 import TeacherScheduleModal from './teacher/TeacherScheduleModal';
+import TeacherQuizResultOverlay from './teacher/TeacherQuizResultOverlay';
 import {
   TeacherLazyStudentsTab,
   TeacherLazyScheduleTab,
@@ -634,6 +635,8 @@ const TeacherDashboard = ({ onNavigate }) => {
           />
         )}
       </div>
+
+      <TeacherQuizResultOverlay />
 
       {showScheduleModal && (
         <TeacherScheduleModal

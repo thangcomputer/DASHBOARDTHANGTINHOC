@@ -4,6 +4,7 @@ import { Eye, EyeOff, CheckCircle2, AlertCircle, Phone, Database, BookOpen, Moni
 import { toast } from 'react-hot-toast';
 import { setTokens, clearOtherRoleSessions, ensureCsrfToken, API_BASE } from '../services/api';
 import { unlockAudio } from '../utils/sound';
+import NavArrow from './ui/NavArrow';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
 import { isValidVNPhone, isValidEmail, normalizePhone } from '../utils/validators';
 import {
@@ -267,9 +268,10 @@ const LoginPage = ({ onLogin }) => {
                         if (phone) q.set('phone', normalizePhone(phone) || phone);
                         navigate(`/dangkykhoahoc?${q.toString()}`);
                       }}
-                      className="mt-1 w-full py-2.5 rounded-xl bg-red-600 text-white text-xs font-black uppercase tracking-wide hover:bg-red-500 transition"
+                      className="mt-1 w-full py-2.5 rounded-xl bg-red-600 text-white text-xs font-black uppercase tracking-wide hover:bg-red-500 transition inline-flex items-center justify-center gap-1"
                     >
-                      Đăng ký / thanh toán khóa học →
+                      Đăng ký / thanh toán khóa học
+                      <NavArrow size={14} className="text-white" />
                     </button>
                   )}
                 </div>
@@ -331,7 +333,7 @@ const LoginPage = ({ onLogin }) => {
                 <div>
                   <h3 className="text-white font-black text-lg">Quên mật khẩu</h3>
                   <p className="text-white/70 text-xs font-medium">
-                    {forgotStep === 1 ? 'Nhập SĐT → xác nhận' : 'Tin nhắn đã sẵn — chỉ việc gửi'}
+                    {forgotStep === 1 ? 'Nhập SĐT › xác nhận' : 'Tin nhắn đã sẵn — chỉ việc gửi'}
                   </p>
                 </div>
               </div>
@@ -410,7 +412,7 @@ const LoginPage = ({ onLogin }) => {
                   <div className={`rounded-xl p-3 text-xs font-bold ${copied ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' : 'bg-sky-500/10 border border-sky-500/20 text-sky-300'}`}>
                     {copied
                       ? '✓ Đã copy — mở Zalo Admin rồi dán (Ctrl+V / giữ để dán) và gửi.'
-                      : '① Bấm Copy → ② Bấm Zalo Admin → dán tin nhắn và gửi.'}
+                      : '① Bấm Copy › ② Bấm Zalo Admin › dán tin nhắn và gửi.'}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -438,9 +440,10 @@ const LoginPage = ({ onLogin }) => {
                   <button
                     type="button"
                     onClick={() => { setForgotStep(1); setForgotError(''); setForgotContact(null); setCopied(false); }}
-                    className="w-full py-3 border border-white/10 text-gray-400 font-bold rounded-xl hover:border-white/20 transition text-sm"
+                    className="w-full py-3 border border-white/10 text-gray-400 font-bold rounded-xl hover:border-white/20 transition text-sm inline-flex items-center justify-center gap-1"
                   >
-                    ← Quay lại
+                    <NavArrow size={16} direction="back" className="text-gray-400" />
+                    Quay lại
                   </button>
                 </div>
               )}

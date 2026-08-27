@@ -27,7 +27,10 @@ import TeacherRatingDetailModal, {
   getEvaluationIdFromNotif,
   isTeacherRatingNotif,
 } from './teacher/TeacherRatingDetailModal';
+import TeacherAttendanceConfirmedModal from './teacher/TeacherAttendanceConfirmedModal';
+import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
 import { RATING_CRITERIA } from '../context/useDataRatings';
+import NavArrow from './ui/NavArrow';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -48,6 +51,86 @@ const PAGE_TITLES = {
   evaluation: 'Đánh giá',
   profile: 'Hồ sơ',
 };
+
+function isTeacherAttendanceConfirmedNotif(n) {
+  if (String(n?.payload?.kind || '') === 'attendance_confirmed') return true;
+  return String(n?.title || '').includes('Học viên đã xác nhận điểm danh');
+}
+
+function attendancePayloadMissingTeacherOrCa(payload) {
+  const name = String(payload?.teacherName || '').trim();
+  const hasName = name && name !== 'Giảng viên';
+  const hasCa = Boolean(String(payload?.timeRange || '').trim() || payload?.startTime);
+  return !hasName || !hasCa;
+}
+
+function formatScheduleForConfirmModal(sch) {
+  const d = sch?.date ? new Date(sch.date) : null;
+  const ok = d && !Number.isNaN(d.getTime());
+  const start = sch?.startTime || '';
+  const end = sch?.endTime || '';
+  return {
+    scheduleId: String(sch?._id || sch?.id || ''),
+    teacherName: sch?.teacherName || sch?.teacherId?.name || '',
+    weekday: ok ? d.toLocaleDateString('vi-VN', { weekday: 'long', timeZone: 'Asia/Ho_Chi_Minh' }) : '',
+    dateLabel: ok ? d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '',
+    startTime: start,
+    endTime: end,
+    timeRange: end ? `${start} - ${end}` : start,
+    sessionNumber: sch?.sessionOrdinalPreview || null,
+    totalSessions: sch?.sessionTotalPreview || null,
+    course: sch?.course || '',
+  };
+}
+
+function matchScheduleForAttendanceNotif(list, base) {
+  const arr = Array.isArray(list) ? list : [];
+  const sid = String(base?.scheduleId || '').trim();
+  if (sid) {
+    const hit = arr.find((s) => String(s._id || s.id) === sid);
+    if (hit) return hit;
+  }
+  const course = String(base?.course || '').trim().toLowerCase();
+  const completed = arr.filter((s) => String(s.status) === 'completed');
+  const byCourse = course
+    ? completed.filter((s) => String(s.course || '').trim().toLowerCase() === course)
+    : completed;
+  const pool = byCourse.length ? byCourse : completed;
+  if (!pool.length) return null;
+
+  const sessionNo = Number(base?.sessionNumber || base?.completedSessions);
+  const sorted = [...pool].sort((a, b) => {
+    const da = new Date(a.date).getTime() - new Date(b.date).getTime();
+    if (da !== 0) return da;
+    return String(a.startTime || '').localeCompare(String(b.startTime || ''));
+  });
+  if (Number.isFinite(sessionNo) && sessionNo > 0) {
+    const byOrdinal = pool.find((s) => Number(s.sessionOrdinalPreview) === sessionNo);
+    if (byOrdinal) return byOrdinal;
+    if (sorted[sessionNo - 1]) return sorted[sessionNo - 1];
+  }
+  return sorted[sorted.length - 1] || null;
+}
+
+async function enrichAttendancePayloadFromSchedules(base, studentId) {
+  if (!attendancePayloadMissingTeacherOrCa(base) || !studentId) return base;
+  try {
+    const res = await api.schedules.getByStudent(studentId);
+    const sch = matchScheduleForAttendanceNotif(res?.data, base);
+    if (!sch) return base;
+    const extra = formatScheduleForConfirmModal(sch);
+    return {
+      ...base,
+      ...extra,
+      sessionNumber: base.sessionNumber || base.completedSessions || extra.sessionNumber,
+      totalSessions: base.totalSessions || base.totalRequired || extra.totalSessions,
+      course: base.course || extra.course,
+      teacherName: extra.teacherName || base.teacherName,
+    };
+  } catch {
+    return base;
+  }
+}
 
 function resolvePageTitle(role, pathname, hash) {
   const key = (hash || '').replace('#', '');
@@ -321,6 +404,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [attendanceConfirmBusy, setAttendanceConfirmBusy] = useState(false);
   const [attendanceDispute, setAttendanceDispute] = useState(null);
   const [attendanceDisputeBusy, setAttendanceDisputeBusy] = useState(false);
+  const [teacherAttendanceConfirm, setTeacherAttendanceConfirm] = useState(null);
 
   const starBonusSeenKey = React.useCallback((teacherId, month) => (
     `star_bonus_celeb_${teacherId}_${month}`
@@ -543,31 +627,33 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     const forceRejected = opts.forceRejected === true;
 
     if (forceResolved || forceRejected) {
+      const merged = await enrichAttendancePayloadFromSchedules(base, myId);
       setAttendanceConfirm({
-        ...base,
-        scheduleId,
-        sessionNumber: base.sessionNumber || base.completedSessions || '?',
-        totalSessions: base.totalSessions || base.totalRequired,
+        ...merged,
+        scheduleId: merged.scheduleId || scheduleId,
+        sessionNumber: merged.sessionNumber || merged.completedSessions || '?',
+        totalSessions: merged.totalSessions || merged.totalRequired,
         resolved: true,
         waiting: false,
         resolveOutcome: forceRejected ? 'rejected' : 'approved',
         studentConfirmStatus: forceRejected
           ? 'admin_rejected'
-          : (base.studentConfirmStatus || 'admin_approved'),
-        kind: forceRejected ? 'attendance_rejected' : (base.kind || 'attendance_taken'),
+          : (merged.studentConfirmStatus || 'admin_approved'),
+        kind: forceRejected ? 'attendance_rejected' : (merged.kind || 'attendance_taken'),
       });
       return;
     }
 
     if (!scheduleId) {
-      // Không có scheduleId (vd. «Đã điểm danh buổi học») → chỉ xem đã giải quyết + thoát
+      // Thông báo cũ «Đã điểm danh» không có scheduleId → bổ sung GV/ca từ lịch HV
+      const merged = await enrichAttendancePayloadFromSchedules(base, myId);
       setAttendanceConfirm({
-        ...base,
-        sessionNumber: base.sessionNumber || base.completedSessions || '?',
-        totalSessions: base.totalSessions || base.totalRequired,
+        ...merged,
+        sessionNumber: merged.sessionNumber || merged.completedSessions || '?',
+        totalSessions: merged.totalSessions || merged.totalRequired,
         resolved: true,
         waiting: false,
-        kind: base.kind || 'attendance_taken',
+        kind: merged.kind || 'attendance_taken',
         studentConfirmStatus: 'accepted',
       });
       return;
@@ -605,7 +691,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     } catch {
       setAttendanceConfirm({ ...base, scheduleId, resolved: false, waiting: false });
     }
-  }, []);
+  }, [myId]);
 
   const handleAdminDisputeDecision = React.useCallback(async (decision) => {
     const sid = attendanceDispute?.scheduleId;
@@ -632,6 +718,45 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       setAttendanceDisputeBusy(false);
     }
   }, [attendanceDispute, toast, triggerBackgroundSync]);
+
+  const openTeacherAttendanceConfirmed = React.useCallback(async (n) => {
+    const base = { ...(n?.payload || {}) };
+    const confirmedAt = base.studentConfirmedAt || n?.time || n?.createdAt || n?.timestamp || null;
+    let payload = {
+      ...base,
+      studentName: base.studentName || '',
+      confirmedAt,
+    };
+    const missingCa = !String(payload.timeRange || '').trim() && !payload.startTime;
+    const missingSession = payload.sessionNumber == null && payload.sessionOrdinalPreview == null;
+    const missingName = !String(payload.studentName || '').trim();
+    if ((missingCa || missingSession || missingName) && myId) {
+      try {
+        const res = await api.schedules.getByTeacher(myId);
+        const list = Array.isArray(res?.data) ? res.data : [];
+        const sid = String(payload.scheduleId || '');
+        const sch = sid
+          ? list.find((s) => String(s._id || s.id) === sid)
+          : null;
+        if (sch) {
+          const extra = formatScheduleForConfirmModal(sch);
+          payload = {
+            ...extra,
+            ...payload,
+            studentName: payload.studentName || sch.studentName || sch.studentId?.name || '',
+            timeRange: payload.timeRange || extra.timeRange,
+            sessionNumber: payload.sessionNumber ?? extra.sessionNumber,
+            totalSessions: payload.totalSessions ?? extra.totalSessions,
+            weekday: payload.weekday || extra.weekday,
+            dateLabel: payload.dateLabel || extra.dateLabel,
+            course: payload.course || extra.course,
+            confirmedAt: payload.confirmedAt || sch.studentConfirmedAt || confirmedAt,
+          };
+        }
+      } catch { /* dùng payload thông báo */ }
+    }
+    setTeacherAttendanceConfirm(payload);
+  }, [myId]);
 
   const dismissWelcomeCelebration = React.useCallback(async () => {
     setShowWelcomeCelebration(false);
@@ -1032,6 +1157,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         onReject={() => handleAdminDisputeDecision('reject')}
         onClose={() => setAttendanceDispute(null)}
       />
+      <TeacherAttendanceConfirmedModal
+        open={role === 'teacher' && !!teacherAttendanceConfirm}
+        payload={teacherAttendanceConfirm}
+        onClose={() => setTeacherAttendanceConfirm(null)}
+      />
 
       {showNotif && typeof document !== 'undefined' && createPortal(
         <>
@@ -1220,18 +1350,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               studentId: n.payload?.studentId,
                               ...n,
                             });
+                          } else if (role === 'teacher' && isTeacherAttendanceConfirmedNotif(n)) {
+                            setShowNotif(false);
+                            openTeacherAttendanceConfirmed(n);
                       } else if (role === 'teacher' && n.payload?.quizId) {
-                        // Popup chi tiết kết quả trắc nghiệm (đúng/sai, thời điểm làm, số câu đúng/sai...)
-                        navigate('/teacher#students');
-                        window.setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('open-teacher-quiz-detail', {
-                            detail: {
-                              quizId: n.payload?.quizId,
-                              studentId: n.payload?.studentId,
-                              payload: n.payload,
-                            },
-                          }));
-                        }, 250);
+                        setShowNotif(false);
+                        const detail = {
+                          quizId: n.payload?.quizId,
+                          studentId: n.payload?.studentId,
+                          payload: n.payload,
+                        };
+                        try {
+                          sessionStorage.setItem(PENDING_TEACHER_QUIZ_DETAIL_KEY, JSON.stringify(detail));
+                        } catch { /* ignore */ }
+                        if (location.pathname === '/teacher') {
+                          window.dispatchEvent(new CustomEvent('open-teacher-quiz-detail', { detail }));
+                        } else {
+                          navigate('/teacher');
+                        }
                           } else if (role === 'teacher' && (n.payload?.type === 'schedule' || n.type === 'schedule')) {
                             // Chuyển hướng đến tab lịch học của giảng viên khi nhận thông báo ghi chú từ học viên
                             navigate('/teacher#schedule');
@@ -1336,9 +1472,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
                   navigate(`${base}/notifications`);
                 }}
-                className="text-[12px] font-semibold text-red-600 hover:underline"
+                className="text-[12px] font-semibold text-red-600 hover:underline inline-flex items-center gap-0.5"
               >
                 Xem tất cả
+                <NavArrow size={14} className="text-red-600" />
               </button>
             </div>
           </div>

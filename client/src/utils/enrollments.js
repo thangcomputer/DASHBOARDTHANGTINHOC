@@ -81,6 +81,7 @@ export function getClientEnrollments(student) {
       avgGrade: e.avgGrade || 0, grades: e.grades || [], linkHoc: e.linkHoc || '',
       nextClass: e.nextClass || '', nextClassTime: e.nextClassTime || '',
       paid: e.paid, price: e.price, status: e.status || 'active',
+      teacherAlert: e.teacherAlert || '',
       cancelledAt: e.cancelledAt || null,
       cancelReason: e.cancelReason || '',
       refundedAmount: Number(e.refundedAmount) || 0,
@@ -99,6 +100,7 @@ export function getClientEnrollments(student) {
       completedSessions: completed, totalSessions: student.totalSessions || 12, remainingSessions: student.remainingSessions,
       avgGrade: student.avgGrade || 0, grades: student.grades || [], linkHoc: student.linkHoc || '',
       nextClass: student.nextClass || '', nextClassTime: student.nextClassTime || '',
+      teacherAlert: student.teacherAlert || '',
       paid: student.paid, price: student.price,
       status: student.status === 'Ho\u00E0n th\u00E0nh' ? 'completed' : 'active',
       registeredAt: student.createdAt, isPrimary: true,
@@ -218,6 +220,7 @@ export function expandStudentsForTeacher(students, teacherId) {
           linkHoc: enr.linkHoc || student.linkHoc,
           nextClass: enr.nextClass || student.nextClass,
           nextClassTime: enr.nextClassTime || student.nextClassTime,
+          teacherAlert: enr.teacherAlert || '',
           avgGrade: enr.avgGrade ?? student.avgGrade,
           paid: enr.paid ?? student.paid,
           price: enr.price ?? student.price,
@@ -259,6 +262,7 @@ export function scopeStudentToEnrollment(student, enrollment) {
     grades: enrollment.grades?.length ? enrollment.grades : (enrollment.isPrimary ? student.grades : []),
     linkHoc: enrollment.linkHoc || student.linkHoc, nextClass: enrollment.nextClass || student.nextClass,
     nextClassTime: enrollment.nextClassTime || student.nextClassTime,
+    teacherAlert: enrollment.teacherAlert || student.teacherAlert || '',
     paid: enrollment.paid ?? student.paid, price: enrollment.price ?? student.price,
     activeEnrollmentId: enrollment.enrollmentId || enrollment.id };
 }

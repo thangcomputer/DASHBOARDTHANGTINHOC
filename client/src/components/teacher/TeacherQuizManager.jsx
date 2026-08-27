@@ -99,12 +99,16 @@ export default function TeacherQuizManager({
   }, [toast]);
 
   useEffect(() => {
+    if (createOnly) return undefined;
     const onOpen = (e) => {
+      const studentId = e?.detail?.studentId || e?.detail?.payload?.studentId;
+      // Thông báo nộp bài (có studentId) → overlay xem từng câu; không mở list trắng
+      if (studentId) return;
       openTeacherQuizDetailByNotification(e?.detail || {});
     };
     window.addEventListener('open-teacher-quiz-detail', onOpen);
     return () => window.removeEventListener('open-teacher-quiz-detail', onOpen);
-  }, [openTeacherQuizDetailByNotification]);
+  }, [createOnly, openTeacherQuizDetailByNotification]);
 
   useEffect(() => {
     if (!createOnly) fetchQuizzes();

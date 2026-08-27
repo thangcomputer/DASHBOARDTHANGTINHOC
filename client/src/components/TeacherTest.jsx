@@ -1227,7 +1227,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                 Đánh giá năng lực giảng viên
               </h1>
               <p className="mt-2 text-base font-medium text-blue-100/90 sm:text-lg">
-                Phần 1 trắc nghiệm → Phần 2 tự luận (nếu đạt) → Admin duyệt
+                Phần 1 trắc nghiệm › Phần 2 tự luận (nếu đạt) › Admin duyệt
               </p>
             </div>
             <button
@@ -1481,7 +1481,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                   </h3>
                   <p className="mt-0.5 text-sm font-semibold text-slate-500 sm:text-base">
                     {practicalStarted
-                      ? 'Tải đề → làm bài → nén ZIP/RAR → nộp trước khi hết giờ'
+                      ? 'Tải đề › làm bài › nén ZIP/RAR › nộp trước khi hết giờ'
                       : 'Bấm Bắt đầu để tải đề — đồng hồ chỉ chạy sau khi bạn xác nhận'}
                   </p>
                 </div>
@@ -1497,7 +1497,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                           )}
                         </p>
                         <p className="text-sm font-bold text-amber-900 sm:text-base">
-                          Hết giờ chưa nộp file → bài thi <strong>không đạt</strong>, tài khoản bị khóa.
+                          Hết giờ chưa nộp file › bài thi <strong>không đạt</strong>, tài khoản bị khóa.
                           Camera giám sát bật khi bấm Bắt đầu (mắt / nhìn thẳng / chuyển động — tối đa 5 lần cảnh báo).
                         </p>
                         <ol className="min-h-0 flex-1 list-decimal list-inside space-y-1 overflow-hidden text-sm font-semibold leading-snug text-amber-950 sm:text-base">
@@ -1518,7 +1518,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                         <p className="shrink-0 text-center text-sm font-bold text-red-600">Chưa có đề tự luận — liên hệ Admin</p>
                       )}
                       <p className="shrink-0 text-center text-sm font-bold text-slate-500 sm:text-base">
-                        Tải đề → làm bài → nén một file ZIP/RAR → tải lên
+                        Tải đề › làm bài › nén một file ZIP/RAR › tải lên
                       </p>
                     </>
                   ) : (

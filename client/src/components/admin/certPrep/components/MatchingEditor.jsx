@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
+import NavArrow from '../../../ui/NavArrow';
 import CmsSelect from '../../../ui/CmsSelect';
 import CertPrepImageUploader from '../CertPrepImageUploader';
 
@@ -155,7 +156,7 @@ export default function MatchingEditor({
             <span className="text-sm font-semibold text-slate-700 min-w-[8rem]">
               {String.fromCharCode(65 + idx)}. {item.text || '(trống)'}
             </span>
-            <span className="text-slate-400 hidden sm:inline" aria-hidden="true">→</span>
+            <NavArrow size={14} className="text-slate-400 hidden sm:inline" />
             <CmsSelect
               value={pairForItem(item.id)}
               disabled={disabled}

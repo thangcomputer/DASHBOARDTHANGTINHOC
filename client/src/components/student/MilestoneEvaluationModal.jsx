@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Star, Building2, UserRound } from 'lucide-react';
+import NavArrow from '../ui/NavArrow';
 import { RATING_CRITERIA as DEFAULT_RATING_CRITERIA } from '../../context/useDataRatings';
 
 const EMPTY = {
@@ -224,9 +225,11 @@ export function MilestoneEvaluationModal({
                 type="button"
                 onClick={submitCenter}
                 disabled={!canSubmitCenter || submitting}
-                className="w-full bg-gradient-to-r from-red-600 to-red-500 py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-red-100 active:scale-95 transition transform disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-red-600 to-red-500 py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-red-100 active:scale-95 transition transform disabled:opacity-50 inline-flex items-center justify-center gap-1"
               >
-                {alreadyPubliclyRated ? 'TIẾP TỤC → CHỈNH SỬA ĐÁNH GIÁ GV' : 'TIẾP TỤC → ĐÁNH GIÁ GIẢNG VIÊN'}
+                TIẾP TỤC
+                <NavArrow size={16} className="text-white" />
+                {alreadyPubliclyRated ? 'CHỈNH SỬA ĐÁNH GIÁ GV' : 'ĐÁNH GIÁ GIẢNG VIÊN'}
               </button>
             </>
           ) : !isCourseEnd ? (

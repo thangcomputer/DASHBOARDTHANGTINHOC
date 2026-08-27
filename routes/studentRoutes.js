@@ -24,6 +24,7 @@ const {
   studentMatchesTeacher,
   resolveEnrollmentExamSubjects,
   syncStudentFromPrimaryEnrollment,
+  sanitizeTeacherAlert,
 } = require('../services/enrollmentService');
 
 async function syncCertPrepFromEnrollment(student, req) {
@@ -1010,6 +1011,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         registeredAt: new Date(),
         requireWebcam: true,
         examUnlocked: false,
+        teacherAlert: sanitizeTeacherAlert(req.body.teacherAlert),
       }];
     } else if (isPaidOnCreate) {
       student.enrollments.forEach((e, i) => {
@@ -2145,7 +2147,7 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, policyShadowStudentM
 // Admin thêm khóa học mới cho học viên (cùng tài khoản, khác môn / thầy)
 router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStudentMutation('enrollment_create'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
-    const { courseName, courseId, teacherId, price, totalSessions, paid, paymentMethod } = req.body;
+    const { courseName, courseId, teacherId, price, totalSessions, paid, paymentMethod, teacherAlert } = req.body;
     if (!courseName?.trim() && !courseId) {
       return res.status(400).json({ success: false, message: 'Tên khóa học hoặc courseId là bắt buộc' });
     }
@@ -2224,6 +2226,7 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
       registeredAt: new Date(),
       requireWebcam: true,
       examUnlocked: false,
+      teacherAlert: sanitizeTeacherAlert(teacherAlert),
     });
 
     // Cộng doanh thu thực nhận khi khóa phụ được đánh dấu đã thanh toán

@@ -282,4 +282,112 @@ export const printInvoice = () => {
   });
 };
 
+/**
+ * Chụp phiếu thu đang hiện (#invoice-template) thành PNG blob.
+ * Tách riêng — không đụng luồng In / Tải PDF.
+ */
+export async function captureInvoicePngBlob() {
+  const element = getInvoiceElement();
+  if (!element) {
+    toast.error('Không tìm thấy mẫu hóa đơn. Vui lòng thử lại.');
+    return null;
+  }
+
+  const { container, clone } = buildCaptureRoot(element);
+
+  try {
+    await waitForImages(clone);
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const w = captureWidthPx();
+    const h = captureHeightPx();
+    const { html2canvas } = await getPdfLibs();
+
+    const canvas = await html2canvas(clone, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: w,
+      height: h,
+      x: 0,
+      y: 0,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: w,
+      windowHeight: h,
+      onclone: (_doc, clonedEl) => {
+        prepareCloneForCapture(clonedEl);
+      },
+    });
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b), 'image/png');
+    });
+    if (!blob) {
+      toast.error('Không chụp được phiếu thu. Vui lòng thử lại.');
+      return null;
+    }
+    return blob;
+  } catch {
+    toast.error('Không chụp được phiếu thu. Vui lòng thử lại.');
+    return null;
+  } finally {
+    container.remove();
+  }
+}
+
+let _zaloCaptureBusy = false;
+
+/**
+ * Chụp phiếu thu → copy ảnh vào clipboard → mở chat Zalo theo SĐT đã đăng ký.
+ * Nhân viên dán (Ctrl+V) trong Zalo rồi gửi. Web không tự gửi ảnh vào Zalo.
+ */
+export async function captureAndSendZalo({ phone, zalo, studentName, courseName } = {}) {
+  if (_zaloCaptureBusy) return false;
+  _zaloCaptureBusy = true;
+
+  try {
+    const digits = String(zalo || phone || '').replace(/\D/g, '');
+    if (!digits) {
+      toast.error('Học viên chưa có số Zalo/SĐT.');
+      return false;
+    }
+
+    const blob = await captureInvoicePngBlob();
+    if (!blob) return false;
+
+    let copied = false;
+    try {
+      if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob }),
+        ]);
+        copied = true;
+      }
+    } catch {
+      copied = false;
+    }
+
+    const parts = ['Phiếu thu học phí', studentName, courseName].filter(Boolean);
+    const url = `https://zalo.me/${digits}?text=${encodeURIComponent(parts.join(' - '))}`;
+
+    await new Promise((r) => setTimeout(r, 250));
+    window.open(url, '_blank', 'noopener,noreferrer');
+
+    if (copied) {
+      toast.success('Đã copy phiếu thu. Dán (Ctrl+V) trong Zalo rồi gửi.');
+    } else {
+      toast.error('Đã mở Zalo nhưng chưa copy được ảnh. Hãy Tải PDF rồi gửi tay.');
+    }
+    return copied;
+  } finally {
+    _zaloCaptureBusy = false;
+  }
+}
+
 export default exportPDF;

@@ -215,7 +215,7 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
               <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-bold text-amber-800 text-sm">Chưa cấu hình tài khoản</p>
-                <p className="text-amber-600 text-xs mt-1">Admin cần vào <strong>Cài đặt hệ thống → Tài khoản Thu học phí</strong> để cấu hình ngân hàng.</p>
+                <p className="text-amber-600 text-xs mt-1">Admin cần vào <strong>Cài đặt hệ thống › Tài khoản Thu học phí</strong> để cấu hình ngân hàng.</p>
               </div>
             </div>
           )}

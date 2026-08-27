@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { DollarSign, X, CreditCard, CheckCircle2, AlertCircle, Loader2, Star } from 'lucide-react';
+import NavArrow from '../../ui/NavArrow';
 import { generateVietQRUrl } from '../../BankSelect';
 import { formatHoaHong, formatStarBonusRule } from '../../../utils/teacherCommission';
 import {
@@ -385,7 +386,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                   <span className="font-bold text-red-600 tabular-nums">
                     {Number(pm.amount).toLocaleString('vi-VN')}đ
                   </span>
-                  {' → '}
+                  <NavArrow size={14} className="inline-block align-middle mx-1 text-slate-400" />
                   <span className="font-semibold text-slate-800">{pm.teacherName}</span>
                 </p>
               </div>
@@ -446,7 +447,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                 onClick={() => setPayoutModal((prev) => ({ ...prev, step: 1 }))}
                 className="cms-btn cms-btn-outline"
               >
-                ← Quay lại
+                <NavArrow size={16} direction="back" /> Quay lại
               </button>
               <button type="button" onClick={onConfirm} className="cms-btn cms-btn-primary">
                 <CheckCircle2 size={16} /> Đã chuyển xong

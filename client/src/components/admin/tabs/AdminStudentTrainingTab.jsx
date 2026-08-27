@@ -7,6 +7,7 @@ import {
   FileSpreadsheet, Edit3, X, Upload, Loader2, FileText, Save, Search,
   CheckCircle2, XCircle, Layers, Award, ImagePlus, Link2,
 } from 'lucide-react';
+import NavArrow from '../../ui/NavArrow';
 import AdminCourseBuilder from '../../AdminCourseBuilder';
 import RichTextEditor from '../shared/RichTextEditor';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
@@ -486,8 +487,9 @@ export default function AdminStudentTrainingTab() {
                   ) : (
                   /* Table — mobile: vuốt ngang; chữ header rút gọn để thấy đủ cột */
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                    <p className="sm:hidden text-[11px] text-slate-400 px-3 py-1.5 border-b border-slate-50">
-                      Vuốt ngang để xem đủ cột →
+                    <p className="sm:hidden text-[11px] text-slate-400 px-3 py-1.5 border-b border-slate-50 flex items-center gap-0.5">
+                      Vuốt ngang để xem đủ cột
+                      <NavArrow size={12} className="text-slate-400" />
                     </p>
                     <div className="cms-table-wrap">
                       <table className="w-full text-left border-collapse min-w-[640px] sm:min-w-[900px]">

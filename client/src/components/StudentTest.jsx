@@ -11,6 +11,7 @@ import { useData } from '../context/DataContext';
 import { getClientEnrollments } from '../utils/enrollments';
 import { getExamSubjectMeta, requireWebcamForSubject, canEnterCertificationExam } from '../utils/examSubjects';
 import { useModal } from '../utils/Modal.jsx';
+import NavArrow from './ui/NavArrow';
 import { getStudentMcQuestionsForExam, normalizeMcCorrectIndex, getStudentPracticeFilesForSubject } from '../utils/htmlContent';
 import {
   getCertificationAttemptKey,
@@ -752,7 +753,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
             onClick={onBack}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-200 hover:text-white hover:bg-slate-700 text-xs font-bold border border-slate-600"
           >
-            ← Quay lại
+            <NavArrow size={14} direction="back" />
+            Quay lại
           </button>
         )}
       </div>
@@ -848,13 +850,14 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                  : 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'}
          </button>
          {!canStartExam && cameraReady && !questionsLoading && bankTotal === 0 && (
-           <p className="text-[10px] text-amber-700 font-bold mt-2 px-1">Admin cần thêm câu hỏi môn {meta.short} tại Đào tạo HV → Ngân hàng câu hỏi.</p>
+           <p className="text-[10px] text-amber-700 font-bold mt-2 px-1">Admin cần thêm câu hỏi môn {meta.short} tại Đào tạo HV › Ngân hàng câu hỏi.</p>
          )}
          {!cameraReady && !cameraError && (
            <p className="text-[10px] text-slate-400 font-bold mt-2">Bấm &quot;Cho phép mỗi khi truy cập&quot; để bật camera.</p>
          )}
-         <button type="button" onClick={() => onBack?.()} className="w-full mt-3 py-2 font-bold rounded-[14px] text-xs border border-slate-200 text-slate-600 hover:bg-slate-50">
-           ← Quay lại
+         <button type="button" onClick={() => onBack?.()} className="w-full mt-3 py-2 font-bold rounded-[14px] text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center gap-1">
+           <NavArrow size={14} direction="back" className="text-slate-600" />
+           Quay lại
          </button>
        </div>
       </div>
@@ -964,7 +967,10 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
             <p className="text-red-700 font-bold text-sm">⏳ Bạn không đạt phần trắc nghiệm. Bài thi sẽ bị khóa trong 7 ngày trước khi có thể thi lại.</p>
           </div>
         )}
-        <button onClick={() => onBack?.()} className="w-full py-3 bg-gray-800 hover:bg-black text-white font-bold rounded-xl">← Về Phòng Thi</button>
+        <button onClick={() => onBack?.()} className="w-full py-3 bg-gray-800 hover:bg-black text-white font-bold rounded-xl inline-flex items-center justify-center gap-1">
+          <NavArrow size={16} direction="back" className="text-white" />
+          Về Phòng Thi
+        </button>
       </div>
     </div>
   );
@@ -978,7 +984,10 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-8 text-center border border-gray-100">
           <p className="text-gray-800 font-bold text-sm mb-2">Không có câu hỏi trắc nghiệm cho môn {meta.label}.</p>
           <p className="text-gray-500 text-xs mb-6">Admin cần thêm câu hỏi (phần thi khớp Word/Excel/PowerPoint) vào ngân hàng học viên.</p>
-          <button type="button" onClick={() => onBack?.()} className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl text-sm hover:bg-black">← Quay lại</button>
+          <button type="button" onClick={() => onBack?.()} className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl text-sm hover:bg-black inline-flex items-center justify-center gap-1">
+            <NavArrow size={16} direction="back" className="text-white" />
+            Quay lại
+          </button>
         </div>
       </div>
     );

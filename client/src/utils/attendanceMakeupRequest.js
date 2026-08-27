@@ -63,7 +63,7 @@ export function buildAttendanceMakeupDraft({ student, schedule, teacherName } = 
     s.total > 0 ? `Buổi: ${s.sessionNo}/${s.total}` : `Buổi tiếp theo (đã học ${s.done})`,
     `Lịch: ${s.dateLabel} · ${s.timeRange}`,
     '',
-    '→ Bấm tên học viên ở dòng HV để mở hồ sơ và điểm danh bù.',
+    '› Bấm tên học viên ở dòng HV để mở hồ sơ và điểm danh bù.',
     '',
     'Nội dung xác nhận:',
     '- Giảng viên chịu trách nhiệm về buổi học này.',
