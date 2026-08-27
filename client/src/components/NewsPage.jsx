@@ -183,7 +183,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
         if (!inserted) {
           const src = String(img.url || '').replace(/"/g, '&quot;');
           const alt = String(img.name || '').replace(/"/g, '&quot;');
-          setContentHtml((prev) => `${prev || ''}<p><img src="${src}" alt="${alt}" style="max-width:100%;height:auto;border-radius:12px" /></p><p><br></p>`);
+          setContentHtml((prev) => `${prev || ''}<p><img src="${src}" alt="${alt}" style="max-width:100%;width:auto;height:auto;max-height:22rem;border-radius:12px;display:inline-block" /></p><p><br></p>`);
         }
       });
       toast.success(`Đã chèn ${imgs.length} ảnh vào bài`);
@@ -283,7 +283,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
             className="prose prose-slate max-w-none text-slate-800 text-[15px] leading-relaxed
               [&_h2]:text-xl [&_h2]:font-black [&_h3]:text-lg [&_h3]:font-bold
               [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
-              [&_img]:rounded-xl [&_img]:max-w-full [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3"
+              [&_img]:rounded-xl [&_img]:max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[28rem] [&_img]:mx-0 [&_img]:inline-block [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3"
             dangerouslySetInnerHTML={{ __html: resolveContentHtml(contentHtml) }}
           />
         </div>
@@ -662,7 +662,6 @@ export default function NewsPage({ session, role = 'admin' }) {
         </div>
       );
     }
-    const thumb = detail.thumbnailUrl ? resolveMediaUrl(detail.thumbnailUrl) : null;
     return (
       <div className="w-full space-y-6 pb-20 text-left">
         <div className="w-full bg-white rounded-2xl border border-slate-100 p-6 sm:p-8 shadow-sm space-y-6">
@@ -674,11 +673,6 @@ export default function NewsPage({ session, role = 'admin' }) {
           >
             <ChevronLeft size={16} /> Tin tức
           </button>
-          {thumb && (
-            <div className="rounded-2xl overflow-hidden aspect-[21/9] bg-slate-100">
-              <img src={thumb} alt="" className="w-full h-full object-cover" />
-            </div>
-          )}
           <div>
             {detail.isNew && (
               <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black">NEW</span>
@@ -703,7 +697,7 @@ export default function NewsPage({ session, role = 'admin' }) {
               [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
               [&_blockquote]:border-l-4 [&_blockquote]:border-red-400 [&_blockquote]:pl-3 [&_blockquote]:italic
               [&_a]:text-red-600 [&_a]:underline
-              [&_img]:rounded-xl [&_img]:max-w-full [&_img]:my-3"
+              [&_img]:rounded-xl [&_img]:max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[28rem] [&_img]:my-3 [&_img]:mx-0 [&_img]:inline-block"
             dangerouslySetInnerHTML={{ __html: resolveContentHtml(detail.contentHtml || '') }}
           />
           {(() => {
