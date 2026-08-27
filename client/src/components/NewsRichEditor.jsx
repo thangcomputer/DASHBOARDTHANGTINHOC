@@ -9,6 +9,7 @@ import {
   Link2, ImagePlus, AlignLeft, AlignCenter, AlignRight, Quote,
 } from 'lucide-react';
 import { resolveMediaUrl } from '../services/api';
+import { applyAnchorNewTabPolicy } from '../utils/htmlContent';
 
 const DEFAULT_IMG_STYLE = 'max-width:100%;width:auto;height:auto;max-height:22rem;border-radius:12px;display:inline-block';
 
@@ -42,10 +43,33 @@ function extractUploadsPath(src) {
   return m ? m[0] : '';
 }
 
+function normalizeHref(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (/^(javascript|data):/i.test(s)) return '';
+  if (/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(s)) return s;
+  if (s.startsWith('//')) return `https:${s}`;
+  return `https://${s.replace(/^\/+/, '')}`;
+}
+
+function decorateAnchors(root) {
+  if (!root) return;
+  root.querySelectorAll('a[href]').forEach((a) => {
+    const href = normalizeHref(a.getAttribute('href'));
+    if (!href) {
+      a.removeAttribute('href');
+      return;
+    }
+    a.setAttribute('href', href);
+  });
+  applyAnchorNewTabPolicy(root);
+}
+
 function htmlToStorage(html) {
   if (!html || typeof document === 'undefined') return html || '';
   const wrap = document.createElement('div');
   wrap.innerHTML = html;
+  decorateAnchors(wrap);
   wrap.querySelectorAll('img').forEach((img) => {
     const stored = img.getAttribute('data-cms-src') || extractUploadsPath(img.getAttribute('src') || '');
     if (stored) {
@@ -61,6 +85,7 @@ function htmlToEditor(html) {
   if (!html || typeof document === 'undefined') return html || '';
   const wrap = document.createElement('div');
   wrap.innerHTML = html;
+  decorateAnchors(wrap);
   wrap.querySelectorAll('img').forEach((img) => {
     const src = img.getAttribute('src') || '';
     const stored = img.getAttribute('data-cms-src') || extractUploadsPath(src) || src;
@@ -315,9 +340,37 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
   }));
 
   const addLink = () => {
-    const url = window.prompt('Nhập link (https://…)');
-    if (!url) return;
-    run('createLink', url.trim());
+    if (disabled) return;
+    saveRange();
+    const raw = window.prompt('Nhập link (https://…)');
+    if (!raw) return;
+    const href = normalizeHref(raw);
+    if (!href) return;
+    const el = elRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    const range = savedRange.current;
+    const canRestore = !!(range && el.contains(range.commonAncestorContainer) && sel);
+    if (canRestore) {
+      try {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch { /* ignore */ }
+    }
+    const selectedText = (canRestore && range && !range.collapsed ? String(range.toString() || '') : '').trim();
+    if (selectedText) {
+      document.execCommand('createLink', false, href);
+    } else {
+      const a = document.createElement('a');
+      a.setAttribute('href', href);
+      a.textContent = selectedText || href.replace(/^https?:\/\//i, '');
+      const frag = document.createDocumentFragment();
+      frag.appendChild(a);
+      insertFragment(frag);
+    }
+    decorateAnchors(el);
+    emit();
   };
 
   const onEditorMouseDown = (e) => {

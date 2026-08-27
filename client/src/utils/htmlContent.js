@@ -12,11 +12,15 @@ import DOMPurify from 'dompurify';
 export function applyAnchorNewTabPolicy(rootElement) {
   if (!rootElement || typeof rootElement.querySelectorAll !== 'function') return;
   rootElement.querySelectorAll('a[href]').forEach((el) => {
-    const href = (el.getAttribute('href') || '').trim();
-    if (!href || /^javascript:/i.test(href)) return;
+    let href = (el.getAttribute('href') || '').trim();
+    if (!href || /^javascript:/i.test(href) || /^data:/i.test(href)) return;
     if (/^mailto:/i.test(href) || /^tel:/i.test(href)) return;
     if (href === '#') return;
     if (/^#[^#/]+$/.test(href)) return;
+    if (!/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(href)) {
+      href = href.startsWith('//') ? `https:${href}` : `https://${href.replace(/^\/+/, '')}`;
+      el.setAttribute('href', href);
+    }
     el.setAttribute('target', '_blank');
     const rel = (el.getAttribute('rel') || '')
       .split(/\s+/)

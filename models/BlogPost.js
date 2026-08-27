@@ -35,6 +35,13 @@ const blogPostSchema = new mongoose.Schema({
     maxlength: 200000,
   },
   thumbnailUrl: { type: String, default: '' },
+  topicId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'BlogTopic',
+    default: null,
+    index: true,
+  },
+  topicName: { type: String, default: '', trim: true, maxlength: 80 },
   attachments: { type: [attachmentSchema], default: [] },
   authorId: { type: String, required: true, index: true },
   authorName: { type: String, default: 'Admin' },

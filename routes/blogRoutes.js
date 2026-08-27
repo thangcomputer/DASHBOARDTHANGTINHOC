@@ -5,8 +5,10 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const mongoose = require('mongoose');
 const router = express.Router();
 const BlogPost = require('../models/BlogPost');
+const BlogTopic = require('../models/BlogTopic');
 const { authMiddleware, userHasPermission } = require('../middleware/auth');
 const { policyShadowBlog } = require('../middleware/policyShadowBlog');
 const { blogCutoverGate } = require('../middleware/blogCutoverGate');
@@ -60,6 +62,8 @@ function serializeCard(doc) {
     slug: o.slug,
     excerpt: o.excerpt || '',
     thumbnailUrl: o.thumbnailUrl || '',
+    topicId: o.topicId ? String(o.topicId) : '',
+    topicName: o.topicName || '',
     authorName: o.authorName || 'Admin',
     authorRole: o.authorRole,
     status: o.status,
@@ -100,6 +104,127 @@ function sanitizeHtml(html) {
   return s.slice(0, 200000);
 }
 
+function vnYmd(d = new Date()) {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const [y, m, day] = fmt.format(d).split('-').map(Number);
+  return { y, m, day };
+}
+
+function vnDate(y, m, d, h = 0, min = 0, s = 0) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return new Date(`${y}-${pad(m)}-${pad(d)}T${pad(h)}:${pad(min)}:${pad(s)}+07:00`);
+}
+
+function monthRangeVN(y, m) {
+  const start = vnDate(y, m, 1);
+  const nextM = m === 12 ? 1 : m + 1;
+  const nextY = m === 12 ? y + 1 : y;
+  return { start, end: vnDate(nextY, nextM, 1) };
+}
+
+function dateInRangeClause(start, end) {
+  return {
+    $or: [
+      { publishedAt: { $gte: start, $lt: end } },
+      { publishedAt: null, createdAt: { $gte: start, $lt: end } },
+    ],
+  };
+}
+
+function sortSpec(sortKey) {
+  if (sortKey === 'oldest') return { publishedAt: 1, createdAt: 1 };
+  if (sortKey === 'views') return { viewCount: -1, publishedAt: -1, createdAt: -1 };
+  return { publishedAt: -1, createdAt: -1 };
+}
+
+async function uniqueTopicSlug(base, excludeId) {
+  let slug = slugify(base).slice(0, 80) || `chu-de-${Date.now()}`;
+  let n = 0;
+  for (;;) {
+    const candidate = n === 0 ? slug : `${slug}-${n}`;
+    const q = { slug: candidate };
+    if (excludeId) q._id = { $ne: excludeId };
+    const exists = await BlogTopic.exists(q);
+    if (!exists) return candidate;
+    n += 1;
+  }
+}
+
+async function resolveTopicFields(topicIdRaw) {
+  if (topicIdRaw == null || topicIdRaw === '' || topicIdRaw === 'none') {
+    return { topicId: null, topicName: '' };
+  }
+  const id = String(topicIdRaw);
+  if (!mongoose.Types.ObjectId.isValid(id)) return { error: 'Chủ đề không hợp lệ' };
+  const t = await BlogTopic.findOne({ _id: id, deletedAt: null }).lean();
+  if (!t) return { error: 'Không tìm thấy chủ đề' };
+  return { topicId: t._id, topicName: t.name };
+}
+
+async function applyTopicAndPeriod(filter, { topic, period }) {
+  const topicQ = String(topic || '').trim();
+  if (topicQ && topicQ !== 'all') {
+    if (mongoose.Types.ObjectId.isValid(topicQ) && topicQ.length === 24) {
+      filter.topicId = topicQ;
+    } else {
+      const t = await BlogTopic.findOne({ slug: topicQ, deletedAt: null }).select('_id').lean();
+      filter.topicId = t ? t._id : new mongoose.Types.ObjectId('000000000000000000000000');
+    }
+  }
+
+  const p = String(period || '').trim();
+  if (!p) return;
+  const { y, m, day } = vnYmd();
+  let start;
+  let end;
+  if (p === 'today') {
+    start = vnDate(y, m, day);
+    end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  } else if (p === 'this_month') {
+    ({ start, end } = monthRangeVN(y, m));
+  } else if (p === 'last_month') {
+    const lm = m === 1 ? 12 : m - 1;
+    const ly = m === 1 ? y - 1 : y;
+    ({ start, end } = monthRangeVN(ly, lm));
+  } else if (p === 'oldest_month') {
+    const oldest = await BlogPost.findOne(filter).sort({ publishedAt: 1, createdAt: 1 }).select('publishedAt createdAt').lean();
+    const raw = oldest?.publishedAt || oldest?.createdAt;
+    if (!raw) {
+      filter._id = { $in: [] };
+      return;
+    }
+    const o = vnYmd(new Date(raw));
+    ({ start, end } = monthRangeVN(o.y, o.m));
+  } else {
+    return;
+  }
+  const clause = dateInRangeClause(start, end);
+  if (filter.$or) {
+    const qOr = filter.$or;
+    delete filter.$or;
+    filter.$and = [{ $or: qOr }, clause];
+  } else if (filter.$and) {
+    filter.$and.push(clause);
+  } else {
+    Object.assign(filter, clause);
+  }
+}
+
+function serializeTopic(doc) {
+  const o = doc.toObject ? doc.toObject() : doc;
+  return {
+    id: String(o._id),
+    name: o.name,
+    slug: o.slug,
+    sortOrder: o.sortOrder || 0,
+  };
+}
+
 const blogDir = path.join(__dirname, '..', 'uploads', 'blog');
 if (!fs.existsSync(blogDir)) fs.mkdirSync(blogDir, { recursive: true });
 
@@ -128,6 +253,15 @@ const upload = multer({
  */
 router.use(authMiddleware);
 
+router.get('/topics', policyShadowBlog('list'), blogCutoverGate('list'), async (req, res) => {
+  try {
+    const rows = await BlogTopic.find({ deletedAt: null }).sort({ sortOrder: 1, name: 1 }).lean();
+    res.json({ success: true, data: rows.map(serializeTopic) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ─── GET /api/blog/posts — danh sách public (đã xuất bản) ───────────────────
 router.get('/posts', policyShadowBlog('list'), blogCutoverGate('list'), async (req, res) => {
   try {
@@ -135,6 +269,7 @@ router.get('/posts', policyShadowBlog('list'), blogCutoverGate('list'), async (r
     const limit = Math.min(40, Math.max(1, parseInt(req.query.limit, 10) || 12));
     const q = String(req.query.q || '').trim();
     const target = String(req.query.target || '').trim();
+    const sortKey = String(req.query.sort || '').trim();
     const filter = { deletedAt: null, status: 'published' };
 
     if (target && ['all', 'teacher', 'student'].includes(target)) {
@@ -151,9 +286,10 @@ router.get('/posts', policyShadowBlog('list'), blogCutoverGate('list'), async (r
         { excerpt: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
       ];
     }
+    await applyTopicAndPeriod(filter, { topic: req.query.topic, period: req.query.period });
     const [rows, total] = await Promise.all([
       BlogPost.find(filter)
-        .sort({ publishedAt: -1, createdAt: -1 })
+        .sort(sortSpec(sortKey))
         .skip((page - 1) * limit)
         .limit(limit)
         .select('-contentHtml -attachments')
@@ -212,6 +348,7 @@ router.get('/posts/:slugOrId', policyShadowBlog('get'), blogCutoverGate('get'), 
       status: 'published',
       _id: { $ne: doc._id },
     };
+    if (doc.topicId) relatedFilter.topicId = doc.topicId;
 
     if (!isAdminSide) {
       if (req.user?.role === 'teacher') {
@@ -221,11 +358,22 @@ router.get('/posts/:slugOrId', policyShadowBlog('get'), blogCutoverGate('get'), 
       }
     }
 
-    const related = await BlogPost.find(relatedFilter)
+    let related = await BlogPost.find(relatedFilter)
       .sort({ publishedAt: -1 })
       .limit(4)
       .select('-contentHtml -attachments')
       .lean();
+    if (related.length < 4 && relatedFilter.topicId) {
+      const extraFilter = { ...relatedFilter };
+      delete extraFilter.topicId;
+      extraFilter._id = { $nin: [doc._id, ...related.map((r) => r._id)] };
+      const extra = await BlogPost.find(extraFilter)
+        .sort({ publishedAt: -1 })
+        .limit(4 - related.length)
+        .select('-contentHtml -attachments')
+        .lean();
+      related = related.concat(extra);
+    }
 
     res.json({
       success: true,
@@ -245,6 +393,7 @@ router.get('/manage/posts', manageGuard('manage_list'), async (req, res) => {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const status = String(req.query.status || '').trim();
     const q = String(req.query.q || '').trim();
+    const sortKey = String(req.query.sort || '').trim() || 'newest';
     const filter = { deletedAt: null };
     if (status && ['draft', 'published', 'hidden'].includes(status)) filter.status = status;
     if (q) {
@@ -253,8 +402,12 @@ router.get('/manage/posts', manageGuard('manage_list'), async (req, res) => {
         { excerpt: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
       ];
     }
+    await applyTopicAndPeriod(filter, { topic: req.query.topic, period: req.query.period });
+    const manageSort = sortKey === 'newest' && !req.query.sort
+      ? { updatedAt: -1 }
+      : sortSpec(sortKey);
     const [rows, total] = await Promise.all([
-      BlogPost.find(filter).sort({ updatedAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      BlogPost.find(filter).sort(manageSort).skip((page - 1) * limit).limit(limit).lean(),
       BlogPost.countDocuments(filter),
     ]);
     res.json({
@@ -285,6 +438,8 @@ router.post('/manage/posts', manageGuard('manage_create'), async (req, res) => {
     const slug = await uniqueSlug(req.body.slug || title);
     const status = ['draft', 'published', 'hidden'].includes(req.body.status) ? req.body.status : 'draft';
     const targetAudience = ['all', 'teacher', 'student'].includes(req.body.targetAudience) ? req.body.targetAudience : 'all';
+    const topicFields = await resolveTopicFields(req.body.topicId);
+    if (topicFields.error) return res.status(400).json({ success: false, message: topicFields.error });
     const publishedAt = status === 'published' ? new Date() : null;
 
     const post = await BlogPost.create({
@@ -293,6 +448,8 @@ router.post('/manage/posts', manageGuard('manage_create'), async (req, res) => {
       excerpt: String(req.body.excerpt || '').trim().slice(0, 500),
       contentHtml: sanitizeHtml(req.body.contentHtml || req.body.content || ''),
       thumbnailUrl: String(req.body.thumbnailUrl || '').trim(),
+      topicId: topicFields.topicId,
+      topicName: topicFields.topicName,
       attachments: Array.isArray(req.body.attachments) ? req.body.attachments : [],
       authorId: String(req.user.id),
       authorName: req.user.name || 'Admin',
@@ -328,6 +485,12 @@ router.put('/manage/posts/:id', manageGuard('manage_update'), async (req, res) =
     if (req.body.slug) post.slug = await uniqueSlug(req.body.slug, post._id);
     if (req.body.targetAudience && ['all', 'teacher', 'student'].includes(req.body.targetAudience)) {
       post.targetAudience = req.body.targetAudience;
+    }
+    if (req.body.topicId !== undefined) {
+      const topicFields = await resolveTopicFields(req.body.topicId);
+      if (topicFields.error) return res.status(400).json({ success: false, message: topicFields.error });
+      post.topicId = topicFields.topicId;
+      post.topicName = topicFields.topicName;
     }
 
     const prevStatus = post.status;
@@ -393,6 +556,59 @@ router.delete('/manage/posts/:id', manageGuard('manage_delete'), async (req, res
     );
     if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết hoặc bài đã bị xóa' });
     res.json({ success: true, message: 'Đã xóa bài viết' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/manage/topics', manageGuard('manage_create'), async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim().slice(0, 80);
+    if (!name) return res.status(400).json({ success: false, message: 'Nhập tên chủ đề' });
+    const slug = await uniqueTopicSlug(name);
+    const sortOrder = Number.isFinite(Number(req.body.sortOrder)) ? Number(req.body.sortOrder) : Date.now();
+    const topic = await BlogTopic.create({ name, slug, sortOrder });
+    res.status(201).json({ success: true, data: serializeTopic(topic) });
+  } catch (err) {
+    if (err?.code === 11000) return res.status(400).json({ success: false, message: 'Chủ đề đã tồn tại' });
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/manage/topics/:id', manageGuard('manage_update'), async (req, res) => {
+  try {
+    const topic = await BlogTopic.findOne({ _id: req.params.id, deletedAt: null });
+    if (!topic) return res.status(404).json({ success: false, message: 'Không tìm thấy chủ đề' });
+    if (req.body.name != null) {
+      const name = String(req.body.name || '').trim().slice(0, 80);
+      if (!name) return res.status(400).json({ success: false, message: 'Nhập tên chủ đề' });
+      topic.name = name;
+      topic.slug = await uniqueTopicSlug(name, topic._id);
+    }
+    await topic.save();
+    await BlogPost.updateMany(
+      { topicId: topic._id, deletedAt: null },
+      { $set: { topicName: topic.name } },
+    );
+    res.json({ success: true, data: serializeTopic(topic) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.delete('/manage/topics/:id', manageGuard('manage_delete'), async (req, res) => {
+  try {
+    const topic = await BlogTopic.findOneAndUpdate(
+      { _id: req.params.id, deletedAt: null },
+      { deletedAt: new Date() },
+      { returnDocument: 'after' },
+    );
+    if (!topic) return res.status(404).json({ success: false, message: 'Không tìm thấy chủ đề' });
+    await BlogPost.updateMany(
+      { topicId: topic._id, deletedAt: null },
+      { $set: { topicId: null, topicName: '' } },
+    );
+    res.json({ success: true, message: 'Đã xóa chủ đề' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

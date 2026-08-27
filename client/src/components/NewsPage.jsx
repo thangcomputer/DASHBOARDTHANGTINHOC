@@ -9,10 +9,12 @@ import {
   ImagePlus, Paperclip, Send, Save, EyeOff, Trash2, RefreshCw, X, FileText,
 } from 'lucide-react';
 import { resolveMediaUrl, blogAPI } from '../services/api';
+import { applyAnchorNewTabPolicy } from '../utils/htmlContent';
 import { useToast } from '../utils/toast';
 import { useSocket } from '../context/SocketContext';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
 import NewsRichEditor from './NewsRichEditor';
+import CmsSelect from './ui/CmsSelect';
 
 function formatDate(iso) {
   if (!iso) return '';
@@ -35,6 +37,8 @@ function statusClass(s) {
   if (s === 'hidden') return 'bg-slate-100 text-slate-600';
   return 'bg-amber-50 text-amber-700';
 }
+
+const selectClass = 'bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-red-100 focus-visible:border-red-500';
 
 function NewsCard({ post, basePath, onOpen }) {
   const thumb = post.thumbnailUrl ? resolveMediaUrl(post.thumbnailUrl) : null;
@@ -64,6 +68,11 @@ function NewsCard({ post, basePath, onOpen }) {
         <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black tracking-wide shadow-sm">
           {post.targetAudience === 'teacher' ? '👨‍🏫 Giảng viên' : post.targetAudience === 'student' ? '🎓 Học viên' : '🌐 Tất cả'}
         </span>
+        {post.topicName ? (
+          <span className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-white/90 text-slate-700 text-[10px] font-bold shadow-sm">
+            {post.topicName}
+          </span>
+        ) : null}
       </div>
       <div className="p-3.5 sm:p-4 flex flex-col flex-1 gap-2 min-w-0">
         <h3 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-red-600 transition-colors">
@@ -95,10 +104,15 @@ function resolveContentHtml(html) {
     /(<img\b[^>]*\bsrc=["'])([^"']+)(["'])/gi,
     (_, pre, src, post) => `${pre}${resolveMediaUrl(src)}${post}`,
   );
-  return DOMPurify.sanitize(resolved, {
-    ADD_ATTR: ['target', 'style'],
+  const clean = DOMPurify.sanitize(resolved, {
+    ADD_ATTR: ['target', 'style', 'rel'],
     ADD_TAGS: ['h2', 'h3', 'blockquote'],
   });
+  if (typeof document === 'undefined') return clean;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = clean;
+  applyAnchorNewTabPolicy(wrap);
+  return wrap.innerHTML;
 }
 
 function isHtmlEmpty(html) {
@@ -132,6 +146,9 @@ function EditorForm({ initial, onSaved, onCancel }) {
   const [contentHtml, setContentHtml] = useState(() => initial?.contentHtml || '');
   const [thumbnailUrl, setThumbnailUrl] = useState(() => initial?.thumbnailUrl || '');
   const [targetAudience, setTargetAudience] = useState(() => initial?.targetAudience || 'all');
+  const [topicId, setTopicId] = useState(() => initial?.topicId || '');
+  const [topics, setTopics] = useState([]);
+  const [newTopicName, setNewTopicName] = useState('');
   const [attachments, setAttachments] = useState(() => (
     Array.isArray(initial?.attachments) ? initial.attachments : []
   ));
@@ -140,6 +157,15 @@ function EditorForm({ initial, onSaved, onCancel }) {
 
   const words = useMemo(() => wordCountFromHtml(contentHtml), [contentHtml]);
   const readMins = Math.max(1, Math.ceil(words / 200));
+
+  const loadTopics = useCallback(async () => {
+    try {
+      const res = await blogAPI.listTopics();
+      if (res?.success) setTopics(res.data || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadTopics(); }, [loadTopics]);
 
   const uploadRaw = async (files) => {
     const list = Array.isArray(files) ? files : Array.from(files || []);
@@ -230,6 +256,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
         attachments,
         status,
         targetAudience,
+        topicId: topicId || 'none',
       };
       let res;
       if (initial?.id) res = await blogAPI.update(initial.id, payload);
@@ -320,6 +347,67 @@ function EditorForm({ initial, onSaved, onCancel }) {
                   {opt.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+              Chủ đề bài viết
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setTopicId('')}
+                className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${
+                  !topicId ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                Không chọn
+              </button>
+              {topics.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTopicId(t.id)}
+                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${
+                    topicId === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                value={newTopicName}
+                onChange={(e) => setNewTopicName(e.target.value)}
+                placeholder="Tên chủ đề mới…"
+                className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-300 bg-white"
+              />
+              <button
+                type="button"
+                disabled={busy || !newTopicName.trim()}
+                onClick={async () => {
+                  const name = newTopicName.trim();
+                  if (!name) return;
+                  setBusy(true);
+                  try {
+                    const res = await blogAPI.createTopic({ name });
+                    if (!res?.success) throw new Error(res?.message || 'Không tạo được chủ đề');
+                    setNewTopicName('');
+                    await loadTopics();
+                    if (res.data?.id) setTopicId(res.data.id);
+                    toast.success('Đã tạo chủ đề');
+                  } catch (err) {
+                    toast.error(err.message || 'Tạo chủ đề thất bại');
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold disabled:opacity-40"
+              >
+                Tạo chủ đề
+              </button>
             </div>
           </div>
 
@@ -466,6 +554,11 @@ export default function NewsPage({ session, role = 'admin' }) {
   const [pages, setPages] = useState(1);
   const [q, setQ] = useState('');
   const [qInput, setQInput] = useState('');
+  const [topics, setTopics] = useState([]);
+  const [topicFilter, setTopicFilter] = useState('all');
+  const [sortFilter, setSortFilter] = useState('newest');
+  const [periodFilter, setPeriodFilter] = useState('');
+  const [newTopicName, setNewTopicName] = useState('');
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [detailError, setDetailError] = useState('');
@@ -476,9 +569,16 @@ export default function NewsPage({ session, role = 'admin' }) {
   const loadList = useCallback(async (p = 1) => {
     setLoading(true);
     try {
+      const filters = {
+        page: p,
+        topic: topicFilter,
+        sort: sortFilter,
+        period: periodFilter || undefined,
+        q: q || undefined,
+      };
       const res = canManage && mode === 'manage'
-        ? await blogAPI.manageList({ page: p, limit: 20, status: manageStatus || undefined, q: q || undefined })
-        : await blogAPI.list({ page: p, limit: 12, q: q || undefined });
+        ? await blogAPI.manageList({ ...filters, limit: 20, status: manageStatus || undefined })
+        : await blogAPI.list({ ...filters, limit: 12 });
       if (res.success) {
         setItems(res.data || []);
         setPages(res.pagination?.pages || 1);
@@ -489,7 +589,14 @@ export default function NewsPage({ session, role = 'admin' }) {
     } finally {
       setLoading(false);
     }
-  }, [canManage, mode, manageStatus, q, toast]);
+  }, [canManage, mode, manageStatus, q, topicFilter, sortFilter, periodFilter, toast]);
+
+  const loadTopics = useCallback(async () => {
+    try {
+      const res = await blogAPI.listTopics();
+      if (res?.success) setTopics(res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadDetail = useCallback(async (s) => {
     setLoading(true);
@@ -510,6 +617,8 @@ export default function NewsPage({ session, role = 'admin' }) {
       setLoading(false);
     }
   }, [canManage, mode]);
+
+  useEffect(() => { loadTopics(); }, [loadTopics, mode, slug]);
 
   useEffect(() => {
     if (slug) loadDetail(slug);
@@ -677,6 +786,11 @@ export default function NewsPage({ session, role = 'admin' }) {
             {detail.isNew && (
               <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black">NEW</span>
             )}
+            {detail.topicName ? (
+              <span className="inline-block mb-2 ml-2 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-black">
+                {detail.topicName}
+              </span>
+            ) : null}
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">{detail.title}</h1>
             <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold text-slate-500">
               <span className="inline-flex items-center gap-1"><User size={13} />{detail.authorName}</span>
@@ -848,8 +962,8 @@ export default function NewsPage({ session, role = 'admin' }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 w-full">
-        <div className="relative flex-1 min-w-0">
+      <div className="flex flex-wrap items-center gap-2 w-full">
+        <div className="relative flex-1 min-w-[12rem]">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={qInput}
@@ -868,17 +982,112 @@ export default function NewsPage({ session, role = 'admin' }) {
         >
           Tìm
         </button>
+        <CmsSelect
+          value={topicFilter}
+          onChange={(e) => setTopicFilter(e.target.value)}
+          className={selectClass}
+          wrapperClassName="w-[9.5rem] sm:w-[11rem] shrink-0"
+          title="Chủ đề"
+        >
+          <option value="all">Chủ đề: Tất cả</option>
+          {topics.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </CmsSelect>
+        <CmsSelect
+          value={sortFilter}
+          onChange={(e) => setSortFilter(e.target.value)}
+          className={selectClass}
+          wrapperClassName="w-[9.5rem] sm:w-[11rem] shrink-0"
+          title="Sắp xếp"
+        >
+          <option value="newest">Tin mới nhất</option>
+          <option value="oldest">Tin cũ nhất</option>
+          <option value="views">Xem nhiều</option>
+        </CmsSelect>
+        <CmsSelect
+          value={periodFilter}
+          onChange={(e) => setPeriodFilter(e.target.value)}
+          className={selectClass}
+          wrapperClassName="w-[9.5rem] sm:w-[11rem] shrink-0"
+          title="Thời gian"
+        >
+          <option value="">Thời gian: Mọi lúc</option>
+          <option value="today">Hôm nay</option>
+          <option value="this_month">Tháng này</option>
+          <option value="last_month">Tháng trước</option>
+          <option value="oldest_month">Tháng cũ nhất</option>
+        </CmsSelect>
+        {canManage && topicFilter !== 'all' && (
+          <button
+            type="button"
+            title="Xóa chủ đề đang chọn"
+            className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 shrink-0"
+            onClick={async () => {
+              const t = topics.find((x) => x.id === topicFilter);
+              if (!t) return;
+              if (!(await window.cmsConfirm(`Xóa chủ đề “${t.name}”? Bài viết giữ nguyên, chỉ bỏ gắn chủ đề.`))) return;
+              const res = await blogAPI.removeTopic(t.id);
+              if (res?.success) {
+                setTopicFilter('all');
+                loadTopics();
+              }
+            }}
+          >
+            <X size={14} />
+          </button>
+        )}
+        {canManage && (
+          <div className="flex items-center gap-1.5 min-w-0 flex-1 max-w-[16rem]">
+            <input
+              value={newTopicName}
+              onChange={(e) => setNewTopicName(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key !== 'Enter') return;
+                const name = newTopicName.trim();
+                if (!name) return;
+                const res = await blogAPI.createTopic({ name });
+                if (res?.success) {
+                  setNewTopicName('');
+                  loadTopics();
+                  if (res.data?.id) setTopicFilter(res.data.id);
+                }
+              }}
+              placeholder="Tạo chủ đề…"
+              className="w-full min-w-0 border border-slate-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-red-500 bg-white"
+            />
+            <button
+              type="button"
+              className="p-2.5 rounded-xl bg-slate-900 text-white shrink-0"
+              title="Tạo chủ đề"
+              onClick={async () => {
+                const name = newTopicName.trim();
+                if (!name) return;
+                const res = await blogAPI.createTopic({ name });
+                if (res?.success) {
+                  setNewTopicName('');
+                  loadTopics();
+                  if (res.data?.id) setTopicFilter(res.data.id);
+                }
+              }}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        )}
         {canManage && mode === 'manage' && (
-          <select
+          <CmsSelect
             value={manageStatus}
             onChange={(e) => setManageStatus(e.target.value)}
-            className="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold bg-white shrink-0 outline-none focus:border-red-500"
+            className={selectClass}
+            wrapperClassName="w-[9.5rem] sm:w-[11rem] shrink-0"
+            title="Trạng thái"
           >
             <option value="">Tất cả trạng thái</option>
             <option value="published">Đã đăng</option>
             <option value="draft">Nháp</option>
             <option value="hidden">Đã ẩn</option>
-          </select>
+          </CmsSelect>
         )}
       </div>
 
@@ -897,7 +1106,9 @@ export default function NewsPage({ session, role = 'admin' }) {
               <li key={p.id} className="p-3 sm:p-4 flex flex-wrap items-center gap-3 hover:bg-slate-50">
                 <button type="button" className="flex-1 min-w-0 text-left" onClick={() => openPost(p)}>
                   <p className="font-bold text-slate-900 truncate">{p.title}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{formatDate(p.updatedAt)} · {p.viewCount || 0} xem</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {p.topicName ? `${p.topicName} · ` : ''}{formatDate(p.updatedAt)} · {p.viewCount || 0} xem
+                  </p>
                 </button>
                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${statusClass(p.status)}`}>
                   {statusLabel(p.status)}
