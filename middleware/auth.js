@@ -35,7 +35,7 @@ const authMiddleware = async (req, res, next) => {
     if (decoded.id && decoded.id !== 'admin') {
       let dbUser = null;
       if (decoded.role === 'student') {
-        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode').lean();
+        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode accountLocked').lean();
       } else {
         dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role permissions adminRole createdAt branchId branchCode').lean();
       }
@@ -62,6 +62,15 @@ const authMiddleware = async (req, res, next) => {
           success: false,
           code: 'TOKEN_VERSION_MISMATCH',
           message: 'Tài khoản đã đăng nhập ở thiết bị khác. Phiên này đã bị vô hiệu.',
+        });
+      }
+
+      if (decoded.role === 'student' && dbUser.accountLocked) {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_LOCKED',
+          isBan: true,
+          message: 'Tài khoản học viên đã bị khóa đăng nhập. Vui lòng liên hệ trung tâm.',
         });
       }
 

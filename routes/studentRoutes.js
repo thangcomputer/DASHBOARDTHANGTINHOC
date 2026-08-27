@@ -1193,6 +1193,10 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     delete safeBody.paidAt;
     delete safeBody.paymentMethod;
     delete safeBody.paidNote;
+    delete safeBody.knownDevices;
+    delete safeBody.knownDeviceCount;
+    delete safeBody.accountLocked;
+    delete safeBody.deviceFingerprint;
     const before = await Student.findById(req.params.id)
       .select(
         'studentExamUnlocked examApproved name examProgress phone email course status price '
@@ -3216,6 +3220,121 @@ router.delete('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── POST /api/students/:id/reset-devices ─────────────────────────────────────
+// Xóa lịch sử trình duyệt HV (không đụng khóa phiên 1 máy của lần login sau).
+router.post('/:id/reset-devices', [
+  authMiddleware,
+  branchFilter,
+  policyShadowStudentMutation('update'),
+  checkPermission(PERMISSIONS.MANAGE_STUDENTS),
+  assertStudentBranchAccess,
+], async (req, res) => {
+  try {
+    const student = await Student.findByIdAndUpdate(
+      req.params.id,
+      { $set: { knownDevices: [], knownDeviceCount: 0 } },
+      { returnDocument: 'after' },
+    );
+    if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    const io = req.app.get('io');
+    if (io) {
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
+    }
+    return res.json({
+      success: true,
+      message: 'Đã xóa danh sách thiết bị. Học viên có thể gắn lại tối đa 2 trình duyệt trước khi báo Admin.',
+      data: {
+        _id: student._id,
+        knownDeviceCount: 0,
+        accountLocked: !!student.accountLocked,
+      },
+    });
+  } catch (error) {
+    logger.error('[STUDENTS] reset-devices: %s', error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── POST /api/students/:id/lock-account ──────────────────────────────────────
+router.post('/:id/lock-account', [
+  authMiddleware,
+  branchFilter,
+  policyShadowStudentMutation('update'),
+  checkPermission(PERMISSIONS.MANAGE_STUDENTS),
+  assertStudentBranchAccess,
+], async (req, res) => {
+  try {
+    const student = await Student.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: { accountLocked: true },
+        $inc: { tokenVersion: 1 },
+        $unset: { refreshToken: '', deviceFingerprint: '' },
+      },
+      { returnDocument: 'after' },
+    );
+    if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('auth:forceLogout', {
+        userId: String(student._id),
+        role: 'student',
+        reason: 'account_locked',
+      });
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
+    }
+    return res.json({
+      success: true,
+      message: `Đã khóa đăng nhập của ${student.name}`,
+      data: {
+        _id: student._id,
+        accountLocked: true,
+        knownDeviceCount: Number(student.knownDeviceCount) || 0,
+      },
+    });
+  } catch (error) {
+    logger.error('[STUDENTS] lock-account: %s', error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── POST /api/students/:id/unlock-account ────────────────────────────────────
+router.post('/:id/unlock-account', [
+  authMiddleware,
+  branchFilter,
+  policyShadowStudentMutation('update'),
+  checkPermission(PERMISSIONS.MANAGE_STUDENTS),
+  assertStudentBranchAccess,
+], async (req, res) => {
+  try {
+    const student = await Student.findByIdAndUpdate(
+      req.params.id,
+      { $set: { accountLocked: false } },
+      { returnDocument: 'after' },
+    );
+    if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    const io = req.app.get('io');
+    if (io) {
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
+    }
+    return res.json({
+      success: true,
+      message: `Đã mở khóa đăng nhập của ${student.name}`,
+      data: {
+        _id: student._id,
+        accountLocked: false,
+        knownDeviceCount: Number(student.knownDeviceCount) || 0,
+      },
+    });
+  } catch (error) {
+    logger.error('[STUDENTS] unlock-account: %s', error.message);
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

@@ -957,7 +957,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       if (safeTab) q.set('tab', safeTab === 'overview' ? 'summary' : safeTab);
       const sch = String(scheduleId || '').trim();
       if (sch) q.set('scheduleId', sch);
-      navigate(`/admin#students?${q.toString()}`);
+      const hash = `students?${q.toString()}`;
+      // Hash-only trên /admin: navigate('/admin#…') bị RR bỏ qua → modal không mở tới khi F5.
+      navigate({ pathname: '/admin', hash });
+      window.location.hash = hash;
     };
     window.addEventListener('open-student-detail', onOpenStudentDetail);
     return () => window.removeEventListener('open-student-detail', onOpenStudentDetail);
@@ -1409,6 +1412,15 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               if (st) openPopup(st);
                               else if (n.path) navigate(n.path);
                             }
+                          } else if (
+                            (role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF')
+                            && n.payload?.kind === 'student_device_alert'
+                            && n.payload?.studentId
+                          ) {
+                            setShowNotif(false);
+                            window.dispatchEvent(new CustomEvent('open-student-detail', {
+                              detail: { id: String(n.payload.studentId), tab: 'summary' },
+                            }));
                           } else if (n.path) {
                             let targetPath = n.path;
 
@@ -1434,7 +1446,13 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               if (role === 'student' && String(n.type).toLowerCase() === 'exam' && n.payload?.quizId) {
                                 targetPath = '/student/exam';
                               }
-                              navigate(targetPath);
+                              if (String(targetPath).includes('#')) {
+                                const [pathPart, hashPart] = String(targetPath).split('#');
+                                navigate(pathPart || location.pathname || '/');
+                                window.location.hash = hashPart || '';
+                              } else {
+                                navigate(targetPath);
+                              }
                             }
                           }
                           setShowNotif(false);

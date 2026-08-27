@@ -313,6 +313,11 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         return;
       }
     }
+    if (isAdmin && n.payload?.kind === 'student_device_alert' && n.payload?.studentId) {
+      setStudentDetailTab('summary');
+      setStudentDetailId(String(n.payload.studentId));
+      return;
+    }
     const path = resolveNavPath(n.path);
     if (path && role === 'teacher' && String(path).includes('evaluationId=')) {
       await openTeacherRatingDetail(n);

@@ -286,6 +286,20 @@ const StudentSchema = new mongoose.Schema(
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login
     refreshToken: { type: String, select: false }, // Refresh token rotation (server-side)
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập
+    /** Lịch sử fingerprint (HV). Logout chỉ xóa deviceFingerprint phiên hiện tại, không xóa mảng này. */
+    knownDevices: {
+      type: [{
+        fingerprint: { type: String, default: '' },
+        userAgent: { type: String, default: '' },
+        firstSeenAt: { type: Date, default: Date.now },
+        lastSeenAt: { type: Date, default: Date.now },
+      }],
+      default: [],
+      select: false,
+    },
+    knownDeviceCount: { type: Number, default: 0 },
+    /** Khóa đăng nhập HV — tách khỏi status học vụ (Đang học / Chờ xếp lớp). */
+    accountLocked: { type: Boolean, default: false },
     
     // ── Audit: Ai là người thêm học viên này ──────────────────────
     createdBy: {

@@ -462,6 +462,7 @@ const FATAL_AUTH_CODES = new Set([
   'REFRESH_REUSE',
   'DEVICE_CONFLICT',
   'ACCOUNT_DISABLED',
+  'ACCOUNT_LOCKED',
   'USER_NOT_FOUND',
 ]);
 
@@ -876,6 +877,18 @@ export const studentsAPI = {
   },
   resetTodayAttendance: async (id) => {
     const res = await apiFetch(`/students/${id}/reset-today-attendance`, { method: 'POST' });
+    return res.json();
+  },
+  resetDevices: async (id) => {
+    const res = await apiFetch(`/students/${id}/reset-devices`, { method: 'POST' });
+    return res.json();
+  },
+  lockAccount: async (id) => {
+    const res = await apiFetch(`/students/${id}/lock-account`, { method: 'POST' });
+    return res.json();
+  },
+  unlockAccount: async (id) => {
+    const res = await apiFetch(`/students/${id}/unlock-account`, { method: 'POST' });
     return res.json();
   },
   lockExam: async (id, reason = '') => {

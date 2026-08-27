@@ -7,7 +7,7 @@ import {
   BookOpen, Search, Download, FileSpreadsheet, Plus, Users, AlertTriangle,
   MoreHorizontal, ClipboardList, Unlock, Lock, Camera, Printer, Trash2,
   ChevronLeft, ChevronRight, Loader2, MapPin, Globe, Building2, KeyRound,
-  CircleDollarSign,
+  CircleDollarSign, Laptop,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
 import { getActiveClientEnrollments, getClientEnrollments } from '../../../utils/enrollments';
@@ -60,6 +60,39 @@ function RefundHint({ amount }) {
   );
 }
 
+function DeviceAccountBadges({ student }) {
+  const locked = !!student?.accountLocked;
+  const count = Number(student?.knownDeviceCount) || 0;
+  if (!locked && count <= 2) return null;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1 mt-1">
+      {locked && (
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-700 border border-red-100">
+          Khóa đăng nhập
+        </span>
+      )}
+      {!locked && count > 2 && (
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
+          {count} trình duyệt
+        </span>
+      )}
+    </span>
+  );
+}
+
+async function confirmAdminAction({ title, content, confirmText, confirmButtonClass }) {
+  if (typeof window.cmsConfirmAdvanced === 'function') {
+    return window.cmsConfirmAdvanced({
+      title,
+      content,
+      confirmText,
+      confirmButtonClass,
+      type: 'warning',
+    });
+  }
+  return window.confirm(content);
+}
+
 /** Nút ⋯ + menu portal (fixed) — tránh bị che bởi overflow bảng/card. */
 function StudentRowActions({
     submittingAction,
@@ -102,7 +135,7 @@ function StudentRowActions({
         return;
       }
       const menuW = Math.min(260, window.innerWidth - 16);
-      const approxH = menuRef.current?.offsetHeight || 360;
+      const approxH = menuRef.current?.offsetHeight || 450;
       const gap = 6;
       const spaceBelow = window.innerHeight - r.bottom - 12;
       const spaceAbove = r.top - 12;
@@ -259,6 +292,74 @@ function StudentRowActions({
             <span className="min-w-0">Cấp mật khẩu</span>
           </button>
         )}
+        <button
+          type="button"
+          role="menuitem"
+          onClick={async () => {
+            setActionMenuId(null);
+            const ok = await confirmAdminAction({
+              title: 'Reset thiết bị',
+              content: `Xóa danh sách trình duyệt đã ghi của ${s.name || 'học viên'}? Học viên sẽ gắn lại tối đa 2 trình duyệt trước khi hệ thống báo Admin.`,
+              confirmText: 'Reset thiết bị',
+              confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm',
+            });
+            if (!ok) return;
+            setSubmittingAction(s.id + '-reset-dev');
+            try {
+              const res = await api.students.resetDevices(s.id || s._id);
+              if (!res?.success) throw new Error(res?.message || 'Không reset được thiết bị');
+              await ctxUpdateStudent(s.id || s._id, { knownDeviceCount: 0 }, { localOnly: true });
+              toast.success(res.message || 'Đã reset danh sách thiết bị');
+            } catch (e) {
+              toast.error(e?.message || 'Không reset được thiết bị');
+            } finally {
+              setSubmittingAction(null);
+            }
+          }}
+          disabled={submittingAction === s.id + '-reset-dev'}
+          className={`${itemCls} text-slate-700 hover:bg-slate-50`}
+        >
+          <Laptop size={15} className="shrink-0 text-slate-500" />
+          <span className="min-w-0">Reset thiết bị</span>
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={async () => {
+            setActionMenuId(null);
+            const lockedAcc = !!s.accountLocked;
+            const ok = await confirmAdminAction({
+              title: lockedAcc ? 'Mở khóa đăng nhập' : 'Khóa đăng nhập',
+              content: lockedAcc
+                ? `Cho phép ${s.name || 'học viên'} đăng nhập lại?`
+                : `Khóa đăng nhập của ${s.name || 'học viên'}? Phiên hiện tại sẽ bị đăng xuất ngay.`,
+              confirmText: lockedAcc ? 'Mở khóa' : 'Khóa đăng nhập',
+              confirmButtonClass: lockedAcc
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                : 'bg-red-600 hover:bg-red-700 text-white shadow-sm',
+            });
+            if (!ok) return;
+            setSubmittingAction(s.id + '-lock-acc');
+            try {
+              const res = lockedAcc
+                ? await api.students.unlockAccount(s.id || s._id)
+                : await api.students.lockAccount(s.id || s._id);
+              if (!res?.success) throw new Error(res?.message || 'Không cập nhật được khóa đăng nhập');
+              await ctxUpdateStudent(s.id || s._id, { accountLocked: !lockedAcc }, { localOnly: true });
+              toast.success(res.message || (lockedAcc ? 'Đã mở khóa đăng nhập' : 'Đã khóa đăng nhập'));
+            } catch (e) {
+              toast.error(e?.message || 'Không cập nhật được khóa đăng nhập');
+            } finally {
+              setSubmittingAction(null);
+            }
+          }}
+          disabled={submittingAction === s.id + '-lock-acc'}
+          className={`${itemCls} ${s.accountLocked ? 'text-emerald-700 hover:bg-emerald-50' : 'text-red-700 hover:bg-red-50'}`}
+        >
+          {s.accountLocked
+            ? <><Unlock size={15} className="shrink-0" /><span className="min-w-0">Mở khóa đăng nhập</span></>
+            : <><Lock size={15} className="shrink-0" /><span className="min-w-0">Khóa đăng nhập</span></>}
+        </button>
         <div className="border-t border-slate-100 my-0.5" />
         <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); removeStudent(s.id); }}
           className={`${itemCls} text-red-600 hover:bg-red-50`}>
@@ -807,6 +908,7 @@ export default function AdminStudentsTab() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <h3 className="text-base font-semibold text-slate-900 leading-snug truncate">{s.name}</h3>
+                      <DeviceAccountBadges student={s} />
                       <p className="text-xs text-slate-500 mt-0.5">
                         {regDate}{s.phone ? ` · ${s.phone}` : ''}
                       </p>
@@ -994,6 +1096,7 @@ export default function AdminStudentsTab() {
                       />
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900 text-base leading-snug truncate max-w-[200px]">{s.name}</p>
+                        <DeviceAccountBadges student={s} />
                         <p className="text-xs text-slate-500 mt-0.5">{regDate}{s.phone ? ` · ${s.phone}` : ''}</p>
                       </div>
                     </div>

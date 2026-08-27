@@ -26,6 +26,12 @@ const { enqueueOtp, enqueuePassword } = require('../services/queue/jobQueue');
 const QRCode = require('qrcode');
 const { generateStudentCode, generateTeacherCode } = require('../services/businessCodeService');
 const { studentHasLearningAccess } = require('../services/enrollmentService');
+const {
+  recordStudentKnownDevice,
+  notifyIfNewStudentDevice,
+  isStudentAccountLocked,
+  STUDENT_LOCKED_RESPONSE,
+} = require('../services/studentKnownDevices');
 
 const router = express.Router();
 
@@ -151,6 +157,17 @@ async function checkDeviceConflict(Model, userId, fp, force, req) {
     code: 'DEVICE_CONFLICT',
     message: 'Tài khoản đang đăng nhập trên máy tính khác. Đăng nhập sẽ đăng xuất phiên đó. Bạn có muốn tiếp tục không?',
   };
+}
+
+/** HV: ghi nhận fingerprint lịch sử (không thay DEVICE_CONFLICT 1 phiên). GV không gọi. */
+function trackStudentKnownDevice(user, userRole, fingerprint, req) {
+  if (userRole !== 'student') return null;
+  return recordStudentKnownDevice(user, fingerprint, req.headers['user-agent']);
+}
+
+function fireStudentDeviceAlert(req, user, userRole, record) {
+  if (userRole !== 'student' || !record) return;
+  notifyIfNewStudentDevice(req.app?.get?.('io'), user, record).catch(() => {});
 }
 
 /** Admin & Staff chỉ được đăng nhập qua cổng nội bộ (có CAPTCHA, cấp token aud='internal') */
@@ -625,13 +642,16 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
       const studentQuery = isEmail
         ? { email: rawId }
         : { $or: [{ phone: rawId }, { zalo: rawId }] };
-      user = await Student.findOne(studentQuery).select('+password');
+      user = await Student.findOne(studentQuery).select('+password +knownDevices');
 
       if (!user) {
         return res.status(401).json({ success: false, message: 'Tài khoản chưa được đăng ký trong hệ thống' });
       }
       if (!user.password) {
         return res.status(403).json({ success: false, message: 'Tài khoản học viên chưa được tạo mật khẩu. Vui lòng liên hệ trung tâm.' });
+      }
+      if (isStudentAccountLocked(user)) {
+        return res.status(403).json(STUDENT_LOCKED_RESPONSE);
       }
       userRole = 'student';
     }
@@ -659,6 +679,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
     );
     if (conflict1) return res.status(409).json(conflict1);
     if (fp1) user.deviceFingerprint = fp1;
+    const knownDevice1 = trackStudentKnownDevice(user, userRole, fp1, req);
 
     // ⭐ Fix 1: Increment tokenVersion → vô hiệu token cũ trên thiết bị khác
     const newTokenVersion = (user.tokenVersion || 0) + 1;
@@ -685,6 +706,7 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
     if (user.lockUntil) user.lockUntil = undefined;
     user.markModified('tokenVersion');  // Force Mongoose to persist new field
     await user.save({ validateModifiedOnly: true });
+    fireStudentDeviceAlert(req, user, userRole, knownDevice1);
 
     // ── Chuẩn bị response data (không trả password) ───────────────
     const userData = {
@@ -757,7 +779,7 @@ async function lookupUser(rawId, requestedRole = null) {
   // Student
   if (!requestedRole || requestedRole === 'student') {
     const studentQ = isEmail ? { email: rawId } : { $or: [{ phone: rawId }, { zalo: rawId }] };
-    const student = await Student.findOne(studentQ).select('+password');
+    const student = await Student.findOne(studentQ).select('+password +knownDevices');
     if (student) return { type: 'student', user: student, role: 'student' };
   }
 
@@ -798,6 +820,9 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
       // locked / pending+submitted: vẫn cho đăng nhập — /teacher/test xử lý UI
     }
     if (userRole === 'student') {
+      if (isStudentAccountLocked(user)) {
+        return res.status(403).json(STUDENT_LOCKED_RESPONSE);
+      }
       if (sStatus === 'inactive' || sStatus === 'suspended') {
         return res.status(403).json({
           success: false,
@@ -837,6 +862,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     );
     if (conflict2) return res.status(409).json(conflict2);
     if (fp2) user.deviceFingerprint = fp2;
+    const knownDevice2 = trackStudentKnownDevice(user, userRole, fp2, req);
 
     // ⭐ Fix 1: tokenVersion
     const newTokenVersion = (user.tokenVersion || 0) + 1;
@@ -853,6 +879,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     user.loginAttempts = 0;
     user.markModified('tokenVersion');
     await user.save({ validateModifiedOnly: true });
+    fireStudentDeviceAlert(req, user, userRole, knownDevice2);
 
     return res.json({
       success: true,

@@ -6,7 +6,8 @@ import {
   MapPin, Phone, Calendar, ChevronRight,
   TrendingUp, CreditCard, ClipboardList, ShieldCheck, 
   Printer, Loader2, AlertCircle, CheckCircle2, Star,
-  Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2, Edit3, Award
+  Smartphone, Hash, ArrowUpRight, Building2, Plus, Download, Trash2, Edit3, Award,
+  Laptop, Lock, Unlock,
 } from 'lucide-react';
 import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
@@ -273,8 +274,12 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
   const [enrollmentSessionForms, setEnrollmentSessionForms] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const { updateStudent, assignTeacher, teachers, triggerBackgroundSync, examSubjectsCatalog } = useData() || {};
+  const { updateStudent, assignTeacher, teachers, triggerBackgroundSync, examSubjectsCatalog, currentUser } = useData() || {};
+  const canManageStudentAccount = ['admin', 'staff'].includes(String(currentUser?.role || '').toLowerCase())
+    || currentUser?.adminRole === 'SUPER_ADMIN'
+    || String(currentUser?.id || currentUser?._id || '') === 'admin';
   const [showAddEnrollment, setShowAddEnrollment] = useState(false);
+  const [deviceBusy, setDeviceBusy] = useState('');
 
   useEffect(() => {
     setCourseFilter('all');
@@ -691,6 +696,79 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     } catch {
       toast.error('Lỗi kết nối API');
     }
+  };
+
+  const patchStudentAccountFields = (sid, fields) => {
+    setData((prev) => {
+      if (!prev?.student) return prev;
+      return { ...prev, student: { ...prev.student, ...fields } };
+    });
+    if (sid && typeof updateStudent === 'function') {
+      updateStudent(sid, fields, { localOnly: true }).catch(() => {});
+    }
+  };
+
+  const handleResetStudentDevices = () => {
+    const sid = data?.student?._id || data?.student?.id || studentId;
+    if (!sid) return;
+    showModal({
+      title: 'Reset thiết bị',
+      content: `Xóa danh sách trình duyệt đã ghi của ${data?.student?.name || 'học viên'}? Học viên sẽ gắn lại tối đa 2 trình duyệt trước khi hệ thống báo Admin.`,
+      type: 'warning',
+      confirmText: 'Reset thiết bị',
+      confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm',
+      onConfirm: async () => {
+        setDeviceBusy('reset');
+        try {
+          const res = await api.students.resetDevices(sid);
+          if (!res?.success) {
+            toast.error(res?.message || 'Không reset được thiết bị');
+            return;
+          }
+          patchStudentAccountFields(sid, { knownDeviceCount: 0 });
+          toast.success(res.message || 'Đã reset danh sách thiết bị');
+        } catch (e) {
+          toast.error(e?.message || 'Không reset được thiết bị');
+        } finally {
+          setDeviceBusy('');
+        }
+      },
+    });
+  };
+
+  const handleToggleStudentAccountLock = () => {
+    const sid = data?.student?._id || data?.student?.id || studentId;
+    if (!sid) return;
+    const lockedAcc = !!data?.student?.accountLocked;
+    showModal({
+      title: lockedAcc ? 'Mở khóa đăng nhập' : 'Khóa đăng nhập',
+      content: lockedAcc
+        ? `Cho phép ${data?.student?.name || 'học viên'} đăng nhập lại?`
+        : `Khóa đăng nhập của ${data?.student?.name || 'học viên'}? Phiên hiện tại sẽ bị đăng xuất ngay.`,
+      type: 'warning',
+      confirmText: lockedAcc ? 'Mở khóa' : 'Khóa đăng nhập',
+      confirmButtonClass: lockedAcc
+        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+        : 'bg-red-600 hover:bg-red-700 text-white shadow-sm',
+      onConfirm: async () => {
+        setDeviceBusy('lock');
+        try {
+          const res = lockedAcc
+            ? await api.students.unlockAccount(sid)
+            : await api.students.lockAccount(sid);
+          if (!res?.success) {
+            toast.error(res?.message || 'Không cập nhật được khóa đăng nhập');
+            return;
+          }
+          patchStudentAccountFields(sid, { accountLocked: !lockedAcc });
+          toast.success(res.message || (lockedAcc ? 'Đã mở khóa đăng nhập' : 'Đã khóa đăng nhập'));
+        } catch (e) {
+          toast.error(e?.message || 'Không cập nhật được khóa đăng nhập');
+        } finally {
+          setDeviceBusy('');
+        }
+      },
+    });
   };
 
   useEffect(() => {
@@ -1316,6 +1394,45 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                       </div>
                     )}
                   </div>
+
+                  {canManageStudentAccount && (
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                      {!!data.student.accountLocked && (
+                        <span className="px-2 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-red-50 text-red-700 border border-red-100">
+                          Đã khóa đăng nhập
+                        </span>
+                      )}
+                      {!data.student.accountLocked && Number(data.student.knownDeviceCount) > 2 && (
+                        <span className="px-2 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
+                          {Number(data.student.knownDeviceCount)} trình duyệt đã dùng
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleResetStudentDevices}
+                        disabled={!!deviceBusy}
+                        className="inline-flex items-center gap-1.5 min-h-9 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100 disabled:opacity-50"
+                      >
+                        {deviceBusy === 'reset' ? <Loader2 size={13} className="animate-spin" /> : <Laptop size={13} />}
+                        Reset thiết bị
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleToggleStudentAccountLock}
+                        disabled={!!deviceBusy}
+                        className={`inline-flex items-center gap-1.5 min-h-9 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold border disabled:opacity-50 ${
+                          data.student.accountLocked
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-100 hover:bg-emerald-100'
+                            : 'text-red-700 bg-red-50 border-red-100 hover:bg-red-100'
+                        }`}
+                      >
+                        {deviceBusy === 'lock'
+                          ? <Loader2 size={13} className="animate-spin" />
+                          : (data.student.accountLocked ? <Unlock size={13} /> : <Lock size={13} />)}
+                        {data.student.accountLocked ? 'Mở khóa đăng nhập' : 'Khóa đăng nhập'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
