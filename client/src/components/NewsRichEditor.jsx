@@ -7,6 +7,7 @@ import {
   Bold, Italic, Underline, List, ListOrdered, Heading2, Heading3,
   Link2, ImagePlus, AlignLeft, AlignCenter, Quote,
 } from 'lucide-react';
+import { resolveMediaUrl } from '../services/api';
 
 function ToolbarBtn({ onClick, title, children, disabled, active }) {
   return (
@@ -29,12 +30,57 @@ function ToolbarBtn({ onClick, title, children, disabled, active }) {
   );
 }
 
+function escAttr(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
+function extractUploadsPath(src) {
+  const raw = String(src || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('/uploads/')) return raw.split('?')[0];
+  if (raw.startsWith('uploads/')) return `/${raw.split('?')[0]}`;
+  const m = raw.match(/\/uploads\/[^\s?#]+/i);
+  return m ? m[0] : '';
+}
+
+function htmlToStorage(html) {
+  if (!html || typeof document === 'undefined') return html || '';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('img').forEach((img) => {
+    const stored = img.getAttribute('data-cms-src') || extractUploadsPath(img.getAttribute('src') || '');
+    if (stored) {
+      img.setAttribute('src', stored);
+      img.removeAttribute('data-cms-src');
+    }
+  });
+  return wrap.innerHTML;
+}
+
+function htmlToEditor(html) {
+  if (!html || typeof document === 'undefined') return html || '';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('img').forEach((img) => {
+    const src = img.getAttribute('src') || '';
+    const stored = img.getAttribute('data-cms-src') || extractUploadsPath(src) || src;
+    if (stored) img.setAttribute('data-cms-src', stored);
+    const display = resolveMediaUrl(stored) || src;
+    if (display) img.setAttribute('src', display);
+  });
+  return wrap.innerHTML;
+}
+
 const NewsRichEditor = forwardRef(function NewsRichEditor(
   { value = '', onChange, disabled = false, onRequestImage },
   ref,
 ) {
   const elRef = useRef(null);
-  const lastHtml = useRef('');
+  const lastStored = useRef('');
+  const savedRange = useRef(null);
 
   const [activeStates, setActiveStates] = useState({
     bold: false,
@@ -48,9 +94,19 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
     center: false,
   });
 
+  const saveRange = useCallback(() => {
+    const el = elRef.current;
+    const sel = window.getSelection();
+    if (!el || !sel || sel.rangeCount < 1) return;
+    const range = sel.getRangeAt(0);
+    if (!el.contains(range.commonAncestorContainer)) return;
+    savedRange.current = range.cloneRange();
+  }, []);
+
   const checkActiveStates = useCallback(() => {
     if (!elRef.current) return;
     try {
+      saveRange();
       const isBold = document.queryCommandState('bold');
       const isItalic = document.queryCommandState('italic');
       const isUnderline = document.queryCommandState('underline');
@@ -61,7 +117,7 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
       let blockTag = '';
       try {
         blockTag = (document.queryCommandValue('formatBlock') || '').toLowerCase();
-      } catch {}
+      } catch { /* ignore */ }
 
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
@@ -89,17 +145,16 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
         ol: isOl,
         center: isCenter,
       });
-    } catch {}
-  }, []);
+    } catch { /* ignore */ }
+  }, [saveRange]);
 
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
     const next = value || '';
-    if (next !== lastHtml.current && next !== el.innerHTML) {
-      el.innerHTML = next;
-      lastHtml.current = next;
-    }
+    if (next === lastStored.current) return;
+    el.innerHTML = htmlToEditor(next);
+    lastStored.current = next;
   }, [value]);
 
   useEffect(() => {
@@ -115,9 +170,9 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
   }, [checkActiveStates]);
 
   const emit = () => {
-    const html = elRef.current?.innerHTML || '';
-    lastHtml.current = html;
-    onChange?.(html);
+    const stored = htmlToStorage(elRef.current?.innerHTML || '');
+    lastStored.current = stored;
+    onChange?.(stored);
     checkActiveStates();
   };
 
@@ -129,23 +184,45 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
     setTimeout(checkActiveStates, 20);
   };
 
+  const insertFragment = (html) => {
+    const el = elRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    const range = savedRange.current;
+    const canRestore = range && el.contains(range.commonAncestorContainer);
+    if (canRestore && sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      const frag = document.createDocumentFragment();
+      while (temp.firstChild) frag.appendChild(temp.firstChild);
+      const live = sel.getRangeAt(0);
+      live.deleteContents();
+      live.insertNode(frag);
+      live.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(live);
+      savedRange.current = live.cloneRange();
+      return;
+    }
+    el.insertAdjacentHTML('beforeend', html);
+  };
+
   const insertImageAtCursor = (url, alt = '') => {
     if (!url || disabled) return;
-    elRef.current?.focus();
-    const safeUrl = String(url).replace(/"/g, '&quot;');
-    const safeAlt = String(alt || '').replace(/"/g, '&quot;');
-    document.execCommand(
-      'insertHTML',
-      false,
-      `<p><img src="${safeUrl}" alt="${safeAlt}" style="max-width:100%;height:auto;border-radius:12px" /></p><p><br></p>`,
-    );
+    const stored = extractUploadsPath(url) || String(url).trim();
+    const display = resolveMediaUrl(stored) || stored;
+    const html = `<p><img src="${escAttr(display)}" data-cms-src="${escAttr(stored)}" alt="${escAttr(alt)}" style="max-width:100%;height:auto;border-radius:12px" /></p><p><br></p>`;
+    insertFragment(html);
     emit();
   };
 
   useImperativeHandle(ref, () => ({
     insertImage: insertImageAtCursor,
     focus: () => elRef.current?.focus(),
-    getHtml: () => elRef.current?.innerHTML || '',
+    getHtml: () => htmlToStorage(elRef.current?.innerHTML || ''),
   }));
 
   const addLink = () => {
@@ -197,7 +274,10 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
         <ToolbarBtn
           title="Chèn ảnh vào bài"
           disabled={disabled}
-          onClick={() => onRequestImage?.()}
+          onClick={() => {
+            saveRange();
+            onRequestImage?.();
+          }}
         >
           <ImagePlus size={15} />
         </ToolbarBtn>
