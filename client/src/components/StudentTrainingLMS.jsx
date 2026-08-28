@@ -1691,7 +1691,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
             <div className="absolute top-3 left-3 z-[1]" title={owned ? 'Khóa đã mua' : 'Khóa có phí'}>
               <span className={`inline-flex items-center justify-center w-9 h-9 rounded-full shadow-md border ${
                 owned
-                  ? 'bg-emerald-500 border-emerald-300/60 text-white'
+                  ? 'bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-600 border-amber-200/90 text-amber-950 shadow-amber-400/40'
                   : 'bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 border-amber-200/80 text-amber-950'
               }`}>
                 <Crown size={16} className="shrink-0" fill="currentColor" aria-hidden="true" />
