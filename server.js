@@ -666,7 +666,7 @@ io.on('connection', (socket) => {
   });
 
   // ── Nhận report vi phạm thi ──
-  socket.on('exam:violation', (data) => {
+  socket.on('exam:violation', async (data) => {
     if (!socket.user) return;
     const uid = socketUserId(socket.user);
     const role = socket.user.role;
@@ -687,28 +687,41 @@ io.on('connection', (socket) => {
       date: new Date().toISOString()
     };
 
-    // Broadcast tới tất cả Admin & Giảng viên qua NotificationService
     const NotificationService = require('./services/NotificationService');
-    
-    // 1. Gửi cho tất cả Admin
+    const receivers = ['ALL_ADMIN'];
+    try {
+      const Student = require('./models/Student');
+      const student = data?.studentId
+        ? await Student.findById(data.studentId).select('branchId').lean()
+        : null;
+      const branchId = student?.branchId ? String(student.branchId) : '';
+      if (branchId) {
+        receivers.push(`ALL_ADMIN_${branchId}`);
+        receivers.push(`ALL_STAFF_${branchId}`);
+      }
+    } catch { /* thiếu chi nhánh → vẫn báo ALL_ADMIN */ }
+
+    // Super/High (ALL_ADMIN) + admin chi nhánh HV. Không gửi giáo viên.
     NotificationService.send(io, {
       type: 'EXAM',
       title: notif.title,
       content: notif.message,
-      receivers: 'ALL_ADMIN',
+      receivers,
       payload: data,
       link: '/admin#students'
     });
 
-    // 2. Gửi cho Giáo viên phụ trách
-    if (data.teacherId) {
+    const studentId = data?.studentId ? String(data.studentId) : '';
+    if (studentId) {
+      const courseLabel = data.course ? String(data.course) : 'chứng chỉ';
+      const reasonTxt = data.reason ? String(data.reason) : 'vi phạm giám sát';
       NotificationService.send(io, {
         type: 'EXAM',
-        title: notif.title,
-        content: notif.message,
-        receivers: data.teacherId.toString(),
-        payload: data,
-        link: '/teacher'
+        title: '🚨 Bài thi bị hủy',
+        content: `Bài thi ${courseLabel} đã bị hủy (${reasonTxt}). Quyền thi của bạn đã bị khóa.`,
+        receivers: studentId,
+        payload: { ...data, targetAudience: 'student' },
+        link: '/student/exam'
       });
     }
      // (Removed io.emit('exam:locked') to prevent INFINITE LOOP with StudentTest resolving 'exam:locked' by emitting 'exam:violation')

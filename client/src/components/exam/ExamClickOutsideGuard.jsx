@@ -22,6 +22,7 @@ const IGNORE_SELECTOR = [
 /**
  * Chỉ bật ở giai đoạn trắc nghiệm.
  * Click ngoài vùng làm bài (hoặc blur cửa sổ) → overlay giữa màn + âm thanh + nút tiếp tục.
+ * Tối đa maxStrikes lần (mặc định 2); lần cuối gọi onMaxStrikes để hủy bài.
  * Tự luận / thực hành: truyền enabled=false.
  */
 export default function ExamClickOutsideGuard({
@@ -29,31 +30,55 @@ export default function ExamClickOutsideGuard({
   soundUrl = '',
   /** Bật khi phòng thi không dùng ExamMonitor (quiz GV). Cert dùng ExamMonitor tab guard. */
   watchVisibility = false,
+  /** Số lần bấm ra ngoài trước khi hủy bài. */
+  maxStrikes = 2,
+  /** Gọi khi đủ maxStrikes (trắc nghiệm). Không truyền = chỉ cảnh báo, không hủy. */
+  onMaxStrikes,
   children,
   className = '',
 }) {
   const [open, setOpen] = useState(false);
+  const [strikeCount, setStrikeCount] = useState(0);
   const openRef = useRef(false);
   const cooldownRef = useRef(0);
+  const strikesRef = useRef(0);
+  const maxedRef = useRef(false);
+  const onMaxStrikesRef = useRef(onMaxStrikes);
 
+  useEffect(() => { onMaxStrikesRef.current = onMaxStrikes; }, [onMaxStrikes]);
   useEffect(() => { openRef.current = open; }, [open]);
 
   useEffect(() => {
-    if (!enabled) setOpen(false);
+    if (!enabled) {
+      setOpen(false);
+      setStrikeCount(0);
+      strikesRef.current = 0;
+      maxedRef.current = false;
+    }
   }, [enabled]);
 
   const trigger = useCallback((source = 'click') => {
-    if (!enabled || openRef.current) return;
+    if (!enabled || openRef.current || maxedRef.current) return;
     // FIX Bug 4: blur/visibility chỉ trigger sau khi người dùng đã có gesture
     // tránh false-positive + âm thanh không có khi chưa unlock audio
     if (source !== 'click' && !hasUserGesture()) return;
     const now = Date.now();
     if (now - cooldownRef.current < 400) return;
     cooldownRef.current = now;
+    strikesRef.current += 1;
+    const n = strikesRef.current;
+    setStrikeCount(n);
     unlockAudio();
     playExamWarningSound(resolveMediaUrl(soundUrl) || soundUrl);
+    const cap = Number.isFinite(maxStrikes) && maxStrikes > 0 ? maxStrikes : 2;
+    if (n >= cap && typeof onMaxStrikesRef.current === 'function') {
+      maxedRef.current = true;
+      setOpen(false);
+      onMaxStrikesRef.current();
+      return;
+    }
     setOpen(true);
-  }, [enabled, soundUrl]);
+  }, [enabled, soundUrl, maxStrikes]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -125,6 +150,14 @@ export default function ExamClickOutsideGuard({
               <p className="text-gray-400 font-bold mt-3 text-sm leading-relaxed">
                 Bạn vừa thao tác ngoài vùng làm bài. Hãy quay lại màn hình thi và tiếp tục làm bài.
               </p>
+              {maxStrikes > 0 && (
+                <p className="text-orange-600 font-extrabold mt-3 text-xs uppercase tracking-wide">
+                  Cảnh báo {strikeCount}/{maxStrikes}
+                  {strikeCount < maxStrikes
+                    ? ` — còn ${maxStrikes - strikeCount} lần, lần sau bài thi sẽ bị hủy.`
+                    : ''}
+                </p>
+              )}
             </div>
             <button
               type="button"

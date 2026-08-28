@@ -332,13 +332,15 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   }, [phase, attemptKey]);
 
   const updateExamProgress = useCallback(async (changes, { revertOnFail = false } = {}) => {
-    if (!student || !updateStudent) return false;
+    if (!student || !updateStudent) {
+      return false;
+    }
     const id = student._id || student.id;
     const previousProgress = Array.isArray(student.examProgress)
       ? student.examProgress.map((e) => ({ ...e }))
       : [];
     const progress = student.examProgress || [];
-    const idx = progress.findIndex((s) => s.id === subjectId);
+    const idx = progress.findIndex((s) => String(s.id) === String(subjectId));
     let newProgress = [...progress];
     if (idx !== -1) {
       newProgress[idx] = { ...newProgress[idx], ...changes };
@@ -359,6 +361,27 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       return false;
     }
   }, [student, updateStudent, subjectId]);
+
+  // HV vào phòng thi (kể cả chờ camera) → dang_thi. API exam-progress bắn student:updated.
+  const markedInProgressRef = useRef(false);
+  useEffect(() => {
+    if (phase !== 'test' && phase !== 'hardware_check') {
+      markedInProgressRef.current = false;
+      return;
+    }
+    if (markedInProgressRef.current) return;
+    const st = progressEntry?.status;
+    if (st === 'dang_thi') {
+      markedInProgressRef.current = true;
+      return;
+    }
+    if (st === 'dat' || st === 'khong_dat') return;
+    if (!canEnterCertificationExam(progressEntry)) return;
+    markedInProgressRef.current = true;
+    void updateExamProgress({ status: 'dang_thi' }).then((ok) => {
+      if (!ok) markedInProgressRef.current = false;
+    });
+  }, [phase, progressEntry, updateExamProgress]);
 
   const applyFailAndLock = useCallback(async (totalOverride) => {
     const total = Number.isFinite(totalOverride) ? totalOverride : TOTAL;
@@ -542,7 +565,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     setPhase('banned');
     void applyFailAndLock();
 
-    // Phát cảnh báo qua socket cho Admin & Giảng viên
+    // Phát cảnh báo qua socket cho Super/High + admin chi nhánh HV
     if (socket) {
       socket.emit('exam:violation', {
         studentId: STUDENT_ID,
@@ -761,7 +784,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
 
         <div className="flex-1 flex items-center justify-center relative overflow-hidden">
           <div className="absolute inset-0 border-[12px] border-blue-500/30 pointer-events-none rounded-[32px] m-4 animate-pulse" />
-          <div className="bg-white rounded-[28px] p-5 max-w-[320px] w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-blue-600 animate-in zoom-in duration-500 overflow-y-auto max-h-[90vh] no-scrollbar">
+          <div className="bg-white rounded-[28px] p-5 sm:p-6 max-w-[320px] sm:max-w-2xl w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-blue-600 animate-in zoom-in duration-500 overflow-y-auto max-h-[90vh] no-scrollbar">
+          <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-5 sm:items-start">
+            <div className="min-w-0 sm:text-left">
              <h2 className="text-lg font-black text-slate-900 tracking-tight mt-0">Yêu cầu bật Camera</h2>
          {questionsLoading && (
            <div className="mb-3 px-2 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold">
@@ -773,12 +798,13 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
              Chưa có câu hỏi trắc nghiệm cho môn <span className="text-amber-950">{meta.short}</span> trong ngân hàng. Vui lòng liên hệ Admin.
            </div>
          )}
-         <p className="text-slate-500 font-bold mt-1 mb-3 px-2 text-xs leading-relaxed">
+         <p className="text-slate-500 font-bold mt-1 mb-3 px-2 sm:px-0 text-xs leading-relaxed">
              Để đảm bảo tính công bằng, bạn <span className="text-red-500">bắt buộc phải bật camera</span> xuyên suốt quá trình làm bài thi.
          </p>
-         
+            </div>
+
          {/* Hướng dẫn Box (Mô phỏng Dialog Chrome) */}
-         <div className="border-[1.5px] border-slate-200 rounded-[20px] p-3 mb-3 relative text-left bg-slate-50 shadow-inner select-none pointer-events-none">
+         <div className="border-[1.5px] border-slate-200 rounded-[20px] p-3 mb-3 sm:mb-0 relative text-left bg-slate-50 shadow-inner select-none pointer-events-none sm:row-span-2 sm:col-start-2 sm:row-start-1">
             <div className="flex items-center justify-between mb-2">
                <div>
                   <p className="font-bold text-slate-700 text-[13px]">{EXAM_CAMERA_PERMISSION_LABEL} muốn</p>
@@ -788,7 +814,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
             </div>
 
             {/* Khung Camera Xem trước */}
-            <div className="bg-slate-900 rounded-xl h-20 mb-2 relative overflow-hidden flex items-center justify-center border-[3px] border-white shadow-md">
+            <div className="bg-slate-900 rounded-xl h-20 sm:h-auto sm:aspect-video mb-2 relative overflow-hidden flex items-center justify-center border-[3px] border-white shadow-md">
                {cameraReady ? (
                    <video ref={previewRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
                ) : (
@@ -828,6 +854,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
             </div>
          </div>
 
+            <div className="min-w-0 sm:col-start-1 sm:row-start-2 sm:text-left">
          {/* Trạng thái Sẵn sàng */}
          <div className={`py-2 rounded-[14px] font-black text-xs mb-3 flex items-center justify-center gap-1.5 transition-all duration-300 ${cameraReady ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400 opacity-60'}`}>
             <CheckCircle size={13} className={cameraReady ? '' : 'grayscale'}/> Camera đã sẵn sàng!
@@ -859,6 +886,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
            <NavArrow size={14} direction="back" className="text-slate-600" />
            Quay lại
          </button>
+            </div>
+          </div>
        </div>
       </div>
     </div>
@@ -1001,6 +1030,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     <ExamClickOutsideGuard
       enabled={phase === 'test' && tab !== 'tu_luan'}
       soundUrl={examWarningSoundUrl}
+      maxStrikes={2}
+      onMaxStrikes={() => handleViolation('Bấm ra ngoài vùng làm bài quá 2 lần. Bài thi bị hủy!')}
       className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-slate-100 font-sans text-slate-900"
     >
       <div
@@ -1012,12 +1043,12 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         }}
       />
 
-      {/* ══════════ HEADER — 3 cột cân đối, tập trung tiêu đề giữa ══════════ */}
+      {/* ══════════ HEADER — 1 hàng: thoát/SBD/giờ | logo | giám sát+camera ══════════ */}
       <header className="relative z-20 shrink-0 px-2 pt-1.5 pb-1.5 md:px-4 md:pt-2 md:pb-2">
-        <div className="mx-auto max-w-[min(100%,90rem)] rounded-xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 shadow-[0_16px_50px_-18px_rgba(15,23,42,0.5)] overflow-hidden md:rounded-2xl">
+        <div className="relative mx-auto max-w-[min(100%,90rem)] rounded-xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 shadow-[0_16px_50px_-18px_rgba(15,23,42,0.5)] overflow-hidden md:rounded-2xl">
           <div className="absolute inset-0 opacity-[0.07] bg-[linear-gradient(rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.06)_1px,transparent_1px)] bg-[size:24px_24px]" />
-          <div className="relative border-b border-white/10 px-3 py-2 md:px-4 md:py-2">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="relative grid grid-cols-1 gap-2 p-2.5 sm:p-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5 lg:justify-start">
                 <button
                   type="button"
                   onClick={() => {
@@ -1032,30 +1063,22 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                       },
                     });
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-black/20 backdrop-blur-sm transition hover:bg-white/15 md:px-3 md:py-2 md:text-xs"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-black/20 backdrop-blur-sm transition hover:bg-white/15"
                 >
                   <ArrowLeft size={14} /> Thoát phòng thi
                 </button>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-200 md:text-xs">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                  Đang giám sát
-                </span>
-            </div>
-          </div>
-          <div className="relative grid grid-cols-1 gap-2 p-2 md:p-2.5 lg:grid-cols-12 lg:items-center lg:gap-3">
-            <div className="flex flex-wrap items-center gap-1.5 md:gap-2 lg:col-span-5 lg:justify-start">
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 font-mono text-xs text-slate-100 shadow-inner md:px-3 md:py-2">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 font-mono text-xs text-slate-100 shadow-inner">
                 <Shield size={12} className="shrink-0 text-sky-400" />
                 <span className="text-slate-400">SBD:</span>
                 <span className="font-bold text-white">{studentSbd}</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 text-xs text-slate-200 shadow-inner md:px-3 md:py-2">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 text-xs text-slate-200 shadow-inner">
                 <LayoutGrid size={12} className="shrink-0 text-sky-400" />
                 <span className="font-semibold text-white">{TOTAL}</span>
                 <span className="text-slate-400">câu TN</span>
               </span>
               <span
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-inner transition-all md:px-3 md:py-2 ${
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-inner transition-all ${
                   timeLeft < 300
                     ? 'border-red-500/45 bg-red-950/60 text-red-200 animate-pulse'
                     : 'border-white/15 bg-black/35 text-white'
@@ -1069,22 +1092,20 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
               </span>
             </div>
 
-            <div className="flex items-center gap-3 lg:col-span-3 lg:justify-center">
+            <div className="flex items-center justify-center gap-3 min-w-0">
               <ExamBrandLogo
                 resolvedUrl={webLogoUrl}
-                className="h-6 w-auto max-w-[min(100%,130px)] md:h-7"
+                className="h-7 w-auto max-w-[min(100%,150px)] md:h-8"
               />
-              <div className="h-6 w-[1px] bg-white/20 hidden md:block" />
-              <div className="text-left hidden md:block">
-                <h1 className="text-xs font-black leading-none text-white uppercase tracking-wider">Ca thi</h1>
-                <p className="text-[10px] font-bold text-indigo-300 mt-0.5 leading-none">{meta.label}</p>
+              <div className="h-7 w-px bg-white/20 hidden sm:block shrink-0" />
+              <div className="text-left hidden sm:block min-w-0">
+                <h1 className="text-[11px] font-black leading-none text-white uppercase tracking-wider">Ca thi</h1>
+                <p className="text-xs font-bold text-indigo-300 mt-1 leading-tight truncate max-w-[14rem]">{meta.label}</p>
               </div>
             </div>
 
-            <div className="flex min-w-0 w-full flex-col lg:col-span-4 lg:items-end">
-              <div className="w-full max-w-[17.5rem] min-w-0 lg:flex lg:justify-end">
-                <CameraHeaderPanel monitorRef={monitorRef} variant="default" />
-              </div>
+            <div className="flex min-w-0 items-center lg:justify-end">
+              <CameraHeaderPanel monitorRef={monitorRef} variant="compact" />
             </div>
           </div>
         </div>

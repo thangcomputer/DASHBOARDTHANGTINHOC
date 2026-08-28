@@ -19,7 +19,7 @@ const PAGE_SIZE = 10;
 /**
  * Student list filters, pagination, CRUD, export, and student-tab UI state.
  */
-export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, sqSectionRef }) {
+export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
   const {
     students,
     addStudent: ctxAddStudent,
@@ -102,6 +102,17 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         branch_id: selectedBranchId,
         forceBranchIdAll: selectedBranchId === 'all',
       });
+      return;
+    }
+    // Đào tạo HV: luôn tải examProgress (badge Kết quả thi + realtime ĐANG THI)
+    if (activeTab === 'student-training') {
+      fetchStudentsPaginated({
+        page: 1,
+        limit: EXAM_RESULTS_STUDENTS_FETCH_CAP,
+        search: '',
+        branch_id: selectedBranchId,
+        forceBranchIdAll: selectedBranchId === 'all',
+      });
     }
   }, [activeTab, currentPage, search, filterPaid, filterCourse, fetchStudentsPaginated, selectedBranchId]);
 
@@ -156,8 +167,17 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
     if (onDataRefresh) {
       return onDataRefresh((payload) => {
         if (payload?.type === 'students' || payload?.type === 'student' || payload?.type === 'socket:any') {
-          // Tránh gọi quá nhiều, có thể debounce nếu cần, 
-          // nhưng onDataRefresh trong SocketContext đã có debounce 320ms.
+          const onExam = activeTab === 'student-training';
+          if (onExam) {
+            fetchStudentsPaginated({
+              page: 1,
+              limit: EXAM_RESULTS_STUDENTS_FETCH_CAP,
+              search: '',
+              branch_id: selectedBranchId,
+              forceBranchIdAll: selectedBranchId === 'all',
+            });
+            return;
+          }
           fetchStudentsPaginated({
             page: currentPage, limit: PAGE_SIZE, search,
             paid: filterPaid, course: filterCourse, branch_id: selectedBranchId,
@@ -166,7 +186,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
         }
       });
     }
-  }, [onDataRefresh, currentPage, search, filterPaid, filterCourse, selectedBranchId, activeTab]);
+  }, [onDataRefresh, currentPage, search, filterPaid, filterCourse, selectedBranchId, activeTab, fetchStudentsPaginated]);
 
   const refreshStudentList = (page = currentPage) => {
     fetchStudentsPaginated({
@@ -397,12 +417,13 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, s
 
   /** Refresh list used by socket / exam-results / confirmDelete */
   const refreshStudentsForTab = () => {
-    if (activeTab === 'student-training' && sTrainingTabRef?.current === 'exam-results') {
+    if (activeTab === 'student-training') {
       fetchStudentsPaginated({
         page: 1,
         limit: EXAM_RESULTS_STUDENTS_FETCH_CAP,
         search: '',
         branch_id: selectedBranchId,
+        forceBranchIdAll: selectedBranchId === 'all',
       });
     } else if (activeTab === 'students') {
       refreshStudentList();

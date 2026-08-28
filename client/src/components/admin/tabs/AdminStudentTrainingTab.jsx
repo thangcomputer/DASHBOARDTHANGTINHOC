@@ -2,6 +2,8 @@ import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { useAdminTab } from '../AdminTabContext';
 import { useAdminTraining } from '../hooks/AdminTrainingContext';
+import { useSocket } from '../../../context/SocketContext';
+import { EXAM_RESULTS_STUDENTS_FETCH_CAP } from '../hooks/adminConstants';
 import {
   BookOpen, Video, Download, HelpCircle, Trophy, Plus, Clock, Trash2,
   FileSpreadsheet, Edit3, X, Upload, Loader2, FileText, Save, Search,
@@ -45,11 +47,38 @@ export default function AdminStudentTrainingTab() {
     erSearch, setErSearch, gradingRow, setGradingRow,
     gradingValue, setGradingValue, ctxUpdateStudent, toast, addNotification,
     erForm, setErForm, safeStudentsList,
+    sTrainingTab, setSTrainingTab,
+    fetchStudentsPaginated, selectedBranchId,
   } = useAdminTab();
+  const { socket } = useSocket() || {};
+
+  React.useEffect(() => {
+    if (typeof fetchStudentsPaginated !== 'function') return undefined;
+    const load = () => {
+      fetchStudentsPaginated({
+        page: 1,
+        limit: EXAM_RESULTS_STUDENTS_FETCH_CAP,
+        search: '',
+        branch_id: selectedBranchId,
+        forceBranchIdAll: selectedBranchId === 'all',
+      });
+    };
+    load();
+    if (!socket) return undefined;
+    const onUpd = () => {
+      load();
+    };
+    socket.on('student:updated', onUpd);
+    socket.on('data:refresh', onUpd);
+    return () => {
+      socket.off('student:updated', onUpd);
+      socket.off('data:refresh', onUpd);
+    };
+  }, [fetchStudentsPaginated, selectedBranchId, socket]);
 
   const {
     sCourseBuilderMode, setSCourseBuilderMode, updateStudentTrainingItem,
-    studentTrainingData, sTrainingTab, setSTrainingTab, setSTrainingForm,
+    studentTrainingData, setSTrainingForm,
     studentQuestions, studentExamMinutes, updateStudentExamMinutes,
     studentExamFiles, setStudentExamFile,
     resetStudentQuestions, setSqForm,
@@ -413,6 +442,7 @@ export default function AdminStudentTrainingTab() {
                       subjectLabel: SUBJECT_LABELS[ep.id] || ep.id,
                       score: ep.tracNghiem?.score ?? 0,
                       total: ep.tracNghiem?.total ?? 15,
+                      hasTracNghiem: Boolean(ep.tracNghiem && Number(ep.tracNghiem.total) > 0),
                       thucHanh: ep.thucHanh || 'chua_nop',
                       essayFile: ep.essayFile || '',
                       essayScore: ep.essayScore ?? null,
@@ -516,10 +546,12 @@ export default function AdminStudentTrainingTab() {
                             const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
                             const isLocked = r.lockUntil && r.lockUntil > Date.now();
                             const tnPass = pct >= 50;
-                            // Trạng thái tổng hợp: TN đạt + TL đã nộp + chấm >= 5 => ĐẠT
-                            const finalStatus = !tnPass ? 'khong_dat'
+                            // Đang thi: không lấy điểm TN=0 thành RỚT. ĐẠT/RỚT chỉ khi đã nộp / đã khóa.
+                            const finalStatus = r.status === 'dang_thi' ? 'dang_thi'
+                              : r.status === 'khong_dat' ? 'khong_dat'
+                              : !tnPass ? 'khong_dat'
                               : r.thucHanh !== 'da_nop' ? r.status
-                              : r.essayScore === null ? 'cho_cham' // chờ chấm
+                              : r.essayScore === null ? 'cho_cham'
                               : r.essayScore >= 5 ? 'dat' : 'khong_dat';
                             return (
                               <tr key={`${r.studentId}-${r.subjectId}`} className="hover:bg-amber-50/30 transition-colors">
@@ -539,8 +571,14 @@ export default function AdminStudentTrainingTab() {
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   <div className="flex flex-col items-center">
-                                    <span className={`text-lg font-black ${pct >= 50 ? 'text-sky-700' : 'text-red-500'}`}>{r.score}/{r.total}</span>
-                                    <span className="text-xs cms-min-text-xs text-gray-400 font-bold">{pct}%</span>
+                                    {r.status === 'dang_thi' && !r.hasTracNghiem ? (
+                                      <span className="text-sm font-bold text-gray-400">—</span>
+                                    ) : (
+                                      <>
+                                        <span className={`text-lg font-black ${pct >= 50 ? 'text-sky-700' : 'text-red-500'}`}>{r.score}/{r.total}</span>
+                                        <span className="text-xs cms-min-text-xs text-gray-400 font-bold">{pct}%</span>
+                                      </>
+                                    )}
                                   </div>
                                 </td>
                                 {/* Cột Tự luận: Chưa nộp / Nút tải xuống */}

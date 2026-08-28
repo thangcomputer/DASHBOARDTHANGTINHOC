@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useCallback, useState, useEffect, useRef } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import api from '../services/api';
 import { mapStudent } from '../lib/entityMaps';
 import { useSocket } from './SocketContext';
@@ -92,6 +92,8 @@ export function StudentsProvider({ user, children }) {
   const studentsPagination = data?.pagination ?? EMPTY_PAGINATION;
   // First fetch for this key: block learning gate until settled
   const isStudentsLoading = Boolean(key) && (isLoading || (data == null && isValidating));
+  const userRef = useRef(user);
+  userRef.current = user;
 
   const fetchStudentsPaginated = useCallback(async (params = {}) => {
     const prev = adminQueryRef.current;
@@ -107,6 +109,7 @@ export function StudentsProvider({ user, children }) {
         ? !!params.forceBranchIdAll
         : !!prev?.forceBranchIdAll,
     };
+    const nextKey = studentsKey(userRef.current, q);
     setAdminQuery(q);
     adminQueryRef.current = q;
     const paidParam = q.paid !== undefined && q.paid !== 'all'
@@ -129,14 +132,21 @@ export function StudentsProvider({ user, children }) {
         : {}),
     });
     if (res?.success) {
-      await mutate({
-        students: res.data.map(mapStudent),
+      const mapped = res.data.map(mapStudent);
+      const payload = {
+        students: mapped,
         pagination: {
           totalRecords: res.totalRecords || 0,
           totalPages: res.totalPages || 1,
           currentPage: res.currentPage || 1,
         },
-      }, { revalidate: false });
+      };
+      // Hook mutate gắn key SWR hiện tại (null khi F5) — ghi đúng key sắp đọc.
+      if (nextKey) {
+        await globalMutate(nextKey, payload, { revalidate: false });
+      } else {
+        await mutate(payload, { revalidate: false });
+      }
     }
     return res;
   }, [mutate]);

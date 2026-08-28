@@ -1112,14 +1112,17 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   if (phase === 'hardware_check') return (
     <div className="flex-1 min-h-0 h-full w-full bg-slate-900 flex items-center justify-center p-4 sm:p-6 relative overflow-y-auto overscroll-y-contain">
       <div className="absolute inset-0 border-[12px] border-[#203DB5]/30 pointer-events-none rounded-[32px] m-4 animate-pulse" />
-      <div className="bg-white rounded-[28px] p-5 max-w-[320px] w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-[#203DB5] animate-in zoom-in duration-500 my-4">
+      <div className="bg-white rounded-[28px] p-5 sm:p-6 max-w-[320px] sm:max-w-2xl w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-[#203DB5] animate-in zoom-in duration-500 my-4">
+         <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-5 sm:items-start">
+         <div className="min-w-0 sm:text-left">
          <h2 className="text-lg font-black text-slate-900 tracking-tight mt-0">Yêu cầu bật Camera</h2>
-         <p className="text-slate-500 font-bold mt-1 mb-3 px-2 text-xs leading-relaxed">
+         <p className="text-slate-500 font-bold mt-1 mb-3 px-2 sm:px-0 text-xs leading-relaxed">
              Để đảm bảo tính công bằng, bạn <span className="text-[#E13B35]">bắt buộc phải bật camera</span> xuyên suốt quá trình làm bài thi.
          </p>
+         </div>
          
          {/* Hướng dẫn Box (Mô phỏng Dialog Chrome) */}
-         <div className="relative mb-3">
+         <div className="relative mb-3 sm:mb-0 sm:row-span-2 sm:col-start-2 sm:row-start-1">
            <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-600 text-white text-xs cms-min-text-xs font-black px-2 py-0.5 rounded-full z-20 shadow-sm animate-bounce">HƯỚNG DẪN</div>
            <div className="border-[1.5px] border-slate-200 rounded-[20px] p-3 relative text-left bg-[#F4F7F6] shadow-inner select-none pointer-events-none">
             <div className="flex items-center justify-between mb-2">
@@ -1131,7 +1134,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
             </div>
 
             {/* Khung Camera Xem trước */}
-            <div className="bg-slate-900 rounded-xl h-20 mb-2 relative overflow-hidden flex items-center justify-center border-[3px] border-white shadow-md">
+            <div className="bg-slate-900 rounded-xl h-20 sm:h-auto sm:aspect-video mb-2 relative overflow-hidden flex items-center justify-center border-[3px] border-white shadow-md">
                {cameraReady ? (
                    <video ref={previewRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
                ) : (
@@ -1177,6 +1180,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
          </div>
          </div>
 
+         <div className="min-w-0 sm:col-start-1 sm:row-start-2 sm:text-left">
          {/* Trạng thái Sẵn sàng */}
          <div className={`py-2 rounded-[14px] font-black text-xs mb-3 flex items-center justify-center gap-1.5 transition-all duration-300 ${cameraReady ? 'bg-[#E1FDEB] text-[#008945]' : 'bg-slate-100 text-slate-400 opacity-60'}`}>
             <CheckCircle2 size={13} className={cameraReady ? '' : 'grayscale'}/> Camera đã sẵn sàng!
@@ -1205,6 +1209,8 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
              }`}>
              {startingExam ? 'Đang tải thời gian thi…' : 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'}
          </button>
+         </div>
+         </div>
       </div>
     </div>
   );

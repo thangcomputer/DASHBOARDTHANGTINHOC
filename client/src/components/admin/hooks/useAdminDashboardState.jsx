@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import useSWR, { mutate } from 'swr';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
@@ -154,7 +154,7 @@ export function useAdminDashboardState() {
   const sqSectionRef = useRef('coban');
   const qSectionRef = useRef('coban');
 
-  const studentsApi = useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef, sqSectionRef });
+  const studentsApi = useAdminStudents({ activeTab, setDeleteModal, sqSectionRef });
   const teachersApi = useAdminTeachers({
     selectedBranchId,
     activeTab,
@@ -395,18 +395,24 @@ export function useAdminDashboardState() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Student training management state
-  const [sTrainingTab, setSTrainingTab] = useState('videos');
+  const [sTrainingTab, setSTrainingTabState] = useState('videos');
+  const setSTrainingTab = useCallback((next) => {
+    const value = typeof next === 'function' ? next(sTrainingTabRef.current) : next;
+    sTrainingTabRef.current = value;
+    setSTrainingTabState(value);
+  }, []);
   useEffect(() => {
     sTrainingTabRef.current = sTrainingTab;
   }, [sTrainingTab]);
 
   useEffect(() => {
-    if (activeTab !== 'student-training' || sTrainingTab !== 'exam-results') return;
+    if (activeTab !== 'student-training') return;
     fetchStudentsPaginated({
       page: 1,
       limit: EXAM_RESULTS_STUDENTS_FETCH_CAP,
       search: '',
       branch_id: selectedBranchId,
+      forceBranchIdAll: selectedBranchId === 'all',
     });
   }, [activeTab, sTrainingTab, selectedBranchId, fetchStudentsPaginated]);
 
@@ -567,6 +573,7 @@ export function useAdminDashboardState() {
     addNotification, sqSection, setSqSection, sqType, setSqType, sqSearch, setSqSearch, removeStudentQuestion,
     removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
     erForm, setErForm, safeStudentsList, updateExamResult, addExamResult,
+    fetchStudentsPaginated,
   }), [
     search, filterCourse, filterPaid, handleExportExcel, isExportingExcel, showImportModal, showModal,
     studentsPagination, filteredStudents, safeTeachers, safeBranches,
@@ -594,7 +601,7 @@ export function useAdminDashboardState() {
     transactions, addSystemLog, financeStudents, isLoadingFinance, markStudentPaid, financialData,
     
     sCourseBuilderMode, updateStudentTrainingItem,
-    studentTrainingData, sTrainingTab,
+    studentTrainingData, sTrainingTab, setSTrainingTab,
     students, studentQuestions, studentExamMinutes, updateStudentExamMinutes,
     studentExamFiles, setStudentExamFile,
     resetStudentQuestions, handleStudentQuestionsExcelFile,
@@ -603,6 +610,7 @@ export function useAdminDashboardState() {
     addNotification, sqSection, sqType, sqSearch, removeStudentQuestion,
     removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
     erForm, safeStudentsList, updateExamResult, addExamResult,
+    fetchStudentsPaginated,
   ]);
 
   return {

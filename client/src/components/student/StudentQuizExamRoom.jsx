@@ -442,6 +442,8 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
       enabled={!resultData && !loading && !!quizData}
       soundUrl={examWarningSoundUrl}
       watchVisibility
+      maxStrikes={2}
+      onMaxStrikes={() => { void submitForfeit('Bấm ra ngoài vùng làm bài quá 2 lần'); }}
       className="flex-1 min-h-0 flex flex-col select-none overflow-x-hidden"
     >
       {/* ── TOPBAR PHÒNG THI ── */}
