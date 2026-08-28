@@ -1,7 +1,9 @@
-﻿import React from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminTab } from '../AdminTabContext';
-import { AlertTriangle, ShieldAlert, MessageSquare, CheckCircle2, MessageCircle, UserCheck, Building2 } from 'lucide-react';
+import { useBranch } from '../../../context/BranchContext';
+import api from '../../../services/api';
+import { AlertTriangle, ShieldAlert, MessageSquare, CheckCircle2, MessageCircle, UserCheck, Building2, Loader2 } from 'lucide-react';
 import { RATING_CRITERIA } from '../../../context/useDataRatings';
 
 function Chip({ label, value, tone = 'sky' }) {
@@ -127,12 +129,42 @@ function EvaluationCard({ ev, markEvaluationRead, navigate }) {
 }
 
 export default function AdminEvaluationsTab() {
-  const {
-    getPrivateEvaluationsForAdmin, markEvaluationRead,
-  } = useAdminTab();
+  const { markEvaluationRead } = useAdminTab();
+  const { selectedBranchId } = useBranch();
   const navigate = useNavigate();
+  const [branchEvals, setBranchEvals] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const allEvals = getPrivateEvaluationsForAdmin();
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.evaluations.getPrivate({ branchId: selectedBranchId || 'all' })
+      .then((res) => {
+        if (cancelled) return;
+        const rows = res?.success ? (res.data || []) : [];
+        setBranchEvals(rows.map((e) => ({
+          ...e,
+          id: e._id || e.id,
+          comment: e.content || e.comment || '',
+        })));
+      })
+      .catch(() => {
+        if (!cancelled) setBranchEvals([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedBranchId]);
+
+  const markRead = (evalId) => {
+    markEvaluationRead(evalId);
+    setBranchEvals((prev) => prev.map((ev) => (
+      String(ev.id) === String(evalId) ? { ...ev, read: true } : ev
+    )));
+  };
+
+  const allEvals = branchEvals;
   
   const centerEvals = allEvals.filter(ev => ev.milestone === 'course_end_center' || (ev.criteria && (ev.criteria.centerSupport || ev.criteria.centerFacility)));
   const teacherEvals = allEvals.filter(ev => !centerEvals.includes(ev));
@@ -153,6 +185,11 @@ export default function AdminEvaluationsTab() {
         </div>
         
         <div className="p-4 sm:p-6 bg-slate-50">
+          {loading ? (
+            <div className="py-16 flex justify-center text-slate-400">
+              <Loader2 className="animate-spin" size={28} />
+            </div>
+          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             
             {/* Cột 1: Đánh giá Giảng viên */}
@@ -176,7 +213,7 @@ export default function AdminEvaluationsTab() {
                 ) : (
                   <div className="space-y-0">
                     {teacherEvals.map(ev => (
-                      <EvaluationCard key={ev.id} ev={ev} markEvaluationRead={markEvaluationRead} navigate={navigate} />
+                      <EvaluationCard key={ev.id} ev={ev} markEvaluationRead={markRead} navigate={navigate} />
                     ))}
                   </div>
                 )}
@@ -204,7 +241,7 @@ export default function AdminEvaluationsTab() {
                 ) : (
                   <div className="space-y-0">
                     {centerEvals.map(ev => (
-                      <EvaluationCard key={ev.id} ev={ev} markEvaluationRead={markEvaluationRead} navigate={navigate} />
+                      <EvaluationCard key={ev.id} ev={ev} markEvaluationRead={markRead} navigate={navigate} />
                     ))}
                   </div>
                 )}
@@ -212,6 +249,7 @@ export default function AdminEvaluationsTab() {
             </div>
 
           </div>
+          )}
         </div>
       </div>
     </div>

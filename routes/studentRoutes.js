@@ -1197,6 +1197,11 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     delete safeBody.knownDeviceCount;
     delete safeBody.accountLocked;
     delete safeBody.deviceFingerprint;
+    let pendingTeacherAlert;
+    if (Object.prototype.hasOwnProperty.call(safeBody, 'teacherAlert')) {
+      pendingTeacherAlert = sanitizeTeacherAlert(safeBody.teacherAlert);
+      delete safeBody.teacherAlert;
+    }
     const before = await Student.findById(req.params.id)
       .select(
         'studentExamUnlocked examApproved name examProgress phone email course status price '
@@ -1445,6 +1450,20 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
               e.requireWebcam = !!safeBody.requireWebcam;
             });
           }
+          student.markModified('enrollments');
+          await student.save();
+        }
+      }
+
+      if (pendingTeacherAlert !== undefined) {
+        if (!student.enrollments?.length && student.course) {
+          student.enrollments = [legacyEnrollmentFromStudent(student)];
+          student.enrollments[0].isPrimary = true;
+        }
+        if (student.enrollments?.length) {
+          let alertIdx = student.enrollments.findIndex((e) => e.isPrimary);
+          if (alertIdx < 0) alertIdx = 0;
+          student.enrollments[alertIdx].teacherAlert = pendingTeacherAlert;
           student.markModified('enrollments');
           await student.save();
         }
@@ -2347,12 +2366,17 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
       totalSessions,
       completedSessions,
       remainingSessions,
+      teacherAlert,
     } = req.body || {};
     if (typeof requireWebcam === 'boolean') {
       student.enrollments[idx].requireWebcam = requireWebcam;
     }
     if (typeof examUnlocked === 'boolean') {
       student.enrollments[idx].examUnlocked = examUnlocked;
+    }
+    const touchAlert = Object.prototype.hasOwnProperty.call(req.body || {}, 'teacherAlert');
+    if (touchAlert) {
+      student.enrollments[idx].teacherAlert = sanitizeTeacherAlert(teacherAlert);
     }
 
     const touchSessions =
@@ -2403,7 +2427,9 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
 
     return res.json({
       success: true,
-      message: touchSessions ? 'Đã cập nhật số buổi khóa học' : 'Đã cập nhật quyền khóa học',
+      message: touchSessions
+        ? 'Đã cập nhật số buổi khóa học'
+        : (touchAlert ? 'Đã cập nhật lưu ý giảng viên' : 'Đã cập nhật quyền khóa học'),
       data: doc,
       meta: {
         courseName: student.enrollments[idx]?.courseName || '',

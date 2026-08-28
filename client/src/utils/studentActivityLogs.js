@@ -160,11 +160,48 @@ function classifyGradeNote(note) {
   const noteLower = String(note || '').toLowerCase();
   if (noteLower.includes('hủy điểm danh')) return 'attendance_cancel';
   if (noteLower.includes('hủy ca')) return 'schedule_cancel';
+  if (noteLower.includes('đổi lịch') || noteLower.includes('đổi ca') || noteLower.includes('dời lịch') || noteLower.includes('dời ca')) {
+    return 'schedule_change';
+  }
   if (noteLower.includes('cập nhật điểm') || noteLower.includes('sửa điểm')) return 'grade_update';
   if (noteLower.includes('bài nộp')) return 'homework';
   if (noteLower.includes('trắc nghiệm')) return 'quiz';
   if (noteLower.includes('đánh giá')) return 'evaluation';
   return 'attendance';
+}
+
+const SCHEDULE_LOG_TYPES = new Set([
+  'scheduled',
+  'pending_attendance',
+  'overdue_attendance',
+  'past_pending',
+  'attendance',
+  'attendance_cancel',
+  'schedule_cancel',
+  'cancelled',
+  'schedule_change',
+]);
+
+/** Ghi chú / type đổi lịch (GV dời ca). */
+export function isScheduleChangeLog(item) {
+  if (!item) return false;
+  if (item.type === 'schedule_change') return true;
+  const noteLower = String(item.note || '').toLowerCase();
+  return noteLower.includes('đổi lịch') || noteLower.includes('đổi ca')
+    || noteLower.includes('dời lịch') || noteLower.includes('dời ca');
+}
+
+/** Hủy buổi / lịch học / đổi lịch / điểm danh buổi. */
+export function isStudentScheduleLog(item) {
+  if (!item) return false;
+  if (isScheduleChangeLog(item)) return true;
+  return SCHEDULE_LOG_TYPES.has(item.type);
+}
+
+/** Bài nộp / trắc nghiệm / điểm / đánh giá — mọi thứ không thuộc nhật ký lịch. */
+export function isStudentScoreLog(item) {
+  if (!item) return false;
+  return !isStudentScheduleLog(item);
 }
 
 function normalizeAttendanceNote(note, sessionNumber) {
@@ -444,6 +481,11 @@ export const ACTIVITY_LOG_META = {
     label: 'Hủy ca',
     badge: 'bg-slate-200 text-slate-800 border-slate-300',
     iconWrap: 'bg-slate-200 text-slate-700',
+  },
+  schedule_change: {
+    label: 'Đổi lịch',
+    badge: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    iconWrap: 'bg-indigo-100 text-indigo-700',
   },
   homework: {
     label: 'Bài nộp',

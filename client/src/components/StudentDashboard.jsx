@@ -18,7 +18,7 @@ import {
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
 import { getScheduleDisplayKind } from '../utils/scheduleTime';
-import { buildStudentActivityLogs } from '../utils/studentActivityLogs';
+import { buildStudentActivityLogs, isStudentScheduleLog, isStudentScoreLog } from '../utils/studentActivityLogs';
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
 import { StudentNoteModal } from './student/StudentNoteModal';
 import {
@@ -29,6 +29,88 @@ import {
   StudentLazyOverviewTab,
 } from './student/StudentLazyTabShell';
 
+function parseLogDateToMs(dStr) {
+  if (!dStr) return 0;
+  if (dStr instanceof Date) return dStr.getTime();
+  if (typeof dStr === 'number') return dStr;
+  const str = String(dStr).trim();
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      const dt = new Date(year, month, day);
+      if (!Number.isNaN(dt.getTime())) return dt.getTime();
+    }
+  }
+  const dt = new Date(str);
+  return Number.isNaN(dt.getTime()) ? 0 : dt.getTime();
+}
+
+function parseScheduleLogTimestamp(dateVal, timeStr) {
+  const dateMs = parseLogDateToMs(dateVal);
+  if (!dateMs) return 0;
+  const m = String(timeStr || '').match(/(\d{1,2}):(\d{2})/);
+  if (!m) return dateMs;
+  const d = new Date(dateMs);
+  d.setHours(parseInt(m[1], 10), parseInt(m[2], 10), 0, 0);
+  return d.getTime();
+}
+
+/** Lịch sắp tới / đang diễn ra / chờ điểm danh — không gồm buổi đã hoàn thành. */
+function buildPendingScheduleLogs(schedules, student) {
+  if (!student) return [];
+  const pendingLogs = [];
+  const seenKeys = new Set();
+  (schedules || []).forEach((s, sIdx) => {
+    const dateStr = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
+    const ts = parseScheduleLogTimestamp(s.date, s.startTime) || Date.now();
+    const kind = getScheduleDisplayKind(s);
+
+    if (kind === 'upcoming' || kind === 'ongoing') {
+      const key = `sched_${dateStr}_${s.startTime || sIdx}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      pendingLogs.push({
+        type: 'scheduled',
+        displayKind: kind,
+        date: dateStr,
+        time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
+        note: s.title || s.subject || `Lịch học giảng viên xếp (${s.teacherName || student.teacher || 'Giảng viên'})`,
+        grade: null,
+        index: null,
+        timestamp: ts,
+      });
+      return;
+    }
+
+    if (kind === 'past_pending' || kind === 'pending_attendance' || kind === 'overdue_attendance') {
+      const key = `past_${dateStr}_${s.startTime || sIdx}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      const pendingNote = kind === 'overdue_attendance'
+        ? `Quá hạn điểm danh — chờ quản trị viên điểm danh bù (${s.teacherName || student.teacher || 'Giảng viên'})`
+        : `Chưa điểm danh — buổi đã kết thúc (${s.teacherName || student.teacher || 'Giảng viên'})`;
+      pendingLogs.push({
+        type: kind === 'overdue_attendance' ? 'overdue_attendance' : 'pending_attendance',
+        displayKind: kind,
+        date: dateStr,
+        time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
+        note: s.title || s.subject || pendingNote,
+        grade: null,
+        index: null,
+        timestamp: ts,
+      });
+    }
+  });
+  return pendingLogs;
+}
+
+function mergeScheduleLogs(pendingLogs, activityLogs) {
+  const fromActivity = (activityLogs || []).filter(isStudentScheduleLog);
+  return [...pendingLogs, ...fromActivity].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+}
 
 const StudentDashboard = ({ onNavigate }) => {
   const [activeCourseName, setActiveCourseName] = useState('');
@@ -387,75 +469,17 @@ const StudentDashboard = ({ onNavigate }) => {
     });
   }, [studentData, myAssignments, myQuizzes, privateEvaluations, mySchedulesAll]);
 
-  const studyLogs = useMemo(() => {
-    if (!viewStudent) return [];
-    const pendingLogs = [];
-    const seenKeys = new Set();
+  /** Tổng quan: bài nộp / TN / điểm / đánh giá (không gồm lịch & điểm danh buổi). */
+  const scoreLogs = useMemo(
+    () => (displayGrades || []).filter(isStudentScoreLog),
+    [displayGrades],
+  );
 
-    const parseDateToMs = (dStr) => {
-      if (!dStr) return 0;
-      if (dStr instanceof Date) return dStr.getTime();
-      if (typeof dStr === 'number') return dStr;
-      const str = String(dStr).trim();
-      if (str.includes('/')) {
-        const parts = str.split('/');
-        if (parts.length === 3) {
-          const day = parseInt(parts[0], 10);
-          const month = parseInt(parts[1], 10) - 1;
-          const year = parseInt(parts[2], 10);
-          const dt = new Date(year, month, day);
-          if (!Number.isNaN(dt.getTime())) return dt.getTime();
-        }
-      }
-      const dt = new Date(str);
-      return Number.isNaN(dt.getTime()) ? 0 : dt.getTime();
-    };
-
-    // Lịch GV xếp — nhãn theo thời gian thực (upcoming/pending)
-    (mySchedules || []).forEach((s, sIdx) => {
-       const dateStr = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
-       const ts = parseDateToMs(s.date) || Date.now();
-       const kind = getScheduleDisplayKind(s);
-
-       if (kind === 'upcoming' || kind === 'ongoing') {
-         const key = `sched_${dateStr}_${s.startTime || sIdx}`;
-         if (!seenKeys.has(key)) {
-           seenKeys.add(key);
-           pendingLogs.push({
-              type: 'scheduled',
-              displayKind: kind,
-              date: dateStr,
-              time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
-              note: s.title || s.subject || `Lịch học giảng viên xếp (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`,
-              grade: null,
-              index: null,
-              timestamp: ts
-           });
-         }
-       } else if (kind === 'past_pending' || kind === 'pending_attendance' || kind === 'overdue_attendance') {
-         const key = `past_${dateStr}_${s.startTime || sIdx}`;
-         if (!seenKeys.has(key)) {
-           seenKeys.add(key);
-           const pendingNote = kind === 'overdue_attendance'
-             ? `Quá hạn điểm danh — chờ quản trị viên điểm danh bù (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`
-             : `Chưa điểm danh — buổi đã kết thúc (${s.teacherName || viewStudent.teacher || 'Giảng viên'})`;
-           pendingLogs.push({
-              type: kind === 'overdue_attendance' ? 'overdue_attendance' : 'pending_attendance',
-              displayKind: kind,
-              date: dateStr,
-              time: s.startTime ? `${s.startTime}${s.endTime ? ` - ${s.endTime}` : ''}` : (s.time || ''),
-              note: s.title || s.subject || pendingNote,
-              grade: null,
-              index: null,
-              timestamp: ts
-           });
-         }
-       }
-       // completed: đã hiện qua attendanceHistory/grades ở bước 1 — không nhân đôi
-    });
-
-    return [...pendingLogs, ...displayGrades].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-  }, [viewStudent, mySchedules, displayGrades]);
+  /** Tab Lịch: hủy buổi / lịch học / đổi lịch / điểm danh buổi. */
+  const studyLogsAll = useMemo(() => {
+    if (!studentData) return [];
+    return mergeScheduleLogs(buildPendingScheduleLogs(mySchedulesAll, studentData), displayGradesAll);
+  }, [studentData, mySchedulesAll, displayGradesAll]);
 
 
   const isNew = viewStudent?.completedSessions === 0;
@@ -709,7 +733,7 @@ const StudentDashboard = ({ onNavigate }) => {
             viewStudent={viewStudent}
             mySchedules={mySchedulesAll}
             setNoteModalSched={setNoteModalSched}
-            displayGrades={displayGradesAll}
+            displayGrades={studyLogsAll}
           />
         ) : ['materials', 'materials-videos', 'materials-files', 'materials-software', 'materials-assignments', 'exam-scores'].includes(currentHash) ? (
           <StudentLazyMaterialsTab
@@ -773,7 +797,7 @@ const StudentDashboard = ({ onNavigate }) => {
             mySchedules={mySchedules}
             upcomingScheduleCount={upcomingScheduleCount}
             myUnreadMsgs={myUnreadMsgs}
-            studyLogs={studyLogs}
+            studyLogs={scoreLogs}
             studentTrainingForLms={studentTrainingForLms}
           />
         )}

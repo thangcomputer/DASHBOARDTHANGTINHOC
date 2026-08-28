@@ -216,6 +216,43 @@ test('branchFilter: HIGH_ADMIN + GET + branch_id=all → bi allowlisted (BI Dash
   }
 });
 
+test('branchFilter: HIGH_ADMIN + GET + branch_id=all → evaluations allowlisted', async () => {
+  const { branchFilter } = require('../../middleware/auth');
+  const TeacherOrig = Teacher.findById;
+  Teacher.findById = () => ({
+    select() {
+      return {
+        lean: async () => ({
+          adminRole: 'HIGH_ADMIN',
+          branchId: null,
+          branchCode: '',
+        }),
+      };
+    },
+  });
+
+  try {
+    const req = {
+      user: {
+        id: '507f1f77bcf86cd799439011',
+        role: 'staff',
+        adminRole: 'HIGH_ADMIN',
+      },
+      method: 'GET',
+      query: { branch_id: 'all' },
+      headers: {},
+      originalUrl: '/api/evaluations/admin?branch_id=all',
+    };
+    const res = mockRes();
+    let next = false;
+    await branchFilter(req, res, () => { next = true; });
+    assert.equal(next, true);
+    assert.deepEqual(req.branchFilter, {});
+  } finally {
+    Teacher.findById = TeacherOrig;
+  }
+});
+
 test('branchFilter: HIGH_ADMIN + GET + branchId=all (camelCase) → bi allowlisted', async () => {
   const { branchFilter } = require('../../middleware/auth');
   const TeacherOrig = Teacher.findById;

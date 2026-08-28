@@ -392,7 +392,7 @@ const branchFilter = async (req, res, next) => {
           const url = req.originalUrl || '';
           // Overview/HR/Teachers/Students/Finance + analytics báo cáo + BI Dashboard
           // (cùng UI Super khi chọn Tất cả chi nhánh). Không mở messaging/courses/…
-          return /\/(students|teachers|employees|finance|transactions|analytics|bi)(\/|\?|$)/.test(url);
+          return /\/(students|teachers|employees|finance|transactions|analytics|bi|evaluations)(\/|\?|$)/.test(url);
         };
         if (qBranch && qBranch !== 'all' && qBranch !== '') {
           req.branchFilter = { branchId: qBranch };

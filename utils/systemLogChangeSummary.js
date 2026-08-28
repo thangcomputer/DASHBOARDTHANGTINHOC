@@ -286,6 +286,7 @@ function summarizeEnrollmentSettings(body) {
   if (body.nextClass !== undefined || body.nextClassTime !== undefined) parts.push('Đổi lịch buổi tiếp theo');
   if (body.status !== undefined) parts.push(`Trạng thái khóa → ${body.status}`);
   if (body.notes !== undefined) parts.push('Đổi ghi chú');
+  if (body.teacherAlert !== undefined) parts.push('Đổi lưu ý giảng viên');
   if (!parts.length && body.courseName) parts.push(`Khóa "${body.courseName}"`);
   return parts;
 }

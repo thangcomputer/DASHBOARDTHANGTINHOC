@@ -82,6 +82,7 @@ export default function CmsSelect({
   const [coords, setCoords] = useState(null);
   const wrapRef = useRef(null);
   const triggerRef = useRef(null);
+  const selectedOptionRef = useRef(null);
 
   const options = useMemo(() => {
     if (optionsProp?.length) return optionsProp;
@@ -140,7 +141,10 @@ export default function CmsSelect({
       return;
     }
     updateCoords();
-    const onScrollOrResize = () => updateCoords();
+    const onScrollOrResize = (e) => {
+      if (e?.target?.closest?.('[data-cms-select-panel]')) return;
+      updateCoords();
+    };
     window.addEventListener('scroll', onScrollOrResize, true);
     window.addEventListener('resize', onScrollOrResize);
     return () => {
@@ -148,6 +152,16 @@ export default function CmsSelect({
       window.removeEventListener('resize', onScrollOrResize);
     };
   }, [open, align, options.length]);
+
+  useLayoutEffect(() => {
+    if (!open || !coords) return;
+    const el = selectedOptionRef.current;
+    const panel = el?.closest?.('[data-cms-select-panel]');
+    if (!el || !panel) return;
+    const elTop = el.offsetTop;
+    const nextTop = elTop - (panel.clientHeight / 2) + (el.offsetHeight / 2);
+    panel.scrollTop = Math.max(0, nextTop);
+  }, [open, coords?.top, coords?.maxHeight, strValue]);
 
   useEffect(() => {
     if (!open) return;
@@ -208,6 +222,7 @@ export default function CmsSelect({
           return (
             <button
               key={`${opt.value}-${String(opt.label)}`}
+              ref={isSelected ? selectedOptionRef : undefined}
               type="button"
               role="option"
               aria-selected={isSelected}

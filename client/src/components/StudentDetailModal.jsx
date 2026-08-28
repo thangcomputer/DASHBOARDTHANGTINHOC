@@ -270,7 +270,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
   const [editForm, setEditForm] = useState({
     name: '', email: '', phone: '', age: '', zalo: '', password: '', gender: 'male',
   });
-  /** { [enrollmentId]: { totalSessions, completedSessions, remainingSessions, courseName, isPrimary, status } } */
+  /** { [enrollmentId]: { totalSessions, completedSessions, remainingSessions, courseName, isPrimary, status, teacherAlert } } */
   const [enrollmentSessionForms, setEnrollmentSessionForms] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -391,6 +391,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
           courseName: enr.courseName || enr.name || `Khóa ${idx + 1}`,
           isPrimary: !!enr.isPrimary,
           status: enr.status || '',
+          teacherAlert: String(enr.teacherAlert || '').slice(0, 500),
         };
       });
     } else {
@@ -406,6 +407,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
         courseName: s.course || 'Khóa học',
         isPrimary: true,
         status: s.status || '',
+        teacherAlert: String(s.teacherAlert || '').slice(0, 500),
       };
     }
     setEnrollmentSessionForms(next);
@@ -490,6 +492,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
       payload.totalSessions = total;
       payload.completedSessions = completed;
       payload.remainingSessions = Math.max(0, total - completed);
+      payload.teacherAlert = String(sess.teacherAlert || '').trim().slice(0, 500);
     }
 
     setSavingEdit(true);
@@ -512,6 +515,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
             totalSessions: total,
             completedSessions: completed,
             remainingSessions: remaining,
+            teacherAlert: String(sess.teacherAlert || '').trim().slice(0, 500),
           });
           if (enrRes?.success === false) {
             toast.error(enrRes?.message || `Không cập nhật được khóa ${sess.courseName || enrId}`);
@@ -1572,6 +1576,45 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                              </div>
                           </div>
 
+                          {(() => {
+                            const alertRows = (scopedEnrollments || []).filter((e) => {
+                              const st = String(e.status || '').toLowerCase();
+                              if (st === 'cancelled' || st === 'refunded') return false;
+                              return String(e.teacherAlert || '').trim();
+                            });
+                            return (
+                              <div className={`mt-4 rounded-2xl border px-4 py-3 ${
+                                alertRows.length ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'
+                              }`}>
+                                <p className={`text-[10px] font-black uppercase tracking-wide mb-1 ${
+                                  alertRows.length ? 'text-amber-700' : 'text-slate-400'
+                                }`}>
+                                  Lưu ý cho giảng viên
+                                </p>
+                                {alertRows.length === 0 ? (
+                                  <p className="text-xs font-medium text-slate-400">
+                                    Chưa có lưu ý. Thêm ở tab Sửa thông tin.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {alertRows.map((e) => (
+                                      <div key={String(e.enrollmentId || e.id)}>
+                                        {(scopedEnrollments.length > 1 || enrollments.length > 1) && (
+                                          <p className="text-[11px] font-black text-amber-800/70 mb-0.5">
+                                            {e.courseName || e.name}
+                                          </p>
+                                        )}
+                                        <p className="text-sm font-semibold text-amber-950 whitespace-pre-wrap break-words leading-snug">
+                                          {String(e.teacherAlert).trim()}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+
                           {/* Danh sách khóa học (đa môn) */}
                           {(() => {
                             const enrollments = getClientEnrollments(data.student);
@@ -2582,6 +2625,23 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                   />
                                 </div>
                               </div>
+                              {!cancelled && (
+                                <div>
+                                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-wide block mb-1">Lưu ý cho giảng viên</label>
+                                  <textarea
+                                    value={sess.teacherAlert || ''}
+                                    maxLength={500}
+                                    rows={3}
+                                    onChange={(e) => setEnrollmentSessionForms((prev) => ({
+                                      ...prev,
+                                      [enrId]: { ...prev[enrId], teacherAlert: e.target.value.slice(0, 500) },
+                                    }))}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-200 bg-white resize-y min-h-[4.5rem]"
+                                    placeholder="VD: Học chậm, cần ôn Word, học buổi tối..."
+                                  />
+                                  <p className="text-[11px] text-slate-400 mt-1">GV thấy ngay khi mở hồ sơ khóa này. Không bắt buộc.</p>
+                                </div>
+                              )}
                             </div>
                           );
                         })

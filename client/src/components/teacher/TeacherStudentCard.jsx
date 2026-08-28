@@ -1634,6 +1634,7 @@ export const StudentCard = ({
                           : log.type === 'homework' ? Clipboard
                             : log.type === 'grade_update' ? Edit3
                               : log.type === 'evaluation' ? Star
+                                : log.type === 'schedule_change' ? Calendar
                                 : log.type === 'attendance_cancel' || log.type === 'schedule_cancel' ? X
                                   : CheckCircle;
                       return (

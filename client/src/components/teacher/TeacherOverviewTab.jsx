@@ -10,6 +10,7 @@ import {
   isScheduleOngoingNow,
   getScheduleDisplayKind,
   normalizeScheduleDate,
+  formatLocalDateKey,
 } from '../../utils/scheduleTime';
 import { getClientEnrollments } from '../../utils/enrollments';
 import { STAR_BONUS_MIN_STUDENTS, STAR_BONUS_MIN_STARS } from '../../utils/teacherCommission';
@@ -31,10 +32,12 @@ function formatSessionDayLabel(date) {
 function getNextScheduleForStudent(schedules, student, now = new Date()) {
   const sid = String(student?._id || student?.id || '');
   if (!sid) return null;
+  const todayKey = formatLocalDateKey(now);
   const course = String(student?.course || '').trim().toLowerCase();
   const list = (schedules || []).filter((s) => {
     if (String(s?.status || '') !== 'scheduled') return false;
     if (scheduleStudentId(s) !== sid) return false;
+    if (normalizeScheduleDate(s.date) !== todayKey) return false;
     if (course) {
       const sc = String(s.course || '').trim().toLowerCase();
       if (sc && sc !== course) return false;
@@ -115,6 +118,24 @@ export default function TeacherOverviewTab({
         return ka.localeCompare(kb);
       });
   }, [students, mySchedules, nowTick]);
+
+  const upcomingThisMonth = useMemo(() => {
+    void nowTick;
+    const now = new Date();
+    const monthKey = formatLocalDateKey(now).slice(0, 7);
+    return (mySchedules || [])
+      .filter((s) => {
+        if (String(s?.status || '') !== 'scheduled') return false;
+        if (normalizeScheduleDate(s.date).slice(0, 7) !== monthKey) return false;
+        const kind = getScheduleDisplayKind(s, now);
+        return kind === 'upcoming' || kind === 'ongoing';
+      })
+      .sort((a, b) => {
+        const ka = `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`;
+        const kb = `${normalizeScheduleDate(b.date)}-${b.startTime || ''}`;
+        return ka.localeCompare(kb);
+      });
+  }, [mySchedules, nowTick]);
 
   /** HV mới gắn với GV trong 30 ngày (theo registeredAt enrollment / createdAt). */
   const newStudents30d = useMemo(() => {
@@ -544,12 +565,12 @@ export default function TeacherOverviewTab({
           </div>
         </div>
 
-        {/* Cột 3: Lịch dạy sắp tới — hiện ~7, scroll thêm */}
+        {/* Cột 3: Lịch dạy sắp tới trong tháng */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col min-w-0 w-full">
           <div className="px-4 sm:px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0">
             <h4 className="font-bold text-slate-700 text-xs sm:text-sm flex items-center gap-2 min-w-0">
               <Calendar size={14} className="text-indigo-500 shrink-0" aria-hidden="true" />
-              <span className="truncate">Lịch dạy sắp tới trong tuần</span>
+              <span className="truncate">Lịch dạy sắp tới trong tháng</span>
             </h4>
             <button
               type="button"
@@ -561,14 +582,17 @@ export default function TeacherOverviewTab({
             </button>
           </div>
           <div className="divide-y divide-slate-50 max-h-[25.5rem] overflow-y-auto overscroll-contain pr-1 min-h-0">
-            {mySchedules.filter((s) => s.status === 'scheduled').length === 0 && (
-              <p className="px-4 sm:px-5 py-4 text-xs text-slate-400 text-center">Chưa có lịch dạy sắp tới.</p>
+            {upcomingThisMonth.length === 0 && (
+              <p className="px-4 sm:px-5 py-4 text-xs text-slate-400 text-center">Chưa có lịch dạy sắp tới trong tháng.</p>
             )}
-            {mySchedules.filter((s) => s.status === 'scheduled').map((s) => (
+            {upcomingThisMonth.map((s) => {
+              const day = normalizeScheduleDate(s.date);
+              const [, monthStr, dayStr] = day.split('-');
+              return (
               <div key={s._id || s.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 hover:bg-indigo-50/30 transition">
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 flex flex-col items-center justify-center text-indigo-600 flex-shrink-0">
-                  <span className="text-xs font-black tabular-nums">{new Date(s.date).getDate()}</span>
-                  <span className="text-[7px] font-bold opacity-60">T{new Date(s.date).getMonth() + 1}</span>
+                  <span className="text-xs font-black tabular-nums">{Number(dayStr) || new Date(s.date).getDate()}</span>
+                  <span className="text-[7px] font-bold opacity-60">T{Number(monthStr) || (new Date(s.date).getMonth() + 1)}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-800 truncate">{s.studentName || s.course}</p>
@@ -578,7 +602,8 @@ export default function TeacherOverviewTab({
                   {s.startTime}
                 </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

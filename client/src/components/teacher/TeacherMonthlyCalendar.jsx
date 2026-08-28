@@ -409,7 +409,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                 <Clock size={16} />
               </div>
               <h4 className="text-xs sm:text-sm font-black text-slate-900">
-                📅 Sắp tới trong tháng
+                📅 Lịch trong tháng
               </h4>
             </div>
             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">

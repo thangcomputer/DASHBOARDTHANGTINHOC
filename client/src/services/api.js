@@ -1328,8 +1328,14 @@ export const schedulesAPI = {
 
 // ─── EVALUATION API ─────────────────────────────────────────────────────────
 export const evaluationsAPI = {
-  getPrivate: async () => {
-    const res = await apiFetch('/evaluations/admin');
+  getPrivate: async ({ branchId } = {}) => {
+    const qs = new URLSearchParams();
+    if (branchId) {
+      qs.set('branch_id', branchId);
+      qs.set('branchId', branchId);
+    }
+    const q = qs.toString();
+    const res = await apiFetch(`/evaluations/admin${q ? `?${q}` : ''}`);
     return res.json();
   },
   getByTeacher: async (teacherId) => {

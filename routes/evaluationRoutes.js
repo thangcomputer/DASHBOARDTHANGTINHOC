@@ -1,7 +1,8 @@
 const express = require('express');
 const Evaluation = require('../models/Evaluation');
 const Teacher = require('../models/Teacher');
-const { authMiddleware } = require('../middleware/auth');
+const Student = require('../models/Student');
+const { authMiddleware, branchFilter } = require('../middleware/auth');
 const { policyShadowEvaluation } = require('../middleware/policyShadowEvaluation');
 const { evaluationsCutoverGate } = require('../middleware/evaluationsCutoverGate');
 const { emitDataRefresh } = require('../utils/realtimeEmit');
@@ -14,13 +15,27 @@ function evaluationsGuard(action) {
 }
 
 // ─── ADMIN lấy danh sách phản hồi mật ──────────────────────────────────────
-router.get('/admin', authMiddleware, ...evaluationsGuard('admin_list'), async (req, res) => {
+router.get('/admin', authMiddleware, branchFilter, ...evaluationsGuard('admin_list'), async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'staff') {
       return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
     }
 
-    const evals = await Evaluation.find({ type: 'admin_feedback' }).sort({ updatedAt: -1, createdAt: -1 });
+    const bf = req.branchFilter || {};
+    if (bf._id && bf._id.$in && Array.isArray(bf._id.$in) && bf._id.$in.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const query = { type: 'admin_feedback' };
+    if (Object.prototype.hasOwnProperty.call(bf, 'branchId')) {
+      const studentIds = await Student.find({ branchId: bf.branchId }).select('_id').lean();
+      if (studentIds.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+      query.studentId = { $in: studentIds.map((s) => s._id) };
+    }
+
+    const evals = await Evaluation.find(query).sort({ updatedAt: -1, createdAt: -1 });
     const seen = new Set();
     const uniqueEvals = [];
     for (const e of evals) {

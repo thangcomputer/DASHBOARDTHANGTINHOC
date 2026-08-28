@@ -1295,6 +1295,37 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       { path: 'studentId', select: 'name course totalSessions studentExamUnlocked' },
     ]);
 
+    const slotChanged = Boolean(
+      (startTime && startTime !== schedule.startTime)
+      || (date && new Date(date).getTime() !== new Date(schedule.date).getTime())
+    );
+    if (schedule.studentId && slotChanged) {
+      try {
+        const oldD = new Date(schedule.date).toLocaleDateString('vi-VN');
+        const newD = new Date(effectiveDate).toLocaleDateString('vi-VN');
+        const oldT = [schedule.startTime, schedule.endTime].filter(Boolean).join('–');
+        const newT = [effectiveStart, effectiveEnd].filter(Boolean).join('–');
+        const changeNote = `Đổi lịch: ${oldD}${oldT ? ` · ${oldT}` : ''} → ${newD}${newT ? ` · ${newT}` : ''}`;
+        await Student.findByIdAndUpdate(schedule.studentId, {
+          $push: {
+            activityLog: {
+              $each: [buildActivityEntry({
+                type: 'schedule_change',
+                date: newD,
+                note: changeNote,
+                actor: req.user,
+                scheduleId: schedule._id,
+                course: schedule.course || '',
+              })],
+              $slice: -100,
+            },
+          },
+        });
+      } catch (e) {
+        logger.warn('[SCHEDULE] activityLog change append failed:', e?.message || e);
+      }
+    }
+
     // BUSINESS LOGIC: Nếu đánh dấu hoàn thành → kiểm tra unlock thi
     if (status === 'completed' && schedule.status !== 'completed' && schedule.studentId) {
       if (io) {

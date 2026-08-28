@@ -8,7 +8,16 @@ import {
 import { CourseSwitcher, StatCard } from './StudentShared';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
 import api, { downloadMediaFile, resolveMediaUrl } from '../../services/api';
-import { isScheduleOngoingNow } from '../../utils/scheduleTime';
+import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
+
+function formatSessionDayLabel(date) {
+  const d = date ? new Date(date) : null;
+  if (!d || Number.isNaN(d.getTime())) return { weekday: '', dateLabel: '' };
+  return {
+    weekday: d.toLocaleDateString('vi-VN', { weekday: 'long', timeZone: 'Asia/Ho_Chi_Minh' }),
+    dateLabel: d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }),
+  };
+}
 
 export default function StudentOverviewTab({
   studentData,
@@ -45,12 +54,35 @@ export default function StudentOverviewTab({
     return (mySchedules || []).find((s) => s.status === 'scheduled' && isScheduleOngoingNow(s));
   }, [mySchedules, nowTick]);
 
+  const featuredSchedule = useMemo(() => {
+    void nowTick;
+    if (ongoingSchedule) return ongoingSchedule;
+    const list = (mySchedules || []).filter((s) => {
+      if (String(s?.status || '') !== 'scheduled') return false;
+      return getScheduleDisplayKind(s) === 'upcoming';
+    });
+    list.sort((a, b) => {
+      const ka = `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`;
+      const kb = `${normalizeScheduleDate(b.date)}-${b.startTime || ''}`;
+      return ka.localeCompare(kb);
+    });
+    return list[0] || null;
+  }, [mySchedules, ongoingSchedule, nowTick]);
+
   const isLive = Boolean(ongoingSchedule) || Boolean(viewStudent.isLikelyLiveClass);
-  const joinUrl = ongoingSchedule?.linkHoc || viewStudent.joinClassUrl || '';
-  const timeLabel = ongoingSchedule
-    ? `${ongoingSchedule.startTime || ''}${ongoingSchedule.endTime ? ` - ${ongoingSchedule.endTime}` : ''}`
-    : (viewStudent.nextClass || '');
-  const courseLabel = ongoingSchedule?.course || viewStudent.course;
+  const joinUrl = ongoingSchedule?.linkHoc || featuredSchedule?.linkHoc || viewStudent.joinClassUrl || '';
+  const courseLabel = ongoingSchedule?.course || featuredSchedule?.course || viewStudent.course;
+  const sessionTimeRange = featuredSchedule
+    ? `${featuredSchedule.startTime || ''}${featuredSchedule.endTime ? ` - ${featuredSchedule.endTime}` : ''}`.trim()
+    : '';
+  const sessionDay = featuredSchedule
+    ? formatSessionDayLabel(featuredSchedule.date)
+    : (viewStudent.nextClassTime ? formatSessionDayLabel(viewStudent.nextClassTime) : { weekday: '', dateLabel: '' });
+  const sessionWhenLabel = [
+    sessionTimeRange ? `Ca ${sessionTimeRange}` : '',
+    sessionDay.weekday,
+    sessionDay.dateLabel,
+  ].filter(Boolean).join(' · ');
 
   useEffect(() => {
     let cancelled = false;
@@ -232,10 +264,18 @@ export default function StudentOverviewTab({
                 </h2>
                 <div className="flex flex-col gap-3 md:flex-row md:items-center">
                   <div className="flex-1 min-w-0 space-y-2">
+                    {sessionWhenLabel ? (
+                      <p className="cms-sd-body text-white flex items-center gap-2 min-w-0">
+                        <Clock size={16} className="shrink-0 text-yellow-200" aria-hidden="true" />
+                        <span className="font-extrabold tabular-nums capitalize tracking-tight">
+                          {sessionWhenLabel}
+                        </span>
+                      </p>
+                    ) : null}
                     <p className="cms-sd-body text-white/90 flex items-center gap-2 min-w-0">
                       <Calendar size={16} className="shrink-0" aria-hidden="true" />
                       <span className="truncate">
-                        {timeLabel ? `${timeLabel} | ` : ''}GV: {viewStudent.teacher}
+                        GV: {viewStudent.teacher}
                         {!isNew && teacherRatingData.count > 0 && (
                           <span className="ml-1.5 inline-flex items-center gap-0.5 bg-yellow-400 text-red-700 px-1.5 py-0.5 rounded-md text-[11px] font-extrabold">
                             <Star size={10} className="fill-red-700" aria-hidden="true" /> {teacherRatingData.avg}
@@ -243,15 +283,6 @@ export default function StudentOverviewTab({
                         )}
                       </span>
                     </p>
-                    <span
-                      className={`inline-flex items-center cms-sd-caption font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${
-                        isLive
-                          ? 'bg-emerald-400/25 text-emerald-50 border border-emerald-300/40'
-                          : 'bg-white/20'
-                      }`}
-                    >
-                      {isLive ? 'Đang học' : 'Sắp diễn ra'}
-                    </span>
                   </div>
                   <a
                     href={joinUrl || '#'}
@@ -362,14 +393,14 @@ export default function StudentOverviewTab({
               </button>
             </section>
 
-            {/* Nhật ký học tập — Nằm dưới phần Tài liệu ở cột bên phải */}
+            {/* Nhật ký học tập & Điểm số — dưới Tài liệu (bài nộp / TN / điểm / đánh giá) */}
             <section className="cms-sd-card !p-0 overflow-hidden">
               <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
                 <h3 className="cms-sd-section-title flex items-center gap-2 min-w-0">
-                  <Clock size={18} className="text-blue-500 shrink-0" aria-hidden="true" />
-                  Nhật ký học tập
+                  <ClipboardList size={18} className="text-emerald-500 shrink-0" aria-hidden="true" />
+                  Nhật ký học tập &amp; Điểm số
                 </h3>
-                <span className="text-xs font-bold text-slate-500 shrink-0 tabular-nums">{studyLogs.length} sự kiện</span>
+                <span className="text-xs font-bold text-slate-500 shrink-0 tabular-nums">{studyLogs.length} lượt ghi nhận</span>
               </div>
               <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
                 {studyLogs.map((item, idx) => {
@@ -446,6 +477,31 @@ export default function StudentOverviewTab({
                                 HỦY
                               </span>
                             )}
+                            {isGradeUpdate && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wide shrink-0">
+                                Cập nhật điểm
+                              </span>
+                            )}
+                            {isEvaluation && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-pink-100 text-pink-700 uppercase tracking-wide shrink-0">
+                                Đánh giá
+                              </span>
+                            )}
+                            {isCourseComplete && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wide shrink-0">
+                                Hoàn thành
+                              </span>
+                            )}
+                            {isHomework && !isGradeUpdate && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wide shrink-0">
+                                Bài nộp
+                              </span>
+                            )}
+                            {isQuiz && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wide shrink-0">
+                                Trắc nghiệm
+                              </span>
+                            )}
                           </div>
                           <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">{item.note}</p>
                         </div>
@@ -487,9 +543,10 @@ export default function StudentOverviewTab({
                 {studyLogs.length === 0 && (
                   <div className="cms-sd-empty !py-6">
                     <div className="cms-sd-empty__icon">
-                      <Clock size={20} aria-hidden="true" />
+                      <ClipboardList size={20} aria-hidden="true" />
                     </div>
-                    <p className="text-xs font-bold text-slate-600">Chưa có sự kiện nào.</p>
+                    <p className="text-xs font-bold text-slate-600">Chưa có dữ liệu điểm số.</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Bài nộp, trắc nghiệm và điểm sẽ hiện tại đây.</p>
                   </div>
                 )}
               </div>

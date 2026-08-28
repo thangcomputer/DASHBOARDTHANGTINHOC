@@ -4,7 +4,64 @@ import {
   ChevronLeft, ChevronRight, User, BookOpen, Sparkles, MessageSquare, ExternalLink, Award, ClipboardList
 } from 'lucide-react';
 import { getScheduleDisplayKind, getScheduleDisplayMeta, isScheduleUpcomingDisplay } from '../../utils/scheduleTime';
-import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
+import { isScheduleChangeLog } from '../../utils/studentActivityLogs';
+
+function parseScheduleRowMs(item) {
+  const rawDate = item?.date;
+  let dateMs = 0;
+  if (rawDate instanceof Date) dateMs = rawDate.getTime();
+  else if (typeof rawDate === 'number') dateMs = rawDate;
+  else if (rawDate) {
+    const str = String(rawDate).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const dt = new Date(year, month, day);
+        if (!Number.isNaN(dt.getTime())) dateMs = dt.getTime();
+      }
+    }
+    if (!dateMs) {
+      const dt = new Date(str);
+      if (!Number.isNaN(dt.getTime())) dateMs = dt.getTime();
+    }
+  }
+  if (!dateMs && item?.timestamp) dateMs = Number(item.timestamp) || 0;
+  const m = String(item?.time || '').match(/(\d{1,2}):(\d{2})/);
+  if (dateMs && m) {
+    const d = new Date(dateMs);
+    d.setHours(parseInt(m[1], 10), parseInt(m[2], 10), 0, 0);
+    return d.getTime();
+  }
+  return dateMs || Number(item?.timestamp) || 0;
+}
+
+function scheduleLogStatus(g) {
+  const type = g?.type;
+  const kind = g?.displayKind;
+  if (type === 'schedule_cancel' || type === 'cancelled') {
+    return { label: 'chưa học', className: 'bg-slate-100 text-slate-600' };
+  }
+  if (
+    type === 'pending_attendance'
+    || type === 'overdue_attendance'
+    || type === 'past_pending'
+    || type === 'attendance_cancel'
+    || kind === 'pending_attendance'
+    || kind === 'overdue_attendance'
+  ) {
+    return { label: 'chưa điểm danh', className: 'bg-orange-50 text-orange-700' };
+  }
+  if (type === 'scheduled' || kind === 'upcoming' || kind === 'ongoing') {
+    return { label: 'sắp tới', className: 'bg-blue-50 text-blue-700' };
+  }
+  if (isScheduleChangeLog(g)) {
+    return { label: 'đổi lịch', className: 'bg-indigo-50 text-indigo-700' };
+  }
+  return { label: 'đã điểm danh', className: 'bg-emerald-50 text-emerald-700' };
+}
 
 export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displayGrades = [] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -65,6 +122,10 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
       return d.getMonth() === month && d.getFullYear() === year;
     });
   }, [schedules, month, year]);
+
+  const scheduleLogsOldestFirst = useMemo(() => {
+    return [...(displayGrades || [])].sort((a, b) => parseScheduleRowMs(a) - parseScheduleRowMs(b));
+  }, [displayGrades]);
 
   const upcomingCount = useMemo(() => {
     return monthSchedules.filter((s) => isScheduleUpcomingDisplay(s)).length;
@@ -342,29 +403,29 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
             </div>
           </div>
 
-          {/* 2. Nhật ký học tập & Điểm số (Khung cố định h-[250px] cho vừa 4 dòng, chưa đủ có khoảng trắng, quá 4 dòng có thanh cuộn) */}
+          {/* 2. Nhật ký lịch — hủy buổi / lịch học / đổi lịch / điểm danh buổi */}
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-3.5 sm:p-4 h-[250px] shrink-0 flex flex-col justify-between">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2 shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <ClipboardList size={16} />
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Calendar size={16} />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
-                    Nhật ký học tập &amp; Điểm số
+                    Nhật ký lịch
                   </h3>
                 </div>
               </div>
               {displayGrades && displayGrades.length > 0 && (
                 <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                  {displayGrades.length} lượt ghi nhận
+                  {displayGrades.length} sự kiện
                 </span>
               )}
             </div>
 
-            {displayGrades && displayGrades.length > 0 ? (
+            {scheduleLogsOldestFirst.length > 0 ? (
               <div className="flex-1 overflow-y-auto pr-1 divide-y divide-slate-100 space-y-0.5">
-                {displayGrades.map((g, idx) => {
+                {scheduleLogsOldestFirst.map((g, idx) => {
                   let parsedDate = g.date;
                   if (parsedDate && parsedDate.includes('T')) {
                     parsedDate = new Date(parsedDate).toLocaleDateString('vi-VN');
@@ -373,9 +434,16 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                   const isUpdated = g.type === 'grade_update';
                   const isHomework = g.type === 'homework' || isUpdated;
                   const isQuiz = g.type === 'quiz';
-                  const isCancelled = g.type === 'schedule_cancel' || g.type === 'attendance_cancel';
+                  const isCancelled = g.type === 'schedule_cancel' || g.type === 'attendance_cancel' || g.type === 'cancelled';
                   const isEvaluation = g.type === 'evaluation';
                   const isCourseComplete = g.type === 'course_complete';
+                  const isScheduled = g.type === 'scheduled';
+                  const isPastPending = g.type === 'past_pending'
+                    || g.type === 'pending_attendance'
+                    || g.type === 'overdue_attendance';
+                  const isOverdue = g.type === 'overdue_attendance' || g.displayKind === 'overdue_attendance';
+                  const isDoiLich = isScheduleChangeLog(g);
+                  const status = scheduleLogStatus(g);
 
                   return (
                     <div
@@ -385,13 +453,22 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                       <div className="flex items-center gap-2 min-w-0">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm ${
                           isCancelled ? 'bg-red-50 text-red-600 border border-red-100' :
+                          isOverdue ? 'bg-red-50 text-red-600 border border-red-100' :
+                          isPastPending ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+                          isDoiLich ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' :
+                          isScheduled ? 'bg-blue-50 text-blue-600 border border-blue-100' :
                           isQuiz ? 'bg-purple-50 text-purple-600 border border-purple-100' :
                           isEvaluation ? 'bg-pink-50 text-pink-600 border border-pink-100' :
                           isCourseComplete ? 'bg-amber-50 text-amber-600 border border-amber-100' :
                           isHomework ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                           'bg-blue-50 text-blue-600 border border-blue-100'
                         }`}>
-                          {isCancelled ? <XCircle size={13} /> : isQuiz ? <Award size={13} /> : isCourseComplete ? <Award size={13} /> : isHomework ? <ClipboardList size={13} /> : <CheckCircle size={13} />}
+                          {isCancelled || isOverdue ? <XCircle size={13} />
+                            : isPastPending || isScheduled || isDoiLich ? <Calendar size={13} />
+                            : isQuiz ? <Award size={13} />
+                            : isCourseComplete ? <Award size={13} />
+                            : isHomework ? <ClipboardList size={13} />
+                            : <CheckCircle size={13} />}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -400,7 +477,21 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                             </span>
                             {isCancelled ? (
                               <span className="text-[9px] font-black uppercase bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.2 rounded-full leading-none">
-                                Đã hủy
+                                Hủy buổi
+                              </span>
+                            ) : isDoiLich ? (
+                              <span className="text-[9px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.2 rounded-full leading-none">
+                                Đổi lịch
+                              </span>
+                            ) : isScheduled ? (
+                              <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded-full leading-none">
+                                {g.displayKind === 'ongoing' ? 'Đang diễn ra' : 'Lịch học'}
+                              </span>
+                            ) : isPastPending ? (
+                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full leading-none border ${
+                                isOverdue ? 'bg-red-50 text-red-700 border-red-200' : 'bg-orange-50 text-orange-800 border-orange-200'
+                              }`}>
+                                {isOverdue ? 'Quá hạn ĐD' : 'Chưa điểm danh'}
                               </span>
                             ) : isUpdated ? (
                               <span className="text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded-full leading-none">
@@ -424,7 +515,7 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                               </span>
                             ) : (
                               <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded-full leading-none">
-                                Điểm danh
+                                Điểm danh buổi
                               </span>
                             )}
                           </div>
@@ -435,19 +526,9 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
-                        {g.grade > 0 ? (
-                          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/60 px-1.5 py-0.5 rounded-md">
-                            <span className={`text-xs font-black tabular-nums ${getGradeTextClasses(g.grade)}`}>
-                              {g.grade}
-                            </span>
-                            <span className="text-[9px] text-slate-400 font-bold">/10</span>
-                            <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded ${getGradePillClasses(g.grade)}`}>
-                              {getGradeLabel(g.grade) || 'TB'}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-400 font-bold italic">--</span>
-                        )}
+                        <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md whitespace-nowrap ${status.className}`}>
+                          {status.label}
+                        </span>
                       </div>
                     </div>
                   );
@@ -458,9 +539,9 @@ export const ScheduleView = ({ schedules = [], student, setNoteModalSched, displ
                 <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mx-auto text-slate-300 border border-slate-100">
                   <FileText size={16} />
                 </div>
-                <p className="text-xs font-bold text-slate-700">Chưa có dữ liệu điểm danh</p>
+                <p className="text-xs font-bold text-slate-700">Chưa có sự kiện lịch</p>
                 <p className="text-[10px] text-slate-400 max-w-xs mx-auto">
-                  Dữ liệu điểm số sẽ tự xuất hiện tại đây sau khi bắt đầu học.
+                  Lịch học, đổi lịch, điểm danh và hủy buổi sẽ hiện tại đây.
                 </p>
               </div>
             )}
