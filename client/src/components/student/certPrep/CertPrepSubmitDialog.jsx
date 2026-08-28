@@ -11,7 +11,7 @@ export default function CertPrepSubmitDialog({
   if (!open) return null;
   const unanswered = Math.max(0, total - answeredCount);
   return (
-    <div className="cms-modal-shell" role="presentation">
+    <div className="cms-modal-shell" role="presentation" data-exam-modal>
       <div
         role="dialog"
         aria-modal="true"

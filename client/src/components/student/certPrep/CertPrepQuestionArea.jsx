@@ -24,7 +24,7 @@ export default function CertPrepQuestionArea({
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center rounded-full bg-slate-900 text-white text-[11px] font-black uppercase tracking-wider px-3 py-1">
+        <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
           Câu {index + 1} / {total}
         </span>
         {showFeedback ? (

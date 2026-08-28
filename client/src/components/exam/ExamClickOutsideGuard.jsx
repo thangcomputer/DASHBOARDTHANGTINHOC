@@ -150,7 +150,7 @@ export default function ExamClickOutsideGuard({
               <p className="text-gray-400 font-bold mt-3 text-sm leading-relaxed">
                 Bạn vừa thao tác ngoài vùng làm bài. Hãy quay lại màn hình thi và tiếp tục làm bài.
               </p>
-              {maxStrikes > 0 && (
+              {typeof onMaxStrikes === 'function' && maxStrikes > 0 && (
                 <p className="text-orange-600 font-extrabold mt-3 text-xs uppercase tracking-wide">
                   Cảnh báo {strikeCount}/{maxStrikes}
                   {strikeCount < maxStrikes

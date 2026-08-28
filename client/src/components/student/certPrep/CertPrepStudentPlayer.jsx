@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Loader2, List } from 'lucide-react';
 import useCertPrepSession from '../../../hooks/useCertPrepSession';
 import { isImmediateFeedback } from '../../../utils/certPrepGrade';
+import { useData } from '../../../context/DataContext';
+import ExamClickOutsideGuard from '../../exam/ExamClickOutsideGuard';
 import CertPrepPlayerHeader from './CertPrepPlayerHeader';
 import CertPrepQuestionArea from './CertPrepQuestionArea';
 import CertPrepQuestionNavigator from './CertPrepQuestionNavigator';
@@ -14,6 +16,7 @@ import CertPrepPlayerError from './CertPrepPlayerError';
 export default function CertPrepStudentPlayer() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const { examWarningSoundUrl = '' } = useData() || {};
   const player = useCertPrepSession(sessionId);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
@@ -161,12 +164,18 @@ export default function CertPrepStudentPlayer() {
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] flex flex-col">
+    <ExamClickOutsideGuard
+      enabled={!player.locked && !player.submitting}
+      soundUrl={examWarningSoundUrl}
+      watchVisibility
+      className="min-h-screen bg-[#f4f6f9] flex flex-col"
+    >
       <CertPrepPlayerHeader
         session={player.session}
         currentIndex={player.currentIndex}
         total={player.questions.length}
         remainingSeconds={player.remainingSeconds}
+        answeredCount={player.answeredCount}
       />
       {(player.offline || player.saveError) ? (
         <p className="px-4 sm:px-6 py-2 text-sm font-semibold text-amber-800 bg-amber-50 border-b border-amber-100" role="status">
@@ -174,8 +183,8 @@ export default function CertPrepStudentPlayer() {
         </p>
       ) : null}
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4 p-4 sm:p-6 max-w-6xl w-full mx-auto">
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-7 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)]">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3 p-3 sm:p-5 max-w-6xl w-full mx-auto">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-sm">
           {q ? (
             <CertPrepQuestionArea
               key={q.id}
@@ -191,7 +200,7 @@ export default function CertPrepStudentPlayer() {
             <p className="text-sm text-slate-500">Không có câu hỏi.</p>
           )}
         </div>
-        <aside className="lg:block">
+        <aside className="lg:sticky lg:top-[4.75rem] self-start">
           <button
             type="button"
             className="lg:hidden mb-3 min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold inline-flex items-center gap-2"
@@ -235,6 +244,6 @@ export default function CertPrepStudentPlayer() {
           setConfirmOpen(false);
         }}
       />
-    </div>
+    </ExamClickOutsideGuard>
   );
 }

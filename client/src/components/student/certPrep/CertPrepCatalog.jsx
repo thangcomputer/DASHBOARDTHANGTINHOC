@@ -11,7 +11,7 @@ export default function CertPrepCatalog({ courses, onOpen }) {
     );
   }
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {courses.map((course) => (
         <CertPrepCourseCard key={course.id} course={course} onOpen={onOpen} />
       ))}
