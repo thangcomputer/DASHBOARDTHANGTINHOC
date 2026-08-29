@@ -65,7 +65,7 @@ export default function EditTeacherModal({
         role="dialog"
         aria-modal="true"
         aria-label="Hồ sơ giảng viên"
-        className="cms-sheet cms-sheet--wide cms-sheet--compact w-full"
+        className="cms-sheet cms-sheet--wide cms-sheet--compact cms-sheet--teacher-form w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
@@ -432,7 +432,12 @@ export default function EditTeacherModal({
               >
                 <KeyRound size={15} /> Cấp MK
               </button>
-              <button type="button" onClick={onSave} className="cms-btn cms-btn-primary">
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={!(Array.isArray(editTeacher.subjectIds) && editTeacher.subjectIds.filter(Boolean).length)}
+                className="cms-btn cms-btn-primary"
+              >
                 <Save size={16} /> Lưu
               </button>
             </>

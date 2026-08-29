@@ -220,6 +220,22 @@ async function notifyTeacherAssignedOnEnroll(io, {
   }
 }
 
+/** Chuông HV — lỗi notify không làm fail API gốc. */
+function notifyStudentBell(io, studentId, { type, title, content, payload = {}, link = '/student#profile' }) {
+  if (!studentId) return Promise.resolve();
+  const NotificationService = require('../services/NotificationService');
+  return NotificationService.send(io, {
+    type,
+    title,
+    content,
+    receivers: String(studentId),
+    payload: { targetAudience: 'student', ...payload },
+    link,
+  }).catch((err) => {
+    logger.error('[STUDENTS] notify student: %s', err?.message || err);
+  });
+}
+
 async function nextInvoiceCode() {
   const now = new Date();
   const yy = now.getFullYear().toString().slice(-2);
@@ -1228,6 +1244,9 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
           if (idx >= 0) {
             const { mapEnrollmentStatusToRoot } = require('../utils/studentStatusMap');
             const patchKeys = ['completedSessions', 'remainingSessions', 'lastGrade', 'avgGrade', 'grades', 'status', 'notes', 'linkHoc', 'nextClass', 'nextClassTime'];
+            const prevLinkHoc = Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc')
+              ? String(doc.enrollments[idx].linkHoc || '').trim()
+              : null;
             patchKeys.forEach((k) => {
               if (safeBody[k] !== undefined) doc.enrollments[idx][k] = safeBody[k];
             });
@@ -1247,6 +1266,19 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
             const io = req.app.get('io');
             // Use populated (post-save) — never reference later `const student` (TDZ)
             if (io) studentRealtime(io, populated, 'student:updated', populated._id);
+            if (prevLinkHoc !== null && prevLinkHoc !== String(safeBody.linkHoc || '').trim()) {
+              const courseLabel = enrollmentCourse || doc.enrollments[idx]?.courseName || doc.course || 'khóa học';
+              const nextLink = String(safeBody.linkHoc || '').trim();
+              await notifyStudentBell(io, doc._id, {
+                type: 'SCHEDULE',
+                title: nextLink ? '🔗 Link vào lớp đã cập nhật' : '🔗 Link vào lớp đã được gỡ',
+                content: nextLink
+                  ? `Giảng viên đã cập nhật link học khóa "${courseLabel}". Vào hồ sơ để mở link.`
+                  : `Link học khóa "${courseLabel}" đã được gỡ.`,
+                payload: { kind: 'class_link_updated', courseName: courseLabel },
+                link: '/student#profile',
+              });
+            }
             return res.json({ success: true, data: populated });
           }
         }
@@ -1547,6 +1579,27 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
         }
       } catch (notifErr) {
         logger?.error?.('[STUDENTS] Exam approval notification error:', notifErr);
+      }
+
+      try {
+        const prevLink = String(before?.linkHoc || '').trim();
+        const nextLink = String(student.linkHoc || '').trim();
+        if (req.user.role !== 'student' && Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc') && prevLink !== nextLink) {
+          const NotificationService = require('../services/NotificationService');
+          const courseLabel = student.course || 'khóa học';
+          await NotificationService.send(io, {
+            type: 'SCHEDULE',
+            title: nextLink ? '🔗 Link vào lớp đã cập nhật' : '🔗 Link vào lớp đã được gỡ',
+            content: nextLink
+              ? `Link học khóa "${courseLabel}" đã được cập nhật. Vào hồ sơ để mở link.`
+              : `Link học khóa "${courseLabel}" đã được gỡ.`,
+            receivers: student._id.toString(),
+            payload: { kind: 'class_link_updated', courseName: courseLabel, targetAudience: 'student' },
+            link: '/student#profile',
+          });
+        }
+      } catch (linkErr) {
+        logger?.error?.('[STUDENTS] class link notify: %s', linkErr?.message || linkErr);
       }
     }
 
@@ -2318,6 +2371,15 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
     if (io) {
       studentDataRefresh(io, student, { type: 'student', id: student._id });
     }
+    if (!teacherId) {
+      await notifyStudentBell(io, student._id, {
+        type: 'COURSE',
+        title: '📚 Bạn được đăng ký khóa học',
+        content: `Bạn đã được đăng ký khóa "${resolvedName}".`,
+        payload: { kind: 'enrollment_added', courseName: resolvedName },
+        link: '/student#profile',
+      });
+    }
     if (teacherId) {
       await notifyTeacherAssignedOnEnroll(io, {
         student,
@@ -2359,6 +2421,9 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
     if (idx < 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
     }
+
+    const prevExamUnlocked = Boolean(student.enrollments[idx].examUnlocked);
+    const courseLabelForExam = student.enrollments[idx].courseName || student.course || 'khóa học';
 
     const {
       requireWebcam,
@@ -2424,6 +2489,23 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
     await applyEnrollmentStats(doc, student._id, Schedule);
     const io = req.app.get('io');
     if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+
+    if (typeof examUnlocked === 'boolean' && prevExamUnlocked !== Boolean(student.enrollments[idx].examUnlocked)) {
+      const unlocked = Boolean(student.enrollments[idx].examUnlocked);
+      await notifyStudentBell(io, student._id, {
+        type: 'EXAM',
+        title: unlocked ? '✅ Bạn đã được duyệt thi' : '🔒 Quyền thi đã bị thu hồi',
+        content: unlocked
+          ? `Admin đã mở quyền thi khóa "${courseLabelForExam}". Bạn có thể vào phòng thi.`
+          : `Quyền thi khóa "${courseLabelForExam}" vừa bị khóa.`,
+        payload: {
+          studentId: String(student._id),
+          action: unlocked ? 'exam_approved' : 'exam_revoked',
+          courseName: courseLabelForExam,
+        },
+        link: '/student/exam',
+      });
+    }
 
     return res.json({
       success: true,
@@ -2562,6 +2644,17 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
 
     const io = req.app.get('io');
     if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: fresh._id });
+
+    const maHD = invoice?.maHoaDon || invoice?.maHD || '';
+    await notifyStudentBell(io, fresh._id, {
+      type: 'FINANCE',
+      title: '✅ Thanh toán thành công',
+      content: maHD
+        ? `Học phí khóa "${claimedEnr.courseName}" đã được xác nhận. Mã HĐ: ${maHD}`
+        : `Học phí khóa "${claimedEnr.courseName}" đã được xác nhận.`,
+      payload: { kind: 'tuition_paid', courseName: claimedEnr.courseName },
+      link: '/student#profile',
+    });
 
     const doc = fresh.toObject();
     await applyEnrollmentStats(doc, fresh._id, Schedule);
@@ -2754,6 +2847,15 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
       studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
       if (refundAmt > 0) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: -refundAmt, studentName: student.name });
     }
+    await notifyStudentBell(io, student._id, {
+      type: 'COURSE',
+      title: 'Khóa học đã được hủy',
+      content: refundAmt > 0
+        ? `Khóa "${courseName}" đã hủy. Lý do: ${cancelReason}. Đã hoàn ${refundAmt.toLocaleString('vi-VN')}đ.`
+        : `Khóa "${courseName}" đã hủy. Lý do: ${cancelReason}.`,
+      payload: { kind: 'enrollment_cancelled', courseName, cancelReason },
+      link: '/student#profile',
+    });
 
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
@@ -2851,7 +2953,21 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       targetExamSubjects = student.enrollments[idx]?.examSubjects || [];
     }
 
+    if (
+      !isUnassign && teacherDoc && targetCourse
+      && (!Array.isArray(targetExamSubjects) || !targetExamSubjects.filter(Boolean).length)
+    ) {
+      const enrForCourse = enrollmentId && student.enrollments?.length
+        ? student.enrollments.find((e) => String(e._id) === String(enrollmentId))
+        : (student.enrollments?.find((e) => e.isPrimary) || student.enrollments?.[0]);
+      targetExamSubjects = await resolveEnrollmentExamSubjects({
+        courseName: targetCourse,
+        courseId: enrForCourse?.courseId,
+      }) || [];
+    }
+
     if (!isUnassign && teacherDoc && targetCourse) {
+      const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
       const courseName = String(targetCourse || '').toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
       const specialty = String(teacherDoc.specialty || '').toLowerCase()
@@ -2884,12 +3000,10 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
         if (specialty.includes('word')) focuses.add('word');
         if (specialty.includes('powerpoint') || specialty.includes('ppt')) focuses.add('powerpoint');
         if (specialty.includes('canva')) focuses.add('canva');
-        const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
         const teacherSubs = resolveTeacherSubjectIds(teacherDoc).map(String);
-        const office = ['coban', 'word', 'excel', 'powerpoint'];
         teacherSubs.forEach((id) => {
           if (id === 'coban') return;
-          if (office.includes(id) || id === 'canva') focuses.add(id);
+          focuses.add(id);
         });
         // Đủ Word+Excel+PowerPoint → focus THVP (khớp khóa Tin học văn phòng).
         // Canva không chặn quy đổi — tránh GV Office+Canva bị từ chối gán THVP.
@@ -2905,7 +3019,12 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       })();
 
       let matched = false;
-      if (courseFocus.length && teacherFocus.length) {
+      const teacherSubSet = new Set(resolveTeacherSubjectIds(teacherDoc).map(String).filter((id) => id && id !== 'coban'));
+      const courseSubIds = [...new Set((targetExamSubjects || []).map(String).filter((id) => id && id !== 'coban'))];
+      if (courseSubIds.length && courseSubIds.some((id) => teacherSubSet.has(id))) {
+        matched = true;
+      }
+      if (!matched && courseFocus.length && teacherFocus.length) {
         const set = new Set(teacherFocus);
         matched = courseFocus.some((f) => set.has(f));
         if (!matched && courseFocus.includes('thvp')) {

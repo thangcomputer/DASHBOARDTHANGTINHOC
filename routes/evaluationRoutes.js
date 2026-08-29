@@ -9,6 +9,33 @@ const { emitDataRefresh } = require('../utils/realtimeEmit');
 
 const router = express.Router();
 
+function enrollmentTeacherId(enr) {
+  const et = enr?.teacherId;
+  if (et && typeof et === 'object') return String(et._id || et.id || '');
+  return String(et || '');
+}
+
+/** Công khai: cần ≥ 1/2 buổi đăng ký. Cuối khóa (finalizeCourseEnd) không dùng rule này. */
+function teacherRatingHalfway(student, { teacherId, courseName } = {}) {
+  const list = Array.isArray(student?.enrollments) ? student.enrollments : [];
+  const courseKey = String(courseName || '').trim().toLowerCase();
+  let enr = courseKey
+    ? list.find((e) => String(e.courseName || e.name || '').trim().toLowerCase() === courseKey)
+    : null;
+  const tid = String(teacherId || '');
+  if (!enr && tid) {
+    enr = list.find((e) => enrollmentTeacherId(e) === tid) || null;
+  }
+  const completed = Math.max(0, Number(enr?.completedSessions ?? student?.completedSessions) || 0);
+  const total = Math.max(1, Number(enr?.totalSessions ?? student?.totalSessions) || 12);
+  return {
+    ok: completed * 2 >= total,
+    completed,
+    total,
+    need: Math.ceil(total / 2),
+  };
+}
+
 /** Phase 7.25: policyShadowEvaluation → evaluationsCutoverGate */
 function evaluationsGuard(action) {
   return [policyShadowEvaluation(action), evaluationsCutoverGate(action)];
@@ -138,6 +165,21 @@ router.post('/', authMiddleware, ...evaluationsGuard('create'), async (req, res)
           });
         }
       }
+      if (req.user.role === 'student' && !allowFinalEdit) {
+        const studentDoc = await Student.findById(studentId)
+          .select('completedSessions totalSessions enrollments')
+          .lean();
+        if (studentDoc) {
+          const gate = teacherRatingHalfway(studentDoc, { teacherId: targetTeacherId, courseName });
+          if (!gate.ok) {
+            return res.status(403).json({
+              success: false,
+              code: 'TOO_EARLY_TO_RATE',
+              message: `Chưa đủ buổi để được đánh giá. Cần học ít nhất ${gate.need}/${gate.total} buổi.`,
+            });
+          }
+        }
+      }
     } else if (type === 'admin_feedback') {
       evalDoc = await Evaluation.findOne({ studentId, courseName, milestone, type: 'admin_feedback' });
     }
@@ -189,8 +231,12 @@ router.post('/', authMiddleware, ...evaluationsGuard('create'), async (req, res)
     }
 
     const io = req.app.get('io');
-    const Student = require('../models/Student');
-    const studentInfo = await Student.findById(studentId);
+    let studentInfo = null;
+    try {
+      studentInfo = await Student.findById(studentId);
+    } catch (sErr) {
+      console.error('[EVALUATIONS] studentInfo:', sErr.message);
+    }
 
     if (io) {
       if (type === 'admin_feedback') {
@@ -224,24 +270,28 @@ router.post('/', authMiddleware, ...evaluationsGuard('create'), async (req, res)
            const rawName = studentInfo?.name || 'Vô danh';
            const hvLabel = `⟦student_detail:${studentId}:profile|${rawName}⟧`;
            const starsBit = stars != null ? ` ${stars}/5 sao` : '';
-           await NotificationService.send(io, {
-             type: 'EVALUATION',
-             title: isUpdate
-               ? '⭐ Học viên cập nhật lại đánh giá'
-               : '⭐ Đánh giá mới từ học viên',
-             content: isUpdate
-               ? `Học viên ${hvLabel} đã cập nhật lại đánh giá${starsBit}.`
-               : `Học viên ${hvLabel} đã đánh giá bạn${starsBit}.`,
-             receivers: targetTeacherId.toString(),
-             payload: {
-               kind: 'teacher_rating',
-               evaluationId: evalId,
-               studentId: String(studentId),
-               stars: stars ?? null,
-               isUpdate: !!isUpdate,
-             },
-             link: `/teacher?evaluationId=${encodeURIComponent(evalId)}`,
-           });
+           try {
+             await NotificationService.send(io, {
+               type: 'EVALUATION',
+               title: isUpdate
+                 ? '⭐ Học viên cập nhật lại đánh giá'
+                 : '⭐ Đánh giá mới từ học viên',
+               content: isUpdate
+                 ? `Học viên ${hvLabel} đã cập nhật lại đánh giá${starsBit}.`
+                 : `Học viên ${hvLabel} đã đánh giá bạn${starsBit}.`,
+               receivers: targetTeacherId.toString(),
+               payload: {
+                 kind: 'teacher_rating',
+                 evaluationId: evalId,
+                 studentId: String(studentId),
+                 stars: stars ?? null,
+                 isUpdate: !!isUpdate,
+               },
+               link: `/teacher?evaluationId=${encodeURIComponent(evalId)}`,
+             });
+           } catch (nErr) {
+             console.error('Notify teacher rating error:', nErr);
+           }
 
            // Fire-and-forget: đủ mốc thưởng sao thì báo GV (idempotent theo tháng)
            try {
@@ -259,6 +309,7 @@ router.post('/', authMiddleware, ...evaluationsGuard('create'), async (req, res)
     }
     return res.json({ success: true, data: evalDoc, meta: { isUpdate: !!isUpdate } });
   } catch (err) {
+    console.error('[EVALUATIONS] POST error:', err);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });

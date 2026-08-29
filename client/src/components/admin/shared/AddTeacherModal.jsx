@@ -281,7 +281,12 @@ export default function AddTeacherModal({
           <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">
             Hủy
           </button>
-          <button type="button" onClick={() => onSubmit?.(teacherForm)} className="cms-btn cms-btn-primary">
+          <button
+            type="button"
+            onClick={() => onSubmit?.(teacherForm)}
+            disabled={!(Array.isArray(teacherForm.subjectIds) && teacherForm.subjectIds.filter(Boolean).length)}
+            className="cms-btn cms-btn-primary"
+          >
             <GraduationCap size={16} /> Tạo giảng viên
           </button>
         </div>

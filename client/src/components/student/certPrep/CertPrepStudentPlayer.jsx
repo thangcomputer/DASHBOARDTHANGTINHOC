@@ -164,86 +164,88 @@ export default function CertPrepStudentPlayer() {
   }
 
   return (
-    <ExamClickOutsideGuard
-      enabled={!player.locked && !player.submitting}
-      soundUrl={examWarningSoundUrl}
-      watchVisibility
-      className="min-h-screen bg-[#f4f6f9] flex flex-col"
-    >
-      <CertPrepPlayerHeader
-        session={player.session}
-        currentIndex={player.currentIndex}
-        total={player.questions.length}
-        remainingSeconds={player.remainingSeconds}
-        answeredCount={player.answeredCount}
-      />
-      {(player.offline || player.saveError) ? (
-        <p className="px-4 sm:px-6 py-2 text-sm font-semibold text-amber-800 bg-amber-50 border-b border-amber-100" role="status">
-          {player.offline ? 'Mất kết nối mạng.' : player.saveError}
-        </p>
-      ) : null}
+    <div className="min-h-screen bg-[#f4f6f9] flex flex-col">
+      <ExamClickOutsideGuard
+        enabled={!player.locked && !player.submitting}
+        soundUrl={examWarningSoundUrl}
+        watchVisibility
+        className="w-full max-w-6xl mx-auto flex-1 flex flex-col min-h-0"
+      >
+        <CertPrepPlayerHeader
+          session={player.session}
+          currentIndex={player.currentIndex}
+          total={player.questions.length}
+          remainingSeconds={player.remainingSeconds}
+          answeredCount={player.answeredCount}
+        />
+        {(player.offline || player.saveError) ? (
+          <p className="px-4 sm:px-6 py-2 text-sm font-semibold text-amber-800 bg-amber-50 border-b border-amber-100" role="status">
+            {player.offline ? 'Mất kết nối mạng.' : player.saveError}
+          </p>
+        ) : null}
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3 p-3 sm:p-5 max-w-6xl w-full mx-auto">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-sm">
-          {q ? (
-            <CertPrepQuestionArea
-              key={q.id}
-              question={q}
-              index={player.currentIndex}
-              total={player.questions.length}
-              value={player.answers[q.id]}
-              disabled={answerLocked}
-              showFeedback={immediate && currentRevealed}
-              onChange={(value) => player.selectAnswer(q.id, value)}
-            />
-          ) : (
-            <p className="text-sm text-slate-500">Không có câu hỏi.</p>
-          )}
-        </div>
-        <aside className="lg:sticky lg:top-[4.75rem] self-start">
-          <button
-            type="button"
-            className="lg:hidden mb-3 min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold inline-flex items-center gap-2"
-            onClick={() => setNavOpen((v) => !v)}
-          >
-            <List size={16} aria-hidden="true" /> Danh sách câu hỏi
-          </button>
-          <div className={`${navOpen ? 'block' : 'hidden'} lg:block`}>
-            <CertPrepQuestionNavigator
-              questions={player.questions}
-              answers={player.answers}
-              currentIndex={player.currentIndex}
-              onSelect={player.goToQuestion}
-              revealedIds={revealedIds}
-              showResultColors={immediate}
-            />
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3 p-3 sm:p-5 w-full">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-sm">
+            {q ? (
+              <CertPrepQuestionArea
+                key={q.id}
+                question={q}
+                index={player.currentIndex}
+                total={player.questions.length}
+                value={player.answers[q.id]}
+                disabled={answerLocked}
+                showFeedback={immediate && currentRevealed}
+                onChange={(value) => player.selectAnswer(q.id, value)}
+              />
+            ) : (
+              <p className="text-sm text-slate-500">Không có câu hỏi.</p>
+            )}
           </div>
-        </aside>
-      </div>
+          <aside className="lg:sticky lg:top-[4.75rem] self-start">
+            <button
+              type="button"
+              className="lg:hidden mb-3 min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold inline-flex items-center gap-2"
+              onClick={() => setNavOpen((v) => !v)}
+            >
+              <List size={16} aria-hidden="true" /> Danh sách câu hỏi
+            </button>
+            <div className={`${navOpen ? 'block' : 'hidden'} lg:block`}>
+              <CertPrepQuestionNavigator
+                questions={player.questions}
+                answers={player.answers}
+                currentIndex={player.currentIndex}
+                onSelect={player.goToQuestion}
+                revealedIds={revealedIds}
+                showResultColors={immediate}
+              />
+            </div>
+          </aside>
+        </div>
 
-      <CertPrepPlayerFooter
-        currentIndex={player.currentIndex}
-        total={player.questions.length}
-        onPrevious={player.previous}
-        onNext={handleNext}
-        onSubmit={() => setConfirmOpen(true)}
-        submitDisabled={player.locked || player.submitting}
-        nextLabel={nextMeta.label}
-        nextDisabled={nextMeta.disabled || player.locked}
-        nextPrimary={nextMeta.primary}
-      />
+        <CertPrepPlayerFooter
+          currentIndex={player.currentIndex}
+          total={player.questions.length}
+          onPrevious={player.previous}
+          onNext={handleNext}
+          onSubmit={() => setConfirmOpen(true)}
+          submitDisabled={player.locked || player.submitting}
+          nextLabel={nextMeta.label}
+          nextDisabled={nextMeta.disabled || player.locked}
+          nextPrimary={nextMeta.primary}
+        />
 
-      <CertPrepSubmitDialog
-        open={confirmOpen}
-        answeredCount={player.answeredCount}
-        total={player.questions.length}
-        submitting={player.submitting}
-        onCancel={() => { if (!player.submitting) setConfirmOpen(false); }}
-        onConfirm={async () => {
-          await player.submit({ auto: false });
-          setConfirmOpen(false);
-        }}
-      />
-    </ExamClickOutsideGuard>
+        <CertPrepSubmitDialog
+          open={confirmOpen}
+          answeredCount={player.answeredCount}
+          total={player.questions.length}
+          submitting={player.submitting}
+          onCancel={() => { if (!player.submitting) setConfirmOpen(false); }}
+          onConfirm={async () => {
+            await player.submit({ auto: false });
+            setConfirmOpen(false);
+          }}
+        />
+      </ExamClickOutsideGuard>
+    </div>
   );
 }

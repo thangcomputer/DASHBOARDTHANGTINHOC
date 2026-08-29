@@ -6,6 +6,18 @@ function normCourseName(name) {
   return String(name || '').trim().toLowerCase();
 }
 
+function teacherIdOf(raw) {
+  if (raw && typeof raw === 'object') return String(raw._id || raw.id || '');
+  return String(raw || '');
+}
+
+/** Công khai: ≥ 1/2 buổi đăng ký. */
+function teacherRatingHalfway({ completed, total }) {
+  const t = Math.max(1, Number(total) || 12);
+  const c = Math.max(0, Number(completed) || 0);
+  return { ok: c * 2 >= t, completed: c, total: t, need: Math.ceil(t / 2) };
+}
+
 function isTeacherRatingLocked({ studentId, teacherId, courseName, privateEvaluations, mineEvals }) {
   const sid = String(studentId || '');
   const tid = String(teacherId || '');
@@ -270,18 +282,26 @@ export const EvaluationView = ({
               const courseTeachers = [];
               const seen = new Set();
               (studentData.courses || []).forEach((c) => {
-                const tid = String(c.teacherId || '');
+                const tid = teacherIdOf(c.teacherId);
                 const tname = String(c.teacherName || '').trim();
                 if (!tid || !tname) return;
                 if (seen.has(tid)) return;
                 seen.add(tid);
-                courseTeachers.push({ id: tid, name: tname, courseName: c.courseName || c.name });
+                courseTeachers.push({
+                  id: tid,
+                  name: tname,
+                  courseName: c.courseName || c.name,
+                  completedSessions: Number(c.completedSessions) || 0,
+                  totalSessions: Number(c.totalSessions) || 12,
+                });
               });
               if (!courseTeachers.length && studentData.teacherId && studentData.teacher && studentData.teacher !== 'Chưa phân công') {
                 courseTeachers.push({
                   id: String(studentData.teacherId),
                   name: String(studentData.teacher).replace(/^Thầy\s+/i, ''),
                   courseName: studentData.course,
+                  completedSessions: Number(studentData.completedSessions) || 0,
+                  totalSessions: Number(studentData.totalSessions) || 12,
                 });
               }
 
@@ -312,8 +332,12 @@ export const EvaluationView = ({
                 privateEvaluations,
                 mineEvals,
               });
-              // Trong khóa: sửa được; sau popup cuối khóa (course_end_teacher): khóa vĩnh viễn
-              const showForm = (!hasRated || isEditingRating) && !ratingLocked;
+              const halfway = teacherRatingHalfway({
+                completed: activeTeacher.completedSessions ?? studentData?.completedSessions,
+                total: activeTeacher.totalSessions ?? studentData?.totalSessions,
+              });
+              // Trong khóa: sửa được khi đã đủ 1/2 buổi; sau popup cuối khóa: khóa vĩnh viễn
+              const showForm = halfway.ok && (!hasRated || isEditingRating) && !ratingLocked;
 
               const startEditRating = () => {
                 const src = existingRating?.criteria || {};
@@ -379,6 +403,15 @@ export const EvaluationView = ({
                     </div>
                   </div>
 
+                  {!halfway.ok && !hasRated && !ratingLocked ? (
+                    <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-6 text-center space-y-1">
+                      <p className="text-sm font-black text-amber-900">Chưa đủ buổi để được đánh giá</p>
+                      <p className="text-xs font-semibold text-amber-800/80">
+                        Cần học ít nhất {halfway.need}/{halfway.total} buổi (hiện {halfway.completed}/{halfway.total}).
+                      </p>
+                    </div>
+                  ) : null}
+
                   {hasRated && !showForm ? (
                     <div className="bg-yellow-50/50 rounded-2xl sm:rounded-[32px] p-6 sm:p-8 border border-yellow-100 space-y-5 text-center">
                        <div className="flex flex-col items-center gap-2">
@@ -402,7 +435,7 @@ export const EvaluationView = ({
                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                            Đã khóa sau đánh giá cuối khóa · không thể sửa
                          </p>
-                       ) : (
+                       ) : halfway.ok ? (
                          <button
                            type="button"
                            onClick={startEditRating}
@@ -410,7 +443,7 @@ export const EvaluationView = ({
                          >
                            Cập nhật lại đánh giá
                          </button>
-                       )}
+                       ) : null}
                     </div>
                   ) : showForm ? (
                     <div className="space-y-4 sm:space-y-5">
@@ -496,6 +529,8 @@ export const EvaluationView = ({
                             console.error('Submit Evaluation Logic Crash:', err);
                             const locked = err?.code === 'TEACHER_RATING_LOCKED'
                               || /hoàn tất đánh giá cuối khóa/i.test(String(err?.message || ''));
+                            const tooEarly = err?.code === 'TOO_EARLY_TO_RATE'
+                              || /chưa đủ buổi/i.test(String(err?.message || ''));
                             if (locked) {
                               setIsEditingRating(false);
                               setRatingSubmitted(true);
@@ -513,7 +548,9 @@ export const EvaluationView = ({
                             }
                             const msg = locked
                               ? (err.message || 'Bạn đã hoàn tất đánh giá cuối khóa. Không thể sửa.')
-                              : 'Không gửi được đánh giá. Thử lại nhé.';
+                              : tooEarly
+                                ? (err.message || 'Chưa đủ buổi để được đánh giá')
+                                : 'Không gửi được đánh giá. Thử lại nhé.';
                             showModal({ title: 'Không gửi được', content: msg, type: 'error' });
                           }
                         }}

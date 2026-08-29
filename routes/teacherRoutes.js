@@ -15,9 +15,14 @@ const { teachersCutoverGate } = require('../middleware/teachersCutoverGate');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
+const { EXAM_SUBJECT_LABELS } = require('../services/examSubjectCatalog');
 const { sendAccountWelcome } = require('../services/accountWelcome');
 const NotificationService = require('../services/NotificationService');
 const { resolveDefaultAccountPassword } = require('../utils/tempPassword');
+
+function specialtyFromSubjectIds(ids) {
+  return (Array.isArray(ids) ? ids : []).map((id) => EXAM_SUBJECT_LABELS[id] || id).join(', ');
+}
 const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
@@ -170,7 +175,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       name,
       phone,
       email,
-      specialty: specialty || normalizedSubjectIds.join(', '),
+      specialty: specialty || specialtyFromSubjectIds(normalizedSubjectIds),
       subjectIds: normalizedSubjectIds,
       voiceRegion: normalizeVoiceRegion(voiceRegion),
       startDate: startDate || Date.now(),
@@ -510,7 +515,7 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
   try {
     // Teacher sửa chính mình → cho phép
     const isSelfEdit = req.user.id === req.params.id && req.user.role === 'teacher';
-    // STAFF → chặn (chỉ Super Admin mới được sửa GV)
+    // Admin/Staff: Super Admin, hoặc quyền Đào tạo / Quản lý Giảng viên
     if (!isSelfEdit && req.user.role !== 'admin' && req.user.role !== 'staff') {
       return res.status(403).json({ success: false, message: 'Không có quyền' });
     }
@@ -570,8 +575,7 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
         if (spec) updates.subjectIds = resolveTeacherSubjectIds({ specialty: spec, subjectIds: [] });
       }
       if (req.body.specialty === undefined && updates.subjectIds.length) {
-        const LABELS = { coban: 'Máy vi tính (Cơ bản)', word: 'Word', excel: 'Excel', powerpoint: 'PowerPoint', canva: 'Canva' };
-        updates.specialty = updates.subjectIds.map((id) => LABELS[id] || id).join(', ');
+        updates.specialty = specialtyFromSubjectIds(updates.subjectIds);
       }
     }
 

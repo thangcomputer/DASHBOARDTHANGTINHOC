@@ -16,15 +16,23 @@ import StudentDetailModal from '../../StudentDetailModal';
 
 const StudentImportModal = React.lazy(() => import('../../StudentImportModal'));
 
+const TEACHER_SAVE_KEYS = [
+  'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio',
+  'startDate', 'address', 'bankAccount', 'status', 'baseSalaryPerSession',
+  'customStarBonusAmount', 'branchId', 'branchCode',
+];
+
 function stripTeacherUiFields(teacher) {
   if (!teacher || typeof teacher !== 'object') return {};
-  const {
-    _tab,
-    id,
-    _id,
-    ...rest
-  } = teacher;
-  return rest;
+  const out = {};
+  for (const k of TEACHER_SAVE_KEYS) {
+    if (teacher[k] !== undefined) out[k] = teacher[k];
+  }
+  return out;
+}
+
+function teacherHasSubjects(teacher) {
+  return Array.isArray(teacher?.subjectIds) && teacher.subjectIds.filter(Boolean).length > 0;
 }
 
 export default function AdminModalManager() {
@@ -161,6 +169,9 @@ export default function AdminModalManager() {
             if (!(d?.name || '').trim() || !(d?.phone || '').trim()) {
               throw new Error('Vui lòng nhập họ tên và số điện thoại');
             }
+            if (!teacherHasSubjects(d)) {
+              throw new Error('Chọn ít nhất một môn học');
+            }
             await ctxAddTeacher(d);
             toast?.success?.(`Đã tạo giảng viên ${d.name}`);
             setShowTeacherModal(false);
@@ -182,6 +193,10 @@ export default function AdminModalManager() {
             const id = editTeacher.id || editTeacher._id;
             if (!id) {
               toast?.error?.('Thiếu mã giảng viên');
+              return;
+            }
+            if (!teacherHasSubjects(editTeacher)) {
+              toast?.error?.('Chọn ít nhất một môn học');
               return;
             }
             const ok = await safeRun(

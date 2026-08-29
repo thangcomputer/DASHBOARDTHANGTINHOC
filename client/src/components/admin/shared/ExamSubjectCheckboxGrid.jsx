@@ -16,7 +16,7 @@ export default function ExamSubjectCheckboxGrid({
   dense = false,
   hideLabel = false,
 }) {
-  const options = getExamSubjectOptions(catalog);
+  const options = getExamSubjectOptions(catalog).filter((item) => item?.id && item?.label);
   const selected = Array.isArray(value) ? value : [];
   const groups = options.reduce((acc, item) => {
     const key = item.group || 'admin';
@@ -24,6 +24,7 @@ export default function ExamSubjectCheckboxGrid({
     acc[key].push(item);
     return acc;
   }, {});
+  const groupEntries = Object.entries(groups).filter(([, items]) => items.length > 0);
 
   const toggle = (id) => {
     const next = selected.includes(id)
@@ -56,7 +57,7 @@ export default function ExamSubjectCheckboxGrid({
         </label>
       )}
       <div className={dense ? 'space-y-2.5' : 'space-y-3'}>
-        {Object.entries(groups).map(([groupKey, items]) => (
+        {groupEntries.map(([groupKey, items]) => (
           <div key={groupKey} className={dense ? 'space-y-1.5' : 'space-y-2'}>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               {getExamSubjectGroupLabel(groupKey)}
