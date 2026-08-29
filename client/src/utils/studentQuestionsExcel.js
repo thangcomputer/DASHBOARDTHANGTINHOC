@@ -35,6 +35,22 @@ const SECTION_LABEL_TO_CODE = {
   computer: 'coban',
   windows: 'coban',
   canva: 'canva',
+  photoshop: 'photoshop',
+  corel: 'corel',
+  autocad: 'autocad',
+  python: 'python',
+  web: 'web',
+  cpp: 'cpp',
+  'c++': 'cpp',
+  'mos-word': 'word',
+  'mos word': 'word',
+  'mos-excel': 'excel',
+  'mos excel': 'excel',
+  'mos-powerpoint': 'powerpoint',
+  'mos powerpoint': 'powerpoint',
+  'ms word': 'word',
+  'ms excel': 'excel',
+  'ms powerpoint': 'powerpoint',
   'tinh huong su pham': 'situation',
   situation: 'situation',
   'kien thuc khac': 'other',
@@ -75,12 +91,17 @@ function pick(row, aliases) {
 }
 
 function parseSection(val) {
-  if (val == null || val === '') return null;
+  if (val == null || String(val).trim() === '') return null;
   const key = stripVi(String(val));
   if (SECTION_LABEL_TO_CODE[key]) return SECTION_LABEL_TO_CODE[key];
   for (const [label, code] of Object.entries(SECTION_LABEL_TO_CODE)) {
     if (key === stripVi(label)) return code;
   }
+  if (key.includes('powerpoint') || key.includes('power point')) return 'powerpoint';
+  if (key.includes('excel')) return 'excel';
+  if (key.includes('word')) return 'word';
+  if (key.includes('windows') || key.includes('may tinh') || key.includes('may vi tinh')) return 'coban';
+  if (key.includes('su pham') || key.includes('tinh huong')) return 'situation';
   return null;
 }
 
@@ -249,11 +270,12 @@ export async function exportStudentQuestionsExcel(questions, subjectId, subjectL
 }
 
 /** Cung format cot voi hoc vien — dung chung parser. */
-export async function parseQuestionBankExcel(bstr) {
-  return parseStudentQuestionsExcel(bstr);
+export async function parseQuestionBankExcel(bstr, options) {
+  return parseStudentQuestionsExcel(bstr, options);
 }
 
-export async function parseStudentQuestionsExcel(bstr) {
+export async function parseStudentQuestionsExcel(bstr, options = {}) {
+  const defaultSection = options.defaultSection || null;
   const XLSX = await getXLSX();
   const errors = [];
   const questions = [];
@@ -294,6 +316,7 @@ export async function parseStudentQuestionsExcel(bstr) {
     const type = parseType(pick(row, ['Loại', 'Loai', 'Type']));
     let section = parseSection(pick(row, ['Phần thi', 'Phan thi', 'Section', 'Mon']));
     if (section === 'computer') section = 'coban';
+    if (!section && defaultSection) section = defaultSection;
     if (!section) {
       errors.push(`Dong ${line}: Phan thi khong hop le (vd: Excel, Word).`);
       return;

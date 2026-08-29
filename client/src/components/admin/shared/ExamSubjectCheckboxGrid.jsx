@@ -66,16 +66,13 @@ export default function ExamSubjectCheckboxGrid({
               {items.map(({ id, label }) => {
                 const on = selected.includes(id);
                 return (
-                  <label
+                  <button
+                    type="button"
                     key={id}
                     className={`cms-chip-option ${dense ? 'cms-chip-option--dense' : ''} ${on ? 'is-on' : ''}`}
+                    aria-pressed={on}
+                    onClick={() => toggle(id)}
                   >
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={on}
-                      onChange={() => toggle(id)}
-                    />
                     <span
                       className={`cms-chip-check ${on ? 'is-on' : ''}`}
                       aria-hidden="true"
@@ -83,7 +80,7 @@ export default function ExamSubjectCheckboxGrid({
                       ✓
                     </span>
                     <span className="min-w-0 truncate leading-snug" title={label}>{label}</span>
-                  </label>
+                  </button>
                 );
               })}
             </div>

@@ -1738,11 +1738,14 @@ html.cms-app-shell #root {
   border-radius: 12px;
   border: 1.5px solid var(--cms-border);
   background: #fff;
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
   color: var(--cms-neutral-800);
   cursor: pointer;
   text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
   min-width: 0;
   transition: border-color var(--cms-duration) ease, background var(--cms-duration) ease;
 }

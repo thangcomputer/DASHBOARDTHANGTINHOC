@@ -245,7 +245,7 @@ export default function TeacherQuizManager({
       let binary = '';
       for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
 
-      const parsed = await parseQuestionBankExcel(binary);
+      const parsed = await parseQuestionBankExcel(binary, { defaultSection: 'excel' });
       const parsedQs = Array.isArray(parsed?.questions) ? parsed.questions : [];
       const errors = Array.isArray(parsed?.errors) ? parsed.errors : [];
 
@@ -525,9 +525,9 @@ export default function TeacherQuizManager({
 
       {/* ── MODAL SOẠN BÀI TRẮC NGHIỆM MỚI ── */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-3xl w-full p-5 sm:p-6 space-y-5 my-8 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden">
+          <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 sm:px-6 pt-5 pb-3 shrink-0">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Plus className="text-red-600" size={18} /> Tạo bài thi trắc nghiệm theo buổi học
@@ -543,7 +543,8 @@ export default function TeacherQuizManager({
               </button>
             </div>
 
-            <form onSubmit={handleCreateQuiz} className="space-y-4 text-xs font-semibold">
+            <form onSubmit={handleCreateQuiz} className="flex-1 min-h-0 flex flex-col text-xs font-semibold">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 sm:px-6 py-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-600 mb-1">Tên bài kiểm tra / Buổi học *</label>
@@ -850,8 +851,9 @@ export default function TeacherQuizManager({
                   </div>
                 ))}
               </div>
+              </div>
 
-              <div className="flex gap-3 pt-3 border-t border-slate-100">
+              <div className="flex gap-3 px-5 sm:px-6 py-3 border-t border-slate-100 shrink-0 bg-white">
                 <button
                   type="button"
                   onClick={closeCreateModal}
