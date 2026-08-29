@@ -905,7 +905,7 @@ const AdminProgressPanel = ({ courseId }) => {
 };
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, hideTabBar = false }) => {
+const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, hideTabBar = true }) => {
   const toast = useToast();
   const trainingData = trainingDataProp || { videos: [], guides: [], files: [] };
   const [courses, setCourses] = useState([]);

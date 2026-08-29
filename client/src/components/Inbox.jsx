@@ -21,6 +21,7 @@ import {
   resolveMessagingDeepLink,
   existingPeerIdsFromConversations,
 } from '../utils/messagingDeepLink';
+import { matchesPersonSearch } from '../utils/personSearch';
 import { MessageRichText } from '../utils/messageRichText';
 import ScheduleMessagePreviewModal, {
   resolveScheduleMessagePayload,
@@ -804,6 +805,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     return mergeConversationsById(entries);
   }, [contacts, contactsLoaded, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin, isSuperAdmin, isSupportAgent, handoffUserIds, students, teachers, staffs]);
   const [search, setSearch] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -1620,11 +1622,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (!isSearching && c.isHidden) return false;
 
     if (isSearching) {
-      const searchStr = search.toLowerCase();
-      const matchesName = (c.user?.name || '').toLowerCase().includes(searchStr);
-      const phoneStr = (c.user.phone || '').replace(/\s+/g, '');
-      const matchesPhone = phoneStr.includes(searchStr.replace(/\s+/g, ''));
-      if (!matchesName && !matchesPhone) return false;
+      const hit = matchesPersonSearch(search, {
+        name: c.user?.name || '',
+        phone: c.user?.phone || '',
+        zalo: c.user?.zalo || '',
+      });
+      if (!hit) return false;
     }
 
     if (contactTab === 'all') return true;
@@ -1643,6 +1646,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
     return r === contactTab;
   });
+
+  const contactSearchSuggestions = useMemo(() => {
+    const q = search.trim();
+    if (!q) return [];
+    return conversations.filter((c) => {
+      if (isAiSupportConversationId(c.id)) return false;
+      if (isSupportAgent && handoffUserIds.has(String(c.user?.id || ''))) return false;
+      return matchesPersonSearch(q, {
+        name: c.user?.name || '',
+        phone: c.user?.phone || '',
+        zalo: c.user?.zalo || '',
+      });
+    }).slice(0, 8);
+  }, [search, conversations, isSupportAgent, handoffUserIds]);
 
   // Online lên trên; offline / nhóm ở dưới — trong nhóm vẫn ưu tiên tin mới nhất
   const sortedConvs = [...filteredConvs].sort((a, b) => {
@@ -1752,10 +1769,45 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 <input
                   type="text"
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Tìm kiếm danh bạ..."
+                  onChange={(e) => setSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setSearchFocused(false), 180);
+                  }}
+                  placeholder="Tìm họ, tên, tên đệm, SĐT..."
                   className="cms-input pl-10 pr-3"
+                  autoComplete="off"
+                  aria-label="Tìm kiếm danh bạ"
+                  aria-autocomplete="list"
+                  aria-expanded={searchFocused && contactSearchSuggestions.length > 0}
                 />
+                {searchFocused && search.trim() && contactSearchSuggestions.length > 0 && (
+                  <ul
+                    className="absolute left-0 right-0 top-full mt-1 z-30 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1"
+                    role="listbox"
+                  >
+                    {contactSearchSuggestions.map((c) => (
+                      <li key={c.id} role="option">
+                        <button
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-red-50 transition-colors"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            selectConversation(c);
+                            setSearchFocused(false);
+                          }}
+                        >
+                          <span className="block text-sm font-medium text-slate-800 truncate">
+                            {c.user?.name || 'Không rõ tên'}
+                          </span>
+                          {c.user?.phone ? (
+                            <span className="block text-[11px] text-slate-400">{c.user.phone}</span>
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               {currentUserRole !== 'student' && !isSuperAdmin && (
                 <button
@@ -2771,14 +2823,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     type="text"
                     value={memberSearch}
                     onChange={e => setMemberSearch(e.target.value)}
-                    placeholder="Tìm tên giáo viên hoặc học viên..."
+                    placeholder="Tìm họ, tên, SĐT..."
                     className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-300 focus:bg-white transition-all font-medium text-slate-700"
                   />
                 </div>
                 <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                   {contacts
                     .filter(u => u.id !== currentUserId && u.id !== 'admin')
-                    .filter(u => !memberSearch || (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()))
+                    .filter((u) => !memberSearch || matchesPersonSearch(memberSearch, {
+                      name: u.name,
+                      phone: u.phone,
+                      zalo: u.zalo,
+                    }))
                     .map(u => {
                       const isSelected = selectedParticipants.some(p => p.userId === u.id);
                       return (
@@ -3029,14 +3085,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     type="text"
                     value={memberSearch}
                     onChange={e => setMemberSearch(e.target.value)}
-                    placeholder="Tìm tên thành viên..."
+                    placeholder="Tìm họ, tên, SĐT..."
                     className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-300 focus:bg-white transition-all font-medium text-slate-700"
                   />
                 </div>
                 <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                   {contacts
                     .filter(u => u.id !== currentUserId && u.id !== 'admin')
-                    .filter(u => !memberSearch || (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()))
+                    .filter((u) => !memberSearch || matchesPersonSearch(memberSearch, {
+                      name: u.name,
+                      phone: u.phone,
+                      zalo: u.zalo,
+                    }))
                     .map(u => {
                       const groupObj = groups?.find(g => String(g._id) === String(activeConv?.id?.replace('group_', '')));
                       const isAlreadyInGroup = groupObj?.participants?.some(p => String(p.userId) === String(u.id));

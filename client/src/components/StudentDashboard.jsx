@@ -747,14 +747,14 @@ const StudentDashboard = ({ onNavigate }) => {
             myAssignments={myAssignments}
             studentTrainingData={studentTrainingData}
             initialMainTab={{
-              materials: null,
+              materials: 'courses',
               'materials-videos': 'courses',
               'materials-files': 'files',
               'materials-software': 'software',
               'materials-assignments': 'assignments',
               'exam-scores': 'exams',
             }[currentHash]}
-            hideTabBar={currentHash !== 'materials'}
+            hideTabBar
           />
         ) : currentHash === 'evaluation' ? (
           <StudentLazyEvaluationTab

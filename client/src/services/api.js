@@ -1246,8 +1246,9 @@ export const messagesAPI = {
     const res = await apiFetch(`/messages/read/${conversationId}`, { method: 'PUT' });
     return res.json();
   },
-  getUnread: async (userId) => {
-    const res = await apiFetch(`/messages/unread/${encodeURIComponent(userId)}`);
+  getUnread: async (userId, { excludeAi = false } = {}) => {
+    const q = excludeAi ? '?excludeAi=1' : '';
+    const res = await apiFetch(`/messages/unread/${encodeURIComponent(userId)}${q}`);
     return res.json();
   },
   broadcast: async (targetRole, content, extra = {}) => {

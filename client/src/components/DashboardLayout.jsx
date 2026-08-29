@@ -1461,6 +1461,13 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               if (role === 'student' && String(n.type).toLowerCase() === 'exam' && n.payload?.quizId) {
                                 targetPath = '/student/exam';
                               }
+                              if (
+                                role === 'student'
+                                && targetPath === '/student#materials'
+                                && (/bài tập/i.test(String(n.title || '')) || String(n.payload?.type || '') === 'assignment')
+                              ) {
+                                targetPath = '/student#materials-assignments';
+                              }
                               if (String(targetPath).includes('#')) {
                                 const [pathPart, hashPart] = String(targetPath).split('#');
                                 navigate(pathPart || location.pathname || '/');

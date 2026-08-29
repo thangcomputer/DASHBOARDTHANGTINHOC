@@ -1089,11 +1089,16 @@ router.get('/unread/:userId', messagesGuard('unread'), async (req, res) => {
        return res.status(403).json({ success: false, message: 'Quyền truy cập bị từ chối' });
     }
     const receiverTargets = isAdminLevelAccount(req.user) ? ['admin', String(userId)] : [String(userId)];
+    const senderNin = [String(userId)];
+    // Popup đăng nhập: không tính lời chào/idle của Trợ lý AI (chưa có người nhắn thật).
+    if (req.query.excludeAi === '1' || req.query.excludeAi === 'true') {
+      senderNin.push('ai_support');
+    }
     const count = await Message.countDocuments({
       receiverId: { $in: receiverTargets },
       isRead: false,
       isRecalled: { $ne: true },
-      senderId: { $ne: String(userId) },
+      senderId: { $nin: senderNin },
       hiddenFor: { $nin: receiverTargets },
     });
     res.json({ success: true, data: { unreadCount: count } });

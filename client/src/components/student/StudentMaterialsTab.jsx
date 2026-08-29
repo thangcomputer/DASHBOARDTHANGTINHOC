@@ -7,7 +7,7 @@ export default function StudentMaterialsTab({
   myAssignments,
   studentTrainingData,
   initialMainTab = null,
-  hideTabBar = false,
+  hideTabBar = true,
 }) {
   return (
           <div className="cms-sd cms-sd-page bg-slate-50 min-h-full">

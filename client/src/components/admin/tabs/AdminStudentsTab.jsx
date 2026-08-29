@@ -18,6 +18,7 @@ import {
 import { isTeacherActive } from '../../../constants/teacherStatus';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
+import { matchesPersonSearch } from '../../../utils/personSearch';
 import api, { apiFetch } from '../../../services/api';
 
 /** Tổng tiền đã hoàn từ khóa cancelled (chỉ hiển thị, không sửa). */
@@ -449,6 +450,32 @@ export default function AdminStudentsTab() {
   const [refundModal, setRefundModal] = useState(null); // { student, enr, reason, refundAmount, refundPercent, maxRefund }
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [purgingCancelled, setPurgingCancelled] = useState(false);
+  const [draftSearch, setDraftSearch] = useState(search);
+  const [searchFocused, setSearchFocused] = useState(false);
+
+  useEffect(() => {
+    setDraftSearch(search);
+  }, [search]);
+
+  useEffect(() => {
+    if (draftSearch === search) return undefined;
+    const t = window.setTimeout(() => setSearch(draftSearch), 280);
+    return () => window.clearTimeout(t);
+  }, [draftSearch, search, setSearch]);
+
+  const searchSuggestions = useMemo(() => {
+    const q = String(draftSearch || '').trim();
+    if (!q) return [];
+    return (filteredStudents || [])
+      .filter((s) => matchesPersonSearch(q, {
+        name: s.name,
+        phone: s.phone,
+        zalo: s.zalo,
+        studentCode: s.studentCode,
+        extra: s.course || '',
+      }))
+      .slice(0, 8);
+  }, [draftSearch, filteredStudents]);
 
   const ghostCancelledCount = useMemo(
     () => (filteredStudents || []).filter(isStudentRowLocked).length,
@@ -768,12 +795,46 @@ export default function AdminStudentsTab() {
           <div className="relative w-full">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={draftSearch}
+              onChange={(e) => setDraftSearch(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => {
+                window.setTimeout(() => setSearchFocused(false), 180);
+              }}
               className="pl-10 pr-3 h-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/15 outline-none w-full transition-all"
-              placeholder="Tìm tên / SĐT..."
+              placeholder="Tìm họ, tên đệm, tên, SĐT..."
               aria-label="Tìm học viên"
+              autoComplete="off"
+              aria-autocomplete="list"
+              aria-expanded={searchFocused && searchSuggestions.length > 0}
             />
+            {searchFocused && String(draftSearch || '').trim() && searchSuggestions.length > 0 && (
+              <ul
+                className="absolute left-0 right-0 top-full mt-1 z-30 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1"
+                role="listbox"
+              >
+                {searchSuggestions.map((s) => (
+                  <li key={s.id || s._id} role="option">
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-red-50 transition-colors"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        const name = String(s.name || '').trim();
+                        setDraftSearch(name);
+                        setSearch(name);
+                        setSearchFocused(false);
+                      }}
+                    >
+                      <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
+                      {s.phone ? (
+                        <span className="block text-[11px] text-slate-400">{s.phone}</span>
+                      ) : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 

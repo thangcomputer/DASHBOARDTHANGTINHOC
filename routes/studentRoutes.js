@@ -18,6 +18,7 @@ function requireManageStudentsUnlessTeacher(req, res, next) {
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
 const { buildMongoPaidFilterCondition } = require('../utils/studentPaidFilterBuckets');
+const { buildStudentSearchAndConditions } = require('../utils/personSearchQuery');
 const {
   applyEnrollmentStats,
   legacyEnrollmentFromStudent,
@@ -330,19 +331,8 @@ router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), 
     }
 
     if (search) {
-      const s = sanitizeRegex(search);
-      const sReg = { $regex: s, $options: 'i' };
-      andConditions.push({
-        $or: [
-          { name: sReg },
-          { zalo: sReg },
-          { phone: sReg },
-          { course: sReg },
-          { 'enrollments.courseName': sReg },
-          { studentCode: sReg },
-          { legacyStudentCodes: sReg },
-        ],
-      });
+      const searchConds = buildStudentSearchAndConditions(search);
+      if (searchConds.length) andConditions.push(...searchConds);
     }
 
     const filter = andConditions.length > 0 ? { $and: andConditions } : {};

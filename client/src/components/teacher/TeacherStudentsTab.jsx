@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, MessageSquare, Users, GraduationCap } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
+import { matchesPersonSearch } from '../../utils/personSearch';
 import TeacherStudentCard from './TeacherStudentCard';
 import { getAttendanceAction } from '../../utils/attendanceAction';
 import { normalizeScheduleDate } from '../../utils/scheduleTime';
@@ -70,7 +71,7 @@ export default function TeacherStudentsTab({
                     <input
                       value={studentSearch}
                       onChange={e => setStudentSearch(e.target.value)}
-                      placeholder="Tìm học viên..."
+                      placeholder="Tìm họ, tên, SĐT..."
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
@@ -78,13 +79,12 @@ export default function TeacherStudentsTab({
                
                <div className="flex-1 min-h-0 overflow-visible lg:overflow-y-auto p-2 space-y-1">
                   {students
-                    .filter((s) => {
-                      const q = String(studentSearch || '').toLowerCase();
-                      if (!q) return true;
-                      const name = String(s.name || '').toLowerCase();
-                      const course = String(s.course || '').toLowerCase();
-                      return name.includes(q) || course.includes(q);
-                    })
+                    .filter((s) => matchesPersonSearch(studentSearch, {
+                      name: s.name,
+                      phone: s.phone,
+                      zalo: s.zalo,
+                      extra: s.course || '',
+                    }))
                     .map(s => {
                       const sId = s._id || s.id;
                       const rowKey = s._enrollmentKey || String(sId);

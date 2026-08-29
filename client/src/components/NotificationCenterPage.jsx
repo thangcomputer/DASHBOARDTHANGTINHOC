@@ -63,7 +63,7 @@ function formatTime(t) {
   return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 }
 
-function resolveNavPath(path) {
+function resolveNavPath(path, notif) {
   if (!path) return null;
   let targetPath = path;
   if (targetPath.startsWith('http')) {
@@ -76,8 +76,14 @@ function resolveNavPath(path) {
     targetPath = '/admin#' + targetPath.replace('/admin/', '');
   } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/notifications'].includes(targetPath) && !targetPath.includes('#')) {
     targetPath = '/student#' + targetPath.replace('/student/', '');
-  } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/notifications'].includes(targetPath) && !targetPath.includes('#')) {
+  } else   if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/notifications'].includes(targetPath) && !targetPath.includes('#')) {
     targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
+  }
+  if (
+    targetPath === '/student#materials'
+    && (/bài tập/i.test(String(notif?.title || '')) || String(notif?.payload?.type || '') === 'assignment')
+  ) {
+    targetPath = '/student#materials-assignments';
   }
   return targetPath;
 }
@@ -318,7 +324,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       setStudentDetailId(String(n.payload.studentId));
       return;
     }
-    const path = resolveNavPath(n.path);
+    const path = resolveNavPath(n.path, n);
     if (path && role === 'teacher' && String(path).includes('evaluationId=')) {
       await openTeacherRatingDetail(n);
       return;
@@ -718,11 +724,11 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             </div>
 
             <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
-              {resolveNavPath(selectedNotif.path) && !qaDetail && (
+              {resolveNavPath(selectedNotif.path, selectedNotif) && !qaDetail && (
                 <button
                   type="button"
                   onClick={() => {
-                    const path = resolveNavPath(selectedNotif.path);
+                    const path = resolveNavPath(selectedNotif.path, selectedNotif);
                     setSelectedNotif(null);
                     if (path) navigate(path);
                   }}

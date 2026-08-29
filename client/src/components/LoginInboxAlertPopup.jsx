@@ -10,6 +10,7 @@ import {
   normalizeScheduleDate,
 } from '../utils/scheduleTime';
 import { LOGIN_OVERLAY_EVENT } from '../utils/loginOverlayGate';
+import { isAiSupportConversationId, AI_SUPPORT_PEER } from '../utils/aiSupport';
 
 export const LOGIN_ALERT_STORAGE_PREFIX = 'cms_login_alert';
 
@@ -84,9 +85,16 @@ function writeAck(userId, unread, scheduleIds) {
   } catch { /* ignore */ }
 }
 
-/** Cùng công thức badge Hộp thư trên sidebar. */
+/** Badge hộp thư: bỏ tin chào/idle của Trợ lý AI — chưa phải người nhắn. */
+function isAiSupportConv(c) {
+  return isAiSupportConversationId(c?.id) || String(c?.user?.id || '') === AI_SUPPORT_PEER.id;
+}
+
 function inboxUnreadCount(convs) {
-  return (convs || []).reduce((sum, c) => sum + (Number(c?.unread) || 0), 0);
+  return (convs || []).reduce((sum, c) => {
+    if (isAiSupportConv(c)) return sum;
+    return sum + (Number(c?.unread) || 0);
+  }, 0);
 }
 
 function pickUpcomingClasses(list) {
@@ -179,7 +187,7 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
       let unread = inboxUnreadCount(convs);
       if (unread <= 0) {
         try {
-          const res = await api.messages.getUnread(userId);
+          const res = await api.messages.getUnread(userId, { excludeAi: true });
           if (res?.success) unread = Number(res.data?.unreadCount) || 0;
         } catch { /* ignore */ }
       }
