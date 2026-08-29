@@ -53,6 +53,7 @@ import { useInactivityTimer }                from './utils/useInactivityTimer';
 import { unlockAudio }                       from './utils/sound';
 import { getMessagingRole }                  from './lib/messagingRoles';
 import { hasPermission, PERMISSIONS }        from './constants/permissions';
+import { snapshotLoginAlertStorage, restoreLoginAlertStorage } from './components/LoginInboxAlertPopup';
 import './App.css';
 
 // ── Session helpers ──────────────────────────────────────────────────────────
@@ -555,12 +556,14 @@ function App() {
     // Đang offline → không logout (tránh đá user khi mạng tụt giữa phiên)
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
+    const loginAlerts = snapshotLoginAlertStorage();
     const role = session?.role;
     try { await api.auth.logout(); } catch { /* ignore */ }
     if (role) clearTokens(role);
     localStorage.clear();
     sessionStorage.clear();
     if (deviceId) localStorage.setItem('cms_device_id_v1', deviceId);
+    restoreLoginAlertStorage(loginAlerts);
     setSession(null);
     navigate('/login?msg=inactivity');
   }, [navigate, session]);
@@ -654,12 +657,14 @@ function App() {
       return;
     }
     const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
+    const loginAlerts = snapshotLoginAlertStorage();
     const role = session.role;
     try { await api.auth.logout(); } catch { /* ignore */ }
     clearTokens(role);
     localStorage.clear();
     sessionStorage.clear();
     if (deviceId) localStorage.setItem('cms_device_id_v1', deviceId);
+    restoreLoginAlertStorage(loginAlerts);
     setSession(null);
     navigate('/login');
   }, [navigate, session]);

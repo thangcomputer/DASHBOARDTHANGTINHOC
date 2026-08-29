@@ -21,6 +21,7 @@ import StudentAttendanceConfirmModal from './student/StudentAttendanceConfirmMod
 import StudentAssignedTeacherModal from './student/StudentAssignedTeacherModal';
 import AdminAttendanceDisputeModal from './admin/shared/AdminAttendanceDisputeModal';
 import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
+import LoginInboxAlertPopup from './LoginInboxAlertPopup';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
 import { useAttendanceRealtimeSync } from '../hooks/useAttendanceRealtimeSync';
 import TeacherRatingDetailModal, {
@@ -1115,6 +1116,20 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
       {role === 'student' ? <StudentQuizInviteHost /> : null}
 
+      <LoginInboxAlertPopup
+        role={role}
+        userId={myId}
+        blocked={
+          showWelcomeCelebration
+          || !!courseCelebration
+          || !!starBonusCelebration
+          || (role === 'student' && !!attendanceConfirm)
+          || (role === 'student' && assignedTeacherModal.open)
+          || ((role === 'admin' || role === 'staff') && !!attendanceDispute)
+          || (role === 'teacher' && !!teacherAttendanceConfirm)
+          || (session?.isFirstLogin === true && role !== 'student' && role !== 'teacher')
+        }
+      />
       <WelcomeCelebrationOverlay
         open={showWelcomeCelebration}
         role={role}

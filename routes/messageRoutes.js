@@ -1092,6 +1092,9 @@ router.get('/unread/:userId', messagesGuard('unread'), async (req, res) => {
     const count = await Message.countDocuments({
       receiverId: { $in: receiverTargets },
       isRead: false,
+      isRecalled: { $ne: true },
+      senderId: { $ne: String(userId) },
+      hiddenFor: { $nin: receiverTargets },
     });
     res.json({ success: true, data: { unreadCount: count } });
   } catch (err) {

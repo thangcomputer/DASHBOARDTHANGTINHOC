@@ -18,6 +18,7 @@ import {
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
 import { getScheduleDisplayKind } from '../utils/scheduleTime';
+import { setLoginOverlay } from '../utils/loginOverlayGate';
 import { buildStudentActivityLogs, isStudentScheduleLog, isStudentScoreLog } from '../utils/studentActivityLogs';
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
 import { StudentNoteModal } from './student/StudentNoteModal';
@@ -558,6 +559,11 @@ const StudentDashboard = ({ onNavigate }) => {
     serverMilestoneEvals,
     STUDENT_ID,
   ]);
+
+  useEffect(() => {
+    setLoginOverlay('milestone', Boolean(activeMilestone));
+    return () => setLoginOverlay('milestone', false);
+  }, [activeMilestone]);
 
   const existingPublicRating = (teacherRatingData?.ratings || []).find(
     (r) => String(r.studentId) === String(STUDENT_ID) && (r.criteria?.stars || r.criteria?.teaching),

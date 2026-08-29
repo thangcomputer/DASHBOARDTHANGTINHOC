@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import api from '../services/api';
+import { setLoginOverlay } from '../utils/loginOverlayGate';
 
 const SESSION_KEY = 'cms_popup_seen_';
 
@@ -54,6 +55,11 @@ export default function PopupBanner({ role }) {
     sessionStorage.setItem(storageKey, '1');
     setVisible(false);
   };
+
+  useEffect(() => {
+    setLoginOverlay(`popup-banner-${role}`, visible);
+    return () => setLoginOverlay(`popup-banner-${role}`, false);
+  }, [visible, role]);
 
   if (!visible || !popup) return null;
 
