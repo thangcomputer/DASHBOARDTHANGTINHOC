@@ -112,8 +112,7 @@ export default function StudentProfileTab({
     window.location.hash = `materials-videos?courseId=${encodeURIComponent(order.courseId)}`;
   };
 
-  // Cùng thứ tự với sidebar: ưu tiên gender đã hydrate trên session, rồi gender hồ sơ
-  const profileGender = sessionGender || studentData?.gender || '';
+  const profileGender = studentData?.gender || sessionGender || '';
 
   const teacherValue = Array.isArray(studentData?.teacherNames) && studentData.teacherNames.length
     ? studentData.teacherNames.join(', ')

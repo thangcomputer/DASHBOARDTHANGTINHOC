@@ -186,9 +186,8 @@ const StudentDashboard = ({ onNavigate }) => {
 
     const result = {
       ...student,
-      // Đồng bộ avatar gender với session (sidebar) — tránh profile lệch nam/nữ
-      gender: session?.gender || student.gender || '',
-      avatar: session?.avatar || student.avatar || '',
+      gender: student.gender || session?.gender || '',
+      avatar: student.avatar || session?.avatar || '',
       joinClassUrl,
       isLikelyLiveClass,
       teacher: teacherDisplay,

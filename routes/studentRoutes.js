@@ -1299,12 +1299,18 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
         return res.status(403).json({ success: false, message: 'Bạn chỉ có thể cập nhật hồ sơ của chính mình' });
       }
       // examProgress: dùng PUT /:id/exam-progress (state machine server-side)
-      const allowedKeys = ['email', 'zalo', 'address', 'password', 'avatar'];
+      const allowedKeys = ['email', 'zalo', 'address', 'password', 'avatar', 'gender'];
       Object.keys(safeBody).forEach(key => {
         if (!allowedKeys.includes(key)) {
           delete safeBody[key];
         }
       });
+      if (Object.prototype.hasOwnProperty.call(safeBody, 'gender')) {
+        const g = String(safeBody.gender || '').trim().toLowerCase();
+        if (g === 'female' || g === 'nữ' || g === 'nu') safeBody.gender = 'female';
+        else if (g === 'male' || g === 'nam') safeBody.gender = 'male';
+        else delete safeBody.gender;
+      }
     }
 
     // Một nguồn đúng cho link vào lớp: GV/Admin sửa linkHoc → đồng bộ online_meeting_url (tránh URL cũ chiếm ưu tiên ở client)

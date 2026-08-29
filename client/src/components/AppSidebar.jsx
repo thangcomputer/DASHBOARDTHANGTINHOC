@@ -378,8 +378,8 @@ const AppSidebar = ({
   // Persist: giữ gender session nếu đã có; chỉ bổ sung từ self khi session thiếu
   useEffect(() => {
     if (!session || !sessionStorageKey) return;
-    const nextGender = session.gender || selfProfile?.gender || '';
-    const nextAvatar = session.avatar || selfProfile?.avatar || '';
+    const nextGender = selfProfile?.gender || session.gender || '';
+    const nextAvatar = selfProfile?.avatar || session.avatar || '';
     if (!nextGender && !nextAvatar) return;
     if ((session.gender || '') === (nextGender || '') && (session.avatar || '') === (nextAvatar || '')) return;
     const patched = {

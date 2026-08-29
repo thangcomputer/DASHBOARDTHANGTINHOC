@@ -21,6 +21,19 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
     setLoading(true);
     try {
       await updateStudent(student._id || student.id, formData);
+      try {
+        const key = 'student_user';
+        const saved = JSON.parse(localStorage.getItem(key) || '{}');
+        const sid = student._id || student.id;
+        const patched = {
+          ...saved,
+          id: saved.id || sid,
+          _id: saved._id || student._id || student.id,
+          gender: formData.gender,
+        };
+        localStorage.setItem(key, JSON.stringify(patched));
+        window.dispatchEvent(new CustomEvent('cms:session-patched', { detail: patched }));
+      } catch { /* ignore */ }
       showModal({ title: 'Thành công', content: 'Hệ thống đã cập nhật thông tin hồ sơ của bạn thành công!', type: 'success' });
       onClose();
     } catch (err) {
