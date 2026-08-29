@@ -16,7 +16,7 @@ import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { formatLocalDateKey, isScheduleOngoingNow, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { getAttendanceAction } from '../../utils/attendanceAction';
 import { countEnrollmentCompleted } from '../../utils/schedulingLimits';
-import { showGlossyAlert } from './TeacherShared';
+import { showGlossyAlert, getDisplayName } from './TeacherShared';
 import TeacherQuizManager from './TeacherQuizManager';
 import { useData } from '../../context/DataContext';
 import { useScheduleContext } from '../../context/ScheduleContext';
@@ -47,15 +47,7 @@ import {
 const maskPhone = (str) => {
   if (!str) return str;
   const s = String(str);
-  // Match 10-11 digit phone numbers and mask the middle (e.g. 098***123)
   return s.replace(/(0\d{2})(\d{4,5})(\d{3})/g, '$1***$3');
-};
-
-const getDisplayName = (person) => {
-  if (!person) return 'Không rõ';
-  const name = person.name || '';
-  if (name && !/^\d{5,}$/.test(name)) return maskPhone(name);
-  return maskPhone(person.email || person.phone || person.zalo || `HV-${String(person.id || person._id || '').slice(-4)}`);
 };
 
 /** Chỉ đánh trượt khi học viên đã được mở khóa phòng thi (chưa mở / đã trượt → không bấm lại). */

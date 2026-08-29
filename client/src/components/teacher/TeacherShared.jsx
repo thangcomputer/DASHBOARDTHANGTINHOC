@@ -41,9 +41,16 @@ export const GlossyAlertProvider = () => {
   );
 };
 
-export const getDisplayName = (person) => {
+export const getDisplayName = (person, students = []) => {
   if (!person) return 'Không rõ';
-  const name = person.name || '';
-  if (name && !/^\d{5,}$/.test(name)) return name;
-  return person.email || person.phone || person.zalo || `HV-${String(person.id || person._id || '').slice(-4)}`;
+  const raw = String(person.name || person.studentName || person.displayName || '').trim();
+  if (raw && !/^\d{5,}$/.test(raw) && !raw.includes('*')) return raw;
+  const id = String(person.studentId || person.id || person._id || '');
+  if (id && Array.isArray(students) && students.length) {
+    const found = students.find((s) => String(s._id || s.id) === id);
+    const foundName = String(found?.name || '').trim();
+    if (foundName && !/^\d{5,}$/.test(foundName)) return foundName;
+  }
+  if (raw) return raw;
+  return person.email || person.phone || person.zalo || (id ? `HV-${id.slice(-4)}` : 'Học viên');
 };

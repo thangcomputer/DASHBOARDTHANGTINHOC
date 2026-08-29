@@ -13,6 +13,117 @@ import { sanitizeCsvField } from '../utils/csvSanitizer';
 
 const isPaidTxStatus = (status) => ['completed', 'paid', 'confirmed'].includes(String(status || ''));
 const isPendingTxStatus = (status) => !isPaidTxStatus(status);
+
+function paymentDateLabel(p) {
+  if (p?.date) return String(p.date);
+  if (p?.createdAt) return new Date(p.createdAt).toLocaleDateString('vi-VN');
+  return '';
+}
+
+function paymentStatusLabel(p) {
+  return isPaidTxStatus(p?.status) ? 'Đã nhận' : 'Chưa nhận';
+}
+
+function el(tag, styles, text) {
+  const node = document.createElement(tag);
+  if (styles) node.style.cssText = styles;
+  if (text != null && text !== '') node.textContent = String(text);
+  return node;
+}
+
+/** Bảng PDF cùng cột/dòng với CSV (Tháng, Ngày chuyển, Số tiền, Số buổi, Trạng thái, Ghi chú). */
+function buildFinanceStatementNode({
+  teacherName, generatedAt, totalEarned, totalPending, totalSessions, filterLabel, rows,
+}) {
+  const wrap = el('div', `
+    width:900px;background:#fff;padding:28px 28px 20px;box-sizing:border-box;
+    font-family:Arial,Helvetica,sans-serif;color:#0f172a;
+  `);
+
+  wrap.appendChild(el('div', 'font-size:11px;letter-spacing:.12em;font-weight:700;color:#64748b;text-transform:uppercase;', 'SAO KÊ THU NHẬP'));
+  wrap.appendChild(el('div', 'font-size:22px;font-weight:800;margin:4px 0 2px;', teacherName || 'Giảng viên'));
+  wrap.appendChild(el('div', 'font-size:12px;color:#64748b;margin-bottom:16px;', `Xuất ngày ${generatedAt}${filterLabel ? ` · Bộ lọc: ${filterLabel}` : ''}`));
+
+  const stats = el('div', 'display:flex;gap:12px;margin-bottom:18px;');
+  [
+    ['Đã nhận', `${Number(totalEarned || 0).toLocaleString('vi-VN')}đ`, '#059669'],
+    ['Chưa nhận', `${Number(totalPending || 0).toLocaleString('vi-VN')}đ`, '#d97706'],
+    ['Tổng buổi đã dạy', String(totalSessions || 0), '#e11d48'],
+  ].forEach(([label, value, color]) => {
+    const card = el('div', 'flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;');
+    card.appendChild(el('div', 'font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;', label));
+    card.appendChild(el('div', `font-size:16px;font-weight:800;margin-top:4px;color:${color};`, value));
+    stats.appendChild(card);
+  });
+  wrap.appendChild(stats);
+
+  const table = el('table', 'width:100%;border-collapse:collapse;font-size:12px;');
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  ['Tháng', 'Ngày chuyển', 'Số tiền (VNĐ)', 'Số buổi', 'Trạng thái', 'Ghi chú'].forEach((h, i) => {
+    const th = el('th', `
+      text-align:${i === 2 || i === 3 ? 'right' : 'left'};padding:8px 8px;background:#0f172a;color:#fff;
+      font-size:11px;font-weight:700;border:1px solid #0f172a;
+    `, h);
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  if (!rows.length) {
+    const tr = document.createElement('tr');
+    const td = el('td', 'padding:16px 8px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;', 'Không có giao dịch nào');
+    td.colSpan = 6;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  } else {
+    rows.forEach((p, idx) => {
+      const tr = document.createElement('tr');
+      tr.style.background = idx % 2 ? '#f8fafc' : '#fff';
+      const cells = [
+        [p.month || '', 'left'],
+        [paymentDateLabel(p), 'left'],
+        [`${Number(p.amount || 0).toLocaleString('vi-VN')}`, 'right'],
+        [String(p.sessions || 0), 'right'],
+        [paymentStatusLabel(p), 'left'],
+        [p.note || p.description || '', 'left'],
+      ];
+      cells.forEach(([text, align]) => {
+        tr.appendChild(el('td', `padding:8px;border:1px solid #e2e8f0;text-align:${align};vertical-align:top;`, text));
+      });
+      tbody.appendChild(tr);
+    });
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+
+  const filteredSum = rows.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const foot = el('div', 'display:flex;justify-content:space-between;margin-top:14px;font-size:12px;');
+  foot.appendChild(el('span', 'color:#64748b;', `${rows.length} dòng`));
+  foot.appendChild(el('span', 'font-weight:800;', `Tổng (theo bộ lọc): ${filteredSum.toLocaleString('vi-VN')}đ`));
+  wrap.appendChild(foot);
+
+  return wrap;
+}
+
+function addCanvasPagesToPdf(pdf, canvas) {
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const imgW = pageW;
+  const imgH = (canvas.height * imgW) / canvas.width;
+  const imgData = canvas.toDataURL('image/png');
+  let heightLeft = imgH;
+  let position = 0;
+  pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
+  heightLeft -= pageH;
+  while (heightLeft > 0) {
+    position -= pageH;
+    pdf.addPage();
+    pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
+    heightLeft -= pageH;
+  }
+}
 const CircularProgress = ({ progress }) => {
   const radius = 35;
   const circumference = 2 * Math.PI * radius;
@@ -146,8 +257,7 @@ const TeacherFinanceAndTraining = () => {
       let csvContent = "\uFEFF";
       csvContent += "Tháng,Ngày chuyển,Số tiền (VNĐ),Số buổi,Trạng thái,Ghi chú\n";
       filteredPayments.forEach(p => {
-          const th_status = isPaidTxStatus(p.status) ? 'Đã nhận' : 'Chưa nhận';
-          const row = `"${sanitizeCsvField(p.month)}","${p.date || new Date(p.createdAt).toLocaleDateString('vi-VN')}","${p.amount}","${p.sessions || 0}","${th_status}","${sanitizeCsvField(p.note || '').replace(/"/g, '""')}"`;
+          const row = `"${sanitizeCsvField(p.month)}","${sanitizeCsvField(paymentDateLabel(p))}","${p.amount}","${p.sessions || 0}","${paymentStatusLabel(p)}","${sanitizeCsvField(p.note || '').replace(/"/g, '""')}"`;
           csvContent += row + "\n";
       });
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -169,25 +279,48 @@ const TeacherFinanceAndTraining = () => {
   };
 
   const handleExportPDF = async () => {
-    const el = document.getElementById('finance-report');
-    if (!el) return;
-    const oldClass = el.className;
-    el.className = "bg-white p-8 w-[1000px] h-max"; // Fixed width to ensure standard capturing
-    
+    const filterLabel = filterStatus === 'paid'
+      ? 'Đã nhận'
+      : filterStatus === 'pending'
+        ? 'Chưa nhận'
+        : 'Tất cả';
+    let mount = null;
     try {
-        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-          import('html2canvas'),
-          import('jspdf'),
-        ]);
-        const canvas = await html2canvas(el, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`BaoCao_ThuNhap_${teacherName.replace(/\s+/g,'_')}.pdf`);
-    } catch(e) { void 0 }
-    finally { el.className = oldClass; }
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+      mount = buildFinanceStatementNode({
+        teacherName,
+        generatedAt: new Date().toLocaleDateString('vi-VN'),
+        totalEarned,
+        totalPending,
+        totalSessions,
+        filterLabel: filterStatus === 'all' ? '' : filterLabel,
+        rows: filteredPayments,
+      });
+      mount.style.position = 'fixed';
+      mount.style.left = '-12000px';
+      mount.style.top = '0';
+      document.body.appendChild(mount);
+
+      const canvas = await html2canvas(mount, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+      });
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      addCanvasPagesToPdf(pdf, canvas);
+      pdf.save(`ThuNhap_${teacherName.replace(/\s+/g, '_')}.pdf`);
+    } catch (e) {
+      showModal({
+        title: 'Lỗi xuất file',
+        content: 'Không thể xuất PDF: ' + (e?.message || 'lỗi không xác định'),
+        type: 'error',
+      });
+    } finally {
+      if (mount && mount.parentNode) mount.parentNode.removeChild(mount);
+    }
   };
 
   return (

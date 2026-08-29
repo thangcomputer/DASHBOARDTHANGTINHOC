@@ -572,6 +572,7 @@ function buildAttendanceConfirmPayload(sch) {
     endTime: end,
     timeRange: end ? `${start} - ${end}` : start,
     sessionNumber: sch.sessionOrdinalPreview || null,
+    completedSessions: sch.sessionOrdinalPreview || null,
     totalSessions: sch.sessionTotalPreview || null,
     studentConfirmStatus: sch.studentConfirmStatus || 'none',
     studentConfirmedAt: sch.studentConfirmedAt || null,
@@ -579,9 +580,9 @@ function buildAttendanceConfirmPayload(sch) {
   };
 }
 
-async function emitAttendanceConfirmEvents(io, sch, eventName) {
+async function emitAttendanceConfirmEvents(io, sch, eventName, extra = {}) {
   if (!io || !sch) return;
-  const payload = buildAttendanceConfirmPayload(sch);
+  const payload = { ...buildAttendanceConfirmPayload(sch), ...extra };
   const sid = payload.studentId;
   const tid = payload.teacherId;
   try {
@@ -1501,7 +1502,10 @@ router.post('/:scheduleId/student-confirm', [authMiddleware], async (req, res) =
         maybeNotifyStarBonusEligibility(io, sch.teacherId).catch(() => {});
       }
       checkAndUnlockExam(String(sch.studentId._id || sch.studentId), io, sch.course).catch(() => {});
-      await emitAttendanceConfirmEvents(io, sch, 'attendance:confirmed');
+      await emitAttendanceConfirmEvents(io, sch, 'attendance:confirmed', {
+        completedSessions: result.meta?.completedSessions ?? payload.sessionNumber,
+        totalSessions: result.meta?.totalSessions ?? payload.totalSessions,
+      });
       emitScheduleEvent(io, {
         branchId: sch.branchId,
         teacherId: sch.teacherId,
@@ -1637,7 +1641,10 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
         maybeNotifyStarBonusEligibility(io, sch.teacherId).catch(() => {});
       }
       checkAndUnlockExam(String(sch.studentId._id || sch.studentId), io, sch.course).catch(() => {});
-      await emitAttendanceConfirmEvents(io, sch, 'attendance:confirmed');
+      await emitAttendanceConfirmEvents(io, sch, 'attendance:confirmed', {
+        completedSessions: result.meta?.completedSessions ?? payload.sessionNumber,
+        totalSessions: result.meta?.totalSessions ?? payload.totalSessions,
+      });
       emitScheduleEvent(io, {
         branchId: sch.branchId,
         teacherId: sch.teacherId,

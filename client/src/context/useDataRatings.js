@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import api from '../services/api';
-import { maskStudentPhone } from '../utils/studentMask';
 
 export const RATING_CRITERIA = {
   teaching: {
@@ -147,7 +146,7 @@ export function useDataRatings({ students, teachers, setTeachers, triggerBackgro
         err.code = res.code;
         throw err;
       }
-      const studentLabel = `Học viên ${maskStudentPhone(student?.phone || student?.zalo)}`;
+      const studentLabel = `Học viên ${String(student?.name || '').trim() || 'Học viên'}`;
       const evalId = res?.data?._id || res?.data?.id;
       const isUpdate = !!res?.meta?.isUpdate || existedBefore;
       addNotification(

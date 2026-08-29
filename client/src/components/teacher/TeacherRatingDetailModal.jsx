@@ -1,7 +1,7 @@
 import React from 'react';
 import { Star, X, Loader2 } from 'lucide-react';
 import { RATING_CRITERIA } from '../../context/useDataRatings';
-import { formatMaskedPhone } from './TeacherRatingDisplay';
+import { getDisplayName } from './TeacherShared';
 
 /**
  * Popup chi tiết 1 đánh giá công khai (GV xem từ thông báo).
@@ -56,11 +56,12 @@ export default function TeacherRatingDetailModal({
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-black text-slate-800 truncate">
-                    {formatMaskedPhone(
-                      rating.studentPhone || rating.phone || rating.studentZalo || rating.studentId,
-                      rating.studentName,
-                      students,
-                    )}
+                    {getDisplayName({
+                      name: rating.studentName,
+                      studentId: rating.studentId,
+                      phone: rating.studentPhone || rating.phone,
+                      zalo: rating.studentZalo,
+                    }, students)}
                   </p>
                   {dateLabel ? <p className="text-[11px] text-slate-400 font-medium mt-0.5">{dateLabel}</p> : null}
                 </div>

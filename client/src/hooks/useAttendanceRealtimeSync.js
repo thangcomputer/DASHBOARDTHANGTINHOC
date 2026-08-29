@@ -3,6 +3,7 @@ import { useSocket } from '../context/SocketContext';
 import { useScheduleContext } from '../context/ScheduleContext';
 import { useStudentsContext } from '../context/StudentsContext';
 import { useDataActions } from '../context/DataContext';
+import { applyAttendanceProgressToStudents } from '../utils/attendanceProgressPatch';
 
 function scheduleKey(sch) {
   return String(sch?._id || sch?.id || '');
@@ -62,7 +63,7 @@ function applyAttendanceSocketToSchedules(prev, eventName, payload) {
 export function useAttendanceRealtimeSync({ enabled, myId, role }) {
   const { socket } = useSocket() || {};
   const { setSchedulesLocal, refreshSchedules } = useScheduleContext();
-  const { setStudentsLocal } = useStudentsContext();
+  const { setStudentsLocal, refreshStudents } = useStudentsContext();
   const { triggerBackgroundSync } = useDataActions();
 
   useEffect(() => {
@@ -76,38 +77,13 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       return Boolean(payload.scheduleId || payload._id || payload.id);
     };
 
-    const bumpStudentProgress = (payload) => {
+    const bumpStudentProgress = (payload, { revert = false, incrementIfMissing = false, lockCheckIn = false, skipProgress = false } = {}) => {
       if (!payload?.studentId || typeof setStudentsLocal !== 'function') return;
-      const studentId = String(payload.studentId?._id || payload.studentId);
-      const course = String(payload.course || '').trim();
-      setStudentsLocal((prev) => (prev || []).map((s) => {
-        if (String(s._id || s.id) !== studentId) return s;
-        const nextDone = Math.max(
-          Number(s.completedSessions) || 0,
-          Number(payload.sessionNumber) || 0,
-        );
-        const total = Number(s.totalSessions) || 12;
-        const patchRoot = {
-          ...s,
-          completedSessions: nextDone,
-          remainingSessions: Math.max(0, total - nextDone),
-          can_check_in: false,
-          last_attendance_at: new Date().toISOString(),
-        };
-        if (!course || !Array.isArray(s.enrollments)) return patchRoot;
-        return {
-          ...patchRoot,
-          enrollments: s.enrollments.map((e) => {
-            if (String(e.courseName || e.course || '') !== course) return e;
-            const et = Number(e.totalSessions) || total;
-            const ed = Math.max(Number(e.completedSessions) || 0, Number(payload.sessionNumber) || 0);
-            return {
-              ...e,
-              completedSessions: ed,
-              remainingSessions: Math.max(0, et - ed),
-            };
-          }),
-        };
+      setStudentsLocal((prev) => applyAttendanceProgressToStudents(prev, payload, {
+        revert,
+        incrementIfMissing,
+        lockCheckIn,
+        skipProgress,
       }));
     };
 
@@ -115,8 +91,16 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       if (!mine(payload)) return;
       setSchedulesLocal((prev) => applyAttendanceSocketToSchedules(prev, eventName, payload));
 
-      if (eventName === 'attendance:confirmed') {
+      if (eventName === 'attendance:awaiting-confirm') {
+        bumpStudentProgress(payload, { lockCheckIn: true, skipProgress: true });
+      } else if (eventName === 'attendance:confirmed') {
         bumpStudentProgress(payload);
+      } else if (eventName === 'attendance:disputed' || eventName === 'attendance:rejected') {
+        bumpStudentProgress(payload, { revert: true });
+      }
+
+      if (eventName === 'attendance:confirmed' && typeof refreshStudents === 'function') {
+        Promise.resolve(refreshStudents()).catch(() => {});
       }
 
       if (typeof triggerBackgroundSync === 'function') {
@@ -145,6 +129,7 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
     role,
     setSchedulesLocal,
     refreshSchedules,
+    refreshStudents,
     triggerBackgroundSync,
     setStudentsLocal,
   ]);

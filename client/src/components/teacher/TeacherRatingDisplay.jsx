@@ -1,5 +1,6 @@
 import React from 'react';
 import { Star } from 'lucide-react';
+import { getDisplayName } from './TeacherShared';
 
 export function formatMaskedPhone(phoneStr, fallbackName = '', students = []) {
   let raw = String(phoneStr || '').replace(/\D/g, '');
@@ -90,7 +91,12 @@ export const TeacherRatingDisplay = ({ rating, RATING_CRITERIA, students = [], r
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-800 truncate">
-                      {formatMaskedPhone(r.studentPhone || r.phone || r.studentZalo || r.studentId, r.studentName, students)}
+                      {getDisplayName({
+                        name: r.studentName,
+                        studentId: r.studentId,
+                        phone: r.studentPhone || r.phone,
+                        zalo: r.studentZalo,
+                      }, students)}
                     </p>
                     <p className="text-[10px] sm:text-xs text-slate-400">{r.date}</p>
                   </div>

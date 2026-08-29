@@ -3,6 +3,7 @@ import useSWR, { mutate as globalMutate } from 'swr';
 import api from '../services/api';
 import { mapStudent } from '../lib/entityMaps';
 import { useSocket } from './SocketContext';
+import { applyAttendanceProgressToStudents } from '../utils/attendanceProgressPatch';
 
 const StudentsContext = createContext(null);
 
@@ -176,15 +177,18 @@ export function StudentsProvider({ user, children }) {
   useEffect(() => {
     if (!socket) return;
     const handleAttendanceLocked = (payload) => {
-      patchStudent(payload.studentId, {
-        can_check_in: false,
-        remaining_cooldown_hours: 12,
-        last_attendance_at: payload.attendedAt,
-      });
+      const awaiting = payload.awaitingConfirm === true;
+      setStudentsLocal((prev) => applyAttendanceProgressToStudents(prev, {
+        studentId: payload.studentId,
+        course: payload.course,
+        completedSessions: awaiting ? undefined : payload.meta?.completedSessions,
+        totalSessions: payload.meta?.totalSessions,
+        attendedAt: payload.attendedAt,
+      }, { lockCheckIn: true, skipProgress: awaiting }));
     };
     socket.on('attendance:locked', handleAttendanceLocked);
     return () => socket.off('attendance:locked', handleAttendanceLocked);
-  }, [socket, patchStudent]);
+  }, [socket, setStudentsLocal]);
 
   const value = useMemo(() => ({
     students,
