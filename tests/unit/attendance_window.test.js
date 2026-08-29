@@ -34,6 +34,32 @@ test('UPCOMING: before start', () => {
   );
 });
 
+test('UPCOMING: at class start, teacher cannot attend yet (15 phút delay)', () => {
+  const now = new Date(2026, 7, 13, 13, 51, 0);
+  const s = resolveAttendanceState(mkSchedule(), now);
+  assert.equal(s.state, 'UPCOMING');
+  assert.equal(s.canTeacherAttend, false);
+  assert.throws(
+    () => assertTeacherAttendanceAllowed(mkSchedule(), { now }),
+    (e) => e.code === ATTENDANCE_CODES.WINDOW_NOT_STARTED,
+  );
+});
+
+test('UPCOMING: 14 phút after start still blocked', () => {
+  const now = new Date(2026, 7, 13, 14, 5, 0);
+  const s = resolveAttendanceState(mkSchedule(), now);
+  assert.equal(s.state, 'UPCOMING');
+  assert.equal(s.canTeacherAttend, false);
+});
+
+test('IN_PROGRESS: 15 phút after start, teacher can attend', () => {
+  const now = new Date(2026, 7, 13, 14, 6, 0);
+  const s = resolveAttendanceState(mkSchedule(), now);
+  assert.equal(s.state, 'IN_PROGRESS');
+  assert.equal(s.canTeacherAttend, true);
+  assert.doesNotThrow(() => assertTeacherAttendanceAllowed(mkSchedule(), { now }));
+});
+
 test('IN_PROGRESS: teacher can attend', () => {
   const now = new Date(2026, 7, 13, 14, 30, 0);
   const s = resolveAttendanceState(mkSchedule(), now);

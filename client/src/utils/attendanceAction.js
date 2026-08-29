@@ -4,8 +4,11 @@
 
 export const ATTENDANCE_GRACE_MINUTES = Number(
   import.meta.env?.VITE_ATTENDANCE_GRACE_MINUTES
-  || import.meta.env?.VITE_ATTENDANCE_LATE_GRACE_MINUTES,
+    || import.meta.env?.VITE_ATTENDANCE_LATE_GRACE_MINUTES,
 ) || 60;
+
+/** Khớp services/attendanceWindow.js — GV bấm điểm danh sau giờ học + 15 phút. */
+export const ATTENDANCE_UNLOCK_DELAY_MINUTES = 15;
 
 function parseTimeToMinutes(raw) {
   if (raw == null || raw === '') return null;
@@ -103,8 +106,11 @@ export function getAttendanceAction(schedule, _attendance, now = new Date()) {
 
   const { startAt, endAt, graceEndAt } = bounds;
   const t = now.getTime();
+  const attendUnlockAt = new Date(
+    startAt.getTime() + ATTENDANCE_UNLOCK_DELAY_MINUTES * 60 * 1000,
+  );
 
-  if (t < startAt.getTime()) {
+  if (t < attendUnlockAt.getTime()) {
     return {
       ...ATTENDANCE_UI.UPCOMING,
       action: null,
@@ -112,8 +118,12 @@ export function getAttendanceAction(schedule, _attendance, now = new Date()) {
       canLateAttend: false,
       canAdminMakeup: false,
       canRequestCorrection: false,
-      reason: 'Chưa đến giờ học',
+      reason: t < startAt.getTime()
+        ? 'Chưa đến giờ học — điểm danh sau 15 phút kể từ giờ bắt đầu'
+        : 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học',
       remainingGraceMs: 0,
+      startAt,
+      attendUnlockAt,
       endAt,
       graceEndAt,
     };

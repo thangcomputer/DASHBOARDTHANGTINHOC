@@ -33,7 +33,7 @@ const scheduleSchema = new mongoose.Schema({
   },
 
   /**
-   * Xác nhận điểm danh của HV (sau cửa sổ 30s hủy của GV).
+   * Xác nhận điểm danh của HV (sau cửa sổ 10s hủy của GV).
    * none → pending (chờ HV) → accepted | disputed → admin_approved | admin_rejected
    * Chỉ khi accepted/admin_approved (kèm status=completed) mới tính buổi/lương.
    */

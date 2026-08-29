@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
@@ -194,10 +194,38 @@ const messageIsFromMe = (msg, currentUserId, currentUserRole) => {
   return false;
 };
 
+/** Mở menu xuống dưới nếu không đủ chỗ trên (đụng header / mép vùng tin). */
+function usePlaceChatMenuBelow(open, estimatedHeight = 48) {
+  const wrapRef = useRef(null);
+  const [placeBelow, setPlaceBelow] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const measure = () => {
+      const el = wrapRef.current;
+      if (!el) return;
+      const scroller = el.closest('.cms-chat-messages');
+      const r = el.getBoundingClientRect();
+      const clipTop = scroller ? scroller.getBoundingClientRect().top : 0;
+      setPlaceBelow(r.top - clipTop < estimatedHeight + 8);
+    };
+    measure();
+    const scroller = wrapRef.current?.closest('.cms-chat-messages');
+    scroller?.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    return () => {
+      scroller?.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, [open, estimatedHeight]);
+
+  return [wrapRef, placeBelow];
+}
+
 // ─── Reaction Picker (floating) ────────────────────────────────────────────────
 const ReactionPicker = ({ msgId, isMine, onReact, myReactions }) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [ref, placeBelow] = usePlaceChatMenuBelow(open, 48);
 
   // Đóng khi click ngoài
   useEffect(() => {
@@ -206,7 +234,7 @@ const ReactionPicker = ({ msgId, isMine, onReact, myReactions }) => {
     };
     if (open) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  }, [open, ref]);
 
   return (
     <div className="relative flex items-center" ref={ref}>
@@ -221,7 +249,7 @@ const ReactionPicker = ({ msgId, isMine, onReact, myReactions }) => {
 
       {open && (
         <div
-          className={`absolute bottom-full mb-2 ${isMine ? 'right-0' : 'left-0'} flex items-center gap-1 bg-white rounded-full px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 z-[9999] animate-in zoom-in-75 duration-150`}
+          className={`absolute ${placeBelow ? 'top-full mt-2' : 'bottom-full mb-2'} ${isMine ? 'right-0' : 'left-0'} flex items-center gap-1 bg-white rounded-full px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 z-[9999] animate-in zoom-in-75 duration-150`}
           onMouseLeave={() => setOpen(false)}
         >
           {/* Heart */}
@@ -245,6 +273,15 @@ const ReactionPicker = ({ msgId, isMine, onReact, myReactions }) => {
     </div>
   );
 };
+
+function ChatFlipWrap({ open, estimatedHeight = 160, className = 'relative', children }) {
+  const [wrapRef, placeBelow] = usePlaceChatMenuBelow(open, estimatedHeight);
+  return (
+    <div className={className} ref={wrapRef}>
+      {typeof children === 'function' ? children(placeBelow) : children}
+    </div>
+  );
+}
 
 // ─── MAIN INBOX ──────────────────────────────────────────────────────────────
 const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUserRole = 'admin', onNavigate }) => {
@@ -2271,7 +2308,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </button>
                   </div>
                 ) : null}
-                {messagesToRender.map((msg, msgIndex) => {
+                {messagesToRender.map((msg) => {
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
                   const role = normalizeRole(msg.senderRole);
                   const badgeLabel = msg.senderDisplayRole
@@ -2470,7 +2507,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             )}
 
                           {/* Options/Menu button for Soft Delete */}
-                          <div className="relative">
+                          <ChatFlipWrap open={showMessageOptions === msg.id} estimatedHeight={180} className="relative">
+                            {(placeBelow) => (
+                            <>
                             <button
                               onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
                               className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-slate-600 hover:bg-slate-100 transition-all shadow-sm border border-slate-100 active:scale-90"
@@ -2479,7 +2518,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               <MoreHorizontal size={14} />
                             </button>
                             {showMessageOptions === msg.id && (
-                              <div className={`absolute ${msgIndex < 2 ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
+                              <div className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
                                 {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
                                   <button
                                     onClick={() => {
@@ -2545,7 +2584,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 </button>
                               </div>
                             )}
-                          </div>
+                            </>
+                            )}
+                          </ChatFlipWrap>
                         </div>
 
                         {/* Time & read status */}

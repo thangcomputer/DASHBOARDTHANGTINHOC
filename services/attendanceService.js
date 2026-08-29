@@ -339,7 +339,7 @@ async function completeScheduleAttendance({
     }
   } else if (admin) {
     if (state.state === 'UPCOMING') {
-      throw attendanceError('Chưa đến giờ học — chưa thể điểm danh.', ATTENDANCE_CODES.WINDOW_NOT_STARTED, 409);
+      throw attendanceError('Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học.', ATTENDANCE_CODES.WINDOW_NOT_STARTED, 409);
     }
     if (state.state === 'OVERDUE_ATTENDANCE' || forceAdminMakeup) {
       attendanceMethod = 'admin_makeup';

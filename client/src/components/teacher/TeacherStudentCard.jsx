@@ -14,6 +14,7 @@ import { useModal } from '../../utils/Modal.jsx';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
 import { formatLocalDateKey, isScheduleOngoingNow, normalizeScheduleDate } from '../../utils/scheduleTime';
+import { getAttendanceAction } from '../../utils/attendanceAction';
 import { countEnrollmentCompleted } from '../../utils/schedulingLimits';
 import { showGlossyAlert } from './TeacherShared';
 import TeacherQuizManager from './TeacherQuizManager';
@@ -193,7 +194,7 @@ export const StudentCard = ({
     if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} giờ trước`;
     return d.toLocaleDateString('vi-VN');
   })();
-  /** Chờ 30s sau "Xác nhận Điểm danh" — persist sessionStorage để đổi tab không mất */
+  /** Chờ 10s sau "Xác nhận Điểm danh" — persist sessionStorage để đổi tab không mất */
   const [pendingAttendance, setPendingAttendance] = useState(() => {
     const stored = getAttendanceConfirm(confirmKey);
     if (!stored) return null;
@@ -297,6 +298,38 @@ export const StudentCard = ({
     return () => clearInterval(timer);
   }, []);
 
+  const gateSchedule = attendanceGate?.schedule;
+  const gateUnlockKey = [
+    String(gateSchedule?._id || gateSchedule?.id || ''),
+    normalizeScheduleDate(gateSchedule?.date) || '',
+    String(gateSchedule?.startTime || ''),
+  ].join('|');
+  const [gateNow, setGateNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!gateSchedule) return undefined;
+    const tick = () => setGateNow(Date.now());
+    tick();
+    const action = getAttendanceAction(gateSchedule, null, new Date());
+    const unlockAt = action.attendUnlockAt instanceof Date ? action.attendUnlockAt.getTime() : 0;
+    const remaining = unlockAt - Date.now();
+    if (!(unlockAt > 0) || remaining <= 0) return undefined;
+
+    const timeoutId = setTimeout(tick, remaining);
+    const intervalId = setInterval(() => {
+      tick();
+      if (Date.now() >= unlockAt) clearInterval(intervalId);
+    }, 1000);
+    const onResume = () => tick();
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('focus', onResume);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('focus', onResume);
+    };
+  }, [gateUnlockKey, gateSchedule]);
+
   const lastAttendanceAt = useMemo(() => {
     if (student.last_attendance_at) {
       const d = new Date(student.last_attendance_at);
@@ -397,6 +430,17 @@ export const StudentCard = ({
   );
   const isPendingConfirm = Boolean(pendingAttendance);
   const isCommittingAttendance = Boolean(pendingAttendance?.committing);
+  const liveAttendance = useMemo(
+    () => (gateSchedule ? getAttendanceAction(gateSchedule, null, new Date(gateNow)) : attendanceGate?.meta || null),
+    [gateSchedule, gateNow, attendanceGate?.meta],
+  );
+  const waitingAttendanceUnlock = Boolean(
+    liveAttendance
+    && liveAttendance.state === 'UPCOMING'
+    && !alreadyAttendedToday
+    && !isPendingConfirm
+    && gateSchedule,
+  );
   const confirmRemainSec = useMemo(() => {
     if (!pendingAttendance?.endsAt) return 0;
     return Math.max(0, Math.ceil((pendingAttendance.endsAt - Date.now()) / 1000));
@@ -501,6 +545,10 @@ export const StudentCard = ({
       return;
     }
     if (alreadyAttendedToday || isPendingConfirm || isCompleted) return;
+    if (waitingAttendanceUnlock) {
+      toast.info(liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học.');
+      return;
+    }
     setShowAttendanceModal(false);
     const gateSchedule = attendanceGate?.schedule;
     const scheduleId = gateSchedule?._id || gateSchedule?.id || '';
@@ -520,12 +568,14 @@ export const StudentCard = ({
       endsAt: payload.endsAt,
       committing: false,
     });
-    toast.info('Đã ghi nhận — còn 30 giây để hủy điểm danh trước khi tính buổi.');
+    toast.info(`Đã ghi nhận — còn ${Math.round(ATTENDANCE_CONFIRM_MS / 1000)} giây để hủy điểm danh trước khi tính buổi.`);
   }, [
     isDroppedOut,
     alreadyAttendedToday,
     isPendingConfirm,
     isCompleted,
+    waitingAttendanceUnlock,
+    liveAttendance?.reason,
     attForm.note,
     attForm.grade,
     defaultAttendanceNote,
@@ -570,6 +620,10 @@ export const StudentCard = ({
       return;
     }
     if (alreadyAttendedToday || isPendingConfirm || isCompleted) return;
+    if (waitingAttendanceUnlock) {
+      toast.info(liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học.');
+      return;
+    }
     if (!canCheckIn) return;
     const tGrade = (student.grades || []).find((g) => g.date === todayStr);
     setAttForm({
@@ -586,6 +640,8 @@ export const StudentCard = ({
     alreadyAttendedToday,
     isPendingConfirm,
     isCompleted,
+    waitingAttendanceUnlock,
+    liveAttendance?.reason,
     canCheckIn,
     student.grades,
     student.lastGrade,
@@ -640,7 +696,7 @@ export const StudentCard = ({
     }
   }, [attendanceGate?.schedule, currentUser, student, toast, makeupKey, makeupPending]);
 
-  // Pending 30s: hủy điểm danh (local). Đang commit / đã điểm danh: không hủy. Chưa DD: hủy ca.
+  // Pending 10s: hủy điểm danh (local). Đang commit / đã điểm danh: không hủy. Chưa DD: hủy ca.
   const canCancelSession = (isPendingConfirm && !isCommittingAttendance)
     || (
       showSessionActionRow
@@ -669,7 +725,7 @@ export const StudentCard = ({
     'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60';
 
   const leftAttendanceLocked = alreadyAttendedToday || isPendingConfirm || makeupPending;
-  const leftAttendanceDisabled = isDroppedOut || isCompleted || leftAttendanceLocked || (!isOverdueMakeup && !canCheckIn && !makeupPending);
+  const leftAttendanceDisabled = isDroppedOut || isCompleted || leftAttendanceLocked || waitingAttendanceUnlock || (!isOverdueMakeup && !canCheckIn && !makeupPending);
 
   const fetchStudentAssignments = useCallback(async () => {
     setLoadingAssign(true);
@@ -864,7 +920,7 @@ export const StudentCard = ({
   const handleCancelSession = async () => {
     if (!canCancelSession) return;
 
-    // Trong cửa sổ 30s: hủy pending local — chưa cộng buổi
+    // Trong cửa sổ 10s: hủy pending local — chưa cộng buổi
     if (isPendingConfirm) {
       cancelPendingAttendance();
       return;
@@ -1192,11 +1248,6 @@ export const StudentCard = ({
                  {/* Actions: Điểm danh | Hủy ca / Hủy điểm danh — ẩn khi không còn lịch */}
                  {showSessionActionRow ? (
                  <div className="grid grid-cols-2 gap-2 mt-4 sm:gap-4 min-w-0">
-                   {attendanceGate?.status === 'not_yet' && !alreadyAttendedToday && !isPendingConfirm ? (
-                     <div className="flex items-center justify-center min-h-10 sm:min-h-[3.25rem] px-2 py-2 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide text-center leading-tight border border-dashed border-slate-300 rounded-xl bg-slate-50">
-                        Chưa đến giờ dạy
-                     </div>
-                   ) : (
                      <button 
                        type="button"
                        onClick={openAttendanceModal} 
@@ -1209,7 +1260,8 @@ export const StudentCard = ({
                          isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
                          attendanceDisputed ? 'Học viên không đồng ý — đang giải quyết (chờ Admin)' :
                          awaitingStudentConfirm ? 'Đã gửi điểm danh — đang chờ học viên xác nhận' :
-                         alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
+                         alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` :
+                         waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
                          'Bấm để điểm danh buổi học hôm nay'
                        }
                        className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
@@ -1225,6 +1277,8 @@ export const StudentCard = ({
                            ? 'bg-blue-100 text-blue-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
                          : leftAttendanceLocked
                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
+                         : waitingAttendanceUnlock
+                           ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60'
                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
                        }`}
                      >
@@ -1249,7 +1303,6 @@ export const StudentCard = ({
                                  : 'Điểm danh'}
                        </span>
                      </button>
-                   )}
 
                    <button
                      type="button"
@@ -2008,11 +2061,6 @@ export const StudentCard = ({
             {/* === 2-COLUMN LAYOUT: Điểm danh | Hủy ca / Hủy điểm danh === */}
             {showSessionActionRow ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {attendanceGate?.status === 'not_yet' && !alreadyAttendedToday && !isPendingConfirm ? (
-                <div className="flex items-center justify-center py-4 text-xs font-black text-slate-600 uppercase tracking-widest border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50">
-                  Chưa đến giờ
-                </div>
-              ) : (
                 <button onClick={openAttendanceModal} 
                   disabled={leftAttendanceDisabled}
                   title={
@@ -2023,7 +2071,8 @@ export const StudentCard = ({
                     isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
                     attendanceDisputed ? 'Học viên không đồng ý — đang giải quyết (chờ Admin)' :
                     awaitingStudentConfirm ? 'Đã gửi điểm danh — đang chờ học viên xác nhận' :
-                    alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` : 
+                    alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` :
+                    waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
                     'Bấm để điểm danh'
                   }
                   className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${
@@ -2039,6 +2088,8 @@ export const StudentCard = ({
                       ? 'bg-blue-100 text-blue-800 cursor-not-allowed pointer-events-none select-none border-2 border-blue-200'
                     : leftAttendanceLocked
                       ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
+                    : waitingAttendanceUnlock
+                      ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60 border-2 border-slate-200'
                       : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
                   }`}>
                   <CheckCircle size={18} />
@@ -2062,7 +2113,6 @@ export const StudentCard = ({
                             : 'ĐIỂM DANH'}
                   </span>
                 </button>
-              )}
 
               <button
                 type="button"

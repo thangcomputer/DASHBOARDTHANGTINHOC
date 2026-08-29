@@ -6,6 +6,7 @@
  * Derived UI/logic states: UPCOMING | IN_PROGRESS | PENDING_ATTENDANCE | OVERDUE_ATTENDANCE | COMPLETED | CANCELLED
  *
  * Policy (chốt): ATTENDANCE_GRACE_MINUTES = 60 (env override allowed).
+ * GV điểm danh: sau startAt + ATTENDANCE_UNLOCK_DELAY_MINUTES (15).
  */
 
 const ATTENDANCE_GRACE_MINUTES = Math.max(
@@ -14,6 +15,9 @@ const ATTENDANCE_GRACE_MINUTES = Math.max(
     || Number(process.env.ATTENDANCE_GRACE_MINUTES)
     || 60,
 );
+
+/** GV điểm danh được sau giờ bắt đầu + N phút (không cho bấm ngay lúc vào ca). */
+const ATTENDANCE_UNLOCK_DELAY_MINUTES = 15;
 
 /** @deprecated alias — keep exports stable */
 const ATTENDANCE_LATE_GRACE_MINUTES = ATTENDANCE_GRACE_MINUTES;
@@ -143,8 +147,11 @@ function resolveAttendanceState(schedule, now = new Date()) {
 
   const { startAt, endAt, graceEndAt, now: n } = bounds;
   const t = n.getTime();
+  const attendUnlockAt = new Date(
+    startAt.getTime() + ATTENDANCE_UNLOCK_DELAY_MINUTES * 60 * 1000,
+  );
 
-  if (t < startAt.getTime()) {
+  if (t < attendUnlockAt.getTime()) {
     return {
       state: 'UPCOMING',
       kind: 'NOT_READY',
@@ -156,6 +163,7 @@ function resolveAttendanceState(schedule, now = new Date()) {
       canRequestCorrection: false,
       remainingGraceMs: 0,
       startAt,
+      attendUnlockAt,
       endAt,
       graceEndAt,
     };
@@ -238,7 +246,7 @@ function assertTeacherAttendanceAllowed(schedule, { lateReason, now } = {}) {
     throw err;
   }
   if (win.state === 'UPCOMING') {
-    const err = new Error('Chưa đến giờ học — chưa thể điểm danh.');
+    const err = new Error('Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học.');
     err.status = 409;
     err.code = win.code;
     throw err;
@@ -261,6 +269,7 @@ function assertAttendanceAllowed(schedule, opts) {
 
 module.exports = {
   ATTENDANCE_GRACE_MINUTES,
+  ATTENDANCE_UNLOCK_DELAY_MINUTES,
   ATTENDANCE_LATE_GRACE_MINUTES,
   ATTENDANCE_CODES,
   parseTimeToMinutes,

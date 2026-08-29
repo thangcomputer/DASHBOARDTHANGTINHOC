@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { useToast } from './toast';
 
-export const ATTENDANCE_CONFIRM_MS = 30_000;
+export const ATTENDANCE_CONFIRM_MS = 10_000;
 const STORAGE_KEY = 'cms_attendance_confirm_pending';
 
 let cache = null;
@@ -168,7 +168,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('focus', onResume);
 }
 
-/** Commit điểm danh đã hết 30s kể cả khi GV đang ở tab khác (inbox, lịch…). */
+/** Commit điểm danh đã hết cửa sổ hủy (10s) kể cả khi GV đang ở tab khác (inbox, lịch…). */
 export function useAttendanceConfirmFlush({ enabled, teacherId }) {
   const { markAttendance } = useData();
   const toast = useToast();
