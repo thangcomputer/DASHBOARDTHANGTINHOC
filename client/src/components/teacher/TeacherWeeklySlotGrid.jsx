@@ -6,6 +6,7 @@ import {
   formatTeacherConflictMessage,
   formatLocalDateKey,
   isScheduleDateBeforeToday,
+  parseTimeToMinutes,
 } from '../../utils/scheduleTime';
 import { getStudentScheduleGate, resolveEnrollmentProgress } from '../../utils/schedulingLimits';
 import {
@@ -51,6 +52,26 @@ function studentRowKey(student) {
   return String(student?._enrollmentKey || student?._id || student?.id || '');
 }
 
+function studentDisplayName(student) {
+  return String(student?.displayName || student?.name || '');
+}
+
+function compareStudentNames(a, b, dir = 'asc') {
+  const cmp = studentDisplayName(a).localeCompare(studentDisplayName(b), 'vi', { sensitivity: 'base' });
+  return dir === 'desc' ? -cmp : cmp;
+}
+
+function rowSlotMinutes(student, dateKey, schedules) {
+  const sid = studentIdOf(student);
+  const dayOccupying = findStudentDayOccupying(schedules, sid, dateKey);
+  const own = occupyingMatchesCourse(dayOccupying, student.course) ? dayOccupying : null;
+  const start = slotValueFromSchedule(own);
+  if (!start) return null;
+  return parseTimeToMinutes(start);
+}
+
+const HEADER_CTRL = 'w-full min-w-0 max-w-full h-7 px-1.5 rounded-md border bg-white text-[10px] font-semibold text-slate-600 outline-none';
+
 function studentIdOf(student) {
   return String(student?._id || student?.id || '');
 }
@@ -72,6 +93,8 @@ export default function TeacherWeeklySlotGrid({
   const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
   const [busyKey, setBusyKey] = useState('');
   const [rosterFilter, setRosterFilter] = useState('studying');
+  const [nameQuery, setNameQuery] = useState('');
+  const [sort, setSort] = useState({ kind: 'name', dir: 'asc', dayIndex: 0 });
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -87,21 +110,40 @@ export default function TeacherWeeklySlotGrid({
   const todayKey = formatLocalDateKey(new Date());
   const dateKeys = useMemo(() => weekDateKeys(weekStart), [weekStart]);
 
-  const rows = useMemo(() => {
-    return (students || [])
-      .filter((s) => {
-        if (isDroppedStudent(s)) return false;
-        const finished = isFinishedEnrollment(s, schedules);
-        if (rosterFilter === 'studying') return !finished;
-        if (rosterFilter === 'finished') return finished;
-        return true;
-      })
-      .slice()
-      .sort((a, b) => String(a.displayName || a.name || '').localeCompare(
-        String(b.displayName || b.name || ''),
-        'vi',
-      ));
+  const rosterRows = useMemo(() => {
+    return (students || []).filter((s) => {
+      if (isDroppedStudent(s)) return false;
+      const finished = isFinishedEnrollment(s, schedules);
+      if (rosterFilter === 'studying') return !finished;
+      if (rosterFilter === 'finished') return finished;
+      return true;
+    });
   }, [students, schedules, rosterFilter]);
+
+  const rows = useMemo(() => {
+    const q = nameQuery.trim().toLowerCase();
+    const list = rosterRows.filter((s) => {
+      if (!q) return true;
+      return studentDisplayName(s).toLowerCase().includes(q);
+    });
+    const sorted = list.slice();
+    if (sort.kind === 'day') {
+      const dateKey = dateKeys[sort.dayIndex];
+      sorted.sort((a, b) => {
+        const ma = dateKey ? rowSlotMinutes(a, dateKey, schedules) : null;
+        const mb = dateKey ? rowSlotMinutes(b, dateKey, schedules) : null;
+        if (ma == null && mb == null) return compareStudentNames(a, b);
+        if (ma == null) return 1;
+        if (mb == null) return -1;
+        const diff = sort.dir === 'desc' ? mb - ma : ma - mb;
+        if (diff !== 0) return diff;
+        return compareStudentNames(a, b);
+      });
+    } else {
+      sorted.sort((a, b) => compareStudentNames(a, b, sort.dir || 'asc'));
+    }
+    return sorted;
+  }, [rosterRows, nameQuery, sort, schedules, dateKeys]);
 
   const goPrev = () => setWeekStart((d) => addDays(startOfWeekMonday(d), -7));
   const goNext = () => setWeekStart((d) => addDays(startOfWeekMonday(d), 7));
@@ -155,7 +197,7 @@ export default function TeacherWeeklySlotGrid({
       }
 
       const otherRanges = otherTeacherRowRanges({
-        rows,
+        rows: rosterRows,
         schedules: live,
         dateKey,
         excludeRowKey: studentRowKey(student),
@@ -223,7 +265,7 @@ export default function TeacherWeeklySlotGrid({
     } finally {
       setBusyKey('');
     }
-  }, [busyKey, rows, teacherId, addSchedule, updateSchedule, cancelSchedule, toast]);
+  }, [busyKey, rosterRows, teacherId, addSchedule, updateSchedule, cancelSchedule, toast]);
 
   return (
     <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -291,28 +333,79 @@ export default function TeacherWeeklySlotGrid({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[52rem] border-collapse text-left">
+        <table className="w-full min-w-[64rem] table-fixed border-collapse text-left">
           <thead>
             <tr className="bg-slate-50/80">
-              <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2.5 text-[11px] font-black uppercase tracking-wide text-slate-500 w-48 min-w-[11rem] border-b border-slate-100">
-                Học viên
+              <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-slate-500 w-48 min-w-[11rem] border-b border-slate-100 align-bottom">
+                <div className="text-[11px] font-black uppercase tracking-wide">Học viên</div>
+                <input
+                  type="search"
+                  value={nameQuery}
+                  onChange={(e) => setNameQuery(e.target.value)}
+                  placeholder="Lọc tên"
+                  aria-label="Lọc theo tên học viên"
+                  className={`${HEADER_CTRL} mt-1.5 border-slate-200 font-medium normal-case tracking-normal`}
+                />
+                <select
+                  value={sort.kind === 'name' ? sort.dir : ''}
+                  onChange={(e) => {
+                    const dir = e.target.value === 'desc' ? 'desc' : 'asc';
+                    setSort({ kind: 'name', dir, dayIndex: 0 });
+                  }}
+                  aria-label="Sắp xếp theo tên"
+                  title="Sắp xếp theo tên A–Z hoặc Z–A"
+                  className={`${HEADER_CTRL} mt-1 normal-case tracking-normal ${
+                    sort.kind === 'name' ? 'border-red-300 text-red-700' : 'border-slate-200'
+                  }`}
+                >
+                  {sort.kind !== 'name' && <option value="">Tên</option>}
+                  <option value="asc">A–Z</option>
+                  <option value="desc">Z–A</option>
+                </select>
               </th>
               {dateKeys.map((key, i) => {
                 const isToday = key === todayKey;
                 const past = isScheduleDateBeforeToday(key);
+                const dayActive = sort.kind === 'day' && sort.dayIndex === i;
                 return (
                   <th
                     key={key}
-                    className={`px-2 py-2.5 text-center border-b border-slate-100 min-w-[7.5rem] ${
+                    className={`px-2 py-2 text-center border-b border-slate-100 w-[7.5rem] align-bottom ${
                       isToday ? 'bg-red-50/80' : ''
-                    } ${past ? 'opacity-70' : ''}`}
+                    }`}
                   >
-                    <div className={`text-[11px] font-black ${isToday ? 'text-red-700' : 'text-slate-600'}`}>
-                      {WEEKDAY_LABELS[i]}
+                    <div className={`${past ? 'opacity-70' : ''}`}>
+                      <div className={`text-[11px] font-black ${isToday ? 'text-red-700' : 'text-slate-600'}`}>
+                        {WEEKDAY_LABELS[i]}
+                      </div>
+                      <div className={`text-[10px] font-semibold ${isToday ? 'text-red-500' : 'text-slate-400'}`}>
+                        {key.slice(8, 10)}/{key.slice(5, 7)}
+                      </div>
                     </div>
-                    <div className={`text-[10px] font-semibold ${isToday ? 'text-red-500' : 'text-slate-400'}`}>
-                      {key.slice(8, 10)}/{key.slice(5, 7)}
-                    </div>
+                    <select
+                      value={dayActive ? sort.dir : ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) {
+                          setSort({ kind: 'name', dir: 'asc', dayIndex: 0 });
+                          return;
+                        }
+                        setSort({
+                          kind: 'day',
+                          dir: v === 'desc' ? 'desc' : 'asc',
+                          dayIndex: i,
+                        });
+                      }}
+                      aria-label={`Sắp xếp theo giờ ${WEEKDAY_LABELS[i]}`}
+                      title="Sắp xếp theo giờ: thấp đến cao hoặc cao đến thấp"
+                      className={`${HEADER_CTRL} mt-1.5 ${
+                        dayActive ? 'border-red-300 text-red-700' : 'border-slate-200'
+                      }`}
+                    >
+                      <option value="">Giờ</option>
+                      <option value="asc">Thấp→cao</option>
+                      <option value="desc">Cao→thấp</option>
+                    </select>
                   </th>
                 );
               })}
@@ -322,11 +415,13 @@ export default function TeacherWeeklySlotGrid({
             {rows.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-400 font-medium">
-                  {rosterFilter === 'finished'
-                    ? 'Không có học viên học xong trên bảng này'
-                    : rosterFilter === 'all'
-                      ? 'Chưa có học viên để xếp trên bảng này'
-                      : 'Chưa có học viên đang học để xếp trên bảng này'}
+                  {nameQuery.trim()
+                    ? 'Không tìm thấy học viên khớp tên'
+                    : rosterFilter === 'finished'
+                      ? 'Không có học viên học xong trên bảng này'
+                      : rosterFilter === 'all'
+                        ? 'Chưa có học viên để xếp trên bảng này'
+                        : 'Chưa có học viên đang học để xếp trên bảng này'}
                 </td>
               </tr>
             )}
@@ -352,7 +447,7 @@ export default function TeacherWeeklySlotGrid({
                       isToday={dateKey === todayKey}
                       now={now}
                       extraTakenRanges={otherTeacherRowRanges({
-                        rows,
+                        rows: rosterRows,
                         schedules,
                         dateKey,
                         excludeRowKey: studentRowKey(student),
@@ -384,10 +479,11 @@ function SlotCell({ student, dateKey, schedules, teacherId, busy, isToday, now, 
   const gate = getStudentScheduleGate(student, schedules, dateKey, existingId || null);
 
   const options = extra ? [extra, ...WEEK_SLOT_OPTIONS] : WEEK_SLOT_OPTIONS;
+  const dayTd = `px-1.5 py-1.5 min-w-0 ${isToday ? 'bg-red-50/40' : ''}`;
 
   if (otherCourse) {
     return (
-      <td className={`px-1.5 py-1.5 ${isToday ? 'bg-red-50/40' : ''}`}>
+      <td className={dayTd}>
         <div
           className="w-full min-h-9 px-1.5 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[10px] text-slate-400 font-semibold text-center leading-tight"
           title={`Đã có ca khóa ${dayOccupying.course || 'khác'} ${slotValueFromSchedule(dayOccupying) || ''}`}
@@ -408,7 +504,7 @@ function SlotCell({ student, dateKey, schedules, teacherId, busy, isToday, now, 
         ? 'bg-slate-50 border-slate-100 text-slate-500'
         : 'bg-transparent border-transparent text-slate-300';
     return (
-      <td className={`px-1.5 py-1.5 ${isToday ? 'bg-red-50/40' : ''}`}>
+      <td className={dayTd}>
         <div className={`w-full min-h-9 px-1.5 py-1.5 rounded-lg border text-[10px] font-bold text-center ${tone}`}>
           {label}
         </div>
@@ -420,13 +516,13 @@ function SlotCell({ student, dateKey, schedules, teacherId, busy, isToday, now, 
   const disabledAll = busy || (!own && !canCreate);
 
   return (
-    <td className={`px-1.5 py-1.5 ${isToday ? 'bg-red-50/40' : ''}`}>
+    <td className={dayTd}>
       <select
         value={slotValue}
         disabled={disabledAll}
         title={!own && !gate.canSchedule ? (gate.reason || 'Không xếp thêm được') : undefined}
         onChange={(e) => onChange(student, dateKey, e.target.value)}
-        className={`w-full min-h-9 px-1.5 rounded-lg border text-[11px] font-semibold outline-none ${
+        className={`w-full min-w-0 max-w-full min-h-9 px-1.5 rounded-lg border text-[11px] font-semibold outline-none ${
           own
             ? 'bg-amber-50 border-amber-200 text-amber-800'
             : 'bg-white border-slate-200 text-slate-600'
