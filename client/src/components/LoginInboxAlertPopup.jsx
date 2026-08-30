@@ -128,8 +128,8 @@ function formatClassLine(s) {
 }
 
 /**
- * Popup lúc vào trang: tin chưa đọc; HV gộp lịch sắp tới nếu có.
- * Hiện 1 lần / phiên; lần sau chỉ khi có tin mới hoặc buổi mới (theo id).
+ * Popup lúc vào trang: chỉ khi có tin người thật chưa đọc.
+ * Lịch sắp tới chỉ hiện kèm theo (không mở popup nếu chưa có tin).
  */
 export default function LoginInboxAlertPopup({ role, userId, blocked = false }) {
   const navigate = useNavigate();
@@ -179,17 +179,23 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
       return [];
     };
 
+    const readUnread = () => {
+      const convs = typeof convRef.current === 'function' ? (convRef.current(userId) || []) : [];
+      return inboxUnreadCount(convs);
+    };
+
     const run = async () => {
       if (typeof syncRef.current === 'function') {
         try { await syncRef.current(userId); } catch { /* ignore */ }
       }
-      const convs = typeof convRef.current === 'function' ? (convRef.current(userId) || []) : [];
-      let unread = inboxUnreadCount(convs);
+      // Đợi React cập nhật messages — tránh đếm nhầm lời chào AI.
+      await new Promise((r) => setTimeout(r, 400));
+      if (cancelled) return;
+      let unread = readUnread();
       if (unread <= 0) {
-        try {
-          const res = await api.messages.getUnread(userId, { excludeAi: true });
-          if (res?.success) unread = Number(res.data?.unreadCount) || 0;
-        } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 400));
+        if (cancelled) return;
+        unread = readUnread();
       }
 
       let upcoming = await loadUpcoming();
@@ -212,9 +218,9 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
         writeAck(userId, 0, ack.scheduleIds);
       }
 
+      // Chỉ hiện khi có tin người thật chưa đọc — không hiện vì lịch / lời chào AI.
       const showMsg = unread > 0 && (ackedUnread == null || unread > ackedUnread);
-      const showSched = newIds.length > 0;
-      if (!showMsg && !showSched) {
+      if (!showMsg) {
         writeAck(userId, unread, [...ackedIds, ...currentIds]);
         return;
       }
@@ -223,8 +229,8 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
       writeAck(userId, Math.max(unread, Number(ackedUnread) || 0), mergedIds);
 
       setPayload({
-        unread: unread > 0 ? unread : 0,
-        upcoming: showSched ? upcoming.slice(0, 3) : [],
+        unread,
+        upcoming: newIds.length > 0 ? upcoming.slice(0, 3) : [],
       });
     };
 

@@ -1090,17 +1090,19 @@ router.get('/unread/:userId', messagesGuard('unread'), async (req, res) => {
     }
     const receiverTargets = isAdminLevelAccount(req.user) ? ['admin', String(userId)] : [String(userId)];
     const senderNin = [String(userId)];
-    // Popup đăng nhập: không tính lời chào/idle của Trợ lý AI (chưa có người nhắn thật).
-    if (req.query.excludeAi === '1' || req.query.excludeAi === 'true') {
-      senderNin.push('ai_support');
-    }
-    const count = await Message.countDocuments({
+    const countFilter = {
       receiverId: { $in: receiverTargets },
       isRead: false,
       isRecalled: { $ne: true },
       senderId: { $nin: senderNin },
       hiddenFor: { $nin: receiverTargets },
-    });
+    };
+    if (req.query.excludeAi === '1' || req.query.excludeAi === 'true') {
+      senderNin.push('ai_support');
+      countFilter.senderId = { $nin: senderNin };
+      countFilter.conversationId = { $not: /system_ai_support/ };
+    }
+    const count = await Message.countDocuments(countFilter);
     res.json({ success: true, data: { unreadCount: count } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
