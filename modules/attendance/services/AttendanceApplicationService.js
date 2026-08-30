@@ -780,8 +780,9 @@ class AttendanceApplicationService {
     const noteVal = note !== undefined ? note : topic;
     if (noteVal !== undefined) updates.note = String(noteVal).trim();
     if ('studentNote' in data.body) {
-      updates.studentNote = data.studentNote;
-      updates.hasUnreadStudentNote = true; // Bật cờ có tin nhắn mới cho Giảng viên
+      const nextStudentNote = String(data.studentNote ?? data.body.studentNote || '').trim();
+      updates.studentNote = nextStudentNote;
+      updates.hasUnreadStudentNote = Boolean(nextStudentNote);
     }
     if ('hasUnreadStudentNote' in data.body) {
       // Giảng viên click vào xem thì tắt cờ đi
@@ -863,7 +864,7 @@ class AttendanceApplicationService {
     }
 
     // BUSINESS LOGIC: Gửi thông báo chuông cho Giảng viên nếu Học viên gửi Ghi chú (studentNote)
-    if ('studentNote' in data.body && schedule.teacherId && io) {
+    if ('studentNote' in data.body && String(data.studentNote ?? data.body.studentNote || '').trim() && schedule.teacherId && io) {
       try {
          const NotificationService = require('../../notification/services/NotificationService');
          await NotificationService.send(io, {

@@ -1,7 +1,10 @@
 import React, { useMemo } from 'react';
-import { Calendar, Plus, CheckCircle, Clock, Ban } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Ban } from 'lucide-react';
 import TeacherMonthlyCalendar from './TeacherMonthlyCalendar';
+import TeacherWeeklySlotGrid from './TeacherWeeklySlotGrid';
+import TeacherTeachingLog from './TeacherTeachingLog';
 import { isScheduleDateBeforeToday } from '../../utils/scheduleTime';
+import { TEACHER_WEEKLY_SLOT_GRID_EXPERIMENT, SHOW_TEACHER_MONTHLY_CALENDAR } from '../../utils/weeklySlotGrid';
 
 export default function TeacherScheduleTab({
   setEditingSchedule,
@@ -9,6 +12,11 @@ export default function TeacherScheduleTab({
   mySchedules = [],
   startEditSchedule,
   cancelSchedule,
+  students = [],
+  teacherId,
+  addSchedule,
+  updateSchedule,
+  allSchedules,
 }) {
   const today = new Date();
   const currentMonth = today.getMonth();
@@ -30,7 +38,7 @@ export default function TeacherScheduleTab({
       {/* Top Banner Toolbar & Quick Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 shadow-sm">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100 shadow-sm">
             <Calendar size={22} />
           </div>
           <div className="min-w-0">
@@ -38,17 +46,10 @@ export default function TeacherScheduleTab({
               Quản lý Lịch dạy &amp; Điểm danh
             </h2>
             <p className="text-xs text-slate-500 font-medium">
-              Theo dõi danh sách ca dạy, sắp lịch mới và ghi nhận điểm danh
+              Xếp lịch theo tuần và xem nhật ký giảng dạy
             </p>
           </div>
         </div>
-
-        <button
-          onClick={() => { setEditingSchedule(null); setShowScheduleModal(true); }}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-md shadow-blue-500/20 active:scale-95 transition flex items-center justify-center gap-2 shrink-0 min-h-10 cursor-pointer"
-        >
-          <Plus size={16} /> Xếp lịch dạy mới
-        </button>
       </div>
 
       {/* Stats Summary Cards */}
@@ -90,24 +91,39 @@ export default function TeacherScheduleTab({
         </div>
       </div>
 
-      {/* Main Monthly Calendar & Right Column */}
-      <TeacherMonthlyCalendar
-        schedules={mySchedules}
-        onEditSchedule={startEditSchedule}
-        onAddSchedule={(date) => {
-          if (isScheduleDateBeforeToday(date)) {
-            return;
-          }
-          const yyyy = date.getFullYear();
-          const mm = String(date.getMonth() + 1).padStart(2, '0');
-          const dd = String(date.getDate()).padStart(2, '0');
-          setEditingSchedule({ date: `${yyyy}-${mm}-${dd}`, fromCalendar: true });
-          setShowScheduleModal(true);
-        }}
-        onCancelSchedule={(scheduleId, reason) => {
-          cancelSchedule(scheduleId, reason);
-        }}
-      />
+      {SHOW_TEACHER_MONTHLY_CALENDAR && (
+        <TeacherMonthlyCalendar
+          schedules={mySchedules}
+          onEditSchedule={startEditSchedule}
+          onAddSchedule={(date) => {
+            if (isScheduleDateBeforeToday(date)) {
+              return;
+            }
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            setEditingSchedule({ date: `${yyyy}-${mm}-${dd}`, fromCalendar: true });
+            setShowScheduleModal(true);
+          }}
+          onCancelSchedule={(scheduleId, reason) => {
+            cancelSchedule(scheduleId, reason);
+          }}
+        />
+      )}
+
+      {TEACHER_WEEKLY_SLOT_GRID_EXPERIMENT && (
+        <TeacherWeeklySlotGrid
+          students={students}
+          teacherId={teacherId}
+          mySchedules={mySchedules}
+          allSchedules={allSchedules}
+          addSchedule={addSchedule}
+          updateSchedule={updateSchedule}
+          cancelSchedule={cancelSchedule}
+        />
+      )}
+
+      <TeacherTeachingLog schedules={mySchedules} />
     </div>
   );
 }

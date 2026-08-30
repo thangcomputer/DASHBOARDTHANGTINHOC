@@ -345,6 +345,41 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
       },
     });
   };
+
+  const handleAdminRejectMakeup = (sch) => {
+    const action = getAttendanceAction(sch);
+    if (!action.canAdminMakeup || action.state === 'COMPLETED' || action.state === 'CANCELLED') return;
+    const sid = sch._id || sch.id;
+    showModal({
+      title: 'Không tính buổi điểm danh bù',
+      content: `Học viên: ${sch.studentName || data?.student?.name || '—'}\nKhóa học: ${sch.course || '—'}\nGiảng viên: ${sch.teacherName || '—'}\nThời gian: ${sch.startTime || '?'} - ${sch.endTime || '?'}\n\nBuổi này sẽ bị hủy, không tính tiến độ/lương. Giảng viên được xếp thêm 1 ca cho học viên.`,
+      type: 'warning',
+      confirmText: 'Không tính buổi',
+      onConfirm: async () => {
+        setMakeupBusyId(String(sid));
+        try {
+          const res = await api.schedules.update(sid, {
+            status: 'cancelled',
+            rejectMakeup: true,
+            cancelReason: 'Admin không tính buổi điểm danh bù — GV được xếp thêm 1 ca',
+          });
+          if (!res?.success) {
+            toast.error(res?.message || 'Không thể từ chối điểm danh bù');
+            return;
+          }
+          toast.success('Đã không tính buổi — giảng viên được xếp thêm 1 ca');
+          reloadProfile();
+          if (typeof triggerBackgroundSync === 'function') {
+            Promise.resolve(triggerBackgroundSync()).catch(() => {});
+          }
+        } catch (e) {
+          toast.error(e?.message || 'Lỗi kết nối');
+        } finally {
+          setMakeupBusyId(null);
+        }
+      },
+    });
+  };
   // Refund/hủy khóa đang chọn → về «Tất cả»
   useEffect(() => {
     if (courseFilter === 'all' || !data?.student) return;
@@ -1891,14 +1926,24 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                               </div>
                               <p className="text-[11px] text-slate-500 break-words">{sch.note || sch.subject || 'Dạy thực tế'}</p>
                               {canMakeup && (
-                                <button
-                                  type="button"
-                                  disabled={makeupBusyId === schId}
-                                  onClick={() => handleAdminMakeup(sch)}
-                                  className="w-full min-h-10 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-                                >
-                                  {makeupBusyId === schId ? 'Đang xử lý…' : 'Điểm danh bù'}
-                                </button>
+                                <div className="flex flex-col gap-1.5">
+                                  <button
+                                    type="button"
+                                    disabled={makeupBusyId === schId}
+                                    onClick={() => handleAdminMakeup(sch)}
+                                    className="w-full min-h-10 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                                  >
+                                    {makeupBusyId === schId ? 'Đang xử lý…' : 'Điểm danh bù'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={makeupBusyId === schId}
+                                    onClick={() => handleAdminRejectMakeup(sch)}
+                                    className="w-full min-h-10 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+                                  >
+                                    Không tính buổi
+                                  </button>
+                                </div>
                               )}
                             </div>
                           );
@@ -1952,14 +1997,24 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                       {action.label}
                                     </span>
                                     {canMakeup && (
-                                      <button
-                                        type="button"
-                                        disabled={makeupBusyId === schId}
-                                        onClick={() => handleAdminMakeup(sch)}
-                                        className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 shadow-sm"
-                                      >
-                                        {makeupBusyId === schId ? 'Đang xử lý…' : 'Điểm danh bù'}
-                                      </button>
+                                      <div className="flex flex-col items-center gap-1">
+                                        <button
+                                          type="button"
+                                          disabled={makeupBusyId === schId}
+                                          onClick={() => handleAdminMakeup(sch)}
+                                          className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 shadow-sm"
+                                        >
+                                          {makeupBusyId === schId ? 'Đang xử lý…' : 'Điểm danh bù'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={makeupBusyId === schId}
+                                          onClick={() => handleAdminRejectMakeup(sch)}
+                                          className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+                                        >
+                                          Không tính buổi
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
                                 </td>

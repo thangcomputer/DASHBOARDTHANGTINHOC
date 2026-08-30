@@ -9,8 +9,8 @@ import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
 import { useLocation } from 'react-router-dom';
 import { useToast } from '../utils/toast';
-import { messagesAPI, aiSupportAPI, resolveMediaUrl, schedulesAPI } from '../services/api';
-import { ScheduleModal } from './teacher/TeacherScheduleModal';
+import { messagesAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
+import TeacherStudentWeekSlotSheet from './teacher/TeacherStudentWeekSlotSheet';
 import { displayFileName } from '../utils/validators';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
@@ -295,6 +295,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers, groups,
     teachers, students, staffs, toggleMessageReaction: ctxToggleReaction,
     softDeleteMessage: ctxDeleteMessage, currentUser, messages: contextMessages,
+    schedules, addSchedule, updateSchedule, cancelSchedule, getStudentsByTeacher,
   } = useData();
   const isHighAdmin = currentUser?.adminRole === 'HIGH_ADMIN';
   const isSuperAdmin = currentUser?.id === 'admin' || currentUser?.adminRole === 'SUPER_ADMIN';
@@ -553,71 +554,59 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   };
 
-  const handleScheduleSubmit = async (formData) => {
+  const notifyInboxScheduleCreated = async (formData) => {
+    if (!activeConv?.id) return;
+    let displayDate = formData.date;
     try {
-      const res = await schedulesAPI.create(formData);
-      if (!res?.success) throw new Error(res?.message || 'Không thể xếp lịch');
-      toast.success('Đã xếp lịch học thành công');
-      setShowScheduleModal(false);
-      // Send system message
-      if (activeConv && activeConv.id) {
-        let displayDate = formData.date;
-        try {
-          if (displayDate && displayDate.includes('-')) {
-            const parts = displayDate.split('-');
-            if (parts.length === 3) displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-          }
-        } catch (e) {}
-
-        let weekday = '';
-        try {
-          const rawDate = formData.date
-            ? (String(formData.date).includes('-')
-              ? new Date(`${String(formData.date).slice(0, 10)}T12:00:00`)
-              : new Date(formData.date))
-            : null;
-          if (rawDate && !Number.isNaN(rawDate.getTime())) {
-            weekday = rawDate.toLocaleDateString('vi-VN', {
-              weekday: 'long',
-              timeZone: 'Asia/Ho_Chi_Minh',
-            });
-          }
-        } catch { /* ignore */ }
-
-        const created = res.data || {};
-        const scheduleId = created._id || created.id || null;
-        const courseLabel = formData.course || created.course || activeConv.user?.course || '';
-
-        const properMsg = {
-          conversationId: activeConv.id,
-          senderId: currentUserId,
-          senderName: currentUserName,
-          senderRole: currentUserRole,
-          receiverId: activeConv.user.id,
-          receiverName: activeConv.user.name,
-          receiverRole: activeConv.user.role,
-          content: `Đã xếp lịch học thành công cho học viên vào ngày ${displayDate} từ ${formData.startTime} đến ${formData.endTime}.`,
-          messageType: 'system',
-          isGroup: false,
-          groupId: null,
-          payload: {
-            kind: 'schedule_created',
-            scheduleId: scheduleId ? String(scheduleId) : null,
-            date: formData.date || created.date || null,
-            dateLabel: displayDate,
-            weekday,
-            startTime: formData.startTime || created.startTime || '',
-            endTime: formData.endTime || created.endTime || '',
-            course: courseLabel,
-            studentName: formData.studentName || activeConv.user?.name || '',
-            teacherName: formData.teacherName || currentUserName || '',
-          },
-        };
-        await ctxSendMessage(properMsg);
+      if (displayDate && displayDate.includes('-')) {
+        const parts = displayDate.split('-');
+        if (parts.length === 3) displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
       }
-    } catch (err) {
-      toast.error(err?.message || 'Không thể cập nhật lịch học');
-    }
+    } catch (e) { /* ignore */ }
+
+    let weekday = '';
+    try {
+      const rawDate = formData.date
+        ? (String(formData.date).includes('-')
+          ? new Date(`${String(formData.date).slice(0, 10)}T12:00:00`)
+          : new Date(formData.date))
+        : null;
+      if (rawDate && !Number.isNaN(rawDate.getTime())) {
+        weekday = rawDate.toLocaleDateString('vi-VN', {
+          weekday: 'long',
+          timeZone: 'Asia/Ho_Chi_Minh',
+        });
+      }
+    } catch { /* ignore */ }
+
+    const scheduleId = formData.scheduleId || null;
+    const courseLabel = formData.course || activeConv.user?.course || '';
+
+    await ctxSendMessage({
+      conversationId: activeConv.id,
+      senderId: currentUserId,
+      senderName: currentUserName,
+      senderRole: currentUserRole,
+      receiverId: activeConv.user.id,
+      receiverName: activeConv.user.name,
+      receiverRole: activeConv.user.role,
+      content: `Đã xếp lịch học thành công cho học viên vào ngày ${displayDate} từ ${formData.startTime} đến ${formData.endTime}.`,
+      messageType: 'system',
+      isGroup: false,
+      groupId: null,
+      payload: {
+        kind: 'schedule_created',
+        scheduleId: scheduleId ? String(scheduleId) : null,
+        date: formData.date || null,
+        dateLabel: displayDate,
+        weekday,
+        startTime: formData.startTime || '',
+        endTime: formData.endTime || '',
+        course: courseLabel,
+        studentName: formData.studentName || activeConv.user?.name || '',
+        teacherName: currentUserName || '',
+      },
+    });
   };
 
   const conversations = useMemo(() => {
@@ -2155,6 +2144,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
+                {(!activeConv.isGroup && currentUserRole === 'teacher' && activeConv?.user?.role === 'student') && (
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(true)}
+                    className="shrink-0 ml-1 inline-flex items-center justify-center gap-1.5 min-h-10 px-2.5 sm:px-3 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-100 text-xs font-bold"
+                    title="Xếp lịch tuần cho học viên này"
+                  >
+                    <Calendar size={16} />
+                    <span>Xếp lịch</span>
+                  </button>
+                )}
                 {activeConv.isGroup && (() => {
                   const groupIdStr = activeConv.id.replace('group_', '');
                   const groupObj = groups?.find(g => String(g._id) === groupIdStr || String(g.id) === groupIdStr);
@@ -2704,15 +2704,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       onCaptured={stageScreenshotForSend}
                       onError={(msg) => toast.error(msg)}
                     />
-                      {(!activeConv?.isGroup && currentUserRole === 'teacher' && activeConv?.user?.role === 'student') && (
-                        <button
-                          onClick={() => setShowScheduleModal(true)}
-                          className="p-2 text-violet-500 hover:text-violet-600 hover:bg-violet-50 hover:shadow-sm rounded-xl transition-all"
-                          title="Xếp lịch học"
-                        >
-                          <Calendar size={20} />
-                        </button>
-                      )}
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading}
@@ -3180,23 +3171,36 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       {showScheduleModal && activeConv && !activeConv.isGroup && activeConv.user && (
         (() => {
           const targetId = String(activeConv.user.id || activeConv.user._id || '');
-          const matchedStudent = (students || []).find((s) => String(s.id || s._id) === targetId);
-          const chatStudent = matchedStudent || {
-            id: activeConv.user.id,
-            _id: activeConv.user.id,
-            name: activeConv.user.name || 'Học viên',
-            course: activeConv.user.course || 'Học viên',
-            branchCode: activeConv.user.branchCode || '',
-          };
+          const convCourse = String(activeConv.user.course || '').trim().toLowerCase();
+          const teacherRows = typeof getStudentsByTeacher === 'function'
+            ? (getStudentsByTeacher(currentUserId) || []).filter(
+              (s) => String(s.id || s._id) === targetId,
+            )
+            : [];
+          const fromList = (students || []).filter((s) => String(s.id || s._id) === targetId);
+          const enrollments = (teacherRows.length ? teacherRows : fromList).slice();
+          const preferred = enrollments.find((s) => String(s.course || '').trim().toLowerCase() === convCourse)
+            || enrollments[0]
+            || {
+              id: activeConv.user.id,
+              _id: activeConv.user.id,
+              name: activeConv.user.name || 'Học viên',
+              course: activeConv.user.course || '',
+              branchCode: activeConv.user.branchCode || '',
+            };
           return (
-            <ScheduleModal
-              students={[chatStudent]}
-              allSchedules={[]}
-              schedule={{ studentId: chatStudent.id || chatStudent._id }}
-              lockStudent={true}
+            <TeacherStudentWeekSlotSheet
+              student={preferred}
+              enrollments={enrollments.length ? enrollments : [preferred]}
               teacherId={currentUserId}
+              schedules={schedules || []}
+              addSchedule={addSchedule}
+              updateSchedule={updateSchedule}
+              cancelSchedule={cancelSchedule}
               onClose={() => setShowScheduleModal(false)}
-              onSubmit={handleScheduleSubmit}
+              onCreated={(payload) => {
+                notifyInboxScheduleCreated(payload).catch(() => {});
+              }}
             />
           );
         })()

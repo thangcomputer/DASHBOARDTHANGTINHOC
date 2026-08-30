@@ -21,7 +21,7 @@ import TeacherQuizManager from './TeacherQuizManager';
 import { useData } from '../../context/DataContext';
 import { useScheduleContext } from '../../context/ScheduleContext';
 import { buildStudentActivityLogs, ACTIVITY_LOG_META } from '../../utils/studentActivityLogs';
-import ScheduleModal from './TeacherScheduleModal';
+import TeacherStudentWeekSlotSheet from './TeacherStudentWeekSlotSheet';
 import {
   buildAttendanceMakeupDraft,
   pickAdminContactForMakeup,
@@ -160,6 +160,9 @@ export const StudentCard = ({
     schedules: allSchedules = [],
     triggerBackgroundSync,
     currentUser,
+    addSchedule,
+    updateSchedule,
+    cancelSchedule,
   } = useData();
   const { setSchedulesLocal } = useScheduleContext();
   const [linkInput, setLinkInput] = useState(student.linkHoc);
@@ -462,9 +465,11 @@ export const StudentCard = ({
     const pending = getMakeupPending(makeupKey);
     const pendingSchId = String(pending?.scheduleId || '');
     const gateSchId = String(attendanceGate?.schedule?._id || attendanceGate?.schedule?.id || '');
-    const scheduleDone = (allSchedules || []).some((s) => {
+    const scheduleSettled = (allSchedules || []).some((s) => {
       const id = String(s._id || s.id || '');
-      if (!id || String(s.status || '') !== 'completed') return false;
+      if (!id) return false;
+      const st = String(s.status || '');
+      if (st !== 'completed' && st !== 'cancelled') return false;
       if (pendingSchId && id === pendingSchId) return true;
       if (gateSchId && id === gateSchId) return true;
       return false;
@@ -473,6 +478,7 @@ export const StudentCard = ({
       alreadyAttendedToday
       || attendanceGate?.status === 'done'
       || scheduleDone
+      || scheduleSettled
     ) {
       clearMakeupPending(makeupKey);
       setMakeupPending(false);
@@ -976,25 +982,6 @@ export const StudentCard = ({
     }
     onSaveGrade(student._id || student.id, Number(gradeInput), student.course);
     setGradeSaved(true); setTimeout(() => setGradeSaved(false), 2000);
-  };
-
-  const handleQuickScheduleSubmit = async (scheduleData) => {
-    if (isDroppedOut) {
-      toast.info('Học viên đã thôi học — không xếp lịch được.');
-      return;
-    }
-    try {
-      const res = await api.schedules.create(scheduleData);
-      if (res?.success) {
-        toast.success('Đã xếp lịch học mới');
-        setShowQuickSchedule(false);
-        triggerBackgroundSync?.();
-      } else {
-        toast.error(res?.message || 'Không thể xếp lịch');
-      }
-    } catch (err) {
-      toast.error(err?.message || 'Lỗi kết nối khi xếp lịch');
-    }
   };
 
   const gradeValue = Number(gradeInput) || 0;
@@ -1912,14 +1899,15 @@ export const StudentCard = ({
         )}
 
         {showQuickSchedule && !isDroppedOut && (
-          <ScheduleModal
-            students={[student]}
-            allSchedules={allSchedules}
-            schedule={{ studentId: student.id || student._id }}
-            lockStudent={true}
-            teacherId={currentUser?.id || currentUser?._id || 'current'}
+          <TeacherStudentWeekSlotSheet
+            student={student}
+            enrollments={[student]}
+            teacherId={currentUser?.id || currentUser?._id}
+            schedules={allSchedules}
+            addSchedule={addSchedule}
+            updateSchedule={updateSchedule}
+            cancelSchedule={cancelSchedule}
             onClose={() => setShowQuickSchedule(false)}
-            onSubmit={handleQuickScheduleSubmit}
           />
         )}
       </div>
@@ -2323,14 +2311,15 @@ export const StudentCard = ({
       )}
 
       {showQuickSchedule && !isDroppedOut && (
-        <ScheduleModal
-          students={[student]}
-          allSchedules={allSchedules}
-          schedule={{ studentId: student.id || student._id }}
-          lockStudent={true}
-          teacherId={currentUser?.id || currentUser?._id || 'current'}
+        <TeacherStudentWeekSlotSheet
+          student={student}
+          enrollments={[student]}
+          teacherId={currentUser?.id || currentUser?._id}
+          schedules={allSchedules}
+          addSchedule={addSchedule}
+          updateSchedule={updateSchedule}
+          cancelSchedule={cancelSchedule}
           onClose={() => setShowQuickSchedule(false)}
-          onSubmit={handleQuickScheduleSubmit}
         />
       )}
     </React.Fragment>

@@ -136,6 +136,43 @@ async function notifyTeacherAdminMakeup(io, schedule, actor = {}, sessionInfo = 
 }
 
 /**
+ * Admin không tính buổi điểm danh bù → hủy ca, GV được xếp thêm 1 buổi.
+ */
+async function notifyTeacherMakeupRejected(io, schedule, actor = {}) {
+  if (!io || !schedule?.teacherId) return;
+  try {
+    const teacherId = String(schedule.teacherId._id || schedule.teacherId);
+    const studentId = schedule.studentId?._id || schedule.studentId;
+    const studentName = schedule.studentName || 'học viên';
+    const course = schedule.course || 'khóa học';
+    const d = schedule.date ? new Date(schedule.date) : null;
+    const dateLabel = d && !Number.isNaN(d.getTime())
+      ? d.toLocaleDateString('vi-VN')
+      : '—';
+    const actorName = actor?.name ? ` (${actor.name})` : '';
+    const hvLabel = studentId
+      ? `⟦student_detail:${studentId}:profile|${studentName}⟧`
+      : studentName;
+
+    await NotificationService.send(io, {
+      type: 'SCHEDULE',
+      title: '❌ Buổi điểm danh bù không được tính',
+      content: `Admin${actorName} không tính buổi điểm danh bù của ${hvLabel} — ${course}, ngày ${dateLabel}. Buổi này không tính tiến độ/lương. Bạn được xếp thêm 1 ca cho học viên.`,
+      receivers: teacherId,
+      payload: {
+        kind: 'admin_makeup_rejected',
+        scheduleId: String(schedule._id || schedule.id || ''),
+        studentId: studentId ? String(studentId) : null,
+        course,
+      },
+      link: '/teacher#schedule',
+    });
+  } catch (err) {
+    logger.warn('[teacherAdminNotifier] makeupReject: %s', err.message);
+  }
+}
+
+/**
  * Khi GV vừa đủ điều kiện thưởng sao (tháng chưa chi) → báo 1 lần / tháng.
  */
 async function maybeNotifyStarBonusEligibility(io, teacherId) {
@@ -215,5 +252,6 @@ async function maybeNotifyStarBonusEligibility(io, teacherId) {
 module.exports = {
   notifyTeacherAdminUpdates,
   notifyTeacherAdminMakeup,
+  notifyTeacherMakeupRejected,
   maybeNotifyStarBonusEligibility,
 };

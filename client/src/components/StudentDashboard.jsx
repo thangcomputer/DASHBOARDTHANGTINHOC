@@ -3,6 +3,7 @@ import { FileUp, XCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ClassReminder from './ClassReminder';
 import { useData } from '../context/DataContext';
+import { useScheduleContext } from '../context/ScheduleContext';
 import PopupBanner from './PopupBanner';
 import TuitionPaymentModal from './TuitionPaymentModal';
 import StudentProfileUpdateModal from './StudentProfileUpdateModal';
@@ -125,6 +126,7 @@ const StudentDashboard = ({ onNavigate }) => {
   }
   const STUDENT_ID = session.id || session._id || null;
   const { students, teachers, materials, schedules, getNotifications, getConversations, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, studentQuestions, examSubjectsCatalog } = useData();
+  const { setSchedulesLocal } = useScheduleContext();
   const student = students.find(s => String(s.id) === String(STUDENT_ID));
   const navigate = useNavigate();
   const location = useLocation();
@@ -617,21 +619,21 @@ const StudentDashboard = ({ onNavigate }) => {
            schedule={noteModalSched} 
            onClose={() => setNoteModalSched(null)} 
            onSubmit={async (noteText) => {
-             const targetId = noteModalSched._id || noteModalSched.id;
-             
-             // 1. Tắt Modal trước ngay lập tức để học viên không phải đợi (Optimistic)
+             const targetId = String(noteModalSched._id || noteModalSched.id || '');
+             const nextNote = String(noteText || '').trim();
              setNoteModalSched(null);
-             
-             // 2. Thử cập nhật giao diện ngầm nếu tồn tại hàm báo mảng
+             if (targetId && typeof setSchedulesLocal === 'function') {
+               setSchedulesLocal((prev) => (prev || []).map((s) => (
+                 String(s._id || s.id) === targetId
+                   ? { ...s, studentNote: nextNote, hasUnreadStudentNote: Boolean(nextNote) }
+                   : s
+               )));
+             }
              try {
-               if (typeof setSchedules === 'function') {
-                 setSchedules(prev => prev.map(s => (s._id === targetId || s.id === targetId) ? { ...s, studentNote: noteText } : s));
-               }
-             } catch(err) { /* ignore */ }
-
-             // 3. Gửi chạy ngầm tới máy chủ
-             try {
-               await api.schedules.update(targetId, { studentNote: noteText, hasUnreadStudentNote: true });
+               await api.schedules.update(targetId, {
+                 studentNote: nextNote,
+                 hasUnreadStudentNote: Boolean(nextNote),
+               });
              } catch(e) {
                console.error('Lỗi khi gửi Note:', e);
              }

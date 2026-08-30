@@ -4,6 +4,7 @@ import { useScheduleContext } from '../context/ScheduleContext';
 import { useStudentsContext } from '../context/StudentsContext';
 import { useDataActions } from '../context/DataContext';
 import { applyAttendanceProgressToStudents } from '../utils/attendanceProgressPatch';
+import { mapSchedule } from '../lib/entityMaps';
 
 function scheduleKey(sch) {
   return String(sch?._id || sch?.id || '');
@@ -13,14 +14,19 @@ function applyAttendanceSocketToSchedules(prev, eventName, payload) {
   const list = Array.isArray(prev) ? prev : [];
   if (!payload) return list;
 
-  // schedule:updated đôi khi gửi full document
-  if (eventName === 'schedule:updated' && (payload._id || payload.id) && payload.studentConfirmStatus != null) {
-    const sid = scheduleKey(payload);
+  // schedule:updated: full document hoặc patch ghi chú học viên
+  if (eventName === 'schedule:updated') {
+    const doc = (payload && typeof payload === 'object' && !Array.isArray(payload))
+      ? payload
+      : { _id: payload };
+    const sid = scheduleKey(doc);
+    if (!sid) return list;
+    const mapped = mapSchedule(doc);
     let found = false;
     const next = list.map((sch) => {
       if (scheduleKey(sch) !== sid) return sch;
       found = true;
-      return { ...sch, ...payload, id: sch.id || payload._id || payload.id };
+      return { ...sch, ...mapped, id: sch.id || mapped.id };
     });
     return found ? next : list;
   }
@@ -71,9 +77,12 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
 
     const mine = (payload) => {
       if (!payload) return false;
-      const tid = String(payload.teacherId?._id || payload.teacherId || '');
-      if (tid && tid === String(myId)) return true;
       if (role === 'admin' || role === 'staff') return true;
+      const tid = String(payload.teacherId?._id || payload.teacherId || '');
+      const sid = String(payload.studentId?._id || payload.studentId || '');
+      if (role === 'teacher' && tid && tid === String(myId)) return true;
+      if (role === 'student' && sid && sid === String(myId)) return true;
+      if (role === 'teacher') return Boolean(payload.scheduleId || payload._id || payload.id);
       return Boolean(payload.scheduleId || payload._id || payload.id);
     };
 
@@ -91,6 +100,8 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       if (!mine(payload)) return;
       setSchedulesLocal((prev) => applyAttendanceSocketToSchedules(prev, eventName, payload));
 
+      if (role === 'student') return;
+
       if (eventName === 'attendance:awaiting-confirm') {
         bumpStudentProgress(payload, { lockCheckIn: true, skipProgress: true });
       } else if (eventName === 'attendance:confirmed') {
@@ -103,6 +114,12 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
         Promise.resolve(refreshStudents()).catch(() => {});
       }
 
+      const notePatched = eventName === 'schedule:updated'
+        && payload
+        && typeof payload === 'object'
+        && 'studentNote' in payload;
+      if (notePatched) return;
+
       if (typeof triggerBackgroundSync === 'function') {
         Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
       } else if (typeof refreshSchedules === 'function') {
@@ -110,13 +127,15 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       }
     };
 
-    const handlers = {
-      'attendance:awaiting-confirm': onEvent('attendance:awaiting-confirm'),
-      'attendance:confirmed': onEvent('attendance:confirmed'),
-      'attendance:disputed': onEvent('attendance:disputed'),
-      'attendance:rejected': onEvent('attendance:rejected'),
-      'schedule:updated': onEvent('schedule:updated'),
-    };
+    const handlers = role === 'student'
+      ? { 'schedule:updated': onEvent('schedule:updated') }
+      : {
+          'attendance:awaiting-confirm': onEvent('attendance:awaiting-confirm'),
+          'attendance:confirmed': onEvent('attendance:confirmed'),
+          'attendance:disputed': onEvent('attendance:disputed'),
+          'attendance:rejected': onEvent('attendance:rejected'),
+          'schedule:updated': onEvent('schedule:updated'),
+        };
 
     Object.entries(handlers).forEach(([ev, fn]) => socket.on(ev, fn));
     return () => {

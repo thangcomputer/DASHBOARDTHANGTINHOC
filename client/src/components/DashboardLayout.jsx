@@ -29,6 +29,7 @@ import TeacherRatingDetailModal, {
   isTeacherRatingNotif,
 } from './teacher/TeacherRatingDetailModal';
 import TeacherAttendanceConfirmedModal from './teacher/TeacherAttendanceConfirmedModal';
+import TeacherStudentNoteModal, { isStudentScheduleNoteNotif } from './teacher/TeacherStudentNoteModal';
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
@@ -215,7 +216,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [ratingDetailError, setRatingDetailError] = useState('');
   const [adminQuickPopup, setAdminQuickPopup] = useState(null);
   const { socket } = useSocket() || {};
-  const { students, teachers, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead, getConversations } = useData();
+  const { students, teachers, schedules, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead, getConversations } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const myId = String(session?.id || session?._id || '');
   useAttendanceConfirmFlush({
@@ -223,7 +224,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     teacherId: myId,
   });
   useAttendanceRealtimeSync({
-    enabled: role === 'teacher' || role === 'admin' || role === 'staff',
+    enabled: role === 'teacher' || role === 'admin' || role === 'staff' || role === 'student',
     myId,
     role,
   });
@@ -406,6 +407,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [attendanceDispute, setAttendanceDispute] = useState(null);
   const [attendanceDisputeBusy, setAttendanceDisputeBusy] = useState(false);
   const [teacherAttendanceConfirm, setTeacherAttendanceConfirm] = useState(null);
+  const [studentNotePopup, setStudentNotePopup] = useState(null);
 
   const starBonusSeenKey = React.useCallback((teacherId, month) => (
     `star_bonus_celeb_${teacherId}_${month}`
@@ -758,6 +760,34 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }
     setTeacherAttendanceConfirm(payload);
   }, [myId]);
+
+  const openStudentNoteFromNotif = React.useCallback((n) => {
+    const p = { ...(n?.payload || {}) };
+    const sid = String(p.scheduleId || '');
+    const sch = sid
+      ? (schedules || []).find((s) => String(s._id || s.id) === sid)
+      : null;
+    const start = p.startTime || sch?.startTime || '';
+    const end = p.endTime || sch?.endTime || '';
+    const dateRaw = p.date || sch?.date;
+    let dateLabel = p.dateLabel || '';
+    if (!dateLabel && dateRaw) {
+      const d = new Date(dateRaw);
+      if (!Number.isNaN(d.getTime())) {
+        dateLabel = d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+      }
+    }
+    setStudentNotePopup({
+      studentName: p.studentName || sch?.studentName || sch?.studentId?.name || 'Học viên',
+      studentNote: p.studentNote || sch?.studentNote || '',
+      date: dateRaw,
+      dateLabel,
+      startTime: start,
+      endTime: end,
+      timeRange: p.timeRange || (start && end ? `${start} – ${end}` : start),
+      course: p.course || sch?.course || '',
+    });
+  }, [schedules]);
 
   const dismissWelcomeCelebration = React.useCallback(async () => {
     setShowWelcomeCelebration(false);
@@ -1180,6 +1210,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         payload={teacherAttendanceConfirm}
         onClose={() => setTeacherAttendanceConfirm(null)}
       />
+      <TeacherStudentNoteModal
+        open={role === 'teacher' && !!studentNotePopup}
+        payload={studentNotePopup}
+        onClose={() => setStudentNotePopup(null)}
+      />
 
       {showNotif && typeof document !== 'undefined' && createPortal(
         <>
@@ -1386,6 +1421,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                         } else {
                           navigate('/teacher');
                         }
+                          } else if (role === 'teacher' && isStudentScheduleNoteNotif(n)) {
+                            setShowNotif(false);
+                            openStudentNoteFromNotif(n);
                           } else if (role === 'teacher' && (n.payload?.type === 'schedule' || n.type === 'schedule')) {
                             // Chuyển hướng đến tab lịch học của giảng viên khi nhận thông báo ghi chú từ học viên
                             navigate('/teacher#schedule');

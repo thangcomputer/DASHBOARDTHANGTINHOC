@@ -87,18 +87,30 @@ function normCourse(s) {
   return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+function localizeActorName(who) {
+  const n = String(who || '').trim();
+  if (!n) return 'Admin';
+  const key = n.toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  if (
+    key === 'admin'
+    || key === 'staff'
+    || key === 'high admin'
+    || key === 'hight admin'
+    || key === 'super admin'
+    || key === 'superadmin'
+  ) return 'Admin';
+  return n;
+}
+
 /** Đổi mã kỹ thuật trong ghi chú lịch sang tiếng Việt (kể cả bản ghi cũ). */
-function localizeScheduleNote(raw) {
+export function localizeScheduleNote(raw) {
   let s = String(raw || '').trim();
   if (!s) return '';
   s = s.replace(
     /\[ADMIN_REJECT_ATTENDANCE\]\s*([^\s@|]+(?:\s+[^\s@|]+)*)?\s*@\s*([^\s|]+)/gi,
     (_, who, iso) => {
-      const name = String(who || 'Admin').trim();
-      const whenMs = parseDateToMs(iso);
-      const when = whenMs
-        ? new Date(whenMs).toLocaleString('vi-VN')
-        : String(iso || '').trim();
+      const name = localizeActorName(who);
+      const when = formatActedAtLabel(iso);
       return when
         ? `Admin từ chối điểm danh — ${name} · ${when}`
         : `Admin từ chối điểm danh — ${name}`;
@@ -106,16 +118,17 @@ function localizeScheduleNote(raw) {
   );
   s = s.replace(/\[ADMIN_REJECT_ATTENDANCE\]/gi, 'Admin từ chối điểm danh');
   s = s.replace(
-    /\[ADMIN_MAKEUP\]\s*([^\s@|]+(?:\s+[^\s@|]+)*)?\s*@\s*([^\s|]+)/gi,
-    (_, who, iso) => {
-      const name = String(who || 'Admin').trim();
-      const whenMs = parseDateToMs(iso);
-      const when = whenMs
-        ? new Date(whenMs).toLocaleString('vi-VN')
-        : String(iso || '').trim();
+    /\[ADMIN_MAKEUP\]\s*([^\s@|]+(?:\s+[^\s@|]+)*)?\s*@\s*([^\s|]+)(?:\s*·\s*buổi\s+(\d+)(?:\/(\d+))?)?/gi,
+    (_, who, iso, ordinal, total) => {
+      const name = localizeActorName(who);
+      const when = formatActedAtLabel(iso);
+      const buoi = ordinal
+        ? (total ? ` buổi ${ordinal}/${total}` : ` buổi ${ordinal}`)
+        : '';
+      const whoBit = name && name !== 'Admin' ? ` — ${name}` : '';
       return when
-        ? `Admin điểm danh bù — ${name} · ${when}`
-        : `Admin điểm danh bù — ${name}`;
+        ? `Admin điểm danh bù${buoi}${whoBit} · ${when}`
+        : `Admin điểm danh bù${buoi}${whoBit}`;
     },
   );
   s = s.replace(/\[ADMIN_MAKEUP\]/gi, 'Admin điểm danh bù');

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import api from '../services/api';
-import { normalizeScheduleDate } from '../utils/scheduleTime';
+import { normalizeScheduleDate, formatScheduleDateVi } from '../utils/scheduleTime';
 
 /** enrollment.status enum trên server */
 function attendanceStatusForApi(remaining) {
@@ -211,7 +211,7 @@ export function useDataSchedule({
           ? { ...s, nextClass: dateStr, nextClassTime: `${schedule.date}T${schedule.startTime}:00` } : s
       ));
     }
-    addNotification(schedule.studentId, 'student', `📅 Lịch học mới: ${schedule.course} lúc ${schedule.startTime} ngày ${schedule.date}`);
+    addNotification(schedule.studentId, 'student', `📅 Lịch học mới: ${schedule.course} lúc ${schedule.startTime} ngày ${formatScheduleDateVi(schedule.date)}`);
 
     // Gửi lên server — không gửi local id
     const payload = { ...newSched };
@@ -284,7 +284,7 @@ export function useDataSchedule({
       const sid = res.data?.studentId?._id || res.data?.studentId;
       if (sid) {
         addNotification(sid, 'student',
-          `📅 Lịch học đã cập nhật — ${payload.note || ''} ${payload.startTime || ''} ngày ${payload.date || ''}`.trim());
+          `📅 Lịch học đã cập nhật — ${payload.note || ''} ${payload.startTime || ''} ngày ${formatScheduleDateVi(payload.date) || ''}`.trim());
       }
       triggerBackgroundSync();
       return res;
@@ -311,9 +311,9 @@ export function useDataSchedule({
         const res = await api.schedules?.update(scheduleId, { status: 'cancelled', cancelReason: reason });
         if (res && res.success === false) throw new Error(res.message);
         addNotification(cancelled.studentId, 'student',
-          `⚠️ Buổi học ngày ${cancelled.date} đã bị hủy. Lý do: ${reason || 'Không rõ'}`);
+          `⚠️ Buổi học ngày ${formatScheduleDateVi(cancelled.date)} đã bị hủy. Lý do: ${reason || 'Không rõ'}`);
         addNotification(cancelled.teacherId, 'teacher',
-          `Đã hủy buổi học với ${cancelled.studentName} ngày ${cancelled.date}`);
+          `Đã hủy buổi học với ${cancelled.studentName} ngày ${formatScheduleDateVi(cancelled.date)}`);
         triggerBackgroundSync();
         return res;
       } catch (err) {

@@ -13,10 +13,27 @@ export function maskStudentPhone(phone) {
   return clean + '****';
 }
 
+/** ISO / YYYY-MM-DD trong nội dung thông báo → dd/MM/yyyy (tin cũ + tin mới). */
+export function formatNotificationDatesInText(text) {
+  if (!text || typeof text !== 'string') return text || '';
+  return text.replace(
+    /\b(\d{4}-\d{2}-\d{2})(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?\b/g,
+    (full, ymd) => {
+      if (/T/.test(full)) {
+        const d = new Date(full);
+        if (!Number.isNaN(d.getTime())) {
+          return d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        }
+      }
+      return `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}/${ymd.slice(0, 4)}`;
+    },
+  );
+}
+
 export function formatNotificationStudentMask(text, students = [], isAdmin = false) {
   if (!text || typeof text !== 'string') return text || '';
   
-  let formatted = text;
+  let formatted = formatNotificationDatesInText(text);
 
   // 0. Strip ⟦student_detail:ID:tab|NAME⟧ or [student_detail:ID:tab|NAME] tokens
   formatted = formatted.replace(

@@ -49,6 +49,16 @@ export function normalizeScheduleDate(raw) {
   return formatLocalDateKey(d);
 }
 
+/** Ngày lịch → dd/MM/yyyy (thông báo / UI). Không đổi empty thành hôm nay. */
+export function formatScheduleDateVi(raw) {
+  if (raw == null || raw === '') return '';
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
+  const d = raw instanceof Date ? raw : new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+}
+
 export function normalizeTimeHHmm(raw, fallback = '19:30') {
   if (!raw) return fallback;
   const m = String(raw).trim().match(/^(\d{1,2}):(\d{2})/);
