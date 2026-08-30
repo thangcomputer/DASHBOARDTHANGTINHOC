@@ -1282,6 +1282,10 @@ export const schedulesAPI = {
     const res = await apiFetch(`/schedules/student/${studentId}`);
     return res.json();
   },
+  getById: async (id) => {
+    const res = await apiFetch(`/schedules/${id}`);
+    return res.json();
+  },
   create: async (data) => {
     const res = await apiFetch('/schedules', {
       method: 'POST',

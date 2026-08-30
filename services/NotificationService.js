@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
 const logger = require('../config/logger');
 
@@ -77,6 +78,54 @@ class NotificationService {
       logger.error('[NotificationService] Send error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Xóa thông báo ghi chú lịch khi học viên xóa ghi chú — chuông GV mất realtime.
+   */
+  static async retractStudentScheduleNotes(io, {
+    scheduleId,
+    teacherId,
+    studentName = '',
+    dateLabel = '',
+  } = {}) {
+    const sid = String(scheduleId || '');
+    if (!sid) return [];
+    const idVariants = [sid];
+    if (mongoose.Types.ObjectId.isValid(sid)) {
+      try {
+        idVariants.push(new mongoose.Types.ObjectId(sid));
+      } catch { /* ignore */ }
+    }
+    const filter = {
+      $or: [
+        { 'payload.kind': 'student_schedule_note', 'payload.scheduleId': { $in: idVariants } },
+        { title: { $regex: 'Ghi chú mới từ học viên' }, 'payload.scheduleId': { $in: idVariants } },
+      ],
+    };
+    let docs = [];
+    try {
+      docs = await Notification.find(filter).select('_id').lean();
+      if (docs.length) {
+        await Notification.deleteMany({ _id: { $in: docs.map((d) => d._id) } });
+      }
+    } catch (error) {
+      logger.error('[NotificationService] Retract student notes error:', error);
+    }
+    const ids = docs.map((d) => String(d._id));
+    if (io && teacherId) {
+      const payload = {
+        ids,
+        scheduleId: sid,
+        kind: 'student_schedule_note',
+        studentName: String(studentName || ''),
+        dateLabel: String(dateLabel || ''),
+      };
+      const tid = String(teacherId);
+      io.to(tid).emit('notification:removed', payload);
+      io.to(`teacher_${tid}`).emit('notification:removed', payload);
+    }
+    return ids;
   }
 
   /**

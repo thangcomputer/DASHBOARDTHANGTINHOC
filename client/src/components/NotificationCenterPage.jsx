@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import api, { notificationsAPI, apiFetch } from '../services/api';
 import { useData } from '../context/DataContext';
+import { useSocket } from '../context/SocketContext';
+import { isRetractedStudentScheduleNote } from './teacher/TeacherStudentNoteModal';
 import { useToast } from '../utils/toast';
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { useSearchParams } from 'react-router-dom';
@@ -96,6 +98,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const { markNotificationRead, dismissNotificationLocal, students } = useData();
+  const { socket } = useSocket() || {};
   const isAdmin = role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF';
   const canAnswerQa = isAdmin || role === 'teacher';
 
@@ -146,6 +149,16 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   useEffect(() => {
     load(1);
   }, [type, unreadOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onRemoved = (data) => {
+      setItems((prev) => (Array.isArray(prev) ? prev : []).filter((n) => !isRetractedStudentScheduleNote(n, data)));
+      setSelectedNotif((cur) => (cur && isRetractedStudentScheduleNote(cur, data) ? null : cur));
+    };
+    socket.on('notification:removed', onRemoved);
+    return () => socket.off('notification:removed', onRemoved);
+  }, [socket]);
 
   const openQaById = useCallback(async (qaId) => {
     if (!qaId) return;

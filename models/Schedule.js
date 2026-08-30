@@ -68,6 +68,8 @@ const scheduleSchema = new mongoose.Schema({
   note: { type: String, default: '' },
   studentNote: { type: String, default: '' },
   hasUnreadStudentNote: { type: Boolean, default: false },
+  /** Thời điểm thao tác hủy ca (không phải ngày học). */
+  cancelledAt: { type: Date, default: null },
 
   // Chi nhánh
   branchId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },

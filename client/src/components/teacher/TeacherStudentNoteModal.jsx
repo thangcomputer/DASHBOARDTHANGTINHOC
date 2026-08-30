@@ -22,6 +22,26 @@ export function isStudentScheduleNoteNotif(n) {
   return String(n?.title || '').includes('Ghi chú mới từ học viên');
 }
 
+/** Thông báo ghi chú bị thu hồi khi HV xóa ghi chú. */
+export function isRetractedStudentScheduleNote(n, data) {
+  if (!n || !data) return false;
+  const ids = new Set((data.ids || []).map(String));
+  const nid = String(n.id || n._id || '');
+  if (nid && ids.has(nid)) return true;
+  const scheduleId = String(data.scheduleId || '');
+  const payload = n.payload || {};
+  const payloadSid = String(payload.scheduleId || '');
+  const isNoteTitle = String(n.title || '').includes('Ghi chú mới từ học viên')
+    || String(payload.kind || '') === 'student_schedule_note';
+  if (scheduleId && payloadSid && payloadSid === scheduleId && isNoteTitle) return true;
+  if (isNoteTitle && !payloadSid) {
+    const name = String(data.studentName || '').trim();
+    const text = `${n.message || ''} ${n.content || ''}`;
+    if (name && text.includes(name)) return true;
+  }
+  return false;
+}
+
 export default function TeacherStudentNoteModal({ open, payload, onClose }) {
   if (!open || !payload) return null;
 
@@ -76,9 +96,15 @@ export default function TeacherStudentNoteModal({ open, payload, onClose }) {
           </div>
           <div className="rounded-2xl border border-red-100 bg-red-50/70 px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-red-400">Nội dung ghi chú</p>
-            <p className="text-sm text-slate-800 mt-1.5 leading-relaxed whitespace-pre-wrap">
-              {note || 'Không có nội dung ghi chú.'}
-            </p>
+            {payload.deleted ? (
+              <p className="text-sm text-slate-600 mt-1.5 leading-relaxed font-semibold">
+                Học viên đã xóa ghi chú này. Không còn hoạt động trên lịch.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-800 mt-1.5 leading-relaxed whitespace-pre-wrap">
+                {note || 'Không có nội dung ghi chú.'}
+              </p>
+            )}
           </div>
           <button
             type="button"

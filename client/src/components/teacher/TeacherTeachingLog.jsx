@@ -13,33 +13,37 @@ import { localizeScheduleNote } from '../../utils/studentActivityLogs';
 const COPY = {
   teacher: {
     title: 'Nhật ký giảng dạy',
-    subtitle: 'Ghi lại các ca theo ngày, tuần, tháng hoặc ca đã hủy.',
+    subtitle: 'Ghi lại các ca theo ngày, tuần, tháng, tất cả hoặc ca đã hủy.',
     tabs: [
       { id: 'day', label: 'Lịch dạy trong ngày' },
       { id: 'week', label: 'Lịch dạy trong tuần' },
       { id: 'month', label: 'Lịch dạy trong tháng' },
+      { id: 'all', label: 'Tất cả' },
       { id: 'cancelled', label: 'Lịch hủy' },
     ],
     empty: {
       day: 'Không có ca dạy trong ngày hôm nay.',
       week: 'Không có ca dạy trong tuần này.',
       month: 'Không có ca dạy trong tháng này.',
+      all: 'Chưa có ca dạy.',
       cancelled: 'Không có lịch hủy.',
     },
   },
   student: {
     title: 'Nhật ký học tập',
-    subtitle: 'Xem các ca học theo ngày, tuần, tháng hoặc ca đã hủy.',
+    subtitle: 'Xem các ca học theo ngày, tuần, tháng, tất cả hoặc ca đã hủy.',
     tabs: [
       { id: 'day', label: 'Lịch học trong ngày' },
       { id: 'week', label: 'Lịch học trong tuần' },
       { id: 'month', label: 'Lịch học trong tháng' },
+      { id: 'all', label: 'Tất cả' },
       { id: 'cancelled', label: 'Lịch hủy' },
     ],
     empty: {
       day: 'Không có ca học trong ngày hôm nay.',
       week: 'Không có ca học trong tuần này.',
       month: 'Không có ca học trong tháng này.',
+      all: 'Chưa có ca học.',
       cancelled: 'Không có lịch hủy.',
     },
   },
@@ -65,12 +69,23 @@ function startMinutes(sch) {
   return (Number.isFinite(h) ? h : 99) * 60 + (Number.isFinite(m) ? m : 0);
 }
 
+function cancelActionMs(sch) {
+  const raw = sch?.cancelledAt || sch?.updatedAt;
+  const t = raw ? new Date(raw).getTime() : 0;
+  if (Number.isFinite(t) && t > 0) return t;
+  return 0;
+}
+
+function sortCancelledByAction(list) {
+  return (list || []).slice().sort((a, b) => cancelActionMs(b) - cancelActionMs(a));
+}
+
 function sortSchedules(list) {
   return (list || []).slice().sort((a, b) => {
     const da = normalizeScheduleDate(a.date);
     const db = normalizeScheduleDate(b.date);
-    if (da !== db) return da < db ? -1 : 1;
-    return startMinutes(a) - startMinutes(b);
+    if (da !== db) return da > db ? -1 : 1;
+    return startMinutes(b) - startMinutes(a);
   });
 }
 
@@ -89,7 +104,7 @@ export default function TeacherTeachingLog({
   const list = useMemo(() => {
     const all = schedules || [];
     if (tab === 'cancelled') {
-      return sortSchedules(all.filter((s) => String(s.status) === 'cancelled')).reverse();
+      return sortCancelledByAction(all.filter((s) => String(s.status) === 'cancelled'));
     }
     const inRange = all.filter((s) => {
       if (String(s.status) === 'cancelled') return false;
@@ -97,6 +112,7 @@ export default function TeacherTeachingLog({
       if (tab === 'day') return key === todayKey;
       if (tab === 'week') return weekKeys.includes(key);
       if (tab === 'month') return key.startsWith(monthPrefix);
+      if (tab === 'all') return true;
       return false;
     });
     return sortSchedules(inRange);

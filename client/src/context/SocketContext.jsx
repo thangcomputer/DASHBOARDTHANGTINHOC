@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { playMessageSound, playNotifySound } from '../utils/sound';
 import { getMessagingRole, isMessageFromSelf } from '../lib/messagingRoles';
 import { API_BASE, SOCKET_BASE, apiFetch } from '../services/api';
+import { isRetractedStudentScheduleNote } from '../components/teacher/TeacherStudentNoteModal';
 
 const SocketContext = createContext(null);
 const SOCKET_URL = SOCKET_BASE;
@@ -275,6 +276,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       'message:recall',
       'message:pinned',
       'group:deleted',
+      'notification:removed',
     ]);
     const onAnyEvent = (eventName, payload) => {
       if (ignoredAnyEvents.has(eventName)) return;
@@ -336,6 +338,12 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       }
     };
 
+    const onNotificationRemoved = (data) => {
+      setNotifications((prev) => (
+        (Array.isArray(prev) ? prev.filter(Boolean) : []).filter((n) => !isRetractedStudentScheduleNote(n, data))
+      ));
+    };
+
     const onClassReminder = (reminder) => {
       if (!reminder || typeof reminder !== 'object') return;
       playNotifySound();
@@ -395,6 +403,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     newSocket.onAny(onAnyEvent);
     newSocket.on('RECEIVE_NOTIFICATION', onReceiveNotification);
     newSocket.on('new-notification', onNewNotification);
+    newSocket.on('notification:removed', onNotificationRemoved);
     newSocket.on('class:reminder', onClassReminder);
     newSocket.on('SYSTEM_RESET', onSystemReset);
     newSocket.on('CONTACT_LIST_UPDATED', onContactListUpdated);
@@ -449,6 +458,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       newSocket.offAny(onAnyEvent);
       newSocket.off('RECEIVE_NOTIFICATION', onReceiveNotification);
       newSocket.off('new-notification', onNewNotification);
+      newSocket.off('notification:removed', onNotificationRemoved);
       newSocket.off('class:reminder', onClassReminder);
       newSocket.off('SYSTEM_RESET', onSystemReset);
       newSocket.off('CONTACT_LIST_UPDATED', onContactListUpdated);

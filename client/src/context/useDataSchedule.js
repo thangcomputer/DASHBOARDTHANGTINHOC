@@ -301,7 +301,7 @@ export function useDataSchedule({
     let cancelled = null;
     setSchedules(prev => prev.map(sch => {
       if (String(sch.id) === String(scheduleId) || String(sch._id) === String(scheduleId)) {
-        cancelled = { ...sch, status: 'cancelled', cancelReason: reason };
+        cancelled = { ...sch, status: 'cancelled', cancelReason: reason, cancelledAt: new Date().toISOString() };
         return cancelled;
       }
       return sch;

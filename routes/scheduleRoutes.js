@@ -1260,6 +1260,9 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       // Giảng viên click vào xem thì tắt cờ đi
       updates.hasUnreadStudentNote = req.body.hasUnreadStudentNote;
     }
+    if (status === 'cancelled' && String(schedule.status) !== 'cancelled') {
+      updates.cancelledAt = new Date();
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ success: false, message: 'Không có thông tin để cập nhật' });
@@ -1402,14 +1405,13 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
              },
              link: '/teacher#schedule',
            });
-
-           io.to(schedule.teacherId.toString()).emit('RECEIVE_NOTIFICATION', {
-             _id: Date.now(),
-             type: 'schedule',
-             title: '📝 Ghi chú mới từ học viên',
-             message: `Học viên ${schedule.studentName} vừa để lại ghi chú trên lịch học`,
-             time: new Date(),
-             userId: schedule.teacherId.toString()
+         } else if (!nextStudentNote) {
+           const NotificationService = require('../services/NotificationService');
+           await NotificationService.retractStudentScheduleNotes(io, {
+             scheduleId: schedule._id,
+             teacherId: schedule.teacherId,
+             studentName: schedule.studentName || '',
+             dateLabel: new Date(schedule.date).toLocaleDateString('vi-VN'),
            });
          }
 
@@ -1887,6 +1889,36 @@ router.get('/history/:teacherId', [authMiddleware, ...schedulesGuard('history')]
     };
 
     res.json({ success: true, data: history, stats });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── GET /api/schedules/:scheduleId ─────────────────────────────────────────────
+router.get('/:scheduleId', [authMiddleware, ...schedulesGuard('list')], async (req, res) => {
+  try {
+    const id = String(req.params.scheduleId || '');
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'ID lịch không hợp lệ' });
+    }
+    const schedule = await Schedule.findById(id).select(
+      'studentNote hasUnreadStudentNote studentId teacherId studentName course date startTime endTime status',
+    );
+    if (!schedule) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
+    }
+    const role = String(req.user.role || '').toLowerCase();
+    const uid = String(req.user.id || req.user._id);
+    if (role === 'teacher' && String(schedule.teacherId) !== uid) {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem lịch này' });
+    }
+    if (role === 'student' && String(schedule.studentId) !== uid) {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem lịch này' });
+    }
+    if (!['teacher', 'student', 'admin', 'staff'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền xem lịch' });
+    }
+    res.json({ success: true, data: schedule });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

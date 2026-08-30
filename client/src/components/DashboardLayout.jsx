@@ -29,7 +29,9 @@ import TeacherRatingDetailModal, {
   isTeacherRatingNotif,
 } from './teacher/TeacherRatingDetailModal';
 import TeacherAttendanceConfirmedModal from './teacher/TeacherAttendanceConfirmedModal';
-import TeacherStudentNoteModal, { isStudentScheduleNoteNotif } from './teacher/TeacherStudentNoteModal';
+import TeacherStudentNoteModal, {
+  isStudentScheduleNoteNotif,
+} from './teacher/TeacherStudentNoteModal';
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
@@ -408,6 +410,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [attendanceDisputeBusy, setAttendanceDisputeBusy] = useState(false);
   const [teacherAttendanceConfirm, setTeacherAttendanceConfirm] = useState(null);
   const [studentNotePopup, setStudentNotePopup] = useState(null);
+  const studentNotePopupLive = React.useMemo(() => {
+    if (!studentNotePopup) return null;
+    if (studentNotePopup.deleted) return studentNotePopup;
+    const sid = String(studentNotePopup.scheduleId || '');
+    const sch = sid
+      ? (schedules || []).find((s) => String(s._id || s.id) === sid)
+      : null;
+    if (!sch) return studentNotePopup;
+    const liveNote = String(sch.studentNote || '').trim();
+    if (!liveNote) return { ...studentNotePopup, studentNote: '', deleted: true };
+    return { ...studentNotePopup, studentNote: liveNote, deleted: false };
+  }, [studentNotePopup, schedules]);
 
   const starBonusSeenKey = React.useCallback((teacherId, month) => (
     `star_bonus_celeb_${teacherId}_${month}`
@@ -777,9 +791,13 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         dateLabel = d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
       }
     }
+    const liveNote = sch ? String(sch.studentNote || '').trim() : '';
+    const deletedLocal = Boolean(sch) && !liveNote;
     setStudentNotePopup({
+      scheduleId: sid || String(sch?._id || sch?.id || ''),
       studentName: p.studentName || sch?.studentName || sch?.studentId?.name || 'Học viên',
-      studentNote: p.studentNote || sch?.studentNote || '',
+      studentNote: deletedLocal ? '' : (liveNote || String(p.studentNote || '').trim()),
+      deleted: deletedLocal,
       date: dateRaw,
       dateLabel,
       startTime: start,
@@ -787,7 +805,33 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       timeRange: p.timeRange || (start && end ? `${start} – ${end}` : start),
       course: p.course || sch?.course || '',
     });
+    if (!sid) return;
+    api.schedules.getById(sid).then((res) => {
+      const found = res?.success ? res.data : null;
+      const live = String(found?.studentNote || '').trim();
+      const gone = !found || !live;
+      setStudentNotePopup((prev) => {
+        if (!prev || String(prev.scheduleId || '') !== sid) return prev;
+        return { ...prev, studentNote: live, deleted: gone };
+      });
+    }).catch(() => {});
   }, [schedules]);
+
+  React.useEffect(() => {
+    if (!socket) return undefined;
+    const onRemoved = (data) => {
+      if (String(data?.kind || '') !== 'student_schedule_note') return;
+      setStudentNotePopup((prev) => {
+        if (!prev) return prev;
+        if (data.scheduleId && String(prev.scheduleId || '') === String(data.scheduleId)) return null;
+        if (data.studentName && String(prev.studentName || '') === String(data.studentName)
+          && data.dateLabel && String(prev.dateLabel || '') === String(data.dateLabel)) return null;
+        return prev;
+      });
+    };
+    socket.on('notification:removed', onRemoved);
+    return () => socket.off('notification:removed', onRemoved);
+  }, [socket]);
 
   const dismissWelcomeCelebration = React.useCallback(async () => {
     setShowWelcomeCelebration(false);
@@ -1212,7 +1256,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       />
       <TeacherStudentNoteModal
         open={role === 'teacher' && !!studentNotePopup}
-        payload={studentNotePopup}
+        payload={studentNotePopupLive}
         onClose={() => setStudentNotePopup(null)}
       />
 

@@ -792,6 +792,9 @@ class AttendanceApplicationService {
     if (Object.keys(updates).length === 0) {
       return { _status: 400, _body: { success: false, message: 'Không có thông tin để cập nhật' } };
     }
+    if (status === 'cancelled' && String(schedule.status) !== 'cancelled') {
+      updates.cancelledAt = new Date();
+    }
 
     const io = data.app.get('io');
     if (schedule.studentId && io) {

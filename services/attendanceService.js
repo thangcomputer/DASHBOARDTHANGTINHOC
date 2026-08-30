@@ -745,6 +745,7 @@ async function resolveAttendanceDispute({ schedule, actor, decision }) {
       {
         $set: {
           status: 'cancelled',
+          cancelledAt: new Date(),
           studentConfirmStatus: 'admin_rejected',
           attendanceDisputeResolvedAt: new Date(),
           attendanceDisputeResolvedBy: who,
