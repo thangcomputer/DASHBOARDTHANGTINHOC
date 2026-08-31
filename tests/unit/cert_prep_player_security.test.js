@@ -59,6 +59,7 @@ function makeSession(overrides = {}) {
       timeLimitMinutes: 50,
       questionCount: 1,
       passingScore: 700,
+      feedbackMode: 'after_submit',
     },
     async save() { return this; },
     ...overrides,

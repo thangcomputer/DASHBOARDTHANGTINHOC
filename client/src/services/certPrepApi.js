@@ -140,6 +140,10 @@ export const certPrepApi = {
       }),
     })),
     getSession: async (sessionId) => parse(await apiFetch(`/cert-prep/sessions/${sessionId}`)),
+    pauseSession: async (sessionId) => parse(await apiFetch(`/cert-prep/sessions/${sessionId}/pause`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })),
     saveAnswers: async (sessionId, answers) => parse(await apiFetch(`/cert-prep/sessions/${sessionId}`, {
       method: 'PATCH',
       body: JSON.stringify({ answers }),

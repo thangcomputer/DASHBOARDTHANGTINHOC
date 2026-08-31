@@ -33,6 +33,10 @@ const certPrepSessionSchema = new mongoose.Schema({
   questionIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'CertPrepQuestion' }],
   answers: { type: [answerSchema], default: [] },
   startedAt: { type: Date, default: Date.now },
+  /** Khi set: đồng hồ tạm dừng (thoát phòng thi). */
+  pausedAt: { type: Date, default: null },
+  /** Tổng ms đã tạm dừng (không tính khoảng pausedAt hiện tại). */
+  pausedTotalMs: { type: Number, default: 0 },
   submittedAt: { type: Date, default: null },
   score: { type: Number, default: null },
   passed: { type: Boolean, default: null },

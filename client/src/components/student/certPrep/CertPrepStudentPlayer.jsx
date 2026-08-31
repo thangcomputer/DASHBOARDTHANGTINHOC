@@ -5,12 +5,14 @@ import { Loader2, List, LayoutGrid } from 'lucide-react';
 import useCertPrepSession, { isQuestionAnswered } from '../../../hooks/useCertPrepSession';
 import { isImmediateFeedback } from '../../../utils/certPrepGrade';
 import { useData } from '../../../context/DataContext';
+import certPrepApi from '../../../services/certPrepApi';
 import ExamClickOutsideGuard from '../../exam/ExamClickOutsideGuard';
 import CertPrepPlayerHeader from './CertPrepPlayerHeader';
 import CertPrepQuestionArea from './CertPrepQuestionArea';
 import CertPrepQuestionNavigator from './CertPrepQuestionNavigator';
 import CertPrepPlayerFooter from './CertPrepPlayerFooter';
 import CertPrepSubmitDialog from './CertPrepSubmitDialog';
+import CertPrepExitDialog from './CertPrepExitDialog';
 import CertPrepSessionExpired from './CertPrepSessionExpired';
 import CertPrepPlayerError from './CertPrepPlayerError';
 
@@ -38,15 +40,19 @@ export default function CertPrepStudentPlayer() {
   const { examWarningSoundUrl = '' } = useData() || {};
   const player = useCertPrepSession(sessionId);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [exitLeaving, setExitLeaving] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [revealedIds, setRevealedIds] = useState({});
   const keysReloadTried = useRef(false);
 
   const immediate = isImmediateFeedback(player.session);
+  const examActive = player.uiStatus === 'active' && player.session?.status === 'in_progress';
 
   useEffect(() => {
     setRevealedIds({});
     keysReloadTried.current = false;
+    setExitOpen(false);
   }, [sessionId]);
 
   useEffect(() => {
@@ -76,8 +82,39 @@ export default function CertPrepStudentPlayer() {
   }, [player.loading, player.session?.status, sessionId, navigate]);
 
   const leaveCatalog = useCallback(() => {
+    const levelId = player.session?.configSnapshot?.levelId;
+    if (levelId) {
+      navigate(`/student/cert-prep/levels/${levelId}`);
+      return;
+    }
     navigate('/student/cert-prep');
-  }, [navigate]);
+  }, [navigate, player.session?.configSnapshot?.levelId]);
+
+  const requestExit = useCallback(() => {
+    if (examActive && !player.locked && !player.submitting) {
+      setExitOpen(true);
+      return;
+    }
+    leaveCatalog();
+  }, [examActive, player.locked, player.submitting, leaveCatalog]);
+
+  const confirmExit = useCallback(async () => {
+    if (exitLeaving) return;
+    setExitLeaving(true);
+    try {
+      if (sessionId && examActive) {
+        try {
+          await certPrepApi.student.pauseSession(sessionId);
+        } catch {
+          /* vẫn cho thoát */
+        }
+      }
+      setExitOpen(false);
+      leaveCatalog();
+    } finally {
+      setExitLeaving(false);
+    }
+  }, [exitLeaving, sessionId, examActive, leaveCatalog]);
 
   const q = player.currentQuestion;
   const qid = q?.id ? String(q.id) : '';
@@ -200,7 +237,7 @@ export default function CertPrepStudentPlayer() {
           total={player.questions.length}
           remainingSeconds={player.remainingSeconds}
           answeredCount={player.answeredCount}
-          onExit={leaveCatalog}
+          onExit={requestExit}
           onSubmit={() => setConfirmOpen(true)}
           submitDisabled={player.locked || player.submitting}
         />
@@ -284,6 +321,13 @@ export default function CertPrepStudentPlayer() {
             await player.submit({ auto: false });
             setConfirmOpen(false);
           }}
+        />
+        <CertPrepExitDialog
+          exam
+          open={exitOpen}
+          leaving={exitLeaving}
+          onCancel={() => { if (!exitLeaving) setExitOpen(false); }}
+          onConfirm={confirmExit}
         />
       </ExamClickOutsideGuard>
     </ExamOverlay>

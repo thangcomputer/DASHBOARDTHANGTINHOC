@@ -150,6 +150,15 @@ router.get('/sessions/:id', ...requireStudent, async (req, res) => {
   }
 });
 
+router.post('/sessions/:id/pause', ...requireStudent, async (req, res) => {
+  try {
+    const data = await service.pauseSession(studentIdFromAuth(req), req.params.id);
+    return res.json({ success: true, data });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
 router.get('/sessions/:id/result', ...requireStudent, async (req, res) => {
   try {
     const data = await service.getSessionResult(studentIdFromAuth(req), req.params.id);

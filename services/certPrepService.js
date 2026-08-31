@@ -108,16 +108,47 @@ function gradeQuestion(question, value) {
   return false;
 }
 
-function isSessionExpired(session, timeLimitMinutes, now = new Date()) {
+function pausedDurationMs(session, now = new Date()) {
+  const total = Math.max(0, Number(session?.pausedTotalMs) || 0);
+  if (!session?.pausedAt) return total;
+  const pausedAt = new Date(session.pausedAt);
+  if (Number.isNaN(pausedAt.getTime())) return total;
+  return total + Math.max(0, now.getTime() - pausedAt.getTime());
+}
+
+/** Thời gian học viên thực sự làm bài (trừ lúc pause). */
+function activeElapsedMs(session, now = new Date()) {
   const started = session?.startedAt ? new Date(session.startedAt) : null;
+  if (!started || Number.isNaN(started.getTime())) return 0;
+  return Math.max(0, now.getTime() - started.getTime() - pausedDurationMs(session, now));
+}
+
+function isSessionExpired(session, timeLimitMinutes, now = new Date()) {
   const limit = Number(timeLimitMinutes);
-  if (!started || !Number.isFinite(limit) || limit <= 0) return false;
-  return now.getTime() - started.getTime() >= limit * 60 * 1000;
+  if (!Number.isFinite(limit) || limit <= 0) return false;
+  if (!session?.startedAt) return false;
+  return activeElapsedMs(session, now) >= limit * 60 * 1000;
 }
 
 function elapsedSeconds(session, now = new Date()) {
-  const started = session?.startedAt ? new Date(session.startedAt) : now;
-  return Math.max(0, Math.floor((now.getTime() - started.getTime()) / 1000));
+  return Math.max(0, Math.floor(activeElapsedMs(session, now) / 1000));
+}
+
+/** Cộng dồn pause hiện tại và bỏ pausedAt — trả true nếu có thay đổi. */
+function applyResumeTimer(session, now = new Date()) {
+  if (!session?.pausedAt) return false;
+  const pausedAt = new Date(session.pausedAt);
+  const add = Number.isNaN(pausedAt.getTime()) ? 0 : Math.max(0, now.getTime() - pausedAt.getTime());
+  session.pausedTotalMs = Math.max(0, Number(session.pausedTotalMs) || 0) + add;
+  session.pausedAt = null;
+  return true;
+}
+
+function applyPauseTimer(session, now = new Date()) {
+  if (!session || session.status !== 'in_progress') return false;
+  if (session.pausedAt) return false;
+  session.pausedAt = now;
+  return true;
 }
 
 function assertSessionOwner(session, studentId) {
@@ -324,14 +355,17 @@ function serializeSession(session, extra = {}) {
 
 function sessionTiming(session, now = new Date()) {
   const limitMin = Number(session?.configSnapshot?.timeLimitMinutes);
-  const started = session?.startedAt ? new Date(session.startedAt) : now;
   const limitMs = (Number.isFinite(limitMin) && limitMin > 0 ? limitMin : 0) * 60 * 1000;
-  const deadlineAt = new Date(started.getTime() + limitMs);
-  const remainingSeconds = Math.max(0, Math.ceil((deadlineAt.getTime() - now.getTime()) / 1000));
+  const remainingMs = Math.max(0, limitMs - activeElapsedMs(session, now));
+  const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const paused = Boolean(session?.pausedAt);
+  // Khi đang pause: deadline ảo = now + remaining (đứng yên trên client nếu sync lại).
+  const deadlineAt = new Date(now.getTime() + remainingMs);
   return {
     serverNow: now.toISOString(),
     deadlineAt: deadlineAt.toISOString(),
     remainingSeconds,
+    paused,
   };
 }
 
@@ -352,6 +386,8 @@ function toStudentSession(session, questions = [], extra = {}) {
       timeLimitMinutes: snap.timeLimitMinutes,
       questionCount: snap.questionCount,
       feedbackMode,
+      levelId: snap.levelId || '',
+      courseId: snap.courseId || '',
     },
     answers: (session.answers || []).map((a) => ({
       questionId: String(a.questionId),
@@ -361,6 +397,7 @@ function toStudentSession(session, questions = [], extra = {}) {
     remainingSeconds: timing.remainingSeconds,
     serverNow: timing.serverNow,
     deadlineAt: timing.deadlineAt,
+    paused: Boolean(timing.paused),
     ...(extra.autoSubmitted ? { autoSubmitted: true } : {}),
   };
 }
@@ -923,12 +960,27 @@ async function listTestsForStudent(studentId, levelId) {
   }).sort({ locale: 1, sortOrder: 1 }).lean();
   const testIds = tests.map((t) => t._id);
   let submittedByTest = {};
+  const activeByTest = {};
   if (testIds.length) {
+    const studentOid = new mongoose.Types.ObjectId(sid);
     const submitted = await CertPrepSession.aggregate([
-      { $match: { studentId: new mongoose.Types.ObjectId(sid), testId: { $in: testIds }, status: 'submitted' } },
+      { $match: { studentId: studentOid, testId: { $in: testIds }, status: 'submitted' } },
       { $group: { _id: '$testId', n: { $sum: 1 } } },
     ]);
     submittedByTest = Object.fromEntries(submitted.map((row) => [String(row._id), row.n]));
+
+    const inProgress = await CertPrepSession.find({
+      studentId: studentOid,
+      testId: { $in: testIds },
+      status: 'in_progress',
+    }).lean();
+    for (const session of inProgress) {
+      const tid = String(session.testId);
+      if (activeByTest[tid]) continue;
+      const limit = session.configSnapshot?.timeLimitMinutes;
+      if (isSessionExpired(session, limit)) continue;
+      activeByTest[tid] = String(session._id);
+    }
   }
   return {
     course: {
@@ -952,6 +1004,7 @@ async function listTestsForStudent(studentId, levelId) {
       allowRetake: t.allowRetake,
       maxAttempts: t.maxAttempts,
       submittedCount: submittedByTest[String(t._id)] || 0,
+      activeSessionId: activeByTest[String(t._id)] || null,
     })),
   };
 }
@@ -1114,6 +1167,7 @@ async function startSession(studentId, body) {
         ? existing.configSnapshot.toObject()
         : { ...(existing.configSnapshot || {}) };
       existing.set('configSnapshot', { ...snap, feedbackMode });
+      applyResumeTimer(existing);
       await existing.save();
       await expandSessionQuestionsIfNeeded(existing, test);
       return toStudentSession(existing, []);
@@ -1229,9 +1283,32 @@ async function getSession(studentId, sessionId) {
   if (session.status === 'in_progress' && isSessionExpired(session, limit)) {
     await finalizeSession(session, { auto: true });
     autoSubmitted = true;
+  } else if (session.status === 'in_progress' && applyResumeTimer(session)) {
+    // Vào lại phòng thi → tiếp tục đếm giờ
+    await session.save();
   }
   const questions = await loadSessionQuestions(session);
   return toStudentSession(session, questions, { autoSubmitted });
+}
+
+async function pauseSession(studentId, sessionId) {
+  const sid = requireOid(studentId, 'studentId');
+  const id = requireOid(sessionId, 'sessionId');
+  const session = await CertPrepSession.findById(id);
+  if (!session) throw new CertPrepError(404, 'Không tìm thấy phiên làm bài');
+  assertSessionOwner(session, sid);
+  if (session.status !== 'in_progress') {
+    return toStudentSession(session, []);
+  }
+  const limit = session.configSnapshot?.timeLimitMinutes;
+  if (isSessionExpired(session, limit)) {
+    await finalizeSession(session, { auto: true });
+    return toStudentSession(session, [], { autoSubmitted: true });
+  }
+  if (applyPauseTimer(session)) {
+    await session.save();
+  }
+  return toStudentSession(session, []);
 }
 
 async function saveProgress(studentId, sessionId, body) {
@@ -1251,9 +1328,10 @@ async function saveProgress(studentId, sessionId, body) {
     await finalizeSession(session, { auto: true });
     return toStudentSession(session, [], { autoSubmitted: true });
   }
+  // Đang trong phòng thi mà còn paused (hiếm) → resume để đồng hồ chạy tiếp
+  applyResumeTimer(session);
   session.answers = mergeAnswers(session, body?.answers);
   await session.save();
-  // Client remainingSeconds is ignored; deadline is startedAt + timeLimitMinutes.
   return toStudentSession(session, []);
 }
 
@@ -1561,6 +1639,8 @@ module.exports = {
   gradeQuestion,
   isSessionExpired,
   elapsedSeconds,
+  applyPauseTimer,
+  applyResumeTimer,
   assertSessionOwner,
   isAccessCurrentlyValid,
   assertRetakeAllowed,
@@ -1599,6 +1679,7 @@ module.exports = {
   assertStudentCanAccessTest,
   startSession,
   getSession,
+  pauseSession,
   saveProgress,
   submitSession,
   abandonSession,

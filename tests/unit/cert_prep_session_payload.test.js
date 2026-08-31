@@ -86,6 +86,34 @@ test('sessionTiming is 0 after expiry; server does not use client remainingSecon
   assert.equal(isSessionExpired(session, 50, new Date('2026-08-15T00:50:00.000Z')), true);
 });
 
+test('paused time does not count toward expiry or remainingSeconds', () => {
+  const session = {
+    startedAt: new Date('2026-08-15T00:00:00.000Z'),
+    pausedAt: new Date('2026-08-15T00:10:00.000Z'),
+    pausedTotalMs: 0,
+    configSnapshot: { timeLimitMinutes: 50 },
+  };
+  // Wall clock +40m after start, but paused since +10m → only 10m active
+  const now = new Date('2026-08-15T00:40:00.000Z');
+  const t = sessionTiming(session, now);
+  assert.equal(t.remainingSeconds, 40 * 60);
+  assert.equal(t.paused, true);
+  assert.equal(isSessionExpired(session, 50, now), false);
+});
+
+test('pausedTotalMs is subtracted after resume', () => {
+  const session = {
+    startedAt: new Date('2026-08-15T00:00:00.000Z'),
+    pausedAt: null,
+    pausedTotalMs: 30 * 60 * 1000,
+    configSnapshot: { timeLimitMinutes: 50 },
+  };
+  // Wall 40m, paused 30m total → active 10m → remaining 40m
+  const t = sessionTiming(session, new Date('2026-08-15T00:40:00.000Z'));
+  assert.equal(t.remainingSeconds, 40 * 60);
+  assert.equal(isSessionExpired(session, 50, new Date('2026-08-15T00:40:00.000Z')), false);
+});
+
 test('mergeAnswers ignores unknown question ids and remainingSeconds-like fields', () => {
   const session = {
     questionIds: ['507f1f77bcf86cd7994390a1'],
