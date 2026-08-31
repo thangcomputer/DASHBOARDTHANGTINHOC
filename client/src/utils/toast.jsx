@@ -109,7 +109,7 @@ function ToastContainer({ toasts, onDismiss }) {
         position: 'fixed',
         top: '1.25rem',
         right: '1.25rem',
-        zIndex: 99999,
+        zIndex: 100100,
         display: 'flex',
         flexDirection: 'column',
         gap: '0.65rem',

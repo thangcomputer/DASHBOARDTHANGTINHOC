@@ -206,7 +206,7 @@ export default function CmsSelect({
         role="listbox"
         id={id ? `${id}-listbox` : undefined}
         aria-label={ariaLabel}
-        className="fixed z-[10050] rounded-xl border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.12)] py-1.5 overflow-y-auto overscroll-contain"
+        className="fixed z-[100050] rounded-xl border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.12)] py-1.5 overflow-y-auto overscroll-contain"
         style={{
           top: coords.top,
           left: coords.left,
