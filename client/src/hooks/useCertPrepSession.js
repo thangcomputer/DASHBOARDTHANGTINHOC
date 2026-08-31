@@ -78,9 +78,11 @@ export default function useCertPrepSession(sessionId) {
   const expireOnceRef = useRef(false);
   const remainingRef = useRef(null);
   const tickRef = useRef(null);
+  const saveBlockedRef = useRef(false);
   const remainingAtSyncRef = useRef(null);
   const syncAtRef = useRef(null);
   const flushSaveRef = useRef(async () => true);
+  const saveGenRef = useRef(0);
 
   const applySession = useCallback((data, { restoreAnswers = false } = {}) => {
     if (!data) return;
@@ -145,21 +147,37 @@ export default function useCertPrepSession(sessionId) {
       return false;
     }
     setSaving(true);
+    saveBlockedRef.current = false;
     try {
-      const res = await certPrepApi.student.saveAnswers(current.id, toPayload(answersRef.current));
-      dirtyRef.current = false;
-      retryCountRef.current = 0;
-      setSaveError('');
-      applySession(res.data);
-      return true;
+      let attempts = 0;
+      while (dirtyRef.current && attempts < 5) {
+        attempts += 1;
+        const gen = saveGenRef.current;
+        const payload = toPayload(answersRef.current);
+        const res = await certPrepApi.student.saveAnswers(current.id, payload);
+        retryCountRef.current = 0;
+        setSaveError('');
+        applySession(res.data);
+        if (sessionRef.current?.status !== 'in_progress') {
+          dirtyRef.current = false;
+          return true;
+        }
+        if (saveGenRef.current === gen) {
+          dirtyRef.current = false;
+          return true;
+        }
+      }
+      return !dirtyRef.current;
     } catch (err) {
       if (err?.status === 403) {
+        saveBlockedRef.current = true;
         setUiStatus('forbidden');
         setError(certPrepPlayerErrorMessage(err));
         dirtyRef.current = false;
         return false;
       }
       if (err?.status === 409 || err?.status === 410) {
+        saveBlockedRef.current = true;
         setUiStatus('expired');
         dirtyRef.current = false;
         return false;
@@ -199,6 +217,7 @@ export default function useCertPrepSession(sessionId) {
     const next = { ...answersRef.current, [String(questionId)]: value };
     answersRef.current = next;
     setAnswers(next);
+    saveGenRef.current += 1;
     scheduleSave();
   }, [scheduleSave]);
 
@@ -233,7 +252,11 @@ export default function useCertPrepSession(sessionId) {
     setUiStatus('submitting');
     clearTimeout(saveTimerRef.current);
     try {
-      await flushSave();
+      const saved = await flushSave();
+      if (!saved && !auto) {
+        if (!saveBlockedRef.current) setUiStatus('active');
+        return null;
+      }
       const res = await certPrepApi.student.submitSession(current.id);
       const data = res.data;
       dirtyRef.current = false;

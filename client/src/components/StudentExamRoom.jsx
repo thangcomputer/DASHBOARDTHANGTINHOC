@@ -17,6 +17,7 @@ import {
   isExamUnlockedForSubject,
   isExamProgressLocked,
   canEnterCertificationExam,
+  canStartCertificationSubject,
 } from '../utils/examSubjects';
 import { useIsDesktopExamDevice } from '../utils/examDevice';
 import StudentQuizList from './student/StudentQuizList';
@@ -555,7 +556,13 @@ const StudentExamRoom = ({
   const handleStart = (subjectId) => {
     if (!allowStartExam) return;
     const entry = subjects.find((s) => String(s.id) === String(subjectId));
-    if (!canEnterCertificationExam(entry)) return;
+    if (!canStartCertificationSubject({
+      student,
+      enrollments,
+      subjectId,
+      catalog: examSubjectsCatalog,
+      examProgressEntry: entry,
+    })) return;
     if (onStartExam) onStartExam(subjectId);
   };
 

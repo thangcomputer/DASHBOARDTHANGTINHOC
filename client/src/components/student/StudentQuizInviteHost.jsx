@@ -37,6 +37,8 @@ function toInvitePayload(data) {
     timeLimitMinutes: data.timeLimitMinutes || 15,
     questionsCount: data.questionsCount ?? (Array.isArray(data.questions) ? data.questions.length : 0),
     createdAt: data.createdAt,
+    startTime: data.startTime || null,
+    deadline: data.deadline || null,
   };
 }
 
@@ -50,6 +52,7 @@ export default function StudentQuizInviteHost() {
   const navigate = useNavigate();
   const [invite, setInvite] = useState(null);
   const [queue, setQueue] = useState([]);
+  const [gateMessage, setGateMessage] = useState('');
 
   const enqueueOrShow = useCallback((raw) => {
     const payload = toInvitePayload(raw);
@@ -92,6 +95,8 @@ export default function StudentQuizInviteHost() {
             timeLimitMinutes: q.timeLimitMinutes,
             questionsCount: q.questionsCount,
             createdAt: q.createdAt,
+            startTime: q.startTime,
+            deadline: q.deadline,
           });
           if (!payload) continue;
           if (wait === 0) {
@@ -136,14 +141,21 @@ export default function StudentQuizInviteHost() {
 
   const handleCancel = () => {
     if (invite) markDismissed(invite.quizId);
+    setGateMessage('');
     setInvite(null);
     advanceQueue();
   };
 
   const handleStart = () => {
     if (!invite) return;
+    const startMs = invite.startTime ? new Date(invite.startTime).getTime() : 0;
+    if (startMs && Number.isFinite(startMs) && Date.now() < startMs) {
+      setGateMessage('Chưa đến giờ làm bài. Vui lòng đợi đến giờ mở đề trong Phòng thi.');
+      return;
+    }
     markDismissed(invite.quizId);
     sessionStorage.setItem(PENDING_QUIZ_START_KEY, invite.quizId);
+    setGateMessage('');
     setInvite(null);
     setQueue([]);
     navigate('/student/exam');
@@ -197,6 +209,9 @@ export default function StudentQuizInviteHost() {
           <p className="text-sm text-slate-500 leading-relaxed">
             Giảng viên vừa giao bài trắc nghiệm. Bạn có thể làm ngay hoặc hủy để làm sau trong Phòng thi.
           </p>
+          {gateMessage ? (
+            <p className="text-sm font-semibold text-red-600 leading-relaxed">{gateMessage}</p>
+          ) : null}
         </div>
 
         <div className="px-5 pb-5 flex flex-col-reverse sm:flex-row gap-2.5">

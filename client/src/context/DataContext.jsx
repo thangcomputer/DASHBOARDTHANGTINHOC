@@ -88,6 +88,8 @@ export const DataProvider = ({ children, user, onLogout }) => {
   const {
     trainingData, setTrainingData,
     studentTrainingData, setStudentTrainingData,
+    setTrainingDataFromSync,
+    setStudentTrainingDataFromSync,
     questions, setQuestions,
     teacherExamTimeLimitMinutes, setTeacherExamTimeLimitMinutes,
     teacherExamMinutes, updateTeacherExamMinutes,
@@ -142,7 +144,9 @@ export const DataProvider = ({ children, user, onLogout }) => {
     currentUser, onLogout,
     setStudents, setTeachers, setTransactions, setStaffs,
     setSchedulesRef, setExamResultsRef, setGroupsRef,
-    setTrainingData, setStudentTrainingData, setQuestions, setTeacherExamTimeLimitMinutes,
+    setTrainingData: setTrainingDataFromSync,
+    setStudentTrainingData: setStudentTrainingDataFromSync,
+    setQuestions, setTeacherExamTimeLimitMinutes,
     applyStudentExamConfigFromServer,
     setPrivateEvaluations,
   });

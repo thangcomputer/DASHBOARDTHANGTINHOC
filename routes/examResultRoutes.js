@@ -13,7 +13,6 @@ const NotificationService = require('../services/NotificationService');
 const logger = require('../config/logger');
 const { emitDataRefresh } = require('../utils/realtimeEmit');
 const { pickExamResultCreate, pickExamResultUpdate } = require('../utils/examResultDto');
-const { studentMatchesTeacher } = require('../services/enrollmentService');
 const { policyShadowExamResult } = require('../middleware/policyShadowExamResult');
 const { examResultsCutoverGate } = require('../middleware/examResultsCutoverGate');
 
@@ -100,7 +99,7 @@ async function staffCanManageExam(req, type) {
 
 async function authorizeExamMutation(req, doc) {
   const role = String(req.user?.role || '').toLowerCase();
-  const { branchId, student } = await resolveSubjectBranch(doc);
+  const { branchId } = await resolveSubjectBranch(doc);
   const br = branchAllows(req, branchId);
   if (!br.ok) return br;
 
@@ -109,16 +108,11 @@ async function authorizeExamMutation(req, doc) {
   }
 
   if (role === 'teacher') {
-    if (doc.type === 'teacher') {
-      if (String(doc.teacherId) !== String(req.user.id)) {
-        return { ok: false, status: 403, message: 'Chỉ ghi nhận kết quả thi của chính bạn' };
-      }
-      return { ok: true, branchId };
-    }
-    if (!student || !studentMatchesTeacher(student, req.user.id)) {
-      return { ok: false, status: 403, message: 'Chỉ thao tác kết quả thi học viên mình phụ trách' };
-    }
-    return { ok: true, branchId };
+    return {
+      ok: false,
+      status: 403,
+      message: 'Giảng viên không được tự tạo hoặc sửa kết quả thi',
+    };
   }
 
   if (role === 'admin' || role === 'staff') {

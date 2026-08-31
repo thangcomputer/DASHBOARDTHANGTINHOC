@@ -6,7 +6,7 @@ import { setTokens, clearOtherRoleSessions, ensureCsrfToken, API_BASE } from '..
 import { unlockAudio } from '../utils/sound';
 import NavArrow from './ui/NavArrow';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
-import { isValidVNPhone, isValidEmail, normalizePhone } from '../utils/validators';
+import { isValidVNPhone, normalizePhone } from '../utils/validators';
 import {
   ADMIN_ZALO_PHONE,
   buildForgotPasswordZaloMessage,
@@ -57,11 +57,8 @@ const LoginPage = ({ onLogin }) => {
   const doLogin = async (forceDevice = false) => {
     setLoading(true); setError(null);
     const id = normalizePhone(phone);
-    if (!id) { setError('Vui lòng nhập tài khoản'); setLoading(false); return; }
-    if (id.includes('@')) {
-      if (!isValidEmail(id)) { setError('Email không hợp lệ'); setLoading(false); return; }
-    } else if (!isValidVNPhone(id)) {
-      setError('Số điện thoại không hợp lệ (10 số, bắt đầu 0)'); setLoading(false); return;
+    if (!id || !isValidVNPhone(id)) {
+      setError('Số điện thoại không hợp lệ (hỗ trợ 0... hoặc +84...)'); setLoading(false); return;
     }
     try {
       const fp = getDeviceFingerprint();
@@ -73,7 +70,7 @@ const LoginPage = ({ onLogin }) => {
           'Content-Type': 'application/json',
           ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         },
-        body: JSON.stringify({ identifier: id, password, role, deviceFingerprint: fp, force: forceDevice }),
+        body: JSON.stringify({ phone: id, password, role, deviceFingerprint: fp, force: forceDevice }),
       });
       const data = await response.json();
       if (response.status === 409 && data.code === 'DEVICE_CONFLICT') {
@@ -138,21 +135,17 @@ const LoginPage = ({ onLogin }) => {
           'Content-Type': 'application/json',
           ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         },
-        body: JSON.stringify({ phone: forgotPhone.trim(), role: forgotRole }),
+        body: JSON.stringify({ phone: p, role: forgotRole }),
       });
       const data = await res.json();
 
       if (!data.success) {
-        if (data.message?.includes('không tìm thấy') || data.message?.includes('Không tìm thấy') || res.status === 404) {
-          setForgotError('Số điện thoại chưa được đăng ký trong hệ thống.');
-        } else {
-          setForgotError(data.message || 'Không gửi được yêu cầu. Thử lại sau.');
-        }
+        setForgotError(data.message || 'Không gửi được yêu cầu. Thử lại sau.');
         return;
       }
 
-      const accountName = data.data?.name || '';
-      const accountPhone = data.data?.phone || forgotPhone.trim();
+      const accountName = '';
+      const accountPhone = p;
       const message = buildForgotPasswordZaloMessage({
         name: accountName,
         phone: accountPhone,
@@ -166,7 +159,7 @@ const LoginPage = ({ onLogin }) => {
       });
       setForgotStep(2);
       setCopied(false);
-      toast.success('Xác nhận thành công — copy tin nhắn rồi mở Zalo Admin');
+      toast.success('Đã ghi nhận yêu cầu');
     } catch {
       setForgotError('Lỗi kết nối máy chủ');
     } finally {
@@ -278,12 +271,12 @@ const LoginPage = ({ onLogin }) => {
               )}
               <div className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">{role === 'student' ? 'SỐ ĐIỆN THOẠI HOẶC EMAIL' : 'TÀI KHOẢN GIẢNG VIÊN'}</label>
+                  <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">SỐ ĐIỆN THOẠI</label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User size={18} className="text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" /></div>
-                    <input id="login-identifier" type="text" required value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="username"
+                    <input id="login-identifier" type="tel" inputMode="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel"
                       className="w-full bg-[#1e293b]/50 border-2 border-white/10 rounded-2xl pl-11 pr-5 py-4 text-white outline-none focus:border-red-600 focus:bg-[#1e293b] transition-all font-bold placeholder:text-slate-400"
-                      placeholder="Nhập thông tin tài khoản..." />
+                      placeholder="VD: 0912345678 hoặc +84912345678" />
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -358,7 +351,7 @@ const LoginPage = ({ onLogin }) => {
                     <label className="text-xs font-bold text-gray-400 uppercase block mb-1.5">Số điện thoại đăng ký</label>
                     <div className="relative">
                       <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-                      <input type="text" value={forgotPhone} onChange={e => { setForgotPhone(e.target.value); setForgotError(''); }}
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={forgotPhone} onChange={e => { setForgotPhone(e.target.value); setForgotError(''); }}
                         onKeyDown={e => e.key === 'Enter' && handleCheckPhone()}
                         className="w-full bg-[#0f172a] border-2 border-white/10 rounded-xl pl-11 pr-4 py-3 text-white text-sm font-bold outline-none focus:border-red-500 transition placeholder:text-slate-400"
                         placeholder="VD: 0912345678" />
@@ -395,11 +388,9 @@ const LoginPage = ({ onLogin }) => {
                     <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto">
                       <CheckCircle2 size={28} className="text-emerald-400" />
                     </div>
-                    <p className="text-white font-bold text-base">Đã chuẩn bị tin nhắn</p>
+                    <p className="text-white font-bold text-base">Đã ghi nhận yêu cầu</p>
                     <p className="text-gray-400 text-sm">
                       {forgotContact.role === 'teacher' ? 'Giảng viên' : 'Học viên'}:{' '}
-                      <strong className="text-white">{forgotContact.name}</strong>
-                      {' · '}
                       <strong className="text-white font-mono">{forgotContact.phone}</strong>
                     </p>
                   </div>

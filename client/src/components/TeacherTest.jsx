@@ -5,7 +5,6 @@ import {
   ChevronRight, ChevronLeft, CheckCircle, User, Clock,
   RefreshCw, Video, Monitor, LayoutGrid, ArrowLeft, Download,
 } from 'lucide-react';
-import { gradeAnswers } from '../data/questionBank';
 import { useData } from '../context/DataContext';
 import { useModal } from '../utils/Modal.jsx';
 import ExamMonitor, { CameraHeaderPanel } from './ExamMonitor';
@@ -13,6 +12,7 @@ import { EXAM_CAMERA_PERMISSION_LABEL } from '../utils/examUi';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../services/api';
 import {
   getEssayQuestionFile,
+  isStudentEssayQuestion,
   questionMatchesExamSubject,
 } from '../utils/htmlContent';
 import { getExamSubjectMeta } from '../utils/examSubjects';
@@ -22,7 +22,6 @@ import {
   getTeacherPracticeFilesBySubject,
   countTeacherQuestionsBySubject,
   getQuestionSubjectId,
-  filterTeacherExamQuestionPool,
   computeTeacherMcExamTotalMinutesBySubjects,
   computeTeacherExamTotalMinutesBySubjects,
   resolveTeacherExamSubjectIds,
@@ -259,9 +258,7 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
 
 const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   const {
-    questions: contextQuestionBank,
     teachers,
-    updateTeacher,
     teacherExamMinutes,
     teacherEssayExamMinutes,
     updateTeacherExamMinutes,
@@ -281,6 +278,8 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   const [practicalExpired, setPracticalExpired] = useState(false);
   const practicalTimerRef = useRef(null);
   const [uploadFile, setUploadFile] = useState(null);
+  const [practicalSubmitting, setPracticalSubmitting] = useState(false);
+  const practicalSubmittingRef = useRef(false);
   const fileRef = useRef(null);
   const [tabViolations, setTabViolations] = useState(0);
   const [cameraViolations, setCameraViolations] = useState(0);
@@ -317,10 +316,15 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   const [hasServerEssayMinutes, setHasServerEssayMinutes] = useState(false);
   const [examConfigReady, setExamConfigReady] = useState(false);
   const [startingExam, setStartingExam] = useState(false);
+  const [examAttemptToken, setExamAttemptToken] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
-  const pool =
-    contextQuestionBank?.length > 0 ? contextQuestionBank : (fetchedQuestionBank || []);
-  const examPool = useMemo(() => filterTeacherExamQuestionPool(pool), [pool]);
+  // Teacher never consumes the management bank from DataContext.
+  const examPool = useMemo(
+    () => (Array.isArray(fetchedQuestionBank) ? fetchedQuestionBank : []).filter(Boolean),
+    [fetchedQuestionBank],
+  );
 
   const currentTeacher = selfTeacher
     || teachers?.find(t => String(t.id) === String(teacherId) || String(t._id) === String(teacherId));
@@ -432,14 +436,14 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
 
   /** Luôn tải phút thi + ngân hàng từ server (GV không qua hydrate admin) */
   const loadTeacherExamConfigFromServer = useCallback(async () => {
-    const res = await api.settings.getTeacherExamConfig();
+    if (!teacherId) return null;
+    const res = await api.teachers.startExamAttempt(teacherId);
     if (!res?.success || !res.data) return null;
     const d = res.data;
-    if (!contextQuestionBank?.length) {
-      const qs = Array.isArray(d.questions) ? d.questions : [];
-      if (qs.length > 0) setFetchedQuestionBank(qs);
-    }
-    if (d.hasTeacherExamMinutes && d.teacherExamMinutes && typeof d.teacherExamMinutes === 'object') {
+    const qs = Array.isArray(d.questions) ? d.questions : [];
+    setFetchedQuestionBank(qs);
+    setExamAttemptToken(String(d.attemptToken || ''));
+    if (d.teacherExamMinutes && typeof d.teacherExamMinutes === 'object') {
       setHasServerExamMinutes(true);
       setRemoteExamMinutes(d.teacherExamMinutes);
       updateTeacherExamMinutes(d.teacherExamMinutes);
@@ -447,7 +451,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       setHasServerExamMinutes(false);
       setRemoteExamMinutes(null);
     }
-    if (d.hasTeacherEssayExamMinutes && d.teacherEssayExamMinutes && typeof d.teacherEssayExamMinutes === 'object') {
+    if (d.teacherEssayExamMinutes && typeof d.teacherEssayExamMinutes === 'object') {
       setHasServerEssayMinutes(true);
       setRemoteEssayMinutes(d.teacherEssayExamMinutes);
       updateTeacherEssayExamMinutes(d.teacherEssayExamMinutes);
@@ -457,14 +461,16 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     }
     setExamConfigReady(true);
     return d;
-  }, [contextQuestionBank?.length, updateTeacherExamMinutes, updateTeacherEssayExamMinutes]);
+  }, [teacherId, updateTeacherExamMinutes, updateTeacherEssayExamMinutes]);
 
   const handleStartMcExam = useCallback(async () => {
     if (!cameraReady || questions.length === 0 || startingExam) return;
     setStartingExam(true);
     try {
       const d = await loadTeacherExamConfigFromServer();
-      const mcMap = d?.hasTeacherExamMinutes ? d.teacherExamMinutes : null;
+      const mcMap = d?.teacherExamMinutes && typeof d.teacherExamMinutes === 'object'
+        ? d.teacherExamMinutes
+        : null;
       if (!mcMap) {
         showModal?.({
           title: 'Chưa cấu hình thời gian thi',
@@ -477,10 +483,12 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       setTimeLeft(seconds);
       setPhase('test');
       localStorage.setItem('teacher_test_phase', 'test');
-    } catch {
-      setTimeLeft(resolveTeacherExamTimeSeconds(questions.length));
-      setPhase('test');
-      localStorage.setItem('teacher_test_phase', 'test');
+    } catch (err) {
+      showModal?.({
+        title: 'Không thể bắt đầu bài thi',
+        content: err?.message || 'Server chưa cấp được lượt thi hợp lệ. Vui lòng thử lại.',
+        type: 'error',
+      });
     } finally {
       setStartingExam(false);
     }
@@ -517,28 +525,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       setTimeLeft(configuredMcMinutes * 60);
     }
   }, [configuredMcMinutes, phase]);
-
-  useEffect(() => {
-    if (contextQuestionBank?.length > 0) {
-      setFetchedQuestionBank(null);
-      return;
-    }
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      try {
-        const res = await api.settings.getTeacherExamConfig();
-        if (cancelled || !res?.success || !res.data) return;
-        const qs = Array.isArray(res.data.questions) ? res.data.questions : [];
-        if (qs.length > 0) setFetchedQuestionBank(qs);
-      } catch {
-        /* ignore */
-      }
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [contextQuestionBank?.length]);
 
   useEffect(() => {
     const origin = import.meta.env.VITE_API_URL || '';
@@ -608,10 +594,9 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   const practicalMonitorActiveRef = useRef(false);
   practicalMonitorActiveRef.current = practicalMonitorActive;
 
-  const handleFaceViolationChange = useCallback((count) => {
-    if (!teacherId) return;
-    updateTeacher(teacherId, { faceViolationCount: count }).catch(() => {});
-  }, [teacherId, updateTeacher]);
+  const handleFaceViolationChange = useCallback(() => {
+    // Exam outcome mutations are handled only by dedicated server endpoints.
+  }, []);
 
   const handleViolate = useCallback((reason) => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -619,15 +604,13 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     localStorage.removeItem('teacher_test_tabs');
     setBanReason(reason);
     setPhase('banned');
-    if (teacherId) {
-      updateTeacher(teacherId, { 
-        status: 'Locked', 
-        testScore: 0,
-        lockReason: reason,
-        faceViolationCount: 5,
-      });
+    if (teacherId && examAttemptToken) {
+      api.teachers.forfeitExamAttempt(teacherId, {
+        attemptToken: examAttemptToken,
+        reason,
+      }).catch(() => {});
     }
-  }, [teacherId, updateTeacher]);
+  }, [teacherId, examAttemptToken]);
 
   // Tự động khôi phục phase nếu đã có kết quả trong DB
   useEffect(() => {
@@ -888,48 +871,65 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    const result = gradeAnswers(questions, answers);
-    const payload = {
-      testScore: result.total,
-      testDate: new Date().toISOString(),
-      testStatus: result.pass ? 'passed' : 'failed',
-      testMcCorrect: result.correctCount,
-      testMcWrong: result.wrongCount,
-      testMcTotal: result.mcTotal,
-      status: result.pass ? 'Pending' : 'Locked',
-      lockReason: result.pass ? null : `Thi trượt trắc nghiệm (${result.total}/100)`,
-    };
-
-    setGrade(result);
-    setShowQuizSummary(true);
-    setPhase('result');
-    localStorage.removeItem('teacher_test_phase');
-    persistTeacherSession(payload);
-    setSelfTeacher((prev) => (prev || sessionTeacher)
-      ? { ...(prev || sessionTeacher), ...payload, id: teacherId }
-      : prev);
+    if (!teacherId || !examAttemptToken || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     try {
-      sessionStorage.setItem('teacher_quiz_result', JSON.stringify(result));
-    } catch { /* ignore */ }
-
-    if (teacherId) {
+      const response = await api.teachers.submitExamAttempt(teacherId, {
+        attemptToken: examAttemptToken,
+        answers: questions
+          .map((question, index) => ({ question, index }))
+          .filter(({ question }) => !isStudentEssayQuestion(question))
+          .map(({ question, index }) => ({
+            questionId: question.id,
+            selectedOption: answers[index] ?? null,
+          })),
+      });
+      const result = response?.data;
+      if (!result) throw new Error('Server không trả kết quả chấm thi');
+      if (timerRef.current) clearInterval(timerRef.current);
+      const payload = {
+        testScore: result.score,
+        testDate: new Date().toISOString(),
+        testStatus: result.passed ? 'passed' : 'failed',
+        testMcCorrect: result.correctCount,
+        testMcWrong: result.wrongCount,
+        testMcTotal: result.mcTotal,
+        status: result.passed ? 'Pending' : 'Locked',
+        lockReason: result.passed ? null : `Thi trượt trắc nghiệm (${result.score}/100)`,
+      };
+      const gradeResult = {
+        ...result,
+        total: result.score,
+        pass: result.passed,
+      };
+      setGrade(gradeResult);
+      setShowQuizSummary(true);
+      setPhase('result');
+      localStorage.removeItem('teacher_test_phase');
+      persistTeacherSession(payload);
+      setSelfTeacher((prev) => (prev || sessionTeacher)
+        ? { ...(prev || sessionTeacher), ...payload, id: teacherId }
+        : prev);
       try {
-        await updateTeacher(teacherId, payload);
-      } catch {
-        showModal({
-          title: 'Lưu kết quả',
-          content: 'Đã chấm bài trên máy bạn nhưng chưa đồng bộ lên máy chủ. Liên hệ Admin nếu điểm không hiển thị.',
-          type: 'warning',
-        });
-      }
+        sessionStorage.setItem('teacher_quiz_result', JSON.stringify(gradeResult));
+      } catch { /* ignore */ }
+    } catch (err) {
+      showModal({
+        title: 'Chưa nộp được bài',
+        content: err?.message || 'Vui lòng kiểm tra kết nối. Câu trả lời của bạn vẫn được giữ.',
+        type: 'error',
+      });
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
-  }, [questions, answers, teacherId, updateTeacher, persistTeacherSession, sessionTeacher, showModal]);
+  }, [questions, answers, teacherId, examAttemptToken, persistTeacherSession, sessionTeacher, showModal]);
 
   handleSubmitRef.current = handleSubmit;
 
   const handlePracticalSubmit = useCallback(async (fileObj) => {
-    if (!teacherId || !fileObj) return;
+    if (!teacherId || !fileObj || practicalSubmittingRef.current) return;
     if (!practicalStarted || practicalExpired) {
       showModal({
         title: 'Chưa bắt đầu',
@@ -947,14 +947,14 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       return;
     }
 
+    practicalSubmittingRef.current = true;
+    setPracticalSubmitting(true);
     try {
       showModal({ title: 'Đang tải file...', content: 'Vui lòng chờ trong giây lát.', type: 'info' });
       const res = await api.teachers.uploadPractical(fileObj);
       if (res.success && res.fileUrl) {
-         await updateTeacher(teacherId, {
-           practicalFile: (res.fileUrl || '').replace(/^https?:\/\/[^/]+/i, '') || res.fileUrl,
-           practicalStatus: 'submitted'
-         });
+         const fileUrl = (res.fileUrl || '').replace(/^https?:\/\/[^/]+/i, '') || res.fileUrl;
+         await api.teachers.submitPractical(teacherId, fileUrl);
          setPracticalSubmitted(true);
          setPracticalStarted(false);
          if (practicalTimerRef.current) clearInterval(practicalTimerRef.current);
@@ -965,8 +965,11 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       }
     } catch (err) {
       showModal({ title: 'Lỗi', content: err.message || 'Lỗi máy chủ khi tải file lên.', type: 'error' });
+    } finally {
+      practicalSubmittingRef.current = false;
+      setPracticalSubmitting(false);
     }
-  }, [teacherId, updateTeacher, showModal, practicalStarted, practicalExpired]);
+  }, [teacherId, showModal, practicalStarted, practicalExpired]);
 
   const handlePracticalTimeout = useCallback(async () => {
     if (practicalTimerRef.current) clearInterval(practicalTimerRef.current);
@@ -981,10 +984,9 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       : prev);
     if (teacherId) {
       try {
-        await updateTeacher(teacherId, {
-          status: 'Locked',
-          lockReason: reason,
-          practicalStatus: 'expired',
+        await api.teachers.forfeitPractical(teacherId, {
+          reasonType: 'expired',
+          reason,
         });
       } catch { /* ignore */ }
     }
@@ -993,7 +995,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       content: 'Bạn không nộp bài tự luận đúng thời hạn. Tài khoản đã bị khóa — liên hệ Admin để được hỗ trợ.',
       type: 'error',
     });
-  }, [teacherId, updateTeacher, persistTeacherSession, sessionTeacher, showModal]);
+  }, [teacherId, persistTeacherSession, sessionTeacher, showModal]);
 
   const handleStartPractical = useCallback(() => {
     const minutes = practicalMinutesConfig ?? 60;
@@ -1032,14 +1034,12 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       ? { ...(prev || sessionTeacher), status: 'Locked', lockReason, practicalStatus: 'cancelled', id: teacherId }
       : prev);
     if (teacherId) {
-      updateTeacher(teacherId, {
-        status: 'Locked',
-        lockReason,
-        practicalStatus: 'cancelled',
-        faceViolationCount: 5,
+      api.teachers.forfeitPractical(teacherId, {
+        reasonType: 'cancelled',
+        reason: lockReason,
       }).catch(() => {});
     }
-  }, [teacherId, updateTeacher, persistTeacherSession, sessionTeacher]);
+  }, [teacherId, persistTeacherSession, sessionTeacher]);
 
   handlePracticalViolateRef.current = handlePracticalViolate;
 
@@ -1573,12 +1573,15 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                       </div>
 
                       <label
-                        className="group relative flex shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 px-3 py-3 text-center hover:border-blue-300 sm:py-3.5"
+                        className={`group relative flex shrink-0 flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 px-3 py-3 text-center sm:py-3.5 ${
+                          practicalSubmitting ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-blue-300'
+                        }`}
                         onMouseDown={() => suspendTabGuard(10000)}
                         onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50/50'); }}
                         onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50/50'); }}
                         onDrop={(e) => {
                           e.preventDefault();
+                          if (practicalSubmittingRef.current) return;
                           e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50/50');
                           const file = e.dataTransfer.files?.[0];
                           if (!file) return;
@@ -1596,6 +1599,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                       >
                         <input
                           type="file"
+                          disabled={practicalSubmitting}
                           accept=".zip,.rar,application/zip,application/x-rar-compressed,application/vnd.rar"
                           className="hidden"
                           onChange={(e) => {
@@ -1614,7 +1618,9 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                           }}
                         />
                         <Upload size={22} className="mb-1 text-blue-500" />
-                        <p className="text-sm font-black text-slate-700 sm:text-base">Tải lên file .zip hoặc .rar</p>
+                        <p className="text-sm font-black text-slate-700 sm:text-base">
+                          {practicalSubmitting ? 'Đang nộp bài…' : 'Tải lên file .zip hoặc .rar'}
+                        </p>
                         <p className="text-xs font-bold text-slate-500 sm:text-sm">Một file nén duy nhất · tối đa 50MB</p>
                       </label>
                     </div>
@@ -1931,6 +1937,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
               <div className="shrink-0 border-t border-slate-100 p-2">
                 <button
                   type="button"
+                  disabled={submitting}
                   onClick={() => {
                     if (answeredCount < TOTAL) {
                       showModal({
@@ -1941,7 +1948,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                         type: 'question',
                         confirmText: 'Xác nhận nộp',
                         cancelText: 'Làm tiếp',
-                        onConfirm: () => { handleSubmit(); },
+                        onConfirm: () => { void handleSubmit(); },
                       });
                     } else {
                       showModal({
@@ -1950,14 +1957,14 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                         type: 'question',
                         confirmText: 'Nộp bài',
                         cancelText: 'Làm tiếp',
-                        onConfirm: () => { handleSubmit(); },
+                        onConfirm: () => { void handleSubmit(); },
                       });
                     }
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 py-2.5 text-sm font-black text-white shadow-md hover:from-red-700 hover:to-red-800 active:scale-[0.98]"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 py-2.5 text-sm font-black text-white shadow-md hover:from-red-700 hover:to-red-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send size={16} />
-                  NỘP BÀI KIỂM TRA
+                  {submitting ? 'ĐANG NỘP BÀI…' : 'NỘP BÀI KIỂM TRA'}
                 </button>
               </div>
             </div>

@@ -41,6 +41,31 @@ function legacyEnrollmentFromStudent(student) {
   };
 }
 
+/**
+ * Resolve enrollment by Mongo _id, primary alias, or client synthetic id `enr-N`
+ * (used when legacy HV only has root.course and the UI invents enr-0).
+ */
+function resolveEnrollmentIndex(enrollments, enrollmentId) {
+  const list = Array.isArray(enrollments) ? enrollments : [];
+  const id = String(enrollmentId || '').trim();
+  if (!id || !list.length) return -1;
+
+  const byId = list.findIndex((e) => String(e?._id || '') === id);
+  if (byId >= 0) return byId;
+
+  if (id === 'main') {
+    const primary = list.findIndex((e) => e?.isPrimary);
+    return primary >= 0 ? primary : 0;
+  }
+
+  const synthetic = /^enr-(\d+)$/i.exec(id);
+  if (synthetic) {
+    const idx = Number(synthetic[1]);
+    if (Number.isInteger(idx) && idx >= 0 && idx < list.length) return idx;
+  }
+  return -1;
+}
+
 async function resolveEnrollmentExamSubjects({ courseName, courseId }) {
   const Course = require('../models/Course');
   const { getCachedSettings } = require('./settingsCache');
@@ -582,6 +607,7 @@ async function applyReEnrollmentAfterPayment(studentDoc, {
 
 module.exports = {
   legacyEnrollmentFromStudent,
+  resolveEnrollmentIndex,
   getEnrollmentsFromStudent,
   studentHasLearningAccess,
   toClientCourse,

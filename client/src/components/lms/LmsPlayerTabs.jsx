@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
-  FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
+  ExternalLink, FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
 import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getChapterLessonIndex } from '../../utils/lmsLessonUi';
 import LessonSidebarMeta from './LessonSidebarMeta';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
-import { buildMediaDownloadUrl, downloadMediaFile, apiFetch } from '../../services/api';
+import { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, apiFetch } from '../../services/api';
 import useLmsLocalStore, { lmsStoreKey } from '../../hooks/useLmsLocalStore';
 
 function initials(name = '') {
@@ -629,10 +629,6 @@ function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' })
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto w-full">
-      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3.5 py-3 text-[12px] text-slate-300">
-        Đánh giá lưu trên server — Admin nhận thông báo chuông khi bạn gửi / cập nhật.
-      </div>
-
       <div className="flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
         <div>
           <p className="text-3xl font-extrabold text-white tabular-nums">{avg ? avg.toFixed(1) : '—'}</p>
@@ -733,8 +729,10 @@ function ResourcesPanel({ files }) {
   return (
     <ul className="space-y-3 max-w-3xl mx-auto w-full">
       {list.map((file, idx) => {
-        const href = (file.fileUrl || file.url)
-          ? buildMediaDownloadUrl(file.fileUrl || file.url, file.fileOriginalName || file.title)
+        const rawUrl = file.fileUrl || file.url || '';
+        const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK';
+        const href = rawUrl
+          ? (isLink ? resolveMediaUrl(rawUrl) : buildMediaDownloadUrl(rawUrl, file.fileOriginalName || file.title))
           : null;
         return (
           <li
@@ -743,23 +741,34 @@ function ResourcesPanel({ files }) {
           >
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-slate-100 truncate">{file.title || 'Tài liệu'}</p>
-              <p className="text-[11px] text-slate-500 mt-1">{file.fileSize || file.size || file.type || 'File'}</p>
+              <p className="text-[11px] text-slate-500 mt-1">{file.fileSize || file.size || file.fileType || file.type || 'File'}</p>
             </div>
             {href ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await downloadMediaFile(file.fileUrl || file.url, file.fileOriginalName || file.title);
-                  } catch (err) {
-                    // eslint-disable-next-line no-alert
-                    window.cmsAlert(err?.message || 'Không tải được tài liệu', 'error');
-                  }
-                }}
-                className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 border-0 cursor-pointer"
-              >
-                <Download size={14} /> Tải về
-              </button>
+              isLink ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 no-underline"
+                >
+                  <ExternalLink size={14} /> Mở
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await downloadMediaFile(rawUrl, file.fileOriginalName || file.title);
+                    } catch (err) {
+                      // eslint-disable-next-line no-alert
+                      window.cmsAlert(err?.message || 'Không tải được tài liệu', 'error');
+                    }
+                  }}
+                  className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 border-0 cursor-pointer"
+                >
+                  <Download size={14} /> Tải về
+                </button>
+              )
             ) : (
               <span className="text-xs font-bold text-slate-500 shrink-0">Chưa có file</span>
             )}

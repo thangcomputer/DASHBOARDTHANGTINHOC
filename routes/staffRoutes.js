@@ -13,6 +13,8 @@ const { HIGH_ADMIN_DEFAULT_PERMISSIONS, SUPPORT_DEFAULT_PERMISSIONS } = require(
 const { generateTeacherCode } = require('../services/businessCodeService');
 const { purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
 const logger = require('../config/logger');
+const { normalizeVNPhone } = require('../utils/phoneIdentity');
+const { assertUniqueContact } = require('../utils/uniqueContact');
 
 const router = express.Router();
 /**
@@ -67,6 +69,10 @@ router.post('/', guard('create'), async (req, res) => {
 
     if (!name || !phone || !password)
       return res.status(400).json({ success: false, message: 'Thiếu tên, số điện thoại hoặc mật khẩu' });
+    const canonicalPhone = normalizeVNPhone(phone);
+    if (!canonicalPhone) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+    }
 
     // Không cho tạo thêm Super Admin qua API (chỉ tài khoản hệ thống id=admin)
     if (adminRole === 'SUPER_ADMIN') {
@@ -95,9 +101,7 @@ router.post('/', guard('create'), async (req, res) => {
       branchCode = branch.code || '';
     }
 
-    const exists = await Teacher.findOne({ phone });
-    if (exists)
-      return res.status(409).json({ success: false, message: 'Số điện thoại đã được sử dụng' });
+    await assertUniqueContact({ phone: canonicalPhone });
 
     let safePermissions = (adminRole === 'SUPER_ADMIN')
       ? []
@@ -112,7 +116,7 @@ router.post('/', guard('create'), async (req, res) => {
     const resolvedRole = (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') ? 'admin' : 'staff';
 
     const newStaff = await Teacher.create({
-      name, phone, password,
+      name, phone: canonicalPhone, password,
       role:        resolvedRole,
       adminRole,
       permissions: safePermissions,
@@ -131,6 +135,7 @@ router.post('/', guard('create'), async (req, res) => {
       data: { ...newStaff.toObject(), password: undefined },
     });
   } catch (err) {
+    if (err.status === 409) return res.status(409).json({ success: false, message: err.message });
     if (err.code === 11000) return res.status(409).json({ success: false, message: 'Số điện thoại đã tồn tại' });
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -168,7 +173,10 @@ router.put('/:id', guard('update'), async (req, res) => {
     // SUPER_ADMIN/root can update phone for any staff account (HIGH/SUPPORT/STAFF/SUPER).
     // Non-SUPER requests are ignored to keep legacy behavior.
     if (actorIsSuperAdmin(req) && phone != null) {
-      const nextPhone = String(phone).trim();
+      const nextPhone = normalizeVNPhone(phone);
+      if (!nextPhone) {
+        return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+      }
       if (nextPhone) {
         const exists = await Teacher.findOne({
           phone: nextPhone,
@@ -177,6 +185,11 @@ router.put('/:id', guard('update'), async (req, res) => {
         if (exists) {
           return res.status(409).json({ success: false, message: 'Số điện thoại đã được sử dụng' });
         }
+        await assertUniqueContact({
+          phone: nextPhone,
+          excludeRole: 'teacher',
+          excludeId: req.params.id,
+        });
         updates.phone = nextPhone;
       }
     }
@@ -250,6 +263,7 @@ router.put('/:id', guard('update'), async (req, res) => {
     if (!updated) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
     return res.json({ success: true, message: 'Đã cập nhật phân quyền', data: updated });
   } catch (err) {
+    if (err.status === 409) return res.status(409).json({ success: false, message: err.message });
     return res.status(500).json({ success: false, message: err.message });
   }
 });

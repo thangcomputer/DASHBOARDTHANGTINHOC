@@ -62,10 +62,17 @@ export default function AdminTrainingTab() {
               </div>
 
               {courseBuilderMode ? (
-                 <AdminCourseBuilder course={courseBuilderMode} onBack={() => setCourseBuilderMode(null)} onSave={(updatedCourse) => {
-                     updateTrainingItem('videos', courseBuilderMode.id, updatedCourse);
+                 <AdminCourseBuilder course={courseBuilderMode} onBack={() => setCourseBuilderMode(null)}
+                   onPatch={async (updatedCourse) => {
+                     const cid = courseBuilderMode.id || courseBuilderMode._id;
+                     await updateTrainingItem('videos', cid, updatedCourse);
+                   }}
+                   onSave={async (updatedCourse) => {
+                     const cid = courseBuilderMode.id || courseBuilderMode._id;
+                     await updateTrainingItem('videos', cid, updatedCourse);
                      setCourseBuilderMode(null);
-                 }} />
+                   }}
+                 />
               ) : (
                 <>
               {/* Sub-tabs + primary action (laptop+: one row of tabs, action left-aligned) */}

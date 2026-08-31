@@ -1,4 +1,5 @@
 const express  = require('express');
+const crypto   = require('crypto');
 const mongoose = require('mongoose');
 const multer   = require('multer');
 const path     = require('path');
@@ -27,8 +28,16 @@ const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
 const { emitTeacherEvent, emitDataRefresh, emitFinanceEvent, emitUser } = require('../utils/realtimeEmit');
+const { getCachedSettings } = require('../services/settingsCache');
+const {
+  createExamAttempt,
+  gradeExamAttempt,
+  verifyAttemptToken,
+} = require('../services/examAttemptService');
+const { claimTeacherAttempt } = require('../services/examAttemptStore');
 const { purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
 const { normalizeVoiceRegion } = require('../constants/voiceRegions');
+const { attemptedTeacherExamFields } = require('../utils/teacherExamFields');
 
 const router = express.Router();
 
@@ -113,6 +122,254 @@ router.post('/upload-practical', authMiddleware, ...teacherRouteGuard('upload_pr
   });
 });
 
+function teacherExamDurationSeconds(settings, subjectIds) {
+  const minutes = (subjectIds || []).reduce((sum, subjectId) => {
+    const raw = Number(settings?.teacherExamMinutesRaw?.[subjectId]);
+    return sum + (Number.isFinite(raw) && raw >= 1 && raw <= 600 ? raw : 90);
+  }, 0);
+  return Math.max(10 * 60, Math.min(8 * 60 * 60, Math.round(minutes * 60)));
+}
+
+function teacherGradeResponse(teacher, gradedResult, extra = {}) {
+  const correct = gradedResult?.correct ?? (Number(teacher?.testMcCorrect) || 0);
+  const totalQuestions = gradedResult?.total ?? (Number(teacher?.testMcTotal) || 0);
+  const score = gradedResult?.percentage ?? (Number(teacher?.testScore) || 0);
+  return {
+    attemptId: teacher?.examAttemptId || '',
+    total: score,
+    score,
+    pass: gradedResult?.passed ?? String(teacher?.testStatus || '').toLowerCase() === 'passed',
+    passed: gradedResult?.passed ?? String(teacher?.testStatus || '').toLowerCase() === 'passed',
+    correctCount: correct,
+    wrongCount: Math.max(0, totalQuestions - correct),
+    mcTotal: totalQuestions,
+    sectionFailures: gradedResult?.sectionFailures || [],
+    idempotent: false,
+    ...extra,
+  };
+}
+
+// ─── POST /api/teachers/:id/exam-attempt ─────────────────────────────────────
+router.post('/:id/exam-attempt', authMiddleware, ...teacherRouteGuard('submit_practical'), async (req, res) => {
+  try {
+    if (req.user?.role !== 'teacher' || String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Chỉ giáo viên được tạo lượt thi của chính mình' });
+    }
+    let [teacher, settings] = await Promise.all([
+      Teacher.findById(req.params.id),
+      getCachedSettings(),
+    ]);
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+    const testStatus = String(teacher.testStatus || '').toLowerCase();
+    const accountStatus = String(teacher.status || '').toLowerCase();
+    if (testStatus === 'passed' || accountStatus === 'active') {
+      return res.status(409).json({ success: false, message: 'Kết quả thi đã được chốt' });
+    }
+    if (testStatus === 'failed' || teacher.examAttemptStatus === 'forfeited') {
+      return res.status(409).json({ success: false, message: 'Lượt thi đã bị khóa, liên hệ Admin để mở lại' });
+    }
+
+    const subjectIds = resolveTeacherSubjectIds(teacher);
+    if (!subjectIds.length) {
+      return res.status(409).json({ success: false, message: 'Giảng viên chưa được gán môn thi' });
+    }
+    const durationSeconds = teacherExamDurationSeconds(settings, subjectIds);
+    let attemptId = teacher.examAttemptStatus === 'active' ? String(teacher.examAttemptId || '') : '';
+    let startedAt = teacher.examAttemptStartedAt ? new Date(teacher.examAttemptStartedAt).getTime() : 0;
+    if (attemptId && startedAt && Date.now() >= startedAt + durationSeconds * 1000) {
+      await claimTeacherAttempt(Teacher, {
+        teacherId: req.params.id,
+        attemptId,
+        setFields: {
+          testScore: 0,
+          testMcCorrect: 0,
+          testStatus: 'failed',
+          examAttemptStatus: 'forfeited',
+          examAttemptSubmittedAt: new Date(),
+        },
+      });
+      return res.status(409).json({ success: false, message: 'Lượt thi đã hết thời gian' });
+    }
+    if (!attemptId) {
+      const proposedAttemptId = crypto.randomUUID();
+      startedAt = Date.now();
+      const claimed = await Teacher.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          examAttemptStatus: { $ne: 'active' },
+          testStatus: { $nin: ['passed', 'failed'] },
+          status: { $ne: 'active' },
+        },
+        {
+          $set: {
+            examAttemptId: proposedAttemptId,
+            examAttemptStatus: 'active',
+            examAttemptStartedAt: new Date(startedAt),
+            examAttemptSubmittedAt: null,
+          },
+        },
+        { returnDocument: 'after', runValidators: true },
+      );
+      teacher = claimed || await Teacher.findById(req.params.id);
+      if (!teacher || teacher.examAttemptStatus !== 'active' || !teacher.examAttemptId) {
+        return res.status(409).json({ success: false, message: 'Không thể xác nhận lượt thi đang hoạt động' });
+      }
+      attemptId = String(teacher.examAttemptId);
+      startedAt = teacher.examAttemptStartedAt
+        ? new Date(teacher.examAttemptStartedAt).getTime()
+        : startedAt;
+    }
+
+    const remainingSeconds = Math.max(
+      1,
+      Math.floor((startedAt + durationSeconds * 1000 - Date.now()) / 1000),
+    );
+    const attempt = createExamAttempt({
+      kind: 'teacher',
+      userId: req.user.id,
+      subjectIds,
+      bank: settings?.teacherExamBankRawData,
+      attemptId,
+      ttlSeconds: remainingSeconds,
+    });
+    return res.json({
+      success: true,
+      data: {
+        ...attempt,
+        subjectIds,
+        durationSeconds,
+        passPercentage: 80,
+        sectionPassPercentage: 50,
+        teacherExamMinutes: settings?.teacherExamMinutesRaw || {},
+        teacherEssayExamMinutes: settings?.teacherEssayExamMinutesRaw || {},
+      },
+    });
+  } catch (error) {
+    logger.warn('[TEACHERS] create exam attempt: %s', error.message);
+    return res.status(error.status || 500).json({ success: false, message: error.message || 'Lỗi server' });
+  }
+});
+
+// ─── POST /api/teachers/:id/exam-attempt/submit ──────────────────────────────
+router.post('/:id/exam-attempt/submit', authMiddleware, ...teacherRouteGuard('submit_practical'), async (req, res) => {
+  try {
+    if (req.user?.role !== 'teacher' || String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Không thể nộp lượt thi của giáo viên khác' });
+    }
+    const settings = await getCachedSettings();
+    const graded = gradeExamAttempt({
+      token: req.body?.attemptToken,
+      expected: { kind: 'teacher', userId: req.user.id },
+      bank: settings?.teacherExamBankRawData,
+      answers: req.body?.answers,
+    });
+    const status = graded.result.passed ? 'Pending' : 'Locked';
+    const lockReason = graded.result.passed
+      ? null
+      : `Thi trượt trắc nghiệm (${graded.result.percentage}/100)`;
+    const teacher = await claimTeacherAttempt(Teacher, {
+      teacherId: req.params.id,
+      attemptId: graded.payload.attemptId,
+      setFields: {
+        testScore: graded.result.percentage,
+        testDate: new Date(),
+        testStatus: graded.result.passed ? 'passed' : 'failed',
+        testMcCorrect: graded.result.correct,
+        testMcWrong: graded.result.total - graded.result.correct,
+        testMcTotal: graded.result.total,
+        status,
+        lockReason,
+        examAttemptStatus: 'submitted',
+        examAttemptSubmittedAt: new Date(),
+      },
+    }).select('-password -refreshToken');
+
+    if (!teacher) {
+      const existing = await Teacher.findById(req.params.id)
+        .select('testScore testStatus testMcCorrect testMcTotal examAttemptId examAttemptStatus')
+        .lean();
+      if (
+        String(existing?.examAttemptId) === graded.payload.attemptId
+        && existing?.examAttemptStatus === 'submitted'
+      ) {
+        return res.json({
+          success: true,
+          data: teacherGradeResponse(existing, graded.result, { idempotent: true }),
+        });
+      }
+      return res.status(409).json({ success: false, message: 'Lượt thi không còn hoạt động hoặc đã được thay thế' });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      emitDataRefresh(io, { type: 'teacher', id: teacher._id }, {
+        branchId: teacher.branchId,
+        userIds: [teacher._id],
+      });
+      NotificationService.notifyAdmins(
+        io,
+        graded.result.passed ? '🎉 Giảng viên thi đạt' : '❌ Giảng viên thi chưa đạt',
+        `GV ${teacher.name}: ${graded.result.percentage}/100.`,
+        { teacherId: teacher._id, passed: graded.result.passed },
+        '/admin#training',
+      ).catch((err) => logger.warn('[TEACHERS] notify exam result: %s', err.message));
+    }
+    return res.json({
+      success: true,
+      data: teacherGradeResponse(teacher, graded.result),
+    });
+  } catch (error) {
+    logger.warn('[TEACHERS] submit exam attempt: %s', error.message);
+    return res.status(error.status || 400).json({ success: false, message: error.message || 'Không thể nộp bài' });
+  }
+});
+
+// ─── POST /api/teachers/:id/exam-attempt/forfeit ─────────────────────────────
+router.post('/:id/exam-attempt/forfeit', authMiddleware, ...teacherRouteGuard('submit_practical'), async (req, res) => {
+  try {
+    if (req.user?.role !== 'teacher' || String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Không thể hủy lượt thi của giáo viên khác' });
+    }
+    const payload = verifyAttemptToken(req.body?.attemptToken, {
+      kind: 'teacher',
+      userId: req.user.id,
+    }, { allowExpired: true });
+    const teacher = await claimTeacherAttempt(Teacher, {
+      teacherId: req.params.id,
+      attemptId: payload.attemptId,
+      setFields: {
+        testScore: 0,
+        testDate: new Date(),
+        testStatus: 'failed',
+        testMcCorrect: 0,
+        testMcWrong: payload.questionIds.length,
+        testMcTotal: payload.questionIds.length,
+        status: 'Locked',
+        lockReason: String(req.body?.reason || 'Bài thi bị hủy').slice(0, 300),
+        examAttemptStatus: 'forfeited',
+        examAttemptSubmittedAt: new Date(),
+      },
+    }).select('-password -refreshToken');
+    if (!teacher) {
+      const existing = await Teacher.findById(req.params.id)
+        .select('examAttemptId examAttemptStatus testScore testStatus testMcCorrect testMcTotal')
+        .lean();
+      if (
+        String(existing?.examAttemptId) === payload.attemptId
+        && ['submitted', 'forfeited'].includes(existing?.examAttemptStatus)
+      ) {
+        return res.json({ success: true, data: teacherGradeResponse(existing, null, { idempotent: true }) });
+      }
+      return res.status(409).json({ success: false, message: 'Lượt thi không còn hoạt động' });
+    }
+    return res.json({ success: true, data: teacherGradeResponse(teacher) });
+  } catch (error) {
+    return res.status(error.status || 400).json({ success: false, message: error.message || 'Không thể hủy bài' });
+  }
+});
+
 // ⭐ RBAC Guard: Chặn STAFF thực hiện thao tác ghi trên teachers
 // STAFF chỉ được GET (xem), KHÔNG được POST/PUT/DELETE
 // superAdminOnlyTeacher retained inside teachersCutoverGate (Phase 7.31).
@@ -132,11 +389,16 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
     }
+    const { normalizeVNPhone } = require('../utils/phoneIdentity');
+    const canonicalPhone = normalizeVNPhone(phone);
+    if (!canonicalPhone) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+    }
     const emailTrim = (rawEmail || '').trim();
     const email = emailTrim && emailTrim !== 'email@example.com' ? emailTrim : undefined;
     try {
       const { assertUniqueContact } = require('../utils/uniqueContact');
-      await assertUniqueContact({ phone, zalo: phone, email });
+      await assertUniqueContact({ phone: canonicalPhone, email });
     } catch (dupErr) {
       if (dupErr.status === 409) {
         return res.status(409).json({ success: false, message: dupErr.message });
@@ -169,11 +431,11 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       ? [...new Set(subjectIds.map((id) => String(id).trim()).filter(Boolean))]
       : [];
 
-    const plainPassword = resolveDefaultAccountPassword({ password, phone });
+    const plainPassword = resolveDefaultAccountPassword({ password, phone: canonicalPhone });
     const teacherCode = await generateTeacherCode();
     const teacher = await Teacher.create({
       name,
-      phone,
+      phone: canonicalPhone,
       email,
       specialty: specialty || specialtyFromSubjectIds(normalizedSubjectIds),
       subjectIds: normalizedSubjectIds,
@@ -536,23 +798,27 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
     // Branch isolation: assertTeacherBranchAccess (trusted req.userBranchId)
 
     const isAdminRole = (req.user.role === 'admin' || req.user.role === 'staff');
-    // Self-edit: profile + kết quả thi onboarding (client-side grade rồi sync)
+    const attemptedExamFields = attemptedTeacherExamFields(req.body);
+    if (attemptedExamFields.length) {
+      return res.status(isSelfEdit ? 403 : 400).json({
+        success: false,
+        message: isSelfEdit
+          ? 'Giảng viên không được tự ghi điểm, trạng thái thi hoặc trạng thái duyệt'
+          : 'Dùng endpoint chấm điểm/duyệt chuyên biệt cho các trường kết quả thi',
+        fields: attemptedExamFields,
+      });
+    }
+
     const allowedFields = isAdminRole 
       ? [
           'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio', 'startDate', 'address',
-          'bankAccount', 'avatar', 'status', 'baseSalaryPerSession', 'customStarBonusAmount',
+          'bankAccount', 'avatar', 'baseSalaryPerSession', 'customStarBonusAmount',
           'assignedClasses', 'assignedStudents',
-          'testScore', 'testStatus', 'testDate', 'testNotes', 'faceViolationCount',
-          'testMcCorrect', 'testMcWrong', 'testMcTotal',
-          'lockReason', 'practicalFile', 'practicalStatus',
           'branchId', 'branchCode',
         ]
       : isSelfEdit
         ? [
             'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address',
-            'testScore', 'testStatus', 'testDate', 'testNotes', 'faceViolationCount',
-            'testMcCorrect', 'testMcWrong', 'testMcTotal',
-            'lockReason', 'practicalFile', 'practicalStatus', 'status',
           ]
         : [
           'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address',
@@ -612,6 +878,14 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
     }
 
     if (updates.phone !== undefined || updates.zalo !== undefined || updates.email !== undefined) {
+      if (updates.phone !== undefined) {
+        const { normalizeVNPhone } = require('../utils/phoneIdentity');
+        const canonicalPhone = normalizeVNPhone(updates.phone);
+        if (!canonicalPhone) {
+          return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+        }
+        updates.phone = canonicalPhone;
+      }
       try {
         const { assertUniqueContact } = require('../utils/uniqueContact');
         await assertUniqueContact({
@@ -897,18 +1171,33 @@ router.post('/:id/submit-practical', authMiddleware, ...teacherRouteGuard('submi
     if (!fileUrl) {
       return res.status(400).json({ success: false, message: 'Thiếu fileUrl' });
     }
+    const normalizedFileUrl = String(fileUrl).trim();
+    if (!normalizedFileUrl.startsWith('/uploads/practical/')) {
+      return res.status(400).json({ success: false, message: 'fileUrl bài thực hành không hợp lệ' });
+    }
 
     const teacher = await Teacher.findByIdAndUpdate(
-      req.params.id,
       {
-        practicalFileUrl: fileUrl,
+        _id: req.params.id,
+        testStatus: 'passed',
+        practicalStatus: { $nin: ['approved', 'reviewed'] },
+      },
+      {
+        practicalFile: normalizedFileUrl,
+        practicalStatus: 'submitted',
         status: 'practical_submitted',
       },
       { returnDocument: 'after' }
     ).select('-password');
 
     if (!teacher) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+      const exists = await Teacher.exists({ _id: req.params.id });
+      return res.status(exists ? 409 : 404).json({
+        success: false,
+        message: exists
+          ? 'Chỉ được nộp thực hành sau khi server chấm đạt trắc nghiệm'
+          : 'Không tìm thấy giảng viên',
+      });
     }
 
     // Thông báo Admin có file mới (branch-scoped)
@@ -917,14 +1206,14 @@ router.post('/:id/submit-practical', authMiddleware, ...teacherRouteGuard('submi
       emitTeacherEvent(io, teacher, 'teacher:practical_submitted', {
         teacherId:   teacher._id.toString(),
         teacherName: teacher.name,
-        fileUrl,
+        fileUrl: normalizedFileUrl,
         message: `📁 Giảng viên ${teacher.name} đã nộp bài thực hành`,
       });
       NotificationService.notifyAdmins(
         io,
         '📁 GV nộp bài thực hành',
         `Giảng viên ${teacher.name} đã nộp bài thực hành.`,
-        { teacherId: teacher._id, fileUrl },
+        { teacherId: teacher._id, fileUrl: normalizedFileUrl },
         '/admin#training',
       ).catch((err) => logger.warn('[TEACHERS] notify practical:', err.message));
     }
@@ -936,7 +1225,7 @@ router.post('/:id/submit-practical', authMiddleware, ...teacherRouteGuard('submi
         entityId: teacher._id,
         entityLabel: teacher.name,
         title: 'Duyệt GV: ' + teacher.name,
-        payload: { testScore: teacher.testScore, practicalFileUrl: fileUrl },
+        payload: { testScore: teacher.testScore, practicalFileUrl: normalizedFileUrl },
         createdBy: String(req.user.id || ''),
       });
     } catch (wfErr) {
@@ -944,6 +1233,47 @@ router.post('/:id/submit-practical', authMiddleware, ...teacherRouteGuard('submi
     }
 
     return res.json({ success: true, data: teacher });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// Server-controlled negative transition for timeout/proctor violations in practical phase.
+router.post('/:id/practical-forfeit', authMiddleware, ...teacherRouteGuard('submit_practical'), async (req, res) => {
+  try {
+    if (req.user?.role !== 'teacher' || String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Không thể hủy bài của giáo viên khác' });
+    }
+    const reasonType = req.body?.reasonType === 'expired' ? 'expired' : 'cancelled';
+    const lockReason = String(req.body?.reason || 'Bài thực hành bị hủy').slice(0, 300);
+    const teacher = await Teacher.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        testStatus: 'passed',
+        practicalStatus: { $nin: ['approved', 'reviewed'] },
+      },
+      {
+        $set: {
+          status: 'Locked',
+          lockReason,
+          practicalStatus: reasonType,
+        },
+      },
+      { returnDocument: 'after', runValidators: true },
+    ).select('-password -refreshToken');
+    if (!teacher) {
+      const existing = await Teacher.findById(req.params.id)
+        .select('practicalStatus status lockReason')
+        .lean();
+      if (existing && ['expired', 'cancelled'].includes(existing.practicalStatus)) {
+        return res.json({ success: true, data: existing, idempotent: true });
+      }
+      return res.status(existing ? 409 : 404).json({
+        success: false,
+        message: existing ? 'Trạng thái bài thực hành không cho phép thao tác này' : 'Không tìm thấy giảng viên',
+      });
+    }
+    return res.json({ success: true, data: teacher, idempotent: false });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Lỗi server' });
   }

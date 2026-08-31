@@ -16,6 +16,8 @@ function buildQuizAssignedPayload(quiz) {
     timeLimitMinutes: q.timeLimitMinutes,
     questionsCount: Array.isArray(q.questions) ? q.questions.length : (q.questionsCount || 0),
     createdAt: q.createdAt || new Date(),
+    startTime: q.startTime || null,
+    deadline: q.deadline || null,
   };
 }
 

@@ -4,14 +4,7 @@
  */
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
-
-function normalizePhone(value) {
-  let digits = String(value || '').replace(/\D/g, '');
-  if (digits.startsWith('84') && digits.length >= 11) {
-    digits = `0${digits.slice(2)}`;
-  }
-  return digits;
-}
+const { normalizeVNPhone: normalizePhone, phoneLookupVariants } = require('./phoneIdentity');
 
 function normalizeEmail(value) {
   const e = String(value || '').trim().toLowerCase();
@@ -30,15 +23,8 @@ function isPlaceholderPhone(value) {
 function phoneVariants(value) {
   const raw = String(value || '').trim();
   const digits = normalizePhone(raw);
-  const out = new Set();
-  if (raw && !isPlaceholderPhone(raw)) out.add(raw);
-  if (digits && digits.length >= 9) {
-    out.add(digits);
-    // variants thường gặp trong DB
-    out.add(digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3'));
-    out.add(digits.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3'));
-  }
-  return [...out];
+  if (!digits || isPlaceholderPhone(raw)) return [];
+  return phoneLookupVariants(digits);
 }
 
 function contactConflictError(message) {

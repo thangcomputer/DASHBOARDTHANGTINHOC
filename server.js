@@ -14,7 +14,7 @@ const cron       = require('node-cron');
 const pinoHttp   = require('pino-http');
 const connectDB  = require('./config/db');
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'test') dotenv.config();
 require('./config/validateEnv')();
 
 const logger = require('./config/logger');
@@ -29,6 +29,7 @@ const trustProxy = process.env.TRUST_PROXY === '0' ? false : (parseInt(process.e
 app.set('trust proxy', trustProxy);
 
 const isProd = process.env.NODE_ENV === 'production';
+const isTest = process.env.NODE_ENV === 'test';
 const cookieSecret = process.env.COOKIE_SECRET || process.env.JWT_SECRET;
 
 const viteLocalOrigins = [5173, 5174, 5175, 5176, 5177].flatMap((p) => [`http://localhost:${p}`, `http://127.0.0.1:${p}`]);
@@ -191,9 +192,6 @@ app.use((req, res, next) => {
 });
 app.use(mongoSanitize({ replaceWith: '_' }));
 app.use(hpp());
-require('./routes/authRoutes');
-app.use(require('passport').initialize());
-app.use(require('passport').session());
 
 app.get('/healthz', (req, res) => {
   // Public probe — nhe, tuong thich cu; chi tiet o /api/monitoring/*
@@ -271,9 +269,9 @@ app.use(systemLogger);
 const { apiRateLimitUnlessAuth } = require('./middleware/apiRateLimit');
 app.use('/api', apiRateLimitUnlessAuth);
 
-connectDB();
+const dbReady = connectDB();
 const outboxWorker = require('./shared/outbox/OutboxWorker');
-outboxWorker.start();
+if (!isTest) outboxWorker.start();
 
 // ==========================================
 // SOCKET.IO - REAL-TIME
@@ -967,8 +965,10 @@ const runMessageFileRetention = async () => {
 };
 
 // Mỗi 6 giờ + chạy một lần khi server khởi động (sau khi DB sẵn sàng)
-setTimeout(() => { runMessageFileRetention(); }, 15_000);
-cron.schedule('0 */6 * * *', runMessageFileRetention);
+if (!isTest) {
+  setTimeout(() => { runMessageFileRetention(); }, 15_000);
+  cron.schedule('0 */6 * * *', runMessageFileRetention);
+}
 
 // FileAsset registry — purge file hết hạn (Phase 8)
 const fileService = require('./services/fileService');
@@ -982,8 +982,10 @@ const runFileAssetPurge = async () => {
     logger.error({ err: err.message }, '[CRON] FileAsset purge');
   }
 };
-setTimeout(() => { runFileAssetPurge(); }, 20_000);
-cron.schedule('30 */6 * * *', runFileAssetPurge);
+if (!isTest) {
+  setTimeout(() => { runFileAssetPurge(); }, 20_000);
+  cron.schedule('30 */6 * * *', runFileAssetPurge);
+}
 
 // Backup định kỳ (Phase 9) — mặc định 03:00 mỗi ngày; tắt bằng BACKUP_SCHEDULE=0
 const backupService = require('./services/backupService');
@@ -999,7 +1001,7 @@ const runScheduledBackup = async () => {
   }
 };
 const backupCronExpr = process.env.BACKUP_CRON || '0 3 * * *';
-if (process.env.BACKUP_SCHEDULE !== '0') {
+if (!isTest && process.env.BACKUP_SCHEDULE !== '0') {
   cron.schedule(backupCronExpr, runScheduledBackup);
 }
 
@@ -1010,7 +1012,7 @@ if (process.env.BACKUP_SCHEDULE !== '0') {
 // const nodemailer = require('nodemailer');
 //
 // Chạy mỗi 10 phút - kiểm tra lịch sắp tới và gửi nhắc nhở
-cron.schedule('*/10 * * * *', async () => {
+if (!isTest) cron.schedule('*/10 * * * *', async () => {
   try {
     // const now = new Date();
     // const thirtyMinsLater = new Date(now.getTime() + 30 * 60000);
@@ -1128,11 +1130,14 @@ const tokenBlacklist = require('./middleware/tokenBlacklist');
 const { initJobQueue, closeJobQueue } = require('./services/queue/jobQueue');
 
 (async () => {
+  await dbReady;
   await attachSocketIoAdapter(io);
   await presenceStore.initPresenceBus();
   server.listen(PORT, '::', () => {
     logger.info({ port: PORT, env: process.env.NODE_ENV || 'development', host: '::' }, 'dashboardthangtinhoc server listening');
-    initJobQueue().catch((err) => logger.warn({ err: err.message }, 'initJobQueue failed'));
+    if (!isTest) {
+      initJobQueue().catch((err) => logger.warn({ err: err.message }, 'initJobQueue failed'));
+    }
     try {
       const { startAiIdleWatcher } = require('./services/aiSupportService');
       startAiIdleWatcher(io, app.notifyUser);

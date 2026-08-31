@@ -138,8 +138,13 @@ export default function AdminStudentTrainingTab() {
                 <AdminCourseBuilder
                   course={sCourseBuilderMode}
                   onBack={() => setSCourseBuilderMode(null)}
-                  onSave={(updatedCourse) => {
-                    updateStudentTrainingItem('videos', sCourseBuilderMode.id, updatedCourse);
+                  onPatch={async (updatedCourse) => {
+                    const cid = sCourseBuilderMode.id || sCourseBuilderMode._id;
+                    await updateStudentTrainingItem('videos', cid, updatedCourse);
+                  }}
+                  onSave={async (updatedCourse) => {
+                    const cid = sCourseBuilderMode.id || sCourseBuilderMode._id;
+                    await updateStudentTrainingItem('videos', cid, updatedCourse);
                     setSCourseBuilderMode(null);
                   }}
                 />

@@ -11,6 +11,8 @@
     "test": "node tests/run.js",
     "test:integration": "node tests/run.js integration",
     "test:ci": "node tests/run.js",
+    "test:phase15:unit": "node --test tests/unit/test_database_guard.test.js tests/unit/phone_identity.test.js tests/unit/oauth_disabled.test.js tests/unit/exam_attempt_security.test.js tests/unit/exam_attempt_store.test.js tests/unit/teacher_exam_fields.test.js tests/unit/quiz_access.test.js",
+    "test:phase15:integration": "node tests/runPhase15Integration.js",
     "lint": "eslint .",
     "smoke": "node scripts/smoke-local.cjs",
     "smoke:api": "node scripts/smoke-api.cjs",

@@ -1269,48 +1269,11 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     }
 
     const io = req.app.get('io');
-    if (schedule.studentId && io) {
-      const NotificationService = require('../services/NotificationService');
-      const notifDate = new Date(schedule.date).toLocaleDateString();
-      
-      if (status === 'cancelled' && schedule.status !== 'cancelled') {
-         // Persist cancel reason into `note` so student UI can render it
-         const cancelReason = String(req.body?.cancelReason || req.body?.reason || req.body?.note || '').trim();
-         if (cancelReason) updates.note = cancelReason;
-
-         NotificationService.send(io, {
-           type: 'SCHEDULE',
-           title: '❌ Lịch học bị hủy',
-           content: cancelReason
-             ? `Lịch học ngày ${notifDate} đã bị hủy. Lý do: ${cancelReason}`
-             : `Lịch học ngày ${notifDate} đã bị hủy.`,
-           receivers: schedule.studentId.toString(),
-           payload: { scheduleId: schedule._id.toString(), reason: cancelReason },
-           link: '/student#schedule'
-         });
-
-         if (isRejectMakeup && schedule.teacherId) {
-           const { notifyTeacherMakeupRejected } = require('../services/teacherAdminNotifier');
-           notifyTeacherMakeupRejected(io, schedule, req.user).catch(() => {});
-         }
-
-         // Emit cancelled event so clients refetch / update UI immediately
-         emitScheduleEvent(io, {
-           branchId: schedule.branchId,
-           teacherId: schedule.teacherId,
-           studentId: schedule.studentId,
-         }, 'schedule:cancelled', { scheduleId: schedule._id.toString(), reason: cancelReason });
-      }
-      else if ((startTime && startTime !== schedule.startTime) || (date && new Date(date).getTime() !== schedule.date.getTime())) {
-         NotificationService.send(io, {
-           type: 'SCHEDULE',
-           title: '🔄 Lịch học đã thay đổi',
-           content: `Lịch học đã cập nhật thành: ${startTime || schedule.startTime} ngày ${date ? new Date(date).toLocaleDateString() : notifDate}.`,
-           receivers: schedule.studentId.toString(),
-           link: '/student#schedule'
-         });
-      }
-    }
+    // Lý do hủy — ghi vào note trước khi save (emit socket sau DB write)
+    const cancelReason = (status === 'cancelled' && schedule.status !== 'cancelled')
+      ? String(req.body?.cancelReason || req.body?.reason || req.body?.note || '').trim()
+      : '';
+    if (cancelReason) updates.note = cancelReason;
 
     const updated = await Schedule.findByIdAndUpdate(
       req.params.scheduleId,
@@ -1320,6 +1283,74 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       { path: 'teacherId', select: 'name phone' },
       { path: 'studentId', select: 'name course totalSessions studentExamUnlocked' },
     ]);
+
+    // Thông báo + realtime SAU khi DB commit — tránh HV refetch còn thấy lịch cũ
+    if (schedule.studentId && io && updated) {
+      const NotificationService = require('../services/NotificationService');
+      const notifDate = new Date(updated.date || schedule.date).toLocaleDateString();
+      const scheduleScope = {
+        branchId: updated.branchId || schedule.branchId,
+        teacherId: updated.teacherId?._id || updated.teacherId || schedule.teacherId,
+        studentId: updated.studentId?._id || updated.studentId || schedule.studentId,
+      };
+      const plain = typeof updated.toObject === 'function' ? updated.toObject() : updated;
+      const updatedPayload = {
+        ...plain,
+        _id: String(updated._id),
+        id: String(updated._id),
+        teacherId: scheduleScope.teacherId,
+        studentId: scheduleScope.studentId,
+      };
+
+      if (status === 'cancelled' && schedule.status !== 'cancelled') {
+         NotificationService.send(io, {
+           type: 'SCHEDULE',
+           title: '❌ Lịch học bị hủy',
+           content: cancelReason
+             ? `Lịch học ngày ${notifDate} đã bị hủy. Lý do: ${cancelReason}`
+             : `Lịch học ngày ${notifDate} đã bị hủy.`,
+           receivers: String(scheduleScope.studentId),
+           payload: { scheduleId: String(updated._id), reason: cancelReason },
+           link: '/student#schedule'
+         }).catch((e) => logger.warn('[SCHEDULE] cancel notif:', e.message));
+
+         if (isRejectMakeup && scheduleScope.teacherId) {
+           const { notifyTeacherMakeupRejected } = require('../services/teacherAdminNotifier');
+           notifyTeacherMakeupRejected(io, schedule, req.user).catch(() => {});
+         }
+
+         emitScheduleEvent(io, scheduleScope, 'schedule:cancelled', {
+           ...updatedPayload,
+           scheduleId: String(updated._id),
+           reason: cancelReason,
+           status: 'cancelled',
+         });
+      } else if (
+        (startTime && startTime !== schedule.startTime)
+        || (date && new Date(date).getTime() !== new Date(schedule.date).getTime())
+        || (endTime !== undefined && String(endTime) !== String(schedule.endTime || ''))
+      ) {
+         NotificationService.send(io, {
+           type: 'SCHEDULE',
+           title: '🔄 Lịch học đã thay đổi',
+           content: `Lịch học đã cập nhật thành: ${updated.startTime || schedule.startTime} ngày ${notifDate}.`,
+           receivers: String(scheduleScope.studentId),
+           link: '/student#schedule'
+         }).catch((e) => logger.warn('[SCHEDULE] reschedule notif:', e.message));
+      }
+
+      // Đổi giờ/ngày/hủy/link/topic: HV + GV nhận document mới (trừ khi chỉ studentNote — emit riêng bên dưới)
+      const onlyStudentNote =
+        'studentNote' in req.body
+        && Object.keys(updates).every((k) => ['studentNote', 'hasUnreadStudentNote'].includes(k));
+      if (!onlyStudentNote) {
+        emitScheduleEvent(io, scheduleScope, 'schedule:updated', updatedPayload);
+        emitDataRefresh(io, { type: 'schedule', id: String(updated._id), action: status || 'update' }, {
+          branchId: scheduleScope.branchId,
+          userIds: [scheduleScope.teacherId, scheduleScope.studentId].filter(Boolean),
+        });
+      }
+    }
 
     const slotChanged = Boolean(
       (startTime && startTime !== schedule.startTime)
@@ -1807,11 +1838,28 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
 
     const io = req.app.get('io');
     if (io) {
-      emitScheduleEvent(io, {
+      const scheduleScope = {
         branchId: schedule.branchId,
         teacherId: schedule.teacherId,
         studentId: schedule.studentId,
-      }, 'schedule:cancelled', { scheduleId: schedule._id.toString(), reason });
+      };
+      const plain = typeof schedule.toObject === 'function' ? schedule.toObject() : schedule;
+      const cancelledPayload = {
+        ...plain,
+        _id: String(schedule._id),
+        id: String(schedule._id),
+        scheduleId: String(schedule._id),
+        status: 'cancelled',
+        reason: String(reason || ''),
+        teacherId: schedule.teacherId,
+        studentId: schedule.studentId,
+      };
+      emitScheduleEvent(io, scheduleScope, 'schedule:cancelled', cancelledPayload);
+      emitScheduleEvent(io, scheduleScope, 'schedule:updated', cancelledPayload);
+      emitDataRefresh(io, { type: 'schedule', id: String(schedule._id), action: 'cancelled' }, {
+        branchId: schedule.branchId,
+        userIds: [schedule.teacherId, schedule.studentId].filter(Boolean),
+      });
 
       // Notify student with reason (if any)
       if (schedule.studentId) {

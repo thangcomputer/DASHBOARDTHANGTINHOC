@@ -97,7 +97,9 @@ async function parseApiJson(res, fallbackMessage = 'Máy chủ không phản h�
     let msg = data?.message || `${fallbackMessage} (HTTP ${res.status})`;
     try {
         window.dispatchEvent(new CustomEvent('cms:api-error', { detail: { message: msg, status: res.status } }));
-      } catch (e) {}
+      } catch {
+        // CustomEvent is unavailable in non-browser consumers.
+      }
       if ([502, 503, 504].includes(res.status)) {
       msg = `${fallbackMessage}. Máy chủ đang khởi động lại — vui lòng đợi vài giây rồi tải lại.`;
     }
@@ -676,10 +678,10 @@ export const authAPI = {
     return { success: true, avatar: avatarUrl };
   },
 
-  login: async (identifier, password) => {
+  login: async (phone, password) => {
     const res = await apiFetch('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ identifier, password }),
+      body: JSON.stringify({ phone, password }),
       skipAuth: true
     });
     return res.json();
@@ -852,6 +854,27 @@ export const studentsAPI = {
     });
     return res.json();
   },
+  startExamAttempt: async (id, subjectId) => {
+    const res = await apiFetch(`/students/${id}/exam-attempt`, {
+      method: 'POST',
+      body: JSON.stringify({ subjectId }),
+    });
+    return parseApiJson(res, 'Không thể tạo lượt thi');
+  },
+  submitExamAttempt: async (id, payload) => {
+    const res = await apiFetch(`/students/${id}/exam-attempt/submit`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return parseApiJson(res, 'Không thể nộp bài');
+  },
+  forfeitExamAttempt: async (id, payload) => {
+    const res = await apiFetch(`/students/${id}/exam-attempt/forfeit`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return parseApiJson(res, 'Không thể hủy bài');
+  },
   remove: async (id) => {
     const res = await apiFetch(`/students/${id}`, { method: 'DELETE' });
     return res.json();
@@ -1005,6 +1028,41 @@ export const teachersAPI = {
     const formData = new FormData();
     formData.append('file', file);
     return uploadWithAuth('/teachers/upload-practical', formData, getAccessToken('teacher') ? 'teacher' : 'admin');
+  },
+  startExamAttempt: async (id) => {
+    const res = await apiFetch(`/teachers/${id}/exam-attempt`, {
+      method: 'POST',
+      body: '{}',
+    });
+    return parseApiJson(res, 'Không thể tạo lượt thi');
+  },
+  submitExamAttempt: async (id, payload) => {
+    const res = await apiFetch(`/teachers/${id}/exam-attempt/submit`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return parseApiJson(res, 'Không thể nộp bài');
+  },
+  forfeitExamAttempt: async (id, payload) => {
+    const res = await apiFetch(`/teachers/${id}/exam-attempt/forfeit`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return parseApiJson(res, 'Không thể hủy bài');
+  },
+  submitPractical: async (id, fileUrl) => {
+    const res = await apiFetch(`/teachers/${id}/submit-practical`, {
+      method: 'POST',
+      body: JSON.stringify({ fileUrl }),
+    });
+    return parseApiJson(res, 'Không thể nộp bài thực hành');
+  },
+  forfeitPractical: async (id, payload) => {
+    const res = await apiFetch(`/teachers/${id}/practical-forfeit`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return parseApiJson(res, 'Không thể cập nhật bài thực hành');
   },
 };
 
@@ -1552,7 +1610,11 @@ export const settingsAPI = {
       method: 'PUT',
       body: JSON.stringify({ trainingData }),
     });
-    return res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.message || `Lưu dữ liệu đào tạo thất bại (${res.status})`);
+    }
+    return data;
   },
   getStudentTrainingData: async () => {
     const res = await apiFetch('/settings/student-training-data');
@@ -1563,7 +1625,11 @@ export const settingsAPI = {
       method: 'PUT',
       body: JSON.stringify({ studentTrainingData }),
     });
-    return res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.message || `Lưu tài liệu khóa học thất bại (${res.status})`);
+    }
+    return data;
   },
   getTeacherExamConfig: async () => {
     const res = await apiFetch('/settings/teacher-exam-config');

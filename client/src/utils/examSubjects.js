@@ -390,6 +390,44 @@ export function canEnterCertificationExam(entry, now = Date.now()) {
   return !st || st === 'chua_thi' || st === 'dang_thi';
 }
 
+export function examMilestone(subjectIds, subjectId, completedSessions, totalSessions) {
+  const ids = (subjectIds || []).map(String);
+  const idx = ids.findIndex((id) => id === String(subjectId));
+  const count = Math.max(1, ids.length);
+  const total = Math.max(1, Number(totalSessions) || 12);
+  const interval = Math.max(1, Math.floor(total / count));
+  const requiredSessions = idx < 0 ? interval : interval * (idx + 1);
+  const done = Number(completedSessions) || 0;
+  return { requiredSessions, meetsMilestone: idx >= 0 && done >= requiredSessions };
+}
+
+/** Mở khóa khóa học, đang thi, hoặc đủ mốc buổi — khớp nút Phòng thi. */
+export function canStartCertificationSubject({
+  student,
+  enrollments,
+  subjectId,
+  catalog,
+  examProgressEntry,
+  now,
+} = {}) {
+  if (!canEnterCertificationExam(examProgressEntry, now)) return false;
+  const unlocked = isExamUnlockedForSubject(
+    enrollments,
+    subjectId,
+    catalog,
+    student?.studentExamUnlocked === true || student?.examApproved === true,
+  );
+  if (unlocked) return true;
+  const ids = getSubjectIdsForStudent(enrollments, student?.course, catalog);
+  if (examMilestone(ids, subjectId, student?.completedSessions, student?.totalSessions).meetsMilestone) {
+    return true;
+  }
+  return findEnrollmentsForSubject(enrollments, subjectId, catalog).some((enr) => {
+    const eids = getSubjectIdsForEnrollment(enr, catalog);
+    return examMilestone(eids, subjectId, enr.completedSessions, enr.totalSessions).meetsMilestone;
+  });
+}
+
 export function resolveExamFilterStatus(subject) {
   if (subject.lockUntil && subject.lockUntil > Date.now()) return 'rot';
   if (subject.status === 'khong_dat') return 'rot';

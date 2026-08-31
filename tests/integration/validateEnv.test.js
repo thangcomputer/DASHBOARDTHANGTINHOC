@@ -9,6 +9,10 @@ function freshValidateEnv() {
 const STRONG = 'a'.repeat(40);
 const STRONG2 = 'b'.repeat(40);
 
+test.beforeEach(() => {
+  process.env.MASTER_ADMIN_PHONE = '0900000001';
+});
+
 test('validateEnv: rejects short JWT_SECRET', () => {
   process.env.NODE_ENV = 'development';
   process.env.JWT_SECRET = 'short';
@@ -50,6 +54,15 @@ test('validateEnv: passes with strong distinct secrets and CLIENT_URL', () => {
   process.env.SMTP_USER = 'user';
   process.env.SMTP_PASS = 'pass';
   assert.doesNotThrow(() => freshValidateEnv()());
+});
+
+test('validateEnv: production requires a valid MASTER_ADMIN_PHONE', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.JWT_SECRET = STRONG;
+  process.env.JWT_REFRESH_SECRET = STRONG2;
+  process.env.CLIENT_URL = 'https://example.com';
+  delete process.env.MASTER_ADMIN_PHONE;
+  assert.throws(() => freshValidateEnv()(), /MASTER_ADMIN_PHONE/);
 });
 
 test('validateEnv: requires REDIS_URL in production', () => {

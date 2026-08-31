@@ -68,7 +68,8 @@ export function StudentsProvider({ user, children }) {
   const [adminQuery, setAdminQuery] = useState(null);
   const adminQueryRef = useRef(null);
   const key = studentsKey(user, adminQuery);
-  const { socket } = useSocket();
+  const { socket, onDataRefresh } = useSocket();
+  const refreshDebounceRef = useRef(null);
 
   useEffect(() => {
     adminQueryRef.current = adminQuery;
@@ -152,7 +153,26 @@ export function StudentsProvider({ user, children }) {
     return res;
   }, [mutate]);
 
-  const refreshStudents = useCallback(() => mutate(), [mutate]);
+  // Force fetch — tránh kẹt cache SWR (dedupe 30s) khi Admin điểm danh bù.
+  const refreshStudents = useCallback(() => {
+    const role = userRef.current?.role;
+    const q = adminQueryRef.current;
+    const k = studentsKey(userRef.current, q);
+    if (!k) return mutate();
+    // Admin giữ mutate() thường — danh sách phân trang do fetchStudentsPaginated / useAdminStudents lo.
+    if (role === 'admin' || role === 'staff') return mutate();
+    return mutate(async () => fetchStudents(k), { revalidate: false, populateCache: true });
+  }, [mutate]);
+
+  const scheduleStudentsRefresh = useCallback(() => {
+    const role = userRef.current?.role;
+    if (role !== 'teacher' && role !== 'student') return;
+    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+    refreshDebounceRef.current = setTimeout(() => {
+      refreshDebounceRef.current = null;
+      Promise.resolve(refreshStudents()).catch(() => {});
+    }, 120);
+  }, [refreshStudents]);
 
   const patchStudent = useCallback((studentId, updates) => {
     mutate((current) => {
@@ -185,10 +205,54 @@ export function StudentsProvider({ user, children }) {
         totalSessions: payload.meta?.totalSessions,
         attendedAt: payload.attendedAt,
       }, { lockCheckIn: true, skipProgress: awaiting }));
+      // Điểm danh bù / hoàn tất: refetch số buổi GV (optimistic patch có thể miss enrollment).
+      if (!awaiting) scheduleStudentsRefresh();
     };
     socket.on('attendance:locked', handleAttendanceLocked);
     return () => socket.off('attendance:locked', handleAttendanceLocked);
-  }, [socket, setStudentsLocal]);
+  }, [socket, setStudentsLocal, scheduleStudentsRefresh]);
+
+  // Gán GV / reset lịch sử / student:updated — không luôn kèm type: 'student' trên payload.
+  useEffect(() => {
+    if (!socket) return undefined;
+    if (user?.role !== 'teacher' && user?.role !== 'student') return undefined;
+    const onStudentListEvt = () => scheduleStudentsRefresh();
+    const events = ['student:assigned', 'student:history_reset', 'student:new', 'student:updated'];
+    events.forEach((ev) => socket.on(ev, onStudentListEvt));
+    return () => {
+      events.forEach((ev) => socket.off(ev, onStudentListEvt));
+    };
+  }, [socket, user?.role, scheduleStudentsRefresh]);
+
+  // data:refresh type student — Admin makeup đã emit; GV trước đây bỏ qua (useDataSync không refetch students).
+  useEffect(() => {
+    if (!onDataRefresh) return undefined;
+    const role = user?.role;
+    if (role !== 'teacher' && role !== 'student') return undefined;
+    const unsub = onDataRefresh((payload) => {
+      const type = payload?.type;
+      if (type === 'student' || type === 'students') {
+        scheduleStudentsRefresh();
+        return;
+      }
+      const ev = String(payload?.eventName || '');
+      if (
+        ev === 'student:assigned'
+        || ev === 'student:history_reset'
+        || ev === 'student:new'
+        || ev === 'student:updated'
+      ) {
+        scheduleStudentsRefresh();
+      }
+    });
+    return () => {
+      unsub();
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+        refreshDebounceRef.current = null;
+      }
+    };
+  }, [onDataRefresh, user?.role, scheduleStudentsRefresh]);
 
   const value = useMemo(() => ({
     students,

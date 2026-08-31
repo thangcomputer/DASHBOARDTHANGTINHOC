@@ -3,6 +3,7 @@ const { lessonQuizRepository } = require('./../repositories');
 const Student = require('./../../student/models/Student');
 const logger = require('./../../../config/logger');
 const { scheduleQuizAssignedNotify } = require('./../../../services/quizAssignedNotifier');
+const { studentCourseNames } = require('./../../../services/quizAccess');
 
 class QuizApplicationService {
   async get_teacher(data) {
@@ -76,7 +77,7 @@ class QuizApplicationService {
         return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
       }
 
-      const studentCourses = [student.course, ...(student.enrollments || []).map(e => e.courseName)].filter(Boolean);
+      const studentCourses = studentCourseNames(student);
 
       const quizzes = await lessonQuizRepository.findMany({
         status: 'active',

@@ -5,16 +5,16 @@ import { toast } from 'react-hot-toast';
 import { setTokens, clearOtherRoleSessions, API_BASE, SOCKET_BASE, ensureCsrfToken } from '../services/api';
 import { unlockAudio } from '../utils/sound';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
+import { isValidVNPhone, normalizePhone } from '../utils/validators';
 
 const AdminLoginPage = ({ onLogin }) => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deviceConflict, setDeviceConflict] = useState(false);
-  const [pendingForce, setPendingForce] = useState(false);
   const [forceTicket, setForceTicket] = useState(null);
   const [mfaToken, setMfaToken] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
@@ -34,7 +34,7 @@ const AdminLoginPage = ({ onLogin }) => {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [API]);
 
   const [userInputCaptcha, setUserInputCaptcha] = useState('');
   const [captchaId, setCaptchaId] = useState('');
@@ -57,15 +57,17 @@ const AdminLoginPage = ({ onLogin }) => {
   }, []);
 
   React.useEffect(() => {
-    generateCaptcha();
+    const timer = window.setTimeout(() => generateCaptcha(), 0);
+    return () => window.clearTimeout(timer);
   }, [generateCaptcha]);
 
   const handleLogin = async (e, forceDevice = false) => {
     if (e?.preventDefault) e.preventDefault();
     
     // 1. Kiểm tra trường trống
-    if (!username || !password) {
-      setError('VUI LÒNG NHẬP TÀI KHOẢN VÀ MẬT KHẨU');
+    const canonicalPhone = normalizePhone(phone);
+    if (!canonicalPhone || !isValidVNPhone(canonicalPhone) || !password) {
+      setError('VUI LÒNG NHẬP SỐ ĐIỆN THOẠI HỢP LỆ VÀ MẬT KHẨU');
       toast.error('Cảnh báo: Thông tin trống');
       return;
     }
@@ -91,7 +93,7 @@ const AdminLoginPage = ({ onLogin }) => {
           ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         },
         body: JSON.stringify({
-          identifier: username,
+          phone: canonicalPhone,
           password,
           captchaId,
           captchaAnswer: userInputCaptcha.trim(),
@@ -299,20 +301,21 @@ const AdminLoginPage = ({ onLogin }) => {
               ) : (
               <>
               <div className="space-y-3">
-                <label htmlFor="admin-username" className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] block ml-1">Username / Identifier</label>
+                <label htmlFor="admin-phone" className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] block ml-1">Số điện thoại</label>
                 <div className="relative group">
                   <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors">
                     <User size={20} aria-hidden="true" />
                   </div>
                   <input
-                    id="admin-username"
-                    type="text"
+                    id="admin-phone"
+                    type="tel"
+                    inputMode="tel"
                     required
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    autoComplete="username"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    autoComplete="tel"
                     className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-5 py-3.5 sm:py-4 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
-                    placeholder="Nhập tài khoản quản trị"
+                    placeholder="VD: 0912345678 hoặc +84912345678"
                   />
                 </div>
               </div>
@@ -424,7 +427,7 @@ const AdminLoginPage = ({ onLogin }) => {
             <div className="p-6 space-y-4">
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
                 <p className="text-amber-300 text-sm font-bold leading-relaxed">
-                  ⚠️ Tài khoản <strong className="text-white">{username}</strong> hiện đang đăng nhập trên máy tính khác.
+                  ⚠️ Số điện thoại <strong className="text-white">{phone}</strong> hiện đang đăng nhập trên máy tính khác.
                 </p>
                 <p className="text-gray-400 text-xs mt-2">
                   Nếu tiếp tục, phiên quản trị trên máy kia sẽ bị đăng xuất ngay lập tức.

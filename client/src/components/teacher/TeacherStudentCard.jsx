@@ -477,7 +477,6 @@ export const StudentCard = ({
     if (
       alreadyAttendedToday
       || attendanceGate?.status === 'done'
-      || scheduleDone
       || scheduleSettled
     ) {
       clearMakeupPending(makeupKey);

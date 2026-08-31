@@ -17,6 +17,7 @@ const IGNORE_SELECTOR = [
   '[data-exam-warning-overlay]',
   '[data-app-modal]',
   '[data-exam-modal]',
+  '[data-cms-select-panel]',
 ].join(', ');
 
 /**
@@ -88,7 +89,7 @@ export default function ExamClickOutsideGuard({
       const t = e.target;
       if (!(t instanceof Element)) return;
       // Ghi nhận gesture khi người dùng click trong vùng thi (exam-surface)
-      if (t.closest('[data-exam-surface]')) markUserGesture();
+      if (t.closest('[data-exam-surface]') || t.closest('[data-cms-select-panel]')) markUserGesture();
       if (t.closest(IGNORE_SELECTOR)) return;
       trigger('click');
     };

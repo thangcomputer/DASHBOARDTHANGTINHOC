@@ -1,14 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Plus, Edit3, Trash2, Video, ChevronDown, ChevronUp, Save, Layers, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
+import {
+  ArrowLeft, Plus, Edit3, Trash2, Video, ChevronDown, ChevronUp, Save, Layers,
+  ArrowUp, ArrowDown, Loader2, FileBox, Upload, Link2, Download,
+} from 'lucide-react';
 import { useToast } from '../utils/toast.jsx';
 import { probeYouTubeDurationSeconds, extractYouTubeId } from '../utils/youtubeDuration';
+import api, { buildMediaDownloadUrl } from '../services/api';
+import { trainingUploadDisplayName } from './admin/utils/trainingUpload';
 
-const AdminCourseBuilder = ({ course, onBack, onSave }) => {
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function extToFileType(fileName) {
+  const ext = String(fileName || '').split('.').pop()?.toUpperCase() || '';
+  const map = {
+    PDF: 'PDF', DOC: 'DOCX', DOCX: 'DOCX', XLS: 'XLSX', XLSX: 'XLSX',
+    PPT: 'PPTX', PPTX: 'PPTX', ZIP: 'ZIP', RAR: 'RAR',
+  };
+  return map[ext] || (ext.length <= 5 ? ext : 'FILE');
+}
+
+const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
   const toast = useToast();
 
   // Use existing chapters or default mock
   const [chapters, setChapters] = useState(course?.chapters || course?.curriculum || []);
+  const [files, setFiles] = useState(() => (
+    Array.isArray(course?.files) ? course.files.map((f, i) => ({
+      ...f,
+      id: f.id || f._id || `file-${i}-${Date.now()}`,
+    })) : []
+  ));
+  const [fileUploading, setFileUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [linkDraft, setLinkDraft] = useState({ title: '', url: '' });
+  const [editingFileId, setEditingFileId] = useState(null);
+  const [editFileTitle, setEditFileTitle] = useState('');
 
   const [editingChapterId, setEditingChapterId] = useState(null);
   const [editingLessonId, setEditingLessonId] = useState(null);
@@ -133,18 +165,147 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
     }));
   };
 
+  // --- FILE / TÀI LIỆU KHÓA HỌC ---
+  const buildCoursePayload = (nextFiles = files, nextChapters = chapters) => {
+    const allLessons = nextChapters.flatMap((c) => c.lessons.map((l) => ({ ...l, chapterTitle: c.title })));
+    return {
+      ...course,
+      id: course?.id || course?._id,
+      _id: course?._id || course?.id,
+      chapters: nextChapters,
+      videos: allLessons,
+      lessons: allLessons,
+      price: Math.max(0, Number(coursePrice) || 0),
+      files: nextFiles,
+    };
+  };
+
+  /** Lưu ngay files lên server (không đóng builder) — tránh mất sau F5. */
+  const persistFilesNow = async (nextFiles) => {
+    if (typeof onPatch !== 'function' && typeof onSave !== 'function') return;
+    const payload = buildCoursePayload(nextFiles);
+    try {
+      if (typeof onPatch === 'function') {
+        await Promise.resolve(onPatch(payload));
+      } else {
+        await Promise.resolve(onSave(payload, { close: false }));
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Không lưu được tài liệu lên server');
+      throw err;
+    }
+  };
+
+  const handleCourseFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setFileUploading(true);
+    try {
+      const data = await api.settings.uploadTrainingFile(file);
+      if (!data?.success) throw new Error(data?.message || 'Upload thất bại');
+      const title = String(file.name || '').replace(/\.[^.]+$/, '') || file.name || 'Tài liệu';
+      const nextFiles = [
+        ...files,
+        {
+          id: `file-${Date.now()}`,
+          title,
+          fileUrl: data.fileUrl,
+          url: data.fileUrl,
+          fileType: extToFileType(file.name),
+          type: extToFileType(file.name),
+          fileSize: formatFileSize(file.size),
+          size: formatFileSize(file.size),
+          fileOriginalName: file.name,
+        },
+      ];
+      setFiles(nextFiles);
+      await persistFilesNow(nextFiles);
+      toast.success('Đã tải và lưu tài liệu lên khóa học');
+    } catch (err) {
+      toast.error(err?.message || 'Lỗi tải lên');
+    } finally {
+      setFileUploading(false);
+    }
+  };
+
+  const addFileByLink = async () => {
+    const title = String(linkDraft.title || '').trim();
+    const url = String(linkDraft.url || '').trim();
+    if (!url) {
+      toast.error('Nhập link Drive / URL file');
+      return;
+    }
+    if (!/^https?:\/\//i.test(url) && !url.startsWith('/uploads/')) {
+      toast.error('Link phải bắt đầu bằng http(s):// hoặc /uploads/');
+      return;
+    }
+    const nextFiles = [
+      ...files,
+      {
+        id: `file-${Date.now()}`,
+        title: title || 'Tài liệu đính kèm',
+        fileUrl: url,
+        url,
+        fileType: 'LINK',
+        type: 'LINK',
+        fileSize: '',
+        size: '',
+        fileOriginalName: title || '',
+      },
+    ];
+    setFiles(nextFiles);
+    setLinkDraft({ title: '', url: '' });
+    try {
+      await persistFilesNow(nextFiles);
+      toast.success('Đã thêm và lưu link tài liệu');
+    } catch {
+      /* toast in persistFilesNow */
+    }
+  };
+
+  const saveFileTitle = async (fileId) => {
+    const next = String(editFileTitle || '').trim();
+    if (!next) {
+      toast.error('Tiêu đề không được trống');
+      return;
+    }
+    const nextFiles = files.map((f) => (
+      String(f.id) === String(fileId) ? { ...f, title: next } : f
+    ));
+    setFiles(nextFiles);
+    setEditingFileId(null);
+    setEditFileTitle('');
+    try {
+      await persistFilesNow(nextFiles);
+    } catch {
+      /* toast in persist */
+    }
+  };
+
+  const removeFile = async (fileId) => {
+    if (!(await window.cmsConfirm('Xóa tài liệu này khỏi khóa học?'))) return;
+    const nextFiles = files.filter((f) => String(f.id) !== String(fileId));
+    setFiles(nextFiles);
+    try {
+      await persistFilesNow(nextFiles);
+      toast.success('Đã xóa tài liệu');
+    } catch {
+      /* toast in persist */
+    }
+  };
+
   // --- SAVE ---
-  const handleSave = () => {
-    if (onSave) {
-      const allLessons = chapters.flatMap(c => c.lessons.map(l => ({ ...l, chapterTitle: c.title })));
-      onSave({
-        ...course,
-        chapters,
-        videos: allLessons,
-        lessons: allLessons,
-        price: Math.max(0, Number(coursePrice) || 0),
-      });
+  const handleSave = async () => {
+    if (!onSave) return;
+    setSaving(true);
+    try {
+      await Promise.resolve(onSave(buildCoursePayload(), { close: true }));
       toast.success('Đã lưu giáo trình thành công!');
+    } catch (err) {
+      toast.error(err?.message || 'Lưu giáo trình thất bại');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -198,11 +359,12 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
               <button
                 type="button"
                 onClick={handleSave}
-                className="inline-flex items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-600 text-white text-sm font-bold shadow-md hover:shadow-lg transition"
+                disabled={saving || fileUploading}
+                className="inline-flex items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-600 text-white text-sm font-bold shadow-md hover:shadow-lg transition disabled:opacity-60"
               >
-                <Save size={16} />
-                <span className="hidden sm:inline">Lưu giáo trình</span>
-                <span className="sm:hidden">Lưu</span>
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                <span className="hidden sm:inline">{saving ? 'Đang lưu...' : 'Lưu giáo trình'}</span>
+                <span className="sm:hidden">{saving ? '...' : 'Lưu'}</span>
               </button>
             </div>
           </div>
@@ -498,6 +660,149 @@ const AdminCourseBuilder = ({ course, onBack, onSave }) => {
           >
             <Plus size={18} /> Thêm Phần/Chương mới
           </button>
+
+          {/* Tài liệu đính kèm khóa — hiện ở tab Tài liệu trong player video */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden min-w-0">
+            <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-5 py-3 sm:py-4">
+              <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 min-w-0">
+                <FileBox className="text-emerald-600 shrink-0" size={20} />
+                <span className="truncate">Tài liệu đính kèm khóa học</span>
+                <span className="text-xs font-bold text-slate-500 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                  {files.length} file
+                </span>
+              </h2>
+              <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                File / link ở đây hiện trong tab <strong>Tài liệu</strong> khi học viên mở khóa video.
+              </p>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className={`inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 text-emerald-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-emerald-100 transition-colors ${fileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                  {fileUploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+                  {fileUploading ? 'Đang tải...' : 'Tải tệp lên'}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar"
+                    onChange={handleCourseFileUpload}
+                    disabled={fileUploading}
+                  />
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
+                <p className="text-[11px] font-black uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+                  <Link2 size={12} /> Hoặc thêm bằng link (Drive / URL)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_auto] gap-2">
+                  <input
+                    value={linkDraft.title}
+                    onChange={(e) => setLinkDraft((d) => ({ ...d, title: e.target.value }))}
+                    placeholder="Tiêu đề (tùy chọn)"
+                    className="w-full min-h-11 border border-slate-200 px-3 rounded-xl text-sm outline-none focus:border-emerald-400"
+                  />
+                  <input
+                    value={linkDraft.url}
+                    onChange={(e) => setLinkDraft((d) => ({ ...d, url: e.target.value }))}
+                    placeholder="https://drive.google.com/..."
+                    className="w-full min-h-11 border border-slate-200 px-3 rounded-xl text-sm outline-none focus:border-emerald-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={addFileByLink}
+                    className="min-h-11 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold inline-flex items-center justify-center gap-1.5"
+                  >
+                    <Plus size={16} /> Thêm
+                  </button>
+                </div>
+              </div>
+
+              {files.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-sm font-semibold border-2 border-dashed border-slate-200 rounded-xl bg-white">
+                  Chưa có tài liệu — tải tệp hoặc dán link phía trên
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {files.map((file) => {
+                    const href = file.fileUrl || file.url
+                      ? buildMediaDownloadUrl(file.fileUrl || file.url, file.fileOriginalName || file.title)
+                      : null;
+                    const isEditing = String(editingFileId) === String(file.id);
+                    return (
+                      <li
+                        key={file.id}
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded-xl border border-slate-200 bg-white p-3 min-w-0"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <FileBox size={16} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {isEditing ? (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input
+                                autoFocus
+                                value={editFileTitle}
+                                onChange={(e) => setEditFileTitle(e.target.value)}
+                                className="w-full min-h-10 border border-slate-200 px-3 rounded-xl text-sm outline-none focus:border-emerald-400"
+                              />
+                              <div className="flex gap-2 shrink-0">
+                                <button type="button" onClick={() => saveFileTitle(file.id)} className="min-h-10 px-3 rounded-xl bg-emerald-600 text-white text-xs font-bold">Lưu</button>
+                                <button type="button" onClick={() => { setEditingFileId(null); setEditFileTitle(''); }} className="min-h-10 px-3 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">Hủy</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm font-bold text-slate-800 truncate">{file.title || 'Tài liệu'}</p>
+                              <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                {[file.fileType || file.type, file.fileSize || file.size, trainingUploadDisplayName(file.fileUrl || file.url, file.fileOriginalName)]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                        {!isEditing && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {href ? (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center justify-center min-w-10 min-h-10 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl"
+                                title="Mở / tải"
+                              >
+                                <Download size={14} />
+                              </a>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingFileId(file.id);
+                                setEditFileTitle(file.title || '');
+                              }}
+                              className="inline-flex items-center justify-center min-w-10 min-h-10 text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl"
+                              aria-label="Sửa tiêu đề"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeFile(file.id)}
+                              className="inline-flex items-center justify-center min-w-10 min-h-10 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl"
+                              aria-label="Xóa tài liệu"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

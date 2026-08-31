@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Loader2, List } from 'lucide-react';
-import useCertPrepSession from '../../../hooks/useCertPrepSession';
+import useCertPrepSession, { isQuestionAnswered } from '../../../hooks/useCertPrepSession';
 import { isImmediateFeedback } from '../../../utils/certPrepGrade';
 import { useData } from '../../../context/DataContext';
 import ExamClickOutsideGuard from '../../exam/ExamClickOutsideGuard';
@@ -59,24 +59,26 @@ export default function CertPrepStudentPlayer() {
 
   const q = player.currentQuestion;
   const qid = q?.id ? String(q.id) : '';
-  const currentRevealed = Boolean(qid && revealedIds[qid]);
-  const answerLocked = player.locked || (immediate && currentRevealed);
+  const currentRevealed = Boolean(qid && (revealedIds[qid] || revealedIds[q.id]));
+  const currentAnswered = isQuestionAnswered(q, player.answers[q?.id] ?? player.answers[qid]);
+  const answerLocked = player.locked || (immediate && currentRevealed && currentAnswered);
 
   const handleNext = useCallback(() => {
     if (!q || player.locked) return;
-    if (immediate && !revealedIds[q.id]) {
-      setRevealedIds((prev) => ({ ...prev, [q.id]: true }));
+    if (immediate && !revealedIds[q.id] && !revealedIds[qid]) {
+      if (!isQuestionAnswered(q, player.answers[q.id] ?? player.answers[qid])) return;
+      setRevealedIds((prev) => ({ ...prev, [q.id]: true, [qid]: true }));
       return;
     }
     player.next();
-  }, [immediate, revealedIds, q, player]);
+  }, [immediate, revealedIds, q, qid, player]);
 
   const nextMeta = useMemo(() => {
     const last = player.currentIndex >= player.questions.length - 1;
-    if (immediate && q && !revealedIds[q.id]) {
+    if (immediate && q && !revealedIds[q.id] && !revealedIds[qid]) {
       return {
         label: 'Hiển thị đáp án',
-        disabled: false,
+        disabled: !isQuestionAnswered(q, player.answers[q.id] ?? player.answers[qid]),
         primary: true,
       };
     }
@@ -85,7 +87,7 @@ export default function CertPrepStudentPlayer() {
       disabled: last,
       primary: false,
     };
-  }, [immediate, q, revealedIds, player.currentIndex, player.questions.length]);
+  }, [immediate, q, qid, revealedIds, player.currentIndex, player.questions.length, player.answers]);
 
   const back = (
     <button

@@ -34,3 +34,42 @@ test('canEnterCertificationExam: chua_thi / dang_thi allowed', async () => {
   assert.equal(canEnterCertificationExam({ status: 'dat' }, now), false);
   assert.equal(canEnterCertificationExam({ status: 'dang_thi', lockUntil: now + 99999 }, now), false);
 });
+
+test('canStartCertificationSubject: unlocked or milestone, not locked fail', async () => {
+  const { canStartCertificationSubject } = await loadExamSubjects();
+  const catalog = undefined;
+  const enrollments = [{
+    courseName: 'Tin học văn phòng',
+    examSubjects: ['word', 'excel', 'powerpoint'],
+    completedSessions: 4,
+    totalSessions: 12,
+    examUnlocked: false,
+  }];
+  const student = {
+    course: 'Tin học văn phòng',
+    completedSessions: 4,
+    totalSessions: 12,
+    studentExamUnlocked: false,
+  };
+  assert.equal(canStartCertificationSubject({
+    student,
+    enrollments,
+    subjectId: 'word',
+    catalog,
+    examProgressEntry: { status: 'chua_thi' },
+  }), true);
+  assert.equal(canStartCertificationSubject({
+    student,
+    enrollments,
+    subjectId: 'excel',
+    catalog,
+    examProgressEntry: { status: 'chua_thi' },
+  }), false);
+  assert.equal(canStartCertificationSubject({
+    student,
+    enrollments,
+    subjectId: 'word',
+    catalog,
+    examProgressEntry: { status: 'khong_dat' },
+  }), false);
+});

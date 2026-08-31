@@ -10,6 +10,13 @@ const { policyShadowQuizAdminRead } = require('../middleware/policyShadowQuizAdm
 const { policyShadowQuiz } = require('../middleware/policyShadowQuiz');
 const { quizzesCutoverGate } = require('../middleware/quizzesCutoverGate');
 const { scheduleQuizAssignedNotify } = require('../services/quizAssignedNotifier');
+const {
+  studentAssignedToQuiz,
+  quizWindow,
+  existingSubmissionPayload,
+  studentCourseNames,
+  claimQuizSubmission,
+} = require('../services/quizAccess');
 
 /** Phase 7.22: policyShadowQuiz → quizzesCutoverGate */
 function quizzesGuard(action) {
@@ -126,15 +133,23 @@ router.get('/student', [authMiddleware, ...quizzesGuard('student_list')], async 
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
 
-    const studentCourses = [student.course, ...(student.enrollments || []).map(e => e.courseName)].filter(Boolean);
+    const studentCourses = studentCourseNames(student);
 
-    // Lọc quiz dành cho lớp của học viên HOẶC đích danh học viên
     const quizzes = await LessonQuiz.find({
       status: 'active',
       $or: [
         { targetStudentIds: studentId },
-        { targetStudentIds: { $size: 0 }, courseName: { $in: studentCourses } },
-        { targetStudentIds: { $exists: false } },
+        {
+          $and: [
+            {
+              $or: [
+                { targetStudentIds: { $size: 0 } },
+                { targetStudentIds: { $exists: false } },
+              ],
+            },
+            { courseName: { $in: studentCourses } },
+          ],
+        },
       ],
     }).sort({ createdAt: -1 }).lean();
 
@@ -174,7 +189,28 @@ router.get('/:id', [authMiddleware, ...quizzesGuard('get')], async (req, res) =>
     }));
 
     const studentId = req.user.id || req.user._id;
+    const isStudent = req.user.role === 'student';
+    let student = null;
+    if (isStudent) {
+      student = await Student.findById(studentId).lean();
+      if (!student) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+      }
+      if (!studentAssignedToQuiz(quiz, student)) {
+        return res.status(403).json({ success: false, message: 'Bài trắc nghiệm này không dành cho bạn' });
+      }
+    }
+
     const mySub = (quiz.submissions || []).find(s => String(s.studentId) === String(studentId));
+    const windowState = quizWindow(quiz);
+    if (isStudent && !mySub) {
+      if (windowState.notYetOpen) {
+        return res.status(403).json({ success: false, message: 'Chưa đến giờ làm bài' });
+      }
+      if (windowState.expired) {
+        return res.status(403).json({ success: false, message: 'Bài trắc nghiệm đã hết hạn' });
+      }
+    }
 
     // Chỉ khi đã nộp (không phải thoát giữa giờ) mới gửi chi tiết xem lại
     let detailedReview = [];
@@ -231,6 +267,15 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
     const existingIndex = quiz.submissions.findIndex(s => String(s.studentId) === String(studentId));
     const existing = existingIndex >= 0 ? quiz.submissions[existingIndex] : null;
 
+    if (!studentAssignedToQuiz(quiz, student)) {
+      return res.status(403).json({ success: false, message: 'Bài trắc nghiệm này không dành cho bạn' });
+    }
+
+    const windowState = quizWindow(quiz);
+    if (!existing && windowState.notYetOpen) {
+      return res.status(403).json({ success: false, message: 'Chưa đến giờ làm bài' });
+    }
+
     if (existing?.forfeit) {
       return res.status(403).json({
         success: false,
@@ -248,21 +293,12 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
       });
     }
 
-    // Đã nộp bình thường rồi mà gửi forfeit (reload muộn) → giữ bài cũ
-    if (isForfeit && existing && !existing.forfeit) {
+    // Đã nộp bình thường rồi — giữ bài cũ (kể cả forfeit muộn / nộp lại)
+    if (existing && !existing.forfeit) {
       return res.json({
         success: true,
         message: 'Bài đã nộp trước đó',
-        data: {
-          score: existing.score,
-          correctCount: existing.correctCount,
-          totalQuestions: existing.totalQuestions,
-          status: existing.status,
-          forfeit: false,
-          exitReason: '',
-          submittedAt: existing.submittedAt,
-          detailedReview: [],
-        },
+        data: existingSubmissionPayload(existing),
       });
     }
 
@@ -302,13 +338,38 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
       exitReason: reason,
     };
 
-    if (existingIndex >= 0) {
-      quiz.submissions[existingIndex] = submissionData;
-    } else {
-      quiz.submissions.push(submissionData);
+    // Atomic claim: concurrent requests for the same student cannot both append.
+    const claim = await claimQuizSubmission(
+      LessonQuiz,
+      quizId,
+      student._id,
+      submissionData,
+    );
+    if (!claim.created) {
+      const concurrentExisting = claim.existing;
+      if (concurrentExisting?.forfeit) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bạn đã bị tính RỚT do thoát giữa giờ. Không thể làm lại bài này.',
+          code: 'QUIZ_FORFEITED',
+          data: existingSubmissionPayload(concurrentExisting),
+        });
+      }
+      if (concurrentExisting) {
+        return res.json({
+          success: true,
+          message: 'Bài đã được ghi nhận trước đó',
+          data: {
+            ...existingSubmissionPayload(concurrentExisting),
+            idempotent: true,
+          },
+        });
+      }
+      return res.status(409).json({
+        success: false,
+        message: 'Không thể xác nhận quyền ghi bài nộp',
+      });
     }
-
-    await quiz.save();
 
     // Thông báo GV (bỏ qua forfeit trùng khi đã nộp bình thường — đã return sớm ở trên)
     try {

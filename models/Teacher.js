@@ -59,6 +59,15 @@ const TeacherSchema = new mongoose.Schema(
     testMcCorrect: { type: Number, default: null },
     testMcWrong: { type: Number, default: null },
     testMcTotal: { type: Number, default: null },
+    /** Optional server-issued attempt metadata; no backfill/migration is required. */
+    examAttemptId: { type: String, default: null },
+    examAttemptStatus: {
+      type: String,
+      enum: ['active', 'submitted', 'forfeited', null],
+      default: null,
+    },
+    examAttemptStartedAt: { type: Date, default: null },
+    examAttemptSubmittedAt: { type: Date, default: null },
     /** Số lần không thấy mặt/mắt trong oval (cộng dồn, không reset khi thấy lại) */
     faceViolationCount: { type: Number, default: 0 },
 

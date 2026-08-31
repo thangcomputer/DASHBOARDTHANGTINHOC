@@ -110,7 +110,15 @@ export default function StudentQuizList() {
             let isExpired = false;
             let deadlineText = '';
             let isWarning = false;
-            if (quiz.deadline) {
+            let notYetOpen = false;
+            if (quiz.startTime) {
+              const startTime = new Date(quiz.startTime).getTime();
+              if (Number.isFinite(startTime) && now < startTime) {
+                notYetOpen = true;
+                deadlineText = `Mở sau: ${formatCountdown(startTime - now)}`;
+              }
+            }
+            if (quiz.deadline && !notYetOpen) {
               const deadlineTime = new Date(quiz.deadline).getTime();
               const diffMs = deadlineTime - now;
               if (diffMs <= 0) {
@@ -118,7 +126,6 @@ export default function StudentQuizList() {
                 deadlineText = 'Đã hết hạn';
               } else {
                 deadlineText = `Hết hạn sau: ${formatCountdown(diffMs)}`;
-                // Cảnh báo nếu còn dưới 1 giờ
                 if (diffMs < 3600000) isWarning = true;
               }
             }
@@ -157,8 +164,8 @@ export default function StudentQuizList() {
                       <User size={12} className="shrink-0" />
                       <span className="truncate">GV: {quiz.teacherName}</span>
                     </span>
-                    {quiz.deadline && (
-                      <span className={`inline-flex items-center gap-1 ${isExpired ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-blue-600'}`}>
+                    {(quiz.deadline || quiz.startTime) && deadlineText && (
+                      <span className={`inline-flex items-center gap-1 ${isExpired ? 'text-red-600' : isWarning || notYetOpen ? 'text-amber-600' : 'text-blue-600'}`}>
                         <AlertCircle size={12} className="shrink-0" />
                         <span>{deadlineText}</span>
                       </span>
@@ -182,11 +189,11 @@ export default function StudentQuizList() {
                 <button
                   type="button"
                   onClick={() => setActiveQuizId(quiz._id)}
-                  disabled={!hasSubmitted && isExpired}
+                  disabled={!hasSubmitted && (isExpired || notYetOpen)}
                   className={`mt-4 w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm ${
                     hasSubmitted
                       ? 'bg-slate-800 hover:bg-slate-900 text-white'
-                      : isExpired
+                      : isExpired || notYetOpen
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                       : 'bg-red-600 hover:bg-red-700 text-white'
                   }`}
@@ -194,6 +201,10 @@ export default function StudentQuizList() {
                   {hasSubmitted ? (
                     <>
                       <CheckCircle size={14} /> Xem lại bài thi ({score}%)
+                    </>
+                  ) : notYetOpen ? (
+                    <>
+                      <Clock size={14} /> Chưa đến giờ
                     </>
                   ) : (
                     <>

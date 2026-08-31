@@ -94,16 +94,27 @@ function emitFinanceEvent(io, { branchId, userIds } = {}, event, payload) {
   emitUsers(io, userIds, event, payload);
 }
 
+/** Normalize user/ref id — tránh String(populatedDoc) === "[object Object]". */
+function asRoomId(value) {
+  if (value == null || value === '') return '';
+  if (typeof value === 'object') {
+    const id = value._id || value.id;
+    return id != null ? String(id) : '';
+  }
+  return String(value);
+}
+
 /**
  * Schedule / attendance: branch + teacher + student user rooms.
  */
 function emitScheduleEvent(io, { branchId, teacherId, studentId } = {}, event, payload) {
   if (!io) return;
+  const sid = asRoomId(studentId);
+  const tid = asRoomId(teacherId);
   emitBranch(io, branchId, event, payload);
-  const users = [teacherId, studentId].filter(Boolean);
-  emitUsers(io, users, event, payload);
-  if (studentId) io.to(`student_${String(studentId)}`).emit(event, payload);
-  if (teacherId) io.to(`teacher_${String(teacherId)}`).emit(event, payload);
+  emitUsers(io, [tid, sid].filter(Boolean), event, payload);
+  if (sid) io.to(`student_${sid}`).emit(event, payload);
+  if (tid) io.to(`teacher_${tid}`).emit(event, payload);
 }
 
 module.exports = {

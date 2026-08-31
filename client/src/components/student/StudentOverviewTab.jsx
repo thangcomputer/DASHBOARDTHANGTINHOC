@@ -69,15 +69,17 @@ export default function StudentOverviewTab({
     return list[0] || null;
   }, [mySchedules, ongoingSchedule, nowTick]);
 
-  const isLive = Boolean(ongoingSchedule) || Boolean(viewStudent.isLikelyLiveClass);
-  const joinUrl = ongoingSchedule?.linkHoc || featuredSchedule?.linkHoc || viewStudent.joinClassUrl || '';
+  const isLive = Boolean(ongoingSchedule);
+  const joinUrl = ongoingSchedule?.linkHoc || featuredSchedule?.linkHoc || '';
   const courseLabel = ongoingSchedule?.course || featuredSchedule?.course || viewStudent.course;
   const sessionTimeRange = featuredSchedule
     ? `${featuredSchedule.startTime || ''}${featuredSchedule.endTime ? ` - ${featuredSchedule.endTime}` : ''}`.trim()
     : '';
+  // Không fallback nextClassTime — dễ stale sau GV hủy/đổi lịch (chờ student profile refresh).
   const sessionDay = featuredSchedule
     ? formatSessionDayLabel(featuredSchedule.date)
-    : (viewStudent.nextClassTime ? formatSessionDayLabel(viewStudent.nextClassTime) : { weekday: '', dateLabel: '' });
+    : { weekday: '', dateLabel: '' };
+  const hasUpcomingClass = Boolean(ongoingSchedule || featuredSchedule);
   const sessionWhenLabel = [
     sessionTimeRange ? `Ca ${sessionTimeRange}` : '',
     sessionDay.weekday,
@@ -239,7 +241,9 @@ export default function StudentOverviewTab({
               className={`rounded-[16px] sm:rounded-2xl p-4 text-white relative overflow-hidden border ${
                 isLive
                   ? 'bg-gradient-to-r from-red-600 via-rose-600 to-indigo-700 shadow-xl shadow-red-500/20 border-red-400/30 animate-pulse'
-                  : 'bg-gradient-to-br from-red-600 to-red-700 shadow-[0_6px_20px_rgba(0,0,0,0.06)] border-transparent'
+                  : hasUpcomingClass
+                    ? 'bg-gradient-to-br from-red-600 to-red-700 shadow-[0_6px_20px_rgba(0,0,0,0.06)] border-transparent'
+                    : 'bg-gradient-to-br from-slate-500 to-slate-600 shadow-[0_6px_20px_rgba(0,0,0,0.06)] border-transparent'
               }`}
             >
               <div className="relative z-10 space-y-3">
@@ -250,12 +254,17 @@ export default function StudentOverviewTab({
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
                       </span>
-                      Ca học đang diễn ra
+                      Buổi học đang diễn ra
                     </>
-                  ) : (
+                  ) : hasUpcomingClass ? (
                     <>
                       <Zap size={14} className="shrink-0" aria-hidden="true" />
                       Lớp học sắp diễn ra
+                    </>
+                  ) : (
+                    <>
+                      <Calendar size={14} className="shrink-0" aria-hidden="true" />
+                      Chưa có lịch sắp tới
                     </>
                   )}
                 </p>
@@ -271,7 +280,11 @@ export default function StudentOverviewTab({
                           {sessionWhenLabel}
                         </span>
                       </p>
-                    ) : null}
+                    ) : (
+                      <p className="cms-sd-body text-white/80">
+                        {hasUpcomingClass ? 'Đang cập nhật thời gian…' : 'Khi GV xếp lịch mới, buổi học sẽ hiện tại đây.'}
+                      </p>
+                    )}
                     <p className="cms-sd-body text-white/90 flex items-center gap-2 min-w-0">
                       <Calendar size={16} className="shrink-0" aria-hidden="true" />
                       <span className="truncate">
@@ -284,19 +297,26 @@ export default function StudentOverviewTab({
                       </span>
                     </p>
                   </div>
-                  <a
-                    href={joinUrl || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`cms-sd-btn w-full md:w-auto ${
-                      isLive
-                        ? 'bg-white text-red-600 hover:bg-red-50 shadow-lg'
-                        : 'bg-white text-red-600 hover:bg-red-50'
-                    }`}
-                  >
-                    <Video size={20} aria-hidden="true" />
-                    VÀO LỚP NGAY
-                  </a>
+                  {hasUpcomingClass && joinUrl ? (
+                    <a
+                      href={joinUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`cms-sd-btn w-full md:w-auto ${
+                        isLive
+                          ? 'bg-white text-red-600 hover:bg-red-50 shadow-lg'
+                          : 'bg-white text-red-600 hover:bg-red-50'
+                      }`}
+                    >
+                      <Video size={20} aria-hidden="true" />
+                      VÀO LỚP NGAY
+                    </a>
+                  ) : hasUpcomingClass ? (
+                    <span className="cms-sd-btn w-full md:w-auto bg-white/20 text-white cursor-default">
+                      <Video size={20} aria-hidden="true" />
+                      Chưa có link học
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <PlayCircle size={140} className="absolute -right-8 -bottom-8 text-white opacity-10 hidden md:block pointer-events-none" aria-hidden="true" />

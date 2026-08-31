@@ -14,11 +14,14 @@ export default function CertPrepMatching({
   const correctByItem = new Map(
     (question.matchingPairs || []).map((p) => [String(p.itemId), String(p.targetId)]),
   );
-  const targetOf = (itemId) => pairs.find((p) => p.itemId === itemId)?.targetId || '';
+  const targetOf = (itemId) => {
+    const hit = pairs.find((p) => String(p.itemId) === String(itemId));
+    return hit?.targetId != null && hit.targetId !== '' ? String(hit.targetId) : '';
+  };
 
   const setPair = (itemId, targetId) => {
-    const rest = pairs.filter((p) => p.itemId !== itemId);
-    onChange(targetId ? [...rest, { itemId, targetId }] : rest);
+    const rest = pairs.filter((p) => String(p.itemId) !== String(itemId));
+    onChange(targetId ? [...rest, { itemId: String(itemId), targetId: String(targetId) }] : rest);
   };
 
   return (
@@ -61,7 +64,7 @@ export default function CertPrepMatching({
             >
               <option value="">Chọn đáp án</option>
               {targets.map((t, ti) => (
-                <option key={t.id} value={t.id}>
+                <option key={t.id} value={String(t.id)}>
                   {ti + 1}. {t.text || ''}
                 </option>
               ))}

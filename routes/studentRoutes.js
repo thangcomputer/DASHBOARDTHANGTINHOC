@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const Student = require('../models/Student');
 const Invoice = require('../models/Invoice');
@@ -22,6 +23,7 @@ const { buildStudentSearchAndConditions } = require('../utils/personSearchQuery'
 const {
   applyEnrollmentStats,
   legacyEnrollmentFromStudent,
+  resolveEnrollmentIndex,
   studentMatchesTeacher,
   resolveEnrollmentExamSubjects,
   syncStudentFromPrimaryEnrollment,
@@ -67,6 +69,13 @@ const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../s
 const { refundStudentTuition, payTeacherForStudent } = require('../services/studentFinanceService');
 const cache = require('../utils/cache');
 const { emitDataRefresh, emitBranch } = require('../utils/realtimeEmit');
+const { getCachedSettings } = require('../services/settingsCache');
+const {
+  createExamAttempt,
+  gradeExamAttempt,
+  verifyAttemptToken,
+} = require('../services/examAttemptService');
+const { claimStudentAttempt } = require('../services/examAttemptStore');
 const {
   purgeStudentSideEffects,
   purgeCancelledOnlyStudents,
@@ -946,6 +955,13 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
       req.body.status = 'Đang học';
     }
 
+    const { normalizeVNPhone } = require('../utils/phoneIdentity');
+    const canonicalPhone = normalizeVNPhone(req.body.phone);
+    if (!canonicalPhone) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+    }
+    req.body.phone = canonicalPhone;
+
     // 1 SĐT / 1 email duy nhất — không trùng HV khác hoặc GV
     try {
       const { assertUniqueContact } = require('../utils/uniqueContact');
@@ -1338,6 +1354,14 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
       || safeBody.zalo !== undefined
       || safeBody.email !== undefined
     ) {
+      if (safeBody.phone !== undefined) {
+        const { normalizeVNPhone } = require('../utils/phoneIdentity');
+        const canonicalPhone = normalizeVNPhone(safeBody.phone);
+        if (!canonicalPhone) {
+          return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+        }
+        safeBody.phone = canonicalPhone;
+      }
       const current = await Student.findById(req.params.id).select('phone zalo email').lean();
       if (!current) {
         return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
@@ -1633,29 +1657,329 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
   }
 });
 
+const studentExamGuard = [
+  authMiddleware,
+  branchFilter,
+  policyShadowStudentMutation('exam_progress'),
+  assertStudentBranchAccess,
+];
+const STUDENT_EXAM_LOCK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function studentAttemptResponse(entry, extra = {}) {
+  const score = Number(entry?.tracNghiem?.score) || 0;
+  const total = Number(entry?.tracNghiem?.total) || 0;
+  return {
+    attemptId: entry?.attemptId || '',
+    score,
+    total,
+    percentage: total > 0 ? Math.round((score / total) * 100) : 0,
+    passed: String(entry?.status) === 'dat' || (
+      String(entry?.status) === 'dang_thi' && total > 0 && score / total >= 0.5
+    ),
+    status: entry?.status || 'chua_thi',
+    essayRequired: String(entry?.status) === 'dang_thi',
+    idempotent: false,
+    ...extra,
+  };
+}
+
+function studentExamDurationSeconds(settings, subjectId) {
+  const raw = Number(settings?.studentExamMinutesRaw?.[subjectId]);
+  const minutes = Number.isFinite(raw) && raw >= 1 && raw <= 600 ? raw : 90;
+  return Math.round(minutes * 60);
+}
+
+// ─── POST /api/students/:id/exam-attempt ──────────────────────────────────────
+// Server issues the exact answer-free question set and binds it to student-self.
+router.post('/:id/exam-attempt', studentExamGuard, async (req, res) => {
+  try {
+    if (req.user?.role !== 'student' || String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Chỉ học viên được tạo lượt thi của chính mình' });
+    }
+    const subjectId = String(req.body?.subjectId || '').trim().toLowerCase();
+    if (!subjectId) {
+      return res.status(400).json({ success: false, message: 'Thiếu subjectId' });
+    }
+
+    const { canStudentWriteExamProgress } = require('../services/examProgressService');
+    let [student, settings] = await Promise.all([
+      Student.findById(req.params.id),
+      getCachedSettings(),
+    ]);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
+    }
+    if (!canStudentWriteExamProgress(student, subjectId)) {
+      return res.status(403).json({ success: false, message: 'Môn thi chưa được mở khóa hoặc chưa đủ số buổi' });
+    }
+
+    let entry = (student.examProgress || []).find((item) => String(item.id) === subjectId);
+    if (['dat', 'khong_dat'].includes(String(entry?.status || ''))) {
+      return res.status(409).json({ success: false, message: 'Môn thi đã được chốt, liên hệ Admin để mở lại' });
+    }
+
+    const ttlSeconds = studentExamDurationSeconds(settings, subjectId);
+    const mcAlreadySubmitted = entry?.attemptStatus === 'submitted'
+      && String(entry?.status) === 'dang_thi'
+      && Number(entry?.tracNghiem?.total) > 0
+      && Number(entry?.tracNghiem?.score) / Number(entry?.tracNghiem?.total) >= 0.5;
+    let attemptId = (entry?.attemptStatus === 'active' || mcAlreadySubmitted)
+      ? String(entry.attemptId || '')
+      : '';
+    let startedAt = entry?.attemptStartedAt ? new Date(entry.attemptStartedAt).getTime() : 0;
+    if (!mcAlreadySubmitted && attemptId && startedAt && Date.now() >= startedAt + ttlSeconds * 1000) {
+      await claimStudentAttempt(Student, {
+        studentId: req.params.id,
+        subjectId,
+        attemptId,
+        setFields: {
+          'examProgress.$.status': 'khong_dat',
+          'examProgress.$.lockUntil': Date.now() + STUDENT_EXAM_LOCK_MS,
+          'examProgress.$.attemptStatus': 'forfeited',
+          'examProgress.$.attemptSubmittedAt': new Date(),
+        },
+      });
+      return res.status(409).json({ success: false, message: 'Lượt thi đã hết thời gian' });
+    }
+    if (!attemptId) {
+      const proposedAttemptId = crypto.randomUUID();
+      startedAt = Date.now();
+      const attemptEntry = {
+        id: subjectId,
+        status: 'dang_thi',
+        attemptId: proposedAttemptId,
+        attemptStatus: 'active',
+        attemptStartedAt: new Date(startedAt),
+        attemptSubmittedAt: null,
+      };
+      let claimed;
+      if (!entry) {
+        claimed = await Student.findOneAndUpdate(
+          { _id: req.params.id, 'examProgress.id': { $ne: subjectId } },
+          { $push: { examProgress: attemptEntry } },
+          { returnDocument: 'after', runValidators: true },
+        );
+      } else {
+        claimed = await Student.findOneAndUpdate(
+          {
+            _id: req.params.id,
+            examProgress: {
+              $elemMatch: {
+                id: subjectId,
+                attemptStatus: { $ne: 'active' },
+                status: { $nin: ['dat', 'khong_dat'] },
+              },
+            },
+          },
+          {
+            $set: {
+              'examProgress.$.status': 'dang_thi',
+              'examProgress.$.attemptId': proposedAttemptId,
+              'examProgress.$.attemptStatus': 'active',
+              'examProgress.$.attemptStartedAt': new Date(startedAt),
+              'examProgress.$.attemptSubmittedAt': null,
+            },
+          },
+          { returnDocument: 'after', runValidators: true },
+        );
+      }
+      student = claimed || await Student.findById(req.params.id);
+      entry = (student?.examProgress || []).find((item) => String(item.id) === subjectId);
+      if (!entry || entry.attemptStatus !== 'active' || !entry.attemptId) {
+        return res.status(409).json({ success: false, message: 'Không thể xác nhận lượt thi đang hoạt động' });
+      }
+      attemptId = String(entry.attemptId);
+      startedAt = entry.attemptStartedAt ? new Date(entry.attemptStartedAt).getTime() : startedAt;
+    }
+
+    const remainingSeconds = mcAlreadySubmitted
+      ? 1
+      : Math.max(1, Math.floor((startedAt + ttlSeconds * 1000 - Date.now()) / 1000));
+    const attempt = createExamAttempt({
+      kind: 'student',
+      userId: req.user.id,
+      subjectIds: [subjectId],
+      bank: settings?.studentExamBankRawData,
+      attemptId,
+      ttlSeconds: remainingSeconds,
+    });
+    const essayRequired = settings?.studentEssayRequiredRaw?.[subjectId] !== false;
+    return res.json({
+      success: true,
+      data: {
+        ...attempt,
+        subjectId,
+        essayRequired,
+        passPercentage: 50,
+        durationSeconds: ttlSeconds,
+        mcSubmitted: mcAlreadySubmitted,
+        mcResult: mcAlreadySubmitted
+          ? studentAttemptResponse(entry, { essayRequired, idempotent: true })
+          : null,
+      },
+    });
+  } catch (error) {
+    logger.error('[STUDENTS] create exam attempt:', error.message);
+    return res.status(error.status || 500).json({ success: false, message: error.message || 'Lỗi server' });
+  }
+});
+
+// ─── POST /api/students/:id/exam-attempt/submit ───────────────────────────────
+router.post('/:id/exam-attempt/submit', studentExamGuard, async (req, res) => {
+  try {
+    if (req.user?.role !== 'student' || String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Không thể nộp lượt thi của học viên khác' });
+    }
+    const settings = await getCachedSettings();
+    const graded = gradeExamAttempt({
+      token: req.body?.attemptToken,
+      expected: { kind: 'student', userId: req.user.id },
+      bank: settings?.studentExamBankRawData,
+      answers: req.body?.answers,
+    });
+    const subjectId = String(graded.payload.subjectIds[0] || '');
+    if (!subjectId || graded.payload.subjectIds.length !== 1) {
+      return res.status(400).json({ success: false, message: 'Attempt không có đúng một môn thi' });
+    }
+    const essayRequired = settings?.studentEssayRequiredRaw?.[subjectId] !== false;
+    const now = new Date();
+    const nextStatus = graded.result.passed
+      ? (essayRequired ? 'dang_thi' : 'dat')
+      : 'khong_dat';
+    const setFields = {
+      'examProgress.$.tracNghiem.score': graded.result.correct,
+      'examProgress.$.tracNghiem.total': graded.result.total,
+      'examProgress.$.status': nextStatus,
+      'examProgress.$.attemptStatus': 'submitted',
+      'examProgress.$.attemptSubmittedAt': now,
+    };
+    if (!graded.result.passed) {
+      setFields['examProgress.$.lockUntil'] = Date.now() + STUDENT_EXAM_LOCK_MS;
+      setFields['examProgress.$.thucHanh'] = 'chua_nop';
+    } else {
+      setFields['examProgress.$.lockUntil'] = null;
+    }
+
+    const student = await claimStudentAttempt(Student, {
+      studentId: req.params.id,
+      subjectId,
+      attemptId: graded.payload.attemptId,
+      setFields,
+    });
+
+    if (!student) {
+      const existingStudent = await Student.findById(req.params.id).select('examProgress').lean();
+      const existing = (existingStudent?.examProgress || []).find(
+        (item) => String(item.id) === subjectId && String(item.attemptId) === graded.payload.attemptId,
+      );
+      if (existing?.attemptStatus === 'submitted') {
+        return res.json({
+          success: true,
+          data: studentAttemptResponse(existing, {
+            essayRequired,
+            idempotent: true,
+          }),
+        });
+      }
+      return res.status(409).json({ success: false, message: 'Lượt thi không còn hoạt động hoặc đã được thay thế' });
+    }
+
+    const entry = (student.examProgress || []).find((item) => String(item.id) === subjectId);
+    const io = req.app.get('io');
+    if (io) {
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
+    }
+    return res.json({
+      success: true,
+      data: studentAttemptResponse(entry, {
+        essayRequired,
+        idempotent: false,
+      }),
+    });
+  } catch (error) {
+    logger.warn('[STUDENTS] submit exam attempt: %s', error.message);
+    return res.status(error.status || 400).json({ success: false, message: error.message || 'Không thể nộp bài' });
+  }
+});
+
+// ─── POST /api/students/:id/exam-attempt/forfeit ──────────────────────────────
+router.post('/:id/exam-attempt/forfeit', studentExamGuard, async (req, res) => {
+  try {
+    if (req.user?.role !== 'student' || String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Không thể hủy lượt thi của học viên khác' });
+    }
+    const payload = verifyAttemptToken(req.body?.attemptToken, {
+      kind: 'student',
+      userId: req.user.id,
+    }, { allowExpired: true });
+    const subjectId = String(payload.subjectIds?.[0] || '');
+    const student = await claimStudentAttempt(Student, {
+      studentId: req.params.id,
+      subjectId,
+      attemptId: payload.attemptId,
+      setFields: {
+        'examProgress.$.tracNghiem.score': 0,
+        'examProgress.$.tracNghiem.total': payload.questionIds.length,
+        'examProgress.$.thucHanh': 'chua_nop',
+        'examProgress.$.status': 'khong_dat',
+        'examProgress.$.lockUntil': Date.now() + STUDENT_EXAM_LOCK_MS,
+        'examProgress.$.attemptStatus': 'forfeited',
+        'examProgress.$.attemptSubmittedAt': new Date(),
+      },
+    });
+    if (!student) {
+      const existingStudent = await Student.findById(req.params.id).select('examProgress').lean();
+      const existing = (existingStudent?.examProgress || []).find(
+        (item) => String(item.id) === subjectId && String(item.attemptId) === payload.attemptId,
+      );
+      if (existing && ['forfeited', 'submitted'].includes(existing.attemptStatus)) {
+        return res.json({ success: true, data: studentAttemptResponse(existing, { idempotent: true }) });
+      }
+      return res.status(409).json({ success: false, message: 'Lượt thi không còn hoạt động' });
+    }
+    const entry = (student.examProgress || []).find((item) => String(item.id) === subjectId);
+    return res.json({ success: true, data: studentAttemptResponse(entry) });
+  } catch (error) {
+    return res.status(error.status || 400).json({ success: false, message: error.message || 'Không thể hủy bài' });
+  }
+});
+
 // ─── PUT /api/students/:id/exam-progress ───────────────────────────────────────
-// Học viên cập nhật tiến độ thi 1 môn (server merge + validate)
+// Student-self may only attach practical work after a server-graded MC attempt.
 router.put('/:id/exam-progress', [authMiddleware, branchFilter, policyShadowStudentMutation('exam_progress'), assertStudentBranchAccess], async (req, res) => {
   try {
-    const { applyStudentExamProgress } = require('../services/examProgressService');
+    const { applyStudentExamProgress, canStudentWriteExamProgress } = require('../services/examProgressService');
     const isSelf = req.user.role === 'student' && String(req.user.id) === String(req.params.id);
     const isStaff = req.user.role === 'admin' || req.user.role === 'staff';
     if (!isSelf && !isStaff) {
       return res.status(403).json({ success: false, message: 'Không có quyền cập nhật tiến độ thi' });
     }
 
-    const { subjectId, changes } = req.body || {};
+    const { subjectId } = req.body || {};
+    let { changes } = req.body || {};
     const student = await Student.findById(req.params.id);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
 
     if (isSelf) {
-      const unlocked = Boolean(student.studentExamUnlocked || student.examApproved);
-      const hasActive = (student.examProgress || []).some((e) => e && e.status === 'dang_thi');
-      if (!unlocked && !hasActive) {
+      if (!canStudentWriteExamProgress(student, subjectId)) {
         return res.status(403).json({ success: false, message: 'Chưa được mở khóa phòng thi' });
       }
+      const current = (student.examProgress || []).find((item) => String(item.id) === String(subjectId));
+      if (
+        current?.attemptStatus !== 'submitted'
+        || String(current?.status) !== 'dang_thi'
+        || Number(current?.tracNghiem?.total) < 1
+        || Number(current?.tracNghiem?.score) / Number(current?.tracNghiem?.total) < 0.5
+      ) {
+        return res.status(409).json({ success: false, message: 'Phần trắc nghiệm chưa được server chấm đạt' });
+      }
+      changes = {
+        ...(req.body?.changes?.thucHanh !== undefined ? { thucHanh: req.body.changes.thucHanh } : {}),
+        ...(req.body?.changes?.essayFile !== undefined ? { essayFile: req.body.changes.essayFile } : {}),
+      };
     }
 
     let progress;
@@ -1671,8 +1995,8 @@ router.put('/:id/exam-progress', [authMiddleware, branchFilter, policyShadowStud
 
     const io = req.app.get('io');
     if (io) {
-      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
     }
 
     return res.json({
@@ -2413,7 +2737,7 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
       student.enrollments = [legacyEnrollmentFromStudent(student)];
       student.enrollments[0].isPrimary = true;
     }
-    const idx = (student.enrollments || []).findIndex((e) => String(e._id) === String(req.params.enrollmentId));
+    const idx = resolveEnrollmentIndex(student.enrollments, req.params.enrollmentId);
     if (idx < 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
     }
@@ -2540,8 +2864,10 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
     if (!student.enrollments?.length && student.course) {
       student.enrollments = [legacyEnrollmentFromStudent(student)];
       student.enrollments[0].isPrimary = true;
+      student.markModified('enrollments');
+      await student.save({ validateModifiedOnly: true });
     }
-    const idx = (student.enrollments || []).findIndex((e) => String(e._id) === String(req.params.enrollmentId));
+    const idx = resolveEnrollmentIndex(student.enrollments, req.params.enrollmentId);
     if (idx < 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
     }
@@ -2675,12 +3001,11 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
       return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     }
     if (!student.enrollments?.length && student.course) {
-      const { legacyEnrollmentFromStudent } = require('../services/enrollmentService');
       student.enrollments = [legacyEnrollmentFromStudent(student)];
       student.enrollments[0].isPrimary = true;
     }
     const list = student.enrollments || [];
-    const idx = list.findIndex((e) => String(e._id) === String(req.params.enrollmentId));
+    const idx = resolveEnrollmentIndex(list, req.params.enrollmentId);
     if (idx < 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
     }

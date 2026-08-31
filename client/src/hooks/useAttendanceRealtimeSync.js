@@ -14,8 +14,8 @@ function applyAttendanceSocketToSchedules(prev, eventName, payload) {
   const list = Array.isArray(prev) ? prev : [];
   if (!payload) return list;
 
-  // schedule:updated: full document hoặc patch ghi chú học viên
-  if (eventName === 'schedule:updated') {
+  // schedule:updated / schedule:new: full document hoặc patch ghi chú học viên
+  if (eventName === 'schedule:updated' || eventName === 'schedule:new') {
     const doc = (payload && typeof payload === 'object' && !Array.isArray(payload))
       ? payload
       : { _id: payload };
@@ -27,6 +27,26 @@ function applyAttendanceSocketToSchedules(prev, eventName, payload) {
       if (scheduleKey(sch) !== sid) return sch;
       found = true;
       return { ...sch, ...mapped, id: sch.id || mapped.id };
+    });
+    if (found) return next;
+    if (eventName === 'schedule:new') return [...list, { ...mapped, id: mapped.id || sid }];
+    return list;
+  }
+
+  if (eventName === 'schedule:cancelled') {
+    const scheduleId = String(payload.scheduleId || payload._id || payload.id || '');
+    if (!scheduleId) return list;
+    let found = false;
+    const next = list.map((sch) => {
+      if (scheduleKey(sch) !== scheduleId) return sch;
+      found = true;
+      return {
+        ...sch,
+        ...mapSchedule(payload),
+        id: sch.id || scheduleId,
+        status: 'cancelled',
+        note: payload.reason || payload.note || sch.note,
+      };
     });
     return found ? next : list;
   }
@@ -64,7 +84,7 @@ function applyAttendanceSocketToSchedules(prev, eventName, payload) {
 }
 
 /**
- * GV/Admin: cập nhật lịch điểm danh ngay từ socket — không chờ sync 15s.
+ * GV/Admin/HV: cập nhật lịch điểm danh ngay từ socket — không chờ sync 15s.
  */
 export function useAttendanceRealtimeSync({ enabled, myId, role }) {
   const { socket } = useSocket() || {};
@@ -82,8 +102,11 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       const sid = String(payload.studentId?._id || payload.studentId || '');
       if (role === 'teacher' && tid && tid === String(myId)) return true;
       if (role === 'student' && sid && sid === String(myId)) return true;
-      if (role === 'teacher') return Boolean(payload.scheduleId || payload._id || payload.id);
-      return Boolean(payload.scheduleId || payload._id || payload.id);
+      // schedule:cancelled đôi khi chỉ có scheduleId — vẫn nhận để patch/refetch
+      if (role === 'teacher' || role === 'student') {
+        return Boolean(payload.scheduleId || payload._id || payload.id);
+      }
+      return false;
     };
 
     const bumpStudentProgress = (payload, { revert = false, incrementIfMissing = false, lockCheckIn = false, skipProgress = false } = {}) => {
@@ -100,7 +123,19 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       if (!mine(payload)) return;
       setSchedulesLocal((prev) => applyAttendanceSocketToSchedules(prev, eventName, payload));
 
-      if (role === 'student') return;
+      if (role === 'student') {
+        // HV: refetch lịch để banner/tab Lịch khớp server (hủy / đổi giờ)
+        if (
+          eventName === 'schedule:updated'
+          || eventName === 'schedule:cancelled'
+          || eventName === 'schedule:new'
+        ) {
+          if (typeof refreshSchedules === 'function') {
+            Promise.resolve(refreshSchedules()).catch(() => {});
+          }
+        }
+        return;
+      }
 
       if (eventName === 'attendance:awaiting-confirm') {
         bumpStudentProgress(payload, { lockCheckIn: true, skipProgress: true });
@@ -117,7 +152,9 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       const notePatched = eventName === 'schedule:updated'
         && payload
         && typeof payload === 'object'
-        && 'studentNote' in payload;
+        && 'studentNote' in payload
+        && !payload.date
+        && !payload.startTime;
       if (notePatched) return;
 
       if (typeof triggerBackgroundSync === 'function') {
@@ -128,13 +165,19 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
     };
 
     const handlers = role === 'student'
-      ? { 'schedule:updated': onEvent('schedule:updated') }
+      ? {
+          'schedule:updated': onEvent('schedule:updated'),
+          'schedule:cancelled': onEvent('schedule:cancelled'),
+          'schedule:new': onEvent('schedule:new'),
+        }
       : {
           'attendance:awaiting-confirm': onEvent('attendance:awaiting-confirm'),
           'attendance:confirmed': onEvent('attendance:confirmed'),
           'attendance:disputed': onEvent('attendance:disputed'),
           'attendance:rejected': onEvent('attendance:rejected'),
           'schedule:updated': onEvent('schedule:updated'),
+          'schedule:cancelled': onEvent('schedule:cancelled'),
+          'schedule:new': onEvent('schedule:new'),
         };
 
     Object.entries(handlers).forEach(([ev, fn]) => socket.on(ev, fn));

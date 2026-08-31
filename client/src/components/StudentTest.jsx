@@ -9,16 +9,15 @@ import ExamClickOutsideGuard from './exam/ExamClickOutsideGuard';
 import { useSocket } from '../context/SocketContext';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments } from '../utils/enrollments';
-import { getExamSubjectMeta, requireWebcamForSubject, canEnterCertificationExam } from '../utils/examSubjects';
+import { getExamSubjectMeta, requireWebcamForSubject, canEnterCertificationExam, canStartCertificationSubject } from '../utils/examSubjects';
 import { useModal } from '../utils/Modal.jsx';
 import NavArrow from './ui/NavArrow';
-import { getStudentMcQuestionsForExam, normalizeMcCorrectIndex, getStudentPracticeFilesForSubject } from '../utils/htmlContent';
+import { getStudentPracticeFilesForSubject } from '../utils/htmlContent';
 import {
   getCertificationAttemptKey,
   loadCertificationAttempt,
   saveCertificationAttempt,
   clearCertificationAttempt,
-  resolveCertificationExamAttempt,
   bankFingerprint,
 } from '../utils/studentCertificationExam';
 import { EXAM_CAMERA_PERMISSION_LABEL } from '../utils/examUi';
@@ -76,10 +75,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   }
   const STUDENT_ID = session.id || session._id || null;
   const punishKey = STUDENT_ID ? `punish_student_exam:${STUDENT_ID}` : 'punish_student_exam';
-  const { students, studentQuestions, setStudentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, studentExamFiles, examWarningSoundUrl = '', updateStudent, addNotification, examSubjectsCatalog, applyStudentExamConfigFromServer } = useData() || {
+  const { students, studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, studentExamFiles, examWarningSoundUrl = '', updateStudent, addNotification, examSubjectsCatalog, applyStudentExamConfigFromServer } = useData() || {
     students: [],
     studentQuestions: [],
-    setStudentQuestions: () => {},
     studentExamMinutes: { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90 },
     studentEssayExamMinutes: { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60 },
     studentEssayRequired: { coban: true, word: true, excel: true, powerpoint: true, canva: true },
@@ -94,6 +92,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const [cameraError, setCameraError] = useState('');
   const [questionsLoading, setQuestionsLoading] = useState(true);
   const [fetchedExamBank, setFetchedExamBank] = useState(null);
+  const [examAttemptToken, setExamAttemptToken] = useState('');
+  const [examAttemptId, setExamAttemptId] = useState('');
+  const [serverResult, setServerResult] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const previewRef = useRef(null);
 
   const meta = useMemo(() => {
@@ -128,27 +131,19 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     };
   }, [subjectId, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, studentExamFiles, studentQuestions, examSubjectsCatalog]);
 
-  const examQuestionBank = useMemo(() => {
-    const ctx = Array.isArray(studentQuestions) ? studentQuestions : [];
-    const fetched = Array.isArray(fetchedExamBank) ? fetchedExamBank : [];
-    return fetched.length >= ctx.length ? fetched : ctx;
-  }, [studentQuestions, fetchedExamBank]);
-
-  /** Normalized bank snapshot — never shuffled; Question Bank SoT stays untouched. */
+  /** Exact answer-free question set issued and shuffled by the server. */
   const rawQuestions = useMemo(() => {
-    const raw = getStudentMcQuestionsForExam(examQuestionBank, subjectId);
+    const raw = Array.isArray(fetchedExamBank) ? fetchedExamBank : [];
     return raw.map((q, i) => {
       const options = (q.options || []).filter((o) => o && String(o).trim());
-      const answer = normalizeMcCorrectIndex(q.correct);
       return {
         id: q.id ?? `sq-${subjectId}-${i}`,
         text: q.q || '',
         options,
-        answer: answer != null ? answer : 0,
         imageUrl: q.imageUrl || '',
       };
     });
-  }, [examQuestionBank, subjectId]);
+  }, [fetchedExamBank, subjectId]);
 
   const bankTotal = rawQuestions.length;
   const bankFp = useMemo(() => bankFingerprint(rawQuestions), [rawQuestions]);
@@ -217,6 +212,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadDone, setUploadDone] = useState(false);
   const [tuLuanSubmitting, setTuLuanSubmitting] = useState(false);
+  const tuLuanSubmittingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const timerRef   = useRef(null);
@@ -224,7 +220,6 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const fileRef    = useRef(null);
   const examPhaseRef = useRef('mc');
   const startingExamRef = useRef(false);
-  const LOCK_MS = 7 * 24 * 60 * 60 * 1000;
 
   const progressEntry = useMemo(
     () => (student?.examProgress || []).find((s) => String(s.id) === String(subjectId)) || null,
@@ -237,6 +232,17 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     onBack?.();
   }, [attemptKey, onBack]);
 
+  const examStartAllowed = useMemo(() => {
+    if (!student) return null;
+    return canStartCertificationSubject({
+      student,
+      enrollments,
+      subjectId,
+      catalog: examSubjectsCatalog,
+      examProgressEntry: progressEntry,
+    });
+  }, [student, enrollments, subjectId, examSubjectsCatalog, progressEntry]);
+
   const beginOrResumeExam = useCallback(() => {
     if (startingExamRef.current) return;
     if (!rawQuestions.length) return;
@@ -247,40 +253,56 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       refuseLockedExam();
       return;
     }
+    if (student && examStartAllowed === false) {
+      refuseLockedExam();
+      return;
+    }
     startingExamRef.current = true;
     const saved = loadCertificationAttempt(attemptKey);
-    const resolved = resolveCertificationExamAttempt({
-      rawQuestions,
-      saved,
-    });
-    setQuestions(resolved.questions);
-    setAnswers(resolved.answers);
-    setCurrentQ(resolved.currentQ);
-    setIsTracNghiemSubmitted(resolved.isTracNghiemSubmitted);
-    setTab(resolved.tab);
-    examPhaseRef.current = resolved.examPhase;
-    if (resolved.timeLeft != null && resolved.timeLeft > 0) {
-      setTimeLeft(resolved.timeLeft);
-    } else if (resolved.examPhase === 'essay') {
+    const fingerprint = bankFingerprint(rawQuestions);
+    const canResume = saved
+      && saved.attemptId === examAttemptId
+      && saved.bankFingerprint === fingerprint
+      && Array.isArray(saved.answers)
+      && saved.answers.length === rawQuestions.length;
+    const nextAnswers = canResume ? saved.answers : Array(rawQuestions.length).fill(null);
+    const nextCurrent = canResume
+      ? Math.min(Math.max(0, Number(saved.currentQ) || 0), rawQuestions.length - 1)
+      : 0;
+    const nextPhase = serverResult?.passed === true || (canResume && saved.examPhase === 'essay')
+      ? 'essay'
+      : 'mc';
+    setQuestions(rawQuestions.map((question) => ({
+      ...question,
+      options: [...question.options],
+    })));
+    setAnswers(nextAnswers);
+    setCurrentQ(nextCurrent);
+    setIsTracNghiemSubmitted(serverResult?.passed === true || (canResume && Boolean(saved.isTracNghiemSubmitted)));
+    setTab(nextPhase === 'essay' ? 'tu_luan' : 'trac_nghiem');
+    examPhaseRef.current = nextPhase;
+    if (canResume && saved.timeLeft != null && saved.timeLeft > 0) {
+      setTimeLeft(saved.timeLeft);
+    } else if (nextPhase === 'essay') {
       setTimeLeft(meta.essayTime);
     } else {
       setTimeLeft(meta.time);
     }
-    attemptFpRef.current = resolved.bankFingerprint;
+    attemptFpRef.current = fingerprint;
     saveCertificationAttempt(attemptKey, {
-      bankFingerprint: resolved.bankFingerprint,
-      questions: resolved.questions,
-      answers: resolved.answers,
-      currentQ: resolved.currentQ,
-      timeLeft: resolved.timeLeft != null && resolved.timeLeft > 0
-        ? resolved.timeLeft
-        : (resolved.examPhase === 'essay' ? meta.essayTime : meta.time),
-      isTracNghiemSubmitted: resolved.isTracNghiemSubmitted,
-      tab: resolved.tab,
-      examPhase: resolved.examPhase,
+      attemptId: examAttemptId,
+      bankFingerprint: fingerprint,
+      answers: nextAnswers,
+      currentQ: nextCurrent,
+      timeLeft: canResume && saved.timeLeft > 0
+        ? saved.timeLeft
+        : (nextPhase === 'essay' ? meta.essayTime : meta.time),
+      isTracNghiemSubmitted: serverResult?.passed === true || (canResume && Boolean(saved.isTracNghiemSubmitted)),
+      tab: nextPhase === 'essay' ? 'tu_luan' : 'trac_nghiem',
+      examPhase: nextPhase,
     });
     setPhase('test');
-  }, [rawQuestions, attemptKey, meta.time, meta.essayTime, progressEntry, punishKey, refuseLockedExam]);
+  }, [rawQuestions, attemptKey, examAttemptId, serverResult, meta.time, meta.essayTime, progressEntry, punishKey, refuseLockedExam, student, examStartAllowed]);
 
   useEffect(() => {
     if (phase !== 'test') startingExamRef.current = false;
@@ -306,16 +328,21 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         refuseLockedExam();
         return;
       }
+      if (student && examStartAllowed === false) {
+        refuseLockedExam();
+        return;
+      }
+      if (student && examStartAllowed !== true) return;
       beginOrResumeExam();
     }
-  }, [requireWebcam, phase, bankTotal, questionsLoading, beginOrResumeExam, punishKey, progressEntry, refuseLockedExam]);
+  }, [requireWebcam, phase, bankTotal, questionsLoading, beginOrResumeExam, punishKey, progressEntry, refuseLockedExam, student, examStartAllowed]);
 
   // Persist attempt while in test (answers / nav / timer) — no reshuffle
   useEffect(() => {
     if (phase !== 'test' || !questions.length) return;
     saveCertificationAttempt(attemptKey, {
+      attemptId: examAttemptId,
       bankFingerprint: attemptFpRef.current || bankFp,
-      questions,
       answers,
       currentQ,
       timeLeft,
@@ -323,7 +350,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       tab,
       examPhase: examPhaseRef.current,
     });
-  }, [phase, questions, answers, currentQ, timeLeft, isTracNghiemSubmitted, tab, attemptKey, bankFp]);
+  }, [phase, questions, answers, currentQ, timeLeft, isTracNghiemSubmitted, tab, attemptKey, bankFp, examAttemptId]);
 
   // Clear attempt when exam ends
   useEffect(() => {
@@ -362,63 +389,56 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     }
   }, [student, updateStudent, subjectId]);
 
-  // HV vào phòng thi (kể cả chờ camera) → dang_thi. API exam-progress bắn student:updated.
-  const markedInProgressRef = useRef(false);
-  useEffect(() => {
-    if (phase !== 'test' && phase !== 'hardware_check') {
-      markedInProgressRef.current = false;
-      return;
-    }
-    if (markedInProgressRef.current) return;
-    const st = progressEntry?.status;
-    if (st === 'dang_thi') {
-      markedInProgressRef.current = true;
-      return;
-    }
-    if (st === 'dat' || st === 'khong_dat') return;
-    if (!canEnterCertificationExam(progressEntry)) return;
-    markedInProgressRef.current = true;
-    void updateExamProgress({ status: 'dang_thi' }).then((ok) => {
-      if (!ok) markedInProgressRef.current = false;
-    });
-  }, [phase, progressEntry, updateExamProgress]);
-
-  const applyFailAndLock = useCallback(async (totalOverride) => {
-    const total = Number.isFinite(totalOverride) ? totalOverride : TOTAL;
+  const applyFailAndLock = useCallback(async () => {
+    if (!STUDENT_ID || !examAttemptToken) return false;
     clearCertificationAttempt(attemptKey);
-    await updateExamProgress({
-      tracNghiem: { score: 0, total },
-      thucHanh: 'chua_nop',
-      status: 'khong_dat',
-      lockUntil: Date.now() + LOCK_MS,
-    }, { revertOnFail: false });
-  }, [TOTAL, attemptKey, updateExamProgress, LOCK_MS]);
+    try {
+      await api.students.forfeitExamAttempt(STUDENT_ID, { attemptToken: examAttemptToken });
+      return true;
+    } catch {
+      return false;
+    }
+  }, [STUDENT_ID, examAttemptToken, attemptKey]);
 
-  // ── Tải ngân hàng câu hỏi từ server (luôn đồng bộ Admin → HV) ──
+  // ── Tải config công khai an toàn + bộ đề chính xác do server cấp ──
   useEffect(() => {
+    if (!STUDENT_ID) return undefined;
     let cancelled = false;
-    const hasLocalMc = getStudentMcQuestionsForExam(studentQuestions, subjectId).length > 0;
-    if (!hasLocalMc) setQuestionsLoading(true);
+    setQuestionsLoading(true);
     (async () => {
       try {
-        const res = await api.settings.getStudentExamConfig();
-        if (!cancelled && res?.success && res.data) {
+        const [configRes, attemptRes] = await Promise.all([
+          api.settings.getStudentExamConfig(),
+          api.students.startExamAttempt(STUDENT_ID, subjectId),
+        ]);
+        if (!cancelled && configRes?.success && configRes.data) {
           if (typeof applyStudentExamConfigFromServer === 'function') {
-            applyStudentExamConfigFromServer(res.data);
-          }
-          const bank = res.data.hasStudentExamBank && Array.isArray(res.data.studentQuestions)
-            ? res.data.studentQuestions
-            : [];
-          if (bank.length > 0) {
-            setFetchedExamBank(bank);
-            if (typeof setStudentQuestions === 'function') setStudentQuestions(bank);
+            applyStudentExamConfigFromServer(configRes.data);
           }
         }
-      } catch { /* ignore */ }
+        if (!cancelled && attemptRes?.success && attemptRes.data) {
+          setFetchedExamBank(Array.isArray(attemptRes.data.questions) ? attemptRes.data.questions : []);
+          setExamAttemptToken(String(attemptRes.data.attemptToken || ''));
+          setExamAttemptId(String(attemptRes.data.attemptId || ''));
+          if (attemptRes.data.mcSubmitted && attemptRes.data.mcResult) {
+            setServerResult(attemptRes.data.mcResult);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setFetchedExamBank([]);
+          showModal({
+            title: 'Không thể mở đề thi',
+            content: err?.message || 'Vui lòng kiểm tra điều kiện dự thi và thử lại.',
+            type: 'error',
+            confirmText: 'Đóng',
+          });
+        }
+      }
       if (!cancelled) setQuestionsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [subjectId, setStudentQuestions, applyStudentExamConfigFromServer]);
+  }, [STUDENT_ID, subjectId, applyStudentExamConfigFromServer, showModal]);
 
   // Cập nhật đề khi admin lưu ngân hàng (socket data:refresh)
   useEffect(() => {
@@ -430,16 +450,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         if (typeof applyStudentExamConfigFromServer === 'function') {
           applyStudentExamConfigFromServer(res.data);
         }
-        if (!res.data.hasStudentExamBank) return;
-        const bank = Array.isArray(res.data.studentQuestions) ? res.data.studentQuestions : [];
-        if (bank.length === 0) return;
-        setFetchedExamBank(bank);
-        if (typeof setStudentQuestions === 'function') setStudentQuestions(bank);
       } catch { /* ignore */ }
     };
     socket.on('data:refresh', refreshBank);
     return () => { socket.off('data:refresh', refreshBank); };
-  }, [socket, setStudentQuestions, applyStudentExamConfigFromServer]);
+  }, [socket, applyStudentExamConfigFromServer]);
 
   // ── YÊU CẦU CAMERA Ở BƯỚC HARDWARE CHECK TRƯỚC KHI VÀO THI ──
   useEffect(() => {
@@ -618,56 +633,79 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     const next = [...answers]; next[qi] = oi; setAnswers(next);
   };
 
-  const handleSubmitFinal = () => {
-    if (TOTAL < 1) return;
-    const finalScore = answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
-    const finalPct = TOTAL > 0 ? Math.round((finalScore / TOTAL) * 100) : 0;
-    const passedTN = finalPct >= 50;
+  const handleSubmitFinal = useCallback(async () => {
+    if (TOTAL < 1 || !STUDENT_ID || !examAttemptToken || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      const response = await api.students.submitExamAttempt(STUDENT_ID, {
+        attemptToken: examAttemptToken,
+        answers: questions.map((question, index) => ({
+          questionId: question.id,
+          selectedOption: answers[index] ?? null,
+        })),
+      });
+      const result = response?.data;
+      if (!result) throw new Error('Server không trả kết quả chấm thi');
 
-    setIsTracNghiemSubmitted(true);
+      clearInterval(timerRef.current);
+      setServerResult(result);
+      setIsTracNghiemSubmitted(true);
+      const passedTN = result.passed === true;
+      const requiresEssay = result.essayRequired !== false;
 
-    if (!passedTN) {
-      // Rớt trắc nghiệm => khóa, về result
-      clearInterval(timerRef.current);
-      clearCertificationAttempt(attemptKey);
-      void updateExamProgress({
-        tracNghiem: { score: finalScore, total: TOTAL },
-        thucHanh: 'chua_nop',
-        status: 'khong_dat',
-        lockUntil: Date.now() + LOCK_MS,
-      }, { revertOnFail: true });
-      setPhase('result');
-      addNotification(null, 'admin', `❌ Học viên ${studentName} rớt trắc nghiệm môn ${meta.label}: ${finalScore}/${TOTAL} (${finalPct}%)`);
-    } else if (!meta.essayRequired) {
-      // Chỉ TN — không bắt tự luận
-      clearInterval(timerRef.current);
-      clearCertificationAttempt(attemptKey);
-      void updateExamProgress({
-        tracNghiem: { score: finalScore, total: TOTAL },
-        thucHanh: 'chua_nop',
-        status: 'dat',
-        lockUntil: null,
-      }, { revertOnFail: true });
-      setPhase('result');
-      addNotification(null, 'admin', `✅ Học viên ${studentName} đạt môn ${meta.label} (chỉ trắc nghiệm): ${finalScore}/${TOTAL} (${finalPct}%).`);
-    } else {
-      void updateExamProgress({
-        tracNghiem: { score: finalScore, total: TOTAL },
-        status: 'dang_thi',
-      }, { revertOnFail: true });
-      examPhaseRef.current = 'essay';
-      setTimeLeft(meta.essayTime);
-      setTab('tu_luan');
-      addNotification(null, 'admin', `✅ Học viên ${studentName} đạt trắc nghiệm môn ${meta.label}: ${finalScore}/${TOTAL} (${finalPct}%). Đang làm phần thực hành.`);
+      if (!passedTN) {
+        clearCertificationAttempt(attemptKey);
+        setPhase('result');
+        if (!result.idempotent) {
+          addNotification(null, 'admin', `❌ Học viên ${studentName} rớt trắc nghiệm môn ${meta.label}: ${result.score}/${result.total} (${result.percentage}%)`);
+        }
+      } else if (!requiresEssay) {
+        clearCertificationAttempt(attemptKey);
+        setPhase('result');
+        if (!result.idempotent) {
+          addNotification(null, 'admin', `✅ Học viên ${studentName} đạt môn ${meta.label} (chỉ trắc nghiệm): ${result.score}/${result.total} (${result.percentage}%).`);
+        }
+      } else {
+        examPhaseRef.current = 'essay';
+        setTimeLeft(meta.essayTime);
+        setTab('tu_luan');
+        if (!result.idempotent) {
+          addNotification(null, 'admin', `✅ Học viên ${studentName} đạt trắc nghiệm môn ${meta.label}: ${result.score}/${result.total} (${result.percentage}%). Đang làm phần thực hành.`);
+        }
+      }
+    } catch (err) {
+      showModal({
+        title: 'Chưa nộp được bài',
+        content: err?.message || 'Vui lòng kiểm tra kết nối. Câu trả lời của bạn vẫn được giữ.',
+        type: 'error',
+        confirmText: 'Đóng',
+      });
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
-  };
+  }, [
+    TOTAL,
+    STUDENT_ID,
+    examAttemptToken,
+    questions,
+    answers,
+    attemptKey,
+    addNotification,
+    studentName,
+    meta.label,
+    meta.essayTime,
+    showModal,
+  ]);
   handleSubmitFinalRef.current = handleSubmitFinal;
 
   const handleFinalTuLuan = useCallback(async () => {
-    clearInterval(timerRef.current);
+    if (tuLuanSubmittingRef.current) return;
+    tuLuanSubmittingRef.current = true;
+    setTuLuanSubmitting(true);
     let essayFileStored = '';
     if (uploadFile) {
-      setTuLuanSubmitting(true);
       try {
         const res = await api.assignments.uploadFile(uploadFile);
         if (!res?.success || !res.fileUrl) {
@@ -680,6 +718,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           essayFileStored = raw;
         }
       } catch (err) {
+        tuLuanSubmittingRef.current = false;
         setTuLuanSubmitting(false);
         showModal({
           title: 'Không tải được bài làm',
@@ -687,47 +726,53 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           type: 'error',
           confirmText: 'Đóng',
         });
-        setTuLuanSubmitting(false);
+        return;
       }
     }
-    const finalScore = answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
-    const finalPct = TOTAL > 0 ? Math.round((finalScore / TOTAL) * 100) : 0;
-    const passedTN = finalPct >= 50;
-
-    const nextStatus = !passedTN ? 'khong_dat' : 'dang_thi';
-    const lockUntil = !passedTN ? Date.now() + LOCK_MS : null;
+    clearInterval(timerRef.current);
+    if (!serverResult?.passed) {
+      tuLuanSubmittingRef.current = false;
+      setTuLuanSubmitting(false);
+      showModal({
+        title: 'Kết quả chưa hợp lệ',
+        content: 'Server chưa xác nhận đạt phần trắc nghiệm.',
+        type: 'error',
+      });
+      return;
+    }
 
     const ok = await updateExamProgress({
-      tracNghiem: { score: finalScore, total: TOTAL },
       thucHanh: essayFileStored ? 'da_nop' : 'chua_nop',
-      status: nextStatus,
-      ...(lockUntil ? { lockUntil } : {}),
       ...(essayFileStored ? { essayFile: essayFileStored } : {}),
     }, { revertOnFail: true });
 
-    if (!ok && !passedTN) {
-      // Vẫn khóa local nếu API từ chối sửa điểm nhưng cần giữ trạng thái rớt
-      await updateExamProgress({
-        status: 'khong_dat',
-        lockUntil: Date.now() + LOCK_MS,
-        thucHanh: 'chua_nop',
-      }, { revertOnFail: false });
+    if (!ok) {
+      tuLuanSubmittingRef.current = false;
+      setTuLuanSubmitting(false);
+      showModal({
+        title: 'Chưa lưu được bài thực hành',
+        content: 'Vui lòng kiểm tra kết nối và thử nộp lại. Kết quả trắc nghiệm vẫn được giữ trên server.',
+        type: 'error',
+      });
+      return;
     }
 
     clearCertificationAttempt(attemptKey);
+    tuLuanSubmittingRef.current = false;
+    setTuLuanSubmitting(false);
     setUploadDone(true);
     setPhase('result');
-    if (essayFileStored && passedTN) {
+    if (essayFileStored) {
       addNotification(null, 'admin', `📝 Học viên ${session.name || studentName} đã nộp bài thực hành môn ${meta.label}. Vui lòng chấm điểm.`);
     }
-  }, [uploadFile, updateExamProgress, showModal, addNotification, session.name, studentName, meta.label, answers, questions, TOTAL, attemptKey, LOCK_MS]);
+  }, [uploadFile, serverResult, updateExamProgress, showModal, addNotification, session.name, studentName, meta.label, attemptKey]);
 
   handleFinalTuLuanRef.current = handleFinalTuLuan;
 
   const trySubmit = () => {
     const unanswered = answers.filter(a => a === null).length;
     if (unanswered > 0) setShowSubmitConfirm(true);
-    else handleSubmitFinal();
+    else void handleSubmitFinal();
   };
 
   const trySubmitTuLuan = () => {
@@ -742,9 +787,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     if (file) setUploadFile(file);
   };
 
-  const score  = answers.reduce((acc, a, i) => acc + (a === questions[i]?.answer ? 1 : 0), 0);
-  const pct    = TOTAL > 0 ? Math.round((score / TOTAL) * 100) : 0;
-  const passed = TOTAL > 0 && pct >= 50;
+  const score  = Number(serverResult?.score) || 0;
+  const pct    = Number(serverResult?.percentage) || 0;
+  const passed = serverResult?.passed === true;
   const mins   = Math.floor(timeLeft / 60);
   const secs   = timeLeft % 60;
 
@@ -1434,10 +1479,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
             </div>
             <button
               type="button"
+              disabled={submitting}
               onClick={trySubmit}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-sm font-black text-white shadow-md shadow-emerald-500/20 transition hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] md:w-auto md:rounded-2xl md:px-8 md:py-3.5 md:shadow-lg"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-sm font-black text-white shadow-md shadow-emerald-500/20 transition hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:w-auto md:rounded-2xl md:px-8 md:py-3.5 md:shadow-lg"
             >
-              <CheckCircle size={18} /> NỘP BÀI TRẮC NGHIỆM
+              <CheckCircle size={18} /> {submitting ? 'ĐANG NỘP BÀI…' : 'NỘP BÀI TRẮC NGHIỆM'}
             </button>
           </div>
         )}
@@ -1454,7 +1500,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           boldText={`Bạn còn ${unanswered}`}
           confirmLabel="Nộp bài"
           cancelLabel="Làm tiếp"
-          onConfirm={() => { setShowSubmitConfirm(false); handleSubmitFinal(); }}
+          onConfirm={() => { setShowSubmitConfirm(false); void handleSubmitFinal(); }}
           onCancel={() => setShowSubmitConfirm(false)}
         />
       )}

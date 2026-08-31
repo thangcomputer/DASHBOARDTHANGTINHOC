@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { questionMatchesExamSubject } from '../utils/htmlContent';
 import {
@@ -31,6 +31,19 @@ import {
   mergedArrayToCatalog,
 } from '../utils/examSubjects';
 
+function trainingItemKey(item) {
+  if (!item || typeof item !== 'object') return '';
+  return String(item.id ?? item._id ?? '');
+}
+
+function matchTrainingItemId(item, id) {
+  const want = String(id ?? '');
+  if (!want) return false;
+  const a = String(item?.id ?? '');
+  const b = String(item?._id ?? '');
+  return (a && a === want) || (b && b === want);
+}
+
 /**
  * Training materials + question banks (GV/HV) for DataProvider.
  */
@@ -55,6 +68,14 @@ export function useDataTraining(currentUser) {
   const [examWarningSoundUrl, setExamWarningSoundUrl] = useState('');
   const [studentExamBankHydrated, setStudentExamBankHydrated] = useState(false);
   const [examSubjectsCatalog, setExamSubjectsCatalog] = useState(BUILTIN_EXAM_SUBJECTS);
+
+  useEffect(() => {
+    const role = currentUser?.role;
+    if (role === 'teacher' || role === 'student') {
+      localStorage.removeItem('thvp_questions');
+      localStorage.removeItem('thvp_studentQuestions');
+    }
+  }, [currentUser?.id, currentUser?.role]);
 
   const applyExamCatalogFromServer = useCallback((d) => {
     if (!d) return;
@@ -315,11 +336,65 @@ export function useDataTraining(currentUser) {
 
   useEffect(() => { localStorage.setItem('thvp_trainingData', JSON.stringify(trainingData)); }, [trainingData]);
   useEffect(() => { localStorage.setItem('thvp_studentTrainingData', JSON.stringify(studentTrainingData)); }, [studentTrainingData]);
+
+  // Ref + chuỗi PUT tuần tự — tránh request cũ (không có files) ghi đè request mới.
+  const studentTrainingDataRef = useRef(studentTrainingData);
+  studentTrainingDataRef.current = studentTrainingData;
+  const studentTrainingWriteChainRef = useRef(Promise.resolve());
+  const studentTrainingWritePendingRef = useRef(0);
+
+  const trainingDataRef = useRef(trainingData);
+  trainingDataRef.current = trainingData;
+  const trainingWriteChainRef = useRef(Promise.resolve());
+  const trainingWritePendingRef = useRef(0);
+
+  const persistStudentTrainingData = useCallback(() => {
+    studentTrainingWritePendingRef.current += 1;
+    studentTrainingWriteChainRef.current = studentTrainingWriteChainRef.current
+      .catch(() => {})
+      .then(async () => {
+        const payload = studentTrainingDataRef.current;
+        try {
+          const res = await api.settings?.updateStudentTrainingData(payload);
+          if (res && res.success === false) {
+            throw new Error(res.message || 'Lưu dữ liệu đào tạo HV thất bại');
+          }
+          return res;
+        } finally {
+          studentTrainingWritePendingRef.current = Math.max(0, studentTrainingWritePendingRef.current - 1);
+        }
+      });
+    return studentTrainingWriteChainRef.current;
+  }, []);
+
+  const persistTrainingData = useCallback(() => {
+    trainingWritePendingRef.current += 1;
+    trainingWriteChainRef.current = trainingWriteChainRef.current
+      .catch(() => {})
+      .then(async () => {
+        const payload = trainingDataRef.current;
+        try {
+          const res = await api.settings?.updateTrainingData(payload);
+          if (res && res.success === false) {
+            throw new Error(res.message || 'Lưu dữ liệu đào tạo GV thất bại');
+          }
+          return res;
+        } finally {
+          trainingWritePendingRef.current = Math.max(0, trainingWritePendingRef.current - 1);
+        }
+      });
+    return trainingWriteChainRef.current;
+  }, []);
+
   // Cache ngân hàng sau khi đã hydrate từ server (không dùng làm SoT lúc boot)
   useEffect(() => {
+    if (currentUser?.role === 'teacher' || currentUser?.role === 'student') {
+      localStorage.removeItem('thvp_questions');
+      return;
+    }
     if (!teacherExamBankHydrated) return;
     localStorage.setItem('thvp_questions', JSON.stringify(questions));
-  }, [questions, teacherExamBankHydrated]);
+  }, [questions, teacherExamBankHydrated, currentUser?.role]);
   useEffect(() => {
     localStorage.setItem(TEACHER_EXAM_TIME_LIMIT_KEY, JSON.stringify(teacherExamTimeLimitMinutes));
   }, [teacherExamTimeLimitMinutes]);
@@ -330,7 +405,11 @@ export function useDataTraining(currentUser) {
     localStorage.setItem(TEACHER_ESSAY_EXAM_MINUTES_KEY, JSON.stringify(teacherEssayExamMinutes));
   }, [teacherEssayExamMinutes]);
   useEffect(() => {
-    if (!studentExamBankHydrated && currentUser?.role !== 'student') return;
+    if (currentUser?.role === 'teacher' || currentUser?.role === 'student') {
+      localStorage.removeItem('thvp_studentQuestions');
+      return;
+    }
+    if (!studentExamBankHydrated) return;
     localStorage.setItem('thvp_studentQuestions', JSON.stringify(studentQuestions));
   }, [studentQuestions, studentExamBankHydrated, currentUser?.role]);
   useEffect(() => { localStorage.setItem(STUDENT_EXAM_MINUTES_KEY, JSON.stringify(studentExamMinutes)); }, [studentExamMinutes]);
@@ -343,80 +422,100 @@ export function useDataTraining(currentUser) {
   useEffect(() => { localStorage.setItem(STUDENT_EXAM_FILES_KEY, JSON.stringify(studentExamFiles)); }, [studentExamFiles]);
 
   const addStudentTrainingItem = useCallback((category, item) => {
+    const newId = item.id || item._id || Date.now();
     setStudentTrainingData((prev) => {
       const newData = {
         ...prev,
-        [category]: [...(prev[category] || []), { ...item, id: item.id || Date.now() }],
+        [category]: [...(prev[category] || []), { ...item, id: newId }],
       };
-      api.settings?.updateStudentTrainingData(newData).catch(console.error);
+      studentTrainingDataRef.current = newData;
       return newData;
     });
-  }, []);
+    return persistStudentTrainingData();
+  }, [persistStudentTrainingData]);
 
   const updateStudentTrainingItem = useCallback((category, id, updates) => {
     setStudentTrainingData((prev) => {
       const list = prev[category] || [];
-      const exists = list.some((item) => String(item.id) === String(id));
+      const exists = list.some((item) => matchTrainingItemId(item, id));
+      const mergedUpdates = {
+        ...updates,
+        id: updates?.id ?? updates?._id ?? id,
+      };
       const newData = {
         ...prev,
         [category]: exists
           ? list.map((item) =>
-              String(item.id) === String(id) ? { ...item, ...updates } : item)
-          : [...list, { ...updates, id: id || Date.now() }],
+            (matchTrainingItemId(item, id)
+              ? { ...item, ...mergedUpdates, id: trainingItemKey(item) || trainingItemKey(mergedUpdates) || id }
+              : item))
+          : [...list, { ...mergedUpdates, id: id || Date.now() }],
       };
-      api.settings?.updateStudentTrainingData(newData).catch(console.error);
+      studentTrainingDataRef.current = newData;
       return newData;
     });
-  }, []);
+    return persistStudentTrainingData();
+  }, [persistStudentTrainingData]);
 
   const removeStudentTrainingItem = useCallback((category, id) => {
     setStudentTrainingData((prev) => {
       const newData = {
         ...prev,
-        [category]: (prev[category] || []).filter((item) => item.id !== id),
+        [category]: (prev[category] || []).filter((item) => !matchTrainingItemId(item, id)),
       };
-      api.settings?.updateStudentTrainingData(newData).catch(console.error);
+      studentTrainingDataRef.current = newData;
       return newData;
     });
-  }, []);
+    return persistStudentTrainingData();
+  }, [persistStudentTrainingData]);
 
   const addTrainingItem = useCallback((category, item) => {
+    const newId = item.id || item._id || Date.now();
     setTrainingData((prev) => {
       const newData = {
         ...prev,
-        [category]: [...(prev[category] || []), { ...item, id: item.id || Date.now() }],
+        [category]: [...(prev[category] || []), { ...item, id: newId }],
       };
-      api.settings?.updateTrainingData(newData).catch(console.error);
+      trainingDataRef.current = newData;
       return newData;
     });
-  }, []);
+    return persistTrainingData();
+  }, [persistTrainingData]);
 
   const updateTrainingItem = useCallback((category, id, updates) => {
     setTrainingData((prev) => {
       const list = prev[category] || [];
-      const exists = list.some((item) => String(item.id) === String(id));
+      const exists = list.some((item) => matchTrainingItemId(item, id));
+      const mergedUpdates = {
+        ...updates,
+        id: updates?.id ?? updates?._id ?? id,
+      };
       const newData = {
         ...prev,
         [category]: exists
           ? list.map((item) =>
-              String(item.id) === String(id) ? { ...item, ...updates } : item)
-          : [...list, { ...updates, id: id || Date.now() }],
+            (matchTrainingItemId(item, id)
+              ? { ...item, ...mergedUpdates, id: trainingItemKey(item) || trainingItemKey(mergedUpdates) || id }
+              : item))
+          : [...list, { ...mergedUpdates, id: id || Date.now() }],
       };
-      api.settings?.updateTrainingData(newData).catch(console.error);
+      trainingDataRef.current = newData;
       return newData;
     });
-  }, []);
+    return persistTrainingData();
+  }, [persistTrainingData]);
 
   const removeTrainingItem = useCallback((category, id) => {
     setTrainingData((prev) => {
       const newData = {
         ...prev,
-        [category]: (prev[category] || []).filter((item) => String(item.id) !== String(id)),
+        [category]: (prev[category] || []).filter((item) => !matchTrainingItemId(item, id)),
       };
-      api.settings?.updateTrainingData(newData).catch(console.error);
+      trainingDataRef.current = newData;
       return newData;
     });
-  }, []);
+    return persistTrainingData();
+  }, [persistTrainingData]);
 
   const addQuestion = useCallback((q) => {
     setQuestions((prev) => [...prev, { ...q, id: `q_${Date.now()}` }]);
@@ -679,23 +778,94 @@ export function useDataTraining(currentUser) {
     });
   }, []);
 
+  /** Sync từ server: khi đang PUT local thì giữ files/chapters mới hơn trên từng khóa video. */
+  const mergeTrainingVideosPreferLocal = useCallback((localData, serverData) => {
+    if (!serverData || typeof serverData !== 'object') return localData;
+    if (!localData || typeof localData !== 'object') return serverData;
+    const localVideos = Array.isArray(localData.videos) ? localData.videos : [];
+    const serverVideos = Array.isArray(serverData.videos) ? serverData.videos : [];
+    const localById = new Map(
+      localVideos.map((v) => [String(v?.id ?? v?._id ?? ''), v]).filter(([k]) => k),
+    );
+    const mergedVideos = serverVideos.map((sv) => {
+      const id = String(sv?.id ?? sv?._id ?? '');
+      const lv = localById.get(id);
+      if (!lv) return sv;
+      const localFiles = Array.isArray(lv.files) ? lv.files : [];
+      const serverFiles = Array.isArray(sv.files) ? sv.files : [];
+      const files = localFiles.length >= serverFiles.length ? localFiles : serverFiles;
+      const localChapters = Array.isArray(lv.chapters) ? lv.chapters : [];
+      const serverChapters = Array.isArray(sv.chapters) ? sv.chapters : [];
+      const chapters = localChapters.length >= serverChapters.length ? localChapters : serverChapters;
+      return {
+        ...sv,
+        files,
+        chapters: chapters.length ? chapters : (sv.chapters || lv.chapters),
+        lessons: sv.lessons || lv.lessons,
+        videos: sv.videos || lv.videos,
+      };
+    });
+    const serverIds = new Set(mergedVideos.map((v) => String(v?.id ?? v?._id ?? '')));
+    localVideos.forEach((lv) => {
+      const id = String(lv?.id ?? lv?._id ?? '');
+      if (id && !serverIds.has(id)) mergedVideos.push(lv);
+    });
+    return {
+      ...serverData,
+      videos: mergedVideos,
+      files: Array.isArray(serverData.files) ? serverData.files : (localData.files || []),
+      guides: Array.isArray(serverData.guides) ? serverData.guides : (localData.guides || []),
+      softwareLinks: Array.isArray(serverData.softwareLinks)
+        ? serverData.softwareLinks
+        : (localData.softwareLinks || []),
+    };
+  }, []);
+
+  const setStudentTrainingDataFromSync = useCallback((serverData) => {
+    if (!serverData) return;
+    if (studentTrainingWritePendingRef.current > 0) {
+      setStudentTrainingData((local) => {
+        const merged = mergeTrainingVideosPreferLocal(local, serverData);
+        studentTrainingDataRef.current = merged;
+        return merged;
+      });
+      return;
+    }
+    studentTrainingDataRef.current = serverData;
+    setStudentTrainingData(serverData);
+  }, [mergeTrainingVideosPreferLocal]);
+
+  const setTrainingDataFromSync = useCallback((serverData) => {
+    if (!serverData) return;
+    if (trainingWritePendingRef.current > 0) {
+      setTrainingData((local) => {
+        const merged = mergeTrainingVideosPreferLocal(local, serverData);
+        trainingDataRef.current = merged;
+        return merged;
+      });
+      return;
+    }
+    trainingDataRef.current = serverData;
+    setTrainingData(serverData);
+  }, [mergeTrainingVideosPreferLocal]);
+
+  const setQuestionsFromSync = setQuestions;
+
   /** Used by background sync to hydrate from server payloads */
   const hydrateTrainingFromSync = useCallback((trainingDataRes, studentTrainingRes, studentExamCfg) => {
-    if (trainingDataRes?.success) setTrainingData(trainingDataRes.data);
-    if (studentTrainingRes?.success) setStudentTrainingData(studentTrainingRes.data);
+    if (trainingDataRes?.success) setTrainingDataFromSync(trainingDataRes.data);
+    if (studentTrainingRes?.success) setStudentTrainingDataFromSync(studentTrainingRes.data);
     if (studentExamCfg?.success && studentExamCfg.data) applyStudentExamConfigFromServer(studentExamCfg.data);
-  }, [applyStudentExamConfigFromServer]);
+  }, [applyStudentExamConfigFromServer, setTrainingDataFromSync, setStudentTrainingDataFromSync]);
 
-  const setTrainingDataFromSync = setTrainingData;
-  const setStudentTrainingDataFromSync = setStudentTrainingData;
-  const setQuestionsFromSync = setQuestions;
+  const isExamCandidate = currentUser?.role === 'teacher' || currentUser?.role === 'student';
 
   return {
     trainingData,
     setTrainingData,
     studentTrainingData,
     setStudentTrainingData,
-    questions,
+    questions: isExamCandidate ? [] : questions,
     setQuestions,
     teacherExamTimeLimitMinutes,
     setTeacherExamTimeLimitMinutes,
@@ -703,7 +873,7 @@ export function useDataTraining(currentUser) {
     updateTeacherExamMinutes,
     teacherEssayExamMinutes,
     updateTeacherEssayExamMinutes,
-    studentQuestions,
+    studentQuestions: isExamCandidate ? [] : studentQuestions,
     setStudentQuestions,
     studentExamMinutes,
     updateStudentExamMinutes,

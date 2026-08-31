@@ -6,7 +6,8 @@ const fs = require('fs');
 
 const SystemSettings = require('../models/SystemSettings');
 const { verifyAdminPassword } = require('../utils/adminPassword');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, userHasPermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const logger = require('../config/logger');
 const { normalizeMulterFile } = require('../utils/escapeRegex');
 const {
@@ -22,10 +23,30 @@ const Course = require('../models/Course');
 const { emitSystemWide } = require('../utils/realtimeEmit');
 const { policyShadowSettings } = require('../middleware/policyShadowSettings');
 const { settingsCutoverGate } = require('../middleware/settingsCutoverGate');
+const { resolveExamBankAccess } = require('../services/examAttemptService');
 
 /** Phase 7.19: policyShadowSettings → settingsCutoverGate (auth applied separately when required) */
 function settingsGuard(action) {
   return [policyShadowSettings(action), settingsCutoverGate(action)];
+}
+
+async function canManageExamBank(req, permission) {
+  if (req.user?.id === 'admin') return true;
+  if (!['admin', 'staff'].includes(String(req.user?.role || '').toLowerCase())) return false;
+  return userHasPermission(req.user, permission);
+}
+
+async function settingsResponseFor(req, settings) {
+  const data = typeof settings?.toObject === 'function'
+    ? settings.toObject()
+    : { ...(settings || {}) };
+  const [canManageStudentBank, canManageTeacherBank] = await Promise.all([
+    canManageExamBank(req, PERMISSIONS.MANAGE_STUDENT_TRAINING),
+    canManageExamBank(req, PERMISSIONS.MANAGE_TRAINING),
+  ]);
+  if (!canManageStudentBank) delete data.studentExamBankRawData;
+  if (!canManageTeacherBank) delete data.teacherExamBankRawData;
+  return data;
 }
 
 /** Settings là TENANT/GLOBAL (SystemSettings _key=main) — ping refresh không kèm secret. */
@@ -51,6 +72,16 @@ function normalizeTrainingDataUrls(data) {
       const next = { ...item };
       if (next.fileUrl) next.fileUrl = normalizeUploadFileUrl(next.fileUrl);
       if (next.submittedFileUrl) next.submittedFileUrl = normalizeUploadFileUrl(next.submittedFileUrl);
+      // Tài liệu đính kèm trong khóa video (course.files)
+      if (Array.isArray(next.files)) {
+        next.files = next.files.map((f) => {
+          if (!f || typeof f !== 'object') return f;
+          const nf = { ...f };
+          if (nf.fileUrl) nf.fileUrl = normalizeUploadFileUrl(nf.fileUrl);
+          if (nf.url) nf.url = normalizeUploadFileUrl(nf.url);
+          return nf;
+        });
+      }
       return next;
     });
   }
@@ -115,7 +146,7 @@ router.get('/bank', ...settingsGuard('public_read'), async (req, res) => {
 router.get('/', authMiddleware, ...settingsGuard('system_read'), async (req, res) => {
   try {
     const settings = await getSettings();
-    return res.json({ success: true, data: settings });
+    return res.json({ success: true, data: await settingsResponseFor(req, settings) });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server: ' + err.message });
   }
@@ -137,7 +168,11 @@ router.put('/', authMiddleware, ...settingsGuard('system_write'), async (req, re
 
     const settings = await updateMainSettings({ $set: updates });
 
-    return res.json({ success: true, data: settings, message: 'Đã lưu cấu hình' });
+    return res.json({
+      success: true,
+      data: await settingsResponseFor(req, settings),
+      message: 'Đã lưu cấu hình',
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server: ' + err.message });
   }
@@ -495,9 +530,16 @@ async function examCatalogPayload(settings) {
   };
 }
 
-// ── GET /api/settings/student-exam-config ── Ngân hàng TN HV + phút làm bài (mọi role đăng nhập)
+// ── GET /api/settings/student-exam-config ── Cấu hình an toàn cho HV; bank đầy đủ chỉ cho quản trị đào tạo
 router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
+    const role = String(req.user?.role || '').toLowerCase();
+    const canManageBank = await canManageExamBank(req, PERMISSIONS.MANAGE_STUDENT_TRAINING);
+    const access = resolveExamBankAccess('student', role, canManageBank);
+    if (!access.allowed) {
+      return res.status(403).json({ success: false, message: 'Không có quyền đọc cấu hình thi học viên' });
+    }
+
     const settings = await getSettings();
     const bank = settings.studentExamBankRawData;
     const hasStudentExamBank = bank != null;
@@ -514,7 +556,9 @@ router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only')
       success: true,
       data: {
         hasStudentExamBank,
-        studentQuestions: hasStudentExamBank && Array.isArray(bank) ? bank : [],
+        // Student receives questions only from the server-issued attempt endpoint.
+        studentQuestions: access.includeManagementBank && hasStudentExamBank && Array.isArray(bank) ? bank : [],
+        questionDelivery: access.includeManagementBank ? 'management_bank' : 'server_attempt',
         studentExamMinutes: hasMinutesOnServer ? sanitizeStudentExamMinutesPayload(minsRaw) : undefined,
         studentEssayExamMinutes: hasEssayMinutesOnServer
           ? sanitizeStudentEssayExamMinutesPayload(essayMinsRaw)
@@ -585,9 +629,16 @@ function sanitizeTeacherExamTimeLimitMinutes(raw) {
   return rounded;
 }
 
-// ── GET /api/settings/teacher-exam-config ── Ngân hàng câu hỏi thi GV (mọi role đăng nhập — chỉ GV cần)
+// ── GET /api/settings/teacher-exam-config ── Timing an toàn cho GV; bank đầy đủ chỉ cho quản trị đào tạo
 router.get('/teacher-exam-config', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
+    const role = String(req.user?.role || '').toLowerCase();
+    const canManageBank = await canManageExamBank(req, PERMISSIONS.MANAGE_TRAINING);
+    const access = resolveExamBankAccess('teacher', role, canManageBank);
+    if (!access.allowed) {
+      return res.status(403).json({ success: false, message: 'Không có quyền đọc cấu hình thi giáo viên' });
+    }
+
     const settings = await getSettings();
     const bank = settings.teacherExamBankRawData;
     const hasTeacherExamBank = bank != null;
@@ -604,7 +655,9 @@ router.get('/teacher-exam-config', authMiddleware, ...settingsGuard('auth_only')
         hasTeacherExamBank,
         hasTeacherExamMinutes: hasTeacherMins,
         hasTeacherEssayExamMinutes: hasTeacherEssayMins,
-        questions: hasTeacherExamBank && Array.isArray(bank) ? bank : [],
+        // Teacher receives only the assigned, answer-free set from /teachers/:id/exam-attempt.
+        questions: access.includeManagementBank && hasTeacherExamBank && Array.isArray(bank) ? bank : [],
+        questionDelivery: access.includeManagementBank ? 'management_bank' : 'server_attempt',
         timeLimitMinutes,
         teacherExamMinutes: hasTeacherMins
           ? rawTeacherExamMinutesPayload(teacherMinsRaw)

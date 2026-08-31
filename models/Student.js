@@ -261,6 +261,15 @@ const StudentSchema = new mongoose.Schema(
       essayFile:  { type: String, default: '' },            // URL file bài tự luận đã upload
       essayScore: { type: Number, default: null },          // Điểm chấm bởi admin (0-10)
       lockUntil:  { type: Number, default: null },          // Timestamp: khóa thi lại trong 7 ngày
+      /** Optional fields for server-issued, idempotent exam attempts. */
+      attemptId: { type: String, default: null },
+      attemptStatus: {
+        type: String,
+        enum: ['active', 'submitted', 'forfeited', null],
+        default: null,
+      },
+      attemptStartedAt: { type: Date, default: null },
+      attemptSubmittedAt: { type: Date, default: null },
     }],
 
     // ── Tài khoản học viên (login) ────────────────────────────────

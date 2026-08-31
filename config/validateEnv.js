@@ -53,7 +53,13 @@ function forceDisableCqrs(reason) {
 
 function validateEnv() {
   const isProd = process.env.NODE_ENV === 'production';
+  const isTest = process.env.NODE_ENV === 'test';
   const minLen = isProd ? 32 : 16;
+
+  if (isTest) {
+    const { assertTestDatabaseEnvironment } = require('../tests/setup/testDatabaseGuard');
+    assertTestDatabaseEnvironment(process.env);
+  }
 
   const jwt = process.env.JWT_SECRET || '';
   const jwr = process.env.JWT_REFRESH_SECRET || '';
@@ -73,6 +79,12 @@ function validateEnv() {
 
   if (isProd && !(process.env.CLIENT_URL || '').trim()) {
     throw new Error('CLIENT_URL is required when NODE_ENV=production (CORS / OAuth)');
+  }
+  if (isProd) {
+    const { normalizeVNPhone } = require('../utils/phoneIdentity');
+    if (!normalizeVNPhone(process.env.MASTER_ADMIN_PHONE)) {
+      throw new Error('MASTER_ADMIN_PHONE is required in production and must be a valid Vietnamese phone');
+    }
   }
 
   if (isProd && !(process.env.SEPAY_API_KEY || '').trim() && !(process.env.SEPAY_SECRET_KEY || '').trim()) {

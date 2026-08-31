@@ -56,6 +56,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [resultData, setResultData] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   const timerRef = useRef(null);
   const resultDataRef = useRef(null);
@@ -115,11 +116,22 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setLoadError('');
+
+    const tryPendingForfeit = async () => {
+      let pendingForfeit = false;
+      try { pendingForfeit = localStorage.getItem(forfeitKey) === '1'; } catch { /* ignore */ }
+      if (!pendingForfeit) return;
+      await submitForfeit('Tải lại hoặc đóng trang khi đang làm bài');
+    };
+
     api.quizzes.getQuizForExam(quizId)
       .then(async (res) => {
         if (!active) return;
         if (!res.success || !res.data) {
+          setLoadError(res.message || 'Không có dữ liệu bài thi');
           toast.error(res.message || 'Không thể tải bài trắc nghiệm');
+          await tryPendingForfeit();
           return;
         }
         setQuizData(res.data);
@@ -139,15 +151,14 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
           return;
         }
 
-        let pendingForfeit = false;
-        try { pendingForfeit = localStorage.getItem(forfeitKey) === '1'; } catch { /* ignore */ }
-        if (pendingForfeit) {
-          try { localStorage.removeItem(forfeitKey); } catch { /* ignore */ }
-          await submitForfeit('Tải lại hoặc đóng trang khi đang làm bài');
-        }
+        await tryPendingForfeit();
       })
-      .catch(() => {
-        if (active) toast.error('Lỗi kết nối máy chủ');
+      .catch(async (err) => {
+        if (!active) return;
+        const msg = err?.data?.message || err?.message || 'Lỗi kết nối máy chủ';
+        setLoadError(msg);
+        toast.error(msg);
+        await tryPendingForfeit();
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -300,11 +311,11 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
     );
   }
 
-  if (!quizData) {
+  if (!quizData && !resultData) {
     return (
       <ExamOverlay>
         <div className="flex-1 flex flex-col items-center justify-center p-4 text-white">
-          <p className="text-base font-bold text-red-400 mb-4">Không có dữ liệu bài thi</p>
+          <p className="text-base font-bold text-red-400 mb-4">{loadError || 'Không có dữ liệu bài thi'}</p>
           <button type="button" onClick={handleLeaveExamRoom} className="px-4 py-2 bg-slate-800 rounded-xl text-sm font-bold">
             Quay lại
           </button>
@@ -313,7 +324,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
     );
   }
 
-  const questions = quizData.questions || [];
+  const questions = quizData?.questions || [];
   const currentQ = questions[currentIndex];
   const answeredCount = Object.keys(selectedAnswers).length;
 
@@ -342,8 +353,8 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
             }`}>
               <Award size={40} />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black mb-1">{quizData.title}</h1>
-            <p className="text-xs text-slate-400 mb-6">Giảng viên: {quizData.teacherName}</p>
+            <h1 className="text-2xl sm:text-3xl font-black mb-1">{quizData?.title || 'Bài trắc nghiệm'}</h1>
+            <p className="text-xs text-slate-400 mb-6">Giảng viên: {quizData?.teacherName || '—'}</p>
 
             <div className="inline-flex flex-col items-center justify-center px-8 py-4 rounded-2xl bg-white/5 border border-white/10 mb-6">
               <span className="text-4xl sm:text-5xl font-black text-amber-400 tabular-nums">
@@ -367,7 +378,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
               </div>
               <div className="bg-white/5 p-3 rounded-xl border border-white/5">
                 <span className="text-slate-400 block text-[10px]">Thời gian làm</span>
-                <span className="text-white font-bold text-sm">{quizData.timeLimitMinutes} phút</span>
+                <span className="text-white font-bold text-sm">{quizData?.timeLimitMinutes != null ? `${quizData.timeLimitMinutes} phút` : '—'}</span>
               </div>
               <div className="bg-white/5 p-3 rounded-xl border border-white/5 col-span-2 sm:col-span-1">
                 <span className="text-slate-400 block text-[10px]">Trạng thái</span>
