@@ -786,7 +786,8 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
       } = s;
 
       const name = s.name?.toUpperCase()?.trim();
-      const phone = String(s.phone || '').trim();
+      const { normalizeVNPhone } = require('../utils/phoneIdentity');
+      const phone = normalizeVNPhone(s.phone) || String(s.phone || '').trim();
       const zalo = String(s.zalo || phone || '').trim();
       if (!name || (!phone && !zalo)) continue;
 
@@ -808,7 +809,10 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
       const totalSessions = Number(s.totalSessions) > 0 ? Number(s.totalSessions) : 12;
       const price = Number(s.price) || 0;
       const ageNum = Number(s.age);
-      const plainPassword = resolveDefaultAccountPassword({ phone, zalo });
+      // Mật khẩu mặc định = SĐT (HV đổi sau lần đăng nhập đầu)
+      const plainPassword = (phone && phone.length >= 6)
+        ? phone
+        : resolveDefaultAccountPassword({ phone, zalo });
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
       const studentCode = await generateStudentCode();
 
@@ -830,7 +834,7 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
         ...(teacherId ? { teacherId } : {}),
         status: s.status || 'Chờ xếp lớp',
         password: hashedPassword,
-        isFirstLogin: false,
+        isFirstLogin: true,
         studentCode,
       });
     }
@@ -892,14 +896,16 @@ router.post(
 // ─── POST /api/students ──────────────────────────────────────────────────────────────────
 router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('create'), checkPermission(PERMISSIONS.MANAGE_STUDENTS)], async (req, res, next) => {
   try {
-    // Mặc định mật khẩu = SĐT/Zalo; chỉ đổi khi user/admin chủ động đổi
-    const plainPassword = resolveDefaultAccountPassword({
-      password: req.body.password,
-      phone: req.body.phone,
-      zalo: req.body.zalo,
-    });
+    const { normalizeVNPhone } = require('../utils/phoneIdentity');
+    const canonicalPhone = normalizeVNPhone(req.body.phone);
+    if (!canonicalPhone) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+    }
+    req.body.phone = canonicalPhone;
+    // Mật khẩu mặc định = SĐT; lần đăng nhập đầu HV đặt MK riêng
+    const plainPassword = canonicalPhone;
     req.body.password = plainPassword;
-    req.body.isFirstLogin = false;
+    req.body.isFirstLogin = true;
 
     // Strangler: CQRS when flag/replica resolves on; otherwise LIVE legacy (never hard-503).
     let useCqrs = false;
@@ -954,13 +960,6 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
     if (req.body.teacherId && (!req.body.status || req.body.status === 'Chờ xếp lớp')) {
       req.body.status = 'Đang học';
     }
-
-    const { normalizeVNPhone } = require('../utils/phoneIdentity');
-    const canonicalPhone = normalizeVNPhone(req.body.phone);
-    if (!canonicalPhone) {
-      return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
-    }
-    req.body.phone = canonicalPhone;
 
     // 1 SĐT / 1 email duy nhất — không trùng HV khác hoặc GV
     try {

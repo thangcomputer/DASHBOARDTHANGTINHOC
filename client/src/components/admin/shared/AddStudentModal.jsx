@@ -584,6 +584,9 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
                     className="cms-input font-mono"
                     placeholder="0911222333"
                   />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Mật khẩu mặc định = số điện thoại. Lần đăng nhập đầu HV sẽ được nhắc đổi mật khẩu.
+                  </p>
                 </div>
               </div>
 

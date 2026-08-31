@@ -388,10 +388,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }
   }, [currentTeacher?.status, session?.status, role, sessionTeacherId, navigate, isRefetching, location.pathname]);
 
-  // Admin/staff lần đầu: mở đổi MK ngay. HV/GV: không auto — đổi thủ công ở Hồ sơ/menu.
+  // Admin/staff + HV lần đầu: mở đổi MK ngay. GV: đổi thủ công ở Hồ sơ/menu.
   useEffect(() => {
     if (session?.isFirstLogin !== true) return;
-    if (role === 'student' || role === 'teacher') return;
+    if (role === 'teacher') return;
     const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('open-change-password-modal'));
     }, 500);
@@ -1201,7 +1201,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           || (role === 'student' && assignedTeacherModal.open)
           || ((role === 'admin' || role === 'staff') && !!attendanceDispute)
           || (role === 'teacher' && !!teacherAttendanceConfirm)
-          || (session?.isFirstLogin === true && role !== 'student' && role !== 'teacher')
+          || (session?.isFirstLogin === true && role !== 'teacher')
         }
       />
       <WelcomeCelebrationOverlay

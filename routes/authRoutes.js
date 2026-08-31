@@ -746,15 +746,19 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
     // Bước 2: Super Admin configured phone (JWT id remains "admin" for compatibility).
     const masterPhone = normalizeVNPhone(process.env.MASTER_ADMIN_PHONE);
     if (masterPhone && phone === masterPhone) {
-      const collisions = await findPhoneMatches(phone);
-      if (collisions.length) {
-        logger.error({ phone: maskPhone(phone), count: collisions.length }, '[AUTH] MASTER_ADMIN_PHONE collision');
-        return res.status(401).json(INVALID_CREDENTIALS);
-      }
-      const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
+      const sysSettings = await SystemSettings.findOne({ _key: 'main' })
+        .select('+adminMfaSecret adminPasswordHash adminName adminMfaEnabled');
       const adminPasswordMatch = await verifyAdminPassword(password, sysSettings);
       if (!adminPasswordMatch) {
         return res.status(401).json(INVALID_CREDENTIALS);
+      }
+      // Trùng SĐT với HV/GV: cảnh báo nhưng vẫn cho Super Admin vào nếu mật khẩu master đúng
+      const collisions = await findPhoneMatches(phone);
+      if (collisions.length) {
+        logger.warn(
+          { phone: maskPhone(phone), count: collisions.length },
+          '[AUTH] MASTER_ADMIN_PHONE collides with HV/GV — allowing master login after password OK',
+        );
       }
       if (sysSettings?.adminMfaEnabled && sysSettings?.adminMfaSecret) {
         return res.json(issueAdminMfaChallenge(sysSettings, 'internal'));
@@ -996,7 +1000,7 @@ router.post('/mfa/disable', authMiddleware, policyShadowAuth('mfa_disable'), asy
       return res.json({ success: true, message: 'Đã tắt MFA' });
     }
 
-    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
+    const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret adminPasswordHash');
     const pwOk = await verifyAdminPassword(password, sysSettings);
     if (!pwOk) return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
     if (sysSettings?.adminMfaEnabled && sysSettings.adminMfaSecret) {
