@@ -1,7 +1,14 @@
-export default function CertPrepPlayerError({ message, onRetry }) {
+export default function CertPrepPlayerError({ message, onRetry, exam = false }) {
   return (
-    <div className="cms-card text-center py-12 px-4 space-y-4" role="alert">
-      <p className="text-base font-bold text-slate-800">{message || 'Không thể tải phiên làm bài.'}</p>
+    <div
+      className={`text-center py-12 px-4 space-y-4 max-w-md ${
+        exam ? 'rounded-2xl border border-white/10 bg-white/5' : 'cms-card'
+      }`}
+      role="alert"
+    >
+      <p className={`text-base font-bold ${exam ? 'text-slate-100' : 'text-slate-800'}`}>
+        {message || 'Không thể tải phiên làm bài.'}
+      </p>
       {onRetry ? (
         <button
           type="button"

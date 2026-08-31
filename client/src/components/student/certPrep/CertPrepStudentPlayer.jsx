@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Loader2, List } from 'lucide-react';
+import { Loader2, List, LayoutGrid } from 'lucide-react';
 import useCertPrepSession, { isQuestionAnswered } from '../../../hooks/useCertPrepSession';
 import { isImmediateFeedback } from '../../../utils/certPrepGrade';
 import { useData } from '../../../context/DataContext';
@@ -12,6 +13,24 @@ import CertPrepPlayerFooter from './CertPrepPlayerFooter';
 import CertPrepSubmitDialog from './CertPrepSubmitDialog';
 import CertPrepSessionExpired from './CertPrepSessionExpired';
 import CertPrepPlayerError from './CertPrepPlayerError';
+
+/** Lớp phủ toàn app — che sidebar/header/messenger (giống trắc nghiệm buổi học) */
+function ExamOverlay({ children, label = 'Phòng thi ôn MOS/IC3' }) {
+  if (typeof document === 'undefined') return children;
+  return createPortal(
+    <div
+      data-exam-surface
+      className="fixed inset-0 z-[99999] h-[100dvh] w-screen max-w-[100vw] bg-[#0b1018] text-white flex flex-col overflow-hidden font-sans"
+      style={{ isolation: 'isolate' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 export default function CertPrepStudentPlayer() {
   const { sessionId } = useParams();
@@ -30,7 +49,6 @@ export default function CertPrepStudentPlayer() {
     keysReloadTried.current = false;
   }, [sessionId]);
 
-  // Phiên immediate nhưng câu hỏi chưa có đáp án (session cũ) → tải lại 1 lần
   useEffect(() => {
     if (!immediate || player.loading || !player.questions.length || keysReloadTried.current) return;
     const sample = player.questions[0];
@@ -56,6 +74,10 @@ export default function CertPrepStudentPlayer() {
       navigate(`/student/cert-prep/result/${sessionId}`, { replace: true });
     }
   }, [player.loading, player.session?.status, sessionId, navigate]);
+
+  const leaveCatalog = useCallback(() => {
+    navigate('/student/cert-prep');
+  }, [navigate]);
 
   const q = player.currentQuestion;
   const qid = q?.id ? String(q.id) : '';
@@ -83,136 +105,163 @@ export default function CertPrepStudentPlayer() {
       };
     }
     return {
-      label: 'Câu tiếp theo',
+      label: 'Câu tiếp',
       disabled: last,
       primary: false,
     };
   }, [immediate, q, qid, revealedIds, player.currentIndex, player.questions.length, player.answers]);
 
-  const back = (
-    <button
-      type="button"
-      onClick={() => navigate('/student/cert-prep')}
-      className="text-sm font-bold text-red-600 inline-flex items-center gap-1 px-4 sm:px-6 pt-4"
-    >
-      <ChevronLeft size={16} aria-hidden="true" /> Quay lại Ôn thi MOS/IC3
-    </button>
-  );
-
   if (player.loading || player.uiStatus === 'loading') {
     return (
-      <div className="min-h-screen bg-slate-100">
-        {back}
-        <div className="cms-card mx-4 sm:mx-6 mt-4 flex items-center justify-center py-16 text-slate-400" role="status">
-          <Loader2 className="animate-spin mr-2" size={20} aria-hidden="true" /> Đang tải bài thi...
+      <ExamOverlay>
+        <div className="flex-1 flex flex-col items-center justify-center text-white">
+          <Loader2 className="animate-spin text-emerald-400 mb-3" size={32} aria-hidden="true" />
+          <p className="text-sm font-bold">Đang tải phòng thi MOS/IC3...</p>
         </div>
-      </div>
+      </ExamOverlay>
     );
   }
 
   if (player.uiStatus === 'forbidden') {
     return (
-      <div className="min-h-screen bg-slate-100">
-        {back}
-        <div className="p-4 sm:p-6">
-          <CertPrepPlayerError message="Bạn không có quyền truy cập phiên làm bài này." />
+      <ExamOverlay>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4">
+          <CertPrepPlayerError message="Bạn không có quyền truy cập phiên làm bài này." exam />
+          <button type="button" onClick={leaveCatalog} className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-xl text-sm font-bold">
+            Quay lại
+          </button>
         </div>
-      </div>
+      </ExamOverlay>
     );
   }
 
   if (player.uiStatus === 'not-found') {
     return (
-      <div className="min-h-screen bg-slate-100">
-        {back}
-        <div className="p-4 sm:p-6">
-          <CertPrepPlayerError message={player.error || 'Không tìm thấy phiên làm bài.'} onRetry={player.loadSession} />
+      <ExamOverlay>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4">
+          <CertPrepPlayerError message={player.error || 'Không tìm thấy phiên làm bài.'} onRetry={player.loadSession} exam />
+          <button type="button" onClick={leaveCatalog} className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-xl text-sm font-bold">
+            Quay lại
+          </button>
         </div>
-      </div>
+      </ExamOverlay>
     );
   }
 
   if (player.uiStatus === 'error') {
     return (
-      <div className="min-h-screen bg-slate-100">
-        {back}
-        <div className="p-4 sm:p-6">
-          <CertPrepPlayerError message={player.error} onRetry={player.loadSession} />
+      <ExamOverlay>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4">
+          <CertPrepPlayerError message={player.error} onRetry={player.loadSession} exam />
+          <button type="button" onClick={leaveCatalog} className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-xl text-sm font-bold">
+            Quay lại
+          </button>
         </div>
-      </div>
+      </ExamOverlay>
     );
   }
 
   if (player.justSubmitted || player.uiStatus === 'submitted' || player.session?.status === 'submitted') {
     return (
-      <div className="min-h-screen bg-slate-100">
-        {back}
-        <div className="cms-card mx-4 sm:mx-6 mt-4 flex items-center justify-center py-16 text-slate-400" role="status">
-          <Loader2 className="animate-spin mr-2" size={20} aria-hidden="true" /> Đang chuyển đến kết quả...
+      <ExamOverlay>
+        <div className="flex-1 flex flex-col items-center justify-center text-white">
+          <Loader2 className="animate-spin text-emerald-400 mb-3" size={32} aria-hidden="true" />
+          <p className="text-sm font-bold">Đang chuyển đến kết quả...</p>
         </div>
-      </div>
+      </ExamOverlay>
     );
   }
 
   if (player.uiStatus === 'expired' || player.session?.status === 'abandoned') {
     return (
-      <div className="min-h-screen bg-slate-100">
-        {back}
-        <div className="p-4 sm:p-6">
-          <CertPrepSessionExpired />
+      <ExamOverlay>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4">
+          <CertPrepSessionExpired exam />
+          <button type="button" onClick={leaveCatalog} className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-xl text-sm font-bold">
+            Quay lại danh sách
+          </button>
         </div>
-      </div>
+      </ExamOverlay>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f6f9] flex flex-col">
+    <ExamOverlay>
       <ExamClickOutsideGuard
         enabled={!player.locked && !player.submitting}
         soundUrl={examWarningSoundUrl}
         watchVisibility
-        className="w-full max-w-6xl mx-auto flex-1 flex flex-col min-h-0"
+        className="flex-1 min-h-0 flex flex-col select-none overflow-x-hidden"
       >
         <CertPrepPlayerHeader
+          exam
           session={player.session}
           currentIndex={player.currentIndex}
           total={player.questions.length}
           remainingSeconds={player.remainingSeconds}
           answeredCount={player.answeredCount}
+          onExit={leaveCatalog}
+          onSubmit={() => setConfirmOpen(true)}
+          submitDisabled={player.locked || player.submitting}
         />
+
         {(player.offline || player.saveError) ? (
-          <p className="px-4 sm:px-6 py-2 text-sm font-semibold text-amber-800 bg-amber-50 border-b border-amber-100" role="status">
+          <p className="px-4 py-2 text-sm font-semibold text-amber-200 bg-amber-500/15 border-b border-amber-500/25 shrink-0" role="status">
             {player.offline ? 'Mất kết nối mạng.' : player.saveError}
           </p>
         ) : null}
 
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3 p-3 sm:p-5 w-full">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-sm">
-            {q ? (
-              <CertPrepQuestionArea
-                key={q.id}
-                question={q}
-                index={player.currentIndex}
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
+          <div className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 overflow-y-auto">
+            <div className="max-w-3xl mx-auto w-full space-y-4">
+              {q ? (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 shadow-xl">
+                  <CertPrepQuestionArea
+                    key={q.id}
+                    exam
+                    question={q}
+                    index={player.currentIndex}
+                    total={player.questions.length}
+                    value={player.answers[q.id]}
+                    disabled={answerLocked}
+                    showFeedback={immediate && currentRevealed}
+                    onChange={(value) => player.selectAnswer(q.id, value)}
+                  />
+                </div>
+              ) : (
+                <p className="text-center py-10 text-slate-400 text-sm">Không có câu hỏi.</p>
+              )}
+
+              <CertPrepPlayerFooter
+                exam
+                currentIndex={player.currentIndex}
                 total={player.questions.length}
-                value={player.answers[q.id]}
-                disabled={answerLocked}
-                showFeedback={immediate && currentRevealed}
-                onChange={(value) => player.selectAnswer(q.id, value)}
+                onPrevious={player.previous}
+                onNext={handleNext}
+                onSubmit={() => setConfirmOpen(true)}
+                submitDisabled={player.locked || player.submitting}
+                nextLabel={nextMeta.label}
+                nextDisabled={nextMeta.disabled || player.locked}
+                nextPrimary={nextMeta.primary}
               />
-            ) : (
-              <p className="text-sm text-slate-500">Không có câu hỏi.</p>
-            )}
+            </div>
           </div>
-          <aside className="lg:sticky lg:top-[4.75rem] self-start">
+
+          <aside className="lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-white/10 p-4 sm:p-5 bg-[#0e1420] flex flex-col shrink-0 lg:overflow-y-auto">
             <button
               type="button"
-              className="lg:hidden mb-3 min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold inline-flex items-center gap-2"
+              className="lg:hidden mb-3 min-h-11 px-3 rounded-xl border border-white/15 bg-white/5 text-sm font-bold inline-flex items-center gap-2 text-slate-200"
               onClick={() => setNavOpen((v) => !v)}
             >
               <List size={16} aria-hidden="true" /> Danh sách câu hỏi
             </button>
             <div className={`${navOpen ? 'block' : 'hidden'} lg:block`}>
+              <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-300">
+                <LayoutGrid size={16} className="text-sky-400" aria-hidden="true" />
+                <span>Danh sách câu hỏi</span>
+              </div>
               <CertPrepQuestionNavigator
+                exam
                 questions={player.questions}
                 answers={player.answers}
                 currentIndex={player.currentIndex}
@@ -224,19 +273,8 @@ export default function CertPrepStudentPlayer() {
           </aside>
         </div>
 
-        <CertPrepPlayerFooter
-          currentIndex={player.currentIndex}
-          total={player.questions.length}
-          onPrevious={player.previous}
-          onNext={handleNext}
-          onSubmit={() => setConfirmOpen(true)}
-          submitDisabled={player.locked || player.submitting}
-          nextLabel={nextMeta.label}
-          nextDisabled={nextMeta.disabled || player.locked}
-          nextPrimary={nextMeta.primary}
-        />
-
         <CertPrepSubmitDialog
+          exam
           open={confirmOpen}
           answeredCount={player.answeredCount}
           total={player.questions.length}
@@ -248,6 +286,6 @@ export default function CertPrepStudentPlayer() {
           }}
         />
       </ExamClickOutsideGuard>
-    </div>
+    </ExamOverlay>
   );
 }

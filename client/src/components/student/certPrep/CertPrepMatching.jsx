@@ -7,6 +7,7 @@ export default function CertPrepMatching({
   disabled,
   onChange,
   showFeedback = false,
+  exam = false,
 }) {
   const items = question.matchingItems || [];
   const targets = question.matchingTargets || [];
@@ -32,27 +33,32 @@ export default function CertPrepMatching({
         const correctTarget = correctByItem.get(String(item.id));
         const isOk = showFeedback && chosen && chosen === correctTarget;
         const isBad = showFeedback && chosen && chosen !== correctTarget;
+        const cardCls = exam
+          ? (isOk
+            ? 'border-emerald-500/40 bg-emerald-500/15'
+            : isBad
+              ? 'border-red-500/40 bg-red-500/15'
+              : 'border-white/10 bg-white/5')
+          : (isOk
+            ? 'border-emerald-400 bg-emerald-50'
+            : isBad
+              ? 'border-red-400 bg-red-50'
+              : 'border-slate-200 bg-white');
         return (
-          <div
-            key={item.id}
-            className={`rounded-2xl border p-4 space-y-2 ${
-              isOk
-                ? 'border-emerald-400 bg-emerald-50'
-                : isBad
-                  ? 'border-red-400 bg-red-50'
-                  : 'border-slate-200 bg-white'
-            }`}
-          >
-            <p className="text-sm font-semibold text-slate-800">
-              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-900/5 text-xs font-black text-slate-700 mr-2">
+          <div key={item.id} className={`rounded-2xl border p-4 space-y-2 ${cardCls}`}>
+            <p className={`text-sm font-semibold ${exam ? 'text-slate-100' : 'text-slate-800'}`}>
+              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-black mr-2 ${
+                exam ? 'bg-white/10 text-slate-200' : 'bg-slate-900/5 text-slate-700'
+              }`}
+              >
                 {String.fromCharCode(65 + i)}
               </span>
               {item.text || ''}
             </p>
             {item.imageUrl ? (
-              <img src={resolveMediaUrl(item.imageUrl)} alt="" className="max-h-28 rounded-xl border border-slate-100" />
+              <img src={resolveMediaUrl(item.imageUrl)} alt="" className={`max-h-28 rounded-xl border ${exam ? 'border-white/10' : 'border-slate-100'}`} />
             ) : null}
-            <label htmlFor={selectId} className="block text-xs font-bold text-slate-500">
+            <label htmlFor={selectId} className={`block text-xs font-bold ${exam ? 'text-slate-400' : 'text-slate-500'}`}>
               Ghép với
             </label>
             <CmsSelect
@@ -70,7 +76,7 @@ export default function CertPrepMatching({
               ))}
             </CmsSelect>
             {showFeedback && correctTarget ? (
-              <p className="text-xs font-semibold text-emerald-800">
+              <p className={`text-xs font-semibold ${exam ? 'text-emerald-300' : 'text-emerald-800'}`}>
                 Đáp án đúng: {targets.find((t) => String(t.id) === correctTarget)?.text || correctTarget}
               </p>
             ) : null}

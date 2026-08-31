@@ -15,6 +15,7 @@ export default function CertPrepQuestionArea({
   disabled,
   onChange,
   showFeedback = false,
+  exam = false,
 }) {
   const [showHint, setShowHint] = useState(false);
   if (!question) return null;
@@ -23,14 +24,16 @@ export default function CertPrepQuestionArea({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-          Câu {index + 1} / {total}
+      <div className={`flex flex-wrap items-center justify-between gap-2 border-b pb-3 ${exam ? 'border-white/10' : 'border-slate-100'}`}>
+        <span className={`text-[11px] font-black uppercase tracking-widest ${exam ? 'text-sky-400' : 'text-slate-400'}`}>
+          Câu hỏi {index + 1} / {total}
         </span>
         {showFeedback ? (
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
-              isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'
+              exam
+                ? (isCorrect ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30')
+                : (isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700')
             }`}
           >
             {isCorrect ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
@@ -39,14 +42,14 @@ export default function CertPrepQuestionArea({
         ) : null}
       </div>
 
-      <p className="text-[16px] font-bold text-slate-900 leading-snug whitespace-pre-wrap">
+      <p className={`text-base sm:text-lg font-bold leading-relaxed whitespace-pre-wrap ${exam ? 'text-slate-100' : 'text-slate-900'}`}>
         {question.questionText}
       </p>
       {question.questionImage ? (
         <img
           src={resolveMediaUrl(question.questionImage)}
           alt="Hình minh họa câu hỏi"
-          className="block w-full h-auto max-w-full rounded-2xl border border-slate-100 bg-slate-50"
+          className={`block w-full h-auto max-w-full rounded-2xl ${exam ? 'border border-white/10 bg-white/5' : 'border border-slate-100 bg-slate-50'}`}
         />
       ) : null}
 
@@ -57,6 +60,7 @@ export default function CertPrepQuestionArea({
           disabled={disabled}
           onChange={onChange}
           showFeedback={showFeedback}
+          exam={exam}
         />
       ) : null}
       {question.type === 'multiple_choice' ? (
@@ -66,6 +70,7 @@ export default function CertPrepQuestionArea({
           disabled={disabled}
           onChange={onChange}
           showFeedback={showFeedback}
+          exam={exam}
         />
       ) : null}
       {question.type === 'matching' ? (
@@ -75,6 +80,7 @@ export default function CertPrepQuestionArea({
           disabled={disabled}
           onChange={onChange}
           showFeedback={showFeedback}
+          exam={exam}
         />
       ) : null}
       {question.type === 'true_false_grid' ? (
@@ -84,12 +90,18 @@ export default function CertPrepQuestionArea({
           disabled={disabled}
           onChange={onChange}
           showFeedback={showFeedback}
+          exam={exam}
         />
       ) : null}
 
       {showFeedback && (question.explanation || question.explanationImage) ? (
-        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/80 p-4 text-sm text-indigo-950">
-          <p className="text-[11px] font-black uppercase tracking-wide text-indigo-600 mb-1">Giải thích</p>
+        <div className={`rounded-2xl p-4 text-sm ${
+          exam
+            ? 'border border-indigo-500/20 bg-indigo-500/10 text-indigo-200'
+            : 'border border-indigo-100 bg-indigo-50/80 text-indigo-950'
+        }`}
+        >
+          <p className={`text-[11px] font-black uppercase tracking-wide mb-1 ${exam ? 'text-indigo-300' : 'text-indigo-600'}`}>Giải thích</p>
           {question.explanation ? <p className="whitespace-pre-wrap font-medium">{question.explanation}</p> : null}
           {question.explanationImage ? (
             <img src={resolveMediaUrl(question.explanationImage)} alt="Hình giải thích" className="max-h-40 mt-2 rounded-xl" />
@@ -102,12 +114,21 @@ export default function CertPrepQuestionArea({
           <button
             type="button"
             onClick={() => setShowHint((v) => !v)}
-            className="min-h-10 px-3.5 rounded-xl text-sm font-bold text-amber-900 bg-amber-50 border border-amber-200"
+            className={`min-h-10 px-3.5 rounded-xl text-sm font-bold border ${
+              exam
+                ? 'text-amber-200 bg-amber-500/15 border-amber-500/30'
+                : 'text-amber-900 bg-amber-50 border-amber-200'
+            }`}
           >
             {showHint ? 'Ẩn gợi ý' : 'Gợi ý'}
           </button>
           {showHint ? (
-            <div className="mt-2 rounded-2xl bg-amber-50 border border-amber-100 p-3.5 text-sm text-slate-800">
+            <div className={`mt-2 rounded-2xl border p-3.5 text-sm ${
+              exam
+                ? 'bg-amber-500/10 border-amber-500/25 text-slate-200'
+                : 'bg-amber-50 border-amber-100 text-slate-800'
+            }`}
+            >
               {question.hint ? <p className="whitespace-pre-wrap">{question.hint}</p> : null}
               {question.hintImage ? (
                 <img src={resolveMediaUrl(question.hintImage)} alt="Hình gợi ý" className="max-h-40 mt-2 rounded-xl" />

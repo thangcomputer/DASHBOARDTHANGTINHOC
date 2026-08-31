@@ -8,9 +8,61 @@ export default function CertPrepQuestionNavigator({
   onSelect,
   revealedIds = {},
   showResultColors = false,
+  exam = false,
 }) {
   const total = questions.length;
   const answered = questions.filter((q) => isQuestionAnswered(q, answers[q.id])).length;
+
+  if (exam) {
+    return (
+      <nav aria-label="Danh sách câu hỏi" className="flex flex-col gap-3">
+        <p className="text-[11px] font-bold text-slate-400">
+          Đã chọn: {answered}/{total}
+        </p>
+        <div className="grid grid-cols-5 gap-2 content-start self-start w-full max-h-[min(40vh,280px)] lg:max-h-none overflow-y-auto pr-0.5">
+          {questions.map((q, i) => {
+            const done = isQuestionAnswered(q, answers[q.id]);
+            const current = i === currentIndex;
+            const revealed = Boolean(revealedIds[q.id]);
+            let btnStyle = 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10';
+            if (showResultColors && revealed) {
+              const ok = gradeCertPrepQuestion(q, answers[q.id]);
+              btnStyle = ok
+                ? 'bg-emerald-500/30 border-emerald-500/60 text-emerald-200 font-bold'
+                : 'bg-red-500/25 border-red-500/50 text-red-200 font-bold';
+            } else if (done) {
+              btnStyle = 'bg-emerald-500/30 border-emerald-500/60 text-emerald-200 font-bold';
+            }
+            if (current) {
+              btnStyle = 'bg-sky-500 text-slate-950 font-black border-sky-300 ring-2 ring-sky-400/40';
+            }
+            return (
+              <button
+                key={q.id}
+                type="button"
+                onClick={() => onSelect(i)}
+                aria-current={current ? 'true' : undefined}
+                className={`min-h-10 rounded-xl text-xs font-black border transition ${btnStyle}`}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
+        <ul className="mt-1 pt-3 border-t border-white/10 space-y-1.5 text-[10px] font-bold text-slate-400">
+          <li className="flex items-center gap-1.5">
+            <span className="w-3.5 h-3.5 rounded bg-sky-500 shrink-0" /> Đang xem
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="w-3.5 h-3.5 rounded bg-emerald-500/60 shrink-0" /> Đã trả lời
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 shrink-0" /> Chưa làm
+          </li>
+        </ul>
+      </nav>
+    );
+  }
 
   return (
     <nav

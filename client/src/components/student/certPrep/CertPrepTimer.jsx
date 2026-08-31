@@ -11,13 +11,13 @@ export default function CertPrepTimer({ remainingSeconds, light = false }) {
   else if (n === 5 * 60) liveText = 'Còn 5 phút';
 
   const color = light
-    ? (critical ? 'text-red-300' : warning ? 'text-amber-200' : 'text-white')
+    ? (critical ? 'text-red-300' : warning ? 'text-amber-200' : 'text-amber-300')
     : (critical ? 'text-red-600' : warning ? 'text-amber-700' : 'text-slate-900');
 
   return (
     <div className={light ? 'text-left' : 'text-right'}>
       <p
-        className={`text-xl sm:text-2xl font-black tabular-nums leading-none ${color}`}
+        className={`${light ? 'text-sm sm:text-base' : 'text-xl sm:text-2xl'} font-black tabular-nums leading-none ${color}`}
         aria-hidden="true"
       >
         {label}
