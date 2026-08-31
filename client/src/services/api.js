@@ -1681,6 +1681,13 @@ export const settingsAPI = {
     });
     return res.json();
   },
+  updateExamAdminGroupLabel: async (label) => {
+    const res = await apiFetch('/settings/exam-admin-group-label', {
+      method: 'PUT',
+      body: JSON.stringify({ label }),
+    });
+    return res.json();
+  },
   uploadTrainingFile: async (file) => {
     const fd = new FormData();
     fd.append('file', file);

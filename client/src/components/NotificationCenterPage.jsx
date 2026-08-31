@@ -18,6 +18,8 @@ import TeacherRatingDetailModal, {
 } from './teacher/TeacherRatingDetailModal';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import StudentDetailModal from './StudentDetailModal';
+import LmsQaVideoPreview from './lms/LmsQaVideoPreview';
+import { formatLmsTimestamp } from '../utils/lmsLessonUi';
 
 const TYPES = [
   { value: '', label: 'Tất cả' },
@@ -99,8 +101,8 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   const toast = useToast();
   const { markNotificationRead, dismissNotificationLocal, students } = useData();
   const { socket } = useSocket() || {};
-  const isAdmin = role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF';
-  const canAnswerQa = isAdmin || role === 'teacher';
+  const isAdmin = role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF' || session?.adminRole === 'SUPPORT';
+  const canAnswerQa = isAdmin || role === 'teacher' || session?.adminRole === 'SUPPORT';
 
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
@@ -160,7 +162,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
     return () => socket.off('notification:removed', onRemoved);
   }, [socket]);
 
-  const openQaById = useCallback(async (qaId) => {
+  const openQaById = useCallback(async (qaId, { keepAnswerDraft = false } = {}) => {
     if (!qaId) return;
     try {
       const res = await apiFetch(`/training-lms/qa?qaId=${encodeURIComponent(qaId)}`);
@@ -171,7 +173,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         return;
       }
       setQaDetail(row);
-      setQaAnswer('');
+      if (!keepAnswerDraft) setQaAnswer('');
       setSelectedNotif({
         title: 'Hỏi đáp LMS',
         type: 'COURSE',
@@ -184,6 +186,26 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       toast.error('Lỗi kết nối hỏi đáp');
     }
   }, [toast]);
+
+  // Realtime đối thoại khi học viên phản hồi / QA cập nhật
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onQa = (raw) => {
+      const p = raw?.payload || raw || {};
+      if (String(p.kind || '') !== 'lms_qa') return;
+      const openId = qaDetail?.id || qaDetail?._id;
+      if (openId && p.qaId && String(p.qaId) === String(openId)) {
+        openQaById(openId, { keepAnswerDraft: true });
+      }
+      load(page);
+    };
+    socket.on('lms_qa:updated', onQa);
+    socket.on('RECEIVE_NOTIFICATION', onQa);
+    return () => {
+      socket.off('lms_qa:updated', onQa);
+      socket.off('RECEIVE_NOTIFICATION', onQa);
+    };
+  }, [socket, qaDetail?.id, qaDetail?._id, openQaById, load, page]);
 
   useEffect(() => {
     const qaId = searchParams.get('qaId');
@@ -676,7 +698,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       {/* ── Modal Chi tiết Thông báo ── */}
       {selectedNotif && (
         <div className="fixed inset-0 bg-slate-900/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 relative border border-slate-100 animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
+          <div className={`bg-white rounded-2xl w-full p-6 shadow-2xl space-y-4 relative border border-slate-100 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col ${qaDetail ? 'max-w-3xl' : 'max-w-lg'}`}>
             <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded-md inline-block mb-1">
@@ -691,7 +713,11 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedNotif(null)}
+                onClick={() => {
+                  setSelectedNotif(null);
+                  setQaDetail(null);
+                  setQaAnswer('');
+                }}
                 className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
               >
                 <X size={18} />
@@ -699,39 +725,93 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             </div>
 
             <div className="overflow-y-auto flex-1 text-sm text-slate-700 leading-relaxed whitespace-pre-line pr-1 font-medium space-y-3">
-              {formatNotificationStudentMask(selectedNotif.message || selectedNotif.content || selectedNotif.text, students, role === 'admin' || role === 'staff' || role === 'teacher')}
+              {!qaDetail ? (
+                formatNotificationStudentMask(selectedNotif.message || selectedNotif.content || selectedNotif.text, students, role === 'admin' || role === 'staff' || role === 'teacher')
+              ) : null}
               {qaDetail ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-left">
-                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Chi tiết câu hỏi LMS</p>
-                  <p className="text-sm font-bold text-slate-900">{qaDetail.title}</p>
-                  {qaDetail.body ? <p className="text-xs text-slate-600 whitespace-pre-wrap">{qaDetail.body}</p> : null}
-                  <p className="text-[11px] text-slate-500">
-                    {qaDetail.askerName} · {qaDetail.lessonTitle || 'Bài học'} · {qaDetail.courseTitle || ''}
-                  </p>
-                  {qaDetail.status === 'answered' && qaDetail.answer ? (
-                    <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-2.5">
-                      <p className="text-[10px] font-black text-emerald-700 uppercase mb-1">Đã trả lời</p>
-                      <p className="text-xs text-emerald-900 whitespace-pre-wrap">{qaDetail.answer}</p>
-                    </div>
-                  ) : canAnswerQa ? (
-                    <div className="space-y-2 pt-1">
-                      <textarea
-                        value={qaAnswer}
-                        onChange={(e) => setQaAnswer(e.target.value)}
-                        rows={3}
-                        placeholder="Nhập câu trả lời cho học viên/giảng viên..."
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-300"
-                      />
-                      <button
-                        type="button"
-                        disabled={qaSaving || !qaAnswer.trim()}
-                        onClick={submitQaAnswer}
-                        className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold disabled:opacity-40"
-                      >
-                        {qaSaving ? 'Đang gửi...' : 'Gửi trả lời'}
-                      </button>
-                    </div>
-                  ) : null}
+                <div className="space-y-3 text-left whitespace-normal">
+                  <LmsQaVideoPreview
+                    videoUrl={qaDetail.videoUrl || ''}
+                    startAtSec={qaDetail.atSec}
+                    durationHint={qaDetail.videoDuration}
+                    lessonTitle={qaDetail.lessonTitle || ''}
+                  />
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Chi tiết câu hỏi LMS</p>
+                    <p className="text-sm font-bold text-slate-900">{qaDetail.title}</p>
+                    {qaDetail.body ? <p className="text-xs text-slate-600 whitespace-pre-wrap">{qaDetail.body}</p> : null}
+                    <p className="text-[11px] text-slate-500">
+                      {qaDetail.askerName} · {qaDetail.lessonTitle || 'Bài học'}
+                      {qaDetail.courseTitle ? ` · ${qaDetail.courseTitle}` : ''}
+                      <span className="text-emerald-700 font-bold tabular-nums">{` · ${formatLmsTimestamp(qaDetail.atSec)}`}</span>
+                    </p>
+
+                    {(function dialogueOf(it) {
+                      const thread = Array.isArray(it.thread) ? it.thread : [];
+                      if (thread.length > 0) {
+                        if (it.answer && !thread.some((m) => String(m.body || '') === String(it.answer || ''))) {
+                          return [
+                            {
+                              authorName: it.answeredByName || 'Support',
+                              authorRole: it.answeredByRole || 'staff',
+                              body: it.answer,
+                              createdAt: it.answeredAt,
+                            },
+                            ...thread,
+                          ];
+                        }
+                        return thread;
+                      }
+                      if (it.answer) {
+                        return [{
+                          authorName: it.answeredByName || 'Support',
+                          authorRole: it.answeredByRole || 'staff',
+                          body: it.answer,
+                          createdAt: it.answeredAt,
+                        }];
+                      }
+                      return [];
+                    })(qaDetail).map((msg, idx) => {
+                      const staffish = ['admin', 'staff', 'teacher'].includes(String(msg.authorRole || '').toLowerCase());
+                      return (
+                        <div
+                          key={msg.id || `qa-msg-${idx}`}
+                          className={`rounded-lg border p-2.5 ${
+                            staffish
+                              ? 'bg-emerald-50 border-emerald-100'
+                              : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <p className={`text-[10px] font-black uppercase mb-1 ${staffish ? 'text-emerald-700' : 'text-slate-500'}`}>
+                            {staffish ? `Trả lời · ${msg.authorName || 'Support'}` : `Học viên · ${msg.authorName || ''}`}
+                          </p>
+                          <p className="text-xs text-slate-800 whitespace-pre-wrap">{msg.body}</p>
+                        </div>
+                      );
+                    })}
+
+                    {canAnswerQa ? (
+                      <div className="space-y-2 pt-1">
+                        <textarea
+                          value={qaAnswer}
+                          onChange={(e) => setQaAnswer(e.target.value)}
+                          rows={3}
+                          placeholder={qaDetail.answer || (qaDetail.thread || []).length
+                            ? 'Tiếp tục đối thoại với học viên...'
+                            : 'Nhập câu trả lời cho học viên/giảng viên...'}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-300"
+                        />
+                        <button
+                          type="button"
+                          disabled={qaSaving || !qaAnswer.trim()}
+                          onClick={submitQaAnswer}
+                          className="px-3 py-2 rounded-xl bg-red-600 text-white text-xs font-bold disabled:opacity-40"
+                        >
+                          {qaSaving ? 'Đang gửi...' : 'Gửi trả lời'}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>

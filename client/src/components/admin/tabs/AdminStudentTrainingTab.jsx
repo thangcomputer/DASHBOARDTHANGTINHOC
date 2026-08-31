@@ -15,6 +15,7 @@ import RichTextEditor from '../shared/RichTextEditor';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
+import { useData } from '../../../context/DataContext';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
 import AdminTeacherQuizHistoryPanel from '../shared/AdminTeacherQuizHistoryPanel';
 
@@ -89,6 +90,7 @@ export default function AdminStudentTrainingTab() {
     removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
     updateExamResult, addExamResult, examSubjectsCatalog,
   } = useAdminTraining();
+  const { examAdminGroupLabel } = useData();
 
   const [dbCourses, setDbCourses] = React.useState([]);
   const [coverUploading, setCoverUploading] = React.useState(false);
@@ -372,6 +374,7 @@ export default function AdminStudentTrainingTab() {
                   <ExamSubjectCheckboxGrid
                     catalog={examSubjectsCatalog}
                     value={sTrainingForm.examSubjects || []}
+                    groupLabels={{ admin: examAdminGroupLabel }}
                     onChange={(ids) => setSTrainingForm((prev) => ({ ...prev, examSubjects: ids }))}
                   />
                   )}

@@ -68,6 +68,7 @@ export function useDataTraining(currentUser) {
   const [examWarningSoundUrl, setExamWarningSoundUrl] = useState('');
   const [studentExamBankHydrated, setStudentExamBankHydrated] = useState(false);
   const [examSubjectsCatalog, setExamSubjectsCatalog] = useState(BUILTIN_EXAM_SUBJECTS);
+  const [examAdminGroupLabel, setExamAdminGroupLabel] = useState('Admin tạo');
 
   useEffect(() => {
     const role = currentUser?.role;
@@ -79,6 +80,11 @@ export function useDataTraining(currentUser) {
 
   const applyExamCatalogFromServer = useCallback((d) => {
     if (!d) return;
+    if (typeof d.examAdminGroupLabel === 'string' && d.examAdminGroupLabel.trim()) {
+      setExamAdminGroupLabel(d.examAdminGroupLabel.trim());
+    } else if (typeof d.adminGroupLabel === 'string' && d.adminGroupLabel.trim()) {
+      setExamAdminGroupLabel(d.adminGroupLabel.trim());
+    }
     if (Array.isArray(d.examSubjectsMerged) && d.examSubjectsMerged.length) {
       setExamSubjectsCatalog(mergedArrayToCatalog(d.examSubjectsMerged));
     } else if (Array.isArray(d.examSubjectsCustom)) {
@@ -699,6 +705,18 @@ export function useDataTraining(currentUser) {
     return true;
   }, []);
 
+  const updateExamAdminGroupLabel = useCallback(async (label) => {
+    const next = String(label || '').trim();
+    if (next.length < 2) throw new Error('Tên nhóm phải từ 2 ký tự');
+    const res = await api.settings.updateExamAdminGroupLabel(next);
+    if (!res?.success) {
+      throw new Error(res?.message || 'Không đổi được tên nhóm');
+    }
+    const saved = String(res.data?.adminGroupLabel || next).trim() || next;
+    setExamAdminGroupLabel(saved);
+    return saved;
+  }, []);
+
   const updateCustomExamSubject = useCallback(async (subjectId, payload) => {
     const id = String(subjectId || '').trim();
     if (!id) throw new Error('Ma mon thi khong hop le');
@@ -886,9 +904,11 @@ export function useDataTraining(currentUser) {
     examWarningSoundUrl,
     setExamWarningSoundUrl,
     examSubjectsCatalog,
+    examAdminGroupLabel,
     addCustomExamSubject,
     updateCustomExamSubject,
     removeCustomExamSubject,
+    updateExamAdminGroupLabel,
     applyStudentExamConfigFromServer,
     addStudentTrainingItem,
     updateStudentTrainingItem,

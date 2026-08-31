@@ -113,6 +113,73 @@ function findCourseInSettings(settings, courseId) {
   );
 }
 
+function collectCourseLessons(course) {
+  let courseLessons = course.lessons || course.videos || [];
+  if (courseLessons.length === 0 && course.chapters) {
+    course.chapters.forEach((ch) => {
+      if (ch.lessons) {
+        courseLessons = courseLessons.concat(
+          ch.lessons.map((l) => ({ ...l, chapterTitle: ch.title || l.chapterTitle }))
+        );
+      }
+    });
+  }
+  if (courseLessons.length === 0 && (course.videoUrl || course.url || course.youtubeUrl || course.link)) {
+    courseLessons = [{
+      id: `v-${course.id || course._id}`,
+      title: course.title,
+      videoUrl: course.videoUrl || course.url || course.youtubeUrl || course.link,
+      duration: course.duration || '',
+    }];
+  }
+  return courseLessons.map((l, i) => ({
+    ...l,
+    _id: l.id || l._id || `ls-${i}`,
+    id: l.id || l._id || `ls-${i}`,
+  }));
+}
+
+function lessonVideoFields(lesson) {
+  if (!lesson) return { videoUrl: '', videoDuration: 0, lessonTitle: '' };
+  const videoUrl = String(
+    lesson.videoUrl || lesson.url || lesson.youtubeUrl || lesson.link || ''
+  ).trim();
+  let videoDuration = Number(lesson.duration) || 0;
+  if (!Number.isFinite(videoDuration) || videoDuration < 0) videoDuration = 0;
+  if (typeof lesson.duration === 'string' && lesson.duration.includes(':')) {
+    const parts = lesson.duration.split(':').map((x) => Number(x));
+    if (parts.length === 2 && parts.every((n) => Number.isFinite(n))) {
+      videoDuration = parts[0] * 60 + parts[1];
+    } else if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
+      videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+  }
+  return {
+    videoUrl,
+    videoDuration: Math.max(0, Math.floor(videoDuration)),
+    lessonTitle: String(lesson.title || lesson.chapterTitle || ''),
+  };
+}
+
+async function resolveLessonMetaFromSettings(courseId, lessonId) {
+  try {
+    const SystemSettings = require('../models/SystemSettings');
+    const settings = await SystemSettings.findOne().lean() || {};
+    const course = findCourseInSettings(settings, courseId);
+    if (!course) return null;
+    const lessons = collectCourseLessons(course);
+    const lid = String(lessonId || '');
+    const lesson = lessons.find((l) => String(l._id || l.id) === lid) || null;
+    if (!lesson) return null;
+    return {
+      courseTitle: String(course.title || ''),
+      ...lessonVideoFields(lesson),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Lấy danh sách bài học của 1 khóa (Kèm trạng thái khóa/mở)
 router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => {
   try {
@@ -367,24 +434,6 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
-function collectCourseLessons(course) {
-  let courseLessons = course.lessons || course.videos || [];
-  if (courseLessons.length === 0 && course.chapters) {
-    course.chapters.forEach((ch) => {
-      if (ch.lessons) courseLessons = courseLessons.concat(ch.lessons);
-    });
-  }
-  if (courseLessons.length === 0 && (course.videoUrl || course.url || course.youtubeUrl || course.link)) {
-    courseLessons = [{
-      id: `v-${course.id || course._id}`,
-      title: course.title,
-      videoUrl: course.videoUrl || course.url || course.youtubeUrl || course.link,
-      duration: course.duration || '',
-    }];
-  }
-  return courseLessons;
-}
 
 function mapLessonForTeacherUi(lesson, index) {
   const url = lesson.videoUrl || lesson.url || lesson.youtubeUrl || lesson.link || '';
@@ -646,12 +695,93 @@ const Student = require('../models/Student');
 
 function mapQaDoc(doc) {
   const o = doc.toObject ? doc.toObject() : { ...doc };
+  const thread = Array.isArray(o.thread)
+    ? o.thread.map((m) => ({
+        id: String(m._id || m.id || ''),
+        authorId: String(m.authorId || ''),
+        authorName: m.authorName || '',
+        authorRole: m.authorRole || '',
+        body: m.body || '',
+        createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+      }))
+    : [];
   return {
     ...o,
     id: String(o._id),
+    atSec: Math.max(0, Math.floor(Number(o.atSec) || 0)),
+    videoUrl: String(o.videoUrl || ''),
+    videoDuration: Math.max(0, Math.floor(Number(o.videoDuration) || 0)),
+    thread,
     createdAt: o.createdAt ? new Date(o.createdAt).getTime() : Date.now(),
     answeredAt: o.answeredAt ? new Date(o.answeredAt).getTime() : null,
   };
+}
+
+async function enrichQaRowsWithVideo(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return [];
+
+  const settingsCache = { value: null };
+  const loadSettings = async () => {
+    if (settingsCache.value) return settingsCache.value;
+    try {
+      const SystemSettings = require('../models/SystemSettings');
+      settingsCache.value = await SystemSettings.findOne().lean() || {};
+    } catch {
+      settingsCache.value = {};
+    }
+    return settingsCache.value;
+  };
+
+  const out = [];
+  for (const row of list) {
+    const mapped = mapQaDoc(row);
+    let videoUrl = mapped.videoUrl;
+    let videoDuration = mapped.videoDuration;
+    let lessonTitle = mapped.lessonTitle || '';
+
+    if (!videoUrl && mapped.courseId && mapped.lessonId) {
+      try {
+        const settings = await loadSettings();
+        const course = findCourseInSettings(settings, mapped.courseId);
+        if (course) {
+          const lessons = collectCourseLessons(course);
+          const lesson = lessons.find(
+            (l) => String(l._id || l.id) === String(mapped.lessonId)
+          );
+          const meta = lessonVideoFields(lesson);
+          videoUrl = meta.videoUrl;
+          videoDuration = videoDuration || meta.videoDuration;
+          lessonTitle = lessonTitle || meta.lessonTitle;
+          if (!mapped.courseTitle && course.title) {
+            mapped.courseTitle = String(course.title);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Fallback TrainingLesson (ObjectId-based courses)
+    if (!videoUrl && /^[a-fA-F0-9]{24}$/.test(String(mapped.lessonId || ''))) {
+      try {
+        const lesson = await TrainingLesson.findById(mapped.lessonId)
+          .select('videoUrl duration title')
+          .lean();
+        if (lesson) {
+          videoUrl = lesson.videoUrl || '';
+          videoDuration = videoDuration || Math.max(0, Math.floor(Number(lesson.duration) || 0));
+          lessonTitle = lessonTitle || lesson.title || '';
+        }
+      } catch { /* ignore */ }
+    }
+
+    out.push({
+      ...mapped,
+      videoUrl: videoUrl || '',
+      videoDuration: Math.max(0, Math.floor(Number(videoDuration) || 0)),
+      lessonTitle: lessonTitle || mapped.lessonTitle || '',
+    });
+  }
+  return out;
 }
 
 function buildAskerDeepLink(doc) {
@@ -670,6 +800,32 @@ function buildStaffDeepLink(doc, role = 'admin') {
   const q = new URLSearchParams({ qaId: String(doc._id || doc.id || '') });
   if (role === 'teacher') return `/teacher/notifications?${q.toString()}`;
   return `/admin/notifications?${q.toString()}`;
+}
+
+function emitLmsQaUpdated(io, doc, extra = {}) {
+  if (!io || !doc) return;
+  const payload = {
+    kind: 'lms_qa',
+    qaId: String(doc._id || doc.id || ''),
+    courseId: String(doc.courseId || ''),
+    lessonId: String(doc.lessonId || ''),
+    audience: doc.audience || 'student',
+    status: doc.status || 'open',
+    atSec: Math.max(0, Math.floor(Number(doc.atSec) || 0)),
+    ...extra,
+  };
+  const askerId = String(doc.askerId || '');
+  try {
+    if (askerId) {
+      io.to(askerId).emit('lms_qa:updated', payload);
+      io.to(`student_${askerId}`).emit('lms_qa:updated', payload);
+      io.to(`teacher_${askerId}`).emit('lms_qa:updated', payload);
+    }
+    io.to('ALL_SUPPORT').emit('lms_qa:updated', payload);
+    io.to('ALL_ADMIN').emit('lms_qa:updated', payload);
+    io.to('ALL_STAFF').emit('lms_qa:updated', payload);
+    io.to('ALL_TEACHER').emit('lms_qa:updated', payload);
+  } catch { /* ignore */ }
 }
 
 // GET /qa?courseId=&lessonId=&status=&qaId=
@@ -691,7 +847,8 @@ router.get('/qa', lmsGuard('lms_qa_list'), async (req, res) => {
     }
 
     const rows = await LmsLessonQa.find(filter).sort({ createdAt: -1 }).limit(200).lean();
-    res.json({ success: true, data: rows.map(mapQaDoc) });
+    const data = await enrichQaRowsWithVideo(rows);
+    res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -710,6 +867,10 @@ router.post('/qa', lmsGuard('lms_qa_create'), async (req, res) => {
       title,
       body,
       audience,
+      atSec,
+      atSeconds,
+      videoUrl: bodyVideoUrl,
+      videoDuration: bodyVideoDuration,
     } = req.body || {};
 
     if (!courseId || !lessonId || !String(title || '').trim()) {
@@ -725,11 +886,21 @@ router.post('/qa', lmsGuard('lms_qa_create'), async (req, res) => {
       } catch { /* ignore */ }
     }
 
+    const atSecSafe = Math.max(0, Math.floor(Number(atSec ?? atSeconds) || 0));
+    const meta = await resolveLessonMetaFromSettings(courseId, lessonId);
+    const videoUrl = String(bodyVideoUrl || meta?.videoUrl || '').trim();
+    const videoDuration = Math.max(
+      0,
+      Math.floor(Number(bodyVideoDuration) || Number(meta?.videoDuration) || 0)
+    );
+
     const doc = await LmsLessonQa.create({
       courseId: String(courseId),
-      courseTitle: String(courseTitle || ''),
+      courseTitle: String(courseTitle || meta?.courseTitle || ''),
       lessonId: String(lessonId),
-      lessonTitle: String(lessonTitle || ''),
+      lessonTitle: String(lessonTitle || meta?.lessonTitle || ''),
+      videoUrl,
+      videoDuration,
       audience: audience === 'teacher' ? 'teacher' : 'student',
       askerId: userId,
       askerRole: ['teacher', 'admin', 'staff'].includes(role) ? role : 'student',
@@ -737,17 +908,39 @@ router.post('/qa', lmsGuard('lms_qa_create'), async (req, res) => {
       assignedTeacherId,
       title: String(title).trim().slice(0, 300),
       body: String(body || '').trim().slice(0, 5000),
+      atSec: atSecSafe,
       status: 'open',
+      thread: [],
     });
+
+    // Bypass schema cache: luôn ghi atSec/video xuống Mongo (tránh model cũ strip field)
+    try {
+      await LmsLessonQa.collection.updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            atSec: atSecSafe,
+            videoUrl,
+            videoDuration,
+            lessonTitle: String(doc.lessonTitle || ''),
+          },
+        }
+      );
+      doc.atSec = atSecSafe;
+      doc.videoUrl = videoUrl;
+      doc.videoDuration = videoDuration;
+    } catch { /* ignore */ }
 
     const io = req.app.get('io');
     const preview = doc.title.length > 80 ? `${doc.title.slice(0, 80)}…` : doc.title;
+    const atLabel = atSecSafe > 0 ? ` · ${Math.floor(atSecSafe / 60)}:${String(atSecSafe % 60).padStart(2, '0')}` : '';
     const payload = {
       kind: 'lms_qa',
       action: 'lms_qa_open',
       qaId: String(doc._id),
       courseId: String(doc.courseId),
       lessonId: String(doc.lessonId),
+      atSec: atSecSafe,
       audience: doc.audience,
       status: 'open',
     };
@@ -755,32 +948,33 @@ router.post('/qa', lmsGuard('lms_qa_create'), async (req, res) => {
     await NotificationService.send(io, {
       type: 'COURSE',
       title: role === 'teacher' ? 'Giảng viên có câu hỏi mới' : 'Học viên có câu hỏi mới',
-      content: `${askerName}: "${preview}"${doc.lessonTitle ? ` · Bài: ${doc.lessonTitle}` : ''}`,
+      content: `${askerName}: "${preview}"${doc.lessonTitle ? ` · Bài: ${doc.lessonTitle}` : ''}${atLabel}`,
       sender_id: userId,
-      receivers: ['ALL_ADMIN'],
+      receivers: ['ALL_SUPPORT'],
       payload,
       link: buildStaffDeepLink(doc, 'admin'),
     });
+    emitLmsQaUpdated(io, doc, { action: 'lms_qa_open' });
 
-    if (assignedTeacherId) {
-      await NotificationService.send(io, {
-        type: 'COURSE',
-        title: 'Học viên có câu hỏi mới',
-        content: `${askerName}: "${preview}"${doc.lessonTitle ? ` · Bài: ${doc.lessonTitle}` : ''}`,
-        sender_id: userId,
-        receivers: [assignedTeacherId],
-        payload,
-        link: buildStaffDeepLink(doc, 'teacher'),
-      });
-    }
-
-    res.json({ success: true, data: mapQaDoc(doc) });
+    const [enriched] = await enrichQaRowsWithVideo([doc.toObject ? doc.toObject() : doc]);
+    res.json({ success: true, data: enriched || mapQaDoc(doc) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// POST /qa/:id/answer — admin/teacher/staff answer
+function pushQaThread(doc, { authorId, authorName, authorRole, body }) {
+  if (!Array.isArray(doc.thread)) doc.thread = [];
+  doc.thread.push({
+    authorId: String(authorId || ''),
+    authorName: String(authorName || ''),
+    authorRole: String(authorRole || ''),
+    body: String(body || '').trim().slice(0, 8000),
+    createdAt: new Date(),
+  });
+}
+
+// POST /qa/:id/answer — admin/teacher/staff answer (first + follow-ups)
 router.post('/qa/:id/answer', lmsGuard('lms_qa_answer'), async (req, res) => {
   try {
     const userId = String(req.user.id || req.user._id || '');
@@ -800,24 +994,43 @@ router.post('/qa/:id/answer', lmsGuard('lms_qa_answer'), async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy câu hỏi' });
     }
 
-    doc.answer = answer.slice(0, 8000);
+    const answererName = req.user.name || req.user.fullName || (role === 'teacher' ? 'Giảng viên' : 'Support');
+    const isFirst = !doc.answer;
+    if (isFirst) {
+      doc.answer = answer.slice(0, 8000);
+      doc.answeredBy = userId;
+      doc.answeredByName = answererName;
+      doc.answeredByRole = role || 'admin';
+      doc.answeredAt = new Date();
+    }
     doc.status = 'answered';
-    doc.answeredBy = userId;
-    doc.answeredByName = req.user.name || req.user.fullName || (role === 'teacher' ? 'Giảng viên' : 'Admin');
-    doc.answeredByRole = role || 'admin';
-    doc.answeredAt = new Date();
+    pushQaThread(doc, {
+      authorId: userId,
+      authorName: answererName,
+      authorRole: role || 'admin',
+      body: answer,
+    });
+    // Backfill video if missing (old QAs)
+    if (!doc.videoUrl) {
+      const meta = await resolveLessonMetaFromSettings(doc.courseId, doc.lessonId);
+      if (meta?.videoUrl) {
+        doc.videoUrl = meta.videoUrl;
+        doc.videoDuration = meta.videoDuration || doc.videoDuration || 0;
+        if (!doc.lessonTitle && meta.lessonTitle) doc.lessonTitle = meta.lessonTitle;
+      }
+    }
     await doc.save();
 
     const io = req.app.get('io');
     await NotificationService.send(io, {
       type: 'COURSE',
-      title: 'Câu hỏi của bạn đã được trả lời',
-      content: `${doc.answeredByName} đã trả lời: "${doc.title}"`,
+      title: isFirst ? 'Câu hỏi của bạn đã được trả lời' : 'Có phản hồi mới cho câu hỏi của bạn',
+      content: `${answererName} đã trả lời: "${doc.title}"`,
       sender_id: userId,
       receivers: [String(doc.askerId)],
       payload: {
         kind: 'lms_qa',
-        action: 'lms_qa_answered',
+        action: isFirst ? 'lms_qa_answered' : 'lms_qa_thread',
         qaId: String(doc._id),
         courseId: String(doc.courseId),
         lessonId: String(doc.lessonId),
@@ -826,8 +1039,102 @@ router.post('/qa/:id/answer', lmsGuard('lms_qa_answer'), async (req, res) => {
       },
       link: buildAskerDeepLink(doc),
     });
+    emitLmsQaUpdated(io, doc, { action: isFirst ? 'lms_qa_answered' : 'lms_qa_thread' });
 
-    res.json({ success: true, data: mapQaDoc(doc) });
+    const [enriched] = await enrichQaRowsWithVideo([doc.toObject()]);
+    res.json({ success: true, data: enriched || mapQaDoc(doc) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /qa/:id/reply — học viên/GV hỏi thêm sau khi đã có trả lời (đối thoại)
+router.post('/qa/:id/reply', lmsGuard('lms_qa_create'), async (req, res) => {
+  try {
+    const userId = String(req.user.id || req.user._id || '');
+    const role = String(req.user.role || 'student').toLowerCase();
+    const body = String(req.body?.body || req.body?.reply || '').trim();
+    if (!body) {
+      return res.status(400).json({ success: false, message: 'Nhập nội dung phản hồi' });
+    }
+
+    const doc = await LmsLessonQa.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy câu hỏi' });
+    }
+
+    const isAsker = String(doc.askerId) === userId;
+    const isStaff = role === 'admin' || role === 'staff' || role === 'teacher' || userId === 'admin';
+    if (!isAsker && !isStaff) {
+      return res.status(403).json({ success: false, message: 'Bạn không thể phản hồi câu hỏi này' });
+    }
+
+    const authorName = req.user.name || req.user.fullName
+      || (isAsker ? doc.askerName : (role === 'teacher' ? 'Giảng viên' : 'Support'));
+    pushQaThread(doc, {
+      authorId: userId,
+      authorName,
+      authorRole: isAsker ? (doc.askerRole || role) : role,
+      body,
+    });
+
+    // Học viên hỏi lại → mở lại để Support thấy
+    if (isAsker) {
+      doc.status = 'open';
+    } else {
+      doc.status = 'answered';
+      if (!doc.answer) {
+        doc.answer = body.slice(0, 8000);
+        doc.answeredBy = userId;
+        doc.answeredByName = authorName;
+        doc.answeredByRole = role;
+        doc.answeredAt = new Date();
+      }
+    }
+    await doc.save();
+
+    const io = req.app.get('io');
+    if (isAsker) {
+      await NotificationService.send(io, {
+        type: 'COURSE',
+        title: 'Học viên phản hồi hỏi đáp LMS',
+        content: `${authorName}: "${body.length > 80 ? `${body.slice(0, 80)}…` : body}" · ${doc.title}`,
+        sender_id: userId,
+        receivers: ['ALL_SUPPORT'],
+        payload: {
+          kind: 'lms_qa',
+          action: 'lms_qa_thread',
+          qaId: String(doc._id),
+          courseId: String(doc.courseId),
+          lessonId: String(doc.lessonId),
+          audience: doc.audience,
+          status: doc.status,
+        },
+        link: buildStaffDeepLink(doc, 'admin'),
+      });
+    } else {
+      await NotificationService.send(io, {
+        type: 'COURSE',
+        title: 'Có phản hồi mới cho câu hỏi của bạn',
+        content: `${authorName}: "${body.length > 80 ? `${body.slice(0, 80)}…` : body}"`,
+        sender_id: userId,
+        receivers: [String(doc.askerId)],
+        payload: {
+          kind: 'lms_qa',
+          action: 'lms_qa_thread',
+          qaId: String(doc._id),
+          courseId: String(doc.courseId),
+          lessonId: String(doc.lessonId),
+          audience: doc.audience,
+          status: doc.status,
+        },
+        link: buildAskerDeepLink(doc),
+      });
+    }
+    emitLmsQaUpdated(io, doc, { action: 'lms_qa_thread' });
+
+    const [enriched] = await enrichQaRowsWithVideo([doc.toObject()]);
+    res.json({ success: true, data: enriched || mapQaDoc(doc) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

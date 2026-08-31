@@ -100,7 +100,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     studentEssayRequired, updateStudentEssayRequired,
     studentExamFiles, setStudentExamFile,
     examWarningSoundUrl, setExamWarningSoundUrl,
-    examSubjectsCatalog, addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
+    examSubjectsCatalog, examAdminGroupLabel, addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject, updateExamAdminGroupLabel,
     applyStudentExamConfigFromServer,
     addStudentTrainingItem, updateStudentTrainingItem, removeStudentTrainingItem,
     addTrainingItem, updateTrainingItem, removeTrainingItem,
@@ -206,6 +206,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     studentExamFiles,
     examWarningSoundUrl,
     examSubjectsCatalog,
+    examAdminGroupLabel,
     systemLogs,
     isRefetching,
     RATING_CRITERIA,
@@ -217,7 +218,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     trainingData, studentTrainingData, questions,
     teacherExamTimeLimitMinutes, teacherExamMinutes, teacherEssayExamMinutes,
     studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired,
-    studentExamFiles, examWarningSoundUrl, examSubjectsCatalog, systemLogs, isRefetching, RATING_CRITERIA,
+    studentExamFiles, examWarningSoundUrl, examSubjectsCatalog, examAdminGroupLabel, systemLogs, isRefetching, RATING_CRITERIA,
   ]);
 
   const actionsValue = useMemo(() => ({
@@ -249,7 +250,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     updateStudentExamMinutes, updateStudentEssayExamMinutes, updateStudentEssayRequired,
     setStudentExamFile, setExamWarningSoundUrl,
     applyStudentExamConfigFromServer,
-    addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
+    addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject, updateExamAdminGroupLabel,
     addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
   }), [
     setCurrentUser,
@@ -280,7 +281,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     updateStudentExamMinutes, updateStudentEssayExamMinutes, updateStudentEssayRequired,
     setStudentExamFile, setExamWarningSoundUrl,
     applyStudentExamConfigFromServer,
-    addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject,
+    addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject, updateExamAdminGroupLabel,
     addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
   ]);
 

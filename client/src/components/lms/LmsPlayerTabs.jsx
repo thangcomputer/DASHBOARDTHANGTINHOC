@@ -8,6 +8,7 @@ import LessonSidebarMeta from './LessonSidebarMeta';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
 import { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, apiFetch } from '../../services/api';
 import useLmsLocalStore, { lmsStoreKey } from '../../hooks/useLmsLocalStore';
+import { useSocket } from '../../context/SocketContext';
 
 function initials(name = '') {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
@@ -299,7 +300,12 @@ function QaPanel({
   audience = 'student',
   canAnswer = false,
   highlightQaId = null,
+  getCurrentTime,
+  videoUrl = '',
+  videoDuration = 0,
+  currentUserId = '',
 }) {
+  const { socket } = useSocket() || {};
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -307,36 +313,78 @@ function QaPanel({
   const [body, setBody] = useState('');
   const [q, setQ] = useState('');
   const [answerDrafts, setAnswerDrafts] = useState({});
+  const [replyDrafts, setReplyDrafts] = useState({});
   const [error, setError] = useState('');
+  const [liveAtSec, setLiveAtSec] = useState(() => readNoteTimeSec(getCurrentTime));
+  const getCurrentTimeRef = useRef(getCurrentTime);
+  const liveAtSecRef = useRef(liveAtSec);
+  getCurrentTimeRef.current = getCurrentTime;
+  liveAtSecRef.current = liveAtSec;
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    const id = setInterval(() => {
+      const next = readNoteTimeSec(getCurrentTimeRef.current);
+      setLiveAtSec((prev) => (prev === next ? prev : next));
+      liveAtSecRef.current = next;
+    }, 400);
+    return () => clearInterval(id);
+  }, [lessonId]);
+
+  const load = useCallback(async (opts = {}) => {
+    const silent = opts === true || opts?.silent === true;
     if (!courseId) {
       setItems([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError('');
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const qs = new URLSearchParams({ courseId: String(courseId) });
+      if (lessonId) qs.set('lessonId', String(lessonId));
       if (audience) qs.set('audience', audience);
+      // Deep-link từ thông báo: vẫn cho phép tải theo qaId trong khóa
+      if (highlightQaId && !lessonId) qs.set('qaId', String(highlightQaId));
       const res = await apiFetch(`/training-lms/qa?${qs.toString()}`);
       const json = await res.json().catch(() => ({}));
       if (json?.success && Array.isArray(json.data)) {
         setItems(json.data);
-      } else {
+      } else if (!silent) {
         setError(json?.message || 'Không tải được hỏi đáp');
       }
     } catch {
-      setError('Lỗi kết nối hỏi đáp');
+      if (!silent) setError('Lỗi kết nối hỏi đáp');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [courseId, audience]);
+  }, [courseId, lessonId, audience, highlightQaId]);
+
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Realtime: Support/GV trả lời hoặc đối thoại → reload danh sách (không flash loading)
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onQaEvent = (raw) => {
+      const p = raw?.payload || raw || {};
+      if (String(p.kind || '') !== 'lms_qa') return;
+      if (courseId && p.courseId && String(p.courseId) !== String(courseId)) return;
+      if (audience && p.audience && String(p.audience) !== String(audience)) return;
+      loadRef.current?.({ silent: true });
+    };
+    socket.on('lms_qa:updated', onQaEvent);
+    socket.on('RECEIVE_NOTIFICATION', onQaEvent);
+    return () => {
+      socket.off('lms_qa:updated', onQaEvent);
+      socket.off('RECEIVE_NOTIFICATION', onQaEvent);
+    };
+  }, [socket, courseId, audience]);
 
   useEffect(() => {
     if (!highlightQaId) return;
@@ -347,7 +395,12 @@ function QaPanel({
   }, [highlightQaId, items]);
 
   const filtered = useMemo(() => {
-    const list = [...(Array.isArray(items) ? items : [])].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    let list = [...(Array.isArray(items) ? items : [])];
+    // Chỉ hiện câu hỏi của video/bài đang xem
+    if (lessonId) {
+      list = list.filter((it) => String(it.lessonId || '') === String(lessonId));
+    }
+    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     const needle = q.trim().toLowerCase();
     if (!needle) return list;
     return list.filter(
@@ -356,7 +409,7 @@ function QaPanel({
         String(it.body || '').toLowerCase().includes(needle) ||
         String(it.answer || '').toLowerCase().includes(needle)
     );
-  }, [items, q]);
+  }, [items, q, lessonId]);
 
   const submit = async () => {
     const t = title.trim();
@@ -364,6 +417,9 @@ function QaPanel({
     setSending(true);
     setError('');
     try {
+      const fromPlayer = readNoteTimeSec(getCurrentTimeRef.current);
+      const fromLive = Math.max(0, Math.floor(Number(liveAtSecRef.current) || 0));
+      const atSec = Math.max(fromLive, fromPlayer);
       const res = await apiFetch('/training-lms/qa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -375,6 +431,10 @@ function QaPanel({
           title: t,
           body: body.trim(),
           audience,
+          atSec,
+          atSeconds: atSec,
+          videoUrl: videoUrl || '',
+          videoDuration: Math.max(0, Math.floor(Number(videoDuration) || 0)),
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -384,7 +444,16 @@ function QaPanel({
       }
       setTitle('');
       setBody('');
-      await load();
+      // Optimistic: hiện đúng giây ngay cả khi response cũ chưa có atSec
+      if (json?.data) {
+        const row = { ...json.data, atSec: Math.max(Number(json.data.atSec) || 0, atSec) };
+        setItems((prev) => {
+          const id = String(row.id || row._id);
+          const rest = (Array.isArray(prev) ? prev : []).filter((it) => String(it.id || it._id) !== id);
+          return [row, ...rest];
+        });
+      }
+      await load({ silent: true });
     } catch {
       setError('Lỗi kết nối khi gửi câu hỏi');
     } finally {
@@ -416,6 +485,58 @@ function QaPanel({
     }
   };
 
+  const submitReply = async (qaId) => {
+    const text = String(replyDrafts[qaId] || '').trim();
+    if (!text) return;
+    setSending(true);
+    setError('');
+    try {
+      const res = await apiFetch(`/training-lms/qa/${qaId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: text }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!json?.success) {
+        setError(json?.message || 'Gửi phản hồi thất bại');
+        return;
+      }
+      setReplyDrafts((prev) => ({ ...prev, [qaId]: '' }));
+      await load();
+    } catch {
+      setError('Lỗi kết nối khi phản hồi');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const dialogueOf = (it) => {
+    const thread = Array.isArray(it.thread) ? it.thread : [];
+    if (thread.length > 0) {
+      if (it.answer && !thread.some((m) => String(m.body || '') === String(it.answer || ''))) {
+        return [
+          {
+            authorName: it.answeredByName || 'Support',
+            authorRole: it.answeredByRole || 'staff',
+            body: it.answer,
+            createdAt: it.answeredAt,
+          },
+          ...thread,
+        ];
+      }
+      return thread;
+    }
+    if (it.answer) {
+      return [{
+        authorName: it.answeredByName || 'Support',
+        authorRole: it.answeredByRole || 'staff',
+        body: it.answer,
+        createdAt: it.answeredAt,
+      }];
+    }
+    return [];
+  };
+
   return (
     <div className="space-y-4 max-w-3xl mx-auto w-full">
       <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-3 text-[12px] text-slate-300">
@@ -436,7 +557,12 @@ function QaPanel({
       </div>
 
       <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-2">
-        <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Đặt câu hỏi</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Đặt câu hỏi</p>
+          <span className="text-[11px] font-semibold tabular-nums text-emerald-400/90">
+            Tại {formatLmsTimestamp(liveAtSec)}
+          </span>
+        </div>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -458,6 +584,9 @@ function QaPanel({
         >
           <MessageSquare size={14} /> {sending ? 'Đang gửi...' : 'Gửi câu hỏi'}
         </button>
+        <p className="text-[11px] text-slate-500">
+          Câu hỏi sẽ gắn với thời điểm video hiện tại ({formatLmsTimestamp(liveAtSec)}) để Support xem đúng đoạn.
+        </p>
         {!lessonId ? (
           <p className="text-[11px] text-amber-400">Chọn một bài học trước khi gửi câu hỏi.</p>
         ) : null}
@@ -465,7 +594,7 @@ function QaPanel({
       </div>
 
       <h3 className="text-sm font-bold text-slate-300">
-        Các câu hỏi trong khóa học này ({filtered.length})
+        Các câu hỏi trong video này ({filtered.length})
       </h3>
 
       {loading ? (
@@ -508,25 +637,41 @@ function QaPanel({
                     <p className="text-[11px] text-slate-500 mt-2">
                       <span className="text-emerald-400/90 font-semibold">{it.askerName || it.author || userName}</span>
                       {it.lessonTitle ? ` · ${it.lessonTitle}` : ''}
+                      <span className="text-amber-300/90 font-semibold tabular-nums">{` · ${formatLmsTimestamp(it.atSec)}`}</span>
                       {` · ${timeAgo(it.createdAt)}`}
                     </p>
 
-                    {it.status === 'answered' && it.answer ? (
-                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-red-600 mb-1">
-                          Trả lời · {it.answeredByName || 'Admin/GV'}
-                        </p>
-                        <p className="text-[13px] text-slate-700 whitespace-pre-wrap">{it.answer}</p>
-                      </div>
-                    ) : null}
+                    {dialogueOf(it).map((msg, idx) => {
+                      const staffish = ['admin', 'staff', 'teacher'].includes(String(msg.authorRole || '').toLowerCase());
+                      return (
+                        <div
+                          key={msg.id || `${id}-m-${idx}`}
+                          className={`mt-3 rounded-lg px-3 py-2.5 ${
+                            staffish
+                              ? 'border border-slate-200 bg-white shadow-sm'
+                              : 'border border-emerald-500/20 bg-emerald-500/10'
+                          }`}
+                        >
+                          <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${staffish ? 'text-red-600' : 'text-emerald-300'}`}>
+                            {staffish ? `Trả lời · ${msg.authorName || 'Support'}` : `Phản hồi · ${msg.authorName || 'Học viên'}`}
+                          </p>
+                          <p className={`text-[13px] whitespace-pre-wrap ${staffish ? 'text-slate-700' : 'text-slate-200'}`}>
+                            {msg.body}
+                          </p>
+                          {msg.createdAt ? (
+                            <p className="text-[10px] text-slate-400 mt-1">{timeAgo(msg.createdAt)}</p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
 
-                    {canAnswer && it.status !== 'answered' ? (
+                    {canAnswer ? (
                       <div className="mt-3 space-y-2">
                         <textarea
                           value={answerDrafts[id] || ''}
                           onChange={(e) => setAnswerDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
                           rows={2}
-                          placeholder="Nhập câu trả lời..."
+                          placeholder={it.status === 'answered' ? 'Tiếp tục trả lời trong đối thoại...' : 'Nhập câu trả lời...'}
                           className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-red-500/40 resize-y"
                         />
                         <button
@@ -536,6 +681,26 @@ function QaPanel({
                           className="px-3 min-h-9 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-xs font-bold"
                         >
                           Gửi trả lời
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {!canAnswer && String(it.askerId || '') === String(currentUserId || '') && (it.answer || (Array.isArray(it.thread) && it.thread.length > 0)) ? (
+                      <div className="mt-3 space-y-2">
+                        <textarea
+                          value={replyDrafts[id] || ''}
+                          onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
+                          rows={2}
+                          placeholder="Phản hồi thêm / hỏi lại Support..."
+                          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/40 resize-y"
+                        />
+                        <button
+                          type="button"
+                          disabled={sending || !String(replyDrafts[id] || '').trim()}
+                          onClick={() => submitReply(id)}
+                          className="px-3 min-h-9 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold"
+                        >
+                          Gửi phản hồi
                         </button>
                       </div>
                     ) : null}
@@ -953,6 +1118,20 @@ export default function LmsPlayerPanels({
         audience={audience}
         canAnswer={canAnswerQa}
         highlightQaId={highlightQaId}
+        getCurrentTime={getCurrentTime}
+        currentUserId={userId}
+        videoUrl={
+          currentLesson?.videoUrl
+          || currentLesson?.url
+          || currentLesson?.youtubeUrl
+          || currentLesson?.link
+          || ''
+        }
+        videoDuration={
+          Number(currentLesson?.adminDurationSeconds)
+          || Number(currentLesson?.duration)
+          || 0
+        }
       />
     );
   }

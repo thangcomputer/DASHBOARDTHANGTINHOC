@@ -21,7 +21,7 @@ export default function EditTeacherModal({
   editTeacher, setEditTeacher, onClose, onSave, onResetPassword, isSuperAdmin, safeBranches,
   getTeacherRating,
 }) {
-  const { examSubjectsCatalog } = useData() || {};
+  const { examSubjectsCatalog, examAdminGroupLabel } = useData() || {};
 
   useEffect(() => {
     if (!editTeacher) return;
@@ -214,6 +214,7 @@ export default function EditTeacherModal({
                     accent="red"
                     columns={3}
                     dense
+                    groupLabels={{ admin: examAdminGroupLabel }}
                     onChange={(ids) => setEditTeacher((p) => ({
                       ...p,
                       subjectIds: ids,

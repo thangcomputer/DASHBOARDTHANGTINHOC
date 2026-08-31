@@ -46,9 +46,11 @@ function CourseModal({
   course,
   otherCourses = [],
   examSubjectsCatalog,
+  examAdminGroupLabel = 'Admin tạo',
   addCustomExamSubject,
   updateCustomExamSubject,
   removeCustomExamSubject,
+  updateExamAdminGroupLabel,
   onClose,
   onSaved,
 }) {
@@ -76,7 +78,11 @@ function CourseModal({
   const [subjectDialog, setSubjectDialog] = useState(null); // { mode: 'delete'|'edit', id, label }
   const [editLabel, setEditLabel] = useState('');
   const [savingSubject, setSavingSubject] = useState(false);
+  const [editingGroupLabel, setEditingGroupLabel] = useState(false);
+  const [groupLabelDraft, setGroupLabelDraft] = useState(examAdminGroupLabel);
+  const [savingGroupLabel, setSavingGroupLabel] = useState(false);
 
+  const groupLabelOverrides = { admin: examAdminGroupLabel };
   const examOptions = getExamSubjectOptions(examSubjectsCatalog);
   const groupedExamOptions = examOptions.reduce((acc, item) => {
     const key = item.group || 'admin';
@@ -119,6 +125,33 @@ function CourseModal({
     }
     setEditLabel(label);
     setSubjectDialog({ mode: 'edit', id, label });
+  };
+
+  const openEditAdminGroupLabel = () => {
+    if (typeof updateExamAdminGroupLabel !== 'function') {
+      toast.error('Chưa kết nối API sửa tên nhóm');
+      return;
+    }
+    setGroupLabelDraft(examAdminGroupLabel || 'Admin tạo');
+    setEditingGroupLabel(true);
+  };
+
+  const saveAdminGroupLabel = async () => {
+    const next = String(groupLabelDraft || '').trim();
+    if (next.length < 2) {
+      toast.error('Tên nhóm phải từ 2 ký tự');
+      return;
+    }
+    setSavingGroupLabel(true);
+    try {
+      await updateExamAdminGroupLabel(next);
+      setEditingGroupLabel(false);
+      toast.success('Đã cập nhật tên nhóm');
+    } catch (err) {
+      toast.error(err?.message || 'Không đổi được tên nhóm');
+    } finally {
+      setSavingGroupLabel(false);
+    }
   };
 
   const confirmDeleteSubject = async () => {
@@ -377,9 +410,67 @@ function CourseModal({
               <div className="space-y-4">
                 {Object.entries(groupedExamOptions).map(([groupKey, items]) => (
                   <div key={groupKey} className="space-y-2">
-                    <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">
-                      {getExamSubjectGroupLabel(groupKey)}
-                    </p>
+                    {groupKey === 'admin' && editingGroupLabel ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={groupLabelDraft}
+                          onChange={(e) => setGroupLabelDraft(e.target.value)}
+                          maxLength={60}
+                          className="flex-1 min-w-0 bg-white border-2 border-purple-300 rounded-xl px-3 py-1.5 text-xs font-black text-gray-700 uppercase tracking-widest outline-none focus:border-purple-500"
+                          aria-label="Tên nhóm môn Admin tạo"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              saveAdminGroupLabel();
+                            }
+                            if (e.key === 'Escape') {
+                              setEditingGroupLabel(false);
+                              setGroupLabelDraft(examAdminGroupLabel || 'Admin tạo');
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={savingGroupLabel}
+                          onClick={saveAdminGroupLabel}
+                          className="w-8 h-8 inline-flex items-center justify-center rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                          title="Lưu tên nhóm"
+                        >
+                          {savingGroupLabel ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingGroupLabel}
+                          onClick={() => {
+                            setEditingGroupLabel(false);
+                            setGroupLabelDraft(examAdminGroupLabel || 'Admin tạo');
+                          }}
+                          className="w-8 h-8 inline-flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
+                          title="Hủy"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                          {getExamSubjectGroupLabel(groupKey, groupLabelOverrides)}
+                        </p>
+                        {groupKey === 'admin' && typeof updateExamAdminGroupLabel === 'function' ? (
+                          <button
+                            type="button"
+                            title="Sửa tên nhóm"
+                            onClick={openEditAdminGroupLabel}
+                            className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition"
+                          >
+                            <Edit2 size={12} aria-hidden="true" />
+                            <span className="sr-only">Sửa tên nhóm</span>
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {items.map(({ id, label }) => {
                         const selected = Array.isArray(form.examSubjects) ? form.examSubjects : [];
@@ -655,7 +746,14 @@ function CourseModal({
 export default function CoursePricingTab() {
   const toast = useToast();
   const { showModal } = useModal();
-  const { examSubjectsCatalog, addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject } = useData();
+  const {
+    examSubjectsCatalog,
+    examAdminGroupLabel,
+    addCustomExamSubject,
+    updateCustomExamSubject,
+    removeCustomExamSubject,
+    updateExamAdminGroupLabel,
+  } = useData();
   const [courses, setCourses]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [modalCourse, setModalCourse] = useState(undefined); // undefined=closed, null=add, obj=edit
@@ -722,9 +820,11 @@ export default function CoursePricingTab() {
           course={modalCourse}
           otherCourses={courses.filter((c) => !modalCourse?._id || c._id !== modalCourse._id)}
           examSubjectsCatalog={examSubjectsCatalog}
+          examAdminGroupLabel={examAdminGroupLabel}
           addCustomExamSubject={addCustomExamSubject}
           updateCustomExamSubject={updateCustomExamSubject}
           removeCustomExamSubject={removeCustomExamSubject}
+          updateExamAdminGroupLabel={updateExamAdminGroupLabel}
           onClose={() => setModalCourse(undefined)}
           onSaved={handleSaved}
         />

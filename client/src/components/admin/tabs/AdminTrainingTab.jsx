@@ -14,6 +14,7 @@ import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/a
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
+import { useData } from '../../../context/DataContext';
 
 export default function AdminTrainingTab() {
   // GV + training UI state live on AdminTabProvider (useAdminDashboardState / useAdminTeachers).
@@ -27,6 +28,8 @@ export default function AdminTrainingTab() {
     setTeacherExamTimeLimitMinutes, teacherExamTimeLimitMinutes,
     examSubjectsCatalog,
   } = useAdminTab();
+
+  const { examAdminGroupLabel } = useData();
 
   const teachersForExamResults = safeTeachersList || [];
   const [gvReviewModal, setGvReviewModal] = useState(null);
@@ -247,6 +250,7 @@ export default function AdminTrainingTab() {
                     catalog={examSubjectsCatalog}
                     value={trainingForm.examSubjects || []}
                     accent="purple"
+                    groupLabels={{ admin: examAdminGroupLabel }}
                     onChange={(ids) => setTrainingForm((prev) => ({ ...prev, examSubjects: ids }))}
                   />
                   )}

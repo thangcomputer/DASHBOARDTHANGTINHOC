@@ -18,7 +18,7 @@ const SALARY_PRESETS = [100000, 130000, 150000, 180000];
 export default function AddTeacherModal({
   teacherForm, setTeacherForm, onClose, onSubmit, isSuperAdmin, safeBranches,
 }) {
-  const { examSubjectsCatalog } = useData() || {};
+  const { examSubjectsCatalog, examAdminGroupLabel } = useData() || {};
   const branches = (safeBranches || []).filter((b) => b && b.isActive !== false);
   const salary = Number(teacherForm.baseSalaryPerSession) || 0;
 
@@ -152,6 +152,7 @@ export default function AddTeacherModal({
                 accent="blue"
                 columns={3}
                 dense
+                groupLabels={{ admin: examAdminGroupLabel }}
                 onChange={(ids) => setTeacherForm((p) => ({
                   ...p,
                   subjectIds: ids,

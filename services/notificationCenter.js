@@ -27,7 +27,10 @@ function buildReceiverMatch(user) {
   const userCreatedAt = getAccountCreationTime(user);
 
   const isSuperAdmin = userId === 'admin' || adminRole === 'SUPER_ADMIN';
-  const isAdminSide = role === 'admin' || role === 'staff' || adminRole === 'SUPER_ADMIN' || adminRole === 'STAFF';
+  const isSupport = adminRole === 'SUPPORT' || role === 'support';
+  const isAdminSide = !isSupport && (
+    role === 'admin' || role === 'staff' || adminRole === 'SUPER_ADMIN' || adminRole === 'STAFF'
+  );
 
   // Helper cho broad receivers — loại bỏ thông báo cũ trước ngày nhân viên được tạo
   const broadCond = (rec) => {
@@ -45,6 +48,10 @@ function buildReceiverMatch(user) {
   if (isSuperAdmin) {
     match.push(broadCond('ALL_ADMIN'));
     match.push(broadCond('ALL_SUPER_ADMIN'));
+  } else if (isSupport) {
+    // Support chỉ nhận hộp ALL_SUPPORT — không lẫn ALL_ADMIN/ALL_STAFF
+    match.push(broadCond('ALL_SUPPORT'));
+    if (branchId) match.push(broadCond('ALL_SUPPORT_' + branchId));
   } else if (adminRole === 'HIGH_ADMIN') {
     match.push(broadCond('ALL_ADMIN'));
     if (branchId) {
@@ -60,7 +67,7 @@ function buildReceiverMatch(user) {
     }
   }
 
-  if (role === 'teacher') {
+  if (role === 'teacher' && !isSupport) {
     match.push(broadCond('ALL_TEACHER'));
     if (branchId) match.push(broadCond('ALL_TEACHER_' + branchId));
   }
@@ -89,6 +96,8 @@ function mapForClient(doc, userId) {
 function isSupportStaffOnly(user) {
   if (!user) return false;
   if (user.id === 'admin' || user.adminRole === 'SUPER_ADMIN') return false;
+  // Tài khoản Support (adminRole SUPPORT) được xem hỏi đáp LMS — không coi là “support mailbox hẹp”
+  if (user.adminRole === 'SUPPORT') return false;
   const isStaff = user.role === 'staff' || user.adminRole === 'STAFF';
   if (!isStaff) return false;
 
@@ -100,6 +109,21 @@ function isSupportStaffOnly(user) {
   if (perms.length === 1 && perms.includes('manage_messages')) return true;
   if (!hasStudentMgmt && !hasTeacherMgmt && !hasFinanceMgmt) return true;
   return false;
+}
+
+/** Bộ lọc hộp thư hẹp của staff chỉ chat — vẫn cho phép hỏi đáp LMS (payload.kind = lms_qa). */
+function supportMailboxRestrictAnd() {
+  return {
+    $or: [
+      { 'payload.kind': 'lms_qa' },
+      {
+        type: { $nin: ['FINANCE', 'EVALUATION', 'EXAM', 'SCHEDULE', 'COURSE'] },
+        'payload.studentId': { $exists: false },
+        'payload.teacherId': { $exists: false },
+        title: { $not: /Học viên|Giảng viên|học phí|Đánh giá|Kỳ thi|Lịch dạy/i },
+      },
+    ],
+  };
 }
 
 async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = false } = {}) {
@@ -120,12 +144,7 @@ async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = fals
 
   if (isSupportStaffOnly(user)) {
     filter.$and = filter.$and || [];
-    filter.$and.push({
-      type: { $nin: ['FINANCE', 'EVALUATION', 'EXAM', 'SCHEDULE', 'COURSE'] },
-      'payload.studentId': { $exists: false },
-      'payload.teacherId': { $exists: false },
-      title: { $not: /Học viên|Giảng viên|học phí|Đánh giá|Kỳ thi|Lịch dạy/i }
-    });
+    filter.$and.push(supportMailboxRestrictAnd());
   }
 
   if (type && VALID_TYPES.includes(String(type).toUpperCase())) {
@@ -154,12 +173,7 @@ async function listForUser(user, { page = 1, limit = 20, type, unreadOnly = fals
 
   if (isSupportStaffOnly(user)) {
     unreadFilter.$and = unreadFilter.$and || [];
-    unreadFilter.$and.push({
-      type: { $nin: ['FINANCE', 'EVALUATION', 'EXAM', 'SCHEDULE', 'COURSE'] },
-      'payload.studentId': { $exists: false },
-      'payload.teacherId': { $exists: false },
-      title: { $not: /Học viên|Giảng viên|học phí|Đánh giá|Kỳ thi|Lịch dạy/i }
-    });
+    unreadFilter.$and.push(supportMailboxRestrictAnd());
   }
 
   const [rows, total, unread] = await Promise.all([
@@ -199,12 +213,7 @@ async function countUnread(user) {
 
   if (isSupportStaffOnly(user)) {
     filter.$and = filter.$and || [];
-    filter.$and.push({
-      type: { $nin: ['FINANCE', 'EVALUATION', 'EXAM', 'SCHEDULE', 'COURSE'] },
-      'payload.studentId': { $exists: false },
-      'payload.teacherId': { $exists: false },
-      title: { $not: /Học viên|Giảng viên|học phí|Đánh giá|Kỳ thi|Lịch dạy/i }
-    });
+    filter.$and.push(supportMailboxRestrictAnd());
   }
 
   const count = await Notification.countDocuments(filter);

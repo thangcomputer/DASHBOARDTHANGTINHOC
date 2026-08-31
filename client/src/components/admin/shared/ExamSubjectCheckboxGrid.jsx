@@ -15,6 +15,7 @@ export default function ExamSubjectCheckboxGrid({
   columns = 3,
   dense = false,
   hideLabel = false,
+  groupLabels = null,
 }) {
   const options = getExamSubjectOptions(catalog).filter((item) => item?.id && item?.label);
   const selected = Array.isArray(value) ? value : [];
@@ -60,7 +61,7 @@ export default function ExamSubjectCheckboxGrid({
         {groupEntries.map(([groupKey, items]) => (
           <div key={groupKey} className={dense ? 'space-y-1.5' : 'space-y-2'}>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {getExamSubjectGroupLabel(groupKey)}
+              {getExamSubjectGroupLabel(groupKey, groupLabels)}
             </p>
             <div className={`cms-chip-grid ${colClass} ${accentClass}`}>
               {items.map(({ id, label }) => {

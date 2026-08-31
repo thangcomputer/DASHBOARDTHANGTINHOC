@@ -77,8 +77,13 @@ export function getExamSubjectOptions(catalog) {
   return Object.values(map).map(({ id, label, group }) => ({ id, label, group: group || 'admin' }));
 }
 
-export function getExamSubjectGroupLabel(group) {
-  return EXAM_SUBJECT_GROUP_LABELS[group] || 'Khac';
+export function getExamSubjectGroupLabel(group, overrides = null) {
+  const key = String(group || '');
+  if (overrides && typeof overrides === 'object' && overrides[key]) {
+    const custom = String(overrides[key]).trim();
+    if (custom) return custom;
+  }
+  return EXAM_SUBJECT_GROUP_LABELS[key] || 'Khác';
 }
 
 export function normalizeCourseKey(name) {

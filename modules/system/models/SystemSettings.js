@@ -72,6 +72,8 @@ const systemSettingsSchema = new mongoose.Schema({
 
   /** Chi tiet mon thi tuy chinh (ngoai 5 mon mac dinh) */
   examSubjectsCustomRaw: { type: mongoose.Schema.Types.Mixed, default: [] },
+  /** Nhan nhom mon do Admin tao (mac dinh: Admin tao) */
+  examAdminGroupLabel: { type: String, default: 'Admin tạo' },
 
   // ── Invoice Settings ─────────────────────────────────────────────
   invoiceLogoUrl:      { type: String, default: '' },

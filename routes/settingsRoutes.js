@@ -527,6 +527,7 @@ async function examCatalogPayload(settings) {
   return {
     custom,
     merged: getMergedExamCatalog(custom),
+    adminGroupLabel: String(settings?.examAdminGroupLabel || '').trim() || 'Admin tạo',
   };
 }
 
@@ -570,6 +571,7 @@ router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only')
         examWarningSoundUrl: String(settings.examWarningSoundUrl || '').trim(),
         examSubjectsCustom: catalog.custom,
         examSubjectsMerged: catalog.merged,
+        examAdminGroupLabel: catalog.adminGroupLabel,
       },
     });
   } catch (err) {
@@ -757,6 +759,26 @@ router.get('/exam-subjects', authMiddleware, ...settingsGuard('auth_only'), asyn
     const settings = await getSettings();
     const catalog = await examCatalogPayload(settings);
     return res.json({ success: true, data: catalog });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── PUT /api/settings/exam-admin-group-label ── Đổi tên nhóm "Admin tạo"
+router.put('/exam-admin-group-label', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
+  try {
+    const label = String(req.body?.label || '').trim();
+    if (label.length < 2 || label.length > 60) {
+      return res.status(400).json({ success: false, message: 'Tên nhóm phải từ 2–60 ký tự' });
+    }
+    await updateMainSettings({ $set: { examAdminGroupLabel: label } });
+    const io = req.app.get('io');
+    if (io) emitSettingsRefresh(io);
+    return res.json({
+      success: true,
+      message: `Đã đổi tên nhóm thành "${label}"`,
+      data: { adminGroupLabel: label },
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

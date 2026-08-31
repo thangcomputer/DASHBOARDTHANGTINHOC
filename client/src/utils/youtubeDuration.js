@@ -66,7 +66,7 @@ export function syncYouTubePlaybackState(player, storedDuration = 0) {
   return { duration, currentTime, rawTime };
 }
 
-function ensureYouTubeApi() {
+export function ensureYouTubeApi() {
   return new Promise((resolve) => {
     if (window.YT?.Player) {
       resolve(window.YT);

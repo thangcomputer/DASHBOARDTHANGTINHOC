@@ -21,6 +21,13 @@ import {
 } from '../utils/lmsLessonUi';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
 import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrandedPlayerChrome';
+import {
+  applyLmsVolumeToPlayer,
+  readLmsMuted,
+  readLmsVolume,
+  writeLmsMuted,
+  writeLmsVolume,
+} from '../utils/lmsPlayerPrefs';
 import LessonSidebarMeta from './lms/LessonSidebarMeta';
 import {
   isLessonAntiSeekEnabled,
@@ -160,8 +167,8 @@ const YouTubePlayerSecure = ({
   const [isTabActive, setIsTabActive] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [maxSeekableUi, setMaxSeekableUi] = useState(0);
-  const [volume, setVolume] = useState(100);
-  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(() => readLmsVolume(80));
+  const [muted, setMuted] = useState(() => readLmsMuted(false));
   const [playerError, setPlayerError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const pauseTimeoutRef = useRef(null);
@@ -176,6 +183,11 @@ const YouTubePlayerSecure = ({
   const bestInitialRef = useRef(0);
   const handleStateChangeRef = useRef(null);
   const isReadyRef = useRef(false);
+  const volumeRef = useRef(volume);
+  const mutedRef = useRef(muted);
+  const uiTimeRef = useRef(0);
+  volumeRef.current = volume;
+  mutedRef.current = muted;
 
   // ── Bộ đếm thực tế ──────────────────────────────────────────────────────────
   const initialLocal = parseInt(sessionStorage.getItem(`lms_watched_${lessonId}`) || "0", 10);
@@ -344,10 +356,7 @@ const YouTubePlayerSecure = ({
               onWatchProgress?.(lessonId, actualWatchedRef.current, dur);
             }
             preferMaxYouTubeQuality(event.target);
-            try {
-              event.target.setVolume?.(100);
-              event.target.unMute?.();
-            } catch { /* ignore */ }
+            applyLmsVolumeToPlayer(event.target, volumeRef.current, mutedRef.current);
             const resumeAt = resolveResumeAt(dur || approxDur);
             if (resumeAt > 0) {
               try {
@@ -408,6 +417,7 @@ const YouTubePlayerSecure = ({
         );
         if (syncDur > 0) setTotalDuration((prev) => Math.max(prev, syncDur));
         setCurrentTime(syncTime);
+        uiTimeRef.current = Number(syncTime) || 0;
         const unlocked = seekUnlockedRef.current;
         if (antiSeekEnabled && !unlocked && !seekGuardRef.current) {
           if (t > maxPosRef.current + 1.25) {
@@ -471,9 +481,10 @@ const YouTubePlayerSecure = ({
     playerApiRef.current = {
       getCurrentTime: () => {
         try {
-          return syncYouTubePlaybackState(playerRef.current, totalDuration).currentTime;
+          const live = syncYouTubePlaybackState(playerRef.current, totalDuration).currentTime;
+          return Math.max(Number(live) || 0, Number(uiTimeRef.current) || 0);
         } catch {
-          return 0;
+          return Number(uiTimeRef.current) || 0;
         }
       },
       getDuration: () => {
@@ -555,6 +566,7 @@ const YouTubePlayerSecure = ({
         );
         if (syncDur > 0) setTotalDuration((prev) => Math.max(prev, syncDur));
         setCurrentTime(syncTime);
+        uiTimeRef.current = Number(syncTime) || 0;
         const unlocked = seekUnlockedRef.current;
         if (t > maxPosRef.current) {
           maxPosRef.current = t;
@@ -641,6 +653,8 @@ const YouTubePlayerSecure = ({
           onVolumeChange={(v) => {
             setVolume(v);
             setMuted(v === 0);
+            writeLmsVolume(v);
+            writeLmsMuted(v === 0);
             try {
               playerRef.current?.setVolume?.(v);
               if (v > 0) playerRef.current?.unMute?.();
@@ -651,12 +665,18 @@ const YouTubePlayerSecure = ({
             try {
               if (muted) {
                 playerRef.current?.unMute?.();
-                playerRef.current?.setVolume?.(volume || 80);
+                const nextVol = volume || 80;
+                playerRef.current?.setVolume?.(nextVol);
                 setMuted(false);
-                if (volume === 0) setVolume(80);
+                writeLmsMuted(false);
+                if (volume === 0) {
+                  setVolume(80);
+                  writeLmsVolume(80);
+                }
               } else {
                 playerRef.current?.mute?.();
                 setMuted(true);
+                writeLmsMuted(true);
               }
             } catch { /* ignore */ }
           }}
@@ -1680,7 +1700,6 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         .custom-scrollbar-dark::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar-dark::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
         .custom-scrollbar-dark::-webkit-scrollbar-thumb:hover { background: #334155; }
-        [id^="yt-player-"] iframe { width: 100% !important; height: 100% !important; object-fit: cover; }
       `}} />
     </div>
   );
