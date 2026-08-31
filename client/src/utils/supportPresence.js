@@ -38,6 +38,14 @@ export function isSuperAdminPresence(u) {
 
 const ROLE_RANK = { admin: 0, staff: 0, teacher: 1, student: 2 };
 
+/** Online trước → offline sau → tên A–Z (kiểu Facebook). */
+export function compareByOnlineThenName(a, b) {
+  const aOn = a?.online ? 1 : 0;
+  const bOn = b?.online ? 1 : 0;
+  if (aOn !== bOn) return bOn - aOn;
+  return String(a?.name || '').localeCompare(String(b?.name || ''), 'vi');
+}
+
 function personFromPresence(u) {
   const rawRole = String(u.role || 'student').toLowerCase();
   const roleKey = normalizeChatRole(rawRole);
@@ -143,7 +151,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [],
       groups: [{
         key: 'support',
         label: supportAgentsOnly ? 'Chuyên viên hỗ trợ' : 'Hỗ trợ viên',
-        people: peopleList,
+        people: peopleList.sort(compareByOnlineThenName),
       }],
     };
   }
@@ -187,9 +195,11 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [],
   }
 
   const sortPeople = (arr) => arr.sort((a, b) => {
+    const onlineCmp = compareByOnlineThenName(a, b);
+    if (onlineCmp !== 0) return onlineCmp;
     const d = (ROLE_RANK[a.displayRole] ?? 9) - (ROLE_RANK[b.displayRole] ?? 9);
     if (d !== 0) return d;
-    return String(a.name).localeCompare(String(b.name), 'vi');
+    return 0;
   });
 
   const groups = [];

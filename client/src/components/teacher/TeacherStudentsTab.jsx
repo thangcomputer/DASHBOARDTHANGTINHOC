@@ -85,6 +85,25 @@ export default function TeacherStudentsTab({
                       zalo: s.zalo,
                       extra: s.course || '',
                     }))
+                    .slice()
+                    .sort((a, b) => {
+                      const aId = String(a._id || a.id || '');
+                      const bId = String(b._id || b.id || '');
+                      const aDropped = Boolean(a.interactionLocked)
+                        || ['cancelled', 'refunded'].includes(String(a.enrollmentStatus || '').toLowerCase())
+                        || String(a.status || '') === 'Thôi học';
+                      const bDropped = Boolean(b.interactionLocked)
+                        || ['cancelled', 'refunded'].includes(String(b.enrollmentStatus || '').toLowerCase())
+                        || String(b.status || '') === 'Thôi học';
+                      if (aDropped !== bDropped) return aDropped ? 1 : -1;
+                      const aOn = !aDropped && onlineUsers.some((u) => String(u.userId) === aId) ? 1 : 0;
+                      const bOn = !bDropped && onlineUsers.some((u) => String(u.userId) === bId) ? 1 : 0;
+                      if (aOn !== bOn) return bOn - aOn;
+                      const aSeen = Number(lastSeenUsers?.[aId] || 0);
+                      const bSeen = Number(lastSeenUsers?.[bId] || 0);
+                      if (aSeen !== bSeen) return bSeen - aSeen;
+                      return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+                    })
                     .map(s => {
                       const sId = s._id || s.id;
                       const rowKey = s._enrollmentKey || String(sId);

@@ -2826,6 +2826,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       phone: u.phone,
                       zalo: u.zalo,
                     }))
+                    .slice()
+                    .sort((a, b) => {
+                      const aOn = isUserOnline(a.id) ? 1 : 0;
+                      const bOn = isUserOnline(b.id) ? 1 : 0;
+                      if (aOn !== bOn) return bOn - aOn;
+                      return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+                    })
                     .map(u => {
                       const isSelected = selectedParticipants.some(p => p.userId === u.id);
                       return (
@@ -2851,6 +2858,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             <p className="text-[11px] text-slate-500 font-medium">
                               {u.role === 'admin' ? 'Nhân viên / Admin' :
                                 u.role === 'teacher' ? 'Giảng viên' : 'Học viên'}
+                              {isUserOnline(u.id) ? ' · Online' : ''}
                             </p>
                           </div>
                         </label>
@@ -3088,6 +3096,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       phone: u.phone,
                       zalo: u.zalo,
                     }))
+                    .slice()
+                    .sort((a, b) => {
+                      const aOn = isUserOnline(a.id) ? 1 : 0;
+                      const bOn = isUserOnline(b.id) ? 1 : 0;
+                      if (aOn !== bOn) return bOn - aOn;
+                      return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+                    })
                     .map(u => {
                       const groupObj = groups?.find(g => String(g._id) === String(activeConv?.id?.replace('group_', '')));
                       const isAlreadyInGroup = groupObj?.participants?.some(p => String(p.userId) === String(u.id));
