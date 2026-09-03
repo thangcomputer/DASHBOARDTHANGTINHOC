@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus, Trash2, Clock, Calendar, Users, Award, BookOpen, CheckCircle,
   X, HelpCircle, Eye, AlertCircle, RefreshCw, Send, Check, Sparkles, Copy
@@ -524,7 +525,7 @@ export default function TeacherQuizManager({
       )}
 
       {/* ── MODAL SOẠN BÀI TRẮC NGHIỆM MỚI ── */}
-      {showCreateModal && (
+      {showCreateModal && createPortal(
         <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden">
           <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 sm:px-6 pt-5 pb-3 shrink-0">
@@ -871,11 +872,12 @@ export default function TeacherQuizManager({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MODAL XEM CHI TIẾT KẾT QUẢ HỌC VIÊN ── */}
-      {!createOnly && selectedDetailQuiz && (
+      {!createOnly && selectedDetailQuiz && createPortal(
         <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-slate-100 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -923,7 +925,8 @@ export default function TeacherQuizManager({
               <p className="py-8 text-center text-xs font-bold text-slate-400">Chưa có học viên nào nộp bài.</p>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
