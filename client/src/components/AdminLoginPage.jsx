@@ -315,7 +315,7 @@ const AdminLoginPage = ({ onLogin }) => {
                     onChange={(e) => setPhone(e.target.value)}
                     autoComplete="tel"
                     className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-5 py-3.5 sm:py-4 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
-                    placeholder="VD: 0912345678 hoặc +84912345678"
+                    placeholder="VD: 0912345678"
                   />
                 </div>
               </div>

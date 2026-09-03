@@ -61,6 +61,7 @@ export default function TeacherOverviewTab({
   const [banners, setBanners] = useState([]);
   const [bannerSpeed, setBannerSpeed] = useState(5);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [pendingGradeCount, setPendingGradeCount] = useState(0);
 
   const meId = String(teacherId || currentTeacher?.id || currentTeacher?._id || '');
 
@@ -68,6 +69,36 @@ export default function TeacherOverviewTab({
     const t = setInterval(() => setNowTick(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
+
+  // Đếm bài tập đã nộp chờ chấm — không dùng lastGrade (HV mới luôn bị báo sai)
+  useEffect(() => {
+    let cancelled = false;
+    const courses = [...new Set((students || []).map((s) => s.course).filter(Boolean))];
+    if (!courses.length) {
+      setPendingGradeCount(0);
+      return undefined;
+    }
+    Promise.all(courses.map((c) => api.assignments.getByCourse(c).catch(() => null)))
+      .then((results) => {
+        if (cancelled) return;
+        const studentIds = new Set();
+        for (const res of results) {
+          if (!res?.success || !Array.isArray(res.data)) continue;
+          for (const a of res.data) {
+            for (const sub of (a.submissions || [])) {
+              if (String(sub.status || '') !== 'submitted') continue;
+              const sid = String(sub.studentId?._id || sub.studentId?.id || sub.studentId || '');
+              if (sid) studentIds.add(sid);
+            }
+          }
+        }
+        setPendingGradeCount(studentIds.size);
+      })
+      .catch(() => {
+        if (!cancelled) setPendingGradeCount(0);
+      });
+    return () => { cancelled = true; };
+  }, [students]);
 
   // Fetch Banners
   useEffect(() => {
@@ -295,7 +326,9 @@ export default function TeacherOverviewTab({
             {
               icon: Clipboard,
               label: 'Chấm điểm',
-              sub: `${students.filter((s) => !s.lastGrade || s.lastGrade === 0).length} HV chưa có điểm`,
+              sub: pendingGradeCount > 0
+                ? `${pendingGradeCount} HV chờ chấm điểm`
+                : 'Không có bài chờ chấm',
               tint: 'bg-amber-50 hover:bg-amber-100/80 border-amber-100 text-amber-900',
               iconClass: 'text-amber-600',
               action: () => navigate('/teacher#assignments'),
@@ -303,7 +336,7 @@ export default function TeacherOverviewTab({
             {
               icon: MessageSquare,
               label: 'Tin nhắn',
-              sub: `${myNotifs} chưa đọc`,
+              sub: myNotifs > 0 ? `${myNotifs} chưa đọc` : 'Không có tin mới',
               tint: 'bg-violet-50 hover:bg-violet-100/80 border-violet-100 text-violet-900',
               iconClass: 'text-violet-600',
               action: () => navigate('/teacher/inbox'),

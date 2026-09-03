@@ -56,6 +56,8 @@ export default function TeacherStudentWeekSlotSheet({
   cancelSchedule,
   onClose,
   onCreated,
+  onUpdated,
+  onCancelled,
 }) {
   const toast = useToast();
   const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
@@ -192,6 +194,17 @@ export default function TeacherStudentWeekSlotSheet({
             await cancelSchedule(saved.id, CLEAR_REASON);
             cancelled += 1;
             live = live.filter((s) => scheduleIdOf(s) !== String(saved.id));
+            if (typeof onCancelled === 'function') {
+              await onCancelled({
+                date: dateKey,
+                startTime: saved.start || prev || '',
+                endTime: saved.end || slotEnd(saved.start || prev) || '',
+                course: activeStudent.course || '',
+                studentName: activeStudent.displayName || activeStudent.name || '',
+                studentId: sid,
+                scheduleId: saved.id,
+              });
+            }
           }
           continue;
         }
@@ -216,6 +229,7 @@ export default function TeacherStudentWeekSlotSheet({
 
         const gate = getStudentScheduleGate(activeStudent, live, dateKey, saved?.id || null);
         if (saved?.id && saved.status === 'scheduled') {
+          const prevEnd = saved.end || slotEnd(prev) || '';
           const res = await updateSchedule(saved.id, {
             date: dateKey,
             startTime: next,
@@ -226,6 +240,19 @@ export default function TeacherStudentWeekSlotSheet({
           live = live.map((s) => (
             scheduleIdOf(s) === String(saved.id) ? { ...s, date: dateKey, startTime: next, endTime } : s
           ));
+          if (typeof onUpdated === 'function') {
+            await onUpdated({
+              date: dateKey,
+              startTime: next,
+              endTime,
+              prevStartTime: prev || saved.start || '',
+              prevEndTime: prevEnd,
+              course: activeStudent.course || '',
+              studentName: activeStudent.displayName || activeStudent.name || '',
+              studentId: sid,
+              scheduleId: saved.id,
+            });
+          }
           continue;
         }
 
@@ -286,7 +313,7 @@ export default function TeacherStudentWeekSlotSheet({
   }, [
     activeStudent, saving, dirtyKeys, savedByDay, valueOf, progress.remaining,
     schedules, sid, teacherId, addSchedule, updateSchedule, cancelSchedule,
-    onCreated, onClose, toast,
+    onCreated, onUpdated, onCancelled, onClose, toast,
   ]);
 
   if (!activeStudent || typeof document === 'undefined') return null;

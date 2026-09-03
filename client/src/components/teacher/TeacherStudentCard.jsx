@@ -829,8 +829,23 @@ export const StudentCard = ({
     };
   }, [socket, student.id, student._id, onDataRefresh, fetchStudentAssignments]);
 
+  const assignmentDeadlineMin = () => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const isDeadlineInPast = (value) => {
+    const t = new Date(value).getTime();
+    return Number.isNaN(t) || t <= Date.now();
+  };
+
   const handleCreateAssign = async () => {
     if (!newAssign.title || !newAssign.deadline) return;
+    if (isDeadlineInPast(newAssign.deadline)) {
+      showGlossyAlert('Hạn nộp phải sau thời điểm hiện tại — không chọn ngày cũ.');
+      return;
+    }
     try {
       const res = await api.assignments.create({
         ...newAssign,
@@ -868,6 +883,10 @@ export const StudentCard = ({
 
   const handleUpdateAssign = async () => {
     if (!editingAssign.title || !editingAssign.deadline) return;
+    if (isDeadlineInPast(editingAssign.deadline)) {
+      showGlossyAlert('Hạn nộp phải sau thời điểm hiện tại — không chọn ngày cũ.');
+      return;
+    }
     try {
       const res = await api.assignments.update(editingAssignmentId, editingAssign);
       if (res.success) {
@@ -1368,7 +1387,11 @@ export const StudentCard = ({
                   <button
                     type="button"
                     onClick={() => setShowAddAssign(!showAddAssign)}
-                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 min-h-9 rounded-lg font-medium transition-all inline-flex items-center gap-1 whitespace-nowrap"
+                    className={`shrink-0 text-xs px-3 min-h-9 rounded-lg font-medium transition-all inline-flex items-center gap-1 whitespace-nowrap ${
+                      showAddAssign
+                        ? 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
+                        : 'bg-red-600 hover:bg-red-700 text-white'
+                    }`}
                   >
                     {showAddAssign ? <X size={14} /> : <Plus size={14} />}
                     {showAddAssign ? 'Hủy' : 'Giao bài'}
@@ -1385,8 +1408,14 @@ export const StudentCard = ({
                       </div>
                       <div>
                         <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Hạn nộp (Deadline)</label>
-                        <input type="datetime-local" value={newAssign.deadline} onChange={e => setNewAssign({...newAssign, deadline: e.target.value})}
-                          className="w-full bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" />
+                        <input
+                          type="datetime-local"
+                          min={assignmentDeadlineMin()}
+                          value={newAssign.deadline}
+                          onChange={e => setNewAssign({...newAssign, deadline: e.target.value})}
+                          className="w-full max-w-full min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none"
+                        />
+                        <p className="text-[10px] text-indigo-300 font-medium mt-1">Chỉ chọn từ hiện tại trở đi.</p>
                       </div>
                       <div className="md:col-span-2">
                         <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
@@ -1428,8 +1457,14 @@ export const StudentCard = ({
                             </div>
                             <div>
                               <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Hạn nộp (Deadline)</label>
-                              <input type="datetime-local" value={editingAssign.deadline} onChange={e => setEditingAssign({...editingAssign, deadline: e.target.value})}
-                                className="w-full bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none text-center" />
+                              <input
+                                type="datetime-local"
+                                min={assignmentDeadlineMin()}
+                                value={editingAssign.deadline}
+                                onChange={e => setEditingAssign({...editingAssign, deadline: e.target.value})}
+                                className="w-full max-w-full min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none"
+                              />
+                              <p className="text-[10px] text-indigo-300 font-medium mt-1">Chỉ chọn từ hiện tại trở đi.</p>
                             </div>
                             <div className="md:col-span-2">
                               <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>

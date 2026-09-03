@@ -312,7 +312,32 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
 
     const existing = await TrainingProgress.findOne({ userId, lessonId }).lean();
     if (existing?.status === 'completed') {
-      return res.json({ success: true, message: 'Bài học đã được hoàn thành trước đó.', alreadyCompleted: true });
+      // Vẫn cho tăng watchedSeconds nếu client báo cao hơn (xem hết video → 100%)
+      const serverWatched = Math.max(0, Number(existing.watchedSeconds) || 0);
+      const clientClaim = Math.max(0, Number(watchedSeconds) || 0);
+      const SystemSettings = require('../models/SystemSettings');
+      const settings = await SystemSettings.findOne() || {};
+      const course = findCourseInSettings(settings, courseId);
+      const lesson = course ? findLessonInCourse(course, lessonId) : null;
+      const effectiveDuration = resolveEffectiveDuration(lesson?.duration, videoDuration);
+      const credited = clampWatchProgressIncrease({
+        previous: serverWatched,
+        incoming: clientClaim,
+        lastWatchedAt: existing.lastWatchedAt,
+        maxSeconds: effectiveDuration > 0 ? effectiveDuration : 0,
+      });
+      if (credited > serverWatched) {
+        await TrainingProgress.updateOne(
+          { userId, lessonId },
+          { watchedSeconds: credited, lastWatchedAt: new Date() },
+        );
+      }
+      return res.json({
+        success: true,
+        message: 'Bài học đã được hoàn thành trước đó.',
+        alreadyCompleted: true,
+        data: { watchedSeconds: Math.max(credited, serverWatched) },
+      });
     }
 
     const SystemSettings = require('../models/SystemSettings');
@@ -557,6 +582,7 @@ router.get('/teacher/overview', lmsGuard('lms_teacher_overview'), async (req, re
 });
 
 // ⏱ Lưu tiến độ xem tạm thời (auto-save mỗi 30s — chống F5 reset bộ đếm)
+// Cho phép tăng watchedSeconds cả khi status=completed (để % lên 100% sau cửa ≥67%)
 router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -566,15 +592,7 @@ router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res)
       return res.status(400).json({ success: false, message: 'Thiếu dữ liệu' });
     }
 
-    const existing = await TrainingProgress.findOne({
-      userId,
-      lessonId,
-      status: { $ne: 'completed' },
-    }).lean();
-
-    if (existing?.status === 'completed') {
-      return res.json({ success: true });
-    }
+    const existing = await TrainingProgress.findOne({ userId, lessonId }).lean();
 
     let maxSeconds = 0;
     let course = null;
@@ -593,7 +611,7 @@ router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res)
       if (!watchGate.ok) {
         return res.status(403).json({ success: false, code: watchGate.code, message: watchGate.message });
       }
-      if (!watchGate.preview) {
+      if (!watchGate.preview && existing?.status !== 'completed') {
         const completed = await TrainingProgress.find({
           userId,
           courseId: String(courseId),
@@ -624,9 +642,25 @@ router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res)
       maxSeconds: maxSeconds > 0 ? maxSeconds : 0,
     });
 
+    if (existing?.status === 'completed') {
+      // Chỉ cập nhật giây xem (không đụng status) — để UI hiện 100% khi xem hết
+      if (nextWatched > (Number(existing.watchedSeconds) || 0)) {
+        await TrainingProgress.updateOne(
+          { userId, lessonId },
+          { watchedSeconds: nextWatched, lastWatchedAt: new Date() },
+        );
+      }
+      return res.json({ success: true, data: { watchedSeconds: Math.max(nextWatched, Number(existing.watchedSeconds) || 0) } });
+    }
+
     await TrainingProgress.findOneAndUpdate(
-      { userId, lessonId, status: { $ne: 'completed' } },
-      { watchedSeconds: nextWatched, courseId, lastWatchedAt: new Date() },
+      { userId, lessonId },
+      {
+        watchedSeconds: nextWatched,
+        courseId,
+        lastWatchedAt: new Date(),
+        ...(existing ? {} : { status: 'unlocked' }),
+      },
       { upsert: true, returnDocument: 'after' }
     );
 

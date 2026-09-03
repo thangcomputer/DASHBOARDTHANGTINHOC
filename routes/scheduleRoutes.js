@@ -447,7 +447,8 @@ router.get('/', [authMiddleware, branchFilter, ...schedulesGuard('list')], async
       Schedule.find(filter)
         .populate('teacherId', 'name phone')
         .populate('studentId', 'name course phone zalo')
-        .sort({ date: 1, startTime: 1 })
+        // Ưu tiên ca mới — tránh limit 500 chỉ còn lịch cũ, mất lịch hủy / ca gần đây
+        .sort({ date: -1, startTime: -1 })
         .skip(skip)
         .limit(limitNum),
       Schedule.countDocuments(filter),
@@ -944,21 +945,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
 
     res.status(201).json({ success: true, data: schedule });
 
-    // 📝 GHI AUDIT LOG: CREATED
-    ScheduleHistory.create({
-      scheduleId: schedule._id,
-      actorId: teacherId,
-      actorName: teacherName,
-      actorRole: req.user?.role || 'teacher',
-      action: 'CREATED',
-      reason: '',
-      oldValue: null,
-      newValue: { status: schedule.status, date: schedule.date, startTime, endTime: resolvedEndTime, studentId, course: courseFinal },
-      studentName,
-      teacherName,
-      scheduledDate: schedule.date,
-      course: courseFinal,
-    }).catch(e => logger.error('[ScheduleHistory] CREATED log err:', e));
+    // (ScheduleHistory CREATED đã được ghi ở trên – không ghi lần 2)
 
   } catch (err) {
     logger.error('[SCHEDULE] Create error:', err);
@@ -1303,6 +1290,22 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       };
 
       if (status === 'cancelled' && schedule.status !== 'cancelled') {
+         // Ghi ScheduleHistory CANCELLED (route PUT)
+         ScheduleHistory.create({
+           scheduleId: schedule._id,
+           actorId: req.user?.id || req.user?._id || schedule.teacherId,
+           actorName: req.user?.name || schedule.teacherName || 'Unknown',
+           actorRole: req.user?.role || 'teacher',
+           action: 'CANCELLED',
+           reason: cancelReason,
+           oldValue: { status: schedule.status, startTime: schedule.startTime, endTime: schedule.endTime },
+           newValue: { status: 'cancelled', startTime: schedule.startTime, endTime: schedule.endTime },
+           studentName: schedule.studentName || updated?.studentId?.name || 'Học viên',
+           teacherName: schedule.teacherName || updated?.teacherId?.name || 'Giảng viên',
+           scheduledDate: schedule.date,
+           course: schedule.course,
+         }).catch(e => logger.warn('[ScheduleHistory] PUT CANCELLED log err:', e.message));
+
          NotificationService.send(io, {
            type: 'SCHEDULE',
            title: '❌ Lịch học bị hủy',
@@ -1330,6 +1333,22 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
         || (date && new Date(date).getTime() !== new Date(schedule.date).getTime())
         || (endTime !== undefined && String(endTime) !== String(schedule.endTime || ''))
       ) {
+         // Ghi ScheduleHistory UPDATED (đổi giờ / ngày)
+         ScheduleHistory.create({
+           scheduleId: schedule._id,
+           actorId: req.user?.id || req.user?._id || schedule.teacherId,
+           actorName: req.user?.name || schedule.teacherName || 'Unknown',
+           actorRole: req.user?.role || 'teacher',
+           action: 'UPDATED',
+           reason: `Đổi ca: ${schedule.startTime || '?'}–${schedule.endTime || '?'} → ${updated.startTime || schedule.startTime}–${updated.endTime || schedule.endTime}`,
+           oldValue: { status: schedule.status, date: schedule.date, startTime: schedule.startTime, endTime: schedule.endTime },
+           newValue: { status: updated.status, date: updated.date, startTime: updated.startTime, endTime: updated.endTime },
+           studentName: schedule.studentName || updated?.studentId?.name || 'Học viên',
+           teacherName: schedule.teacherName || updated?.teacherId?.name || 'Giảng viên',
+           scheduledDate: updated.date || schedule.date,
+           course: schedule.course,
+         }).catch(e => logger.warn('[ScheduleHistory] PUT UPDATED log err:', e.message));
+
          NotificationService.send(io, {
            type: 'SCHEDULE',
            title: '🔄 Lịch học đã thay đổi',
@@ -1898,7 +1917,17 @@ router.get('/history/:teacherId', [authMiddleware, ...schedulesGuard('history')]
       return res.status(403).json({ success: false, message: 'Không có quyền xem lịch sử lịch dạy này' });
     }
     const { limit = 50, action } = req.query;
-    const filter = { actorId: teacherId };
+
+    // Tìm tất cả scheduleId thuộc giảng viên này
+    const teacherSchedules = await Schedule.find({ teacherId }).select('_id').lean();
+    const scheduleIds = teacherSchedules.map(s => s._id);
+
+    const filter = {
+      $or: [
+        { actorId: teacherId },
+        { scheduleId: { $in: scheduleIds } },
+      ],
+    };
     if (action) filter.action = action;
 
     const history = await ScheduleHistory.find(filter)
@@ -1906,8 +1935,17 @@ router.get('/history/:teacherId', [authMiddleware, ...schedulesGuard('history')]
       .limit(Number(limit))
       .lean();
 
+    // Loại bỏ bản ghi trùng (cùng scheduleId + action + cùng giây createdAt)
+    const seen = new Set();
+    const deduped = [];
+    for (const h of history) {
+      const key = `${h.scheduleId}_${h.action}_${Math.floor(new Date(h.createdAt).getTime() / 5000)}`;
+      if (!seen.has(key)) { seen.add(key); deduped.push(h); }
+    }
+    const historyFinal = deduped.slice(0, Number(limit));
+
     // Tự động bổ sung studentName cho các bản ghi lịch sử cũ nếu chưa có
-    const missingSchedIds = history.filter(h => !h.studentName && h.scheduleId).map(h => h.scheduleId);
+    const missingSchedIds = historyFinal.filter(h => !h.studentName && h.scheduleId).map(h => h.scheduleId);
     if (missingSchedIds.length > 0) {
       const schedules = await Schedule.find({ _id: { $in: missingSchedIds } }).select('_id studentName studentId').lean();
       const missingStudentIds = schedules.filter(s => !s.studentName && s.studentId).map(s => s.studentId);
@@ -1919,7 +1957,7 @@ router.get('/history/:teacherId', [authMiddleware, ...schedulesGuard('history')]
         s.studentName || studentMap.get(s.studentId?.toString()) || 'Học viên'
       ]));
 
-      for (const h of history) {
+      for (const h of historyFinal) {
         if (!h.studentName && h.scheduleId && schedMap.has(h.scheduleId.toString())) {
           h.studentName = schedMap.get(h.scheduleId.toString());
         }
@@ -1927,16 +1965,20 @@ router.get('/history/:teacherId', [authMiddleware, ...schedulesGuard('history')]
     }
 
     // Thống kê nhanh
+    const createdCount = historyFinal.filter(h => h.action === 'CREATED').length;
+    const cancelledCount = historyFinal.filter(h => h.action === 'CANCELLED').length;
+    const updatedCount = historyFinal.filter(h => h.action === 'UPDATED').length;
     const stats = {
-      total: history.length,
-      created: history.filter(h => h.action === 'CREATED').length,
-      cancelled: history.filter(h => h.action === 'CANCELLED').length,
-      cancelRate: history.length > 0
-        ? Math.round((history.filter(h => h.action === 'CANCELLED').length / history.length) * 100)
+      total: historyFinal.length,
+      created: createdCount,
+      cancelled: cancelledCount,
+      updated: updatedCount,
+      cancelRate: createdCount > 0
+        ? Math.round((cancelledCount / createdCount) * 100)
         : 0,
     };
 
-    res.json({ success: true, data: history, stats });
+    res.json({ success: true, data: historyFinal, stats });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

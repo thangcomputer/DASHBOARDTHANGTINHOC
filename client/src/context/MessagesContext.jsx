@@ -378,7 +378,14 @@ export function MessagesProvider({ user, children }) {
           },
           lastMessage: m.content,
           lastTime: m.time,
-          unread: userMsgs.filter((um) => um.convId === m.convId && String(um.receiverId) === sId && um.read !== true).length,
+          unread: userMsgs.filter((um) => (
+            um.convId === m.convId
+            && String(um.receiverId) === sId
+            && um.read !== true
+            && !um.isRecalled
+            && String(um.messageType || 'text') !== 'system'
+            && String(um.senderId) !== 'ai_support'
+          )).length,
         };
       }
     });
@@ -496,7 +503,13 @@ export function MessagesProvider({ user, children }) {
           user: { id: g._id, name: g.name, role: 'group', avatar: 'GN', online: true },
           lastMessage: lastMsg ? lastMsg.content : 'Bắt đầu cuộc trò chuyện nhóm',
           lastTime: lastMsg ? lastMsg.time : (g.createdAt ? new Date(g.createdAt) : null),
-          unread: groupMsgs.filter((m) => m.read !== true && String(m.senderId) !== sId).length,
+          unread: groupMsgs.filter((m) => (
+            m.read !== true
+            && String(m.senderId) !== sId
+            && !m.isRecalled
+            && String(m.messageType || 'text') !== 'system'
+            && String(m.senderId) !== 'ai_support'
+          )).length,
         };
       });
     }

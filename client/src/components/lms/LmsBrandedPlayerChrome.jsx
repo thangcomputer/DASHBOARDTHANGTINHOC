@@ -1,6 +1,89 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause, Volume2, VolumeX, Volume1, Maximize2, Minimize2 } from 'lucide-react';
 
+const YT_QUALITY_ORDER = [
+  'default', 'highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny',
+];
+
+const YT_QUALITY_LABEL = {
+  default: 'Auto',
+  highres: '4K',
+  hd2160: '4K',
+  hd1440: '2K',
+  hd1080: '1080p',
+  hd720: '720p',
+  large: '480p',
+  medium: '360p',
+  small: '240p',
+  tiny: '144p',
+};
+
+export function youtubeQualityLabel(level) {
+  const key = String(level || 'default');
+  return YT_QUALITY_LABEL[key] || key;
+}
+
+export function listYouTubeQualityOptions(player) {
+  let levels = [];
+  try {
+    levels = Array.isArray(player?.getAvailableQualityLevels?.())
+      ? player.getAvailableQualityLevels()
+      : [];
+  } catch {
+    levels = [];
+  }
+  const fromYt = [...new Set(
+    levels.map(String).filter((q) => q && q !== 'auto' && q !== 'default'),
+  )];
+  const ordered = YT_QUALITY_ORDER.filter((q) => q !== 'default' && fromYt.includes(q));
+  const extras = fromYt.filter((q) => !YT_QUALITY_ORDER.includes(q));
+  return fromYt.length ? [...ordered, ...extras] : [];
+}
+
+/** Mức cao nhất trong danh sách YouTube báo (theo thứ tự 4K → … → 144p). */
+export function highestYouTubeQuality(levels) {
+  const list = Array.isArray(levels) ? levels.map(String) : [];
+  return YT_QUALITY_ORDER.find((q) => q !== 'default' && list.includes(q)) || list[0] || null;
+}
+
+export function readCurrentYouTubeQuality(player) {
+  try {
+    const q = player?.getPlaybackQuality?.();
+    if (q && q !== 'unknown') return String(q);
+  } catch { /* ignore */ }
+  return 'default';
+}
+
+/**
+ * Best-effort gợi ý mức cao nhất (không pause/seek).
+ * YouTube có thể bỏ qua — chỉ thử, không hứa hiệu lực.
+ */
+export function preferMaxYouTubeQuality(player) {
+  if (!player) return false;
+  try {
+    const levels = listYouTubeQualityOptions(player);
+    const best = highestYouTubeQuality(levels);
+    if (!best) return false;
+    try { player.setPlaybackQualityRange?.(best, best); } catch { /* ignore */ }
+    try { player.setPlaybackQuality?.(best); } catch { /* ignore */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function applyYouTubeQuality() {
+  return false;
+}
+
+export function readStoredYouTubeQuality() {
+  return 'default';
+}
+
+export function writeStoredYouTubeQuality() {
+  /* no-op */
+}
+
 function formatClock(secs) {
   const s = Math.max(0, Math.floor(Number(secs) || 0));
   const h = Math.floor(s / 3600);
@@ -37,24 +120,55 @@ export default function LmsBrandedPlayerChrome({
   isFullscreen = false,
   onToggleFullscreen = null,
   brandLabel = 'THẮNG TIN HỌC',
+  /** () => YT.Player | null — để chọn độ phân giải */
+  getPlayer = null,
+  /** Chất lượng thực tế từ onPlaybackQualityChange */
+  actualPlaybackQuality = null,
 }) {
   const [dragging, setDragging] = useState(false);
   const [dragRatio, setDragRatio] = useState(0);
   const [showVol, setShowVol] = useState(false);
+  const [liveQuality, setLiveQuality] = useState(null);
   const barRef = useRef(null);
+  const preferredMaxOnceRef = useRef(false);
 
   const rawDur = Math.max(0, Number(duration) || 0);
   const rawTime = Math.max(0, Number(dragging ? dragRatio * rawDur : currentTime) || 0);
-  // Nếu YT báo current > duration: mở rộng hiển thị tổng để không lệch (vd 1:38:38 / 1:38:35)
   const safeDur = rawDur > 0 ? Math.max(rawDur, Math.ceil(rawTime)) : rawDur;
   const displayTime = safeDur > 0 ? Math.min(rawTime, safeDur) : rawTime;
   const lockSeek = antiSeekEnabled && !seekUnlocked;
-  // Chưa đủ điều kiện: chỉ tua trong vùng đã xem. Đã đủ: tua full.
   const seekCap = lockSeek
     ? Math.max(Number(maxSeekable) || 0, Number(displayTime) || 0)
     : safeDur;
   const progressPct = safeDur > 0 ? Math.min(100, (displayTime / safeDur) * 100) : 0;
   const maxPct = safeDur > 0 ? Math.min(100, (seekCap / safeDur) * 100) : 0;
+
+  const refreshQualityLevels = useCallback(() => {
+    const player = typeof getPlayer === 'function' ? getPlayer() : null;
+    const levels = listYouTubeQualityOptions(player);
+    const best = highestYouTubeQuality(levels);
+    const cur = readCurrentYouTubeQuality(player);
+    if (cur && cur !== 'default' && cur !== 'unknown') setLiveQuality(cur);
+    if (best && player && !preferredMaxOnceRef.current) {
+      preferredMaxOnceRef.current = true;
+      preferMaxYouTubeQuality(player);
+    }
+  }, [getPlayer]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      preferredMaxOnceRef.current = false;
+      return undefined;
+    }
+    refreshQualityLevels();
+    return undefined;
+  }, [isPlaying, refreshQualityLevels]);
+
+  useEffect(() => {
+    if (!actualPlaybackQuality) return;
+    const q = String(actualPlaybackQuality);
+    if (q && q !== 'default' && q !== 'unknown') setLiveQuality(q);
+  }, [actualPlaybackQuality]);
 
   const ratioFromEvent = useCallback((clientX) => {
     const el = barRef.current;
@@ -103,6 +217,9 @@ export default function LmsBrandedPlayerChrome({
   if (!visible) return null;
 
   const VolIcon = muted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
+  // Option 3: Auto + mức thực tế đang phát (không khóa badge theo max 4K)
+  const liveLabel = liveQuality ? youtubeQualityLabel(liveQuality) : null;
+  const qualityBtnLabel = liveLabel && liveLabel !== 'Auto' ? `Auto · ${liveLabel}` : 'Auto';
 
   return (
     <>
@@ -149,7 +266,6 @@ export default function LmsBrandedPlayerChrome({
         </div>
       )}
 
-      {/* Chỉ vùng trên thanh điều khiển — không che scrubber/volume */}
       {!overlayVisible && (
         <button
           type="button"
@@ -168,7 +284,6 @@ export default function LmsBrandedPlayerChrome({
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
-          {/* Seek track — hit area cao để kéo dễ */}
           <div
             ref={barRef}
             role="slider"
@@ -207,14 +322,11 @@ export default function LmsBrandedPlayerChrome({
                 />
               )}
               <div
-                className="absolute inset-y-0 left-0 rounded-full border border-white/30"
-                style={{
-                  width: `${progressPct}%`,
-                  background: 'linear-gradient(90deg, #fecaca 0%, #ef4444 55%, #dc2626 100%)',
-                }}
+                className="absolute inset-y-0 left-0 rounded-full bg-red-500"
+                style={{ width: `${progressPct}%` }}
               />
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-red-500 shadow-md"
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white shadow border border-red-200"
                 style={{ left: `calc(${progressPct}% - 8px)` }}
               />
             </div>
@@ -248,6 +360,14 @@ export default function LmsBrandedPlayerChrome({
 
             <div className="flex-1" />
 
+            <span
+              className="h-9 min-w-[2.75rem] px-2 rounded-full inline-flex items-center justify-center bg-white/10 text-white border border-white/20 text-[10px] sm:text-[11px] font-bold tabular-nums shrink-0"
+              title={liveLabel ? `Auto · đang phát ${liveLabel}` : 'Auto (YouTube chọn mức)'}
+              aria-label={`Độ phân giải ${qualityBtnLabel}`}
+            >
+              {qualityBtnLabel}
+            </span>
+
             {typeof onToggleFullscreen === 'function' ? (
               <button
                 type="button"
@@ -263,7 +383,6 @@ export default function LmsBrandedPlayerChrome({
               </button>
             ) : null}
 
-            {/* Volume */}
             <div
               className="relative flex items-center gap-1.5"
               onMouseEnter={() => setShowVol(true)}
@@ -300,24 +419,4 @@ export default function LmsBrandedPlayerChrome({
       )}
     </>
   );
-}
-
-/** Prefer highest available YouTube quality (best-effort; YT may ignore). */
-export function preferMaxYouTubeQuality(player) {
-  if (!player) return;
-  try {
-    const levels = typeof player.getAvailableQualityLevels === 'function'
-      ? (player.getAvailableQualityLevels() || [])
-      : [];
-    const order = ['highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small'];
-    const best = order.find((q) => levels.includes(q)) || levels[0];
-    if (best && typeof player.setPlaybackQuality === 'function') {
-      player.setPlaybackQuality(best);
-    }
-    if (typeof player.setPlaybackQualityRange === 'function' && best) {
-      try {
-        player.setPlaybackQualityRange(best, best);
-      } catch { /* ignore */ }
-    }
-  } catch { /* ignore */ }
 }

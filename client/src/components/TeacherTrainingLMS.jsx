@@ -16,6 +16,7 @@ import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import {
   formatLessonDisplayTitle,
   getPlayerCompletionBadgeText,
+  isLessonFullyWatched,
   LMS_PLAYER_PROGRESS_BADGE_CLASS,
   normalizeLmsPlayerTab,
 } from '../utils/lmsLessonUi';
@@ -171,6 +172,7 @@ const YouTubePlayerSecure = ({
   const [muted, setMuted] = useState(() => readLmsMuted(false));
   const [playerError, setPlayerError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [ytPlaybackQuality, setYtPlaybackQuality] = useState('default');
   const pauseTimeoutRef = useRef(null);
   const maxPosRef = useRef(0);
   const seekGuardRef = useRef(false);
@@ -368,6 +370,10 @@ const YouTubePlayerSecure = ({
           onStateChange: (event) => {
             handleStateChangeRef.current?.(event);
           },
+          onPlaybackQualityChange: (event) => {
+            if (cancelled) return;
+            if (event?.data) setYtPlaybackQuality(String(event.data));
+          },
           onError: () => {
             setPlayerError('Không phát được video. Kiểm tra link YouTube hoặc quyền nhúng.');
             setIsReady(false);
@@ -451,7 +457,8 @@ const YouTubePlayerSecure = ({
           player,
         );
         const req = requiredWatchSeconds(resolveEffectiveDuration(lessonDuration, dur)) || 1;
-        const pct = Math.min(100, Math.round((actualWatchedRef.current / req) * 100));
+        const base = dur > 0 ? dur : Math.max(1, Math.round(req * 1.5));
+        const pct = Math.min(100, Math.round((actualWatchedRef.current / base) * 100));
         if (pct !== watchPctSentRef.current) {
           watchPctSentRef.current = pct;
           onWatchProgress?.(lessonId, actualWatchedRef.current, dur);
@@ -508,7 +515,7 @@ const YouTubePlayerSecure = ({
       setIsPlaying(true);
       setHasEnded(false);
       setPlayerError('');
-      preferMaxYouTubeQuality(event.target);
+      // Không gọi preferMaxYouTubeQuality ở đây — pause/seek mỗi PLAYING gây giật
       startCounting();
       if (!totalDuration || totalDuration === 0) {
         const dur = readYouTubeDuration(event.target);
@@ -533,11 +540,18 @@ const YouTubePlayerSecure = ({
       );
       if (finalDur > 0) setTotalDuration(finalDur);
       setCurrentTime(finalTime);
+      if (finalDur > 0 && actualWatchedRef.current < finalDur) {
+        actualWatchedRef.current = finalDur;
+        setDisplayWatched(finalDur);
+        sessionStorage.setItem(`lms_watched_${lessonId}`, String(finalDur));
+        onWatchProgress?.(lessonId, finalDur, finalDur);
+      }
+      onSaveProgress?.(lessonId, actualWatchedRef.current);
       if (onVideoEnded) {
         onVideoEnded(actualWatchedRef.current, finalDur);
       }
     }
-  }, [onVideoEnded, startCounting, stopCounting, totalDuration, lessonDuration]);
+  }, [onVideoEnded, onWatchProgress, onSaveProgress, lessonId, startCounting, stopCounting, totalDuration, lessonDuration]);
   handleStateChangeRef.current = handleStateChange;
 
   const handlePlayClick = useCallback(() => {
@@ -682,6 +696,8 @@ const YouTubePlayerSecure = ({
           }}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
+          getPlayer={() => playerRef.current}
+          actualPlaybackQuality={ytPlaybackQuality}
         />
 
         {!isTabActive && !overlayVisible && (
@@ -728,14 +744,12 @@ const YouTubePlayerSecure = ({
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                   : LMS_PLAYER_PROGRESS_BADGE_CLASS
               }`}>
-                {lessonCompleted
-                  ? 'Đã hoàn thành'
-                  : getPlayerCompletionBadgeText({
-                    lessonCompleted,
-                    displayWatched,
-                    effectiveDuration,
-                    requiredWatchSecondsFn: requiredWatchSeconds,
-                  })}
+                {getPlayerCompletionBadgeText({
+                  lessonCompleted,
+                  displayWatched,
+                  effectiveDuration,
+                  requiredWatchSecondsFn: requiredWatchSeconds,
+                })}
               </span>
             ) : null}
           </div>
@@ -749,6 +763,7 @@ const YouTubePlayerSecure = ({
 const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
   const mins = lesson.duration ? Math.floor(lesson.duration / 60) : 0;
   const secs = lesson.duration ? String(lesson.duration % 60).padStart(2, '0') : '00';
+  const fullyWatched = isLessonFullyWatched(lesson);
 
   return (
     <div
@@ -756,26 +771,26 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
       title={!lesson.isUnlocked ? 'Hoàn thành bài trước để mở bài này' : undefined}
       className={`flex items-start gap-3 px-5 py-4 border-b border-slate-100 transition-all relative
         ${!lesson.isUnlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-        ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : lesson.isCompleted ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
+        ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : fullyWatched ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
       `}
     >
-      {/* Status Icon */}
+      {/* Status Icon — tick chỉ khi xem đủ 100% */}
       <div className="mt-0.5 flex-shrink-0">
-        {lesson.isCompleted ? (
-          <CheckCircle size={18} className="text-emerald-600" />
-        ) : !lesson.isUnlocked ? (
-          <Lock size={16} className="text-slate-400" />
-        ) : isCurrent ? (
+        {isCurrent ? (
           <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-600 flex items-center justify-center">
             <div className="w-2 h-2 bg-emerald-600 rounded-full animate-ping" />
           </div>
+        ) : fullyWatched ? (
+          <CheckCircle size={18} className="text-emerald-600" />
+        ) : !lesson.isUnlocked ? (
+          <Lock size={16} className="text-slate-400" />
         ) : (
           <PlayCircle size={18} className="text-slate-300" />
         )}
       </div>
 
       <div className="flex-1 min-w-0">
-        <h4 className={`text-sm leading-snug line-clamp-2 ${isCurrent ? 'text-emerald-700 font-black' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-700 font-bold'}`}>
+        <h4 className={`text-sm leading-snug line-clamp-2 ${isCurrent ? 'text-emerald-700 font-black' : fullyWatched ? 'text-slate-500 font-semibold' : 'text-slate-700 font-bold'}`}>
           {formatLessonDisplayTitle(lesson.title, index)}
         </h4>
         {lesson.duration ? (
@@ -785,7 +800,7 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
         ) : null}
       </div>
 
-      {lesson.isCompleted && (
+      {fullyWatched && !isCurrent && (
         <div className="flex-shrink-0 w-5 h-5 bg-emerald-500/20 rounded-full flex items-center justify-center">
           <CheckCircle size={10} className="text-emerald-400" />
         </div>
@@ -1630,6 +1645,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
                   {isExpanded && chapterLessons.map((lesson, idx) => {
                     const isCurrent = currentLesson?._id === lesson._id;
+                    const fullyWatched = isLessonFullyWatched(lesson);
                     return (
                       <div
                         key={lesson._id}
@@ -1649,18 +1665,17 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                             : 'border-l-4 border-transparent hover:bg-white/[0.04]'
                         }`}
                       >
-                        {/* Status icon */}
                         <div className="mt-0.5 flex-shrink-0">
-                          {lesson.isCompleted ? (
+                          {isCurrent ? (
+                            <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                            </div>
+                          ) : fullyWatched ? (
                             <div className="w-[18px] h-[18px] rounded-full bg-emerald-500/20 flex items-center justify-center">
                               <CheckCircle size={12} className="text-emerald-400" />
                             </div>
                           ) : !lesson.isUnlocked ? (
                             <Lock size={14} className="text-slate-600" />
-                          ) : isCurrent ? (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                            </div>
                           ) : (
                             <PlayCircle size={16} className="text-slate-600" />
                           )}
@@ -1668,7 +1683,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
                         <div className="flex-1 min-w-0">
                           <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${
-                            isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
+                            isCurrent ? 'text-emerald-400 font-bold' : fullyWatched ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
                           }`}>
                             {formatLessonDisplayTitle(lesson.title, idx)}
                           </h4>

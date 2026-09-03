@@ -276,7 +276,7 @@ const LoginPage = ({ onLogin }) => {
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User size={18} className="text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" /></div>
                     <input id="login-identifier" type="tel" inputMode="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel"
                       className="w-full bg-[#1e293b]/50 border-2 border-white/10 rounded-2xl pl-11 pr-5 py-4 text-white outline-none focus:border-red-600 focus:bg-[#1e293b] transition-all font-bold placeholder:text-slate-400"
-                      placeholder="VD: 0912345678 hoặc +84912345678" />
+                      placeholder="VD: 0912345678" />
                   </div>
                 </div>
                 <div className="space-y-1.5">

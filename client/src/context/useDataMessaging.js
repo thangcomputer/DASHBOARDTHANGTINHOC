@@ -8,6 +8,20 @@ import { resolveMessagingActor, normalizeMessage } from '../lib/messagingIdentit
 import { sortConversationsByLastMessageAt } from '../lib/conversationList';
 import { isAiSupportConversationId } from '../utils/aiSupport';
 
+/** Tin người thật chưa đọc — bỏ hệ thống / AI / thu hồi (khớp badge “cần xử lý”). */
+function countsAsHumanUnread(msg, viewerId) {
+  if (!msg) return false;
+  if (msg.read === true) return false;
+  if (msg.isRecalled) return false;
+  const sid = String(msg.senderId || '');
+  if (!sid || sid === String(viewerId)) return false;
+  if (sid === 'ai_support') return false;
+  if (String(msg.messageType || 'text') === 'system') return false;
+  const conv = String(msg.convId || msg.conversationId || '');
+  if (isAiSupportConversationId(conv)) return false;
+  return true;
+}
+
 /**
  * Messages / groups state, socket listeners, and messaging API for DataProvider.
  */
@@ -571,7 +585,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             let n = 0;
             for (const x of userMsgs) {
               if (x.convId !== convId) continue;
-              if (x.read === true || String(x.senderId) === sId) continue;
+              if (!countsAsHumanUnread(x, sId)) continue;
               const id = String(x.id);
               if (seen.has(id)) continue;
               seen.add(id);
@@ -618,7 +632,19 @@ export function useDataMessaging({ currentUser, students, teachers, staffs, trig
             user: { id: gid, name: g.name, role: 'group', avatar: 'GN', online: true },
             lastMessage: lastMsg ? lastMsg.content : 'Bắt đầu cuộc trò chuyện nhóm',
             lastTime: lastMsg ? lastMsg.time : (g.createdAt ? new Date(g.createdAt) : null),
-            unread: groupMsgs.filter(m => m.read !== true && !userTargetIds.has(String(m.senderId))).length,
+            unread: (() => {
+              const seen = new Set();
+              let n = 0;
+              for (const m of groupMsgs) {
+                if (userTargetIds.has(String(m.senderId))) continue;
+                if (!countsAsHumanUnread(m, sId)) continue;
+                const id = String(m.id);
+                if (seen.has(id)) continue;
+                seen.add(id);
+                n += 1;
+              }
+              return n;
+            })(),
           };
         });
     }

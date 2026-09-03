@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { BookText, Video } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BookText, Video, UserCheck } from 'lucide-react';
 import {
   formatLocalDateKey,
   formatScheduleDateVi,
@@ -10,15 +11,23 @@ import {
 import { startOfWeekMonday, weekDateKeys } from '../../utils/weeklySlotGrid';
 import { localizeScheduleNote } from '../../utils/studentActivityLogs';
 
+const PENDING_KINDS = new Set(['pending_attendance', 'overdue_attendance', 'past_pending']);
+
+function isCancelledSchedule(sch) {
+  const st = String(sch?.status || '').trim().toLowerCase();
+  return st === 'cancelled' || st === 'canceled' || st === 'no_show';
+}
+
 const COPY = {
   teacher: {
     title: 'Nhật ký giảng dạy',
-    subtitle: 'Ghi lại các ca theo ngày, tuần, tháng, tất cả hoặc ca đã hủy.',
+    subtitle: 'Xem toàn bộ ca dạy, theo ngày / tuần / tháng, chưa điểm danh hoặc đã hủy.',
     tabs: [
-      { id: 'day', label: 'Lịch dạy trong ngày' },
-      { id: 'week', label: 'Lịch dạy trong tuần' },
-      { id: 'month', label: 'Lịch dạy trong tháng' },
       { id: 'all', label: 'Tất cả' },
+      { id: 'day', label: 'Ngày' },
+      { id: 'week', label: 'Tuần' },
+      { id: 'month', label: 'Tháng' },
+      { id: 'pending', label: 'Chưa điểm danh' },
       { id: 'cancelled', label: 'Lịch hủy' },
     ],
     empty: {
@@ -26,17 +35,19 @@ const COPY = {
       week: 'Không có ca dạy trong tuần này.',
       month: 'Không có ca dạy trong tháng này.',
       all: 'Chưa có ca dạy.',
+      pending: 'Không có ca chưa điểm danh.',
       cancelled: 'Không có lịch hủy.',
     },
   },
   student: {
     title: 'Nhật ký học tập',
-    subtitle: 'Xem các ca học theo ngày, tuần, tháng, tất cả hoặc ca đã hủy.',
+    subtitle: 'Xem toàn bộ ca học, theo ngày / tuần / tháng, chưa điểm danh hoặc đã hủy.',
     tabs: [
-      { id: 'day', label: 'Lịch học trong ngày' },
-      { id: 'week', label: 'Lịch học trong tuần' },
-      { id: 'month', label: 'Lịch học trong tháng' },
       { id: 'all', label: 'Tất cả' },
+      { id: 'day', label: 'Ngày' },
+      { id: 'week', label: 'Tuần' },
+      { id: 'month', label: 'Tháng' },
+      { id: 'pending', label: 'Chưa điểm danh' },
       { id: 'cancelled', label: 'Lịch hủy' },
     ],
     empty: {
@@ -44,6 +55,7 @@ const COPY = {
       week: 'Không có ca học trong tuần này.',
       month: 'Không có ca học trong tháng này.',
       all: 'Chưa có ca học.',
+      pending: 'Không có ca chưa điểm danh.',
       cancelled: 'Không có lịch hủy.',
     },
   },
@@ -89,13 +101,27 @@ function sortSchedules(list) {
   });
 }
 
+function resolveStudentId(sch) {
+  return String(
+    sch?.studentId?._id
+    || sch?.studentId?.id
+    || sch?.studentId
+    || sch?.student?._id
+    || sch?.student?.id
+    || sch?.student
+    || '',
+  ).trim();
+}
+
 export default function TeacherTeachingLog({
   schedules = [],
   variant = 'teacher',
   onOpenSession,
+  onOpenAttendance,
 }) {
   const copy = COPY[variant] || COPY.teacher;
-  const [tab, setTab] = useState('day');
+  const navigate = useNavigate();
+  const [tab, setTab] = useState('all');
   const todayKey = formatLocalDateKey(new Date());
   const now = useMemo(() => new Date(), []);
   const weekKeys = useMemo(() => weekDateKeys(startOfWeekMonday(now)), [now]);
@@ -103,22 +129,48 @@ export default function TeacherTeachingLog({
 
   const list = useMemo(() => {
     const all = schedules || [];
+    if (tab === 'all') {
+      // Toàn bộ ca kể cả đã hủy / no_show (không lọc status)
+      return sortSchedules(all.slice());
+    }
     if (tab === 'cancelled') {
-      return sortCancelledByAction(all.filter((s) => String(s.status) === 'cancelled'));
+      return sortCancelledByAction(all.filter(isCancelledSchedule));
+    }
+    if (tab === 'pending') {
+      return sortSchedules(
+        all.filter((s) => {
+          if (isCancelledSchedule(s)) return false;
+          return PENDING_KINDS.has(getScheduleDisplayKind(s));
+        }),
+      );
     }
     const inRange = all.filter((s) => {
-      if (String(s.status) === 'cancelled') return false;
+      if (isCancelledSchedule(s)) return false;
       const key = normalizeScheduleDate(s.date);
       if (tab === 'day') return key === todayKey;
       if (tab === 'week') return weekKeys.includes(key);
       if (tab === 'month') return key.startsWith(monthPrefix);
-      if (tab === 'all') return true;
       return false;
     });
     return sortSchedules(inRange);
   }, [schedules, tab, todayKey, weekKeys, monthPrefix]);
 
   const emptyText = copy.empty[tab];
+
+  const openAttendanceFor = (sch) => {
+    if (typeof onOpenAttendance === 'function') {
+      onOpenAttendance(sch);
+      return;
+    }
+    if (variant !== 'teacher') return;
+    const sid = resolveStudentId(sch);
+    if (!sid) return;
+    const course = String(sch.course || sch.courseName || '').trim();
+    const q = new URLSearchParams();
+    q.set('studentId', sid);
+    if (course) q.set('course', course);
+    navigate(`/teacher#students?${q.toString()}`);
+  };
 
   return (
     <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -173,6 +225,12 @@ export default function TeacherTeachingLog({
               const canAct = variant === 'student'
                 && String(sch.status) === 'scheduled'
                 && typeof onOpenSession === 'function';
+              const needsAttendance = variant === 'teacher' && PENDING_KINDS.has(kind);
+              const canOpenAttendance = needsAttendance
+                && (typeof onOpenAttendance === 'function' || Boolean(resolveStudentId(sch)));
+              const attendanceLabel = kind === 'overdue_attendance'
+                ? 'Điểm danh bù'
+                : 'Điểm danh';
               const studentNote = String(sch.studentNote || '').trim();
               return (
                 <li
@@ -197,14 +255,36 @@ export default function TeacherTeachingLog({
                     ) : null}
                   </div>
                   <p className="mt-1.5">
-                    <span className={`inline-flex text-[10px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md ${tone}`}>
-                      {meta.shortLabel || meta.label}
-                    </span>
+                    {canOpenAttendance ? (
+                      <button
+                        type="button"
+                        onClick={() => openAttendanceFor(sch)}
+                        className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md underline-offset-2 hover:underline ${tone}`}
+                        title={`Mở hồ sơ học viên — ${attendanceLabel}`}
+                      >
+                        {meta.shortLabel || meta.label}
+                      </button>
+                    ) : (
+                      <span className={`inline-flex text-[10px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md ${tone}`}>
+                        {meta.shortLabel || meta.label}
+                      </span>
+                    )}
                   </p>
                   {note ? (
                     <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
                       Ghi chú: {note}
                     </p>
+                  ) : null}
+                  {canOpenAttendance ? (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => openAttendanceFor(sch)}
+                        className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-orange-600 text-white text-[10px] font-black uppercase hover:bg-orange-700"
+                      >
+                        <UserCheck size={12} /> {attendanceLabel}
+                      </button>
+                    </div>
                   ) : null}
                   {canAct ? (
                     <div className="flex flex-wrap gap-2 mt-2">

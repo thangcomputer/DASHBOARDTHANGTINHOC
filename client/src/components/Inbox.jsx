@@ -554,7 +554,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   };
 
-  const notifyInboxScheduleCreated = async (formData) => {
+  const notifyInboxScheduleEvent = async (formData, action = 'created') => {
     if (!activeConv?.id) return;
     let displayDate = formData.date;
     try {
@@ -581,6 +581,23 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     const scheduleId = formData.scheduleId || null;
     const courseLabel = formData.course || activeConv.user?.course || '';
+    const startTime = formData.startTime || '';
+    const endTime = formData.endTime || '';
+    const prevStart = formData.prevStartTime || '';
+    const prevEnd = formData.prevEndTime || '';
+
+    let content = `Đã xếp lịch học thành công cho học viên vào ngày ${displayDate} từ ${startTime} đến ${endTime}.`;
+    let kind = 'schedule_created';
+    if (action === 'changed') {
+      kind = 'schedule_changed';
+      const prevLabel = (prevStart && prevEnd)
+        ? ` (trước đó: ${prevStart}–${prevEnd})`
+        : (prevStart ? ` (trước đó: ${prevStart})` : '');
+      content = `Đã đổi ca học của học viên sang ngày ${displayDate} từ ${startTime} đến ${endTime}${prevLabel}.`;
+    } else if (action === 'cancelled') {
+      kind = 'schedule_cancelled';
+      content = `Đã hủy ca học của học viên ngày ${displayDate} từ ${startTime} đến ${endTime}.`;
+    }
 
     await ctxSendMessage({
       conversationId: activeConv.id,
@@ -590,18 +607,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       receiverId: activeConv.user.id,
       receiverName: activeConv.user.name,
       receiverRole: activeConv.user.role,
-      content: `Đã xếp lịch học thành công cho học viên vào ngày ${displayDate} từ ${formData.startTime} đến ${formData.endTime}.`,
+      content,
       messageType: 'system',
       isGroup: false,
       groupId: null,
       payload: {
-        kind: 'schedule_created',
+        kind,
         scheduleId: scheduleId ? String(scheduleId) : null,
         date: formData.date || null,
         dateLabel: displayDate,
         weekday,
-        startTime: formData.startTime || '',
-        endTime: formData.endTime || '',
+        startTime,
+        endTime,
+        prevStartTime: prevStart || null,
+        prevEndTime: prevEnd || null,
         course: courseLabel,
         studentName: formData.studentName || activeConv.user?.name || '',
         teacherName: currentUserName || '',
@@ -3214,7 +3233,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               cancelSchedule={cancelSchedule}
               onClose={() => setShowScheduleModal(false)}
               onCreated={(payload) => {
-                notifyInboxScheduleCreated(payload).catch(() => {});
+                notifyInboxScheduleEvent(payload, 'created').catch(() => {});
+              }}
+              onUpdated={(payload) => {
+                notifyInboxScheduleEvent(payload, 'changed').catch(() => {});
+              }}
+              onCancelled={(payload) => {
+                notifyInboxScheduleEvent(payload, 'cancelled').catch(() => {});
               }}
             />
           );

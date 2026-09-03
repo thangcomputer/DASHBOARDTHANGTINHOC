@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CmsSelect from './ui/CmsSelect';
 import { Plus, Clipboard, FileText, Download, CheckCircle, Clock, XCircle, Search } from 'lucide-react';
 import NavArrow from './ui/NavArrow';
@@ -8,6 +8,22 @@ import { getGradeTextClasses } from '../utils/gradeColors';
 import { useModal } from '../utils/Modal.jsx';
 
 import TeacherQuizManager from './teacher/TeacherQuizManager';
+
+/** Local datetime-local string (YYYY-MM-DDTHH:mm) — không dùng toISOString (UTC lệch). */
+function toDatetimeLocalValue(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function studentRowKey(s) {
+  return String(s?._enrollmentKey || s?._id || s?.id || '');
+}
+
+function studentIdOf(s) {
+  return String(s?._id || s?.id || '').trim();
+}
 
 const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const location = useLocation();
@@ -23,7 +39,15 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   
   // Create / Grade state
   const [formData, setFormData] = useState({ title: '', description: '', attachedFileUrl: '', deadline: '' });
+  const [assignScope, setAssignScope] = useState('all'); // 'all' | 'selected'
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [deadlineMin, setDeadlineMin] = useState(() => toDatetimeLocalValue(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const courseStudents = useMemo(
+    () => (myStudents || []).filter((s) => String(s.course || '') === String(selectedCourse || '')),
+    [myStudents, selectedCourse],
+  );
 
   const [gradingSubmission, setGradingSubmission] = useState(null);
   const [gradeData, setGradeData] = useState({ grade: '', teacherFeedback: '' });
@@ -63,15 +87,44 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   }, [assignments, selectedCourse, location.hash]);
 
   const fetchAssignments = () => {
-    if (!selectedCourse) return;
-    api.assignments.getByCourse(selectedCourse)
+    if (!selectedCourse) return Promise.resolve([]);
+    return api.assignments.getByCourse(selectedCourse)
       .then(res => {
-        if (res.success) setAssignments(res.data);
+        if (res.success) {
+          const rows = res.data || [];
+          setAssignments(rows);
+          setActiveSubmissions((prev) => {
+            if (!prev?._id) return prev;
+            const fresh = rows.find((a) => String(a._id) === String(prev._id));
+            return fresh || prev;
+          });
+          return rows;
+        }
+        return [];
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        return [];
+      });
   };
 
-  const handleCreate = (e) => {
+  const openCreateModal = () => {
+    setDeadlineMin(toDatetimeLocalValue(new Date()));
+    setAssignScope('all');
+    setSelectedStudentIds([]);
+    setFormData({ title: '', description: '', attachedFileUrl: '', deadline: '' });
+    setShowCreateModal(true);
+  };
+
+  const toggleStudentId = (id) => {
+    const key = String(id || '').trim();
+    if (!key) return;
+    setSelectedStudentIds((prev) => (
+      prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]
+    ));
+  };
+
+  const handleCreate = async (e) => {
     e.preventDefault();
     if (!selectedCourse) {
         showModal({ 
@@ -81,29 +134,128 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
         });
         return;
     }
+    if (!formData.title || !formData.deadline) return;
+
+    const deadlineDate = new Date(formData.deadline);
+    if (Number.isNaN(deadlineDate.getTime()) || deadlineDate.getTime() <= Date.now()) {
+      showModal({
+        title: 'Deadline không hợp lệ',
+        content: 'Thời hạn nộp bài phải sau thời điểm hiện tại.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    let targets = [];
+    if (assignScope === 'selected') {
+      if (!selectedStudentIds.length) {
+        showModal({
+          title: 'Chưa chọn học viên',
+          content: 'Chọn ít nhất một học viên, hoặc chọn giao cho cả lớp.',
+          type: 'warning',
+        });
+        return;
+      }
+      targets = selectedStudentIds;
+    } else {
+      // Cả lớp → 1 bài / HV (API HV chỉ trả bài có studentId; null = HV không thấy)
+      const ids = [...new Set(courseStudents.map(studentIdOf).filter(Boolean))];
+      targets = ids.length ? ids : [null];
+    }
+
     setIsSubmitting(true);
-    api.assignments.create({
-      ...formData,
-      teacherId,
-      courseId: selectedCourse,
-      deadline: new Date(formData.deadline),
-    }).then(res => {
-      setIsSubmitting(false);
-      if (res.success) {
+    try {
+      const fileUrl = String(formData.attachedFileUrl || '').trim();
+      const basePayload = {
+        title: formData.title,
+        description: formData.description,
+        fileUrl,
+        attachedFileUrl: fileUrl,
+        teacherId,
+        courseId: selectedCourse,
+        deadline: deadlineDate,
+      };
+
+      let ok = 0;
+      for (const studentId of targets) {
+        const res = await api.assignments.create({
+          ...basePayload,
+          studentId: studentId || null,
+        });
+        if (res?.success) ok += 1;
+      }
+
+      if (ok > 0) {
         setShowCreateModal(false);
         setFormData({ title: '', description: '', attachedFileUrl: '', deadline: '' });
+        setAssignScope('all');
+        setSelectedStudentIds([]);
         fetchAssignments();
+      } else {
+        showModal({
+          title: 'Không tạo được bài tập',
+          content: 'Vui lòng thử lại hoặc kiểm tra kết nối.',
+          type: 'error',
+        });
       }
-    }).catch(() => setIsSubmitting(false));
+    } catch {
+      showModal({
+        title: 'Lỗi kết nối',
+        content: 'Không tạo được bài tập. Vui lòng thử lại.',
+        type: 'error',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGrade = (e) => {
     e.preventDefault();
+    const submissionId = gradingSubmission?._id;
+    const assignmentId = activeSubmissions?._id || gradingSubmission?.assignmentId;
+    if (!submissionId) return;
     setIsSubmitting(true);
-    api.assignments.grade(gradingSubmission._id, gradeData)
+    api.assignments.grade(submissionId, gradeData)
       .then(res => {
         setIsSubmitting(false);
         if (res.success) {
+          const updated = res.data || {};
+          const nextGrade = updated.grade != null ? updated.grade : gradeData.grade;
+          const nextFeedback = updated.teacherFeedback != null
+            ? updated.teacherFeedback
+            : gradeData.teacherFeedback;
+          const patchSub = (sub) => (
+            String(sub._id) === String(submissionId)
+              ? {
+                  ...sub,
+                  ...updated,
+                  grade: nextGrade,
+                  teacherFeedback: nextFeedback,
+                  status: 'graded',
+                }
+              : sub
+          );
+
+          // Cập nhật ngay bảng trong popup (không chờ đóng/mở lại)
+          setActiveSubmissions((prev) => {
+            if (!prev) return prev;
+            if (assignmentId && String(prev._id) !== String(assignmentId)) return prev;
+            return {
+              ...prev,
+              submissions: (prev.submissions || []).map(patchSub),
+            };
+          });
+          setAssignments((prev) => prev.map((a) => {
+            if (assignmentId && String(a._id) !== String(assignmentId)) return a;
+            if (!assignmentId && !(a.submissions || []).some((s) => String(s._id) === String(submissionId))) {
+              return a;
+            }
+            return {
+              ...a,
+              submissions: (a.submissions || []).map(patchSub),
+            };
+          }));
+
           setGradingSubmission(null);
           setGradeData({ grade: '', teacherFeedback: '' });
           fetchAssignments();
@@ -175,18 +327,18 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
         <>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-              <span className="flex items-center gap-2"><Clipboard size={20} className="text-purple-600" /> Bài tập của:</span>
+              <span className="flex items-center gap-2"><Clipboard size={20} className="text-red-600" /> Bài tập của:</span>
               <CmsSelect 
                 value={selectedCourse} 
                 onChange={(e) => setSelectedCourse(e.target.value)}
-                className="border-2 border-purple-200 focus:border-purple-500 rounded-xl px-3 py-1.5 outline-none font-black text-blue-700 bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer text-sm"
+                className="border-2 border-red-200 focus:border-red-500 rounded-xl px-3 py-1.5 outline-none font-black text-red-700 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer text-sm"
               >
                 {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
               </CmsSelect>
             </h2>
         <button 
-          onClick={() => setShowCreateModal(true)}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-purple-200 transition-all flex items-center gap-2 active:scale-95"
+          onClick={openCreateModal}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-red-200 transition-all flex items-center gap-2 active:scale-95"
         >
           <Plus size={16} /> Tạo bài tập mới
         </button>
@@ -246,30 +398,101 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
 
       {/* CREATE SUBMISSION MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-slate-800">Tạo mới Bài tập</h3>
               <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-red-500 bg-white shadow-sm p-1 rounded-full"><XCircle size={22}/></button>
             </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
+            <form onSubmit={handleCreate} className="p-6 space-y-4 overflow-y-auto overscroll-contain min-h-0 flex-1">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Tên bài tập *</label>
-                <input required type="text" className="w-full border-2 border-slate-200 focus:border-purple-500 rounded-xl px-4 py-2.5 outline-none font-semibold" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="VD: THVP Buổi 1..."/>
+                <input required type="text" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none font-semibold" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="VD: THVP Buổi 1..."/>
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Mô tả / Yêu cầu</label>
-                <textarea className="w-full border-2 border-slate-200 focus:border-purple-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[100px]" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Yêu cầu làm các sheet..."></textarea>
+                <textarea className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[100px]" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Yêu cầu làm các sheet..."></textarea>
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Link File đề bài (Google Drive...)</label>
-                <input type="url" className="w-full border-2 border-slate-200 focus:border-purple-500 rounded-xl px-4 py-2.5 outline-none text-sm" value={formData.attachedFileUrl} onChange={e => setFormData({...formData, attachedFileUrl: e.target.value})} placeholder="https://..."/>
+                <input type="url" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm" value={formData.attachedFileUrl} onChange={e => setFormData({...formData, attachedFileUrl: e.target.value})} placeholder="https://..."/>
               </div>
+
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Thời hạn (Deadline) *</label>
-                <input required type="datetime-local" className="w-full border-2 border-slate-200 focus:border-purple-500 rounded-xl px-4 py-2.5 outline-none font-semibold" value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})}/>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Giao cho *</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => { setAssignScope('all'); setSelectedStudentIds([]); }}
+                    className={`h-9 px-3 rounded-xl text-xs font-bold border-2 transition ${
+                      assignScope === 'all'
+                        ? 'bg-red-600 text-white border-red-600'
+                        : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
+                    }`}
+                  >
+                    Cả lớp ({courseStudents.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssignScope('selected')}
+                    className={`h-9 px-3 rounded-xl text-xs font-bold border-2 transition ${
+                      assignScope === 'selected'
+                        ? 'bg-red-600 text-white border-red-600'
+                        : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
+                    }`}
+                  >
+                    Chọn học viên
+                  </button>
+                </div>
+                {assignScope === 'selected' ? (
+                  <div className="max-h-40 overflow-y-auto rounded-xl border-2 border-slate-200 divide-y divide-slate-100 bg-slate-50/80">
+                    {courseStudents.length === 0 ? (
+                      <p className="text-xs text-slate-400 font-medium p-3">Không có học viên trong khóa này.</p>
+                    ) : (
+                      courseStudents.map((s) => {
+                        const sid = studentIdOf(s);
+                        const checked = selectedStudentIds.includes(sid);
+                        return (
+                          <label
+                            key={studentRowKey(s) || sid}
+                            className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-white"
+                          >
+                            <input
+                              type="checkbox"
+                              className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                              checked={checked}
+                              onChange={() => toggleStudentId(sid)}
+                            />
+                            <span className="text-sm font-semibold text-slate-700 truncate">
+                              {s.name || 'Học viên'}
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Sẽ giao cho từng học viên khóa <strong>{selectedCourse}</strong>
+                    {courseStudents.length ? ` (${courseStudents.length} HV)` : ''}.
+                  </p>
+                )}
               </div>
-              <button disabled={isSubmitting} type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-purple-200 mt-4 disabled:opacity-50">
+
+              <div className="min-w-0">
+                <label className="block text-sm font-bold text-slate-700 mb-1">Thời hạn (Deadline) *</label>
+                <input
+                  required
+                  type="datetime-local"
+                  min={deadlineMin}
+                  className="w-full max-w-full min-w-0 border-2 border-slate-200 focus:border-red-500 rounded-xl px-3 sm:px-4 py-2.5 outline-none font-semibold text-sm sm:text-base"
+                  value={formData.deadline}
+                  onChange={e => setFormData({...formData, deadline: e.target.value})}
+                  onFocus={() => setDeadlineMin(toDatetimeLocalValue(new Date()))}
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Chỉ chọn thời điểm từ hiện tại trở đi.</p>
+              </div>
+              <button disabled={isSubmitting} type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-red-200 mt-4 disabled:opacity-50 sticky bottom-0">
                 {isSubmitting ? 'Đang tạo...' : 'Tạo Bài Tập'}
               </button>
             </form>
@@ -329,9 +552,26 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                             </td>
                             <td className="p-3">
                               {isGraded ? (
-                                <div className="text-sm">
+                                <div className="text-sm max-w-[180px]">
                                   <span className={`font-black ${getGradeTextClasses(sub.grade)}`}>{sub.grade}/10</span>
-                                  <span className="block text-[10px] text-slate-500 max-w-[120px] truncate" title={sub.teacherFeedback}>{sub.teacherFeedback}</span>
+                                  {sub.teacherFeedback ? (
+                                    <span className="block text-[10px] text-slate-500 mt-0.5 leading-snug whitespace-normal" title={sub.teacherFeedback}>
+                                      Góp ý: {sub.teacherFeedback}
+                                    </span>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setGradingSubmission(sub);
+                                      setGradeData({
+                                        grade: sub.grade != null ? String(sub.grade) : '',
+                                        teacherFeedback: sub.teacherFeedback || '',
+                                      });
+                                    }}
+                                    className="mt-1 text-[10px] font-bold text-orange-600 hover:underline"
+                                  >
+                                    Sửa điểm / góp ý
+                                  </button>
                                 </div>
                               ) : (
                                 <button onClick={() => { setGradingSubmission(sub); setGradeData({ grade: '', teacherFeedback: '' }); }} className="text-xs font-bold bg-orange-100 text-orange-700 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">

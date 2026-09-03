@@ -146,6 +146,9 @@ router.get('/conversations/:userId', messagesGuard('conversations'), async (req,
           { $and: [
             { $in: ['$receiverId', isAdminLevelAccount(req.user) ? ['admin', String(userId)] : [String(userId)]] },
             { $eq: ['$isRead', false] },
+            { $ne: ['$messageType', 'system'] },
+            { $ne: ['$isRecalled', true] },
+            { $ne: ['$senderId', 'ai_support'] },
           ]}, 1, 0,
         ]}},
       }},
@@ -1094,10 +1097,13 @@ router.get('/unread/:userId', messagesGuard('unread'), async (req, res) => {
       receiverId: { $in: receiverTargets },
       isRead: false,
       isRecalled: { $ne: true },
+      messageType: { $ne: 'system' },
       senderId: { $nin: senderNin },
       hiddenFor: { $nin: receiverTargets },
     };
-    if (req.query.excludeAi === '1' || req.query.excludeAi === 'true') {
+    // Bỏ tin AI khỏi badge (tin người thật) — trừ khi ?includeAi=1
+    const includeAi = req.query.includeAi === '1' || req.query.includeAi === 'true';
+    if (!includeAi) {
       senderNin.push('ai_support');
       countFilter.senderId = { $nin: senderNin };
       countFilter.conversationId = { $not: /system_ai_support/ };

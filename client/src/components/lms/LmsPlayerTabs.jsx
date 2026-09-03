@@ -3,7 +3,7 @@ import {
   AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
   ExternalLink, FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
-import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getChapterLessonIndex } from '../../utils/lmsLessonUi';
+import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getChapterLessonIndex, isLessonFullyWatched } from '../../utils/lmsLessonUi';
 import LessonSidebarMeta from './LessonSidebarMeta';
 import { htmlToPlainText, sanitizeRichHtml } from '../../utils/htmlContent';
 import { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, apiFetch } from '../../services/api';
@@ -1008,16 +1008,16 @@ function ListPanel({
                     }`}
                   >
                     <div className="mt-0.5 flex-shrink-0">
-                      {lesson.isCompleted ? (
+                      {isCurrent ? (
+                        <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                        </div>
+                      ) : isLessonFullyWatched(lesson) ? (
                         <div className="w-[18px] h-[18px] rounded-full bg-emerald-500/20 flex items-center justify-center">
                           <CheckCircle size={12} className="text-emerald-400" />
                         </div>
                       ) : !lesson.isUnlocked ? (
                         <Lock size={14} className="text-slate-600" />
-                      ) : isCurrent ? (
-                        <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">
-                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                        </div>
                       ) : (
                         <PlayCircle size={16} className="text-slate-600" />
                       )}
@@ -1027,7 +1027,7 @@ function ListPanel({
                         className={`text-[12px] leading-snug line-clamp-2 normal-case ${
                           isCurrent
                             ? 'text-emerald-400 font-bold'
-                            : lesson.isCompleted
+                            : isLessonFullyWatched(lesson)
                               ? 'text-slate-500 font-semibold'
                               : 'text-slate-300 font-semibold'
                         }`}

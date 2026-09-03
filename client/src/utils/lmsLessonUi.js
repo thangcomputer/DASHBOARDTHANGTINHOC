@@ -11,12 +11,37 @@ export const LMS_ACCENT = {
   progressDone: 'bg-emerald-400',
 };
 
-/** UI target for completion gate (server uses ceil(duration * 2/3)). */
+/** UI target for unlock gate (server uses ceil(duration * 2/3)). */
 export const COMPLETION_GATE_LABEL = '67%';
 
 /**
- * Progress toward completion gate (2/3), not full video length.
- * towardGatePct: 0–100 relative to requiredSeconds; null if duration unknown.
+ * % xem theo thời lượng video (0–100). null nếu chưa biết duration.
+ * Không gắn với isCompleted (cửa ≥67% mở bài tiếp).
+ */
+export function getLessonWatchPercent(lesson) {
+  const watched = Math.max(0, Number(lesson?.watchedSeconds) || 0);
+  const duration = Math.max(
+    0,
+    Number(lesson?.effectiveDurationSeconds || lesson?.duration) || 0,
+  );
+  const required = Math.max(
+    0,
+    Number(lesson?.requiredSeconds ?? lesson?.requiredWatchSeconds) || 0,
+  );
+  if (duration > 0) return Math.min(100, Math.round((watched / duration) * 100));
+  if (required > 0) return Math.min(100, Math.round((watched / (required * 1.5)) * 100));
+  if (watched > 0) return null;
+  return 0;
+}
+
+/** Đã xem đủ 100% thời lượng video (nhãn “Đã hoàn thành”). */
+export function isLessonFullyWatched(lesson) {
+  const pct = getLessonWatchPercent(lesson);
+  return pct != null && pct >= 100;
+}
+
+/**
+ * Progress UI: % theo full video; eligible = đủ cửa mở bài (≥67%).
  */
 export function getLessonCompletionProgressUi(lesson) {
   const watched = Math.max(0, Number(lesson?.watchedSeconds) || 0);
@@ -24,23 +49,12 @@ export function getLessonCompletionProgressUi(lesson) {
     0,
     Number(lesson?.requiredSeconds ?? lesson?.requiredWatchSeconds) || 0,
   );
-  const completed = !!lesson?.isCompleted;
+  const gateCompleted = !!lesson?.isCompleted;
   const freeSeek = lesson?.antiSeek === false;
+  const towardGatePct = getLessonWatchPercent(lesson);
+  const fullyWatched = towardGatePct != null && towardGatePct >= 100;
 
-  let towardGatePct = null;
-  const duration = Math.max(0, Number(lesson?.duration) || 0);
-  
-  if (duration > 0) {
-    towardGatePct = Math.min(100, Math.round((watched / duration) * 100));
-  } else if (required > 0) {
-    towardGatePct = Math.min(100, Math.round((watched / (required * 1.5)) * 100));
-  } else if (watched > 0) {
-    towardGatePct = null;
-  } else {
-    towardGatePct = 0;
-  }
-
-  const eligible = completed
+  const eligible = gateCompleted
     || lesson?.completionEligible === true
     || (required > 0 && watched >= required);
 
@@ -49,7 +63,10 @@ export function getLessonCompletionProgressUi(lesson) {
     required,
     towardGatePct,
     remainingPct: towardGatePct == null ? null : Math.max(0, 100 - towardGatePct),
-    completed,
+    /** @deprecated dùng fullyWatched — trước đây = isCompleted (cửa 67%) */
+    completed: fullyWatched,
+    gateCompleted,
+    fullyWatched,
     eligible,
     freeSeek,
   };
@@ -68,45 +85,47 @@ export function getLessonAccessStatusLines(lesson, opts = {}) {
     lines.push({ key: 'locked', text: 'Chưa thể học', tone: 'muted' });
     lines.push({
       key: 'hint',
-      text: `Hoàn thành bài trước (≥${COMPLETION_GATE_LABEL}) để mở`,
+      text: `Xem bài trước ≥${COMPLETION_GATE_LABEL} để mở`,
       tone: 'muted',
     });
     return lines;
   }
 
-  if (p.completed) {
+  // Đủ 100% → Đã hoàn thành; đang xem (chưa hết) → Đang học
+  if (p.fullyWatched) {
     lines.push({ key: 'done', text: 'Đã hoàn thành', tone: 'success' });
     return lines;
   }
 
   if (isCurrent) {
     lines.push({ key: 'current', text: 'Đang học', tone: 'active' });
-  } else if (lesson?.allowEarlyAccess && !lesson?.prerequisiteCompleted) {
-    lines.push({ key: 'early', text: 'Có thể học sớm', tone: 'info' });
   } else {
-    lines.push({ key: 'open', text: 'Có thể học', tone: 'muted' });
+    lines.push({ key: 'incomplete', text: 'Chưa hoàn thành', tone: 'muted' });
+    if (lesson?.allowEarlyAccess && !lesson?.prerequisiteCompleted) {
+      lines.push({ key: 'early', text: 'Có thể học sớm', tone: 'info' });
+    }
   }
 
-  if (p.eligible) {
+  if (p.eligible && !p.fullyWatched) {
     lines.push({
       key: 'eligible',
-      text: 'Đủ điều kiện · chờ mở bài tiếp',
+      text: 'Đủ điều kiện mở bài tiếp',
       tone: 'success',
     });
-  } else if (p.towardGatePct != null && p.required > 0) {
+  } else if (!p.eligible && p.towardGatePct != null && p.required > 0) {
     const remaining = Math.max(0, p.required - p.watched);
     lines.push({
       key: 'pct',
       text: remaining > 0 ? `Còn ${remaining} giây nữa để mở bài tiếp` : 'Đang xử lý mở bài...',
       tone: 'info',
     });
-  } else if (p.required <= 0) {
+  } else if (!p.eligible && p.required <= 0) {
     lines.push({
       key: 'duration',
       text: 'Đang lấy thời lượng YouTube…',
       tone: 'info',
     });
-  } else {
+  } else if (!p.eligible) {
     lines.push({
       key: 'need',
       text: `Cần xem ≥${COMPLETION_GATE_LABEL} để mở bài tiếp`,
@@ -126,7 +145,9 @@ export function getLessonAccessStatusLines(lesson, opts = {}) {
 }
 
 /**
- * Sidebar compact: tối đa vài chip + 1 dòng phụ + thanh % (tránh 3–4 dòng uppercase).
+ * Sidebar compact: tối đa vài chip + 1 dòng phụ + thanh %.
+ * Xem đủ 100% → “Đã hoàn thành” + 100% (kể cả đang chọn bài).
+ * Đủ cửa mở bài (≥67%) ≠ hoàn thành.
  */
 export function getLessonSidebarUi(lesson, opts = {}) {
   const { isCurrent = false } = opts;
@@ -138,21 +159,42 @@ export function getLessonSidebarUi(lesson, opts = {}) {
       chips: [{ key: 'locked', text: 'Chưa mở', tone: 'muted' }],
       showProgressBar: false,
       towardGatePct: null,
+      fullyWatched: false,
     };
   }
 
-  if (p.completed) {
+  if (p.fullyWatched) {
     return {
       primary: null,
-      chips: [{ key: 'done', text: 'Hoàn thành', tone: 'success' }],
-      showProgressBar: false,
+      chips: [{ key: 'done', text: 'Đã hoàn thành', tone: 'success' }],
+      showProgressBar: true,
       towardGatePct: 100,
+      fullyWatched: true,
     };
   }
 
-  const chips = [];
-  if (isCurrent) chips.push({ key: 'current', text: 'Đang học', tone: 'active' });
-  else if (lesson?.allowEarlyAccess && !lesson?.prerequisiteCompleted) {
+  if (isCurrent) {
+    const chips = [{ key: 'current', text: 'Đang học', tone: 'active' }];
+    if (p.freeSeek && !p.eligible) {
+      chips.push({ key: 'freeseek', text: 'Tua tự do', tone: 'warn' });
+    }
+    let primary = null;
+    if (p.eligible) {
+      primary = { text: 'Đủ điều kiện mở bài tiếp', tone: 'success' };
+    } else if (p.required <= 0) {
+      primary = { text: 'Đang tải video…', tone: 'muted' };
+    }
+    return {
+      primary,
+      chips,
+      showProgressBar: p.towardGatePct != null,
+      towardGatePct: p.towardGatePct,
+      fullyWatched: false,
+    };
+  }
+
+  const chips = [{ key: 'incomplete', text: 'Chưa hoàn thành', tone: 'muted' }];
+  if (lesson?.allowEarlyAccess && !lesson?.prerequisiteCompleted) {
     chips.push({ key: 'early', text: 'Học sớm', tone: 'info' });
   }
   if (p.freeSeek && !p.eligible) {
@@ -161,18 +203,17 @@ export function getLessonSidebarUi(lesson, opts = {}) {
 
   let primary = null;
   if (p.eligible) {
-    primary = { text: 'Đủ điều kiện', tone: 'success' };
+    primary = { text: 'Đủ điều kiện mở bài tiếp', tone: 'success' };
   } else if (p.required <= 0) {
     primary = { text: 'Đang tải video…', tone: 'muted' };
   }
 
-  const showProgressBar = p.required > 0 && p.towardGatePct != null;
-
   return {
     primary,
     chips,
-    showProgressBar,
+    showProgressBar: p.towardGatePct != null,
     towardGatePct: p.towardGatePct,
+    fullyWatched: false,
   };
 }
 
@@ -187,7 +228,8 @@ export function lessonSidebarChipClass(tone) {
 }
 
 /**
- * Player overlay badge for completion (independent of antiSeek).
+ * Player overlay badge — “Đã hoàn thành” chỉ khi xem đủ 100% video;
+ * cửa ≥67% / isCompleted → “Đủ điều kiện…”.
  */
 export function getPlayerCompletionBadgeText({
   lessonCompleted,
@@ -195,13 +237,18 @@ export function getPlayerCompletionBadgeText({
   effectiveDuration,
   requiredWatchSecondsFn,
 }) {
-  if (lessonCompleted) return 'Đã hoàn thành';
+  const watched = Math.max(0, Number(displayWatched) || 0);
+  const duration = Math.max(0, Number(effectiveDuration) || 0);
+  if (duration > 0 && watched >= duration) return 'Đã hoàn thành';
+
   const req = typeof requiredWatchSecondsFn === 'function'
     ? (requiredWatchSecondsFn(effectiveDuration) || 1)
     : 1;
-  const remainingSecs = Math.max(0, req - Math.max(0, displayWatched));
-  
-  if (displayWatched >= req) return 'Đủ điều kiện · có thể học tiếp phần còn lại hoặc bấm qua bài sau';
+  const remainingSecs = Math.max(0, req - watched);
+
+  if (lessonCompleted || watched >= req) {
+    return 'Đủ điều kiện · có thể học tiếp phần còn lại hoặc bấm qua bài sau';
+  }
   return `Còn ${remainingSecs} giây nữa để được mở bài tiếp`;
 }
 

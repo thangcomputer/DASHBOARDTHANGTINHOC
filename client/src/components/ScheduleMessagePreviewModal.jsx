@@ -96,7 +96,10 @@ export default function ScheduleMessagePreviewModal({ open, data, onClose }) {
 /** Parse tin cũ không có payload. */
 export function parseScheduleSystemContent(content) {
   const raw = String(content || '');
-  if (!/đã xếp lịch/i.test(raw) && !/xếp lịch học thành công/i.test(raw)) {
+  const isCreated = /đã xếp lịch/i.test(raw) || /xếp lịch học thành công/i.test(raw);
+  const isChanged = /đã đổi ca/i.test(raw);
+  const isCancelled = /đã hủy ca/i.test(raw);
+  if (!isCreated && !isChanged && !isCancelled) {
     return null;
   }
   const m = raw.match(
@@ -115,7 +118,7 @@ export function parseScheduleSystemContent(content) {
     }
   } catch { /* ignore */ }
   return {
-    kind: 'schedule_created',
+    kind: isCancelled ? 'schedule_cancelled' : (isChanged ? 'schedule_changed' : 'schedule_created'),
     dateLabel,
     weekday,
     startTime,
@@ -127,7 +130,14 @@ export function parseScheduleSystemContent(content) {
 
 export function resolveScheduleMessagePayload(msg) {
   const p = msg?.payload;
-  if (p && typeof p === 'object' && (p.kind === 'schedule_created' || p.scheduleId || p.dateLabel || p.date)) {
+  if (p && typeof p === 'object' && (
+    p.kind === 'schedule_created'
+    || p.kind === 'schedule_changed'
+    || p.kind === 'schedule_cancelled'
+    || p.scheduleId
+    || p.dateLabel
+    || p.date
+  )) {
     const dateLabel = p.dateLabel
       || (p.date
         ? (() => {
@@ -155,7 +165,7 @@ export function resolveScheduleMessagePayload(msg) {
       } catch { /* ignore */ }
     }
     return {
-      kind: 'schedule_created',
+      kind: p.kind || 'schedule_created',
       scheduleId: p.scheduleId || null,
       dateLabel,
       weekday,
@@ -165,6 +175,8 @@ export function resolveScheduleMessagePayload(msg) {
       course: p.course || '',
       studentName: p.studentName || '',
       teacherName: p.teacherName || '',
+      prevStartTime: p.prevStartTime || '',
+      prevEndTime: p.prevEndTime || '',
     };
   }
   return parseScheduleSystemContent(msg?.content);

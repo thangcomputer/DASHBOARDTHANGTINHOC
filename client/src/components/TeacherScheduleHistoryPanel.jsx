@@ -70,23 +70,27 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
 
   if (!data) return null;
 
-  const { total = 0, created = 0, cancelled = 0, cancelRate = 0, history = [] } = data;
+  const { total = 0, created = 0, cancelled = 0, updated = 0, cancelRate = 0, history = [] } = data;
 
   return (
     <div className="space-y-5">
-      {/* 4-Stat Box */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {/* Stat Boxes */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3 text-center">
           <p className="text-2xl sm:text-3xl font-bold text-sky-700">{created}</p>
-          <p className="text-[10px] uppercase font-bold text-sky-500 mt-1 tracking-wider">Lịch đã xếp</p>
+          <p className="text-[10px] uppercase font-bold text-sky-500 mt-1 tracking-wider">Đã xếp</p>
+        </div>
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-center">
+          <p className="text-2xl sm:text-3xl font-bold text-amber-600">{updated}</p>
+          <p className="text-[10px] uppercase font-bold text-amber-500 mt-1 tracking-wider">Đổi ca</p>
         </div>
         <div className="rounded-2xl border border-red-100 bg-red-50 p-3 text-center">
           <p className="text-2xl sm:text-3xl font-bold text-red-600">{cancelled}</p>
           <p className="text-[10px] uppercase font-bold text-red-500 mt-1 tracking-wider">Đã huỷ</p>
         </div>
-        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-center">
-          <p className="text-2xl sm:text-3xl font-bold text-amber-600">{cancelRate}%</p>
-          <p className="text-[10px] uppercase font-bold text-amber-600 mt-1 tracking-wider">Tỷ lệ hủy</p>
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-center">
+          <p className="text-2xl sm:text-3xl font-bold text-slate-600">{cancelRate}%</p>
+          <p className="text-[10px] uppercase font-bold text-slate-500 mt-1 tracking-wider">Tỷ lệ hủy</p>
         </div>
       </div>
 
@@ -129,6 +133,10 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
                           <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-100/50">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Đã xếp lịch
                           </span>
+                        ) : log.action === 'UPDATED' ? (
+                          <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-amber-100/50">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Đổi ca
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-red-100/50">
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Đã hủy lịch
@@ -145,6 +153,18 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
                             Ca: <span className="font-bold text-slate-800">
                               {log.newValue?.startTime ? `${log.newValue?.startTime} - ${log.newValue?.endTime}` : 'Chưa ghi nhận giờ'}
                             </span>
+                          </div>
+                        ) : log.action === 'UPDATED' ? (
+                          <div className="text-xs border-l-2 border-amber-200 pl-2">
+                            <div className="text-slate-600">
+                              {log.oldValue?.startTime && (
+                                <span>Ca cũ: <span className="font-bold text-slate-800 line-through">{log.oldValue.startTime} - {log.oldValue.endTime}</span> → </span>
+                              )}
+                              Ca mới: <span className="font-bold text-amber-700">{log.newValue?.startTime} - {log.newValue?.endTime}</span>
+                            </div>
+                            <div className="text-slate-500 mt-0.5">
+                              Ngày: <span className="font-bold text-slate-800">{new Date(log.newValue?.date || log.scheduledDate).toLocaleDateString('vi-VN')}</span>
+                            </div>
                           </div>
                         ) : (
                           <div className="text-xs border-l-2 border-red-200 pl-2">

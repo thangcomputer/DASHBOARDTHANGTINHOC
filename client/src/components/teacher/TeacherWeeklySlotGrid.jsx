@@ -28,7 +28,7 @@ import {
 } from '../../utils/weeklySlotGrid';
 
 const LOCKED_STATUSES = new Set(['completed', 'no_show']);
-const CLEAR_REASON = 'Bỏ ca từ bảng tuần thử nghiệm';
+const CLEAR_REASON = 'Bỏ ca từ bảng tuần lịch';
 
 function isDroppedStudent(student) {
   if (!student) return true;

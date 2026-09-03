@@ -24,6 +24,7 @@ import SoftwareLinksTable from './SoftwareLinksTable';
 import {
   formatLessonDisplayTitle,
   getPlayerCompletionBadgeText,
+  isLessonFullyWatched,
   LMS_PLAYER_PROGRESS_BADGE_CLASS,
   normalizeLmsPlayerTab,
 } from '../utils/lmsLessonUi';
@@ -219,6 +220,7 @@ const StudentVideoPlayer = ({
   const [muted, setMuted] = useState(() => readLmsMuted(false));
   const [playerError, setPlayerError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [ytPlaybackQuality, setYtPlaybackQuality] = useState('default');
 
   // Restore watched seconds: lấy max(session, server) — không để session thấp ghi đè SoT
   const bestInitial = useMemo(() => {
@@ -425,6 +427,10 @@ const StudentVideoPlayer = ({
           onStateChange: (event) => {
             handleStateChangeRef.current?.(event);
           },
+          onPlaybackQualityChange: (event) => {
+            if (cancelled) return;
+            if (event?.data) setYtPlaybackQuality(String(event.data));
+          },
           onError: () => {
             setPlayerError('Không phát được video. Kiểm tra link YouTube hoặc quyền nhúng.');
             setIsReady(false);
@@ -508,7 +514,9 @@ const StudentVideoPlayer = ({
           player,
         );
         const req = requiredWatchSeconds(resolveEffectiveDuration(adminDurationSeconds, dur)) || 1;
-        const pct = Math.min(100, Math.round((actualWatchedRef.current / req) * 100));
+        // % theo full video — tránh kẹt cập nhật sau cửa ≥67% (req)
+        const base = dur > 0 ? dur : Math.max(1, Math.round(req * 1.5));
+        const pct = Math.min(100, Math.round((actualWatchedRef.current / base) * 100));
         if (pct !== watchPctSentRef.current) {
           watchPctSentRef.current = pct;
           onWatchProgress?.(lessonId, actualWatchedRef.current, dur);
@@ -565,7 +573,7 @@ const StudentVideoPlayer = ({
       setIsPlaying(true);
       setHasEnded(false);
       setPlayerError('');
-      preferMaxYouTubeQuality(event.target);
+      // Không gọi preferMaxYouTubeQuality ở đây — pause/seek mỗi PLAYING gây giật
       startCounting();
       if (!totalDuration || totalDuration === 0) {
         const dur = readYouTubeDuration(event.target);
@@ -590,11 +598,20 @@ const StudentVideoPlayer = ({
       );
       if (finalDur > 0) setTotalDuration(finalDur);
       setCurrentTime(finalTime);
+      // Đảm bảo sidebar nhận đủ 100% khi hết video
+      if (finalDur > 0 && actualWatchedRef.current < finalDur) {
+        actualWatchedRef.current = finalDur;
+        setDisplayWatched(finalDur);
+        sessionStorage.setItem(`student_lms_watched_${lessonId}`, String(finalDur));
+        onWatchProgress?.(lessonId, finalDur, finalDur);
+      }
+      // Flush server ngay (kể cả khi bài đã completed ở cửa 67%)
+      onSaveProgress?.(lessonId, actualWatchedRef.current);
       if (onVideoEnded) {
         onVideoEnded(actualWatchedRef.current, finalDur);
       }
     }
-  }, [onVideoEnded, startCounting, stopCounting, totalDuration, adminDurationSeconds]);
+  }, [onVideoEnded, onWatchProgress, onSaveProgress, lessonId, startCounting, stopCounting, totalDuration, adminDurationSeconds]);
   handleStateChangeRef.current = handleStateChange;
 
   const handlePlayClick = useCallback(() => {
@@ -739,6 +756,8 @@ const StudentVideoPlayer = ({
           }}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
+          getPlayer={() => playerRef.current}
+          actualPlaybackQuality={ytPlaybackQuality}
         />
 
         {/* INACTIVE TAB OVERLAY */}
@@ -780,14 +799,12 @@ const StudentVideoPlayer = ({
                 ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30'
                 : LMS_PLAYER_PROGRESS_BADGE_CLASS
             }`}>
-              {lessonCompleted
-                ? 'Đã hoàn thành'
-                : getPlayerCompletionBadgeText({
-                  lessonCompleted,
-                  displayWatched,
-                  effectiveDuration,
-                  requiredWatchSecondsFn: requiredWatchSeconds,
-                })}
+              {getPlayerCompletionBadgeText({
+                lessonCompleted,
+                displayWatched,
+                effectiveDuration,
+                requiredWatchSecondsFn: requiredWatchSeconds,
+              })}
             </span>
           </div>
         ) : null}
@@ -803,6 +820,7 @@ const StudentVideoPlayer = ({
 const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
   const mins = lesson.duration ? Math.floor(lesson.duration / 60) : 0;
   const secs = lesson.duration ? String(lesson.duration % 60).padStart(2, '0') : '00';
+  const fullyWatched = isLessonFullyWatched(lesson);
 
   return (
     <div
@@ -810,26 +828,26 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
       title={!lesson.isUnlocked ? 'Hoàn thành bài trước để mở bài này' : undefined}
       className={`flex items-start gap-3 px-5 py-4 border-b border-slate-100 transition-all relative
         ${!lesson.isUnlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-        ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : lesson.isCompleted ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
+        ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : fullyWatched ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
       `}
     >
-      {/* Status Icon */}
+      {/* Status Icon — tick chỉ khi xem đủ 100% (không dùng cửa ≥67%) */}
       <div className="mt-0.5 flex-shrink-0">
-        {lesson.isCompleted ? (
-          <CheckCircle size={18} className="text-emerald-600" />
-        ) : !lesson.isUnlocked ? (
-          <Lock size={16} className="text-slate-400" />
-        ) : isCurrent ? (
+        {isCurrent ? (
           <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-600 flex items-center justify-center">
             <div className="w-2 h-2 bg-emerald-600 rounded-full animate-ping" />
           </div>
+        ) : fullyWatched ? (
+          <CheckCircle size={18} className="text-emerald-600" />
+        ) : !lesson.isUnlocked ? (
+          <Lock size={16} className="text-slate-400" />
         ) : (
           <PlayCircle size={18} className="text-slate-300" />
         )}
       </div>
 
       <div className="flex-1 min-w-0">
-        <h4 className={`text-sm leading-snug line-clamp-2 ${isCurrent ? 'text-emerald-700 font-black' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-700 font-bold'}`}>
+        <h4 className={`text-sm leading-snug line-clamp-2 ${isCurrent ? 'text-emerald-700 font-black' : fullyWatched ? 'text-slate-500 font-semibold' : 'text-slate-700 font-bold'}`}>
           {formatLessonDisplayTitle(lesson.title, index)}
         </h4>
         {lesson.duration ? (
@@ -839,7 +857,7 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
         ) : null}
       </div>
 
-      {lesson.isCompleted && (
+      {fullyWatched && !isCurrent && (
         <div className="flex-shrink-0 w-5 h-5 bg-emerald-500/20 rounded-full flex items-center justify-center">
           <CheckCircle size={10} className="text-emerald-400" />
         </div>
@@ -1709,7 +1727,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
           {price > 0 ? (
             <div className="absolute top-3 left-3 z-[1]" title={owned ? 'Khóa đã mua' : 'Khóa có phí'}>
-              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-full shadow-md border ${
+              <span className={`inline-flex items-center justify-center w-9 h-9 aspect-square shrink-0 rounded-full shadow-md border ${
                 owned
                   ? 'bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-600 border-amber-200/90 text-amber-950 shadow-amber-400/40'
                   : 'bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 border-amber-200/80 text-amber-950'
@@ -1720,9 +1738,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
             </div>
           ) : (
             <div className="absolute top-3 left-3 z-[1]" title="Khóa miễn phí">
-              <span className="inline-flex items-center gap-1.5 max-w-[calc(100%-5rem)] min-h-9 pl-2 pr-2.5 rounded-full shadow-md border border-emerald-200/70 bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
-                <Gift size={14} className="shrink-0" aria-hidden="true" />
-                <span className="text-[10px] font-black uppercase tracking-wide truncate">Miễn phí</span>
+              <span className="inline-flex items-center justify-center w-9 h-9 aspect-square shrink-0 rounded-full shadow-md border border-emerald-200/80 bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-emerald-500/30">
+                <Gift size={16} className="shrink-0" strokeWidth={2.25} aria-hidden="true" />
+                <span className="sr-only">Miễn phí</span>
               </span>
             </div>
           )}
@@ -2188,12 +2206,21 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                             );
                           }
                           const isGraded = submission.status === 'graded';
+                          const feedback = String(submission.teacherFeedback || '').trim();
                           return (
                             <>
                               {isGraded ? (
-                                <div className={`flex items-center justify-center gap-2 px-4 py-2 border rounded-xl font-semibold text-sm shadow-sm opacity-100 ${getGradeBadgeClasses(submission.grade)}`}>
-                                  <CheckCircle2 size={16} className={getGradeIconClasses(submission.grade)} />
-                                  Điểm: {submission.grade}/10
+                                <div className={`flex flex-col gap-1.5 px-4 py-2.5 border rounded-xl font-semibold text-sm shadow-sm ${getGradeBadgeClasses(submission.grade)}`}>
+                                  <div className="flex items-center justify-center gap-2">
+                                    <CheckCircle2 size={16} className={getGradeIconClasses(submission.grade)} />
+                                    Điểm: {submission.grade}/10
+                                  </div>
+                                  {feedback ? (
+                                    <p className="text-left text-[11px] font-medium leading-relaxed opacity-90 border-t border-black/5 pt-1.5 mt-0.5">
+                                      <span className="font-bold">Góp ý GV: </span>
+                                      {feedback}
+                                    </p>
+                                  ) : null}
                                 </div>
                               ) : (
                                 <div className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-400 border border-slate-200 rounded-xl font-semibold text-sm cursor-not-allowed shadow-inner opacity-80">
@@ -2742,6 +2769,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
                   {isExpanded && chapterLessons.map((lesson, idx) => {
                     const isCurrent = currentLesson?._id === lesson._id;
+                    const fullyWatched = isLessonFullyWatched(lesson);
                     return (
                       <div
                         key={lesson._id}
@@ -2764,25 +2792,25 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                             : 'border-l-4 border-transparent hover:bg-white/[0.04]'
                           }`}
                       >
-                        {/* Status icon */}
+                        {/* Status icon — tick chỉ khi 100%; đang xem → đang học */}
                         <div className="mt-0.5 flex-shrink-0">
-                          {lesson.isCompleted ? (
+                          {isCurrent ? (
+                            <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                            </div>
+                          ) : fullyWatched ? (
                             <div className="w-[18px] h-[18px] rounded-full bg-emerald-500/20 flex items-center justify-center">
                               <CheckCircle size={12} className="text-emerald-400" />
                             </div>
                           ) : !lesson.isUnlocked ? (
                             <Lock size={14} className="text-slate-600" />
-                          ) : isCurrent ? (
-                            <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                            </div>
                           ) : (
                             <PlayCircle size={16} className="text-slate-600" />
                           )}
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${isCurrent ? 'text-emerald-400 font-bold' : lesson.isCompleted ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
+                          <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${isCurrent ? 'text-emerald-400 font-bold' : fullyWatched ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
                             }`}>
                             {formatLessonDisplayTitle(lesson.title, idx)}
                           </h4>
