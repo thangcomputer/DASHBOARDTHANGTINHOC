@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import CmsSelect from './ui/CmsSelect';
 import { Plus, Clipboard, FileText, Download, CheckCircle, Clock, XCircle, Search } from 'lucide-react';
 import NavArrow from './ui/NavArrow';
@@ -397,8 +398,8 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
       </div>
 
       {/* CREATE SUBMISSION MODAL */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      {showCreateModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-slate-800">Tạo mới Bài tập</h3>
@@ -497,12 +498,13 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
               </button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* VIEW SUBMISSIONS MODAL */}
-      {activeSubmissions && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      {activeSubmissions && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div>
@@ -588,12 +590,13 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* GRADING MODAL */}
-      {gradingSubmission && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      {gradingSubmission && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="font-bold text-lg text-slate-800">Chấm bài</h3>
@@ -622,7 +625,8 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
               </button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
         </>
       )}

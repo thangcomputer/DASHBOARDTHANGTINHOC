@@ -1024,7 +1024,7 @@ export const StudentCard = ({
 
   if (isDetailed) {
     return (
-      <div className={`bg-white rounded-2xl sm:rounded-[40px] shadow-lg sm:shadow-2xl shadow-blue-900/5 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 min-w-0 w-full max-w-full ${isDroppedOut ? 'opacity-85' : ''}`}>
+      <div className={`bg-white rounded-2xl sm:rounded-[40px] shadow-md sm:shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 min-w-0 w-full max-w-full ${isDroppedOut ? 'opacity-85' : ''}`}>
         {isDroppedOut && (
           <div className="bg-slate-700 text-white text-center text-[11px] sm:text-xs font-bold uppercase tracking-wide px-3 py-2.5">
             Học viên đã thôi học / hoàn phí — chỉ xem lịch sử · không thao tác
