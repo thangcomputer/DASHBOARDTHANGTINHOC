@@ -359,6 +359,14 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       setStudentDetailId(String(n.payload.studentId));
       return;
     }
+    if (
+      role === 'student'
+      && n.payload?.kind === 'class_link_updated'
+      && /^https?:\/\//i.test(String(n.payload?.linkHoc || '').trim())
+    ) {
+      window.open(String(n.payload.linkHoc).trim(), '_blank', 'noopener,noreferrer');
+      return;
+    }
     const path = resolveNavPath(n.path, n);
     if (path && role === 'teacher' && String(path).includes('evaluationId=')) {
       await openTeacherRatingDetail(n);
@@ -817,7 +825,19 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
             </div>
 
             <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
-              {resolveNavPath(selectedNotif.path, selectedNotif) && !qaDetail && (
+              {selectedNotif.payload?.kind === 'class_link_updated'
+                && /^https?:\/\//i.test(String(selectedNotif.payload?.linkHoc || '').trim()) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open(String(selectedNotif.payload.linkHoc).trim(), '_blank', 'noopener,noreferrer');
+                    setSelectedNotif(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1.5"
+                >
+                  <ExternalLink size={14} /> Vào lớp ngay
+                </button>
+              ) : resolveNavPath(selectedNotif.path, selectedNotif) && !qaDetail ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -829,7 +849,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                 >
                   <ExternalLink size={14} /> Đi tới liên kết
                 </button>
-              )}
+              ) : null}
               <button
                 type="button"
                 onClick={() => {

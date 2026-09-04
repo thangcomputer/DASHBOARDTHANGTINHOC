@@ -1554,6 +1554,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                             window.dispatchEvent(new CustomEvent('open-student-detail', {
                               detail: { id: String(n.payload.studentId), tab: 'summary' },
                             }));
+                          } else if (
+                            role === 'student'
+                            && n.payload?.kind === 'class_link_updated'
+                            && /^https?:\/\//i.test(String(n.payload?.linkHoc || '').trim())
+                          ) {
+                            window.open(String(n.payload.linkHoc).trim(), '_blank', 'noopener,noreferrer');
                           } else if (n.path) {
                             let targetPath = n.path;
 

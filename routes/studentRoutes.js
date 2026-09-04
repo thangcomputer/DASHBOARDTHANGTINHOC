@@ -1278,9 +1278,15 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
                 type: 'SCHEDULE',
                 title: nextLink ? '🔗 Link vào lớp đã cập nhật' : '🔗 Link vào lớp đã được gỡ',
                 content: nextLink
-                  ? `Giảng viên đã cập nhật link học khóa "${courseLabel}". Vào hồ sơ để mở link.`
+                  ? `Giảng viên đã cập nhật link học khóa "${courseLabel}". Bấm thông báo để vào lớp.\n${nextLink}`
                   : `Link học khóa "${courseLabel}" đã được gỡ.`,
-                payload: { kind: 'class_link_updated', courseName: courseLabel },
+                payload: {
+                  kind: 'class_link_updated',
+                  courseName: courseLabel,
+                  linkHoc: nextLink || '',
+                  targetAudience: 'student',
+                },
+                // Giữ path hồ sơ làm fallback; Meet URL nằm trong payload.linkHoc
                 link: '/student#profile',
               });
             }
@@ -1610,10 +1616,15 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
             type: 'SCHEDULE',
             title: nextLink ? '🔗 Link vào lớp đã cập nhật' : '🔗 Link vào lớp đã được gỡ',
             content: nextLink
-              ? `Link học khóa "${courseLabel}" đã được cập nhật. Vào hồ sơ để mở link.`
+              ? `Link học khóa "${courseLabel}" đã được cập nhật. Bấm thông báo để vào lớp.\n${nextLink}`
               : `Link học khóa "${courseLabel}" đã được gỡ.`,
             receivers: student._id.toString(),
-            payload: { kind: 'class_link_updated', courseName: courseLabel, targetAudience: 'student' },
+            payload: {
+              kind: 'class_link_updated',
+              courseName: courseLabel,
+              linkHoc: nextLink || '',
+              targetAudience: 'student',
+            },
             link: '/student#profile',
           });
         }
