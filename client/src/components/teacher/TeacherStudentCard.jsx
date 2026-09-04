@@ -989,7 +989,7 @@ export const StudentCard = ({
       toast.info('Học viên đã thôi học — không cập nhật được.');
       return;
     }
-    onUpdateLink(student._id || student.id, linkInput);
+    onUpdateLink(student._id || student.id, linkInput, student.course || '');
     setLinkSaved(true); setTimeout(() => setLinkSaved(false), 2000);
   };
 

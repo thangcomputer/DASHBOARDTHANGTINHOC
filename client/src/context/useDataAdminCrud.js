@@ -407,13 +407,22 @@ export function useDataAdminCrud({
     }
   }, [students, setStudents, triggerBackgroundSync]);
 
-  const updateStudentLink = useCallback(async (studentId, linkHoc) => {
+  const updateStudentLink = useCallback(async (studentId, linkHoc, courseName = '') => {
     const previousStudents = [...students];
-    setStudents(prev => prev.map(s =>
-      (String(s.id) === String(studentId) || String(s._id) === String(studentId)) ? { ...s, linkHoc } : s
-    ));
+    const course = String(courseName || '').trim();
+    setStudents(prev => prev.map(s => {
+      if (String(s.id) !== String(studentId) && String(s._id) !== String(studentId)) return s;
+      const next = { ...s, linkHoc, online_meeting_url: linkHoc };
+      if (course && Array.isArray(s.enrollments) && s.enrollments.length) {
+        next.enrollments = s.enrollments.map((e) => (
+          String(e.courseName || e.name || '') === course ? { ...e, linkHoc } : e
+        ));
+      }
+      return next;
+    }));
     try {
-      const res = await api.students?.update(studentId, { linkHoc });
+      const payload = course ? { linkHoc, courseName: course } : { linkHoc };
+      const res = await api.students?.update(studentId, payload);
       if (!res?.success) throw new Error(res?.message || 'Lỗi cập nhật link học');
       addNotification(studentId, 'student', `📍 Giảng viên đã cập nhật link học mới. Nhấn vào đây để tham gia.`);
       triggerBackgroundSync();

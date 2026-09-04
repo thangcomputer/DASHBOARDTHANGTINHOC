@@ -70,7 +70,15 @@ export default function StudentOverviewTab({
   }, [mySchedules, ongoingSchedule, nowTick]);
 
   const isLive = Boolean(ongoingSchedule);
-  const joinUrl = ongoingSchedule?.linkHoc || featuredSchedule?.linkHoc || '';
+  // Ưu tiên link trên lịch; fallback link hồ sơ HV (GV cập nhật ở tab Link học)
+  const joinUrl = (
+    ongoingSchedule?.linkHoc
+    || featuredSchedule?.linkHoc
+    || viewStudent?.joinClassUrl
+    || viewStudent?.linkHoc
+    || viewStudent?.online_meeting_url
+    || ''
+  ).trim();
   const courseLabel = ongoingSchedule?.course || featuredSchedule?.course || viewStudent.course;
   const sessionTimeRange = featuredSchedule
     ? `${featuredSchedule.startTime || ''}${featuredSchedule.endTime ? ` - ${featuredSchedule.endTime}` : ''}`.trim()

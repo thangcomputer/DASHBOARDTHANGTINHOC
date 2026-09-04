@@ -373,7 +373,7 @@ const TeacherDashboard = ({ onNavigate }) => {
     }
   };
 
-  const updateLink = (id, newLink) => updateStudentLink(id, newLink);
+  const updateLink = (id, newLink, courseName) => updateStudentLink(id, newLink, courseName);
   const saveGrade = (id, grade, courseName) => {
     const key = courseName ? `${id}::${courseName}` : String(id);
     setGradeInputs(prev => ({ ...prev, [key]: grade }));
