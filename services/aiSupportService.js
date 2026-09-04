@@ -26,6 +26,7 @@ const IDLE_END_MS = Math.max(15_000, Number(process.env.AI_SUPPORT_IDLE_END_MS) 
 const IDLE_SWEEP_MS = Math.max(10_000, Number(process.env.AI_SUPPORT_IDLE_SWEEP_MS) || 30_000);
 const ESCALATE_MARKER = 'Đã chuyển yêu cầu tới nhân viên hỗ trợ';
 const BUSY_REPLY = 'Trợ lý AI đang bận. Bạn chọn "Cần nhân viên hỗ trợ" bên dưới nếu muốn gặp người thật.';
+const KEY_INVALID_REPLY = 'Trợ lý AI chưa kết nối được Gemini (API key hết hiệu lực). Admin cần tạo key mới tại Google AI Studio rồi cập nhật GEMINI_API_KEYS trên server. Bạn có thể bấm "Cần nhân viên hỗ trợ" nếu cần gặp người thật.';
 const EMPTY_REPLY = 'Xin lỗi, mình chưa trả lời được lúc này. Bạn thử hỏi lại giúp mình nhé.';
 const OUT_OF_SCOPE_REPLY = 'Em là Trợ lý AI Tin Học của Thắng Tin Học. Câu hỏi này nằm ngoài phạm vi em hỗ trợ.';
 const QUESTION_LIMIT_MARKER = 'lượt hỏi Trợ lý AI hôm nay';
@@ -41,10 +42,10 @@ const IDLE_STILL_HERE = 'Mình vẫn ở đây. Bạn hỏi gì ạ?';
 
 const SUPPORT_MODEL_FALLBACKS = [
   process.env.AI_SUPPORT_MODEL,
-  'gemini-3.6-flash',
-  'gemini-3.5-flash-lite',
   process.env.AI_MODEL,
   'gemini-flash-latest',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
 ].filter(Boolean);
 
 function isSimpleGreeting(text) {
@@ -198,6 +199,25 @@ async function consumeAiQuestionQuota(sessionDoc) {
     used: used + 1,
     limit,
   };
+}
+
+/** Hoàn 1 lượt khi Gemini fail (không trừ oan khi key/model lỗi). */
+async function refundAiQuestionQuota(sessionDoc) {
+  if (!sessionDoc) return;
+  const today = vietnamDateKey();
+  if (String(sessionDoc.questionDate || '') !== today) return;
+  const used = Number(sessionDoc.questionCount || 0);
+  if (used <= 0) return;
+  sessionDoc.questionCount = used - 1;
+  await sessionDoc.save();
+}
+
+function supportFailureReply(err) {
+  const msg = String(err?.message || '');
+  if (/key Gemini het hieu luc|chua chap nhan key|API key|UNAUTHENTICATED|401/i.test(msg)) {
+    return KEY_INVALID_REPLY;
+  }
+  return BUSY_REPLY;
 }
 
 function peekImageQuota(session) {
@@ -990,6 +1010,14 @@ async function replyToUserMessage({
     });
   } catch (err) {
     logger.warn({ err: err?.message, conversationId }, '[AI Support] reply failed');
+    if (q.applies && !q.blocked) {
+      try {
+        await refundAiQuestionQuota(sessionDoc);
+        emitStatus(io, sessionDoc, humanUserId);
+      } catch (refundErr) {
+        logger.warn({ err: refundErr?.message }, '[AI Support] refund quota failed');
+      }
+    }
     sessionDoc.consecutiveAiFailures = Number(sessionDoc.consecutiveAiFailures || 0) + 1;
     await sessionDoc.save();
     return await persistBotReply({
@@ -997,7 +1025,7 @@ async function replyToUserMessage({
       humanUserId,
       humanRole,
       humanName,
-      content: BUSY_REPLY,
+      content: supportFailureReply(err),
       io,
       notifyUser,
     });

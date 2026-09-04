@@ -97,7 +97,7 @@ function getConfig(apiKeyOverride) {
     ? 'https://generativelanguage.googleapis.com/v1beta/openai'
     : 'https://api.openai.com/v1';
   const defaultModel = useGeminiDefaults && !process.env.AI_MODEL && !process.env.OPENAI_MODEL
-    ? 'gemini-3.6-flash'
+    ? 'gemini-flash-latest'
     : 'gpt-4o-mini';
   return {
     apiKey,
@@ -126,15 +126,16 @@ function isRateLimitError(err) {
   return /429|RESOURCE_EXHAUSTED|rate.?limit|quota|too many requests/i.test(msg);
 }
 
+/**
+ * AIza + AQ. auth keys đều dùng x-goog-api-key.
+ * Authorization: Bearer với key AQ. gây 400/401 (OpenAI-compat / native).
+ */
 function buildGeminiHeaders(apiKey) {
-  if (String(apiKey).startsWith('AQ.')) {
-    return { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' };
-  }
   return { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' };
 }
 
 async function chatCompletionGeminiNative(cfg, opts) {
-  const model = String(opts.model || cfg.model || 'gemini-3.6-flash').replace(/^models\//, '');
+  const model = String(opts.model || cfg.model || 'gemini-flash-latest').replace(/^models\//, '');
   const system = opts.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
   const userParts = opts.messages
     .filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -229,11 +230,18 @@ function humanizeAiError(raw) {
     }
   } catch { /* ignore */ }
   const inner = parsed?.error?.message || parsed?.message || msg;
-  if (/401|UNAUTHENTICATED|ACCESS_TOKEN_TYPE_UNSUPPORTED|invalid authentication/i.test(`${inner} ${msg}`)) {
-    return 'Google chua chap nhan key. Bat Generative Language API tren Cloud Console.';
+  const blob = `${inner} ${msg}`;
+  if (/bound service account is deleted or disabled/i.test(blob)) {
+    return 'Key Gemini het hieu luc (service account bi xoa/tat). Tao key moi tai aistudio.google.com/apikey roi cap nhat GEMINI_API_KEYS.';
   }
-  if (/429|RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(`${inner} ${msg}`)) {
+  if (/401|UNAUTHENTICATED|ACCESS_TOKEN_TYPE_UNSUPPORTED|invalid authentication|API key not valid/i.test(blob)) {
+    return 'Google chua chap nhan key. Tao key moi (AI Studio) va dam bao Generative Language API dang bat.';
+  }
+  if (/429|RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(blob)) {
     return 'AI dang qua tai (het han muc). Thu lai sau vai phut hoac them GEMINI_API_KEYS.';
+  }
+  if (/not found|is not found for API version|NOT_FOUND/i.test(blob)) {
+    return 'Model AI khong ton tai. Dat AI_MODEL=gemini-flash-latest trong .env.';
   }
   return String(inner).replace(/\s+/g, ' ').slice(0, 180);
 }
