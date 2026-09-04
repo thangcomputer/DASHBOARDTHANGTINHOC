@@ -260,7 +260,11 @@ export default function TeacherTeachingLog({
                         type="button"
                         onClick={() => openAttendanceFor(sch)}
                         className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md underline-offset-2 hover:underline ${tone}`}
-                        title={`Mở hồ sơ học viên — ${attendanceLabel}`}
+                        title={
+                          kind === 'overdue_attendance'
+                            ? 'Mở yêu cầu điểm danh bù'
+                            : `Mở hồ sơ học viên — ${attendanceLabel}`
+                        }
                       >
                         {meta.shortLabel || meta.label}
                       </button>

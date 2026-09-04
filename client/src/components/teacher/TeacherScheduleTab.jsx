@@ -1,10 +1,25 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar, CheckCircle, Clock, Ban } from 'lucide-react';
 import TeacherMonthlyCalendar from './TeacherMonthlyCalendar';
 import TeacherWeeklySlotGrid from './TeacherWeeklySlotGrid';
 import TeacherTeachingLog from './TeacherTeachingLog';
-import { isScheduleDateBeforeToday } from '../../utils/scheduleTime';
+import AttendanceMakeupRequestModal from './AttendanceMakeupRequestModal';
+import { getScheduleDisplayKind, isScheduleDateBeforeToday } from '../../utils/scheduleTime';
 import { TEACHER_WEEKLY_SLOT_GRID_EXPERIMENT, SHOW_TEACHER_MONTHLY_CALENDAR } from '../../utils/weeklySlotGrid';
+import { useToast } from '../../utils/toast';
+
+function resolveStudentId(sch) {
+  return String(
+    sch?.studentId?._id
+    || sch?.studentId?.id
+    || sch?.studentId
+    || sch?.student?._id
+    || sch?.student?.id
+    || sch?.student
+    || '',
+  ).trim();
+}
 
 export default function TeacherScheduleTab({
   setEditingSchedule,
@@ -18,8 +33,19 @@ export default function TeacherScheduleTab({
   updateSchedule,
   allSchedules,
 }) {
+  const navigate = useNavigate();
+  const toast = useToast();
   const today = new Date();
   const currentMonth = today.getMonth();
+  const [makeupTarget, setMakeupTarget] = useState(null);
+
+  const teacherSession = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('teacher_user') || '{}') || {};
+    } catch {
+      return {};
+    }
+  }, []);
 
   const completedCount = useMemo(() => {
     return (mySchedules || []).filter(s => s.status === 'completed' && new Date(s.date).getMonth() === currentMonth).length;
@@ -32,6 +58,46 @@ export default function TeacherScheduleTab({
   const cancelledCount = useMemo(() => {
     return (mySchedules || []).filter(s => s.status === 'cancelled' && new Date(s.date).getMonth() === currentMonth).length;
   }, [mySchedules, currentMonth]);
+
+  const openStudentProfile = useCallback((sch) => {
+    const sid = resolveStudentId(sch);
+    if (!sid) {
+      toast.error('Không tìm thấy học viên của ca này.');
+      return;
+    }
+    const course = String(sch.course || sch.courseName || '').trim();
+    const q = new URLSearchParams();
+    q.set('studentId', sid);
+    if (course) q.set('course', course);
+    navigate(`/teacher#students?${q.toString()}`);
+  }, [navigate, toast]);
+
+  /** Nhật ký: quá hạn → popup điểm danh bù; còn lại → hồ sơ HV (điểm danh thường). */
+  const handleOpenAttendance = useCallback((sch) => {
+    const kind = getScheduleDisplayKind(sch);
+    if (kind !== 'overdue_attendance') {
+      openStudentProfile(sch);
+      return;
+    }
+    const sid = resolveStudentId(sch);
+    if (!sid) {
+      toast.error('Không tìm thấy học viên của ca này.');
+      return;
+    }
+    const found = (students || []).find(
+      (s) => String(s._id || s.id) === sid,
+    );
+    const student = found || {
+      _id: sid,
+      id: sid,
+      name: sch.studentName || 'Học viên',
+      course: sch.course || sch.courseName || '',
+      completedSessions: sch.completedSessions,
+      remainingSessions: sch.remainingSessions,
+      totalSessions: sch.totalSessions,
+    };
+    setMakeupTarget({ schedule: sch, student });
+  }, [openStudentProfile, students, toast]);
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full min-w-0 py-3 sm:py-6 animate-in fade-in duration-500">
@@ -123,7 +189,19 @@ export default function TeacherScheduleTab({
         />
       )}
 
-      <TeacherTeachingLog schedules={mySchedules} />
+      <TeacherTeachingLog
+        schedules={mySchedules}
+        onOpenAttendance={handleOpenAttendance}
+      />
+
+      <AttendanceMakeupRequestModal
+        open={Boolean(makeupTarget)}
+        onClose={() => setMakeupTarget(null)}
+        student={makeupTarget?.student}
+        schedule={makeupTarget?.schedule}
+        teacherName={teacherSession.name || 'Giảng viên'}
+        teacherId={String(teacherId || teacherSession.id || teacherSession._id || '')}
+      />
     </div>
   );
 }

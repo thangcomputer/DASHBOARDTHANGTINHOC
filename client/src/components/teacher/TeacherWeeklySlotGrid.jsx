@@ -29,6 +29,8 @@ import {
 
 const LOCKED_STATUSES = new Set(['completed', 'no_show']);
 const CLEAR_REASON = 'Bỏ ca từ bảng tuần lịch';
+/** Số HV hiện mặc định trên bảng tuần; bấm «Xem thêm» để hiện hết. */
+const ROSTER_PAGE_SIZE = 8;
 
 function isDroppedStudent(student) {
   if (!student) return true;
@@ -95,6 +97,7 @@ export default function TeacherWeeklySlotGrid({
   const [rosterFilter, setRosterFilter] = useState('studying');
   const [nameQuery, setNameQuery] = useState('');
   const [sort, setSort] = useState({ kind: 'name', dir: 'asc', dayIndex: 0 });
+  const [rosterExpanded, setRosterExpanded] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -144,6 +147,19 @@ export default function TeacherWeeklySlotGrid({
     }
     return sorted;
   }, [rosterRows, nameQuery, sort, schedules, dateKeys]);
+
+  // Đổi lọc / tìm / sắp xếp → thu gọn lại về 8 HV
+  useEffect(() => {
+    setRosterExpanded(false);
+  }, [rosterFilter, nameQuery, sort.kind, sort.dir, sort.dayIndex]);
+
+  const visibleRows = useMemo(() => {
+    if (rosterExpanded || rows.length <= ROSTER_PAGE_SIZE) return rows;
+    return rows.slice(0, ROSTER_PAGE_SIZE);
+  }, [rows, rosterExpanded]);
+
+  const hiddenCount = Math.max(0, rows.length - ROSTER_PAGE_SIZE);
+  const showRosterToggle = hiddenCount > 0;
 
   const goPrev = () => setWeekStart((d) => addDays(startOfWeekMonday(d), -7));
   const goNext = () => setWeekStart((d) => addDays(startOfWeekMonday(d), 7));
@@ -425,7 +441,7 @@ export default function TeacherWeeklySlotGrid({
                 </td>
               </tr>
             )}
-            {rows.map((student) => {
+            {visibleRows.map((student) => {
               const progress = resolveEnrollmentProgress(student, schedules);
               const name = student.displayName || student.name || 'Học viên';
               return (
@@ -459,6 +475,24 @@ export default function TeacherWeeklySlotGrid({
                 </tr>
               );
             })}
+            {showRosterToggle ? (
+              <tr className="border-b border-slate-100">
+                <td colSpan={8} className="sticky left-0 z-10 bg-slate-50/90 px-3 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setRosterExpanded((v) => !v)}
+                    className="text-[11px] font-black text-red-600 hover:text-red-700 hover:underline uppercase tracking-wide"
+                  >
+                    {rosterExpanded
+                      ? 'Thu gọn'
+                      : `Xem thêm ${hiddenCount} học viên`}
+                  </button>
+                  <span className="ml-2 text-[10px] font-semibold text-slate-400">
+                    ({rosterExpanded ? rows.length : ROSTER_PAGE_SIZE}/{rows.length})
+                  </span>
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
