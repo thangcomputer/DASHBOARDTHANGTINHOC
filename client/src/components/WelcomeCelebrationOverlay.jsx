@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Sparkles, X, Star, Video } from 'lucide-react';
 import { formatHoaHong, STAR_BONUS_MIN_STARS, STAR_BONUS_MIN_STUDENTS } from '../utils/teacherCommission';
+import { setLoginOverlay } from '../utils/loginOverlayGate';
 
 /**
  * Pháo hoa chào mừng / hoàn thành khóa / thưởng sao GV — canvas trên overlay (pointer-events: none).
@@ -20,6 +21,12 @@ export default function WelcomeCelebrationOverlay({
   const rocketsRef = useRef([]);
   const sparksRef = useRef([]);
   const flashesRef = useRef([]);
+
+  useEffect(() => {
+    // LMS / layout đều dùng component này — đăng ký gate khi mở
+    setLoginOverlay('welcome-celebration-ui', Boolean(open));
+    return () => setLoginOverlay('welcome-celebration-ui', false);
+  }, [open]);
 
   const stop = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);

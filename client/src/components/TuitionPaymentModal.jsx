@@ -15,6 +15,7 @@ import { generateVietQRUrl } from './BankSelect';
 import api from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/toast';
+import { setLoginOverlay } from '../utils/loginOverlayGate';
 
 const POLL_INTERVAL = 3000; // 3 giây
 
@@ -28,6 +29,11 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
   const timerRef = useRef(null);
   const { socket } = useSocket() || {};
   const toast = useToast();
+
+  useEffect(() => {
+    setLoginOverlay('tuition-payment', true);
+    return () => setLoginOverlay('tuition-payment', false);
+  }, []);
 
   // Canonical studentCode from server only — never invent TTH / _id slice
   const studentCode = String(student?.studentCode || '').trim();

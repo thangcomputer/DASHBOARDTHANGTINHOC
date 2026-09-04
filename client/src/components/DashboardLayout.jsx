@@ -35,6 +35,7 @@ import TeacherStudentNoteModal, {
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
+import { setLoginOverlay } from '../utils/loginOverlayGate';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -389,14 +390,22 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   }, [currentTeacher?.status, session?.status, role, sessionTeacherId, navigate, isRefetching, location.pathname]);
 
   // Admin/staff + HV lần đầu: mở đổi MK ngay. GV: đổi thủ công ở Hồ sơ/menu.
+  // Giữ gate pending để QC/tin nhắn không đè trong lúc chờ mở modal.
+  const [firstLoginPwDone, setFirstLoginPwDone] = useState(false);
   useEffect(() => {
-    if (session?.isFirstLogin !== true) return;
-    if (role === 'teacher') return;
+    const onDone = () => setFirstLoginPwDone(true);
+    window.addEventListener('cms:first-login-password-done', onDone);
+    return () => window.removeEventListener('cms:first-login-password-done', onDone);
+  }, []);
+  useEffect(() => {
+    const needFirstPw = session?.isFirstLogin === true && role !== 'teacher' && !firstLoginPwDone;
+    setLoginOverlay('change-password-pending', needFirstPw);
+    if (!needFirstPw) return undefined;
     const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('open-change-password-modal'));
     }, 500);
     return () => clearTimeout(timer);
-  }, [session?.isFirstLogin, role]);
+  }, [session?.isFirstLogin, role, firstLoginPwDone]);
 
   const [showWelcomeCelebration, setShowWelcomeCelebration] = useState(false);
   const welcomeMarkedRef = React.useRef(false);
@@ -890,6 +899,33 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     loading: false,
     teacher: null,
   });
+
+  // Gate overlay layout → PopupBanner / LoginInbox xếp hàng (không đè nhau)
+  useEffect(() => {
+    setLoginOverlay('welcome-celebration', Boolean(showWelcomeCelebration));
+  }, [showWelcomeCelebration]);
+  useEffect(() => {
+    setLoginOverlay('course-celebration', Boolean(courseCelebration));
+  }, [courseCelebration]);
+  useEffect(() => {
+    setLoginOverlay('star-bonus-celebration', Boolean(starBonusCelebration));
+  }, [starBonusCelebration]);
+  useEffect(() => {
+    setLoginOverlay('attendance-confirm', role === 'student' && Boolean(attendanceConfirm));
+  }, [role, attendanceConfirm]);
+  useEffect(() => {
+    setLoginOverlay('assigned-teacher', role === 'student' && Boolean(assignedTeacherModal.open));
+  }, [role, assignedTeacherModal.open]);
+  useEffect(() => {
+    setLoginOverlay('attendance-dispute', (role === 'admin' || role === 'staff') && Boolean(attendanceDispute));
+  }, [role, attendanceDispute]);
+  useEffect(() => {
+    setLoginOverlay('teacher-attendance-confirm', role === 'teacher' && Boolean(teacherAttendanceConfirm));
+  }, [role, teacherAttendanceConfirm]);
+  useEffect(() => {
+    setLoginOverlay('admin-quick-popup', Boolean(adminQuickPopup));
+  }, [adminQuickPopup]);
+
   const notifRef = React.useRef(null);
   const bellRef = React.useRef(null);
 
@@ -1752,6 +1788,22 @@ const ChangePasswordModal = ({ session, role }) => {
     return () => window.removeEventListener('open-change-password-modal', handleOpen);
   }, []);
 
+  React.useEffect(() => {
+    setLoginOverlay('change-password', isOpen);
+    if (isOpen) {
+      setLoginOverlay('change-password-pending', false);
+      return () => setLoginOverlay('change-password', false);
+    }
+    // Đóng modal: nếu local vẫn bắt buộc đổi MK → giữ gate
+    try {
+      const stored = JSON.parse(localStorage.getItem(`${role}_user`) || '{}');
+      if (stored?.isFirstLogin === true && role !== 'teacher') {
+        setLoginOverlay('change-password-pending', true);
+      }
+    } catch { /* ignore */ }
+    return () => setLoginOverlay('change-password', false);
+  }, [isOpen, role]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
@@ -1772,9 +1824,10 @@ const ChangePasswordModal = ({ session, role }) => {
            try {
              const stored = JSON.parse(localStorage.getItem(key) || '{}');
              localStorage.setItem(key, JSON.stringify({ ...stored, isFirstLogin: false }));
-             // Dispatch event để App.jsx biết session đã thay đổi (nếu cần)
              window.dispatchEvent(new Event('storage'));
            } catch {}
+           setLoginOverlay('change-password-pending', false);
+           window.dispatchEvent(new CustomEvent('cms:first-login-password-done'));
         }
         setTimeout(() => setIsOpen(false), 2000);
       } else {
@@ -1787,9 +1840,15 @@ const ChangePasswordModal = ({ session, role }) => {
     }
   };
 
-  return (
-    <div className="cms-modal-shell" role="dialog" aria-modal="true" aria-labelledby="change-password-title">
-      <div className="cms-modal-panel max-w-sm">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[10050] flex items-center justify-center p-3 sm:p-4 bg-black/60"
+      style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="change-password-title"
+    >
+      <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-sm max-h-[min(92dvh,900px)] overflow-y-auto overflow-x-hidden shadow-xl">
         <div className="bg-gradient-to-r from-red-600 to-red-600 px-6 py-5 flex items-center justify-between">
           <h3 id="change-password-title" className="text-white font-black text-lg flex items-center gap-2">
             <Lock size={20} aria-hidden="true" /> {session?.isFirstLogin === true ? 'Tạo mật khẩu cá nhân' : 'Đổi mật khẩu'}
@@ -1833,7 +1892,8 @@ const ChangePasswordModal = ({ session, role }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

@@ -9,7 +9,7 @@ import {
   getScheduleDisplayKind,
   normalizeScheduleDate,
 } from '../utils/scheduleTime';
-import { LOGIN_OVERLAY_EVENT } from '../utils/loginOverlayGate';
+import { LOGIN_OVERLAY_EVENT, getActiveLoginOverlayIds } from '../utils/loginOverlayGate';
 import { isAiSupportConversationId, AI_SUPPORT_PEER } from '../utils/aiSupport';
 
 export const LOGIN_ALERT_STORAGE_PREFIX = 'cms_login_alert';
@@ -149,12 +149,21 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
   useEffect(() => { syncRef.current = syncMessages; }, [syncMessages]);
 
   useEffect(() => {
+    const syncFromGate = () => {
+      const ids = getActiveLoginOverlayIds();
+      const next = {};
+      ids.forEach((id) => { next[id] = true; });
+      extrasRef.current = next;
+      setExtraBlock(ids.length > 0);
+    };
     const onOverlay = (e) => {
       const id = String(e?.detail?.id || '');
       if (!id) return;
       extrasRef.current[id] = Boolean(e.detail?.open);
+      if (!e.detail?.open) delete extrasRef.current[id];
       setExtraBlock(Object.values(extrasRef.current).some(Boolean));
     };
+    syncFromGate();
     window.addEventListener(LOGIN_OVERLAY_EVENT, onOverlay);
     return () => window.removeEventListener(LOGIN_OVERLAY_EVENT, onOverlay);
   }, []);
