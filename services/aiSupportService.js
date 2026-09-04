@@ -43,9 +43,11 @@ const IDLE_STILL_HERE = 'Mình vẫn ở đây. Bạn hỏi gì ạ?';
 const SUPPORT_MODEL_FALLBACKS = [
   process.env.AI_SUPPORT_MODEL,
   process.env.AI_MODEL,
+  'gemini-3.6-flash',
   'gemini-flash-latest',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash',
 ].filter(Boolean);
 
 function isSimpleGreeting(text) {

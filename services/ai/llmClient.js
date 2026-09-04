@@ -237,6 +237,12 @@ function humanizeAiError(raw) {
   if (/401|UNAUTHENTICATED|ACCESS_TOKEN_TYPE_UNSUPPORTED|invalid authentication|API key not valid/i.test(blob)) {
     return 'Google chua chap nhan key. Tao key moi (AI Studio) va dam bao Generative Language API dang bat.';
   }
+  if (/prepayment credits are depleted|prepay/i.test(blob)) {
+    return 'Project Gemini het credit tra truoc (AI Studio Billing). Key moi van dung chung credit project — nap tai ai.studio/projects.';
+  }
+  if (/high demand|currently experiencing|UNAVAILABLE|503/i.test(blob)) {
+    return 'Model Gemini dang qua tai (503). Thu lai sau vai giay.';
+  }
   if (/429|RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(blob)) {
     return 'AI dang qua tai (het han muc). Thu lai sau vai phut hoac them GEMINI_API_KEYS.';
   }
