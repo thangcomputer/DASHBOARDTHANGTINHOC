@@ -62,6 +62,15 @@ function isTeacherAttendanceConfirmedNotif(n) {
   return String(n?.title || '').includes('Học viên đã xác nhận điểm danh');
 }
 
+function isTeacherAttendanceRejectedNotif(n) {
+  const kind = String(n?.payload?.kind || '');
+  if (kind === 'attendance_rejected' || kind === 'admin_makeup_rejected') return true;
+  const title = String(n?.title || '');
+  return title.includes('Buổi học không được tính')
+    || title.includes('Buổi điểm danh bù không được tính')
+    || title.includes('không được tính');
+}
+
 function attendancePayloadMissingTeacherOrCa(payload) {
   const name = String(payload?.teacherName || '').trim();
   const hasName = name && name !== 'Giảng viên';
@@ -418,6 +427,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [attendanceDispute, setAttendanceDispute] = useState(null);
   const [attendanceDisputeBusy, setAttendanceDisputeBusy] = useState(false);
   const [teacherAttendanceConfirm, setTeacherAttendanceConfirm] = useState(null);
+  const teacherRejectPopupShownRef = React.useRef(new Set());
   const [studentNotePopup, setStudentNotePopup] = useState(null);
   const studentNotePopupLive = React.useMemo(() => {
     if (!studentNotePopup) return null;
@@ -606,6 +616,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     };
   }, [socket, role, myId]);
 
+  // GV: Admin không tính buổi → popup tự động (socket realtime)
+  useEffect(() => {
+    if (!socket || role !== 'teacher' || !myId) return undefined;
+    const onRejected = (payload) => {
+      if (!payload) return;
+      const tid = payload.teacherId != null ? String(payload.teacherId) : '';
+      if (tid && tid !== String(myId)) return;
+      setTeacherAttendanceConfirm({
+        ...payload,
+        rejected: true,
+        kind: payload.kind || 'attendance_rejected',
+        studentName: payload.studentName || '',
+      });
+    };
+    socket.on('attendance:rejected', onRejected);
+    return () => { socket.off('attendance:rejected', onRejected); };
+  }, [socket, role, myId]);
+
   // Admin: tranh chấp → chỉ toast + badge chuông (không auto-mở modal, tránh chen thao tác)
   useEffect(() => {
     if (!socket || (role !== 'admin' && role !== 'staff')) return undefined;
@@ -745,13 +773,21 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     }
   }, [attendanceDispute, toast, triggerBackgroundSync]);
 
-  const openTeacherAttendanceConfirmed = React.useCallback(async (n) => {
+  const openTeacherAttendanceConfirmed = React.useCallback(async (n, opts = {}) => {
+    const rejected = opts.rejected === true
+      || String(n?.payload?.kind || '') === 'attendance_rejected'
+      || String(n?.payload?.kind || '') === 'admin_makeup_rejected'
+      || isTeacherAttendanceRejectedNotif(n);
     const base = { ...(n?.payload || {}) };
     const confirmedAt = base.studentConfirmedAt || n?.time || n?.createdAt || n?.timestamp || null;
     let payload = {
       ...base,
       studentName: base.studentName || '',
       confirmedAt,
+      rejected,
+      kind: rejected
+        ? (base.kind || 'attendance_rejected')
+        : (base.kind || 'attendance_confirmed'),
     };
     const missingCa = !String(payload.timeRange || '').trim() && !payload.startTime;
     const missingSession = payload.sessionNumber == null && payload.sessionOrdinalPreview == null;
@@ -777,6 +813,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             dateLabel: payload.dateLabel || extra.dateLabel,
             course: payload.course || extra.course,
             confirmedAt: payload.confirmedAt || sch.studentConfirmedAt || confirmedAt,
+            rejected,
           };
         }
       } catch { /* dùng payload thông báo */ }
@@ -1049,6 +1086,31 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     starBonusCelebration,
     hasSeenStarBonus,
     queueStarBonusCelebration,
+  ]);
+
+  // GV offline lúc Admin không tính buổi → mở popup khi vào lại (notif chưa đọc)
+  useEffect(() => {
+    if (role !== 'teacher' || !myId) return;
+    if (showWelcomeCelebration || starBonusCelebration || teacherAttendanceConfirm) return;
+    const hit = myNotifications.find((n) => {
+      if (n?.read) return false;
+      if (!isTeacherAttendanceRejectedNotif(n)) return false;
+      const key = String(n.id || n._id || n.payload?.scheduleId || '');
+      if (!key || teacherRejectPopupShownRef.current.has(key)) return false;
+      return true;
+    });
+    if (!hit) return;
+    const key = String(hit.id || hit._id || hit.payload?.scheduleId || '');
+    if (key) teacherRejectPopupShownRef.current.add(key);
+    openTeacherAttendanceConfirmed(hit, { rejected: true });
+  }, [
+    role,
+    myId,
+    myNotifications,
+    showWelcomeCelebration,
+    starBonusCelebration,
+    teacherAttendanceConfirm,
+    openTeacherAttendanceConfirmed,
   ]);
 
   useEffect(() => {
@@ -1380,9 +1442,47 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                                 const live = (Array.isArray(res?.data) ? res.data : []).find(
                                   (p) => String(p?.scheduleId) === String(n.payload.scheduleId),
                                 );
-                                setAttendanceDispute(live || fallback);
+                                if (live) {
+                                  setAttendanceDispute({ ...live, resolved: false });
+                                  return;
+                                }
+                                // Đã giải quyết: lấy schedule để biết chấp thuận / không chấp thuận
+                                let sch = null;
+                                try {
+                                  const one = await api.schedules.getById(n.payload.scheduleId);
+                                  if (one?.success) sch = one.data;
+                                } catch { /* ignore */ }
+                                const st = String(sch?.studentConfirmStatus || '').toLowerCase();
+                                const status = String(sch?.status || '').toLowerCase();
+                                const rejected = st === 'admin_rejected'
+                                  || status === 'cancelled'
+                                  || status === 'canceled'
+                                  || status === 'no_show';
+                                const approved = st === 'admin_approved'
+                                  || st === 'accepted'
+                                  || status === 'completed';
+                                setAttendanceDispute({
+                                  ...fallback,
+                                  ...(sch ? {
+                                    studentName: sch.studentName || sch.studentId?.name || fallback.studentName,
+                                    teacherName: sch.teacherName || sch.teacherId?.name || fallback.teacherName,
+                                    course: sch.course || fallback.course,
+                                    status: sch.status,
+                                    studentConfirmStatus: sch.studentConfirmStatus
+                                      || (rejected ? 'admin_rejected' : approved ? 'admin_approved' : 'admin_approved'),
+                                  } : {
+                                    studentConfirmStatus: 'admin_approved',
+                                  }),
+                                  resolved: true,
+                                  resolveOutcome: rejected ? 'rejected' : 'approved',
+                                });
                               } catch {
-                                setAttendanceDispute(fallback);
+                                setAttendanceDispute({
+                                  ...fallback,
+                                  resolved: true,
+                                  studentConfirmStatus: 'admin_approved',
+                                  resolveOutcome: 'approved',
+                                });
                               }
                             })();
                           } else if (n.payload?.kind === 'attendance_confirm_pending' && role === 'student') {
@@ -1483,6 +1583,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               studentId: n.payload?.studentId,
                               ...n,
                             });
+                          } else if (role === 'teacher' && isTeacherAttendanceRejectedNotif(n)) {
+                            setShowNotif(false);
+                            openTeacherAttendanceConfirmed(n, { rejected: true });
                           } else if (role === 'teacher' && isTeacherAttendanceConfirmedNotif(n)) {
                             setShowNotif(false);
                             openTeacherAttendanceConfirmed(n);

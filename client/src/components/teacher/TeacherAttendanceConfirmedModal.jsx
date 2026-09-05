@@ -15,12 +15,22 @@ function formatConfirmedAt(value) {
   });
 }
 
+function isRejectedPayload(payload) {
+  if (!payload) return false;
+  if (payload.rejected === true || payload.resolveOutcome === 'rejected') return true;
+  const kind = String(payload.kind || '');
+  return kind === 'attendance_rejected' || kind === 'admin_makeup_rejected';
+}
+
 /**
- * Popup GV: học viên đã xác nhận điểm danh (chỉ xem thông tin).
+ * Popup GV:
+ * - confirmed: học viên đã xác nhận điểm danh
+ * - rejected: Admin không tính buổi (tranh chấp / điểm danh bù)
  */
 export default function TeacherAttendanceConfirmedModal({ open, payload, onClose }) {
   if (!open || !payload) return null;
 
+  const rejected = isRejectedPayload(payload);
   const sessionNo = payload.sessionNumber || payload.sessionOrdinalPreview || '?';
   const total = payload.totalSessions || payload.sessionTotalPreview;
   const studentName = payload.studentName || 'Học viên';
@@ -29,7 +39,15 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
   const timeRange = payload.timeRange
     || [payload.startTime, payload.endTime].filter(Boolean).join(' - ');
   const course = payload.course || '';
-  const confirmedAt = payload.confirmedAt || payload.studentConfirmedAt;
+  const confirmedAt = payload.confirmedAt || payload.studentConfirmedAt || payload.resolvedAt;
+
+  const headerTone = rejected
+    ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800'
+    : 'bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-700';
+  const eyebrowTone = rejected ? 'text-slate-200/90' : 'text-emerald-100/90';
+  const titleTone = rejected ? 'text-slate-100' : 'text-emerald-50';
+  const fractionTone = rejected ? 'text-slate-200/90' : 'text-emerald-100/90';
+  const courseTone = rejected ? 'text-slate-100/95' : 'text-emerald-50/95';
 
   const node = (
     <div
@@ -44,7 +62,7 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
         onClick={onClose}
       />
       <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-[0_25px_80px_-12px_rgba(0,0,0,0.55)]">
-        <div className="relative px-6 pt-8 pb-8 text-center text-white bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-700">
+        <div className={`relative px-6 pt-8 pb-8 text-center text-white ${headerTone}`}>
           <button
             type="button"
             onClick={onClose}
@@ -53,20 +71,20 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
           >
             <X size={18} aria-hidden="true" />
           </button>
-          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-emerald-100/90">
-            Học viên đã xác nhận
+          <p className={`text-[11px] font-bold uppercase tracking-[0.25em] ${eyebrowTone}`}>
+            {rejected ? 'Buổi không được tính' : 'Học viên đã xác nhận'}
           </p>
-          <p id="teacher-attendance-confirmed-title" className="mt-3 text-sm font-semibold text-emerald-50">
+          <p id="teacher-attendance-confirmed-title" className={`mt-3 text-sm font-semibold ${titleTone}`}>
             Buổi học
           </p>
           <p className="mt-1 text-5xl sm:text-6xl font-black tabular-nums tracking-tight drop-shadow">
             {sessionNo}
             {total ? (
-              <span className="text-2xl sm:text-3xl font-bold text-emerald-100/90">/{total}</span>
+              <span className={`text-2xl sm:text-3xl font-bold ${fractionTone}`}>/{total}</span>
             ) : null}
           </p>
           {course ? (
-            <p className="mt-2 text-sm font-medium text-emerald-50/95">{course}</p>
+            <p className={`mt-2 text-sm font-medium ${courseTone}`}>{course}</p>
           ) : null}
         </div>
 
@@ -85,20 +103,28 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
                 {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}
               </p>
             </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Xác nhận lúc</p>
-              <p className="text-sm font-semibold text-slate-800">{formatConfirmedAt(confirmedAt)}</p>
-            </div>
+            {!rejected && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Xác nhận lúc</p>
+                <p className="text-sm font-semibold text-slate-800">{formatConfirmedAt(confirmedAt)}</p>
+              </div>
+            )}
           </div>
 
           <p className="text-sm text-slate-500 leading-relaxed text-center">
-            Học viên đã đồng ý điểm danh — buổi này đã được tính vào tiến độ.
+            {rejected
+              ? 'Admin không chấp thuận buổi này — không tính vào tiến độ và lương buổi. Bạn có thể xếp thêm ca cho học viên.'
+              : 'Học viên đã đồng ý điểm danh — buổi này đã được tính vào tiến độ.'}
           </p>
 
           <button
             type="button"
             onClick={onClose}
-            className="w-full min-h-12 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold shadow-lg shadow-slate-800/20 transition"
+            className={`w-full min-h-12 inline-flex items-center justify-center gap-2 rounded-2xl text-white text-sm font-bold shadow-lg transition ${
+              rejected
+                ? 'bg-slate-800 hover:bg-slate-900 shadow-slate-800/20'
+                : 'bg-slate-800 hover:bg-slate-900 shadow-slate-800/20'
+            }`}
           >
             <Check size={18} aria-hidden="true" />
             Đóng
