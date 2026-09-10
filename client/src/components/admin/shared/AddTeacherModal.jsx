@@ -171,7 +171,7 @@ export default function AddTeacherModal({
               {isSuperAdmin ? (
                 <div>
                   <label className="cms-label flex items-center gap-1.5">
-                    <MapPin size={12} /> Chi nhánh
+                    <MapPin size={12} /> Chi nhánh <span className="text-red-500">*</span>
                   </label>
                   <CmsSelect
                     value={teacherForm.branchId || ''}
@@ -186,7 +186,7 @@ export default function AddTeacherModal({
                     }}
                     className="cms-input cursor-pointer"
                   >
-                    <option value="">— Chưa phân chi nhánh —</option>
+                    <option value="">— Chọn chi nhánh —</option>
                     {branches.map((b) => (
                       <option key={b._id} value={b._id}>
                         {b.name}{b.code ? ` (${b.code})` : ''}
@@ -285,7 +285,10 @@ export default function AddTeacherModal({
           <button
             type="button"
             onClick={() => onSubmit?.(teacherForm)}
-            disabled={!(Array.isArray(teacherForm.subjectIds) && teacherForm.subjectIds.filter(Boolean).length)}
+            disabled={
+              !String(teacherForm.branchId || '').trim()
+              || !(Array.isArray(teacherForm.subjectIds) && teacherForm.subjectIds.filter(Boolean).length)
+            }
             className="cms-btn cms-btn-primary"
           >
             <GraduationCap size={16} /> Tạo giảng viên

@@ -1234,6 +1234,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         || (branchId && recs.includes(`ALL_STAFF_${branchId}`))
         || (branchId && recs.includes(`ALL_ADMIN_${branchId}`))
       );
+      const isHighAdminBranchReceiver = session?.adminRole === 'HIGH_ADMIN' && (
+        branchId && (
+          recs.includes(`ALL_ADMIN_${branchId}`)
+          || recs.includes(`ALL_STAFF_${branchId}`)
+        )
+      );
       if (recs.includes('ALL_ADMIN') && !isAdminRole) return false;
       if (recs.includes('ALL_TEACHER') && role !== 'teacher') return false;
       if (recs.includes('ALL_STUDENT') && role !== 'student') return false;
@@ -1243,6 +1249,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                       (isStaffAccount && recs.includes('staff')) ||
                       (isAdminRole && recs.includes('ALL_ADMIN')) ||
                       isSupportReceiver ||
+                      isHighAdminBranchReceiver ||
                       (role === 'teacher' && recs.includes('ALL_TEACHER')) ||
                       (role === 'student' && recs.includes('ALL_STUDENT')) ||
                       isStaffBranchReceiver ||
