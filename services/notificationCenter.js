@@ -234,19 +234,28 @@ async function markRead(user, { notificationId, markAll } = {}) {
     err.status = 400;
     throw err;
   }
-  await Notification.findByIdAndUpdate(notificationId, { $addToSet: { read_by: userId } });
+  const updated = await Notification.findOneAndUpdate(
+    { _id: notificationId, $or: match },
+    { $addToSet: { read_by: userId } },
+    { returnDocument: 'after' },
+  );
+  if (!updated) {
+    const err = new Error('Khong tim thay thong bao');
+    err.status = 404;
+    throw err;
+  }
   return { marked: notificationId };
 }
 
 async function dismiss(user, notificationId) {
-  const { userId } = buildReceiverMatch(user);
+  const { userId, match } = buildReceiverMatch(user);
   if (!notificationId) {
     const err = new Error('Thieu notificationId');
     err.status = 400;
     throw err;
   }
-  const doc = await Notification.findByIdAndUpdate(
-    notificationId,
+  const doc = await Notification.findOneAndUpdate(
+    { _id: notificationId, $or: match },
     { $addToSet: { dismissed_by: userId, read_by: userId } },
     { returnDocument: 'after' },
   );

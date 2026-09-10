@@ -37,6 +37,7 @@ import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOver
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
 import { setLoginOverlay } from '../utils/loginOverlayGate';
+import { hasPermission, PERMISSIONS } from '../constants/permissions';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -234,6 +235,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const { students, teachers, schedules, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead, getConversations } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const myId = String(session?.id || session?._id || '');
+  const isSupportAccount = session?.adminRole === 'SUPPORT' || session?.role === 'support';
+  const isStaffAccount = session?.role === 'staff'
+    || session?.adminRole === 'STAFF'
+    || isSupportAccount;
+  const canManageStudentAdminPopups = hasPermission(session, PERMISSIONS.MANAGE_STUDENTS);
+  const canManageAttendanceAdminPopups = canManageStudentAdminPopups
+    || hasPermission(session, PERMISSIONS.MANAGE_SCHEDULE);
+  const canViewEvaluationNotifications = hasPermission(session, PERMISSIONS.VIEW_EVALUATIONS);
   useAttendanceConfirmFlush({
     enabled: role === 'teacher',
     teacherId: myId,
@@ -790,7 +799,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   // Admin: tranh chấp → chỉ toast + badge chuông (không auto-mở modal, tránh chen thao tác)
   useEffect(() => {
-    if (!socket || (role !== 'admin' && role !== 'staff')) return undefined;
+    if (!socket || (role !== 'admin' && role !== 'staff') || !canManageAttendanceAdminPopups) return undefined;
     const onDispute = (payload) => {
       if (!payload?.scheduleId) return;
       toast.info(
@@ -799,7 +808,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     };
     socket.on('attendance:disputed', onDispute);
     return () => { socket.off('attendance:disputed', onDispute); };
-  }, [socket, role, toast]);
+  }, [socket, role, toast, canManageAttendanceAdminPopups]);
 
   const handleStudentAttendanceDecision = React.useCallback(async (decision) => {
     const sid = attendanceConfirm?.scheduleId;
@@ -1214,22 +1223,35 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     if (Array.isArray(n.receivers) && n.receivers.length > 0) {
       const recs = n.receivers.map((r) => String(r));
       const myIdStr = myId != null ? String(myId) : '';
-      const isAdminRole = role === 'admin' || role === 'staff';
+      const branchId = String(session?.branchId || '').trim();
+      const isAdminRole = role === 'admin' && !isStaffAccount;
+      const isSupportReceiver = isSupportAccount && (
+        recs.includes('ALL_SUPPORT')
+        || (branchId && recs.includes(`ALL_SUPPORT_${branchId}`))
+      );
+      const isStaffBranchReceiver = isStaffAccount && !isSupportAccount && (
+        recs.includes('ALL_STAFF')
+        || (branchId && recs.includes(`ALL_STAFF_${branchId}`))
+        || (branchId && recs.includes(`ALL_ADMIN_${branchId}`))
+      );
       if (recs.includes('ALL_ADMIN') && !isAdminRole) return false;
       if (recs.includes('ALL_TEACHER') && role !== 'teacher') return false;
       if (recs.includes('ALL_STUDENT') && role !== 'student') return false;
 
       const isForMe = (myIdStr && recs.includes(myIdStr)) ||
                       (role && recs.includes(String(role))) ||
+                      (isStaffAccount && recs.includes('staff')) ||
                       (isAdminRole && recs.includes('ALL_ADMIN')) ||
+                      isSupportReceiver ||
                       (role === 'teacher' && recs.includes('ALL_TEACHER')) ||
                       (role === 'student' && recs.includes('ALL_STUDENT')) ||
+                      isStaffBranchReceiver ||
                       recs.includes('GLOBAL') ||
                       recs.includes('ALL');
       if (!isForMe) return false;
     }
     return ((myId && String(n.userId) === String(myId)) || !n.userId) && 
-           (n.role === role || !n.role);
+           (n.role === role || (isStaffAccount && n.role === 'staff') || !n.role);
   }).sort((a, b) => new Date(b.time || Date.now()) - new Date(a.time || Date.now()));
 
 
@@ -1499,7 +1521,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           || !!starBonusCelebration
           || (role === 'student' && !!attendanceConfirm)
           || (role === 'student' && assignedTeacherModal.open)
-          || ((role === 'admin' || role === 'staff') && !!attendanceDispute)
+          || (canManageAttendanceAdminPopups && !!attendanceDispute)
           || (role === 'teacher' && !!teacherAttendanceConfirm)
           || (role === 'teacher' && !!studentNotePopup)
           || (session?.isFirstLogin === true && role !== 'teacher')
@@ -1543,7 +1565,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         onClose={() => setAssignedTeacherModal({ open: false, loading: false, teacher: null })}
       />
       <AdminAttendanceDisputeModal
-        open={(role === 'admin' || role === 'staff') && !!attendanceDispute}
+        open={canManageAttendanceAdminPopups && !!attendanceDispute}
         payload={attendanceDispute}
         busy={attendanceDisputeBusy}
         onApprove={() => handleAdminDisputeDecision('approve')}
@@ -1626,7 +1648,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               const p = n.path || `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`;
                               navigate(p.includes('#') ? p : `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`);
                             }
-                          } else if (n.payload?.kind === 'attendance_dispute' && (role === 'admin' || role === 'staff')) {
+                          } else if (n.payload?.kind === 'attendance_dispute' && (role === 'admin' || role === 'staff') && canManageAttendanceAdminPopups) {
                             setShowNotif(false);
                             (async () => {
                               const fallback = {
@@ -1815,11 +1837,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                             navigate('/teacher#schedule');
                           } else if (
                             (role === 'admin' || role === 'staff')
+                            && canViewEvaluationNotifications
                             && (n.payload?.kind === 'admin_feedback'
                               || String(n.type || '').toUpperCase() === 'EVALUATION')
                           ) {
                             navigate('/admin#evaluations');
-                          } else if ((role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF') && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
+                          } else if (
+                            (
+                              (canManageStudentAdminPopups && n.title?.includes('Học viên mới đăng ký'))
+                              || (canManageAttendanceAdminPopups && n.title?.includes('Điểm danh buổi học'))
+                            )
+                          ) {
 
                             const openPopup = (studentData) => {
                               setAdminQuickPopup({
@@ -1852,7 +1880,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               else if (n.path) navigate(n.path);
                             }
                           } else if (
-                            (role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF')
+                            canManageStudentAdminPopups
                             && n.payload?.kind === 'student_device_alert'
                             && n.payload?.studentId
                           ) {
@@ -1883,7 +1911,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
                             if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && targetPath !== '/admin/news' && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                               targetPath = '/admin#' + targetPath.replace('/admin/', '');
-                            } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                            } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/notifications', '/student/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                               targetPath = '/student#' + targetPath.replace('/student/', '');
                             } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                               targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
