@@ -1142,6 +1142,7 @@ export default function AdminStudentsTab() {
                 return s.teacherId ? String(s.teacherId) : '';
               })();
               const regDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString('vi-VN') : '';
+              const isOnline = isUserOnline(onlineUsers, s);
               return (
                 <tr
                   key={s.id}
