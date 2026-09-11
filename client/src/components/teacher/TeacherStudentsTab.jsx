@@ -1,4 +1,5 @@
 import React from 'react';
+import { isUserOnline } from '../../utils/presence';
 import { Search, MessageSquare, Users, GraduationCap } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { matchesPersonSearch } from '../../utils/personSearch';
@@ -96,18 +97,18 @@ export default function TeacherStudentsTab({
                         || ['cancelled', 'refunded'].includes(String(b.enrollmentStatus || '').toLowerCase())
                         || String(b.status || '') === 'Thôi học';
                       if (aDropped !== bDropped) return aDropped ? 1 : -1;
-                      const aOn = !aDropped && onlineUsers.some((u) => String(u.userId) === aId) ? 1 : 0;
-                      const bOn = !bDropped && onlineUsers.some((u) => String(u.userId) === bId) ? 1 : 0;
+                      const aOn = !aDropped && isUserOnline(onlineUsers, a) ? 1 : 0;
+                      const bOn = !bDropped && isUserOnline(onlineUsers, b) ? 1 : 0;
                       if (aOn !== bOn) return bOn - aOn;
-                      const aSeen = Number(lastSeenUsers?.[aId] || 0);
-                      const bSeen = Number(lastSeenUsers?.[bId] || 0);
+                      const aSeen = new Date(lastSeenUsers?.[aId] || 0).getTime() || 0;
+                      const bSeen = new Date(lastSeenUsers?.[bId] || 0).getTime() || 0;
                       if (aSeen !== bSeen) return bSeen - aSeen;
                       return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
                     })
                     .map(s => {
                       const sId = s._id || s.id;
                       const rowKey = s._enrollmentKey || String(sId);
-                      const isOnline = onlineUsers.some(u => String(u.userId) === String(sId));
+                      const isOnline = isUserOnline(onlineUsers, s);
                       const isSelected = String(selectedEnrollmentKey) === String(rowKey);
                       const isDropped = Boolean(s.interactionLocked)
                         || ['cancelled', 'refunded'].includes(String(s.enrollmentStatus || '').toLowerCase())

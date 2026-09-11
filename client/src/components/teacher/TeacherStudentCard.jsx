@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import api, { buildMediaDownloadUrl, resolveMediaUrl, messagesAPI } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
+import { isUserOnline } from '../../utils/presence';
 import { useModal } from '../../utils/Modal.jsx';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
@@ -177,7 +178,7 @@ export const StudentCard = ({
   const [showQuickSchedule, setShowQuickSchedule] = useState(false);
   const confirmKey = attendanceConfirmKey(student);
   const studentPresenceId = String(student._id || student.id || '');
-  const isStudentOnline = onlineUsers.some((u) => String(u.userId) === studentPresenceId);
+  const isStudentOnline = isUserOnline(onlineUsers, student);
   const lastSeenAt = lastSeenUsers[studentPresenceId];
   const lastSeenLabel = (() => {
     if (!lastSeenAt) return 'Chưa online';

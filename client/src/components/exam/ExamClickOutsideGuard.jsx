@@ -51,12 +51,17 @@ export default function ExamClickOutsideGuard({
 
   useEffect(() => {
     if (!enabled) {
+      stopExamWarningSound();
       setOpen(false);
       setStrikeCount(0);
       strikesRef.current = 0;
       maxedRef.current = false;
     }
   }, [enabled]);
+
+  useEffect(() => () => {
+    stopExamWarningSound();
+  }, []);
 
   const trigger = useCallback((source = 'click') => {
     if (!enabled || openRef.current || maxedRef.current) return;
@@ -74,6 +79,7 @@ export default function ExamClickOutsideGuard({
     const cap = Number.isFinite(maxStrikes) && maxStrikes > 0 ? maxStrikes : 2;
     if (n >= cap && typeof onMaxStrikesRef.current === 'function') {
       maxedRef.current = true;
+      stopExamWarningSound();
       setOpen(false);
       onMaxStrikesRef.current();
       return;

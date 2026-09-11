@@ -16,6 +16,7 @@ import ScheduleMessagePreviewModal, {
 } from './ScheduleMessagePreviewModal';
 import { useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
+import { getPresenceUserId } from '../utils/presence';
 import { useData } from '../context/DataContext';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
@@ -502,7 +503,7 @@ function ChatWindow({
     if (!peerId) return Boolean(tab.user.online);
     // Presence is the live source of truth; a stale false value on the tab
     // must not override a subsequent users:online event.
-    return Boolean(tab.user.online) || onlineUsers.some(u => String(u.userId || u.id) === peerId);
+    return Boolean(tab.user.online) || onlineUsers.some(u => getPresenceUserId(u) === peerId);
   }, [onlineUsers, tab.user.id, tab.user.online]);
 
   const displayRoleLabel = useMemo(() => {
