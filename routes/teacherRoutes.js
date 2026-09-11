@@ -24,6 +24,21 @@ const { resolveDefaultAccountPassword } = require('../utils/tempPassword');
 function specialtyFromSubjectIds(ids) {
   return (Array.isArray(ids) ? ids : []).map((id) => EXAM_SUBJECT_LABELS[id] || id).join(', ');
 }
+
+function paymentSessionDetails(sessions = [], totalAmount = 0, starBonusAmount = 0) {
+  const list = Array.isArray(sessions) ? sessions : [];
+  const teachingAmount = Math.max(0, Number(totalAmount) - Number(starBonusAmount || 0));
+  const perSession = list.length ? Math.floor(teachingAmount / list.length) : 0;
+  const remainder = list.length ? teachingAmount - (perSession * list.length) : 0;
+  return list.map((session, index) => ({
+    sessionId: session._id,
+    studentId: session.studentId || null,
+    studentName: session.studentName || 'Học viên',
+    date: session.date || null,
+    courseName: session.courseName || session.course || session.subject || '',
+    allocatedAmount: perSession + (index === 0 ? remainder : 0),
+  }));
+}
 const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
@@ -1833,6 +1848,8 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
         bankName: teacher.bankAccount?.bankName || '',
         bankAccount: teacher.bankAccount?.accountNumber || '',
         note: note || '',
+        paymentSessionIds: sessionIds,
+        paymentSessionDetails: paymentSessionDetails(claimedSessions, amount, starBonusAmount),
         starBonusAmount,
         starBonusMonths: starBonusMonthKeys,
         ...(idempotencyKey ? { idempotencyKey } : {}),
@@ -1996,7 +2013,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
       teacherId: req.params.id,
       status: 'completed',
       is_paid_to_teacher: { $ne: true }
-    }).select('_id').lean();
+    }).select('_id studentId studentName date courseName course subject').lean();
 
     const sessionIds = pendingSessions.map((s) => s._id);
     if (sessionIds.length === 0) {
@@ -2034,7 +2051,9 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
         confirmedBy: req.user.name || 'Admin',
         confirmedAt: now,
         bankName: teacher.bankAccount?.bankName || '',
-        bankAccount: teacher.bankAccount?.accountNumber || ''
+        bankAccount: teacher.bankAccount?.accountNumber || '',
+        paymentSessionIds: sessionIds,
+        paymentSessionDetails: paymentSessionDetails(pendingSessions, totalAmount),
       });
     } catch (createErr) {
       try {

@@ -56,6 +56,17 @@ const transactionSchema = new mongoose.Schema({
   // Ghi chú
   note: { type: String, default: '' },
 
+  // Snapshot các buổi/học viên tại thời điểm thanh toán để lịch sử không đổi
+  paymentSessionIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Schedule' }],
+  paymentSessionDetails: [{
+    sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Schedule' },
+    studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
+    studentName: { type: String, default: '' },
+    date: { type: Date, default: null },
+    courseName: { type: String, default: '' },
+    allocatedAmount: { type: Number, default: 0, min: 0 },
+  }],
+
   /** Thưởng sao cộng kèm (VNĐ) — tách khỏi lương cứng × buổi */
   starBonusAmount: { type: Number, default: 0, min: 0 },
   /** Các tháng YYYY-MM đã chi thưởng trong phiếu này */

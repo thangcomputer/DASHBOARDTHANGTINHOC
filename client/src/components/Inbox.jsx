@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
   User, Circle, Image, Paperclip, Smile, Download,
-  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff
+  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -2695,13 +2695,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             <span title="Chưa gửi được (Kết nối yếu)">
                               <AlertCircle size={10} className="text-red-500 animate-pulse" />
                             </span>
-                          ) : isMine && !msg.isRecalled && (
-                            <span title={msg.isRead ? "Đã xem" : "Đã nhận"}>
+                          ) : isMine && !msg.isRecalled && !isAiSupportConversationId(activeConv?.id) && (
+                            <span
+                              className={`inline-flex items-center gap-0.5 font-semibold ${
+                                msg.isRead ? 'text-emerald-600' : 'text-slate-400'
+                              }`}
+                              title={msg.isRead ? 'Đã đọc' : 'Chưa đọc'}
+                            >
                               {msg.isRead ? (
-                                <CheckCheck size={12} className="text-blue-500" />
+                                <CheckCircle2 size={11} aria-hidden="true" />
                               ) : (
-                                <CheckCircle2 size={10} className="text-gray-300" />
+                                <CheckCircle2 size={11} aria-hidden="true" />
                               )}
+                              <span>{msg.isRead ? 'Đã đọc' : 'Chưa đọc'}</span>
                             </span>
                           )}
                         </div>
@@ -3279,6 +3285,3 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 };
 
 export default Inbox;
-
-
-
