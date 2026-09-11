@@ -1666,15 +1666,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }).slice(0, 8);
   }, [search, conversations, isSupportAgent, handoffUserIds]);
 
-  // Conversation có hoạt động/tin nhắn luôn lên trước. Các conversation chưa
-  // có hoạt động giữ nguyên thứ tự danh bạ (sort ổn định theo index ban đầu).
+  // Ưu tiên người đang online; trong mỗi nhóm, tin nhắn mới nhất lên trước.
+  // Các conversation chưa có hoạt động giữ nguyên thứ tự danh bạ.
   const sortedConvs = filteredConvs
     .map((conversation, index) => ({
       conversation,
       index,
+      online: !conversation.isGroup && isUserOnline(conversation.user?.id) ? 1 : 0,
       activityTime: toValidActivityDate(conversation.lastTime)?.getTime() || 0,
     }))
     .sort((a, b) => {
+      if (a.online !== b.online) return b.online - a.online;
       const aHasActivity = a.activityTime > 0 ? 1 : 0;
       const bHasActivity = b.activityTime > 0 ? 1 : 0;
       if (aHasActivity !== bHasActivity) return bHasActivity - aHasActivity;
@@ -3277,7 +3279,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 };
 
 export default Inbox;
-
 
 
 

@@ -27,7 +27,7 @@ import {
 } from '../utils/proctor/cameraHealth.js';
 import { createRiskEngine, createConfirmTracker } from '../utils/proctor/riskEngine.js';
 import { createProctorEventLog, resolveProctorUiStatus } from '../utils/proctor/eventLog.js';
-import { playExamWarningSound, unlockAudio } from '../utils/sound';
+import { playExamWarningSound, stopExamWarningSound, unlockAudio } from '../utils/sound';
 import { proctorAPI, resolveMediaUrl } from '../services/api.js';
 
 function readStoredFaceViolations(persistKey, initialCount = 0) {
@@ -138,6 +138,7 @@ const ExamMonitor = forwardRef(({
 
   const terminateExam = useCallback((reason) => {
     if (isTerminated) return;
+    stopExamWarningSound();
     setIsTerminated(true);
     setWarningOverlay({ type: 'terminated', message: 'KẾT THÚC BÀI THI!', sub: reason, persistent: true });
     stopStream(streamRef.current);
@@ -584,11 +585,18 @@ const ExamMonitor = forwardRef(({
     setTabWarnings(0);
 
     const handleVisibilityChange = () => {
-      if (!document.hidden) return;
+      if (!document.hidden) {
+        // A hidden-tab timer may be throttled; always clear stale audio on return.
+        stopExamWarningSound();
+        return;
+      }
       tabWarningsRef.current += 1;
       setTabWarnings(tabWarningsRef.current);
       const w = tabWarningsRef.current;
       playWarningBeep();
+      // Uploaded warning files can be longer than the warning itself. Do not let
+      // them continue playing after the student leaves the exam tab.
+      window.setTimeout(stopExamWarningSound, 1200);
       riskRef.current.add('tab_blur');
       setRiskScore(riskRef.current.getScore());
       logEvent('tab_blur', 'warn', { count: w });
@@ -633,8 +641,14 @@ const ExamMonitor = forwardRef(({
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
+      stopExamWarningSound();
     };
   }, [isActive, isTerminated, enableTabGuard, maxTabWarnings, terminateExam, playWarningBeep, logEvent, softWarn]);
+
+  const dismissWarning = useCallback(() => {
+    stopExamWarningSound();
+    setWarningOverlay(null);
+  }, []);
 
   if (!isActive && !warningOverlay) return null;
 
@@ -661,7 +675,7 @@ const ExamMonitor = forwardRef(({
             </div>
           )}
           {!warningOverlay.persistent ? (
-            <button type="button" onClick={() => setWarningOverlay(null)} className="w-full py-5 bg-gray-900 text-white font-black rounded-3xl hover:bg-black transition-all text-lg">
+            <button type="button" onClick={dismissWarning} className="w-full py-5 bg-gray-900 text-white font-black rounded-3xl hover:bg-black transition-all text-lg">
               TÔI ĐÃ HIỂU, TIẾP TỤC THI
             </button>
           ) : (

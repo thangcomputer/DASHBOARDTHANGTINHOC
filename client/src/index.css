@@ -795,16 +795,16 @@
   .cms-fm-head__name {
     position: absolute;
     z-index: 2;
-    top: -18px;
+    top: -14px;
     left: 50%;
-    width: 92px;
+    width: 32px;
     transform: translateX(-50%);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: center;
     pointer-events: none;
-    @apply rounded-md bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-bold leading-3 text-white shadow-sm;
+    @apply rounded-md bg-slate-900/90 px-1 py-0.5 text-[8px] font-bold leading-3 text-white shadow-sm;
   }
   .cms-fm-head-wrap:hover .cms-fm-head__close {
     opacity: 1;

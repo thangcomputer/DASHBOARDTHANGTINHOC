@@ -111,8 +111,13 @@ export default function ExamClickOutsideGuard({
     };
 
     const onVisibility = () => {
-      if (!watchVisibility || !document.hidden) return;
+      if (!watchVisibility) return;
+      if (!document.hidden) {
+        stopExamWarningSound();
+        return;
+      }
       trigger('visibility');
+      window.setTimeout(stopExamWarningSound, 1200);
     };
 
     document.addEventListener('pointerdown', onPointerDown, true);

@@ -425,13 +425,22 @@ function MessageBubble({
   );
 }
 
+function getNameInitials(name) {
+  const parts = String(name || 'Người dùng')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length <= 2) return parts.map((part) => part[0]).join('').toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
 function ChatHead({ tab, unread = 0, onOpen, onClose }) {
   const isGroup = Boolean(tab.user?.isGroup);
   return (
     <div className="cms-fm-head-wrap">
       {!isGroup && (
         <span className="cms-fm-head__name" title={tab.user.name || 'Người dùng'}>
-          {tab.user.name || 'Người dùng'}
+          {getNameInitials(tab.user.name)}
         </span>
       )}
       <button
@@ -1423,20 +1432,43 @@ export default function FloatingMessenger({ session, role }) {
       staffs: effectiveStaffs,
       supportAgentsOnly: canUseAiSupport,
       });
-      if (!canUseAiSupport) return base;
+      const withAi = canUseAiSupport
+        ? {
+            ...base,
+            groups: [
+              {
+                key: 'ai',
+                label: 'Trợ lý AI',
+                people: [{ ...AI_SUPPORT_PEER, online: true, displayRole: 'AI' }],
+              },
+              ...base.groups,
+            ],
+          }
+        : base;
+      const activityByPeer = new Map(
+        conversations
+          .filter((conversation) => !conversation?.isGroup && conversation?.user?.id != null)
+          .map((conversation) => [
+            String(conversation.user.id),
+            new Date(conversation.lastTime || 0).getTime() || 0,
+          ]),
+      );
       return {
-        ...base,
-        groups: [
-          {
-            key: 'ai',
-            label: 'Trợ lý AI',
-            people: [{ ...AI_SUPPORT_PEER, online: true, displayRole: 'AI' }],
-          },
-          ...base.groups,
-        ],
+        ...withAi,
+        groups: withAi.groups.map((group) => ({
+          ...group,
+          people: [...group.people].sort((a, b) => {
+            const onlineDiff = Number(b.online) - Number(a.online);
+            if (onlineDiff !== 0) return onlineDiff;
+            const activityDiff = (activityByPeer.get(String(b.id)) || 0)
+              - (activityByPeer.get(String(a.id)) || 0);
+            if (activityDiff !== 0) return activityDiff;
+            return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+          }),
+        })),
       };
     },
-    [session, onlineUsers, meId, effectiveStaffs, canUseAiSupport],
+    [session, onlineUsers, meId, effectiveStaffs, canUseAiSupport, conversations],
   );
 
   /** HV/GV dùng AI-first: không mở danh bạ. Nhân viên nhắn tới thì hiện chat-head. */
