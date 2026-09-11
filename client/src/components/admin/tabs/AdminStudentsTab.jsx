@@ -20,6 +20,8 @@ import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 import { matchesPersonSearch } from '../../../utils/personSearch';
 import api, { apiFetch } from '../../../services/api';
+import { useSocket } from '../../../context/SocketContext';
+import { isUserOnline } from '../../../utils/presence';
 
 /** Tổng tiền đã hoàn từ khóa cancelled (chỉ hiển thị, không sửa). */
 function getStudentRefundedTotal(student) {
@@ -433,6 +435,7 @@ function ModeBranchBadges({ s, safeBranches }) {
 }
 
 export default function AdminStudentsTab() {
+  const { onlineUsers = [] } = useSocket() || {};
   const [submittingAction, setSubmittingAction] = useState(null);
   const {
     search,
@@ -949,6 +952,7 @@ export default function AdminStudentsTab() {
             return s.teacherId ? String(s.teacherId) : '';
           })();
           const regDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString('vi-VN') : '';
+          const isOnline = isUserOnline(onlineUsers, s);
           return (
             <article
               key={s.id}
@@ -1157,6 +1161,10 @@ export default function AdminStudentsTab() {
                       />
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900 text-base leading-snug truncate max-w-[200px]">{s.name}</p>
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                          {isOnline ? 'Đang online' : 'Ngoại tuyến'}
+                        </span>
                         <DeviceAccountBadges student={s} />
                         <p className="text-xs text-slate-500 mt-0.5">{regDate}{s.phone ? ` · ${s.phone}` : ''}</p>
                       </div>

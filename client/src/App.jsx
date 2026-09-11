@@ -151,7 +151,7 @@ const Guard = ({ allowedRoles, session, children }) => {
   }
   localStorage.removeItem('alerted_ban');
 
-  // GV pending/locked: chỉ được /teacher/test (và feed nếu mở từ menu)
+  // GV pending/locked: chỉ được truy cập phòng kiểm tra /teacher/test.
   if (isTeacherExamOnly) {
     const p = location.pathname || '';
     const allowed = p === '/teacher/test' || p.startsWith('/teacher/test/');

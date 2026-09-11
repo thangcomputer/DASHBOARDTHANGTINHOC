@@ -379,6 +379,13 @@ router.post('/:id/exam-attempt/forfeit', authMiddleware, ...teacherRouteGuard('s
 // Strangler Facade: ENABLE_CQRS_TEACHER=true → CQRS (transaction + outbox)
 router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')], async (req, res, next) => {
   try {
+    const requestedBranchId = req.userBranchId || req.body?.branchId;
+    if (!requestedBranchId || String(requestedBranchId).trim() === '' || String(requestedBranchId).trim() === 'all') {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng chọn chi nhánh cho giảng viên',
+      });
+    }
     if (process.env.ENABLE_CQRS_TEACHER === 'true' || process.env.ENABLE_CQRS_TEACHER === '1') {
       require('../modules/teacher/commands');
       const CQRSTeacherController = require('../modules/teacher/controllers/CQRSTeacherController');
@@ -411,7 +418,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
 
     // ⭐ Xác định branchId:
     //   - STAFF → bắt buộc dùng branchId của chính họ (không được chọn chi nhánh khác)
-    //   - SUPER_ADMIN → dùng branchId từ request body (dropdown chọn), hoặc null
+    //   - SUPER_ADMIN / HIGH_ADMIN → dùng branchId từ request body (dropdown chọn)
     let finalBranchId   = null;
     let finalBranchCode = '';
     if (req.userBranchId) {
@@ -419,9 +426,15 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       finalBranchId   = req.userBranchId;
       finalBranchCode = req.userBranchCode || '';
     } else if (reqBranchId) {
-      // SUPER_ADMIN chọn chi nhánh
+      // Admin cấp cao chọn chi nhánh
       finalBranchId   = reqBranchId;
       finalBranchCode = reqBranchCode || '';
+    }
+    if (!finalBranchId || String(finalBranchId).trim() === '' || String(finalBranchId).trim() === 'all') {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng chọn chi nhánh cho giảng viên',
+      });
     }
 
     // Auto-Approve Logic: Nếu Admin gán chi nhánh ngay từ lúc tạo, tự động duyệt
@@ -515,19 +528,20 @@ router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], as
 
     const { status, search } = req.query;
     const filter = {};
+    const andConditions = [];
     const bf = req.branchFilter || {};
     if (bf.branchId?.$in) {
       // Tenant scope: vẫn hiển thị GV chưa phân chi nhánh
-      filter.$or = [
+      andConditions.push({ $or: [
         { branchId: { $in: bf.branchId.$in } },
         { branchId: null },
-      ];
+      ] });
     } else if (bf.branchId != null && bf.branchId !== '') {
       // Lọc 1 chi nhánh: gồm GV thuộc chi nhánh đó + GV chưa gán chi nhánh (để vẫn phân công được)
-      filter.$or = [
+      andConditions.push({ $or: [
         { branchId: bf.branchId },
         { branchId: null },
-      ];
+      ] });
     } else {
       Object.assign(filter, bf);
     }
@@ -535,13 +549,14 @@ router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], as
     if (status) filter.status = status;
     if (search) {
       const s = sanitizeRegex(search);
-      filter.$or = [
+      andConditions.push({ $or: [
         { name:      { $regex: s, $options: 'i' } },
         { phone:     { $regex: s, $options: 'i' } },
         { specialty: { $regex: s, $options: 'i' } },
         { teacherCode: { $regex: s, $options: 'i' } },
-      ];
+      ] });
     }
+    if (andConditions.length) filter.$and = andConditions;
 
     const Evaluation = require('../models/Evaluation');
     const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);

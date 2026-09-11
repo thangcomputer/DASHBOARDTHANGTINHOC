@@ -16,6 +16,7 @@ import ScheduleMessagePreviewModal, {
 } from './ScheduleMessagePreviewModal';
 import { useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
+import { getPresenceUserId } from '../utils/presence';
 import { useData } from '../context/DataContext';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
@@ -165,6 +166,29 @@ function isOutgoingMessengerMessage(m, meId) {
   const me = String(meId || '');
   if (!sid || !me || isAssistantSender(m)) return false;
   return sid === me;
+}
+
+function AvatarImage({ user, className = '', alt = '' }) {
+  const [src, setSrc] = useState(() => resolveAvatarUrl(user));
+  const fallbackSrc = useMemo(
+    () => resolveAvatarUrl({ ...user, avatar: '' }),
+    [user],
+  );
+
+  useEffect(() => {
+    setSrc(resolveAvatarUrl(user));
+  }, [user]);
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => {
+        if (src !== fallbackSrc) setSrc(fallbackSrc);
+      }}
+    />
+  );
 }
 
 function ReactionPicker({ msgId, isMine, onReact, myReactions = [] }) {
@@ -401,10 +425,26 @@ function MessageBubble({
   );
 }
 
+function formatChatHeadName(name) {
+  const parts = String(name || 'Người dùng')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length <= 1) return parts[0] || 'Người dùng';
+  const lastName = parts[parts.length - 1];
+  const displayLastName = `${lastName.charAt(0).toLocaleUpperCase('vi-VN')}${lastName.slice(1).toLocaleLowerCase('vi-VN')}`;
+  return `${parts.slice(0, -1).map((part) => `${part.charAt(0).toLocaleUpperCase('vi-VN')}.`).join(' ')} ${displayLastName}`;
+}
+
 function ChatHead({ tab, unread = 0, onOpen, onClose }) {
   const isGroup = Boolean(tab.user?.isGroup);
   return (
     <div className="cms-fm-head-wrap">
+      {!isGroup && (
+        <span className="cms-fm-head__name" title={tab.user.name || 'Người dùng'}>
+          {formatChatHeadName(tab.user.name)}
+        </span>
+      )}
       <button
         type="button"
         onClick={() => onOpen(tab.id)}
@@ -417,9 +457,8 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
             <Users size={22} strokeWidth={2.4} />
           </span>
         ) : (
-          <img
-            src={resolveAvatarUrl(tab.user)}
-            alt=""
+          <AvatarImage
+            user={tab.user}
             className={`cms-fm-head__avatar ${isRealAvatar(tab.user?.avatar) ? 'cms-fm-avatar--photo' : ''}`}
           />
         )}
@@ -480,7 +519,7 @@ function ChatWindow({
     if (!peerId) return Boolean(tab.user.online);
     // Presence is the live source of truth; a stale false value on the tab
     // must not override a subsequent users:online event.
-    return Boolean(tab.user.online) || onlineUsers.some(u => String(u.userId || u.id) === peerId);
+    return Boolean(tab.user.online) || onlineUsers.some(u => getPresenceUserId(u) === peerId);
   }, [onlineUsers, tab.user.id, tab.user.online]);
 
   const displayRoleLabel = useMemo(() => {
@@ -846,9 +885,8 @@ function ChatWindow({
                 <Users size={19} strokeWidth={2.4} />
               </span>
             ) : (
-              <img
-                src={resolveAvatarUrl({ ...tab.user, role: tab.user.role === 'admin' && !isSuper ? 'staff' : tab.user.role, name: displayName })}
-                alt=""
+              <AvatarImage
+                user={{ ...tab.user, role: tab.user.role === 'admin' && !isSuper ? 'staff' : tab.user.role, name: displayName }}
                 className={`w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 ${isRealAvatar(tab.user?.avatar) ? 'cms-fm-avatar--photo' : ''}`}
               />
             )}
@@ -1369,6 +1407,24 @@ export default function FloatingMessenger({ session, role }) {
 
   const effectiveStaffs = fmContacts;
 
+  const getFreshTabUser = useCallback((tab) => {
+    if (!tab?.user || tab.user.isGroup) return tab?.user;
+    const peerId = String(tab.user.id || '');
+    const contact = fmContacts.find((item) => String(item?.id || '') === peerId);
+    if (!contact) return tab.user;
+    return {
+      ...tab.user,
+      name: contact.name || tab.user.name,
+      avatar: contact.avatar || tab.user.avatar || '',
+      gender: contact.gender || tab.user.gender || '',
+      adminRole: contact.adminRole || tab.user.adminRole || null,
+    };
+  }, [fmContacts]);
+
+  const getFreshTab = useCallback((tab) => (
+    tab ? { ...tab, user: getFreshTabUser(tab) } : tab
+  ), [getFreshTabUser]);
+
   const directory = useMemo(
     () => {
       const base = buildSupportDirectory({
@@ -1378,20 +1434,43 @@ export default function FloatingMessenger({ session, role }) {
       staffs: effectiveStaffs,
       supportAgentsOnly: canUseAiSupport,
       });
-      if (!canUseAiSupport) return base;
+      const withAi = canUseAiSupport
+        ? {
+            ...base,
+            groups: [
+              {
+                key: 'ai',
+                label: 'Trợ lý AI',
+                people: [{ ...AI_SUPPORT_PEER, online: true, displayRole: 'AI' }],
+              },
+              ...base.groups,
+            ],
+          }
+        : base;
+      const activityByPeer = new Map(
+        conversations
+          .filter((conversation) => !conversation?.isGroup && conversation?.user?.id != null)
+          .map((conversation) => [
+            String(conversation.user.id),
+            new Date(conversation.lastTime || 0).getTime() || 0,
+          ]),
+      );
       return {
-        ...base,
-        groups: [
-          {
-            key: 'ai',
-            label: 'Trợ lý AI',
-            people: [{ ...AI_SUPPORT_PEER, online: true, displayRole: 'AI' }],
-          },
-          ...base.groups,
-        ],
+        ...withAi,
+        groups: withAi.groups.map((group) => ({
+          ...group,
+          people: [...group.people].sort((a, b) => {
+            const onlineDiff = Number(b.online) - Number(a.online);
+            if (onlineDiff !== 0) return onlineDiff;
+            const activityDiff = (activityByPeer.get(String(b.id)) || 0)
+              - (activityByPeer.get(String(a.id)) || 0);
+            if (activityDiff !== 0) return activityDiff;
+            return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+          }),
+        })),
       };
     },
-    [session, onlineUsers, meId, effectiveStaffs, canUseAiSupport],
+    [session, onlineUsers, meId, effectiveStaffs, canUseAiSupport, conversations],
   );
 
   /** HV/GV dùng AI-first: không mở danh bạ. Nhân viên nhắn tới thì hiện chat-head. */
@@ -1709,6 +1788,12 @@ export default function FloatingMessenger({ session, role }) {
       const group = isGroupMessage
         ? (groups || []).find((item) => String(item?._id || item?.id || '') === groupId)
         : null;
+      const knownPeer = !isGroupMessage
+        ? conversations.find((conversation) => (
+          !conversation.isGroup
+          && String(conversation.user?.id || '') === String(data.senderId)
+        ))
+        : null;
       const peer = isGroupMessage
         ? {
           id: groupId,
@@ -1724,10 +1809,11 @@ export default function FloatingMessenger({ session, role }) {
         ? { ...AI_SUPPORT_PEER }
         : {
           id: String(data.senderId),
-          name: data.sender?.displayName || data.senderName || 'Người dùng',
-          role: normalizeChatRole(data.senderRole || 'student'),
-          adminRole: data.sender?.adminRole || null,
-          avatar: data.sender?.avatar || data.senderAvatar || '',
+          name: knownPeer?.user?.name || data.sender?.displayName || data.senderName || 'Người dùng',
+          role: normalizeChatRole(knownPeer?.user?.role || data.senderRole || 'student'),
+          adminRole: knownPeer?.user?.adminRole || data.sender?.adminRole || null,
+          avatar: knownPeer?.user?.avatar || data.sender?.avatar || data.senderAvatar || '',
+          gender: knownPeer?.user?.gender || data.sender?.gender || '',
         };
 
       if (String(data.senderId) === 'ai_support' && data.conversationId) {
@@ -1771,7 +1857,7 @@ export default function FloatingMessenger({ session, role }) {
       ));
       openChat(peer, { expand: alreadyThis });
     });
-  }, [onMessageReceive, meId, meRole, openChat, closeChat, setSupportOpen, groups]);
+  }, [onMessageReceive, meId, meRole, openChat, closeChat, setSupportOpen, groups, conversations]);
 
   useEffect(() => {
     if (!meId || !activeTabId) return;
@@ -2166,7 +2252,7 @@ export default function FloatingMessenger({ session, role }) {
         <div className="cms-fm-stage">
           <ChatWindow
             key={openWindow.id}
-            tab={openWindow}
+            tab={getFreshTab(openWindow)}
             meId={meId}
             onlineUsers={onlineUsers}
             isSuper={isSuper}
@@ -2259,9 +2345,8 @@ export default function FloatingMessenger({ session, role }) {
                           className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-red-50 text-left transition-colors"
                         >
                           <span className="relative shrink-0">
-                            <img
-                              src={resolveAvatarUrl(c.user)}
-                              alt=""
+                            <AvatarImage
+                              user={c.user}
                               className={`w-9 h-9 rounded-full object-cover ${isRealAvatar(c.user?.avatar) ? 'cms-fm-avatar--photo' : ''}`}
                             />
                             <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-600 text-[9px] font-black text-white flex items-center justify-center ring-2 ring-white">
@@ -2309,9 +2394,8 @@ export default function FloatingMessenger({ session, role }) {
                               className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-slate-50 text-left transition-colors group"
                             >
                               <span className="relative shrink-0">
-                                <img
-                                  src={resolveAvatarUrl({ ...p, role: p.displayRole || p.role })}
-                                  alt=""
+                                <AvatarImage
+                                  user={{ ...p, role: p.displayRole || p.role }}
                                   className={`w-10 h-10 rounded-full object-cover ring-1 ring-slate-200 ${isRealAvatar(p.avatar) ? 'cms-fm-avatar--photo' : ''}`}
                                 />
                                 <span
@@ -2355,7 +2439,7 @@ export default function FloatingMessenger({ session, role }) {
               return (
                 <ChatHead
                   key={tab.id}
-                  tab={tab}
+                  tab={getFreshTab(tab)}
                   unread={unreadByPeer.get(peerKey) || 0}
                   onOpen={handleFocus}
                   onClose={closeChat}

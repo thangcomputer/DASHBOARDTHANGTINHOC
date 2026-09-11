@@ -169,6 +169,9 @@ export default function AdminModalManager() {
             if (!(d?.name || '').trim() || !(d?.phone || '').trim()) {
               throw new Error('Vui lòng nhập họ tên và số điện thoại');
             }
+            if (!String(d?.branchId || '').trim()) {
+              throw new Error('Vui lòng chọn chi nhánh cho giảng viên');
+            }
             if (!teacherHasSubjects(d)) {
               throw new Error('Chọn ít nhất một môn học');
             }

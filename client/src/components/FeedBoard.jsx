@@ -13,6 +13,7 @@ import api, { resolveMediaUrl } from '../services/api';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { useToast } from '../utils/toast';
 import { useSocket } from '../context/SocketContext';
+import { getPresenceUserId } from '../utils/presence';
 import { useFloatingMessenger } from '../context/FloatingMessengerContext';
 import { openSiteChat } from './FloatingMessenger';
 import SupportMascot from './SupportMascot';
@@ -236,10 +237,10 @@ export default function FeedBoard({ session, role }) {
   const quickSupport = useMemo(() => {
     const online = (onlineUsers || []).find((u) => {
       const r = String(u.role || '').toLowerCase();
-      return r === 'staff' || u.adminRole === 'STAFF';
+      return r === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';
     });
     return {
-      id: online?.userId || null,
+      id: getPresenceUserId(online) || null,
       name: online?.name || 'Hỗ trợ viên',
       role: 'support',
       online: !!online,

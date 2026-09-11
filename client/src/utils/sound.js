@@ -73,8 +73,9 @@ export const playNotifySound = () => {
  * FIX Bug 1 & 2: Dùng lại audioCtx module-level (tránh rò rỉ), kiểm tra muted.
  * KHÔNG tạo AudioContext mới mỗi lần gọi nữa.
  */
-const playExamWarningBeep = () => {
+const playExamWarningBeep = (playbackToken) => {
   if (muted) return;
+  if (playbackToken != null && playbackToken !== warningPlaybackToken) return;
   try {
     // Đảm bảo có audioCtx — tạo nếu chưa có (ưu tiên dùng lại)
     if (!audioCtx) {
@@ -94,10 +95,13 @@ const playExamWarningBeep = () => {
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.14);
     osc.connect(gain);
     gain.connect(ctx.destination);
+    warningOscillators.add(osc);
+    osc.onended = () => warningOscillators.delete(osc);
     osc.start();
     osc.stop(ctx.currentTime + 0.14);
     setTimeout(() => {
       try {
+        if (playbackToken != null && playbackToken !== warningPlaybackToken) return;
         const osc2 = ctx.createOscillator();
         const gain2 = ctx.createGain();
         osc2.type = 'square';
@@ -106,6 +110,8 @@ const playExamWarningBeep = () => {
         gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
         osc2.connect(gain2);
         gain2.connect(ctx.destination);
+        warningOscillators.add(osc2);
+        osc2.onended = () => warningOscillators.delete(osc2);
         osc2.start();
         osc2.stop(ctx.currentTime + 0.18);
       } catch { /* ignore */ }
@@ -116,6 +122,8 @@ const playExamWarningBeep = () => {
 };
 
 let currentWarningAudio = null;
+let warningPlaybackToken = 0;
+const warningOscillators = new Set();
 
 /**
  * FIX Bug 3: await resume() trước khi phát để xử lý AudioContext.state === 'suspended'.
@@ -124,8 +132,10 @@ let currentWarningAudio = null;
 export const playExamWarningSound = (customUrl = '') => {
   unlockAudio();
   if (muted) return;
+  const playbackToken = ++warningPlaybackToken;
 
   const doPlay = () => {
+    if (playbackToken !== warningPlaybackToken) return;
     if (currentWarningAudio) {
       try {
         currentWarningAudio.pause();
@@ -140,7 +150,7 @@ export const playExamWarningSound = (customUrl = '') => {
         currentWarningAudio.volume = 0.7;
         void currentWarningAudio.play().catch(() => {
           currentWarningAudio = null;
-          playExamWarningBeep();
+          playExamWarningBeep(playbackToken);
         });
         return;
       } catch {
@@ -148,7 +158,7 @@ export const playExamWarningSound = (customUrl = '') => {
         /* fall through to beep */
       }
     }
-    playExamWarningBeep();
+    playExamWarningBeep(playbackToken);
   };
 
   // FIX Bug 3: đảm bảo AudioContext resumed trước khi phát
@@ -160,6 +170,7 @@ export const playExamWarningSound = (customUrl = '') => {
 };
 
 export const stopExamWarningSound = () => {
+  warningPlaybackToken += 1;
   if (currentWarningAudio) {
     try {
       currentWarningAudio.pause();
@@ -167,4 +178,8 @@ export const stopExamWarningSound = () => {
     } catch { /* ignore */ }
     currentWarningAudio = null;
   }
+  warningOscillators.forEach((osc) => {
+    try { osc.stop(); } catch { /* already stopped */ }
+    warningOscillators.delete(osc);
+  });
 };

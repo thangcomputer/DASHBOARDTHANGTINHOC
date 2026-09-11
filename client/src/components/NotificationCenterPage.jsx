@@ -20,6 +20,7 @@ import { RATING_CRITERIA } from '../context/useDataRatings';
 import StudentDetailModal from './StudentDetailModal';
 import LmsQaVideoPreview from './lms/LmsQaVideoPreview';
 import { formatLmsTimestamp } from '../utils/lmsLessonUi';
+import { hasPermission, PERMISSIONS } from '../constants/permissions';
 
 const TYPES = [
   { value: '', label: 'Tất cả' },
@@ -103,6 +104,10 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
   const { socket } = useSocket() || {};
   const isAdmin = role === 'admin' || role === 'staff' || session?.adminRole === 'SUPER_ADMIN' || session?.adminRole === 'STAFF' || session?.adminRole === 'SUPPORT';
   const canAnswerQa = isAdmin || role === 'teacher' || session?.adminRole === 'SUPPORT';
+  const canManageStudentAdminPopups = hasPermission(session, PERMISSIONS.MANAGE_STUDENTS);
+  const canManageAttendanceAdminPopups = canManageStudentAdminPopups
+    || hasPermission(session, PERMISSIONS.MANAGE_SCHEDULE);
+  const canViewEvaluationNotifications = hasPermission(session, PERMISSIONS.VIEW_EVALUATIONS);
 
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
@@ -316,7 +321,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       return;
     }
     if (
-      (role === 'admin' || role === 'staff')
+      canViewEvaluationNotifications
       && (n.payload?.kind === 'admin_feedback'
         || String(n.type || '').toUpperCase() === 'EVALUATION')
     ) {
@@ -324,12 +329,17 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
       return;
     }
     // Popup nhanh cho "Học viên mới đăng ký" và "Điểm danh buổi học"
-    if (isAdmin && (n.title?.includes('Học viên mới đăng ký') || n.title?.includes('Điểm danh buổi học'))) {
+    const isStudentRegistrationNotif = n.title?.includes('Học viên mới đăng ký');
+    const isAttendanceNotif = n.title?.includes('Điểm danh buổi học');
+    if (
+      (isStudentRegistrationNotif && canManageStudentAdminPopups)
+      || (isAttendanceNotif && canManageAttendanceAdminPopups)
+    ) {
       const tab = n.title?.includes('Điểm danh') ? 'attendance' : 'summary';
 
       const openPopup = (studentData) => {
         setQuickPopup({
-          type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
+          type: isStudentRegistrationNotif ? 'register' : 'attendance',
           notif: n,
           student: studentData,
         });
@@ -354,7 +364,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         return;
       }
     }
-    if (isAdmin && n.payload?.kind === 'student_device_alert' && n.payload?.studentId) {
+    if (canManageStudentAdminPopups && n.payload?.kind === 'student_device_alert' && n.payload?.studentId) {
       setStudentDetailTab('summary');
       setStudentDetailId(String(n.payload.studentId));
       return;

@@ -9,6 +9,7 @@ import {
   frameLooksLikeLensBlocked,
   measureOvalBrightness,
   eyesVisibleFromFace,
+  heuristicEyesInFace,
   heuristicEyesInFrame,
   faceLookingStraightAtScreen,
   heuristicLookingStraight,
@@ -26,7 +27,7 @@ import {
 } from '../utils/proctor/cameraHealth.js';
 import { createRiskEngine, createConfirmTracker } from '../utils/proctor/riskEngine.js';
 import { createProctorEventLog, resolveProctorUiStatus } from '../utils/proctor/eventLog.js';
-import { playExamWarningSound, unlockAudio } from '../utils/sound';
+import { playExamWarningSound, stopExamWarningSound, unlockAudio } from '../utils/sound';
 import { proctorAPI, resolveMediaUrl } from '../services/api.js';
 
 function readStoredFaceViolations(persistKey, initialCount = 0) {
@@ -46,13 +47,6 @@ function writeStoredFaceViolations(persistKey, count) {
     localStorage.setItem(persistKey, String(count));
   } catch { /* ignore */ }
 }
-
-const STATUS_DOT = {
-  green: 'bg-emerald-400',
-  yellow: 'bg-amber-300',
-  orange: 'bg-orange-400',
-  red: 'bg-red-500',
-};
 
 const ExamMonitor = forwardRef(({
   isActive,
@@ -144,6 +138,7 @@ const ExamMonitor = forwardRef(({
 
   const terminateExam = useCallback((reason) => {
     if (isTerminated) return;
+    stopExamWarningSound();
     setIsTerminated(true);
     setWarningOverlay({ type: 'terminated', message: 'KẾT THÚC BÀI THI!', sub: reason, persistent: true });
     stopStream(streamRef.current);
@@ -402,20 +397,25 @@ const ExamMonitor = forwardRef(({
             const lowLight = brightness > 0 && brightness < CONFIG.LOW_LIGHT_AVG_L;
 
             let faces = null;
+            let detectorFailed = false;
             const detectorAvailable = Boolean(faceDetector);
             if (faceDetector) {
               try {
                 faces = await faceDetector.detect(canvas);
                 if (!Array.isArray(faces)) faces = [];
               } catch {
-                // Detector lỗi frame này → coi như không thấy mặt (không fallback heuristic)
-                faces = [];
+                // A transient detector error must not turn a visible person into
+                // a false absence; use the no-detector heuristic for this frame.
+                faces = null;
+                detectorFailed = true;
               }
             }
 
             const frameFaces = getValidatedFrameFaces(faces || [], frame, w, h);
             const multiFace = frameFaces.length >= 2;
-            const presence = evaluateFacePresence(frame, faces, w, h, { detectorAvailable });
+            const presence = evaluateFacePresence(frame, faces, w, h, {
+              detectorAvailable: detectorAvailable && !detectorFailed,
+            });
             let facePresent = presence.present;
             const ovalFaces = presence.ovalFaces;
             let eyesVisible = false;
@@ -428,10 +428,14 @@ const ExamMonitor = forwardRef(({
             if (facesForPose.length > 0) {
               eyesVisible = facesForPose.some((f) => eyesVisibleFromFace(f, w, h));
               lookingStraight = facesForPose.some((f) => faceLookingStraightAtScreen(f, w, h));
-              // Windows không landmark: nếu texture đã xác nhận mặt thì coi mắt/nhìn thẳng OK khi trong oval
-              if (!eyesVisible && facesForPose.some((f) => faceBoxInProctorOval(f.boundingBox, w, h))) {
-                eyesVisible = true;
-                if (!lookingStraight) lookingStraight = true;
+              // Windows thường chỉ trả bounding box, không có landmarks: kiểm tra
+              // vùng mắt từ pixel thay vì mặc định coi bounding box là có mắt.
+              if (!eyesVisible) {
+                const inOvalFace = facesForPose.find((f) => faceBoxInProctorOval(f.boundingBox, w, h));
+                eyesVisible = inOvalFace
+                  ? heuristicEyesInFace(frame, w, h, inOvalFace.boundingBox)
+                  : heuristicEyesInFrame(frame, w, h);
+                if (eyesVisible && !lookingStraight) lookingStraight = heuristicLookingStraight(frame, w, h);
               }
               const box = facesForPose[0]?.boundingBox;
               if (box) {
@@ -525,34 +529,10 @@ const ExamMonitor = forwardRef(({
               absence.reset();
             }
 
-            if (facePresent && !lensBlocked) {
-              const eyeC = eye.tick(!eyesVisible, now);
-              if (eyeC.confirmed) {
-                logEvent('eye_miss', 'warn', { durationMs: eyeC.durationMs });
-                confirmHard('eye_miss', {
-                  type: 'camera',
-                  message: '👁 KHÔNG THẤY MẮT TRONG KHUNG!',
-                  sub: `Nhìn thẳng camera, không che mặt. Lỗi cộng dồn — đủ ${CONFIG.MAX_FACE_VIOLATIONS} lần sẽ hủy bài.`,
-                }, () => eye.reset());
-              } else if (eyesVisible) {
-                eye.reset();
-              }
-
-              // gaze_off chỉ cảnh báo mềm — không cộng lỗi cứng (tránh khóa oan khi đang nhìn cam)
-              const gazeC = gaze.tick(eyesVisible && !lookingStraight, now);
-              if (gazeC.confirmed) {
-                logEvent('gaze_off', 'soft', { durationMs: gazeC.durationMs });
-                riskRef.current.add('gaze_off', now);
-                setRiskScore(riskRef.current.getScore(now));
-                softWarn('gaze_off', '🟠 Khuôn mặt chưa nhìn thẳng', 'Hãy nhìn vào màn hình / vòng oval.');
-                gaze.reset();
-              } else if (lookingStraight) {
-                gaze.reset();
-              }
-            } else {
-              eye.reset();
-              gaze.reset();
-            }
+            // Chỉ giám sát sự hiện diện của khuôn mặt. Không đánh lỗi theo
+            // mắt hoặc hướng nhìn vì dữ liệu landmarks/pixel không ổn định.
+            eye.reset();
+            gaze.reset();
 
             if (lowLight && facePresent) {
               softWarn('low_light', '🟠 Ánh sáng yếu', 'Ngồi gần nguồn sáng hơn để nhận diện ổn định.');
@@ -605,11 +585,18 @@ const ExamMonitor = forwardRef(({
     setTabWarnings(0);
 
     const handleVisibilityChange = () => {
-      if (!document.hidden) return;
+      if (!document.hidden) {
+        // A hidden-tab timer may be throttled; always clear stale audio on return.
+        stopExamWarningSound();
+        return;
+      }
       tabWarningsRef.current += 1;
       setTabWarnings(tabWarningsRef.current);
       const w = tabWarningsRef.current;
       playWarningBeep();
+      // Uploaded warning files can be longer than the warning itself. Do not let
+      // them continue playing after the student leaves the exam tab.
+      window.setTimeout(stopExamWarningSound, 1200);
       riskRef.current.add('tab_blur');
       setRiskScore(riskRef.current.getScore());
       logEvent('tab_blur', 'warn', { count: w });
@@ -654,8 +641,14 @@ const ExamMonitor = forwardRef(({
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
+      stopExamWarningSound();
     };
   }, [isActive, isTerminated, enableTabGuard, maxTabWarnings, terminateExam, playWarningBeep, logEvent, softWarn]);
+
+  const dismissWarning = useCallback(() => {
+    stopExamWarningSound();
+    setWarningOverlay(null);
+  }, []);
 
   if (!isActive && !warningOverlay) return null;
 
@@ -682,7 +675,7 @@ const ExamMonitor = forwardRef(({
             </div>
           )}
           {!warningOverlay.persistent ? (
-            <button type="button" onClick={() => setWarningOverlay(null)} className="w-full py-5 bg-gray-900 text-white font-black rounded-3xl hover:bg-black transition-all text-lg">
+            <button type="button" onClick={dismissWarning} className="w-full py-5 bg-gray-900 text-white font-black rounded-3xl hover:bg-black transition-all text-lg">
               TÔI ĐÃ HIỂU, TIẾP TỤC THI
             </button>
           ) : (
@@ -793,9 +786,6 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
     lowLight: stats.lastLowLight,
     lensBlocked: stats.lastLensBlocked,
   });
-  const dot = STATUS_DOT[ui.level] || STATUS_DOT.yellow;
-  const levelEmoji = ui.level === 'green' ? '🟢' : ui.level === 'yellow' ? '🟡' : ui.level === 'orange' ? '🟠' : '🔴';
-
   return (
     <div
       className={`backdrop-blur-xl shadow-2xl min-w-0 max-w-full ${
@@ -821,8 +811,7 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
         </div>
         <div className={`absolute inset-0 pointer-events-none ${stats.lastFacePresent && stats.lastFaceDetected && !stats.lastMultiFace ? 'bg-emerald-500/10' : 'bg-red-500/25 animate-pulse'}`} />
         <div className="absolute top-1 left-1.5 flex items-center gap-1">
-          <div className={`w-1.5 h-1.5 ${dot} rounded-full animate-pulse`} />
-          <span className="text-white/60 font-black uppercase text-xs cms-min-text-xs">Live</span>
+          <span className="rounded-md bg-black/45 px-1.5 py-0.5 text-white/70 font-black uppercase text-[9px] tracking-wider cms-min-text-xs">Live</span>
         </div>
         {ui.code !== 'ok' && (
           <div className="absolute bottom-0.5 left-0 right-0 text-center px-0.5">
@@ -841,11 +830,10 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
         )}
         <div className={`flex flex-col font-mono ${isLarge ? 'mt-1 gap-0' : isCompact ? 'gap-0.5' : 'mt-1.5 gap-0.5'}`}>
           <div className="flex items-center gap-1.5">
-            <span className={`inline-block w-2 h-2 rounded-full ${dot}`} />
             <span className={`font-bold leading-tight text-xs ${
               ui.level === 'green' ? 'text-emerald-400' : ui.level === 'yellow' ? 'text-amber-300' : ui.level === 'orange' ? 'text-orange-300' : 'text-red-400'
             }`}>
-              {levelEmoji} {ui.label}
+              {ui.label}
             </span>
           </div>
           {!isCompact && <span className="text-white/55 font-semibold leading-tight text-xs">{ui.guide}</span>}
