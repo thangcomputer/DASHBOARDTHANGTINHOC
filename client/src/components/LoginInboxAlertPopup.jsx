@@ -147,7 +147,7 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
   const schedFnRef = useRef(getSchedulesByStudent);
   const syncRef = useRef(syncMessages);
   const busy = blocked || extraBlock;
-  const { onMessageReceive, socket } = useSocket() || {};
+  const { onMessageReceive } = useSocket() || {};
 
   useEffect(() => { convRef.current = getConversations; }, [getConversations]);
   useEffect(() => { schedFnRef.current = getSchedulesByStudent; }, [getSchedulesByStudent]);
@@ -157,46 +157,17 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
     const onLms = (e) => {
       const open = Boolean(e?.detail?.open);
       setLmsOpen(open);
-      // Vào lại player: cho phép kiểm tra tin/lịch mới (ack vẫn chặn popup trùng).
-      if (open) decidedRef.current = false;
+      if (open) {
+        // Mỗi lần mở player là một lần vào LMS mới; không bật lại popup trong cùng phiên.
+        decidedRef.current = false;
+        setPayload(null);
+        setLmsNudge((n) => n + 1);
+      }
     };
     setLmsOpen(isLmsPlayerOpen());
     window.addEventListener(LMS_PLAYER_OPEN_EVENT, onLms);
     return () => window.removeEventListener(LMS_PLAYER_OPEN_EVENT, onLms);
   }, []);
-
-  // Đang học LMS: tin/lịch mới → nudge kiểm tra lại popup (không đụng flow ngoài LMS).
-  useEffect(() => {
-    if (!lmsOpen || !userId) return undefined;
-    let lastBump = 0;
-    const bump = () => {
-      const now = Date.now();
-      if (now - lastBump < 2500) return;
-      lastBump = now;
-      decidedRef.current = false;
-      setLmsNudge((n) => n + 1);
-    };
-    const unsubMsg = typeof onMessageReceive === 'function'
-      ? onMessageReceive((data) => {
-        if (!data) return;
-        if (String(data.senderId) === String(userId)) return;
-        if (isAiSupportConversationId(data.conversationId) || String(data.senderId) === AI_SUPPORT_PEER.id) return;
-        bump();
-      })
-      : null;
-    const onSched = () => bump();
-    if (socket?.on) {
-      socket.on('schedule:updated', onSched);
-      socket.on('schedule:new', onSched);
-    }
-    return () => {
-      if (typeof unsubMsg === 'function') unsubMsg();
-      if (socket?.off) {
-        socket.off('schedule:updated', onSched);
-        socket.off('schedule:new', onSched);
-      }
-    };
-  }, [lmsOpen, userId, onMessageReceive, socket]);
 
   // Tin nhắn người thật đến khi đang ở dashboard phải hiện popup ngay,
   // không chỉ kiểm tra một lần lúc đăng nhập.
@@ -208,6 +179,7 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
       if (
         isAiSupportConversationId(data.conversationId)
         || String(data.senderId) === AI_SUPPORT_PEER.id
+        || lmsOpen
         || isQuietPath(location.pathname)
       ) return;
 
@@ -223,7 +195,7 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
       if (timer) clearTimeout(timer);
       if (typeof unsubMsg === 'function') unsubMsg();
     };
-  }, [role, userId, onMessageReceive, location.pathname]);
+  }, [role, userId, onMessageReceive, location.pathname, lmsOpen]);
 
   useEffect(() => {
     const syncFromGate = () => {
@@ -305,7 +277,7 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
         writeAck(userId, 0, ack.scheduleIds);
       }
 
-      // Ngoài LMS: chỉ hiện khi có tin mới. Trong LMS: tin mới hoặc lịch mới chưa ack.
+      // Ngoài LMS: chỉ hiện khi có tin mới. Khi vừa vào LMS, kiểm tra một lần.
       const showMsg = unread > 0 && (ackedUnread == null || unread > ackedUnread);
       const showSchedOnly = lmsOpen && role === 'student' && newIds.length > 0;
       if (!showMsg && !showSchedOnly) {

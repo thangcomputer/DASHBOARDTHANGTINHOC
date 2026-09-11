@@ -1273,6 +1273,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       return 0;
     }
   }, [getConversations, myId]);
+  const [lmsAttentionVisible, setLmsAttentionVisible] = React.useState(true);
   const inboxPath = role === 'student'
     ? '/student/inbox'
     : role === 'teacher'
@@ -1286,6 +1287,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     window.addEventListener(LMS_PLAYER_OPEN_EVENT, onLmsPlayerChange);
     return () => window.removeEventListener(LMS_PLAYER_OPEN_EVENT, onLmsPlayerChange);
   }, []);
+
+  React.useEffect(() => {
+    if (!lmsPlayerOpen || (unreadCount <= 0 && unreadMessageCount <= 0)) {
+      setLmsAttentionVisible(false);
+      return undefined;
+    }
+    setLmsAttentionVisible(true);
+    const timer = window.setTimeout(() => setLmsAttentionVisible(false), 10000);
+    return () => window.clearTimeout(timer);
+  }, [lmsPlayerOpen, unreadCount, unreadMessageCount]);
 
   // GV offline lúc đạt mốc → hiện popup khi vào lại (notif chưa xem + chưa celeb)
   useEffect(() => {
@@ -2113,7 +2124,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
       {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
       <FloatingMessenger session={session} role={role} />
-      {lmsPlayerOpen && (unreadCount > 0 || unreadMessageCount > 0) ? (
+      {lmsPlayerOpen && lmsAttentionVisible && (unreadCount > 0 || unreadMessageCount > 0) ? (
         <div className="cms-lms-attention" role="status" aria-live="polite">
           <span className="cms-lms-attention__label">Trong LMS</span>
           {unreadCount > 0 ? (
@@ -2143,7 +2154,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           <button
             type="button"
             className="cms-lms-attention__close"
-            onClick={(event) => { event.currentTarget.closest('.cms-lms-attention')?.classList.add('is-dismissed'); }}
+            onClick={() => setLmsAttentionVisible(false)}
             aria-label="Thu gọn chỉ báo LMS"
             title="Thu gọn"
           >
