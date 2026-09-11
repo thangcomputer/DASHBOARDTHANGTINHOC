@@ -429,6 +429,11 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
   const isGroup = Boolean(tab.user?.isGroup);
   return (
     <div className="cms-fm-head-wrap">
+      {!isGroup && (
+        <span className="cms-fm-head__name" title={tab.user.name || 'Người dùng'}>
+          {tab.user.name || 'Người dùng'}
+        </span>
+      )}
       <button
         type="button"
         onClick={() => onOpen(tab.id)}
@@ -1391,6 +1396,24 @@ export default function FloatingMessenger({ session, role }) {
 
   const effectiveStaffs = fmContacts;
 
+  const getFreshTabUser = useCallback((tab) => {
+    if (!tab?.user || tab.user.isGroup) return tab?.user;
+    const peerId = String(tab.user.id || '');
+    const contact = fmContacts.find((item) => String(item?.id || '') === peerId);
+    if (!contact) return tab.user;
+    return {
+      ...tab.user,
+      name: contact.name || tab.user.name,
+      avatar: contact.avatar || tab.user.avatar || '',
+      gender: contact.gender || tab.user.gender || '',
+      adminRole: contact.adminRole || tab.user.adminRole || null,
+    };
+  }, [fmContacts]);
+
+  const getFreshTab = useCallback((tab) => (
+    tab ? { ...tab, user: getFreshTabUser(tab) } : tab
+  ), [getFreshTabUser]);
+
   const directory = useMemo(
     () => {
       const base = buildSupportDirectory({
@@ -2195,7 +2218,7 @@ export default function FloatingMessenger({ session, role }) {
         <div className="cms-fm-stage">
           <ChatWindow
             key={openWindow.id}
-            tab={openWindow}
+            tab={getFreshTab(openWindow)}
             meId={meId}
             onlineUsers={onlineUsers}
             isSuper={isSuper}
@@ -2382,7 +2405,7 @@ export default function FloatingMessenger({ session, role }) {
               return (
                 <ChatHead
                   key={tab.id}
-                  tab={tab}
+                  tab={getFreshTab(tab)}
                   unread={unreadByPeer.get(peerKey) || 0}
                   onOpen={handleFocus}
                   onClose={closeChat}
