@@ -425,13 +425,15 @@ function MessageBubble({
   );
 }
 
-function getNameInitials(name) {
+function formatChatHeadName(name) {
   const parts = String(name || 'Người dùng')
     .trim()
     .split(/\s+/)
     .filter(Boolean);
-  if (parts.length <= 2) return parts.map((part) => part[0]).join('').toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  if (parts.length <= 1) return parts[0] || 'Người dùng';
+  const lastName = parts[parts.length - 1];
+  const displayLastName = `${lastName.charAt(0).toLocaleUpperCase('vi-VN')}${lastName.slice(1).toLocaleLowerCase('vi-VN')}`;
+  return `${parts.slice(0, -1).map((part) => `${part.charAt(0).toLocaleUpperCase('vi-VN')}.`).join(' ')} ${displayLastName}`;
 }
 
 function ChatHead({ tab, unread = 0, onOpen, onClose }) {
@@ -440,7 +442,7 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
     <div className="cms-fm-head-wrap">
       {!isGroup && (
         <span className="cms-fm-head__name" title={tab.user.name || 'Người dùng'}>
-          {getNameInitials(tab.user.name)}
+          {formatChatHeadName(tab.user.name)}
         </span>
       )}
       <button
