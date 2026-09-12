@@ -279,6 +279,7 @@ const TeacherDashboard = ({ onNavigate }) => {
   const [gradeInputs, setGradeInputs] = useState({});
   const [noteInputs, setNoteInputs] = useState({});
   const [studentSearch, setStudentSearch] = useState('');
+  const [studentStatusFilter, setStudentStatusFilter] = useState('active');
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -587,6 +588,8 @@ const TeacherDashboard = ({ onNavigate }) => {
           <TeacherLazyStudentsTab
             studentSearch={studentSearch}
             setStudentSearch={setStudentSearch}
+            studentStatusFilter={studentStatusFilter}
+            setStudentStatusFilter={setStudentStatusFilter}
             students={students}
             onlineUsers={onlineUsers}
             lastSeenUsers={lastSeenUsers}
@@ -822,7 +825,6 @@ const TeacherDashboard = ({ onNavigate }) => {
 };
 
 export default TeacherDashboard;
-
 
 
 
