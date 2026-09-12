@@ -33,7 +33,8 @@ function nextCompleted(prevDone, total, { targetDone, revert, incrementIfMissing
   return prev;
 }
 
-function enrollmentMatches(enr, course) {
+function enrollmentMatches(enr, course, enrollmentId) {
+  if (enrollmentId) return String(enr?._id || enr?.id || enr?.enrollmentId) === String(enrollmentId);
   const want = courseKey(course);
   if (!want) return false;
   return courseKey(enr?.courseName || enr?.course || enr?.name) === want;
@@ -50,6 +51,7 @@ export function applyAttendanceProgressToStudents(prev, payload, options = {}) {
   if (!studentId) return list;
 
   const course = String(payload.course || payload.courseName || '').trim();
+  const enrollmentId = payload.enrollmentId ? String(payload.enrollmentId) : '';
   const targetDone = numOrNaN(
     payload.completedSessions != null ? payload.completedSessions : payload.sessionNumber,
   );
@@ -93,7 +95,7 @@ export function applyAttendanceProgressToStudents(prev, payload, options = {}) {
       const idxs = [];
       if (course) {
         arr.forEach((e, i) => {
-          if (enrollmentMatches(e, course)) idxs.push(i);
+          if (enrollmentMatches(e, course, enrollmentId)) idxs.push(i);
         });
       }
       if (idxs.length === 0 && arr.length === 1) idxs.push(0);
@@ -106,7 +108,7 @@ export function applyAttendanceProgressToStudents(prev, payload, options = {}) {
     const nextCourses = patchList(courses);
     const source = (nextCourses.length ? nextCourses : nextEnrollments);
     const matched = course
-      ? source.filter((e) => enrollmentMatches(e, course))
+      ? source.filter((e) => enrollmentMatches(e, course, enrollmentId))
       : (source.length === 1 ? source : []);
     const primaryMatch = matched[0] || (source.length === 1 ? source[0] : null);
 
@@ -140,7 +142,7 @@ export function applyAttendanceProgressToStudents(prev, payload, options = {}) {
       patched.remaining_cooldown_hours = 12;
       patched.last_attendance_at = payload.attendedAt || payload.last_attendance_at || new Date().toISOString();
       const lockEnrollment = (enrollment) => (
-        course && enrollmentMatches(enrollment, course)
+        (enrollmentId || course) && enrollmentMatches(enrollment, course, enrollmentId)
           ? {
               ...enrollment,
               can_check_in: false,

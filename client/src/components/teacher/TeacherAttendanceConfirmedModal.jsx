@@ -31,6 +31,7 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
   if (!open || !payload) return null;
 
   const rejected = isRejectedPayload(payload);
+  const adminMakeup = String(payload.kind || '') === 'admin_makeup_attendance';
   const sessionNo = [payload.sessionNumber, payload.sessionOrdinalPreview, payload.completedSessions]
     .map((v) => Number(v))
     .find((n) => Number.isFinite(n) && n > 0);
@@ -76,7 +77,7 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
             <X size={18} aria-hidden="true" />
           </button>
           <p className={`text-[11px] font-bold uppercase tracking-[0.25em] ${eyebrowTone}`}>
-            {rejected ? 'Buổi không được tính' : 'Học viên đã xác nhận'}
+            {rejected ? 'Buổi không được tính' : (adminMakeup ? 'Admin đã điểm danh bù' : 'Học viên đã xác nhận')}
           </p>
           <p id="teacher-attendance-confirmed-title" className={`mt-3 text-sm font-semibold ${titleTone}`}>
             Buổi học
@@ -109,7 +110,7 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
             </div>
             {!rejected && (
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Xác nhận lúc</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{adminMakeup ? 'Điểm danh lúc' : 'Xác nhận lúc'}</p>
                 <p className="text-sm font-semibold text-slate-800">{formatConfirmedAt(confirmedAt)}</p>
               </div>
             )}
@@ -118,7 +119,9 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
           <p className="text-sm text-slate-500 leading-relaxed text-center">
             {rejected
               ? 'Admin không chấp thuận buổi này — không tính vào tiến độ và lương buổi. Bạn có thể xếp thêm ca cho học viên.'
-              : 'Học viên đã đồng ý điểm danh — buổi này đã được tính vào tiến độ.'}
+              : (adminMakeup
+                ? 'Admin đã điểm danh bù — buổi này đã được tính vào tiến độ và lương buổi.'
+                : 'Học viên đã đồng ý điểm danh — buổi này đã được tính vào tiến độ.')}
           </p>
 
           <button

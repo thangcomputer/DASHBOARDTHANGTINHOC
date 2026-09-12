@@ -576,6 +576,8 @@ function buildAttendanceConfirmPayload(sch) {
   return {
     scheduleId: String(sch._id || sch.id),
     studentId: String(sch.studentId?._id || sch.studentId || ''),
+    enrollmentId: sch.enrollmentId ? String(sch.enrollmentId) : null,
+    courseId: sch.courseId ? String(sch.courseId?._id || sch.courseId) : null,
     teacherId: String(sch.teacherId?._id || sch.teacherId || ''),
     teacherName: sch.teacherName || sch.teacherId?.name || 'Giảng viên',
     studentName: sch.studentName || sch.studentId?.name || '',
@@ -749,7 +751,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
     }
     let {
       teacherId, teacherName: teacherNameInput,
-      studentId, studentName: studentNameInput,
+      studentId, studentName: studentNameInput, enrollmentId: enrollmentIdInput, courseId: courseIdInput,
       date, startTime, endTime,
       course, linkHoc, note, topic, status
     } = req.body;
@@ -778,6 +780,9 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
     if (!isValidObjectId(studentId)) {
       return res.status(400).json({ success: false, message: `studentId không hợp lệ: "${studentId}". Vui lòng chọn học viên từ danh sách.` });
     }
+    if (courseIdInput && !isValidObjectId(courseIdInput)) {
+      return res.status(400).json({ success: false, message: `courseId không hợp lệ: "${courseIdInput}"` });
+    }
 
     // Auto-lookup names nếu không được cung cấp
     let teacherName = teacherNameInput;
@@ -787,7 +792,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
     if (!teacherName || !studentName || !courseFinal) {
       const [teacher, student] = await Promise.all([
         !teacherName ? Teacher.findById(teacherId).select('name').lean() : null,
-        (!studentName || !courseFinal) ? Student.findById(studentId).select('name course').lean() : null,
+        (!studentName || !courseFinal || enrollmentIdInput) ? Student.findById(studentId).select('name course enrollments').lean() : null,
       ]);
       if (!teacherName) teacherName = teacher?.name || 'Giảng viên';
       if (!studentName) studentName = student?.name || 'Học viên';
@@ -797,6 +802,33 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
     if (!courseFinal) {
       return res.status(400).json({ success: false, message: 'Thiếu thông tin khóa học (course)' });
     }
+
+    const studentForEnrollment = await Student.findById(studentId)
+      .select('enrollments course')
+      .lean();
+    const enrollments = Array.isArray(studentForEnrollment?.enrollments)
+      ? studentForEnrollment.enrollments
+      : [];
+    const requestedEnrollmentId = String(enrollmentIdInput || '').trim();
+    const selectedEnrollment = requestedEnrollmentId
+      ? enrollments.find((e) => String(e._id) === requestedEnrollmentId)
+      : enrollments.find((e) => String(e.courseName || '').trim().toLowerCase() === String(courseFinal || '').trim().toLowerCase());
+    const matchingEnrollments = enrollments.filter(
+      (e) => String(e.courseName || '').trim().toLowerCase() === String(courseFinal || '').trim().toLowerCase(),
+    );
+    if (requestedEnrollmentId && !selectedEnrollment) {
+      return res.status(400).json({ success: false, message: 'Enrollment của học viên không hợp lệ' });
+    }
+    if (!requestedEnrollmentId && matchingEnrollments.length > 1) {
+      return res.status(400).json({
+        success: false,
+        code: 'ENROLLMENT_REQUIRED',
+        message: 'Học viên có nhiều enrollment cùng tên khóa. Vui lòng chọn đúng enrollment.',
+      });
+    }
+    const scheduleEnrollmentId = selectedEnrollment?._id || null;
+    const scheduleCourseId = selectedEnrollment?.courseId || courseIdInput || null;
+    if (selectedEnrollment?.courseName) courseFinal = selectedEnrollment.courseName;
 
     // Mỗi buổi cố định 1h30 — nếu thiếu/lệch endTime thì chuẩn hóa theo startTime
     const resolvedEndTime = endTimeFromStartOrDefault(startTime, endTime);
@@ -860,7 +892,9 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
       const lastAttendance = await Schedule.findOne({
         studentId,
-        course: courseFinal,
+        ...(scheduleEnrollmentId
+          ? { enrollmentId: scheduleEnrollmentId }
+          : { course: courseFinal }),
         status: 'completed',
         createdAt: { $gte: twelveHoursAgo },
       }).sort({ createdAt: -1 });
@@ -890,6 +924,8 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
     const schedule = await Schedule.create({
       teacherId, teacherName,
       studentId, studentName,
+      enrollmentId: scheduleEnrollmentId,
+      courseId: scheduleCourseId,
       date: new Date(date),
       startTime, endTime: resolvedEndTime,
       course: courseFinal, 
@@ -1164,6 +1200,15 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
             can_check_in: false,
             meta: result.meta,
           });
+
+          if (isAdminMakeup) {
+            await emitAttendanceConfirmEvents(ioAttend, result.schedule, 'attendance:admin-makeup-completed', {
+              status: 'completed',
+              studentConfirmStatus: 'admin_approved',
+              completedAt: result.schedule.updatedAt || new Date().toISOString(),
+              completedBy: actor,
+            });
+          }
         }
 
         if (result.student?.teacher_payment_status === 'PAID_IN_ADVANCE') {

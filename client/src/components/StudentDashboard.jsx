@@ -222,7 +222,10 @@ const StudentDashboard = ({ onNavigate }) => {
   const enrollments = useMemo(() => studentData?.courses || [], [studentData?.courses]);
 
   useEffect(() => {
-    if (enrollments.length && !activeCourseName) {
+    const activeExists = enrollments.some(
+      (enrollment) => (enrollment.courseName || enrollment.name) === activeCourseName,
+    );
+    if (enrollments.length && (!activeCourseName || !activeExists)) {
       setActiveCourseName(enrollments[0].courseName || enrollments[0].name);
     }
   }, [enrollments, activeCourseName]);
@@ -412,11 +415,11 @@ const StudentDashboard = ({ onNavigate }) => {
 
   const upcomingScheduleCount = useMemo(() => {
     // Tổng quan: đếm buổi còn sắp tới / đang diễn ra (không tính buổi đã qua giờ)
-    return (mySchedulesAll || []).filter((s) => {
+    return (mySchedules || []).filter((s) => {
       const kind = getScheduleDisplayKind(s);
       return kind === 'upcoming' || kind === 'ongoing';
     }).length;
-  }, [mySchedulesAll]);
+  }, [mySchedules]);
   const myMaterials = useMemo(() =>
     materials.filter(m => student?.course?.includes(m.course) || m.course?.includes('THVP NÂNG CAO')),
     [materials, student]
@@ -449,27 +452,27 @@ const StudentDashboard = ({ onNavigate }) => {
     fetchMyQuizzes();
   }, [fetchMyQuizzes]);
 
+  const activeAssignments = useMemo(() => {
+    const activeCourse = String(viewStudent?.course || '').trim().toLowerCase();
+    if (!activeCourse) return myAssignments || [];
+    return (myAssignments || []).filter((assignment) => {
+      const assignmentCourse = String(
+        assignment?.courseName || assignment?.course || assignment?.courseId || '',
+      ).trim().toLowerCase();
+      return !assignmentCourse || assignmentCourse === activeCourse;
+    });
+  }, [myAssignments, viewStudent?.course]);
+
   const displayGrades = useMemo(() => {
     if (!viewStudent) return [];
     return buildStudentActivityLogs({
       student: viewStudent,
-      assignments: myAssignments || [],
+      assignments: activeAssignments,
       quizzes: myQuizzes || [],
       evaluations: privateEvaluations || [],
       schedules: mySchedules || [],
     });
-  }, [viewStudent, myAssignments, myQuizzes, privateEvaluations, mySchedules]);
-
-  const displayGradesAll = useMemo(() => {
-    if (!studentData) return [];
-    return buildStudentActivityLogs({
-      student: { ...studentData, course: null }, // bypass course filter to show all logs
-      assignments: myAssignments || [],
-      quizzes: myQuizzes || [],
-      evaluations: privateEvaluations || [],
-      schedules: mySchedulesAll || [],
-    });
-  }, [studentData, myAssignments, myQuizzes, privateEvaluations, mySchedulesAll]);
+  }, [viewStudent, activeAssignments, myQuizzes, privateEvaluations, mySchedules]);
 
   /** Tổng quan: bài nộp / TN / điểm / đánh giá (không gồm lịch & điểm danh buổi). */
   const scoreLogs = useMemo(
@@ -477,12 +480,11 @@ const StudentDashboard = ({ onNavigate }) => {
     [displayGrades],
   );
 
-  /** Tab Lịch: hủy buổi / lịch học / đổi lịch / điểm danh buổi. */
-  const studyLogsAll = useMemo(() => {
-    if (!studentData) return [];
-    return mergeScheduleLogs(buildPendingScheduleLogs(mySchedulesAll, studentData), displayGradesAll);
-  }, [studentData, mySchedulesAll, displayGradesAll]);
-
+  /** Tab Lịch: giữ cả lịch chờ điểm danh và hoạt động của khóa đang chọn. */
+  const studyLogs = useMemo(() => {
+    if (!viewStudent) return [];
+    return mergeScheduleLogs(buildPendingScheduleLogs(mySchedules, viewStudent), displayGrades);
+  }, [viewStudent, mySchedules, displayGrades]);
 
   const isNew = viewStudent?.completedSessions === 0;
 
@@ -738,16 +740,22 @@ const StudentDashboard = ({ onNavigate }) => {
         {currentHash === 'schedule' ? (
           <StudentLazyScheduleTab
             viewStudent={viewStudent}
-            mySchedules={mySchedulesAll}
+            mySchedules={mySchedules}
+            enrollments={enrollments}
+            activeCourseName={activeCourseName}
+            setActiveCourseName={setActiveCourseName}
             setNoteModalSched={setNoteModalSched}
-            displayGrades={studyLogsAll}
+            displayGrades={studyLogs}
           />
         ) : ['materials', 'materials-videos', 'materials-files', 'materials-software', 'materials-assignments', 'exam-scores'].includes(currentHash) ? (
           <StudentLazyMaterialsTab
             viewStudent={viewStudent}
             studentTrainingForLms={studentTrainingForLms}
-            myAssignments={myAssignments}
+            myAssignments={activeAssignments}
             studentTrainingData={studentTrainingData}
+            enrollments={enrollments}
+            activeCourseName={activeCourseName}
+            setActiveCourseName={setActiveCourseName}
             initialMainTab={{
               materials: 'courses',
               'materials-videos': 'courses',
@@ -800,7 +808,7 @@ const StudentDashboard = ({ onNavigate }) => {
             progressPct={progressPct}
             teacherRatingData={teacherRatingData}
             isNew={isNew}
-            myAssignments={myAssignments}
+            myAssignments={activeAssignments}
             mySchedules={mySchedules}
             upcomingScheduleCount={upcomingScheduleCount}
             myUnreadMsgs={myUnreadMsgs}

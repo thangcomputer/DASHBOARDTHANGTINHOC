@@ -730,18 +730,33 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         prev && String(prev.scheduleId) === String(payload.scheduleId) ? null : prev
       ));
     };
+    const onAdminMakeupCompleted = (payload) => {
+      if (!payload?.scheduleId) return;
+      if (payload.studentId && String(payload.studentId) !== myId) return;
+      attendanceConfirmRevisionRef.current += 1;
+      setAttendanceConfirm((prev) => (
+        prev && String(prev.scheduleId) === String(payload.scheduleId) ? null : prev
+      ));
+      setAttendanceConfirmBusy(false);
+      toast.info('Buổi học đã được Admin điểm danh bù và hoàn tất.');
+      if (typeof triggerBackgroundSync === 'function') {
+        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+      }
+    };
     socket.on('attendance:awaiting-confirm', onAwait);
     socket.on('attendance:confirmed', onConfirmed);
     socket.on('attendance:disputed', onDisputed);
     socket.on('attendance:rejected', onRejected);
+    socket.on('attendance:admin-makeup-completed', onAdminMakeupCompleted);
     return () => {
       cancelled = true;
       socket.off('attendance:awaiting-confirm', onAwait);
       socket.off('attendance:confirmed', onConfirmed);
       socket.off('attendance:disputed', onDisputed);
       socket.off('attendance:rejected', onRejected);
+      socket.off('attendance:admin-makeup-completed', onAdminMakeupCompleted);
     };
-  }, [socket, role, myId]);
+  }, [socket, role, myId, toast, triggerBackgroundSync]);
 
   // GV: Admin không tính buổi → popup tự động (socket realtime, 1 lần / buổi)
   useEffect(() => {
@@ -818,6 +833,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     try {
       const res = await api.schedules.studentConfirm(sid, decision);
       if (!res?.success) {
+        if (res?.code === 'ALREADY_COMPLETED' || res?.code === 'ATTENDANCE_ALREADY_COMPLETED') {
+          setAttendanceConfirm(null);
+          toast.info('Buổi học đã được Admin điểm danh bù và hoàn tất.');
+          if (typeof triggerBackgroundSync === 'function') {
+            Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+          }
+          return;
+        }
         toast.error(res?.message || 'Không gửi được xác nhận');
         return;
       }
@@ -1770,6 +1793,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               totalSessions: n.payload?.totalRequired || n.payload?.totalSessions,
                               teacherName: n.payload?.teacherName,
                             }, { forceResolved: true });
+                          } else if (
+                            role === 'teacher'
+                            && n.payload?.kind === 'admin_makeup_attendance'
+                          ) {
+                            setShowNotif(false);
+                            openTeacherAttendanceConfirmed(n);
                           } else if (
                             role === 'student'
                             && (

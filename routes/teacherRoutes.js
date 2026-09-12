@@ -34,6 +34,8 @@ function paymentSessionDetails(sessions = [], totalAmount = 0, starBonusAmount =
     sessionId: session._id,
     studentId: session.studentId || null,
     studentName: session.studentName || 'Học viên',
+    enrollmentId: session.enrollmentId || null,
+    courseId: session.courseId || null,
     date: session.date || null,
     courseName: session.courseName || session.course || session.subject || '',
     allocatedAmount: perSession + (index === 0 ? remainder : 0),

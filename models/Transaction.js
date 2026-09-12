@@ -62,6 +62,8 @@ const transactionSchema = new mongoose.Schema({
     sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Schedule' },
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
     studentName: { type: String, default: '' },
+    enrollmentId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', default: null },
     date: { type: Date, default: null },
     courseName: { type: String, default: '' },
     allocatedAmount: { type: Number, default: 0, min: 0 },

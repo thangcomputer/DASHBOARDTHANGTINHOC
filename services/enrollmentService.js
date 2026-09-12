@@ -301,19 +301,29 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
   }
 
   let sessionByCourse = {};
+  let sessionByEnrollment = {};
   if (Schedule && studentId) {
     const sid = mongoose.Types.ObjectId.isValid(studentId)
       ? new mongoose.Types.ObjectId(studentId)
       : studentId;
     const rows = await Schedule.aggregate([
       { $match: { studentId: sid, status: 'completed' } },
-      { $group: { _id: '$course', completed: { $sum: 1 } } },
+      {
+        $group: {
+          _id: { enrollmentId: '$enrollmentId', course: '$course' },
+          completed: { $sum: 1 },
+        },
+      },
     ]);
     // Gom theo tên khóa đã chuẩn hóa (trim / hoa thường / bỏ dấu) — tránh lệch
     // "khóa học test" vs "Khóa học test" làm điểm danh bù không tăng tiến độ.
     sessionByCourse = {};
     rows.forEach((r) => {
-      const key = normCourseName(r._id);
+      const enrollmentId = r._id?.enrollmentId ? String(r._id.enrollmentId) : '';
+      if (enrollmentId) {
+        sessionByEnrollment[enrollmentId] = (sessionByEnrollment[enrollmentId] || 0) + (Number(r.completed) || 0);
+      }
+      const key = normCourseName(r._id?.course);
       if (!key) return;
       sessionByCourse[key] = (sessionByCourse[key] || 0) + (Number(r.completed) || 0);
     });
@@ -356,7 +366,10 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
     // SoT tiến độ: tối đa giữa (1) số lịch completed theo khóa và (2) giá trị lưu trên enrollment.
     // → Điểm danh vẫn tăng tiến độ; Admin nhập tay "đã học" (migration / bù) không bị tụt về 0 khi chưa có lịch.
     const courseKey = normCourseName(courseName);
-    const fromSchedule = courseKey ? sessionByCourse[courseKey] : undefined;
+    const enrollmentKey = e._id ? String(e._id) : '';
+    const fromSchedule = (enrollmentKey && sessionByEnrollment[enrollmentKey] != null)
+      ? sessionByEnrollment[enrollmentKey]
+      : (courseKey ? sessionByCourse[courseKey] : undefined);
     const fromStored = Number(e.completedSessions) || 0;
     const completed = fromSchedule != null
       ? Math.max(Number(fromSchedule) || 0, fromStored)
