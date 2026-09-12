@@ -4,7 +4,7 @@ const logger = require('../../../config/logger');
 class TeacherApplicationService {
   async post_root(data) {
   try {
-    const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession, gender } = data.body;
+    const { name, phone, age, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession, gender } = data.body;
     if (!name || !phone) {
       return { _status: 400, _body: { success: false, message: 'Vui lòng nhập Tên và Số điện thoại' } };
     }
@@ -47,6 +47,7 @@ class TeacherApplicationService {
     const teacher = await require('../repositories').teacherRepository.create({
       name,
       phone,
+      age: age === '' || age == null ? null : Number(age),
       email,
       specialty: specialty || normalizedSubjectIds.join(', '),
       subjectIds: normalizedSubjectIds,

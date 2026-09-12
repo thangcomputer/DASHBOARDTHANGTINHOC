@@ -100,6 +100,18 @@ export default function AddTeacherModal({
                   />
                 </div>
                 <div>
+                  <label className="cms-label">Tuổi</label>
+                  <input
+                    type="number"
+                    min="18"
+                    max="100"
+                    value={teacherForm.age ?? ''}
+                    onChange={(e) => setTeacherForm((p) => ({ ...p, age: e.target.value }))}
+                    className="cms-input"
+                    placeholder="Ví dụ: 30"
+                  />
+                </div>
+                <div>
                   <label className="cms-label">Ngày vào làm</label>
                   <input
                     type="date"

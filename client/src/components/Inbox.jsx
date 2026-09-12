@@ -453,7 +453,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showTeacherInfoMenu, setShowTeacherInfoMenu] = useState(false);
   const [pinnedMessageObj, setPinnedMessageObj] = useState(null);
+
+  useEffect(() => {
+    setShowTeacherInfoMenu(false);
+  }, [activeConv?.id]);
 
   // Đóng hội thoại chỉ khi peer chắc chắn ghost (không dùng students/teachers/staffs local —
   // Admin/Staff thường students=[], GV chỉ có teachers=[self] → trước đây kill nhầm mọi chat).
@@ -1816,9 +1821,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <span className="block text-sm font-medium text-slate-800 truncate">
                             {c.user?.name || 'Không rõ tên'}
                           </span>
-                          {c.user?.phone ? (
-                            <span className="block text-[11px] text-slate-400">{c.user.phone}</span>
-                          ) : null}
                         </button>
                       </li>
                     ))}
@@ -2171,6 +2173,39 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
+                {currentUserRole === 'student' && !activeConv.isGroup && activeConv.user?.role === 'teacher' && (
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowTeacherInfoMenu((open) => !open)}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                      aria-label="Tùy chọn giảng viên"
+                      aria-expanded={showTeacherInfoMenu}
+                    >
+                      <MoreHorizontal size={20} />
+                    </button>
+                    {showTeacherInfoMenu && (
+                      <div className="absolute right-0 top-11 z-30 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowTeacherInfoMenu(false);
+                            window.dispatchEvent(new CustomEvent('open-assigned-teacher-card', {
+                              detail: {
+                                teacherId: activeConv.user.id || activeConv.user._id,
+                                teacherName: activeConv.user.name,
+                                avatar: activeConv.user.avatar,
+                              },
+                            }));
+                          }}
+                          className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700"
+                        >
+                          Thông tin giảng viên
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {(!activeConv.isGroup && currentUserRole === 'teacher' && activeConv?.user?.role === 'student') && (
                   <button
                     type="button"

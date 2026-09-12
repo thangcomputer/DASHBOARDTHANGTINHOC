@@ -11,6 +11,7 @@ export default function StudentAssignedTeacherModal({ open, teacher, loading = f
 
   const name = teacher?.name || 'Giảng viên';
   const specialty = teacher?.specialty || '';
+  const age = teacher?.age;
   const avg = Number(teacher?.averageRating) || 0;
   const count = Number(teacher?.ratingCount) || 0;
   const region = voiceRegionLabel(teacher?.voiceRegion) || 'Chưa cập nhật';
@@ -57,6 +58,13 @@ export default function StudentAssignedTeacherModal({ open, teacher, loading = f
         </div>
 
         <div className="px-5 py-4 space-y-3 text-sm text-slate-700">
+          <div className="flex items-start gap-2.5">
+            <User size={16} className="text-sky-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Tuổi</p>
+              <p className="font-semibold text-slate-900">{age != null ? `${age} tuổi` : 'Chưa cập nhật'}</p>
+            </div>
+          </div>
           <div className="flex items-start gap-2.5">
             <Award size={16} className="text-sky-600 shrink-0 mt-0.5" />
             <div className="min-w-0">

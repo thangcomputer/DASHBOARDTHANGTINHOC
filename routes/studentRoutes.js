@@ -164,13 +164,14 @@ async function notifyTeacherAssignedOnEnroll(io, {
   try {
     const Teacher = require('../models/Teacher');
     const t = await Teacher.findById(tid)
-      .select('name specialty averageRating ratingCount voiceRegion avatar')
+      .select('name age specialty averageRating ratingCount voiceRegion avatar')
       .lean();
     if (t) {
       if (!gvName) gvName = t.name || '';
       teacherCard = {
         teacherId: tid,
         teacherName: gvName || t.name || 'Giảng viên',
+        age: t.age == null ? null : Number(t.age),
         specialty: t.specialty || '',
         averageRating: Number(t.averageRating) || 0,
         ratingCount: Number(t.ratingCount) || 0,
@@ -4149,6 +4150,5 @@ router.put('/:id/pay-teacher', [authMiddleware, branchFilter, policyShadowStuden
 });
 
 module.exports = router;
-
 
 

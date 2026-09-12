@@ -56,7 +56,7 @@ function resolveTodayAttendanceGate(todaySchedules) {
 }
 
 export default function TeacherStudentsTab({
-  studentSearch, setStudentSearch, students, onlineUsers, lastSeenUsers, timeAgo,
+  studentSearch, setStudentSearch, students, onlineUsers, lastSeenUsers,
   selectedEnrollmentKey, setSelectedEnrollmentKey, navigate, mySchedules,
   markAttendance, updateLink, saveGrade, updateNotes, lockStudentExam,
   cancelSchedule,
@@ -161,8 +161,8 @@ export default function TeacherStudentsTab({
                               ) : (
                                 <span className="text-[10px] font-medium text-slate-400">
                                   {lastSeenUsers[String(sId)]
-                                    ? `${timeAgo(lastSeenUsers[String(sId)])}`
-                                    : 'Chưa online'}
+                                    ? `Truy cập lần cuối: ${new Date(lastSeenUsers[String(sId)]).toLocaleString('vi-VN')}`
+                                    : 'Chưa có dữ liệu truy cập'}
                                 </span>
                               )}
                             </div>

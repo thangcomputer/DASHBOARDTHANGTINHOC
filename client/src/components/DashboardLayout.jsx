@@ -1179,6 +1179,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     const fallback = {
       id: teacherId,
       name: payload?.teacherName || 'Giảng viên',
+      age: payload?.age ?? null,
       specialty: payload?.specialty || '',
       averageRating: Number(payload?.averageRating) || 0,
       ratingCount: Number(payload?.ratingCount) || 0,
@@ -1203,6 +1204,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     } catch { /* keep fallback */ }
     setAssignedTeacherModal({ open: true, loading: false, teacher: fallback });
   }, []);
+
+  useEffect(() => {
+    const handleOpenTeacherCard = (event) => {
+      openAssignedTeacherFromNotif(event?.detail || {});
+    };
+    window.addEventListener('open-assigned-teacher-card', handleOpenTeacherCard);
+    return () => window.removeEventListener('open-assigned-teacher-card', handleOpenTeacherCard);
+  }, [openAssignedTeacherFromNotif]);
 
   useLayoutEffect(() => {
     if (!showNotif) return undefined;

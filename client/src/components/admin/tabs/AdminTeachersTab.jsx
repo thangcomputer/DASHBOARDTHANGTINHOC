@@ -439,6 +439,12 @@ export default function AdminTeachersTab() {
                                 <span className="font-mono">{t.phone}</span>
                               </>
                             )}
+                            {t.age != null && (
+                              <>
+                                {(joinDate || t.phone) && <span className="text-slate-300">·</span>}
+                                <span>{t.age} tuổi</span>
+                              </>
+                            )}
                           </p>
                           {t.branchCode && (
                             <p className="text-[11px] text-slate-400 mt-0.5">{t.branchCode}</p>

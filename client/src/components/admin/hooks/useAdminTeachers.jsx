@@ -39,7 +39,7 @@ export function useAdminTeachers({
   const [teachers, setLocalTeachers] = useState([]);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [teacherForm, setTeacherForm] = useState({
-    name: '', phone: '', email: '', specialty: '', subjectIds: [],
+    name: '', phone: '', age: '', email: '', specialty: '', subjectIds: [],
     startDate: new Date().toISOString().split('T')[0],
     address: '', voiceRegion: '', branchId: '', branchCode: '',
     baseSalaryPerSession: 150000,

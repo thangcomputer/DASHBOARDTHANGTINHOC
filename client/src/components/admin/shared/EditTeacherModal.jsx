@@ -154,6 +154,18 @@ export default function EditTeacherModal({
                       />
                     </div>
                     <div>
+                      <label className="cms-label">Tuổi</label>
+                      <input
+                        type="number"
+                        min="18"
+                        max="100"
+                        value={editTeacher.age ?? ''}
+                        onChange={(e) => setEditTeacher((p) => ({ ...p, age: e.target.value }))}
+                        className="cms-input"
+                        placeholder="Ví dụ: 30"
+                      />
+                    </div>
+                    <div>
                       <label className="cms-label">Ngày vào làm</label>
                       <input
                         type="date"

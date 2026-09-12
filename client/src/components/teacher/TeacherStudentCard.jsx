@@ -181,14 +181,10 @@ export const StudentCard = ({
   const isStudentOnline = isUserOnline(onlineUsers, student);
   const lastSeenAt = lastSeenUsers[studentPresenceId];
   const lastSeenLabel = (() => {
-    if (!lastSeenAt) return 'Chưa online';
+    if (!lastSeenAt) return 'Chưa có dữ liệu truy cập';
     const d = new Date(lastSeenAt);
-    if (Number.isNaN(d.getTime())) return 'Chưa online';
-    const diff = Date.now() - d.getTime();
-    if (diff < 60_000) return 'Vừa xong';
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} phút trước`;
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} giờ trước`;
-    return d.toLocaleDateString('vi-VN');
+    if (Number.isNaN(d.getTime())) return 'Chưa có dữ liệu truy cập';
+    return `Truy cập lần cuối: ${d.toLocaleString('vi-VN')}`;
   })();
   /** Chờ 10s sau "Xác nhận Điểm danh" — persist sessionStorage để đổi tab không mất */
   const [pendingAttendance, setPendingAttendance] = useState(() => {
