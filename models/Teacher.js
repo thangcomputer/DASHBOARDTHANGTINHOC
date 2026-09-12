@@ -19,6 +19,12 @@ const TeacherSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    age: {
+      type: Number,
+      min: 18,
+      max: 100,
+      default: null,
+    },
     zalo: {
       type: String,
       trim: true,

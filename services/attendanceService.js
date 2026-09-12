@@ -54,7 +54,9 @@ function isAdminActor(actor) {
 async function resolveSessionOrdinalForSchedule(studentDoc, schedule) {
   const courseKey = normCourseName(schedule?.course);
   const enrs = Array.isArray(studentDoc?.enrollments) ? studentDoc.enrollments : [];
-  let enr = courseKey
+  let enr = schedule?.enrollmentId
+    ? enrs.find((e) => String(e._id) === String(schedule.enrollmentId))
+    : courseKey
     ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
     : null;
   if (!enr) {
@@ -66,6 +68,13 @@ async function resolveSessionOrdinalForSchedule(studentDoc, schedule) {
   let calendarCompleted = 0;
   const sid = scheduleStudentId(schedule);
   if (sid) {
+    if (schedule?.enrollmentId) {
+      calendarCompleted = await Schedule.countDocuments({
+        studentId: sid,
+        status: 'completed',
+        enrollmentId: schedule.enrollmentId,
+      });
+    } else {
     const rows = await Schedule.aggregate([
       { $match: { studentId: sid, status: 'completed' } },
       { $group: { _id: '$course', completed: { $sum: 1 } } },
@@ -75,6 +84,7 @@ async function resolveSessionOrdinalForSchedule(studentDoc, schedule) {
       if (courseKey && key !== courseKey) return;
       calendarCompleted += Number(r.completed) || 0;
     });
+    }
   }
 
   const enrDone = enr?.completedSessions != null
@@ -145,6 +155,7 @@ async function refreshScheduleSessionPreview(schedule) {
  */
 async function syncEnrollmentProgressAfterAttendance(studentId, {
   courseName,
+  enrollmentId,
   logNote,
   logDate,
   grade = 0,
@@ -155,7 +166,10 @@ async function syncEnrollmentProgressAfterAttendance(studentId, {
 
   const courseKey = normCourseName(courseName || '');
   let prevCompleted = Number(student.completedSessions) || 0;
-  if (courseKey && Array.isArray(student.enrollments) && student.enrollments.length) {
+  if (enrollmentId && Array.isArray(student.enrollments) && student.enrollments.length) {
+    const enr = student.enrollments.find((e) => String(e._id) === String(enrollmentId));
+    if (enr) prevCompleted = Number(enr.completedSessions) || 0;
+  } else if (courseKey && Array.isArray(student.enrollments) && student.enrollments.length) {
     const enr = student.enrollments.find(
       (e) => normCourseName(e.courseName || e.course) === courseKey,
     );
@@ -168,7 +182,9 @@ async function syncEnrollmentProgressAfterAttendance(studentId, {
   // Math.max(schedule, stored) trong applyEnrollmentStats không tăng khi
   // "đã học" nhập tay > số lịch completed (migration / bù tay).
   if (Array.isArray(student.enrollments) && student.enrollments.length) {
-    let idx = courseKey
+    let idx = enrollmentId
+      ? student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId))
+      : courseKey
       ? student.enrollments.findIndex(
         (e) => normCourseName(e.courseName || e.course) === courseKey,
       )
@@ -358,7 +374,9 @@ async function completeScheduleAttendance({
     if (studentForEnr) {
       const courseKey = normCourseName(schedule.course);
       const enrs = Array.isArray(studentForEnr.enrollments) ? studentForEnr.enrollments : [];
-      const enr = courseKey
+      const enr = schedule.enrollmentId
+        ? enrs.find((e) => String(e._id) === String(schedule.enrollmentId))
+        : courseKey
         ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
         : enrs.find((e) => String(e.status || '').toLowerCase() === 'active') || enrs[0];
       const enrStatus = String(enr?.status || '').toLowerCase();
@@ -451,6 +469,7 @@ async function completeScheduleAttendance({
     updated.studentId || schedule.studentId,
     {
       courseName: updated.course || schedule.course,
+      enrollmentId: updated.enrollmentId || schedule.enrollmentId || null,
       logDate: updated.date || schedule.date || new Date(),
       ...(Number.isFinite(gradeForLog) ? { grade: gradeForLog } : {}),
       // chưa ghi note — ghi sau khi biết số buổi thật
@@ -462,7 +481,9 @@ async function completeScheduleAttendance({
   let finalTotal = Math.max(1, Number(sessionTotal) || 12);
   if (student) {
     const enrs = Array.isArray(student.enrollments) ? student.enrollments : [];
-    const enr = courseKey
+    const enr = (updated.enrollmentId || schedule.enrollmentId)
+      ? enrs.find((e) => String(e._id) === String(updated.enrollmentId || schedule.enrollmentId))
+      : courseKey
       ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
       : null;
     if (enr) {

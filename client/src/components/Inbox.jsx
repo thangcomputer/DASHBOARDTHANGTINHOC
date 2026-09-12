@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
   User, Circle, Image, Paperclip, Smile, Download,
-  CheckCheck, Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff
+  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -453,7 +453,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showTeacherInfoMenu, setShowTeacherInfoMenu] = useState(false);
   const [pinnedMessageObj, setPinnedMessageObj] = useState(null);
+
+  useEffect(() => {
+    setShowTeacherInfoMenu(false);
+  }, [activeConv?.id]);
 
   // Đóng hội thoại chỉ khi peer chắc chắn ghost (không dùng students/teachers/staffs local —
   // Admin/Staff thường students=[], GV chỉ có teachers=[self] → trước đây kill nhầm mọi chat).
@@ -1816,9 +1821,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <span className="block text-sm font-medium text-slate-800 truncate">
                             {c.user?.name || 'Không rõ tên'}
                           </span>
-                          {c.user?.phone ? (
-                            <span className="block text-[11px] text-slate-400">{c.user.phone}</span>
-                          ) : null}
                         </button>
                       </li>
                     ))}
@@ -2171,6 +2173,39 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
+                {currentUserRole === 'student' && !activeConv.isGroup && activeConv.user?.role === 'teacher' && (
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowTeacherInfoMenu((open) => !open)}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                      aria-label="Tùy chọn giảng viên"
+                      aria-expanded={showTeacherInfoMenu}
+                    >
+                      <MoreHorizontal size={20} />
+                    </button>
+                    {showTeacherInfoMenu && (
+                      <div className="absolute right-0 top-11 z-30 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowTeacherInfoMenu(false);
+                            window.dispatchEvent(new CustomEvent('open-assigned-teacher-card', {
+                              detail: {
+                                teacherId: activeConv.user.id || activeConv.user._id,
+                                teacherName: activeConv.user.name,
+                                avatar: activeConv.user.avatar,
+                              },
+                            }));
+                          }}
+                          className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700"
+                        >
+                          Thông tin giảng viên
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {(!activeConv.isGroup && currentUserRole === 'teacher' && activeConv?.user?.role === 'student') && (
                   <button
                     type="button"
@@ -2695,13 +2730,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             <span title="Chưa gửi được (Kết nối yếu)">
                               <AlertCircle size={10} className="text-red-500 animate-pulse" />
                             </span>
-                          ) : isMine && !msg.isRecalled && (
-                            <span title={msg.isRead ? "Đã xem" : "Đã nhận"}>
+                          ) : isMine && !msg.isRecalled && !isAiSupportConversationId(activeConv?.id) && (
+                            <span
+                              className={`inline-flex items-center gap-0.5 font-semibold ${
+                                msg.isRead ? 'text-emerald-600' : 'text-slate-400'
+                              }`}
+                              title={msg.isRead ? 'Đã đọc' : 'Chưa đọc'}
+                            >
                               {msg.isRead ? (
-                                <CheckCheck size={12} className="text-blue-500" />
+                                <CheckCircle2 size={11} aria-hidden="true" />
                               ) : (
-                                <CheckCircle2 size={10} className="text-gray-300" />
+                                <CheckCircle2 size={11} aria-hidden="true" />
                               )}
+                              <span>{msg.isRead ? 'Đã đọc' : 'Chưa đọc'}</span>
                             </span>
                           )}
                         </div>
@@ -3279,6 +3320,3 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 };
 
 export default Inbox;
-
-
-

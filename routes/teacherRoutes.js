@@ -24,6 +24,23 @@ const { resolveDefaultAccountPassword } = require('../utils/tempPassword');
 function specialtyFromSubjectIds(ids) {
   return (Array.isArray(ids) ? ids : []).map((id) => EXAM_SUBJECT_LABELS[id] || id).join(', ');
 }
+
+function paymentSessionDetails(sessions = [], totalAmount = 0, starBonusAmount = 0) {
+  const list = Array.isArray(sessions) ? sessions : [];
+  const teachingAmount = Math.max(0, Number(totalAmount) - Number(starBonusAmount || 0));
+  const perSession = list.length ? Math.floor(teachingAmount / list.length) : 0;
+  const remainder = list.length ? teachingAmount - (perSession * list.length) : 0;
+  return list.map((session, index) => ({
+    sessionId: session._id,
+    studentId: session.studentId || null,
+    studentName: session.studentName || 'Học viên',
+    enrollmentId: session.enrollmentId || null,
+    courseId: session.courseId || null,
+    date: session.date || null,
+    courseName: session.courseName || session.course || session.subject || '',
+    allocatedAmount: perSession + (index === 0 ? remainder : 0),
+  }));
+}
 const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
@@ -392,9 +409,12 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       return CQRSTeacherController.post_root(req, res, next);
     }
 
-    const { name, phone, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession, voiceRegion } = req.body;
+    const { name, phone, age, specialty, subjectIds, password, status, branchId: reqBranchId, branchCode: reqBranchCode, startDate, address, email: rawEmail, baseSalaryPerSession, voiceRegion } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập Tên và Số điện thoại' });
+    }
+    if (age !== '' && age != null && (!Number.isInteger(Number(age)) || Number(age) < 18 || Number(age) > 100)) {
+      return res.status(400).json({ success: false, message: 'Tuổi giảng viên phải là số nguyên từ 18 đến 100' });
     }
     const { normalizeVNPhone } = require('../utils/phoneIdentity');
     const canonicalPhone = normalizeVNPhone(phone);
@@ -449,6 +469,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
     const teacher = await Teacher.create({
       name,
       phone: canonicalPhone,
+      age: age === '' || age == null ? null : Number(age),
       email,
       specialty: specialty || specialtyFromSubjectIds(normalizedSubjectIds),
       subjectIds: normalizedSubjectIds,
@@ -694,7 +715,7 @@ router.get('/:id/public-card', [authMiddleware, branchFilter], async (req, res) 
     }
 
     const teacher = await Teacher.findById(teacherId)
-      .select('name specialty averageRating ratingCount voiceRegion avatar subjectIds')
+      .select('name age specialty averageRating ratingCount voiceRegion avatar subjectIds')
       .lean();
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
@@ -706,6 +727,7 @@ router.get('/:id/public-card', [authMiddleware, branchFilter], async (req, res) 
         id: String(teacher._id),
         _id: String(teacher._id),
         name: teacher.name || '',
+        age: teacher.age == null ? null : Number(teacher.age),
         specialty: teacher.specialty || '',
         subjectIds: Array.isArray(teacher.subjectIds) ? teacher.subjectIds : [],
         averageRating: Number(teacher.averageRating) || 0,
@@ -826,14 +848,14 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
 
     const allowedFields = isAdminRole 
       ? [
-          'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio', 'startDate', 'address',
+          'name', 'phone', 'age', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio', 'startDate', 'address',
           'bankAccount', 'avatar', 'baseSalaryPerSession', 'customStarBonusAmount',
           'assignedClasses', 'assignedStudents',
           'branchId', 'branchCode',
         ]
       : isSelfEdit
         ? [
-            'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address',
+            'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address', 'age',
           ]
         : [
           'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address',
@@ -843,6 +865,12 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
+    if (updates.age !== undefined && updates.age !== null && updates.age !== ''
+      && (!Number.isInteger(Number(updates.age)) || Number(updates.age) < 18 || Number(updates.age) > 100)) {
+      return res.status(400).json({ success: false, message: 'Tuổi giảng viên phải là số nguyên từ 18 đến 100' });
+    }
+    if (updates.age === '') updates.age = null;
+    if (updates.age !== null && updates.age !== undefined) updates.age = Number(updates.age);
     if (Object.prototype.hasOwnProperty.call(updates, 'voiceRegion')) {
       updates.voiceRegion = normalizeVoiceRegion(updates.voiceRegion);
     }
@@ -1833,6 +1861,8 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
         bankName: teacher.bankAccount?.bankName || '',
         bankAccount: teacher.bankAccount?.accountNumber || '',
         note: note || '',
+        paymentSessionIds: sessionIds,
+        paymentSessionDetails: paymentSessionDetails(claimedSessions, amount, starBonusAmount),
         starBonusAmount,
         starBonusMonths: starBonusMonthKeys,
         ...(idempotencyKey ? { idempotencyKey } : {}),
@@ -1996,7 +2026,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
       teacherId: req.params.id,
       status: 'completed',
       is_paid_to_teacher: { $ne: true }
-    }).select('_id').lean();
+    }).select('_id studentId studentName date courseName course subject').lean();
 
     const sessionIds = pendingSessions.map((s) => s._id);
     if (sessionIds.length === 0) {
@@ -2034,7 +2064,9 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
         confirmedBy: req.user.name || 'Admin',
         confirmedAt: now,
         bankName: teacher.bankAccount?.bankName || '',
-        bankAccount: teacher.bankAccount?.accountNumber || ''
+        bankAccount: teacher.bankAccount?.accountNumber || '',
+        paymentSessionIds: sessionIds,
+        paymentSessionDetails: paymentSessionDetails(pendingSessions, totalAmount),
       });
     } catch (createErr) {
       try {

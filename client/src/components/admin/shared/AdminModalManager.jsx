@@ -17,7 +17,7 @@ import StudentDetailModal from '../../StudentDetailModal';
 const StudentImportModal = React.lazy(() => import('../../StudentImportModal'));
 
 const TEACHER_SAVE_KEYS = [
-  'name', 'phone', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio',
+  'name', 'phone', 'age', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio',
   'startDate', 'address', 'bankAccount', 'baseSalaryPerSession',
   'customStarBonusAmount', 'branchId', 'branchCode',
 ];

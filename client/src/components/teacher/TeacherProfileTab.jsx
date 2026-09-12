@@ -29,6 +29,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
     address: '',
     zalo: '',
     voiceRegion: '',
+    age: '',
   });
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
@@ -58,6 +59,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         address: currentTeacher.address || '',
         zalo: currentTeacher.zalo || '',
         voiceRegion: currentTeacher.voiceRegion || '',
+        age: currentTeacher.age ?? '',
       });
     }
   }, [currentTeacher]);
@@ -100,6 +102,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         bio: profileForm.bio,
         address: profileForm.address,
         voiceRegion: profileForm.voiceRegion || '',
+        age: profileForm.age === '' ? null : Number(profileForm.age),
       });
       if (result && result.success) {
         setSaveMsg('✅ Đã cập nhật thông tin cá nhân!');
@@ -258,6 +261,32 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                   <Phone size={16} className="text-gray-400 flex-shrink-0" />
                   <span className="text-sm text-gray-700">{profileForm.zalo || '—'}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Age - Editable */}
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Tuổi</label>
+              {editingProfile ? (
+                <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-blue-200 focus-within:border-blue-400 transition">
+                  <User size={16} className="text-blue-400 flex-shrink-0" />
+                  <input
+                    type="number"
+                    min="18"
+                    max="100"
+                    value={profileForm.age ?? ''}
+                    onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })}
+                    placeholder="Nhập tuổi..."
+                    className="flex-1 text-sm outline-none bg-transparent"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                  <User size={16} className="text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">
+                    {currentTeacher?.age != null ? `${currentTeacher.age} tuổi` : '—'}
+                  </span>
                 </div>
               )}
             </div>

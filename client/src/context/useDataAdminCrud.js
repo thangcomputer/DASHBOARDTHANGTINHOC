@@ -66,6 +66,7 @@ export function useDataAdminCrud({
     const payload = {
       name:      teacher.name,
       phone:     teacher.phone,
+      age:       teacher.age === '' || teacher.age == null ? null : Number(teacher.age),
       email,
       specialty: teacher.specialty || '',
       subjectIds: Array.isArray(teacher.subjectIds) ? teacher.subjectIds : [],

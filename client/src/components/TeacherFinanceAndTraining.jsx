@@ -210,6 +210,7 @@ const TeacherFinanceAndTraining = () => {
   const totalPending = financeStats.unpaidAmount || 0;
   const totalSessions = financeStats.totalSessions || 0;
   const [filterStatus, setFilterStatus] = useState('all');
+  const [expandedPaymentId, setExpandedPaymentId] = useState(null);
 
   /** Gộp transaction thật + dòng hoa hồng chưa chi (tính từ buổi completed chưa thanh toán) */
   const displayPayments = useMemo(() => {
@@ -452,27 +453,33 @@ const TeacherFinanceAndTraining = () => {
 
               <div className="divide-y divide-slate-50">
                 {filteredPayments.map(p => (
-                  <div key={p.id || p._id} className={`px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-3 hover:bg-slate-50/50 transition ${isPendingTxStatus(p.status) ? 'bg-amber-50/30' : ''}`}>
-                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${
-                        isPaidTxStatus(p.status) ? 'bg-emerald-100' : 'bg-amber-100'
-                      }`}>
-                        {isPaidTxStatus(p.status)
-                          ? <CheckCircle2 size={18} className="text-emerald-600" />
-                          : <Clock size={18} className="text-amber-600" />
-                        }
+                  <div key={p.id || p._id} className={`px-4 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition ${isPendingTxStatus(p.status) ? 'bg-amber-50/30' : ''}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${
+                          isPaidTxStatus(p.status) ? 'bg-emerald-100' : 'bg-amber-100'
+                        }`}>
+                          {isPaidTxStatus(p.status)
+                            ? <CheckCircle2 size={18} className="text-emerald-600" />
+                            : <Clock size={18} className="text-amber-600" />
+                          }
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-800 text-sm sm:text-base tabular-nums">{Number(p.amount || 0).toLocaleString('vi-VN')}đ</p>
+                          <p className="text-xs text-slate-500 mt-0.5 truncate">
+                            {p._synthetic ? 'Tạm tính · ' : ''}{p.note || p.description}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                            <CalendarIcon size={10} /> {p.month} · {paymentDateLabel(p)}
+                          </p>
+                          {!p._synthetic && (
+                            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                              Người chuyển: {p.confirmedBy || 'Admin'} · {p.sessions || p.paymentSessionDetails?.length || 0} buổi
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-800 text-sm sm:text-base tabular-nums">{p.amount ? p.amount.toLocaleString('vi-VN') : 0}đ</p>
-                        <p className="text-xs text-slate-500 mt-0.5 truncate">
-                          {p._synthetic ? 'Tạm tính · ' : ''}{p.note || p.description}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                          <CalendarIcon size={10} /> {p.month} · {p.date || new Date(p.createdAt).toLocaleDateString('vi-VN')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
+                      <div className="text-right flex-shrink-0">
                       {p._synthetic ? (
                         <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full">
                           <Clock size={12} /> Tạm tính
@@ -486,8 +493,49 @@ const TeacherFinanceAndTraining = () => {
                           <Clock size={12} /> Đang chờ
                         </span>
                       )}
-                      {p.sessions > 0 && <p className="text-[10px] text-slate-400 mt-1">{p.sessions} buổi</p>}
+                      {(p.sessions > 0 || p.paymentSessionDetails?.length > 0) && (
+                        <p className="text-[10px] text-slate-400 mt-1">{p.sessions || p.paymentSessionDetails.length} buổi</p>
+                      )}
+                      </div>
                     </div>
+                    {!p._synthetic && p.paymentSessionDetails?.length > 0 && (
+                      <button
+                        type="button"
+                        className="mt-2 text-[11px] font-bold text-emerald-700 hover:text-emerald-900"
+                        onClick={() => setExpandedPaymentId((id) => (id === (p.id || p._id) ? null : (p.id || p._id)))}
+                      >
+                        {expandedPaymentId === (p.id || p._id) ? 'Thu gọn chi tiết' : `Xem ${new Set(p.paymentSessionDetails.map((s) => s.studentId || s.studentName)).size} học viên`}
+                      </button>
+                    )}
+                    {expandedPaymentId === (p.id || p._id) && p.paymentSessionDetails?.length > 0 && (
+                      <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 space-y-2">
+                        <p className="text-[10px] text-slate-400">Phân bổ tiền buổi dạy theo số buổi; thưởng sao hiển thị riêng.</p>
+                        {Object.values(p.paymentSessionDetails.reduce((groups, session) => {
+                          const key = String(session.studentId || session.studentName || 'unknown');
+                          if (!groups[key]) groups[key] = {
+                            name: session.studentName || 'Học viên', count: 0, amount: 0, dates: [],
+                          };
+                          groups[key].count += 1;
+                          groups[key].amount += Number(session.allocatedAmount) || 0;
+                          if (session.date) groups[key].dates.push(new Date(session.date).toLocaleDateString('vi-VN'));
+                          return groups;
+                        }, {})).map((student) => (
+                          <div key={student.name} className="flex items-start justify-between gap-3 text-xs">
+                            <span className="font-semibold text-slate-700 truncate">{student.name}</span>
+                            <span className="shrink-0 text-right text-slate-500">
+                              {student.count} buổi · {student.amount.toLocaleString('vi-VN')}đ
+                              {student.dates.length ? ` · ${student.dates.join(', ')}` : ''}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="border-t border-slate-200 pt-2 text-[11px] text-slate-500">
+                          <span>Người chuyển: {p.confirmedBy || 'Admin'}</span>
+                          {Number(p.starBonusAmount) > 0 && (
+                            <span className="ml-3 text-amber-700">⭐ Thưởng sao: {Number(p.starBonusAmount).toLocaleString('vi-VN')}đ</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
 

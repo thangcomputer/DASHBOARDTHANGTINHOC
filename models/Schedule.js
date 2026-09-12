@@ -15,6 +15,16 @@ const scheduleSchema = new mongoose.Schema({
     ref: 'Student',
   },
   studentName: { type: String, required: true },
+  /** Enrollment cụ thể của học viên; lịch cũ có thể không có field này. */
+  enrollmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null,
+  },
+  courseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Course',
+    default: null,
+  },
 
   // Lịch
   date: { type: Date, required: true },

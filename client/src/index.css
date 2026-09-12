@@ -2245,7 +2245,7 @@ html.cms-app-shell #root {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 14px 16px;
+  padding: 12px 14px 88px;
   display: flex;
   flex-direction: column;
   gap: 10px;

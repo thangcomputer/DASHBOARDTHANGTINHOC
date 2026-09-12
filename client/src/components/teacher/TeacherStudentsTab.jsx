@@ -56,11 +56,27 @@ function resolveTodayAttendanceGate(todaySchedules) {
 }
 
 export default function TeacherStudentsTab({
-  studentSearch, setStudentSearch, students, onlineUsers, lastSeenUsers, timeAgo,
+  studentSearch, setStudentSearch, studentStatusFilter, setStudentStatusFilter,
+  students, onlineUsers, lastSeenUsers,
   selectedEnrollmentKey, setSelectedEnrollmentKey, navigate, mySchedules,
   markAttendance, updateLink, saveGrade, updateNotes, lockStudentExam,
   cancelSchedule,
 }) {
+  const resolveStudentStatus = (student) => {
+    const enrollmentStatus = String(student?.enrollmentStatus || '').toLowerCase();
+    if (Boolean(student?.interactionLocked)
+      || ['cancelled', 'refunded'].includes(enrollmentStatus)
+      || String(student?.status || '') === 'Thôi học') {
+      return 'dropped';
+    }
+    if (enrollmentStatus === 'completed'
+      || String(student?.status || '').toLowerCase() === 'completed'
+      || (Number(student?.remainingSessions) <= 0 && Number(student?.totalSessions) > 0)) {
+      return 'completed';
+    }
+    return 'active';
+  };
+
   return (
           <div className="cms-page-gutter py-3 sm:py-4 md:py-6 min-h-0 flex-1 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:min-h-0 overflow-y-auto overscroll-y-contain lg:overflow-hidden min-w-0 w-full max-w-full">
             
@@ -76,10 +92,32 @@ export default function TeacherStudentsTab({
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
+                  <div className="grid grid-cols-4 gap-1.5 mt-3">
+                    {[
+                      ['all', 'Tất cả'],
+                      ['active', 'Đang học'],
+                      ['completed', 'Học xong'],
+                      ['dropped', 'Thôi học'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setStudentStatusFilter(value)}
+                        className={`min-h-8 rounded-lg px-1 text-[11px] font-bold transition-colors ${
+                          studentStatusFilter === value
+                            ? 'bg-red-600 text-white shadow-sm'
+                            : 'bg-white text-slate-500 border border-slate-200 hover:border-red-300 hover:text-red-600'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                </div>
                
                <div className="flex-1 min-h-0 overflow-visible lg:overflow-y-auto p-2 space-y-1">
                   {students
+                    .filter((s) => studentStatusFilter === 'all' || resolveStudentStatus(s) === studentStatusFilter)
                     .filter((s) => matchesPersonSearch(studentSearch, {
                       name: s.name,
                       phone: s.phone,
@@ -161,8 +199,8 @@ export default function TeacherStudentsTab({
                               ) : (
                                 <span className="text-[10px] font-medium text-slate-400">
                                   {lastSeenUsers[String(sId)]
-                                    ? `${timeAgo(lastSeenUsers[String(sId)])}`
-                                    : 'Chưa online'}
+                                    ? `Truy cập lần cuối: ${new Date(lastSeenUsers[String(sId)]).toLocaleString('vi-VN')}`
+                                    : 'Chưa có dữ liệu truy cập'}
                                 </span>
                               )}
                             </div>

@@ -730,18 +730,33 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         prev && String(prev.scheduleId) === String(payload.scheduleId) ? null : prev
       ));
     };
+    const onAdminMakeupCompleted = (payload) => {
+      if (!payload?.scheduleId) return;
+      if (payload.studentId && String(payload.studentId) !== myId) return;
+      attendanceConfirmRevisionRef.current += 1;
+      setAttendanceConfirm((prev) => (
+        prev && String(prev.scheduleId) === String(payload.scheduleId) ? null : prev
+      ));
+      setAttendanceConfirmBusy(false);
+      toast.info('Buổi học đã được Admin điểm danh bù và hoàn tất.');
+      if (typeof triggerBackgroundSync === 'function') {
+        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+      }
+    };
     socket.on('attendance:awaiting-confirm', onAwait);
     socket.on('attendance:confirmed', onConfirmed);
     socket.on('attendance:disputed', onDisputed);
     socket.on('attendance:rejected', onRejected);
+    socket.on('attendance:admin-makeup-completed', onAdminMakeupCompleted);
     return () => {
       cancelled = true;
       socket.off('attendance:awaiting-confirm', onAwait);
       socket.off('attendance:confirmed', onConfirmed);
       socket.off('attendance:disputed', onDisputed);
       socket.off('attendance:rejected', onRejected);
+      socket.off('attendance:admin-makeup-completed', onAdminMakeupCompleted);
     };
-  }, [socket, role, myId]);
+  }, [socket, role, myId, toast, triggerBackgroundSync]);
 
   // GV: Admin không tính buổi → popup tự động (socket realtime, 1 lần / buổi)
   useEffect(() => {
@@ -818,6 +833,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     try {
       const res = await api.schedules.studentConfirm(sid, decision);
       if (!res?.success) {
+        if (res?.code === 'ALREADY_COMPLETED' || res?.code === 'ATTENDANCE_ALREADY_COMPLETED') {
+          setAttendanceConfirm(null);
+          toast.info('Buổi học đã được Admin điểm danh bù và hoàn tất.');
+          if (typeof triggerBackgroundSync === 'function') {
+            Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+          }
+          return;
+        }
         toast.error(res?.message || 'Không gửi được xác nhận');
         return;
       }
@@ -1156,6 +1179,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     const fallback = {
       id: teacherId,
       name: payload?.teacherName || 'Giảng viên',
+      age: payload?.age ?? null,
       specialty: payload?.specialty || '',
       averageRating: Number(payload?.averageRating) || 0,
       ratingCount: Number(payload?.ratingCount) || 0,
@@ -1180,6 +1204,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     } catch { /* keep fallback */ }
     setAssignedTeacherModal({ open: true, loading: false, teacher: fallback });
   }, []);
+
+  useEffect(() => {
+    const handleOpenTeacherCard = (event) => {
+      openAssignedTeacherFromNotif(event?.detail || {});
+    };
+    window.addEventListener('open-assigned-teacher-card', handleOpenTeacherCard);
+    return () => window.removeEventListener('open-assigned-teacher-card', handleOpenTeacherCard);
+  }, [openAssignedTeacherFromNotif]);
 
   useLayoutEffect(() => {
     if (!showNotif) return undefined;
@@ -1273,6 +1305,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       return 0;
     }
   }, [getConversations, myId]);
+  const [lmsAttentionVisible, setLmsAttentionVisible] = React.useState(true);
   const inboxPath = role === 'student'
     ? '/student/inbox'
     : role === 'teacher'
@@ -1286,6 +1319,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     window.addEventListener(LMS_PLAYER_OPEN_EVENT, onLmsPlayerChange);
     return () => window.removeEventListener(LMS_PLAYER_OPEN_EVENT, onLmsPlayerChange);
   }, []);
+
+  React.useEffect(() => {
+    if (!lmsPlayerOpen || (unreadCount <= 0 && unreadMessageCount <= 0)) {
+      setLmsAttentionVisible(false);
+      return undefined;
+    }
+    setLmsAttentionVisible(true);
+    const timer = window.setTimeout(() => setLmsAttentionVisible(false), 10000);
+    return () => window.clearTimeout(timer);
+  }, [lmsPlayerOpen, unreadCount, unreadMessageCount]);
 
   // GV offline lúc đạt mốc → hiện popup khi vào lại (notif chưa xem + chưa celeb)
   useEffect(() => {
@@ -1760,6 +1803,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               teacherName: n.payload?.teacherName,
                             }, { forceResolved: true });
                           } else if (
+                            role === 'teacher'
+                            && n.payload?.kind === 'admin_makeup_attendance'
+                          ) {
+                            setShowNotif(false);
+                            openTeacherAttendanceConfirmed(n);
+                          } else if (
                             role === 'student'
                             && (
                               n.payload?.kind === 'teacher_assigned'
@@ -2113,7 +2162,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
       {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
       <FloatingMessenger session={session} role={role} />
-      {lmsPlayerOpen && (unreadCount > 0 || unreadMessageCount > 0) ? (
+      {lmsPlayerOpen && lmsAttentionVisible && (unreadCount > 0 || unreadMessageCount > 0) ? (
         <div className="cms-lms-attention" role="status" aria-live="polite">
           <span className="cms-lms-attention__label">Trong LMS</span>
           {unreadCount > 0 ? (
@@ -2143,7 +2192,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           <button
             type="button"
             className="cms-lms-attention__close"
-            onClick={(event) => { event.currentTarget.closest('.cms-lms-attention')?.classList.add('is-dismissed'); }}
+            onClick={() => setLmsAttentionVisible(false)}
             aria-label="Thu gọn chỉ báo LMS"
             title="Thu gọn"
           >
