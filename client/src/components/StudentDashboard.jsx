@@ -16,6 +16,7 @@ import {
   enrichEnrollmentsWithTeachers,
   uniqueTeacherNames,
   formatTeacherDisplay,
+  isEnrollmentCompleted,
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
 import { getScheduleDisplayKind } from '../utils/scheduleTime';
@@ -220,20 +221,30 @@ const StudentDashboard = ({ onNavigate }) => {
   }, [student, teachers, session?.gender, session?.avatar]);
 
   const enrollments = useMemo(() => studentData?.courses || [], [studentData?.courses]);
+  const selectableEnrollments = useMemo(
+    () => enrollments.filter((enrollment) => !isEnrollmentCompleted(enrollment)),
+    [enrollments],
+  );
 
   useEffect(() => {
     const activeExists = enrollments.some(
-      (enrollment) => (enrollment.courseName || enrollment.name) === activeCourseName,
+      (enrollment) => !isEnrollmentCompleted(enrollment)
+        && (enrollment.courseName || enrollment.name) === activeCourseName,
     );
-    if (enrollments.length && (!activeCourseName || !activeExists)) {
-      setActiveCourseName(enrollments[0].courseName || enrollments[0].name);
+    if (selectableEnrollments.length && (!activeCourseName || !activeExists)) {
+      setActiveCourseName(selectableEnrollments[0].courseName || selectableEnrollments[0].name);
+    } else if (!selectableEnrollments.length && activeCourseName) {
+      setActiveCourseName('');
+    } else if (!enrollments.length && activeCourseName) {
+      setActiveCourseName('');
     }
-  }, [enrollments, activeCourseName]);
+  }, [enrollments, selectableEnrollments, activeCourseName]);
 
   const activeEnrollment = useMemo(() => {
-    if (!enrollments.length) return null;
-    return enrollments.find((e) => (e.courseName || e.name) === activeCourseName) || enrollments[0];
-  }, [enrollments, activeCourseName]);
+    if (!selectableEnrollments.length) return null;
+    return selectableEnrollments.find((e) => (e.courseName || e.name) === activeCourseName)
+      || selectableEnrollments[0];
+  }, [selectableEnrollments, activeCourseName]);
 
   const viewStudent = useMemo(() => {
     if (!studentData) return null;
