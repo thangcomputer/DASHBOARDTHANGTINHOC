@@ -1,4 +1,5 @@
 import React from 'react';
+import { isEnrollmentCompleted } from '../../utils/enrollments';
 
 export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
   <div className="cms-sd-card !p-4 h-full flex flex-col min-w-0">
@@ -19,15 +20,19 @@ export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
 
 export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
   if (!courses || courses.length <= 1) return null;
+  const orderedCourses = [...courses].sort(
+    (a, b) => Number(isEnrollmentCompleted(a)) - Number(isEnrollmentCompleted(b)),
+  );
   return (
     <section className="min-w-0">
       <p className="cms-sd-caption font-semibold uppercase tracking-wide mb-3 text-slate-400">
         Khóa học của bạn
       </p>
       <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-1 -mx-1 px-1 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {courses.map((c) => {
+        {orderedCourses.map((c) => {
           const name = c.courseName || c.name;
-          const active = name === activeCourseName;
+          const completed = isEnrollmentCompleted(c);
+          const active = !completed && name === activeCourseName;
           const total = c.totalSessions ?? 12;
           const done = c.completedSessions ?? 0;
           const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
@@ -35,21 +40,31 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
             <button
               key={c.enrollmentId || c.id || name}
               type="button"
-              onClick={() => onChange(name)}
+              onClick={() => {
+                if (!completed) onChange(name);
+              }}
+              disabled={completed}
               title={name}
               className={`snap-start shrink-0 w-[min(calc(100vw-40px),20rem)] sm:w-[17rem] text-left p-4 rounded-[16px] border transition-all duration-200 active:scale-[0.98] min-h-[44px] ${
                 active
                   ? 'border-blue-500 bg-blue-50/80 shadow-[0_6px_20px_rgba(0,0,0,0.06)] ring-1 ring-blue-100'
-                  : 'border-slate-100 bg-white hover:border-slate-200 shadow-[0_6px_20px_rgba(0,0,0,0.06)]'
+                  : completed
+                    ? 'border-slate-100 bg-slate-50/70 opacity-75 cursor-not-allowed shadow-[0_6px_20px_rgba(0,0,0,0.04)]'
+                    : 'border-slate-100 bg-white hover:border-slate-200 shadow-[0_6px_20px_rgba(0,0,0,0.06)]'
               }`}
             >
               <p
                 className={`cms-sd-card-title line-clamp-2 ${
-                  active ? 'text-blue-800' : 'text-slate-800'
+                  active ? 'text-blue-800' : completed ? 'text-slate-700' : 'text-slate-800'
                 }`}
               >
                 {name}
               </p>
+              {completed && (
+                <span className="inline-flex mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  Đã hoàn thành
+                </span>
+              )}
               <p className="cms-sd-caption mt-2 truncate">
                 GV: {c.teacherName || 'Chưa phân công'}
               </p>

@@ -116,6 +116,15 @@ export function getActiveClientEnrollments(student) {
   return getClientEnrollments(student).filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
 }
 
+export function isEnrollmentCompleted(enrollment) {
+  if (!enrollment) return false;
+  const status = String(enrollment.status || '').trim().toLowerCase();
+  if (status === 'completed' || status === 'hoàn thành' || status === 'hoan thanh') return true;
+  const total = Number(enrollment.totalSessions) || 0;
+  const completed = Number(enrollment.completedSessions) || 0;
+  return total > 0 && completed >= total;
+}
+
 /** Placeholder root course — không tính là đang đăng ký khóa. */
 export function isPlaceholderCourseName(name) {
   const n = String(name || '').trim().toLowerCase();
