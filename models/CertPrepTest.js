@@ -38,6 +38,13 @@ const certPrepTestSchema = new mongoose.Schema({
   maxAttempts: { type: Number, default: null, min: 1 },
   sortOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
+  essayPromptFile: {
+    assetId: { type: mongoose.Schema.Types.ObjectId, ref: 'FileAsset', default: null },
+    url: { type: String, default: '' },
+    originalName: { type: String, default: '' },
+    mimeType: { type: String, default: '' },
+    size: { type: Number, default: 0 },
+  },
 }, { timestamps: true });
 
 certPrepTestSchema.index({ levelId: 1, locale: 1, sortOrder: 1 });

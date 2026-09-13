@@ -72,6 +72,12 @@ const CATEGORIES = {
     exts: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
     retentionDays: null,
   },
+  cert_prep: {
+    dir: 'cert-prep',
+    maxBytes: 15 * 1024 * 1024,
+    exts: ['.pdf', '.docx'],
+    retentionDays: null,
+  },
 };
 
 function ensureDir(dir) {
