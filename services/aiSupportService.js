@@ -2,6 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const dns = require('dns').promises;
+const net = require('net');
 const http = require('http');
 const https = require('https');
 const Message = require('../models/Message');
@@ -302,19 +304,77 @@ function loadInlineImage(fileUrl) {
  */
 async function fetchInlineImageFromUrl(fileUrl) {
   try {
-    // Resolve relative URL to absolute using BASE_URL or SERVER_URL env
-    let targetUrl = String(fileUrl || '').trim();
+    const rawUrl = String(fileUrl || '').trim();
+    if (!rawUrl) return null;
+
+    // AI image analysis may only read files uploaded by this application.
+    if (rawUrl.startsWith('/') && !rawUrl.startsWith('/uploads/messages/')) return null;
+
+    // Resolve relative URL to the configured application origin. External hosts
+    // must be explicitly allowlisted and are still checked against private IPs.
+    let targetUrl = rawUrl;
     if (!targetUrl) return null;
     if (targetUrl.startsWith('/')) {
       const base = (process.env.BASE_URL || process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
       targetUrl = `${base}${targetUrl}`;
     }
-    if (!targetUrl.startsWith('http')) return null;
+    let parsed;
+    try {
+      parsed = new URL(targetUrl);
+    } catch {
+      return null;
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+
+    const configuredHosts = String(process.env.AI_SUPPORT_ALLOWED_IMAGE_HOSTS || '')
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean);
+    const baseUrl = new URL(
+      (process.env.BASE_URL || process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, ''),
+    );
+    const isSameOrigin = parsed.hostname.toLowerCase() === baseUrl.hostname.toLowerCase()
+      && (parsed.port || (parsed.protocol === 'https:' ? '443' : '80'))
+        === (baseUrl.port || (baseUrl.protocol === 'https:' ? '443' : '80'));
+    if (isSameOrigin && !parsed.pathname.startsWith('/uploads/messages/')) return null;
+    if (!isSameOrigin && !configuredHosts.includes(parsed.hostname.toLowerCase())) return null;
+    if (!isSameOrigin && parsed.protocol !== 'https:') return null;
+
+    const addresses = net.isIP(parsed.hostname)
+      ? [{ address: parsed.hostname }]
+      : await dns.lookup(parsed.hostname, { all: true, verbatim: true });
+    const isPrivateAddress = (address) => {
+      if (net.isIPv4(address)) {
+        const octets = address.split('.').map(Number);
+        return octets[0] === 10
+          || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
+          || octets[0] === 192 && octets[1] === 168
+          || octets[0] === 127
+          || octets[0] === 169 && octets[1] === 254
+          || octets[0] === 0;
+      }
+      const normalized = address.toLowerCase();
+      return normalized === '::1'
+        || normalized.startsWith('fc')
+        || normalized.startsWith('fd')
+        || normalized.startsWith('fe8')
+        || normalized.startsWith('fe9')
+        || normalized.startsWith('fea')
+        || normalized.startsWith('feb');
+    };
+    if (addresses.some(({ address }) => isPrivateAddress(address)) && !isSameOrigin) return null;
 
     const MAX_BYTES = 4 * 1024 * 1024;
     return await new Promise((resolve) => {
-      const lib = targetUrl.startsWith('https') ? https : http;
-      const req = lib.get(targetUrl, { timeout: 8000 }, (res) => {
+      const lib = parsed.protocol === 'https:' ? https : http;
+      const req = lib.get(parsed, { timeout: 8000, maxRedirects: 0 }, (res) => {
+        // Redirect targets are deliberately rejected; they could bypass the
+        // host and private-address checks above.
+        if (res.statusCode >= 300 && res.statusCode < 400) {
+          res.resume();
+          resolve(null);
+          return;
+        }
         if (res.statusCode !== 200) { res.resume(); resolve(null); return; }
         const contentType = res.headers['content-type'] || '';
         const mime = contentType.split(';')[0].trim();
