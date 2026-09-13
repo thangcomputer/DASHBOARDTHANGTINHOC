@@ -100,6 +100,7 @@ Các điểm cần xác minh trên staging:
 - Path traversal (`..`) không được coi là public upload path.
 - Quyền đọc của admin/staff/teacher đã được kiểm tra qua HTTP integration; ownership của học viên có unit và integration regression test.
 - State machine thực tế đã được kiểm tra cho submit idempotent và reload/rời phòng: lượt mở lại bị `forfeited`/`EXAM_ATTEMPT_ABANDONED`, không thể mở lại nếu chưa được admin reset.
+- Branch isolation đã có regression coverage: staff/manager không thể thao tác student hoặc teacher khác chi nhánh; tenant isolation và quyền permission đều được kiểm tra ở HTTP-style policy matrix.
 
 Kết quả chuyên gia security độc lập được giữ riêng trong phiên audit; các finding bảo mật exploitable chỉ được chốt sau khi agent hoàn tất và đối chiếu line-level. Mục này **CẦN XÁC MINH**, không suy đoán thành lỗ hổng.
 
@@ -151,10 +152,10 @@ Không liệt kê file để xóa chỉ dựa vào tên/import chưa dùng. Các
 
 ### Giai đoạn 1 — Critical/security
 
-1. [Đã làm một phần] Hoàn tất security line review và IDOR matrix.
+1. [Đã làm một phần] Hoàn tất security line review và IDOR matrix; branch/tenant policy matrix đã đạt local test.
 2. [Đã hoàn tất] Fail-fast session store production.
 3. [Đã làm một phần] E2E upload/download với revoke token, MIME/path traversal và expiry.
-4. [Còn thiếu] Mở rộng HTTP matrix cho branch scope; quyền đọc certification của admin/staff/teacher đã có integration coverage.
+4. [Còn thiếu] Chạy staging HTTP matrix với dữ liệu nhiều chi nhánh; local policy matrix và quyền đọc certification của admin/staff/teacher đã có coverage.
 
 ### Giai đoạn 2 — Logic nghiệp vụ
 
