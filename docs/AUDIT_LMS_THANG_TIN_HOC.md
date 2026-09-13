@@ -99,7 +99,7 @@ Các điểm cần xác minh trên staging:
 - File có `expiresAt` trong quá khứ bị trả `404`, không để lộ nội dung file.
 - Path traversal (`..`) không được coi là public upload path.
 - Quyền đọc của admin/staff/teacher đã được kiểm tra qua HTTP integration; ownership của học viên có unit và integration regression test.
-- State machine thực tế đã được kiểm tra cho submit idempotent và reload/rời phòng: lượt mở lại bị `forfeited`/`EXAM_ATTEMPT_ABANDONED`, không thể mở lại nếu chưa được admin reset.
+- State machine thực tế đã được kiểm tra cho submit idempotent, reload/rời phòng và timeout: lượt mở lại bị `forfeited`/`EXAM_ATTEMPT_ABANDONED`, lượt quá thời lượng trả `409` và bị chốt, không thể mở lại nếu chưa được admin reset.
 - Branch isolation đã có regression coverage: staff/manager không thể thao tác student hoặc teacher khác chi nhánh; tenant isolation và quyền permission đều được kiểm tra ở HTTP-style policy matrix.
 
 Kết quả chuyên gia security độc lập được giữ riêng trong phiên audit; các finding bảo mật exploitable chỉ được chốt sau khi agent hoàn tất và đối chiếu line-level. Mục này **CẦN XÁC MINH**, không suy đoán thành lỗ hổng.
@@ -159,7 +159,7 @@ Không liệt kê file để xóa chỉ dựa vào tên/import chưa dùng. Các
 
 ### Giai đoạn 2 — Logic nghiệp vụ
 
-1. [Đã làm một phần] Test state machine exam: submit idempotent và reload/rời phòng đã có integration coverage; còn thiếu timeout, forfeit chủ động và luồng MC + essay đầy đủ.
+1. [Đã làm một phần] Test state machine exam: submit idempotent, reload/rời phòng và timeout đã có integration coverage; còn thiếu forfeit chủ động và E2E MC + essay với trình duyệt.
 2. Chuẩn hóa file đề theo canonical subject và version.
 3. Loại race autosave bằng version/ETag hoặc server-side patch contract.
 

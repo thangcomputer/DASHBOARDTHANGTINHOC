@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const mongoose = require('mongoose');
 const { Phase15LiveHarness } = require('../helpers/phase15LiveHarness');
 
 const harness = new Phase15LiveHarness();
@@ -67,6 +68,17 @@ async function seedFixtures() {
     phone: '0981234567',
     zalo: '0981234567',
     password: 'StudentPass!2',
+    course: 'Word căn bản',
+    price: 1000000,
+    status: 'Đang học',
+    paid: true,
+    studentExamUnlocked: true,
+  });
+  const studentThree = await Student.create({
+    name: 'Phase15 Student Three',
+    phone: '0991234567',
+    zalo: '0991234567',
+    password: 'StudentPass!3',
     course: 'Word căn bản',
     price: 1000000,
     status: 'Đang học',
@@ -165,6 +177,7 @@ async function seedFixtures() {
   Object.assign(ids, {
     student: String(student._id),
     studentTwo: String(studentTwo._id),
+    studentThree: String(studentThree._id),
     teacher: String(teacher._id),
     staff: String(staff._id),
     limitedStaff: String(limitedStaff._id),
@@ -413,6 +426,35 @@ test('Phase 1.5 live auth and exam route matrix', async (t) => {
     });
     assert.equal(reopened.response.status, 409);
     assert.match(reopened.json.message, /đã được chốt/i);
+
+    const timedStudent = await publicLogin('0991234567', 'StudentPass!3', 'student');
+    assert.equal(timedStudent.response.status, 200);
+    const timedStart = await harness.request('POST', `/api/students/${ids.studentThree}/exam-attempt`, {
+      token: timedStudent.json.data.accessToken,
+      body: { subjectId: 'word' },
+    });
+    assert.equal(timedStart.response.status, 200);
+
+    const Student = require('../../models/Student');
+    const timedStartAt = new Date(Date.now() - (31 * 60 * 1000));
+    await mongoose.connect(process.env.TEST_DATABASE_URI);
+    try {
+      await Student.updateOne(
+        { _id: ids.studentThree, 'examProgress.id': 'word' },
+        { $set: { 'examProgress.$.attemptStartedAt': timedStartAt } },
+      );
+    } finally {
+      await mongoose.disconnect();
+    }
+    const timedRetry = await harness.request('POST', `/api/students/${ids.studentThree}/exam-attempt`, {
+      token: timedStudent.json.data.accessToken,
+      body: {
+        subjectId: 'word',
+        liveAttemptId: timedStart.json.data.attemptId,
+      },
+    });
+    assert.equal(timedRetry.response.status, 409);
+    assert.match(timedRetry.json.message, /hết thời gian/i);
   });
 
   await t.test('teacher attempt protects profile/results and validates practical URL', async () => {
