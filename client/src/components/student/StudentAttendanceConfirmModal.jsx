@@ -162,7 +162,7 @@ export default function StudentAttendanceConfirmModal({
               {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}
             </p>
             <p className="text-sm font-semibold text-slate-800">
-              Ca {timeRange || '—'}
+              Ca {timeRange || '—'} · Giờ Việt Nam (UTC+7)
             </p>
           </div>
 

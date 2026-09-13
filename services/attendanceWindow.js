@@ -21,6 +21,7 @@ const ATTENDANCE_UNLOCK_DELAY_MINUTES = 15;
 
 /** @deprecated alias — keep exports stable */
 const ATTENDANCE_LATE_GRACE_MINUTES = ATTENDANCE_GRACE_MINUTES;
+const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 const ATTENDANCE_CODES = {
   NOT_READY: 'ATTENDANCE_WINDOW_NOT_STARTED',
@@ -51,17 +52,24 @@ function scheduleBounds(schedule, now = new Date()) {
   const d = new Date(dateRaw);
   if (Number.isNaN(d.getTime())) return null;
 
-  const y = d.getFullYear();
-  const mo = d.getMonth();
-  const day = d.getDate();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: VIETNAM_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d);
+  const valueOf = (type) => Number(parts.find((part) => part.type === type)?.value);
+  const y = valueOf('year');
+  const mo = valueOf('month') - 1;
+  const day = valueOf('day');
 
   const startMins = parseTimeToMinutes(schedule.startTime);
   let endMins = parseTimeToMinutes(schedule.endTime);
   if (endMins == null && startMins != null) endMins = Math.min(startMins + 90, 23 * 60 + 59);
   if (startMins == null || endMins == null) return null;
 
-  const startAt = new Date(y, mo, day, Math.floor(startMins / 60), startMins % 60, 0, 0);
-  const endAt = new Date(y, mo, day, Math.floor(endMins / 60), endMins % 60, 0, 0);
+  const startAt = new Date(Date.UTC(y, mo, day, Math.floor(startMins / 60) - 7, startMins % 60, 0, 0));
+  const endAt = new Date(Date.UTC(y, mo, day, Math.floor(endMins / 60) - 7, endMins % 60, 0, 0));
   const graceEndAt = new Date(endAt.getTime() + ATTENDANCE_GRACE_MINUTES * 60 * 1000);
 
   return { startAt, endAt, graceEndAt, now: now instanceof Date ? now : new Date(now) };

@@ -55,18 +55,18 @@ export const WEEK_SLOT_OPTIONS = buildWeekSlotOptions();
 const OCCUPYING = new Set(['scheduled', 'completed', 'no_show']);
 
 export function startOfWeekMonday(input = new Date()) {
-  const date = input instanceof Date ? new Date(input) : new Date(input);
-  date.setHours(0, 0, 0, 0);
-  const day = date.getDay();
+  const key = normalizeScheduleDate(input);
+  const [year, month, dayOfMonth] = key.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, dayOfMonth, 12));
+  const day = date.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
+  date.setUTCDate(date.getUTCDate() + diff);
   return date;
 }
 
 export function addDays(date, n) {
   const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + n);
   return d;
 }
 
