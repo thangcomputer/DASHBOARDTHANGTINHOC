@@ -9,14 +9,24 @@ export function parseTimeToMinutes(raw) {
   return h * 60 + min;
 }
 
-/** YYYY-MM-DD theo lịch local (không dùng UTC slice — tránh lệch ngày lúc đêm VN). */
+export const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+function vietnamDateParts(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: VIETNAM_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  return Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+}
+
+/** YYYY-MM-DD theo giờ Việt Nam, không phụ thuộc múi giờ máy người dùng. */
 export function formatLocalDateKey(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
   if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  const { year, month, day } = vietnamDateParts(d);
+  return `${year}-${month}-${day}`;
 }
 
 /** Ngày lịch (YYYY-MM-DD local) đã trước hôm nay — không cho xếp/sửa. */
@@ -66,9 +76,14 @@ export function normalizeTimeHHmm(raw, fallback = '19:30') {
   return `${String(parseInt(m[1], 10)).padStart(2, '0')}:${m[2]}`;
 }
 
-/** Gio hien tai cua he thong (HH:mm, 24h) */
+/** Gio hien tai theo gio Viet Nam (HH:mm, 24h) */
 export function getCurrentTimeHHmm(date = new Date()) {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: VIETNAM_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
 }
 
 export const SESSION_DURATION_MINS = 90;
@@ -141,17 +156,18 @@ export function formatTeacherConflictMessage(conflict) {
 /** Buoi hoc dang dien ra: cung ngay va gio hien tai nam trong [startTime, endTime] */
 export function isScheduleOngoingNow(schedule, now = new Date()) {
   if (!schedule || schedule.status !== 'scheduled') return false;
-  const schedDate = new Date(schedule.date);
-  if (Number.isNaN(schedDate.getTime())) return false;
-  if (
-    schedDate.getFullYear() !== now.getFullYear()
-    || schedDate.getMonth() !== now.getMonth()
-    || schedDate.getDate() !== now.getDate()
-  ) return false;
+  if (normalizeScheduleDate(schedule.date) !== formatLocalDateKey(now)) return false;
 
   const start = parseTimeToMinutes(schedule.startTime);
   const end = parseTimeToMinutes(schedule.endTime);
-  const current = now.getHours() * 60 + now.getMinutes();
+  const currentParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: VIETNAM_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const current = Number(currentParts.find((part) => part.type === 'hour')?.value || 0) * 60
+    + Number(currentParts.find((part) => part.type === 'minute')?.value || 0);
   if (start == null) return false;
   if (end == null) return current >= start;
   return current >= start && current <= end;
@@ -178,12 +194,11 @@ export function isSchedulePastEnd(schedule, now = new Date()) {
   }
   if (endMins == null) {
     // Không có giờ → coi hết ngày là "đã qua"
-    const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
-    return now.getTime() > endOfDay.getTime();
+    const endOfDay = Date.UTC(y, m - 1, d, 16, 59, 59, 999);
+    return now.getTime() > endOfDay;
   }
-
-  const endAt = new Date(y, m - 1, d, Math.floor(endMins / 60), endMins % 60, 0, 0);
-  return now.getTime() > endAt.getTime();
+  const endAt = Date.UTC(y, m - 1, d, Math.floor(endMins / 60) - 7, endMins % 60, 0, 0);
+  return now.getTime() > endAt;
 }
 
 /** Nhãn hiển thị lịch (không ghi DB) — aligned with attendance state machine */

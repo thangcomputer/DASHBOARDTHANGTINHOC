@@ -3,6 +3,8 @@ import { Calendar, CheckCircle, Clock, Ban } from 'lucide-react';
 import {
   getScheduleDisplayKind,
   isScheduleUpcomingDisplay,
+  normalizeScheduleDate,
+  formatLocalDateKey,
 } from '../../utils/scheduleTime';
 import TeacherTeachingLog from '../teacher/TeacherTeachingLog';
 import StudentWeeklyScheduleGrid from './StudentWeeklyScheduleGrid';
@@ -12,14 +14,14 @@ export const ScheduleView = ({
   student,
   setNoteModalSched,
 }) => {
-  const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
+  const todayKey = formatLocalDateKey(new Date());
+  const currentMonth = todayKey.slice(5, 7);
+  const currentYear = todayKey.slice(0, 4);
 
   const monthSchedules = useMemo(() => (
     (schedules || []).filter((s) => {
-      const d = new Date(s.date);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      const key = normalizeScheduleDate(s.date);
+      return key.slice(5, 7) === currentMonth && key.slice(0, 4) === currentYear;
     })
   ), [schedules, currentMonth, currentYear]);
 
@@ -48,7 +50,7 @@ export const ScheduleView = ({
               Quản lý Lịch học &amp; Điểm danh
             </h2>
             <p className="text-xs text-slate-500 font-medium">
-              Xem lịch học theo tuần và nhật ký học tập
+              Xem lịch học theo tuần và nhật ký học tập · Giờ Việt Nam (UTC+7)
             </p>
           </div>
         </div>
