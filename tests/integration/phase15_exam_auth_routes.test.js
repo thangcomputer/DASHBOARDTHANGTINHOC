@@ -155,6 +155,18 @@ async function seedFixtures() {
     studentExamBankRawData: studentBank,
     studentExamMinutesRaw: { word: 30 },
     studentEssayRequiredRaw: { word: false },
+    studentExamFilesRaw: {
+      word: {
+        fileUrl: '/uploads/training/word.docx',
+        fileName: 'Word.docx',
+        fileType: 'DOCX',
+      },
+      powerpoint: {
+        fileUrl: '/uploads/training/powerpoint.pptx',
+        fileName: 'PowerPoint.pptx',
+        fileType: 'PPTX',
+      },
+    },
     teacherExamBankRawData: teacherBank,
     teacherExamMinutesRaw: { word: 30 },
     adminMfaEnabled: false,
@@ -355,6 +367,28 @@ test('Phase 1.5 live auth and exam route matrix', async (t) => {
       token: tokens.limitedStaff,
     });
     assert.equal(limited.response.status, 403);
+
+    const updateFile = await harness.request('PUT', '/api/settings/student-exam-config', {
+      token: tokens.staff,
+      body: {
+        studentExamFiles: {
+          excel: {
+            fileUrl: '/uploads/training/excel.xlsx',
+            fileName: 'Excel.xlsx',
+            fileType: 'xlsx',
+          },
+        },
+      },
+    });
+    assert.equal(updateFile.response.status, 200);
+
+    const studentConfigAfterPatch = await harness.request('GET', '/api/settings/student-exam-config', {
+      token: tokens.student,
+    });
+    assert.equal(studentConfigAfterPatch.response.status, 200);
+    assert.equal(studentConfigAfterPatch.json.data.studentExamFiles.word.fileUrl, '/uploads/training/word.docx');
+    assert.equal(studentConfigAfterPatch.json.data.studentExamFiles.powerpoint.fileUrl, '/uploads/training/powerpoint.pptx');
+    assert.equal(studentConfigAfterPatch.json.data.studentExamFiles.excel.fileUrl, '/uploads/training/excel.xlsx');
   });
 
   await t.test('student attempt is owned, answer-free, server-graded and idempotent', async () => {

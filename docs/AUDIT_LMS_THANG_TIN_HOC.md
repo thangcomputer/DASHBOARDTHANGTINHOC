@@ -101,6 +101,7 @@ Các điểm cần xác minh trên staging:
 - Quyền đọc của admin/staff/teacher đã được kiểm tra qua HTTP integration; ownership của học viên có unit và integration regression test.
 - State machine thực tế đã được kiểm tra cho submit idempotent, reload/rời phòng và timeout: lượt mở lại bị `forfeited`/`EXAM_ATTEMPT_ABANDONED`, lượt quá thời lượng trả `409` và bị chốt, không thể mở lại nếu chưa được admin reset.
 - Branch isolation đã có regression coverage: staff/manager không thể thao tác student hoặc teacher khác chi nhánh; tenant isolation và quyền permission đều được kiểm tra ở HTTP-style policy matrix.
+- Cấu hình file đề đã có live API regression: cập nhật file một môn không xóa metadata file của các môn khác, và học viên đọc lại được mapping đầy đủ sau autosave.
 
 Kết quả chuyên gia security độc lập được giữ riêng trong phiên audit; các finding bảo mật exploitable chỉ được chốt sau khi agent hoàn tất và đối chiếu line-level. Mục này **CẦN XÁC MINH**, không suy đoán thành lỗ hổng.
 
