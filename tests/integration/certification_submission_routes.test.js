@@ -9,6 +9,7 @@ const harness = new Phase15LiveHarness();
 let studentId;
 let studentToken;
 let otherStudentToken;
+const staffTokens = {};
 let uploadedFileUrl;
 
 async function login(phone, password) {
@@ -17,8 +18,16 @@ async function login(phone, password) {
   });
 }
 
+async function internalLogin(phone, password) {
+  const captcha = await harness.captcha();
+  return harness.request('POST', '/api/auth/login/internal', {
+    body: { phone, password, ...captcha },
+  });
+}
+
 async function seedFixtures() {
   const Student = require('../../models/Student');
+  const Teacher = require('../../models/Teacher');
   const student = await Student.create({
     name: 'Certification Integration Student',
     phone: '0905551001',
@@ -48,6 +57,30 @@ async function seedFixtures() {
     paid: true,
     studentExamUnlocked: true,
   });
+  await Teacher.create({
+    name: 'Certification Teacher',
+    phone: '0905551010',
+    password: 'CertificationTeacher!1',
+    role: 'teacher',
+    status: 'pending',
+    subjectIds: ['word'],
+  });
+  await Teacher.create({
+    name: 'Certification Staff',
+    phone: '0905551011',
+    password: 'CertificationStaff!1',
+    role: 'staff',
+    adminRole: 'STAFF',
+    status: 'active',
+  });
+  await Teacher.create({
+    name: 'Certification Admin',
+    phone: '0905551012',
+    password: 'CertificationAdmin!1',
+    role: 'admin',
+    adminRole: 'HIGH_ADMIN',
+    status: 'active',
+  });
   studentId = String(student._id);
 }
 
@@ -60,10 +93,41 @@ test.before(async () => {
   assert.equal(other.response.status, 200);
   studentToken = student.json.data.accessToken;
   otherStudentToken = other.json.data.accessToken;
+  const teacher = await harness.request('POST', '/api/auth/login/public', {
+    body: { phone: '0905551010', password: 'CertificationTeacher!1', role: 'teacher' },
+  });
+  assert.equal(teacher.response.status, 200);
+  staffTokens.teacher = teacher.json.data.accessToken;
+  for (const [role, phone, password] of [
+    ['staff', '0905551011', 'CertificationStaff!1'],
+    ['admin', '0905551012', 'CertificationAdmin!1'],
+  ]) {
+    const internal = await internalLogin(phone, password);
+    assert.equal(internal.response.status, 200);
+    staffTokens[role] = internal.json.data.accessToken;
+  }
 });
 
 test.after(async () => {
   await harness.stop();
+});
+
+test('certification upload rejects spoofed file content', async () => {
+  const form = new FormData();
+  form.append('file', new Blob([Buffer.from('not a real Word document')]), 'spoofed.docx');
+  const response = await fetch(`${harness.baseUrl}/api/assignments/upload?context=certification`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${studentToken}`,
+      Cookie: harness.cookie,
+      'X-CSRF-Token': harness.csrfToken,
+    },
+    body: form,
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 400);
+  assert.match(payload.message, /không khớp/i);
 });
 
 test('certification upload registers an owned FileAsset', async () => {
@@ -115,4 +179,58 @@ test('another student cannot use the uploaded certification file', async () => {
     },
   });
   assert.equal(result.response.status, 403);
+});
+
+test('certification download requires authentication and enforces token revocation', async () => {
+  assert.ok(uploadedFileUrl);
+
+  const unauthenticated = await fetch(`${harness.baseUrl}${uploadedFileUrl}`, {
+    headers: { Accept: 'application/json' },
+  });
+  assert.equal(unauthenticated.status, 401);
+
+  const ownDownload = await fetch(`${harness.baseUrl}${uploadedFileUrl}`, {
+    headers: { Authorization: `Bearer ${studentToken}` },
+  });
+  assert.equal(ownDownload.status, 200);
+
+  for (const role of ['teacher', 'staff', 'admin']) {
+    const staffDownload = await fetch(`${harness.baseUrl}${uploadedFileUrl}`, {
+      headers: { Authorization: `Bearer ${staffTokens[role]}` },
+    });
+    assert.equal(staffDownload.status, 200, role);
+  }
+
+  const otherDownload = await fetch(`${harness.baseUrl}${uploadedFileUrl}`, {
+    headers: { Authorization: `Bearer ${otherStudentToken}` },
+  });
+  assert.equal(otherDownload.status, 403);
+
+  const FileAsset = require('../../models/FileAsset');
+  await mongoose.connect(process.env.TEST_DATABASE_URI);
+  await FileAsset.updateOne(
+    { url: uploadedFileUrl },
+    { $set: { expiresAt: new Date(Date.now() - 1000) } },
+  );
+  await mongoose.disconnect();
+  const expiredDownload = await fetch(`${harness.baseUrl}${uploadedFileUrl}`, {
+    headers: { Authorization: `Bearer ${studentToken}` },
+  });
+  assert.equal(expiredDownload.status, 404);
+
+  await mongoose.connect(process.env.TEST_DATABASE_URI);
+  await FileAsset.updateOne(
+    { url: uploadedFileUrl },
+    { $set: { expiresAt: null } },
+  );
+  await mongoose.disconnect();
+  const logout = await harness.request('POST', '/api/auth/logout', {
+    token: studentToken,
+    body: {},
+  });
+  assert.equal(logout.response.status, 200);
+  const revokedDownload = await fetch(`${harness.baseUrl}${uploadedFileUrl}`, {
+    headers: { Authorization: `Bearer ${studentToken}` },
+  });
+  assert.equal(revokedDownload.status, 401);
 });

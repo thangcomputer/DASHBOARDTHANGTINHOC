@@ -91,6 +91,16 @@ Các điểm cần xác minh trên staging:
 4. Xác minh hardcoded admin không dùng mật khẩu dev/fallback trong production; production env validation phải bắt buộc secret riêng.
 5. Xác minh webhook payment signature, replay/idempotency và quyền export CSV.
 
+### Bằng chứng đã xác minh trong local test harness
+
+- Upload certification gắn `FileAsset` với `relatedType: certification_submission` và đúng `uploadedBy`.
+- Nội dung giả mạo đuôi `.docx` bị từ chối bằng magic-byte validation.
+- File certification yêu cầu authentication, kiểm tra ownership và chặn token đã revoke.
+- File có `expiresAt` trong quá khứ bị trả `404`, không để lộ nội dung file.
+- Path traversal (`..`) không được coi là public upload path.
+- Quyền đọc của admin/staff/teacher đã được kiểm tra qua HTTP integration; ownership của học viên có unit và integration regression test.
+- State machine thực tế đã được kiểm tra cho submit idempotent và reload/rời phòng: lượt mở lại bị `forfeited`/`EXAM_ATTEMPT_ABANDONED`, không thể mở lại nếu chưa được admin reset.
+
 Kết quả chuyên gia security độc lập được giữ riêng trong phiên audit; các finding bảo mật exploitable chỉ được chốt sau khi agent hoàn tất và đối chiếu line-level. Mục này **CẦN XÁC MINH**, không suy đoán thành lỗ hổng.
 
 ## 6. Frontend
@@ -141,13 +151,14 @@ Không liệt kê file để xóa chỉ dựa vào tên/import chưa dùng. Các
 
 ### Giai đoạn 1 — Critical/security
 
-1. Hoàn tất security line review và IDOR matrix.
-2. Fail-fast session store production.
-3. E2E upload/download với revoke token, MIME/path traversal và branch scope.
+1. [Đã làm một phần] Hoàn tất security line review và IDOR matrix.
+2. [Đã hoàn tất] Fail-fast session store production.
+3. [Đã làm một phần] E2E upload/download với revoke token, MIME/path traversal và expiry.
+4. [Còn thiếu] Mở rộng HTTP matrix cho branch scope; quyền đọc certification của admin/staff/teacher đã có integration coverage.
 
 ### Giai đoạn 2 — Logic nghiệp vụ
 
-1. Test toàn bộ state machine exam.
+1. [Đã làm một phần] Test state machine exam: submit idempotent và reload/rời phòng đã có integration coverage; còn thiếu timeout, forfeit chủ động và luồng MC + essay đầy đủ.
 2. Chuẩn hóa file đề theo canonical subject và version.
 3. Loại race autosave bằng version/ETag hoặc server-side patch contract.
 
@@ -218,4 +229,3 @@ Không liệt kê file để xóa chỉ dựa vào tên/import chưa dùng. Các
 - `Set-Location client; npm.cmd run build`: đạt, 2.421 modules transformed.
 - Root `npm run build` không tồn tại; build đúng phải chạy trong `client`.
 - Full integration chưa chạy vì cần `TEST_DATABASE_URI` an toàn và dữ liệu fixture riêng.
-

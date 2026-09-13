@@ -2,7 +2,15 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { canReadCertificationSubmission } = require('../../middleware/uploadsAuth');
+const {
+  canReadCertificationSubmission,
+  isPublicUploadPath,
+} = require('../../middleware/uploadsAuth');
+
+test('public upload matching fails closed for traversal paths', () => {
+  assert.equal(isPublicUploadPath('/images/../assignments/private.docx'), false);
+  assert.equal(isPublicUploadPath('/images/logo.png'), true);
+});
 
 test('certification submission files are readable by their uploader', () => {
   assert.equal(

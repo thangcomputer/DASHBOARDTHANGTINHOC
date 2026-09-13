@@ -23,6 +23,7 @@ const PUBLIC_UPLOAD_PREFIXES = [
 function isPublicUploadPath(urlPath) {
   const p = String(urlPath || '').split('?')[0];
   const normalized = p.startsWith('/') ? p : `/${p}`;
+  if (normalized.split('/').includes('..')) return false;
   // express.static mounts at /uploads so req.path is relative like /messages/...
   return PUBLIC_UPLOAD_PREFIXES.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
 }

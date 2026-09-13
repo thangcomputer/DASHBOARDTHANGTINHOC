@@ -392,6 +392,27 @@ test('Phase 1.5 live auth and exam route matrix', async (t) => {
     });
     assert.equal(retry.response.status, 200);
     assert.equal(retry.json.data.idempotent, true);
+
+    const reloadCreated = await harness.request('POST', `/api/students/${ids.studentTwo}/exam-attempt`, {
+      token: tokens.studentTwo,
+      body: { subjectId: 'word' },
+    });
+    assert.equal(reloadCreated.response.status, 200);
+    assert.ok(reloadCreated.json.data.attemptId);
+
+    const reload = await harness.request('POST', `/api/students/${ids.studentTwo}/exam-attempt`, {
+      token: tokens.studentTwo,
+      body: { subjectId: 'word' },
+    });
+    assert.equal(reload.response.status, 409);
+    assert.equal(reload.json.code, 'EXAM_ATTEMPT_ABANDONED');
+
+    const reopened = await harness.request('POST', `/api/students/${ids.studentTwo}/exam-attempt`, {
+      token: tokens.studentTwo,
+      body: { subjectId: 'word' },
+    });
+    assert.equal(reopened.response.status, 409);
+    assert.match(reopened.json.message, /đã được chốt/i);
   });
 
   await t.test('teacher attempt protects profile/results and validates practical URL', async () => {
