@@ -9,6 +9,8 @@ export default function CertPrepTestList({
   onToggle,
   onQuestions,
   onPreview,
+  onPromptUpload,
+  onPromptRemove,
 }) {
   if (loading) {
     return (
@@ -41,8 +43,16 @@ export default function CertPrepTestList({
               <p className={`text-xs font-bold mt-1 ${t.isActive === false ? 'text-slate-400' : 'text-emerald-600'}`}>
                 {t.isActive === false ? 'Tắt' : 'Bật'}
               </p>
+              <p className={`text-xs font-bold mt-1 ${t.essayPromptFile?.url ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {t.essayPromptFile?.url ? `Đã có file tự luận: ${t.essayPromptFile.originalName || 'tài liệu'}` : 'Thiếu file đề tự luận'}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <label className="min-h-10 px-3 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 inline-flex items-center cursor-pointer">
+                {t.essayPromptFile?.url ? 'Thay file tự luận' : 'Tải file tự luận'}
+                <input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPromptUpload?.(t, f); }} />
+              </label>
+              {t.essayPromptFile?.url ? <button type="button" onClick={() => onPromptRemove?.(t)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-red-50 text-red-700">Xóa file</button> : null}
               <button type="button" onClick={() => onQuestions(t)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-red-600 text-white">Câu hỏi</button>
               <button type="button" onClick={() => onPreview(t)} className="min-h-10 px-3 rounded-xl text-xs font-bold bg-slate-100 inline-flex items-center gap-1">
                 <Eye size={14} aria-hidden="true" /> Preview đề

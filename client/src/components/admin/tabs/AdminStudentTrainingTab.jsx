@@ -18,6 +18,7 @@ import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../
 import { useData } from '../../../context/DataContext';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
 import AdminTeacherQuizHistoryPanel from '../shared/AdminTeacherQuizHistoryPanel';
+import { getExamProgressDisplayStatus, summarizeExamProgress } from '../../../utils/examProgressStats';
 
 function mergeDocumentCourseOptions(dbCourses, lmsVideos) {
   const merged = [];
@@ -167,7 +168,7 @@ export default function AdminStudentTrainingTab() {
                   { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
                   { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: studentTrainingData?.softwareLinks?.length || 0 },
                   { key: 'questions', icon: HelpCircle, label: 'Ngân hàng câu hỏi', count: studentQuestions?.length || 0 },
-                  { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: (students || []).reduce((acc, s) => acc + (s.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').length, 0) },
+                  { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: summarizeExamProgress(students).total },
                   { key: 'quizzes', icon: Award, label: 'Lịch sử Trắc nghiệm GV', count: 'Mới' },
                 ].map(t => (
                   <button
@@ -496,6 +497,7 @@ export default function AdminStudentTrainingTab() {
                       subjectLabel: SUBJECT_LABELS[ep.id] || ep.id,
                       score: ep.tracNghiem?.score ?? 0,
                       total: ep.tracNghiem?.total ?? 15,
+                      tracNghiem: ep.tracNghiem || { score: 0, total: 0 },
                       hasTracNghiem: Boolean(ep.tracNghiem && Number(ep.tracNghiem.total) > 0),
                       thucHanh: ep.thucHanh || 'chua_nop',
                       essayFile: ep.essayFile || '',
@@ -507,6 +509,15 @@ export default function AdminStudentTrainingTab() {
                 const filtered = allRows.filter(r => 
                   !erSearch || r.studentName?.toLowerCase().includes(erSearch.toLowerCase())
                 );
+                const visibleSummary = filtered.reduce((summary, row) => {
+                  const status = getExamProgressDisplayStatus(row);
+                  if (status === 'dat') summary.dat += 1;
+                  else if (status === 'cho_nop') summary.choNop += 1;
+                  else if (status === 'cho_cham') summary.choCham += 1;
+                  else if (status === 'dang_thi') summary.dangThi += 1;
+                  else if (status === 'khong_dat') summary.khongDat += 1;
+                  return summary;
+                }, { dat: 0, choNop: 0, choCham: 0, dangThi: 0, khongDat: 0 });
 
                 // Helper: save essay score to student's examProgress
                 const saveEssayScore = async (studentId, subjectId, newScore) => {
@@ -561,6 +572,20 @@ export default function AdminStudentTrainingTab() {
                       {filtered.length} bản ghi
                     </span>
                   </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    {[
+                      ['ĐẠT', visibleSummary.dat, 'border-emerald-200 bg-emerald-50 text-emerald-700'],
+                      ['CHỜ NỘP', visibleSummary.choNop, 'border-blue-200 bg-blue-50 text-blue-700'],
+                      ['CHỜ CHẤM', visibleSummary.choCham, 'border-amber-200 bg-amber-50 text-amber-700'],
+                      ['ĐANG THI', visibleSummary.dangThi, 'border-yellow-200 bg-yellow-50 text-yellow-700'],
+                      ['RỚT', visibleSummary.khongDat, 'border-red-200 bg-red-50 text-red-700'],
+                    ].map(([label, count, classes]) => (
+                      <div key={label} className={`rounded-xl border px-3 py-2 ${classes}`}>
+                        <p className="text-[10px] font-black uppercase tracking-wide">{label}</p>
+                        <p className="mt-0.5 text-xl font-black">{count}</p>
+                      </div>
+                    ))}
+                  </div>
 
                   {filtered.length === 0 ? (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-14 text-center text-gray-400">
@@ -600,13 +625,9 @@ export default function AdminStudentTrainingTab() {
                             const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
                             const isLocked = r.lockUntil && r.lockUntil > Date.now();
                             const tnPass = pct >= 50;
-                            // Đang thi: không lấy điểm TN=0 thành RỚT. ĐẠT/RỚT chỉ khi đã nộp / đã khóa.
-                            const finalStatus = r.status === 'dang_thi' ? 'dang_thi'
-                              : r.status === 'khong_dat' ? 'khong_dat'
-                              : !tnPass ? 'khong_dat'
-                              : r.thucHanh !== 'da_nop' ? r.status
-                              : r.essayScore === null ? 'cho_cham'
-                              : r.essayScore >= 5 ? 'dat' : 'khong_dat';
+                            // Đang thi: không lấy điểm TN=0 thành RỚT. Sau khi đạt TN,
+                            // phân biệt rõ trạng thái đang chờ học viên nộp file thực hành.
+                            const finalStatus = getExamProgressDisplayStatus(r);
                             return (
                               <tr key={`${r.studentId}-${r.subjectId}`} className="hover:bg-amber-50/30 transition-colors">
                                 <td className="px-4 py-3">
@@ -665,7 +686,7 @@ export default function AdminStudentTrainingTab() {
                                   {r.thucHanh === 'da_nop' ? (() => {
                                     const rowKey = `${r.studentId}-${r.subjectId}`;
                                     const isGrading = gradingRow === rowKey;
-                                    if (r.essayScore !== null && !isGrading) {
+                                    if (r.essayScore != null && !isGrading) {
                                       // Đã chấm: hiện điểm + nút chấm lại
                                       return (
                                         <div className="flex flex-col items-center gap-1">
@@ -730,12 +751,14 @@ export default function AdminStudentTrainingTab() {
                                     finalStatus === 'dat' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                     : finalStatus === 'khong_dat' ? 'bg-red-50 text-red-600 border border-red-200'
                                     : finalStatus === 'cho_cham' ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : finalStatus === 'cho_nop' ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                     : finalStatus === 'dang_thi' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
                                     : 'bg-gray-50 text-gray-500 border border-gray-200'
                                   }`}>
                                     {finalStatus === 'dat' && <><CheckCircle2 size={11} /> ĐẠT</>}
                                     {finalStatus === 'khong_dat' && <><XCircle size={11} /> RỚT</>}
                                     {finalStatus === 'dang_thi' && '⏳ ĐANG THI'}
+                                    {finalStatus === 'cho_nop' && '📎 CHỜ NỘP TỰ LUẬN'}
                                     {finalStatus === 'cho_cham' && '📝 CHỜ CHẤM'}
                                   </span>
                                 </td>

@@ -840,7 +840,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     let essayFileStored = '';
     if (uploadFile) {
       try {
-        const res = await api.assignments.uploadFile(uploadFile);
+        const res = await api.assignments.uploadFile(uploadFile, { context: 'certification' });
         if (!res?.success || !res.fileUrl) {
           throw new Error(res?.message || 'Tải file lên thất bại');
         }
@@ -909,8 +909,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   };
 
   const trySubmitTuLuan = () => {
-    if (!uploadFile) setShowNoFileConfirm(true);
-    else void handleFinalTuLuan();
+    if (!uploadFile) return;
+    void handleFinalTuLuan();
   };
 
   // Drag & drop
@@ -1145,11 +1145,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                 }
                 <button
                   type="button"
-                  disabled={tuLuanSubmitting}
+                  disabled={tuLuanSubmitting || !uploadFile}
                   onClick={() => { if (!uploadFile) return; void handleFinalTuLuan(); }}
-                  className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-bold rounded-xl text-sm"
+                  className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-45 text-white font-bold rounded-xl text-sm"
                 >
-                  {tuLuanSubmitting ? 'Đang tải lên…' : 'Nộp bài tự luận'}
+                  {tuLuanSubmitting ? 'Đang tải lên…' : uploadFile ? 'Nộp bài tự luận' : 'Chọn file để nộp bài'}
                 </button>
               </>
             )}
@@ -1509,17 +1509,17 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                             <p className="mt-2 text-sm text-slate-600">
                               Kéo thả hoặc <span className="font-bold text-indigo-600">chọn file</span>
                             </p>
-                            <p className="mt-1 text-xs text-slate-400">Word, Excel, PowerPoint · tối đa 50MB</p>
+                            <p className="mt-1 text-xs text-slate-400">Word, Excel, PowerPoint · tối đa 3MB</p>
                           </div>
                         )}
                       </div>
                       <button
                         type="button"
-                        disabled={tuLuanSubmitting}
+                        disabled={tuLuanSubmitting || !uploadFile}
                         onClick={trySubmitTuLuan}
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 py-4 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:opacity-60"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 py-4 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
                       >
-                        <Send size={18} /> {tuLuanSubmitting ? 'ĐANG TẢI LÊN…' : 'NỘP BÀI THỰC HÀNH'}
+                        <Send size={18} /> {tuLuanSubmitting ? 'ĐANG TẢI LÊN…' : uploadFile ? 'NỘP BÀI THỰC HÀNH' : 'CHỌN FILE ĐỂ NỘP BÀI'}
                       </button>
                     </div>
                   )}

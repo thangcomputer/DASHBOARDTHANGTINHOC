@@ -1515,10 +1515,11 @@ export const assignmentsAPI = {
     });
     return res.json();
   },
-  uploadFile: async (file) => {
+  uploadFile: async (file, options = {}) => {
     const formData = new FormData();
     formData.append('file', file);
-    return uploadWithAuth('/assignments/upload', formData);
+    const context = options?.context === 'certification' ? '?context=certification' : '';
+    return uploadWithAuth(`/assignments/upload${context}`, formData);
   },
   submit: async (assignmentId, data) => {
     const res = await apiFetch(`/assignments/${assignmentId}/submit`, {
@@ -1710,7 +1711,9 @@ export const settingsAPI = {
     return data;
   },
   getStudentExamConfig: async () => {
-    const res = await apiFetch('/settings/student-exam-config');
+    const res = await apiFetch(`/settings/student-exam-config?_=${Date.now()}`, {
+      cache: 'no-store',
+    });
     return res.json();
   },
   updateStudentExamConfig: async (payload) => {
@@ -1718,7 +1721,11 @@ export const settingsAPI = {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
-    return res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.message || `Lưu cấu hình thi học viên thất bại (${res.status})`);
+    }
+    return data;
   },
   getExamSubjectsCatalog: async () => {
     const res = await apiFetch('/settings/exam-subjects');
@@ -2558,4 +2565,3 @@ export default {
   blog:          blogAPI,
   centerInfo:    centerInfoAPI,
 };
-

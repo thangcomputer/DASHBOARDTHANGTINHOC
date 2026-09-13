@@ -24,6 +24,10 @@ const { emitSystemWide } = require('../utils/realtimeEmit');
 const { policyShadowSettings } = require('../middleware/policyShadowSettings');
 const { settingsCutoverGate } = require('../middleware/settingsCutoverGate');
 const { resolveExamBankAccess } = require('../services/examAttemptService');
+const {
+  sanitizeStudentExamFilesPayload,
+  buildStudentExamFileUpdates,
+} = require('../utils/studentExamFiles');
 
 /** Phase 7.19: policyShadowSettings → settingsCutoverGate (auth applied separately when required) */
 function settingsGuard(action) {
@@ -475,19 +479,19 @@ function sanitizeStudentEssayRequiredPayload(body) {
   return out;
 }
 
-function sanitizeStudentExamFilesPayload(body) {
+function studentExamFilesFromQuestionBank(bank) {
   const out = {};
-  if (!body || typeof body !== 'object') return out;
-  for (const [k, v] of Object.entries(body)) {
-    if (!v || typeof v !== 'object') continue;
-    const sid = String(k).trim().slice(0, 40);
-    if (!sid) continue;
-    const fileUrl = String(v.fileUrl || '').trim();
-    if (!fileUrl.startsWith('/uploads/')) continue;
-    out[sid] = {
+  for (const question of Array.isArray(bank) ? bank : []) {
+    const section = String(question?.section || '').trim().toLowerCase();
+    const fileUrl = String(question?.attachedFileUrl || question?.practiceFileUrl || '').trim();
+    if (!section || !fileUrl.startsWith('/uploads/')) continue;
+    if (out[section]) continue;
+    out[section] = {
       fileUrl: fileUrl.slice(0, 500),
-      fileName: String(v.fileName || '').trim().slice(0, 255),
-      fileType: String(v.fileType || '').trim().slice(0, 20).toUpperCase(),
+      fileName: String(
+        question?.attachedFileName || question?.practiceFileName || question?.attachedFile || '',
+      ).trim().slice(0, 255),
+      fileType: '',
     };
   }
   return out;
@@ -567,7 +571,10 @@ router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only')
         studentEssayRequired: hasEssayRequiredOnServer
           ? sanitizeStudentEssayRequiredPayload(essayRequiredRaw)
           : undefined,
-        studentExamFiles: hasExamFilesOnServer ? sanitizeStudentExamFilesPayload(filesRaw) : {},
+        studentExamFiles: {
+          ...studentExamFilesFromQuestionBank(bank),
+          ...(hasExamFilesOnServer ? sanitizeStudentExamFilesPayload(filesRaw) : {}),
+        },
         examWarningSoundUrl: String(settings.examWarningSoundUrl || '').trim(),
         examSubjectsCustom: catalog.custom,
         examSubjectsMerged: catalog.merged,
@@ -913,7 +920,7 @@ router.put('/student-exam-config', authMiddleware, ...settingsGuard('student_tra
       updates.studentEssayRequiredRaw = sanitizeStudentEssayRequiredPayload(studentEssayRequired);
     }
     if (studentExamFiles !== undefined) {
-      updates.studentExamFilesRaw = sanitizeStudentExamFilesPayload(studentExamFiles);
+      Object.assign(updates, buildStudentExamFileUpdates(studentExamFiles));
     }
     if (examWarningSoundUrl !== undefined) {
       const url = String(examWarningSoundUrl || '').trim();
@@ -928,7 +935,18 @@ router.put('/student-exam-config', authMiddleware, ...settingsGuard('student_tra
     await updateMainSettings({ $set: updates });
     const io = req.app.get('io');
     if (io) emitSettingsRefresh(io);
-    return res.json({ success: true, message: 'Đã lưu cấu hình thi học viên' });
+    return res.json({
+      success: true,
+      message: 'Đã lưu cấu hình thi học viên',
+      data: {
+        studentExamFiles: Object.keys(updates)
+          .filter((key) => key.startsWith('studentExamFilesRaw.'))
+          .reduce((files, key) => {
+            files[key.slice('studentExamFilesRaw.'.length)] = updates[key];
+            return files;
+          }, {}),
+      },
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

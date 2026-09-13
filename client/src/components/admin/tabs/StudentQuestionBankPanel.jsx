@@ -92,6 +92,7 @@ export default function StudentQuestionBankPanel() {
     studentEssayRequired,
     updateStudentEssayRequired,
     studentExamFiles,
+    setStudentExamFile,
     examWarningSoundUrl = '',
     setExamWarningSoundUrl,
     addStudentQuestion,
@@ -117,6 +118,7 @@ export default function StudentQuestionBankPanel() {
   const [soundUploading, setSoundUploading] = React.useState(false);
   const [imageUploading, setImageUploading] = React.useState(false);
   const [pdfUploading, setPdfUploading] = React.useState(false);
+  const [examFileUploading, setExamFileUploading] = React.useState(false);
 
   React.useEffect(() => {
     setMcSearch('');
@@ -155,6 +157,41 @@ export default function StudentQuestionBankPanel() {
       toast.error(err.message || 'Không tải được file');
     } finally {
       setPdfUploading(false);
+    }
+  };
+
+  const handleSubjectExamFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !sqSection) return;
+    setExamFileUploading(true);
+    try {
+      const data = await api.settings.uploadTrainingFile(file);
+      if (!data.success || !data.fileUrl) throw new Error(data.message || 'Upload thất bại');
+      const fileMeta = {
+        fileUrl: data.fileUrl,
+        fileName: data.fileOriginalName || file.name,
+        fileType: file.type || '',
+      };
+      setStudentExamFile(sqSection, fileMeta);
+      const saved = await api.settings.updateStudentExamConfig({
+        studentQuestions,
+        studentExamMinutes,
+        studentEssayExamMinutes,
+        studentEssayRequired,
+        studentExamFiles: { ...studentExamFiles, [sqSection]: fileMeta },
+        examWarningSoundUrl,
+      });
+      const savedFile = saved?.data?.studentExamFiles?.[sqSection];
+      if (!saved?.success || !savedFile?.fileUrl) {
+        throw new Error('Máy chủ không lưu được file đề cho môn thi này');
+      }
+      setStudentExamFile(sqSection, savedFile);
+      toast.success(`Đã tải đề tự luận môn ${activeSubject?.label || sqSection}`);
+    } catch (err) {
+      toast.error(err.message || 'Không tải được file đề');
+    } finally {
+      setExamFileUploading(false);
     }
   };
 
@@ -317,6 +354,25 @@ export default function StudentQuestionBankPanel() {
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </CmsSelect>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700">
+                {examFileUploading ? 'Đang tải đề...' : (studentExamFiles?.[sqSection]?.fileUrl ? 'Thay file đề tự luận' : 'Tải file đề tự luận')}
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                  className="sr-only"
+                  disabled={examFileUploading}
+                  onChange={handleSubjectExamFileUpload}
+                />
+              </label>
+              {studentExamFiles?.[sqSection]?.fileUrl ? (
+                <span className="max-w-full truncate text-xs font-semibold text-emerald-700">
+                  {studentExamFiles[sqSection].fileName || 'Đã có file đề'}
+                </span>
+              ) : (
+                <span className="text-xs font-semibold text-amber-700">Chưa có file đề cho môn này</span>
+              )}
+            </div>
           </div>
           <div className="w-28">
             <label className="text-[11px] font-bold uppercase tracking-wide text-amber-700 block mb-1.5">

@@ -106,6 +106,13 @@ export const certPrepApi = {
     create: async (levelId, body) => parse(await apiFetch(`/cert-prep/levels/${levelId}/tests`, { method: 'POST', body: JSON.stringify(body) })),
     update: async (id, body) => parse(await apiFetch(`/cert-prep/tests/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
     remove: async (id) => parse(await apiFetch(`/cert-prep/tests/${id}`, { method: 'DELETE' })),
+    getPrompt: async (id) => parse(await apiFetch(`/cert-prep/tests/${id}/prompt`)),
+    uploadPrompt: async (id, file) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return uploadWithAuth(`/cert-prep/tests/${id}/prompt`, fd);
+    },
+    removePrompt: async (id) => parse(await apiFetch(`/cert-prep/tests/${id}/prompt`, { method: 'DELETE' })),
   },
   questions: {
     list: async (testId, params = {}) => parse(await apiFetch(`/cert-prep/tests/${testId}/questions${qs(params)}`)),
@@ -154,6 +161,12 @@ export const certPrepApi = {
     getResult: async (sessionId) => parse(await apiFetch(`/cert-prep/sessions/${sessionId}/result`)),
     getReview: async (sessionId) => parse(await apiFetch(`/cert-prep/sessions/${sessionId}/result`)),
     getAttempts: async (testId) => parse(await apiFetch(`/cert-prep/tests/${testId}/attempts`)),
+    getPrompt: async (testId) => parse(await apiFetch(`/cert-prep/tests/${testId}/prompt`)),
+    uploadAnswerFile: async (sessionId, file) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return uploadWithAuth(`/cert-prep/sessions/${sessionId}/answer-file`, fd);
+    },
   },
   enrollmentMappings: {
     list: async () => parse(await apiFetch('/cert-prep/enrollment-mappings')),

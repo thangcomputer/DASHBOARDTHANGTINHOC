@@ -17,6 +17,7 @@ const { pickAssignmentCreate, pickAssignmentUpdate } = require('../utils/assignm
 const { studentMatchesTeacher } = require('../services/enrollmentService');
 const { policyShadowAssignment } = require('../middleware/policyShadowAssignment');
 const { assignmentsCutoverGate } = require('../middleware/assignmentsCutoverGate');
+const { validateUploadedFileMagic } = require('../utils/uploadSniff');
 
 const router = express.Router();
 
@@ -98,6 +99,23 @@ router.post('/upload', [authMiddleware, ...assignmentsGuard('upload')], upload.s
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Chưa chọn file để tải lên' });
     }
+    const isCertificationSubmission = req.query.context === 'certification';
+    if (isCertificationSubmission && req.user?.role !== 'student') {
+      await fs.promises.unlink(req.file.path);
+      return res.status(403).json({ success: false, message: 'Chỉ học viên mới được tải bài thi chứng nhận' });
+    }
+    const fileCheck = validateUploadedFileMagic(req.file.path, req.file.originalname);
+    if (!fileCheck.ok) {
+      try {
+        await fs.promises.unlink(req.file.path);
+      } catch (cleanupError) {
+        logger.warn({ err: cleanupError.message, filePath: req.file.path }, '[ASSIGNMENTS] Invalid upload cleanup failed');
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Nội dung file không khớp với định dạng đã chọn',
+      });
+    }
     normalizeMulterFile(req.file);
     const fileUrl = `/uploads/assignments/${req.file.filename}`;
     try {
@@ -106,10 +124,18 @@ router.post('/upload', [authMiddleware, ...assignmentsGuard('upload')], upload.s
         category: 'assignments',
         uploadedBy: String(req.user?.id || ''),
         uploadedByRole: req.user?.role || '',
-        relatedType: 'assignment',
+        relatedType: isCertificationSubmission ? 'certification_submission' : 'assignment',
       });
     } catch (regErr) {
       logger.warn({ err: regErr.message }, '[ASSIGNMENTS] FileAsset register failed');
+      if (isCertificationSubmission) {
+        try {
+          await fs.promises.unlink(req.file.path);
+        } catch (cleanupError) {
+          logger.warn({ err: cleanupError.message, filePath: req.file.path }, '[ASSIGNMENTS] Registration cleanup failed');
+        }
+        return res.status(503).json({ success: false, message: 'Chưa thể lưu metadata bài nộp, vui lòng thử lại' });
+      }
     }
     return res.json({ success: true, fileUrl, message: 'Tải file lên thành công!' });
   } catch (error) {

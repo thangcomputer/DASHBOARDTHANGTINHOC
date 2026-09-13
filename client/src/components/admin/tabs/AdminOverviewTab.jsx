@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, GraduationCap, DollarSign, TrendingUp, ChevronRight } from 'lucide-react';
+import { Users, GraduationCap, DollarSign, TrendingUp, ChevronRight, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../shared/StatCard';
 import Avatar from '../shared/Avatar';
@@ -10,6 +10,7 @@ import api from '../../../services/api';
 import { useBranch } from '../../../context/BranchContext';
 import { sumClientPaidTuition } from '../../../utils/enrollments';
 import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
+import { summarizeExamProgress } from '../../../utils/examProgressStats';
 
 export default function AdminOverviewTab({ session }) {
   const { filteredStudents = [], safeTeachers = [] } = useAdminTab() || {};
@@ -33,6 +34,7 @@ export default function AdminOverviewTab({ session }) {
   const statTotalTeachers = branchStats?.totalTeachers ?? safeTeachers.length;
   const statTotalRevenue = branchStats?.totalRevenue ?? filteredStudents.reduce((sum, s) => sum + sumClientPaidTuition(s), 0);
   const statPendingTeachers = branchStats?.pendingTeachers ?? safeTeachers.filter((t) => t.status === 'Pending').length;
+  const certificationStats = summarizeExamProgress(filteredStudents);
 
   const navigate = useNavigate();
 
@@ -88,6 +90,13 @@ export default function AdminOverviewTab({ session }) {
           value={statPendingTeachers}
           sub="đang chờ xét duyệt hồ sơ"
           color="bg-amber-500"
+        />
+        <StatCard
+          icon={Award}
+          label="Chứng nhận đạt"
+          value={certificationStats.dat}
+          sub={`${certificationStats.choNop} chờ nộp · ${certificationStats.choCham} chờ chấm`}
+          color="bg-emerald-600"
         />
       </div>
 

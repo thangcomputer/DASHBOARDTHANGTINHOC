@@ -177,9 +177,19 @@ export function getStudentPracticeFilesForSubject(studentQuestions, subjectId, s
     .map((q) => getEssayQuestionFile(q))
     .filter(Boolean);
   if (fromEssays.length > 0) return fromEssays;
-  const legacy = studentExamFiles?.[subjectId];
+  const subject = String(subjectId || '').toLowerCase().trim();
+  const aliases = SUBJECT_SECTION_ALIASES[subject] || [subject];
+  const legacy = aliases
+    .map((key) => studentExamFiles?.[key])
+    .find((item) => item && (item.fileUrl || item.url || item.attachedFileUrl));
   if (legacy?.fileUrl) {
     return [{ fileUrl: legacy.fileUrl, fileName: legacy.fileName || 'De_thuc_hanh' }];
+  }
+  if (legacy?.url || legacy?.attachedFileUrl) {
+    return [{
+      fileUrl: legacy.url || legacy.attachedFileUrl,
+      fileName: legacy.fileName || legacy.name || legacy.attachedFileName || 'De_thuc_hanh',
+    }];
   }
   return [];
 }

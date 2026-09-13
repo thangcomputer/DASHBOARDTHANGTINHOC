@@ -166,6 +166,22 @@ export default function AdminCertPrepTab() {
     } catch (err) { handleError(err); }
   });
 
+  const uploadEssayPrompt = async (t, file) => {
+    try {
+      await certPrepApi.tests.uploadPrompt(t._id || t.id, file);
+      toast.success('Đã tải file tự luận');
+      await admin.loadTests(level._id || level.id);
+    } catch (err) { handleError(err); }
+  };
+
+  const removeEssayPrompt = async (t) => {
+    try {
+      await certPrepApi.tests.removePrompt(t._id || t.id);
+      toast.success('Đã xóa file tự luận');
+      await admin.loadTests(level._id || level.id);
+    } catch (err) { handleError(err); }
+  };
+
   const saveQuestion = (body) => admin.runSave(async () => {
     try {
       const tid = test._id || test.id;
@@ -395,6 +411,8 @@ export default function AdminCertPrepTab() {
           onToggle={(t) => toggleActive('test', t)}
           onQuestions={openTest}
           onPreview={previewTest}
+          onPromptUpload={uploadEssayPrompt}
+          onPromptRemove={removeEssayPrompt}
         />
       )}
       {section === 'questions' && (

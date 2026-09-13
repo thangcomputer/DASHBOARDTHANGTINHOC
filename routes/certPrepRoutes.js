@@ -83,6 +83,19 @@ function certPrepExcelUploadMiddleware(req, res, next) {
   });
 }
 
+function certPrepDocumentUploadMiddleware(req, res, next) {
+  let uploader;
+  try {
+    uploader = fileService.createUploader('cert_prep');
+  } catch (err) {
+    return res.status(err.status || 400).json({ success: false, message: err.message });
+  }
+  uploader.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message || 'Lỗi upload tài liệu' });
+    return next();
+  });
+}
+
 router.post('/upload', ...requireCertPrepAdmin, certPrepUploadMiddleware, async (req, res) => {
   try {
     if (!req.file) {
@@ -189,6 +202,15 @@ router.patch('/sessions/:id', ...requireStudent, async (req, res) => {
 router.post('/sessions/:id/submit', ...requireStudent, async (req, res) => {
   try {
     const data = await service.submitSession(studentIdFromAuth(req), req.params.id);
+    return res.json({ success: true, data });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+router.post('/sessions/:id/answer-file', ...requireStudent, certPrepDocumentUploadMiddleware, async (req, res) => {
+  try {
+    const data = await service.uploadEssayAnswer(studentIdFromAuth(req), req.params.id, req.file);
     return res.json({ success: true, data });
   } catch (err) {
     return sendError(res, err);
@@ -343,6 +365,36 @@ router.get('/tests/:id/questions', ...requireCertPrepAdmin, async (req, res) => 
   try {
     const data = await service.listQuestions(req.params.id, req.query || {});
     return res.json({ success: true, data });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+router.get('/tests/:id/prompt', authMiddleware, adminOrStudentForLevelTests, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const data = req.user?.role === 'student'
+      ? await service.getStudentEssayPrompt(studentIdFromAuth(req), id)
+      : (await service.getTest(id)).essayPromptFile || null;
+    return res.json({ success: true, data });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+router.post('/tests/:id/prompt', ...requireCertPrepAdmin, certPrepDocumentUploadMiddleware, async (req, res) => {
+  try {
+    const data = await service.saveEssayPromptFile(req.params.id, req.file, studentIdFromAuth(req));
+    return res.status(201).json({ success: true, data: data.essayPromptFile });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+router.delete('/tests/:id/prompt', ...requireCertPrepAdmin, async (req, res) => {
+  try {
+    const data = await service.removeEssayPromptFile(req.params.id);
+    return res.json({ success: true, data: data.essayPromptFile });
   } catch (err) {
     return sendError(res, err);
   }

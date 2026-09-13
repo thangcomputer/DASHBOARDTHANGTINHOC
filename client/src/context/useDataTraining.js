@@ -292,13 +292,14 @@ export function useDataTraining(currentUser) {
           studentExamMinutes,
           studentEssayExamMinutes,
           studentEssayRequired,
-          studentExamFiles,
           examWarningSoundUrl,
         })
-        .catch(() => {});
+        .catch((error) => {
+          console.error('[student-exam-config] autosave failed:', error);
+        });
     }, 800);
     return () => clearTimeout(t);
-  }, [studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, studentExamFiles, examWarningSoundUrl, currentUser?.role, studentExamBankHydrated]);
+  }, [studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, examWarningSoundUrl, currentUser?.role, studentExamBankHydrated]);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'teacher') return;

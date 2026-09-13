@@ -55,6 +55,7 @@ async function seedFixtures() {
     email: 'student.phase15@example.test',
     password: 'StudentPass!1',
     course: 'Word căn bản',
+    price: 1000000,
     status: 'Đang học',
     paid: true,
     totalSessions: 12,
@@ -64,8 +65,10 @@ async function seedFixtures() {
   const studentTwo = await Student.create({
     name: 'Phase15 Student Two',
     phone: '0981234567',
+    zalo: '0981234567',
     password: 'StudentPass!2',
     course: 'Word căn bản',
+    price: 1000000,
     status: 'Đang học',
     paid: true,
     studentExamUnlocked: true,
@@ -120,8 +123,10 @@ async function seedFixtures() {
   await Student.create({
     name: 'Duplicate Student',
     phone: '0962345678',
+    zalo: '0962345678',
     password: 'Duplicate!1',
     course: 'Word căn bản',
+    price: 1000000,
     status: 'Đang học',
     paid: true,
   });
@@ -398,7 +403,7 @@ test('Phase 1.5 live auth and exam route matrix', async (t) => {
 
     const resultTamper = await harness.request('POST', '/api/exam-results', {
       token: tokens.teacher,
-      body: { teacherId: ids.teacher, score: 100 },
+      body: { type: 'teacher', teacherId: ids.teacher, score: 100 },
     });
     assert.equal(resultTamper.response.status, 403);
 

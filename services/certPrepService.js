@@ -8,6 +8,8 @@ const CertPrepTest = require('../models/CertPrepTest');
 const CertPrepQuestion = require('../models/CertPrepQuestion');
 const CertPrepSession = require('../models/CertPrepSession');
 const StudentCertPrepAccess = require('../models/StudentCertPrepAccess');
+const FileAsset = require('../models/FileAsset');
+const fileService = require('./fileService');
 const {
   LOCALES,
   validateQuestion,
@@ -30,6 +32,75 @@ function requireOid(id, label = 'ID') {
     throw new CertPrepError(400, `${label} không hợp lệ`);
   }
   return String(id);
+}
+
+function serializeAsset(asset) {
+    if (!asset) return null;
+    return {
+      assetId: String(asset._id),
+      url: asset.url,
+      originalName: asset.originalName || '',
+      mimeType: asset.mimeType || '',
+      size: Number(asset.size) || 0,
+    };
+  }
+
+async function saveEssayPromptFile(testId, file, actor) {
+    const id = requireOid(testId, 'testId');
+    const test = await CertPrepTest.findById(id);
+    if (!test) throw new CertPrepError(404, 'Không tìm thấy bài kiểm tra');
+    if (!file) throw new CertPrepError(400, 'Chưa chọn file tự luận');
+    const asset = await fileService.registerUploadedFile(file, {
+      category: 'cert_prep',
+      uploadedBy: actor,
+      uploadedByRole: 'admin',
+      relatedType: 'cert_prep_essay_prompt',
+      relatedId: id,
+    });
+    if (test.essayPromptFile?.assetId) {
+      const old = await FileAsset.findById(test.essayPromptFile.assetId);
+      if (old) await fileService.deleteAsset(old);
+    }
+    test.essayPromptFile = serializeAsset(asset);
+    await test.save();
+    return test.toObject();
+  }
+
+async function removeEssayPromptFile(testId) {
+    const id = requireOid(testId, 'testId');
+    const test = await CertPrepTest.findById(id);
+    if (!test) throw new CertPrepError(404, 'Không tìm thấy bài kiểm tra');
+    if (test.essayPromptFile?.assetId) {
+      const asset = await FileAsset.findById(test.essayPromptFile.assetId);
+      if (asset) await fileService.deleteAsset(asset);
+    }
+    test.essayPromptFile = { assetId: null, url: '', originalName: '', mimeType: '', size: 0 };
+    await test.save();
+    return test.toObject();
+  }
+
+async function uploadEssayAnswer(studentId, sessionId, file) {
+    const sid = requireOid(studentId, 'studentId');
+    const id = requireOid(sessionId, 'sessionId');
+    const session = await CertPrepSession.findById(id);
+    assertSessionOwner(session, sid);
+    if (session.status !== 'in_progress') throw new CertPrepError(409, 'Phiên làm bài đã kết thúc');
+    if (!file) throw new CertPrepError(400, 'Chưa chọn file bài làm');
+    const asset = await fileService.registerUploadedFile(file, {
+      category: 'cert_prep',
+      uploadedBy: sid,
+      uploadedByRole: 'student',
+      relatedType: 'cert_prep_essay_answer',
+      relatedId: id,
+    });
+    if (session.essayAnswerFile?.assetId) {
+      const old = await FileAsset.findById(session.essayAnswerFile.assetId);
+      if (old) await fileService.deleteAsset(old);
+    }
+    session.essayAnswerFile = { ...serializeAsset(asset), uploadedAt: new Date() };
+    session.essayGradingStatus = 'pending_manual_grading';
+    await session.save();
+    return serializeSession(session);
 }
 
 function slugify(raw) {
@@ -381,6 +452,8 @@ function toStudentSession(session, questions = [], extra = {}) {
     status: session.status,
     startedAt: session.startedAt,
     submittedAt: session.submittedAt || null,
+    essayAnswerFile: session.essayAnswerFile || null,
+    essayGradingStatus: session.essayGradingStatus || 'not_submitted',
     configSnapshot: {
       name: snap.name || '',
       timeLimitMinutes: snap.timeLimitMinutes,
@@ -653,6 +726,22 @@ async function listTestsAdmin(levelId) {
   const level = await CertPrepLevel.findById(id).lean();
   if (!level) throw new CertPrepError(404, 'Không tìm thấy level');
   return CertPrepTest.find({ levelId: id }).sort({ locale: 1, sortOrder: 1, createdAt: 1 }).lean();
+}
+
+async function getTest(id) {
+  const testId = requireOid(id, 'testId');
+  const { test } = await loadTestChain(testId);
+  return test;
+}
+
+async function getTestLevelId(id) {
+  const test = await getTest(id);
+  return String(test.levelId);
+}
+
+async function getStudentEssayPrompt(studentId, testId) {
+  const { test } = await assertStudentCanAccessTest(studentId, testId);
+  return test.essayPromptFile || null;
 }
 
 async function createTest(levelId, body) {
@@ -1003,6 +1092,7 @@ async function listTestsForStudent(studentId, levelId) {
       passingScore: t.passingScore,
       allowRetake: t.allowRetake,
       maxAttempts: t.maxAttempts,
+      essayPromptFile: t.essayPromptFile || null,
       submittedCount: submittedByTest[String(t._id)] || 0,
       activeSessionId: activeByTest[String(t._id)] || null,
     })),
@@ -1659,8 +1749,14 @@ module.exports = {
   updateLevel,
   deleteLevel,
   listTestsAdmin,
+  getTest,
+  getTestLevelId,
+  getStudentEssayPrompt,
   createTest,
   updateTest,
+  saveEssayPromptFile,
+  removeEssayPromptFile,
+  uploadEssayAnswer,
   deleteTest,
   listQuestions,
   createQuestion,

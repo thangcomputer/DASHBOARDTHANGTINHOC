@@ -6,6 +6,7 @@ import useCertPrepSession, { isQuestionAnswered } from '../../../hooks/useCertPr
 import { isImmediateFeedback } from '../../../utils/certPrepGrade';
 import { useData } from '../../../context/DataContext';
 import certPrepApi from '../../../services/certPrepApi';
+import { resolveMediaUrl } from '../../../services/api';
 import ExamClickOutsideGuard from '../../exam/ExamClickOutsideGuard';
 import CertPrepPlayerHeader from './CertPrepPlayerHeader';
 import CertPrepQuestionArea from './CertPrepQuestionArea';
@@ -44,6 +45,8 @@ export default function CertPrepStudentPlayer() {
   const [exitLeaving, setExitLeaving] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [revealedIds, setRevealedIds] = useState({});
+  const [essayPrompt, setEssayPrompt] = useState(null);
+  const [essayUploading, setEssayUploading] = useState(false);
   const keysReloadTried = useRef(false);
 
   const immediate = isImmediateFeedback(player.session);
@@ -54,6 +57,24 @@ export default function CertPrepStudentPlayer() {
     keysReloadTried.current = false;
     setExitOpen(false);
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!player.session?.testId) return;
+    certPrepApi.student.getPrompt(player.session.testId)
+      .then((res) => setEssayPrompt(res.data || null))
+      .catch(() => setEssayPrompt(null));
+  }, [player.session?.testId]);
+
+  const uploadEssayAnswer = async (file) => {
+    if (!file || !sessionId) return;
+    setEssayUploading(true);
+    try {
+      await certPrepApi.student.uploadAnswerFile(sessionId, file);
+      await player.loadSession();
+    } finally {
+      setEssayUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!immediate || player.loading || !player.questions.length || keysReloadTried.current) return;
@@ -268,6 +289,24 @@ export default function CertPrepStudentPlayer() {
               ) : (
                 <p className="text-center py-10 text-slate-400 text-sm">Không có câu hỏi.</p>
               )}
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <p className="text-sm font-bold text-slate-100">Phần tự luận</p>
+                {essayPrompt?.url ? (
+                  <a className="text-sm text-sky-300 underline" href={resolveMediaUrl(essayPrompt.url)} target="_blank" rel="noreferrer">
+                    Xem/tải đề tự luận: {essayPrompt.originalName || 'tài liệu'}
+                  </a>
+                ) : (
+                  <p className="text-sm text-amber-300">Đề thi chưa có file tự luận do admin tải lên.</p>
+                )}
+                <label className="inline-flex min-h-10 px-3 rounded-xl bg-sky-600 text-white text-sm font-bold items-center cursor-pointer">
+                  {essayUploading ? 'Đang tải bài làm...' : 'Tải bài làm tự luận'}
+                  <input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="sr-only" disabled={essayUploading || player.locked} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; uploadEssayAnswer(f); }} />
+                </label>
+                {player.session?.essayAnswerFile?.url ? (
+                  <p className="text-xs text-emerald-300">Đã nộp: {player.session.essayAnswerFile.originalName} (chờ chấm thủ công)</p>
+                ) : null}
+              </div>
 
               <CertPrepPlayerFooter
                 exam

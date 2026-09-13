@@ -163,7 +163,8 @@ if (isProd && process.env.MONGODB_URI) {
         : undefined,
     });
   } catch (e) {
-    logger.warn({ err: e.message }, 'connect-mongo unavailable; falling back to MemoryStore');
+    logger.error({ err: e.message }, 'connect-mongo unavailable in production');
+    throw e;
   }
 }
 

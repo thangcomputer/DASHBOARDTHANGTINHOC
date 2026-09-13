@@ -29,6 +29,7 @@ import {
   normalizeLmsPlayerTab,
 } from '../utils/lmsLessonUi';
 import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors';
+import { getExamProgressDisplayStatus } from '../utils/examProgressStats';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
 import LmsBrandedPlayerChrome, { preferMaxYouTubeQuality } from './lms/LmsBrandedPlayerChrome';
 import {
@@ -2299,8 +2300,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           };
 
           const renderResultCell = (sub) => {
-            if (sub.status === 'dat') return <span className="text-emerald-600 font-black text-[10px] sm:text-xs">ĐẠT</span>;
-            if (sub.status === 'khong_dat') return <span className="text-red-600 font-black text-[10px] sm:text-xs leading-tight">KHÔNG ĐẠT</span>;
+            const displayStatus = getExamProgressDisplayStatus(sub);
+            if (displayStatus === 'dat') return <span className="text-emerald-600 font-black text-[10px] sm:text-xs">ĐẠT</span>;
+            if (displayStatus === 'khong_dat') return <span className="text-red-600 font-black text-[10px] sm:text-xs leading-tight">KHÔNG ĐẠT</span>;
+            if (displayStatus === 'cho_nop') return <span className="text-blue-600 font-black text-[10px] sm:text-xs">CHỜ NỘP</span>;
+            if (displayStatus === 'cho_cham') return <span className="text-amber-600 font-black text-[10px] sm:text-xs">CHỜ CHẤM</span>;
             if (sub.status === 'dang_khoa') return <span className="text-orange-500 font-bold text-[10px] sm:text-xs">ĐANG KHÓA</span>;
             return <span className="text-gray-400 font-bold text-[10px] sm:text-xs">CHƯA THI</span>;
           };
@@ -2878,7 +2882,6 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 };
 
 export default StudentTrainingLMS;
-
 
 
 

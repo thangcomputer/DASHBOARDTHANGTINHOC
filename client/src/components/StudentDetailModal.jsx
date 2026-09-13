@@ -20,6 +20,7 @@ import { useToast } from '../utils/toast';
 import { getAttendanceAction, attendanceToneClass } from '../utils/attendanceAction';
 import ZaloIcon from './ZaloIcon';
 import { formatStudentGradeNote } from '../utils/studentActivityLogs';
+import { getExamProgressDisplayStatus } from '../utils/examProgressStats';
 
 const fmt = (n) => n ? Number(n).toLocaleString('vi-VN') + 'đ' : '0đ';
 const fmtTuition = (n) => {
@@ -2401,8 +2402,11 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                               return (data.student.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').map(ep => {
                                 const tn = ep.tracNghiem || {};
                                 const pct = tn.total > 0 ? Math.round(((tn.score || 0) / tn.total) * 100) : 0;
-                                const isDat = ep.status === 'dat';
-                                const isKhongDat = ep.status === 'khong_dat';
+                                const displayStatus = getExamProgressDisplayStatus(ep);
+                                const isDat = displayStatus === 'dat';
+                                const isKhongDat = displayStatus === 'khong_dat';
+                                const isChoNop = displayStatus === 'cho_nop';
+                                const isChoCham = displayStatus === 'cho_cham';
                                 return (
                                   <div key={ep.id || ep._id} className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
                                      <div className="flex items-center gap-3 mb-3">
@@ -2411,8 +2415,8 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                         </div>
                                         <div>
                                            <p className="text-sm font-black text-slate-800">{SL[ep.id] || ep.id}</p>
-                                           <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${isDat ? 'bg-emerald-50 text-emerald-600' : isKhongDat ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}`}>
-                                             {isDat ? 'ĐẠT' : isKhongDat ? 'RỚT' : 'ĐANG THI'}
+                                           <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${isDat ? 'bg-emerald-50 text-emerald-600' : isKhongDat ? 'bg-red-50 text-red-500' : isChoNop ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                                             {isDat ? 'ĐẠT' : isKhongDat ? 'RỚT' : isChoNop ? 'CHỜ NỘP' : isChoCham ? 'CHỜ CHẤM' : 'ĐANG THI'}
                                            </span>
                                         </div>
                                      </div>

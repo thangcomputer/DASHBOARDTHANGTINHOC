@@ -5,6 +5,7 @@
 const jwt = require('jsonwebtoken');
 const blacklist = require('./tokenBlacklist');
 const logger = require('../config/logger');
+const FileAsset = require('../models/FileAsset');
 
 /** Thư mục công khai (logo, popup marketing, avatar) — không cần đăng nhập */
 const PUBLIC_UPLOAD_PREFIXES = [
@@ -26,6 +27,14 @@ function isPublicUploadPath(urlPath) {
   return PUBLIC_UPLOAD_PREFIXES.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
 }
 
+function canReadCertificationSubmission(asset, payload) {
+  if (!asset || asset.relatedType !== 'certification_submission') return true;
+  const role = String(payload?.role || '').toLowerCase();
+  const userId = String(payload?.id || payload?.userId || payload?._id || '');
+  if (new Set(['admin', 'staff', 'teacher']).has(role)) return true;
+  return Boolean(userId) && String(asset.uploadedBy) === userId;
+}
+
 async function uploadsAuthMiddleware(req, res, next) {
   try {
     if (isPublicUploadPath(req.path)) return next();
@@ -45,7 +54,19 @@ async function uploadsAuthMiddleware(req, res, next) {
       return res.status(401).json({ success: false, code: 'TOKEN_REVOKED', message: 'Phiên đã hết hạn' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const asset = await FileAsset.findOne({
+      url: `/uploads${req.path}`,
+      status: 'active',
+    }).select('uploadedBy relatedType expiresAt').lean();
+    if (asset?.expiresAt && new Date(asset.expiresAt).getTime() <= Date.now()) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(404).json({ success: false, message: 'Tệp không còn khả dụng' });
+    }
+    if (!canReadCertificationSubmission(asset, payload)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền tải tệp này' });
+    }
     return next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
@@ -58,4 +79,9 @@ async function uploadsAuthMiddleware(req, res, next) {
   }
 }
 
-module.exports = { uploadsAuthMiddleware, isPublicUploadPath, PUBLIC_UPLOAD_PREFIXES };
+module.exports = {
+  uploadsAuthMiddleware,
+  isPublicUploadPath,
+  canReadCertificationSubmission,
+  PUBLIC_UPLOAD_PREFIXES,
+};

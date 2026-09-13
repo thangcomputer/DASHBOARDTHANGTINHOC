@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const Student = require('../models/Student');
+const FileAsset = require('../models/FileAsset');
 const Invoice = require('../models/Invoice');
 const Schedule = require('../models/Schedule');
 const { authMiddleware, checkPermission, isTeacher, branchFilter, userHasPermission } = require('../middleware/auth');
@@ -10,6 +11,8 @@ const { assertStudentBranchAccess } = require('../middleware/studentBranchGuard'
 const { policyShadowStudentRead } = require('../middleware/policyShadowStudentRead');
 const { policyShadowStudentMutation } = require('../middleware/policyShadowStudentMutation');
 const { dataScopeObserve } = require('../middleware/dataScopeObserve');
+const { validateOwnedCertificationFile } = require('../utils/certificationFilePolicy');
+const { validateAdminExamProgress } = require('../utils/adminExamProgressPolicy');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
 function requireManageStudentsUnlessTeacher(req, res, next) {
@@ -1326,6 +1329,17 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
       }
     }
 
+    if ((req.user.role === 'admin' || req.user.role === 'staff')
+      && Object.prototype.hasOwnProperty.call(safeBody, 'examProgress')) {
+      const examPolicy = validateAdminExamProgress(safeBody.examProgress);
+      if (!examPolicy.ok) {
+        return res.status(examPolicy.status).json({
+          success: false,
+          message: examPolicy.message,
+        });
+      }
+    }
+
     // Một nguồn đúng cho link vào lớp: GV/Admin sửa linkHoc → đồng bộ online_meeting_url (tránh URL cũ chiếm ưu tiên ở client)
     if (Object.prototype.hasOwnProperty.call(safeBody, 'linkHoc')) {
       safeBody.online_meeting_url = safeBody.linkHoc || '';
@@ -2102,6 +2116,27 @@ router.put('/:id/exam-progress', [authMiddleware, branchFilter, policyShadowStud
         || Number(current?.tracNghiem?.score) / Number(current?.tracNghiem?.total) < 0.5
       ) {
         return res.status(409).json({ success: false, message: 'Phần trắc nghiệm chưa được server chấm đạt' });
+      }
+      const requestedPracticalStatus = String(req.body?.changes?.thucHanh || '');
+      if (requestedPracticalStatus === 'da_nop') {
+        const essayFile = String(req.body?.changes?.essayFile || '').trim();
+        if (!essayFile.startsWith('/uploads/')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Phải tải lên file bài thực hành trước khi nộp bài',
+          });
+        }
+        const asset = await FileAsset.findOne({
+          url: essayFile,
+          status: 'active',
+        }).select('uploadedBy relatedType expiresAt').lean();
+        const filePolicy = validateOwnedCertificationFile(asset, req.user.id);
+        if (!filePolicy.ok) {
+          return res.status(filePolicy.status).json({
+            success: false,
+            message: filePolicy.message,
+          });
+        }
       }
       changes = {
         ...(req.body?.changes?.thucHanh !== undefined ? { thucHanh: req.body.changes.thucHanh } : {}),
@@ -4150,5 +4185,3 @@ router.put('/:id/pay-teacher', [authMiddleware, branchFilter, policyShadowStuden
 });
 
 module.exports = router;
-
-
