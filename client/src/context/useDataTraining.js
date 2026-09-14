@@ -302,31 +302,6 @@ export function useDataTraining(currentUser) {
   }, [studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, examWarningSoundUrl, currentUser?.role, studentExamBankHydrated]);
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'teacher') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.settings.getTeacherExamConfig();
-        if (cancelled || !res?.success || !res.data) return;
-        if (res.data.hasTeacherExamBank) {
-          setQuestions(Array.isArray(res.data.questions) ? res.data.questions : []);
-        }
-        const tm = res.data.timeLimitMinutes;
-        setTeacherExamTimeLimitMinutes(
-          tm != null && Number.isFinite(Number(tm)) ? Math.round(Number(tm)) : null,
-        );
-        if (res.data.hasTeacherExamMinutes && res.data.teacherExamMinutes && typeof res.data.teacherExamMinutes === 'object') {
-          setTeacherExamMinutes(res.data.teacherExamMinutes);
-        }
-        if (res.data.hasTeacherEssayExamMinutes && res.data.teacherEssayExamMinutes && typeof res.data.teacherEssayExamMinutes === 'object') {
-          setTeacherEssayExamMinutes(res.data.teacherEssayExamMinutes);
-        }
-      } catch { /* ignore */ }
-    })();
-    return () => { cancelled = true; };
-  }, [currentUser?.id, currentUser?.role]);
-
-  useEffect(() => {
     if (!currentUser || currentUser.role !== 'student') return;
     let cancelled = false;
     (async () => {

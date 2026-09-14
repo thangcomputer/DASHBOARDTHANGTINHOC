@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '../services/api';
-import { mapStudent, mapTeacher, mapTransaction, mapSchedule } from '../lib/entityMaps';
+import { mapStudent, mapSchedule } from '../lib/entityMaps';
 import { useSocket } from './SocketContext';
 import { loadState } from './dataStorage';
 
@@ -50,12 +50,6 @@ export function useDataSync({
 
       const promises = [];
 
-      if (isTeacher) {
-        // Teacher students: StudentsContext (SWR) owns list — tránh double-fetch
-        // Use the scoped endpoint instead of loading every schedule in the system.
-        promises.push(api.schedules.getByTeacher(currentUser.id || currentUser._id).catch(() => ({ success: false })));
-      }
-
       if (isAdmin) {
         const perms = currentUser.permissions || [];
         const isSuper = currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN';
@@ -67,11 +61,7 @@ export function useDataSync({
         promises.push((hasPerm('manage_staff') || hasPerm('manage_hr') || isSuper) ? api.staff.getAll().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
         promises.push((hasPerm('manage_training') || hasPerm('manage_students')) ? api.examResults.getAll({ limit: 200 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
         promises.push(hasPerm('view_evaluations') ? api.evaluations.getPrivate().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
-      } else if (isTeacher) {
-        promises.push(api.transactions.getByTeacher(currentUser.id).catch(() => ({ success: false })));
-        promises.push(api.teachers.getById(currentUser.id || currentUser._id).catch(() => ({ success: false })));
       }
-
       if (isStudent) {
         promises.push(api.students.getById(currentUser.id || currentUser._id).catch(() => ({ success: false })));
         promises.push(api.schedules.getByStudent(currentUser.id || currentUser._id).catch(() => ({ success: false })));
@@ -97,11 +87,6 @@ export function useDataSync({
       const results = await Promise.all(promises);
       let idx = 0;
 
-      if (isTeacher) {
-        const schedulesRes = results[idx++];
-        if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
-      }
-
       if (isAdmin) {
         const staffRes = results[idx++];
         if (staffRes?.success) setStaffs(staffRes.data.map(st => ({ ...st, id: st._id })));
@@ -115,18 +100,12 @@ export function useDataSync({
             comment: e.content || e.comment || '',
           })));
         }
-      } else if (isTeacher) {
-        const transactionsRes = results[idx++];
-        if (transactionsRes?.success) setTransactions(transactionsRes.data.map(mapTransaction));
-        const teacherSelfRes = results[idx++];
-        if (teacherSelfRes?.success) setTeachers([mapTeacher(teacherSelfRes.data)]);
-      }
-
       if (isStudent) {
         const studentRes = results[idx++];
         if (studentRes?.success) setStudents([mapStudent(studentRes.data)]);
         const schedulesRes = results[idx++];
         if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
+      }
       }
 
       // Groups
