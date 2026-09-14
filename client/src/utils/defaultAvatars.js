@@ -109,7 +109,11 @@ export function resolveAvatarUrl(userObj = {}) {
   if (typeof userObj === 'string') {
     avatar = userObj;
   } else if (userObj && typeof userObj === 'object') {
-    avatar = userObj.avatar ?? userObj.src;
+    avatar = userObj.avatar
+      ?? userObj.avatarUrl
+      ?? userObj.photo
+      ?? userObj.photoUrl
+      ?? userObj.src;
     role = userObj.role;
     adminRole = userObj.adminRole;
     name = userObj.name;

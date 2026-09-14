@@ -98,7 +98,15 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
         : undefined,
       adminRole: person.adminRole || person.user?.adminRole || null,
       gender: person.gender || person.user?.gender || '',
-      avatar: person.avatar || person.user?.avatar || '',
+      avatar: person.avatar
+        || person.avatarUrl
+        || person.photo
+        || person.photoUrl
+        || person.user?.avatar
+        || person.user?.avatarUrl
+        || person.user?.photo
+        || person.user?.photoUrl
+        || '',
     };
 
     setTabs((prev) => {

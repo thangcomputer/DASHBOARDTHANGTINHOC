@@ -64,7 +64,11 @@ async function upsertPresence(key, user) {
   return row;
 }
 
-async function removePresence(key) {
+async function removePresence(key, socketId = '') {
+  const current = local.get(key);
+  // Multiple tabs can share one presence key. An older socket must not
+  // remove the newer socket's live presence record.
+  if (!current || (socketId && current.socketId && current.socketId !== socketId)) return false;
   local.delete(key);
   const redis = readyRedis();
   if (redis) {
@@ -76,6 +80,7 @@ async function removePresence(key) {
     }
   }
   notify();
+  return true;
 }
 
 function getPresence(key) {

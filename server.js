@@ -812,7 +812,7 @@ io.on('connection', (socket) => {
     if (hit) {
       lastSeenMap.set(String(hit.user.userId), new Date().toISOString());
       trimLastSeenMap();
-      await presenceStore.removePresence(hit.key);
+      await presenceStore.removePresence(hit.key, socket.id);
     }
     // Cleanup socket rate map
     socketRateMap.clear();

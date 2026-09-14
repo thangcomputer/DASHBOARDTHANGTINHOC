@@ -186,6 +186,9 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
     const onConnect = () => {
       setIsConnected(true);
+      // Presence is not valid until the server sends a fresh users:online
+      // snapshot for this socket connection.
+      setOnlineUsers([]);
       if (userId) {
         const uRole = getMessagingRole(sessionUser);
         const resolvedId = String(userId);
@@ -206,11 +209,15 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
 
     const onConnectError = () => {
       setIsConnected(false);
+      setOnlineUsers([]);
       pauseReconnectIfOffline();
     };
 
     const onDisconnect = (reason) => {
       setIsConnected(false);
+      // Do not keep stale green indicators while the socket is offline or
+      // reconnecting.
+      setOnlineUsers([]);
       if (reason === 'io server disconnect') {
         newSocket.connect();
       }

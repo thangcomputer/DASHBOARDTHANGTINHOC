@@ -12,7 +12,6 @@ import {
 import { LOGIN_OVERLAY_EVENT, getActiveLoginOverlayIds } from '../utils/loginOverlayGate';
 import { isAiSupportConversationId, AI_SUPPORT_PEER } from '../utils/aiSupport';
 import { LMS_PLAYER_OPEN_EVENT, isLmsPlayerOpen } from '../utils/lmsPlayerOverlay';
-import { useSocket } from '../context/SocketContext';
 
 export const LOGIN_ALERT_STORAGE_PREFIX = 'cms_login_alert';
 
@@ -147,7 +146,6 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
   const schedFnRef = useRef(getSchedulesByStudent);
   const syncRef = useRef(syncMessages);
   const busy = blocked || extraBlock;
-  const { onMessageReceive } = useSocket() || {};
 
   useEffect(() => { convRef.current = getConversations; }, [getConversations]);
   useEffect(() => { schedFnRef.current = getSchedulesByStudent; }, [getSchedulesByStudent]);
@@ -158,9 +156,7 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
       const open = Boolean(e?.detail?.open);
       setLmsOpen(open);
       if (open) {
-        // Mỗi lần mở player là một lần vào LMS mới; không bật lại popup trong cùng phiên.
-        decidedRef.current = false;
-        setPayload(null);
+        // Do not reopen the login alert when the LMS/player is opened later.
         setLmsNudge((n) => n + 1);
       }
     };
@@ -168,34 +164,6 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
     window.addEventListener(LMS_PLAYER_OPEN_EVENT, onLms);
     return () => window.removeEventListener(LMS_PLAYER_OPEN_EVENT, onLms);
   }, []);
-
-  // Tin nhắn người thật đến khi đang ở dashboard phải hiện popup ngay,
-  // không chỉ kiểm tra một lần lúc đăng nhập.
-  useEffect(() => {
-    if (role !== 'student' || !userId || typeof onMessageReceive !== 'function') return undefined;
-    let timer = null;
-    const unsubMsg = onMessageReceive((data) => {
-      if (!data || String(data.senderId) === String(userId)) return;
-      if (
-        isAiSupportConversationId(data.conversationId)
-        || String(data.senderId) === AI_SUPPORT_PEER.id
-        || lmsOpen
-        || isQuietPath(location.pathname)
-      ) return;
-
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        const convs = typeof convRef.current === 'function' ? (convRef.current(userId) || []) : [];
-        const unread = Math.max(1, inboxUnreadCount(convs));
-        setPayload({ unread, upcoming: [] });
-      }, 350);
-    });
-
-    return () => {
-      if (timer) clearTimeout(timer);
-      if (typeof unsubMsg === 'function') unsubMsg();
-    };
-  }, [role, userId, onMessageReceive, location.pathname, lmsOpen]);
 
   useEffect(() => {
     const syncFromGate = () => {
@@ -278,7 +246,9 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
       }
 
       // Ngoài LMS: chỉ hiện khi có tin mới. Khi vừa vào LMS, kiểm tra một lần.
-      const showMsg = unread > 0 && (ackedUnread == null || unread > ackedUnread);
+      // Message popup is a login-time alert only. Realtime messages are handled
+      // by the floating messenger badge/chat-head, not by this modal.
+      const showMsg = !lmsOpen && unread > 0 && (ackedUnread == null || unread > ackedUnread);
       const showSchedOnly = lmsOpen && role === 'student' && newIds.length > 0;
       if (!showMsg && !showSchedOnly) {
         writeAck(userId, unread, [...ackedIds, ...currentIds]);

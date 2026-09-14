@@ -60,7 +60,8 @@ export function useDataSync({
         promises.push(hasPerm('manage_schedule') ? api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
       } else if (isTeacher) {
         // Teacher students: StudentsContext (SWR) owns list — tránh double-fetch
-        promises.push(api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })));
+        // Use the scoped endpoint instead of loading every schedule in the system.
+        promises.push(api.schedules.getByTeacher(currentUser.id || currentUser._id).catch(() => ({ success: false })));
       }
 
       if (isAdmin) {
@@ -94,13 +95,19 @@ export function useDataSync({
       // Handle Groups (everyone except student has groups at this index)
       promises.push(api.messages.getGroups(currentUser.id || currentUser._id).catch(() => ({ success: false })));
 
-      // Fetch training data for all (Admin & Teacher)
+      // Fetch only the training dataset needed by the current role.
       const isAdminTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_training')) : false;
-      promises.push((isAdmin && !isAdminTrainingPerm) ? Promise.resolve({ success: true, data: {} }) : api.settings.getTrainingData().catch(() => ({ success: false })));
+      const needsTeacherTraining = isAdmin || isTeacher;
+      promises.push((!needsTeacherTraining || (isAdmin && !isAdminTrainingPerm))
+        ? Promise.resolve({ success: true, data: {} })
+        : api.settings.getTrainingData().catch(() => ({ success: false })));
 
-      // Fetch student training data for all (Admin & Student)
+      // Student training data is not needed by teachers.
       const isAdminStudentTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_student_training')) : false;
-      promises.push((isAdmin && !isAdminStudentTrainingPerm) ? Promise.resolve({ success: true, data: {} }) : api.settings.getStudentTrainingData().catch(() => ({ success: false })));
+      const needsStudentTraining = isAdmin || isStudent;
+      promises.push((!needsStudentTraining || (isAdmin && !isAdminStudentTrainingPerm))
+        ? Promise.resolve({ success: true, data: {} })
+        : api.settings.getStudentTrainingData().catch(() => ({ success: false })));
 
       const results = await Promise.all(promises);
       let idx = 0;

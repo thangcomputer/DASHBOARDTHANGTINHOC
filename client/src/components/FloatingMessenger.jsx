@@ -436,7 +436,7 @@ function formatChatHeadName(name) {
   return `${parts.slice(0, -1).map((part) => `${part.charAt(0).toLocaleUpperCase('vi-VN')}.`).join(' ')} ${displayLastName}`;
 }
 
-function ChatHead({ tab, unread = 0, onOpen, onClose }) {
+function ChatHead({ tab, unread = 0, online = false, onOpen, onClose }) {
   const isGroup = Boolean(tab.user?.isGroup);
   return (
     <div className="cms-fm-head-wrap">
@@ -465,7 +465,7 @@ function ChatHead({ tab, unread = 0, onOpen, onClose }) {
         {unread > 0 ? (
           <span className="cms-fm-head__badge">{unread > 99 ? '99+' : unread}</span>
         ) : (
-          <span className="cms-fm-head__online" />
+          <span className={`cms-fm-head__online ${online ? '!bg-emerald-500' : '!bg-slate-300'}`} />
         )}
       </button>
       <button
@@ -510,17 +510,11 @@ function ChatWindow({
   const resizeRef = useRef({ active: false, x: 0, y: 0, w: 0, h: 0 });
 
   const isOnline = useMemo(() => {
-    if (tab.user?.isGroup) {
-      // Tin nhắn nhóm chỉ tạo chat-head khi có thành viên hoạt động.
-      return true;
-    }
-    if (!Array.isArray(onlineUsers)) return Boolean(tab.user.online);
+    if (tab.user?.isGroup) return false;
     const peerId = String(tab.user.id || '');
-    if (!peerId) return Boolean(tab.user.online);
-    // Presence is the live source of truth; a stale false value on the tab
-    // must not override a subsequent users:online event.
-    return Boolean(tab.user.online) || onlineUsers.some(u => getPresenceUserId(u) === peerId);
-  }, [onlineUsers, tab.user.id, tab.user.online]);
+    if (!peerId || !Array.isArray(onlineUsers)) return false;
+    return onlineUsers.some(u => getPresenceUserId(u) === peerId);
+  }, [onlineUsers, tab.user.id, tab.user.isGroup]);
 
   const displayRoleLabel = useMemo(() => {
     const adminRole = String(tab.user.adminRole || '').toUpperCase();
@@ -1415,7 +1409,12 @@ export default function FloatingMessenger({ session, role }) {
     return {
       ...tab.user,
       name: contact.name || tab.user.name,
-      avatar: contact.avatar || tab.user.avatar || '',
+      avatar: contact.avatar
+        || contact.avatarUrl
+        || contact.photo
+        || contact.photoUrl
+        || tab.user.avatar
+        || '',
       gender: contact.gender || tab.user.gender || '',
       adminRole: contact.adminRole || tab.user.adminRole || null,
     };
@@ -1744,7 +1743,11 @@ export default function FloatingMessenger({ session, role }) {
         id: peerId,
         name: payload.userName || 'Học viên',
         role: normalizeChatRole(payload.userRole || 'student'),
-        avatar: payload.avatar || '',
+        avatar: payload.avatar
+          || payload.avatarUrl
+          || payload.photo
+          || payload.photoUrl
+          || '',
         online: true,
       };
       setUserOpenedChat(true);
@@ -1812,7 +1815,13 @@ export default function FloatingMessenger({ session, role }) {
           name: knownPeer?.user?.name || data.sender?.displayName || data.senderName || 'Người dùng',
           role: normalizeChatRole(knownPeer?.user?.role || data.senderRole || 'student'),
           adminRole: knownPeer?.user?.adminRole || data.sender?.adminRole || null,
-          avatar: knownPeer?.user?.avatar || data.sender?.avatar || data.senderAvatar || '',
+          avatar: knownPeer?.user?.avatar
+            || knownPeer?.user?.avatarUrl
+            || data.sender?.avatar
+            || data.sender?.avatarUrl
+            || data.senderAvatar
+            || data.senderPhoto
+            || '',
           gender: knownPeer?.user?.gender || data.sender?.gender || '',
         };
 
@@ -2378,7 +2387,9 @@ export default function FloatingMessenger({ session, role }) {
                     <ul className="space-y-0.5">
                       {group.people.map((p) => {
                         const peerUnread = unreadByPeer.get(`${normalizeChatRole(p.role)}_${p.id}`) || 0;
-                        const online = p.online !== false;
+                        const online = p.online === true
+                          && Array.isArray(onlineUsers)
+                          && onlineUsers.some((user) => getPresenceUserId(user) === String(p.id || ''));
                         return (
                           <li key={`${p.role}_${p.id}`}>
                             <button
@@ -2441,6 +2452,8 @@ export default function FloatingMessenger({ session, role }) {
                   key={tab.id}
                   tab={getFreshTab(tab)}
                   unread={unreadByPeer.get(peerKey) || 0}
+                  online={!tab.user?.isGroup && Array.isArray(onlineUsers)
+                    && onlineUsers.some((user) => getPresenceUserId(user) === String(tab.user?.id || ''))}
                   onOpen={handleFocus}
                   onClose={closeChat}
                 />
