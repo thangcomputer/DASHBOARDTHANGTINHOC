@@ -571,9 +571,11 @@ const StudentDashboard = ({ onNavigate }) => {
     const pool = [...(privateEvaluations || []), ...serverMilestoneEvals];
     const done = (m) => {
       const hasMatchingEvaluation = pool.some((e) => {
-        if (!matchesStudent(e) || !matchesCourse(e)) return false;
+        if (!matchesStudent(e)) return false;
         const milestone = String(e?.milestone || '').trim();
-        if (milestone === m) return true;
+        // lesson_1 is a one-time feedback prompt. Legacy records can have a
+        // stale course name after a course/enrollment rename.
+        if (milestone === m && (m === 'lesson_1' || matchesCourse(e))) return true;
         // Legacy lesson-one evaluations were saved before milestone was added.
         return m === 'lesson_1'
           && (!milestone || milestone === 'manual_feedback')
