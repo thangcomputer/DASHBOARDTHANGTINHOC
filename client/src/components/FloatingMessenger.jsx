@@ -501,6 +501,7 @@ function ChatWindow({
   const pendingUrlRef = useRef('');
   const [activeMsgOptions, setActiveMsgOptions] = useState(null);
   const [schedulePreview, setSchedulePreview] = useState(null);
+  const messagesBodyRef = useRef(null);
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const imageRef = useRef(null);
@@ -598,9 +599,17 @@ function ChatWindow({
     return () => clearTimeout(timer);
   }, [aiStatus, isAiPeer, supportOnline]);
 
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, tab.id, peerTyping]);
+  useLayoutEffect(() => {
+    const body = messagesBodyRef.current;
+    if (!body) return undefined;
+    const scrollToLatest = () => {
+      body.scrollTop = body.scrollHeight;
+      endRef.current?.scrollIntoView({ block: 'end' });
+    };
+    scrollToLatest();
+    const frame = requestAnimationFrame(scrollToLatest);
+    return () => cancelAnimationFrame(frame);
+  }, [displayMessages.length, messages.length, tab.id, peerTyping, sending]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -929,7 +938,7 @@ function ChatWindow({
         </p>
       ) : null}
 
-      <div className="cms-fm-window__body">
+      <div ref={messagesBodyRef} className="cms-fm-window__body">
         {displayMessages.length === 0 ? (
           <p className="text-center text-[12px] text-slate-400 py-8 px-3 font-medium">
             {isAiPeer
