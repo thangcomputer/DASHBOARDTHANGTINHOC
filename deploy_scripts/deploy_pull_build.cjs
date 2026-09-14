@@ -30,7 +30,16 @@ async function main() {
     await run(ssh, 'NPM INSTALL (backend)', 'npm install --omit=dev');
     await run(ssh, 'NPM INSTALL (client)', 'npm install', { cwd: `${APP}/client` });
     await run(ssh, 'BUILD CLIENT', 'npm run build', { cwd: `${APP}/client` });
-    await run(ssh, 'PM2 RESTART', 'pm2 restart dashboardthangtinhoc || pm2 start server.js --name dashboardthangtinhoc');
+    // Older VPS deployments use `thangtinhhoc-api`; restarting a second app
+    // name creates an EADDRINUSE crash loop on the shared PORT=5000.
+    await run(
+      ssh,
+      'PM2 RESTART',
+      'pm2 delete dashboardthangtinhoc 2>/dev/null || true; ' +
+      'if pm2 describe thangtinhhoc-api >/dev/null 2>&1; then ' +
+      'pm2 restart thangtinhhoc-api --update-env; ' +
+      'else pm2 startOrReload ecosystem.config.cjs --env production; fi',
+    );
     await run(ssh, 'PM2 SAVE', 'pm2 save');
     await run(ssh, 'PM2 LIST', 'pm2 list');
     console.log('\n✅ DEPLOY COMPLETED');
