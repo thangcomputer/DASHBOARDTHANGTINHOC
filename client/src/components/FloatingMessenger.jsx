@@ -511,6 +511,7 @@ function ChatWindow({
   const resizeRef = useRef({ active: false, x: 0, y: 0, w: 0, h: 0 });
 
   const isOnline = useMemo(() => {
+    if (isAiSupportPeer(tab.user)) return true;
     if (tab.user?.isGroup) return false;
     const peerId = String(tab.user.id || '');
     if (!peerId || !Array.isArray(onlineUsers)) return false;
@@ -2396,9 +2397,10 @@ export default function FloatingMessenger({ session, role }) {
                     <ul className="space-y-0.5">
                       {group.people.map((p) => {
                         const peerUnread = unreadByPeer.get(`${normalizeChatRole(p.role)}_${p.id}`) || 0;
-                        const online = p.online === true
+                        const isAi = isAiSupportPeer(p);
+                        const online = isAi || (p.online === true
                           && Array.isArray(onlineUsers)
-                          && onlineUsers.some((user) => getPresenceUserId(user) === String(p.id || ''));
+                          && onlineUsers.some((user) => getPresenceUserId(user) === String(p.id || '')));
                         return (
                           <li key={`${p.role}_${p.id}`}>
                             <button
