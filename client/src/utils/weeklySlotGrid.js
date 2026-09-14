@@ -147,6 +147,7 @@ export function isWeekSlotElapsed(dateKey, startTime, endTime, now = new Date())
 
 export function weekSlotSelectMeta(opt, dateKey, {
   schedules,
+  conflictSchedules,
   teacherId,
   excludeScheduleId,
   now,
@@ -160,7 +161,7 @@ export function weekSlotSelectMeta(opt, dateKey, {
     r?.start && timeRangesOverlap(start, optEnd, r.start, r.end || endTimeFromStart(r.start))
   ));
   const taken = takenByHold || (!elapsed && isSlotTakenByOther(
-    schedules,
+    conflictSchedules || schedules,
     teacherId,
     dateKey,
     start,
@@ -176,7 +177,7 @@ export function weekSlotSelectMeta(opt, dateKey, {
     bookedName = String(hold?.studentName || '').trim();
     if (!bookedName) {
       const clash = findTeacherScheduleConflict({
-        schedules,
+        schedules: conflictSchedules || schedules,
         teacherId,
         date: dateKey,
         startTime: start,

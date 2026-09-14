@@ -178,6 +178,25 @@ export default function TeacherWeeklySlotGrid({
     return { byStudent, byStudentDay };
   }, [schedules]);
 
+  const teacherSchedulesByDate = useMemo(() => {
+    const byDate = new Map();
+    const tid = String(teacherId || '');
+    for (const schedule of schedules || []) {
+      const scheduleTeacherId = String(
+        schedule?.teacherId?._id
+        || schedule?.teacherId?.id
+        || schedule?.teacherId
+        || '',
+      );
+      if (tid && scheduleTeacherId !== tid) continue;
+      const dayKey = normalizeScheduleDate(schedule.date);
+      if (!dayKey) continue;
+      if (!byDate.has(dayKey)) byDate.set(dayKey, []);
+      byDate.get(dayKey).push(schedule);
+    }
+    return byDate;
+  }, [schedules, teacherId]);
+
   const otherTeacherRangesByDate = useMemo(() => {
     const map = new Map();
     for (const dateKey of dateKeys) {
@@ -520,6 +539,7 @@ export default function TeacherWeeklySlotGrid({
                       schedules={schedules}
                       studentSchedules={studentScheduleIndex.byStudent.get(studentIdOf(student)) || []}
                       dayOccupying={studentScheduleIndex.byStudentDay.get(`${studentIdOf(student)}|${dateKey}`) || null}
+                      teacherSchedulesForDate={teacherSchedulesByDate.get(dateKey) || []}
                       teacherId={teacherId}
                       busy={busyKey === `${studentRowKey(student)}|${dateKey}`}
                       isToday={dateKey === todayKey}
@@ -562,6 +582,7 @@ function SlotCell({
   schedules,
   studentSchedules,
   dayOccupying: indexedDayOccupying,
+  teacherSchedulesForDate,
   teacherId,
   busy,
   isToday,
@@ -636,6 +657,7 @@ function SlotCell({
         {options.map((opt) => {
           const meta = weekSlotSelectMeta(opt, dateKey, {
             schedules,
+            conflictSchedules: teacherSchedulesForDate,
             teacherId,
             excludeScheduleId: existingId,
             now,

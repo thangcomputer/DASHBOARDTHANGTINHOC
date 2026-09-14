@@ -187,7 +187,6 @@ export function useDataSchedule({
               ? { ...s, ...resSch.data }
               : s));
           }
-          triggerBackgroundSync();
           return true;
         }
         const tempId = 'temp-' + Date.now();
@@ -277,7 +276,6 @@ export function useDataSchedule({
         setSchedules(prev => prev.map(s =>
           s.id === tempId ? { ...res.data, id: res.data._id } : s
         ));
-        triggerBackgroundSync();
         return res;
       }
       setSchedules(prev => prev.filter(s => s.id !== tempId));
@@ -340,7 +338,6 @@ export function useDataSchedule({
         addNotification(sid, 'student',
           `📅 Lịch học đã cập nhật — ${payload.note || ''} ${payload.startTime || ''} ngày ${formatScheduleDateVi(payload.date) || ''}`.trim());
       }
-      triggerBackgroundSync();
       return res;
     } catch (err) {
       setSchedules(previousSchedules);
