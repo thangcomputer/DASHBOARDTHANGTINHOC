@@ -81,10 +81,12 @@ export function ScheduleProvider({ user, children }) {
   useEffect(() => {
     if (!socket || !key) return undefined;
     const onEvt = (eventName) => (payload) => {
+      let patched = false;
       // Patch tức thì — HV thấy hủy/đổi lịch trước khi refetch xong
       if (eventName === 'schedule:cancelled' && payload) {
         const sid = String(payload.scheduleId || payload._id || payload.id || '');
         if (sid) {
+          patched = true;
           setSchedulesLocal((prev) => (prev || []).map((sch) => {
             if (String(sch._id || sch.id) !== sid) return sch;
             return {
@@ -100,6 +102,7 @@ export function ScheduleProvider({ user, children }) {
       } else if (eventName === 'schedule:updated' && payload && typeof payload === 'object') {
         const sid = String(payload._id || payload.id || payload.scheduleId || '');
         if (sid) {
+          patched = true;
           const mapped = mapSchedule(payload);
           setSchedulesLocal((prev) => {
             let found = false;
@@ -115,6 +118,7 @@ export function ScheduleProvider({ user, children }) {
         const mapped = mapSchedule(payload);
         const sid = String(mapped._id || mapped.id || '');
         if (sid) {
+          patched = true;
           setSchedulesLocal((prev) => {
             if ((prev || []).some((sch) => String(sch._id || sch.id) === sid)) {
               return (prev || []).map((sch) => (
@@ -125,7 +129,9 @@ export function ScheduleProvider({ user, children }) {
           });
         }
       }
-      scheduleSchedulesRefresh();
+      // The event payload has already patched SWR locally. Refetching the
+      // complete teacher schedule list here makes every edit feel slow.
+      if (!patched) scheduleSchedulesRefresh();
     };
     const handlers = SCHEDULE_SOCKET_EVENTS.map((ev) => [ev, onEvt(ev)]);
     handlers.forEach(([ev, fn]) => socket.on(ev, fn));
