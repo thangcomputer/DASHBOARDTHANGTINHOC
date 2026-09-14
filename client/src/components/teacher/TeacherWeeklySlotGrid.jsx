@@ -5,6 +5,7 @@ import {
   findTeacherScheduleConflict,
   formatTeacherConflictMessage,
   formatLocalDateKey,
+  normalizeScheduleDate,
   isScheduleDateBeforeToday,
   parseTimeToMinutes,
 } from '../../utils/scheduleTime';
