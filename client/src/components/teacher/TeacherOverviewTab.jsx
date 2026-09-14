@@ -130,6 +130,22 @@ export default function TeacherOverviewTab({
     return (mySchedules || []).find((s) => s.status === 'scheduled' && isScheduleOngoingNow(s));
   }, [mySchedules, nowTick]);
 
+  const ongoingStudent = useMemo(() => {
+    const studentId = scheduleStudentId(ongoingSchedule);
+    if (!studentId) return null;
+    return (students || []).find((student) => (
+      String(student?._id || student?.id || '') === studentId
+    )) || null;
+  }, [ongoingSchedule, students]);
+
+  const ongoingJoinUrl = (
+    ongoingSchedule?.linkHoc
+    || ongoingStudent?.linkHoc
+    || ongoingStudent?.joinClassUrl
+    || ongoingStudent?.online_meeting_url
+    || ''
+  ).trim();
+
   const nextSessions = useMemo(() => {
     void nowTick;
     const now = new Date();
@@ -280,9 +296,9 @@ export default function TeacherOverviewTab({
             </div>
           </div>
 
-          {ongoingSchedule.linkHoc && (
+          {ongoingJoinUrl && (
             <a
-              href={ongoingSchedule.linkHoc}
+              href={ongoingJoinUrl}
               target="_blank"
               rel="noreferrer"
               className="w-full sm:w-auto px-5 py-2.5 bg-white text-red-600 hover:bg-red-50 rounded-xl text-xs sm:text-sm font-black shadow-lg transition active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"

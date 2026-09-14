@@ -199,6 +199,7 @@ export default function TeacherScheduleTab({
 
       <TeacherTeachingLog
         schedules={mySchedules}
+        students={students}
         onOpenAttendance={handleOpenAttendance}
       />
 

@@ -115,6 +115,7 @@ function resolveStudentId(sch) {
 
 export default function TeacherTeachingLog({
   schedules = [],
+  students = [],
   variant = 'teacher',
   onOpenSession,
   onOpenAttendance,
@@ -126,6 +127,12 @@ export default function TeacherTeachingLog({
   const now = useMemo(() => new Date(), []);
   const weekKeys = useMemo(() => weekDateKeys(startOfWeekMonday(now)), [now]);
   const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const studentById = useMemo(() => new Map(
+    (students || []).map((student) => [
+      String(student?._id || student?.id || ''),
+      student,
+    ]),
+  ), [students]);
 
   const list = useMemo(() => {
     const all = schedules || [];
@@ -292,9 +299,19 @@ export default function TeacherTeachingLog({
                   ) : null}
                   {canAct ? (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {sch.linkHoc ? (
+                      {(
+                        sch.linkHoc
+                        || studentById.get(resolveStudentId(sch))?.linkHoc
+                        || studentById.get(resolveStudentId(sch))?.joinClassUrl
+                        || studentById.get(resolveStudentId(sch))?.online_meeting_url
+                      ) ? (
                         <a
-                          href={sch.linkHoc}
+                          href={
+                            sch.linkHoc
+                            || studentById.get(resolveStudentId(sch))?.linkHoc
+                            || studentById.get(resolveStudentId(sch))?.joinClassUrl
+                            || studentById.get(resolveStudentId(sch))?.online_meeting_url
+                          }
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-red-600 text-white text-[10px] font-black uppercase"
