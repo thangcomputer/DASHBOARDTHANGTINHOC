@@ -74,31 +74,38 @@ export default function TeacherOverviewTab({
   // Đếm bài tập đã nộp chờ chấm — không dùng lastGrade (HV mới luôn bị báo sai)
   useEffect(() => {
     let cancelled = false;
-    const courses = [...new Set((students || []).map((s) => s.course).filter(Boolean))];
-    if (!courses.length) {
-      setPendingGradeCount(0);
-      return undefined;
-    }
-    Promise.all(courses.map((c) => api.assignments.getByCourse(c).catch(() => null)))
-      .then((results) => {
-        if (cancelled) return;
-        const studentIds = new Set();
-        for (const res of results) {
-          if (!res?.success || !Array.isArray(res.data)) continue;
-          for (const a of res.data) {
-            for (const sub of (a.submissions || [])) {
-              if (String(sub.status || '') !== 'submitted') continue;
-              const sid = String(sub.studentId?._id || sub.studentId?.id || sub.studentId || '');
-              if (sid) studentIds.add(sid);
+    const timer = setTimeout(() => {
+      const courses = [...new Set((students || [])
+        .map((s) => String(s.course || '').trim())
+        .filter(Boolean))];
+      if (!courses.length) {
+        setPendingGradeCount(0);
+        return;
+      }
+      Promise.all(courses.map((c) => api.assignments.getByCourse(c).catch(() => null)))
+        .then((results) => {
+          if (cancelled) return;
+          const studentIds = new Set();
+          for (const res of results) {
+            if (!res?.success || !Array.isArray(res.data)) continue;
+            for (const a of res.data) {
+              for (const sub of (a.submissions || [])) {
+                if (String(sub.status || '') !== 'submitted') continue;
+                const sid = String(sub.studentId?._id || sub.studentId?.id || sub.studentId || '');
+                if (sid) studentIds.add(sid);
+              }
             }
           }
-        }
-        setPendingGradeCount(studentIds.size);
-      })
-      .catch(() => {
-        if (!cancelled) setPendingGradeCount(0);
-      });
-    return () => { cancelled = true; };
+          setPendingGradeCount(studentIds.size);
+        })
+        .catch(() => {
+          if (!cancelled) setPendingGradeCount(0);
+        });
+    }, 1200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [students]);
 
   // Fetch Banners

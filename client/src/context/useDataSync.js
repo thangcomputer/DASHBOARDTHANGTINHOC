@@ -72,7 +72,9 @@ export function useDataSync({
 
       // Fetch only the training dataset needed by the current role.
       const isAdminTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_training')) : false;
-      const needsTeacherTraining = isAdmin || isTeacher;
+      // TeacherTrainingLMS loads its lightweight overview when the tab opens.
+      // Do not pull the full training catalog during dashboard startup.
+      const needsTeacherTraining = isAdmin;
       promises.push((!needsTeacherTraining || (isAdmin && !isAdminTrainingPerm))
         ? Promise.resolve({ success: true, data: {} })
         : api.settings.getTrainingData().catch(() => ({ success: false })));
@@ -122,20 +124,6 @@ export function useDataSync({
       const studentTrainingRes = results[idx++];
       if (studentTrainingRes?.success) {
         setStudentTrainingData(studentTrainingRes.data);
-      }
-
-      // Giảng viên: làm mới ngân hàng câu hỏi thi từ server khi sync
-      if (isTeacher) {
-        const teRes = await api.settings.getTeacherExamConfig().catch(() => null);
-        if (teRes?.success && teRes.data) {
-          if (teRes.data.hasTeacherExamBank) {
-            setQuestions(Array.isArray(teRes.data.questions) ? teRes.data.questions : []);
-          }
-          const tm = teRes.data.timeLimitMinutes;
-          setTeacherExamTimeLimitMinutes(
-            tm != null && Number.isFinite(Number(tm)) ? Math.round(Number(tm)) : null
-          );
-        }
       }
 
       if (isStudent || (isAdmin && (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('system_settings')))) {
