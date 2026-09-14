@@ -43,11 +43,16 @@ function isDroppedStudent(student) {
     || st === 'pending_payment';
 }
 
-function isFinishedEnrollment(student, schedules) {
+function isFinishedEnrollment(student) {
   const st = String(student?.enrollmentStatus || student?.status || '').toLowerCase();
   if (st === 'completed' || st === 'hoàn thành') return true;
-  const progress = resolveEnrollmentProgress(student, schedules);
-  return progress.displayDone >= progress.totalSessions;
+  const totalSessions = Number(student?.totalSessions) > 0
+    ? Number(student.totalSessions)
+    : 12;
+  const completedSessions = student?.completedSessions != null
+    ? Math.max(0, Number(student.completedSessions) || 0)
+    : Math.max(0, totalSessions - (Number(student?.remainingSessions) || 0));
+  return completedSessions >= totalSessions;
 }
 
 function studentRowKey(student) {
@@ -116,7 +121,7 @@ export default function TeacherWeeklySlotGrid({
   const rosterRows = useMemo(() => {
     return (students || []).filter((s) => {
       if (isDroppedStudent(s)) return false;
-      const finished = isFinishedEnrollment(s, schedules);
+      const finished = isFinishedEnrollment(s);
       if (rosterFilter === 'studying') return !finished;
       if (rosterFilter === 'finished') return finished;
       return true;
