@@ -569,9 +569,24 @@ const StudentDashboard = ({ onNavigate }) => {
       return saved === courseName;
     };
     const pool = [...(privateEvaluations || []), ...serverMilestoneEvals];
-    const done = (m) => pool.some(
-      (e) => matchesStudent(e) && String(e?.milestone || '').trim() === m && matchesCourse(e),
-    ) || submittedMilestones.has(`${studentId}::${courseName}::${m}`);
+    const done = (m) => {
+      const hasMatchingEvaluation = pool.some((e) => {
+        if (!matchesStudent(e) || !matchesCourse(e)) return false;
+        const milestone = String(e?.milestone || '').trim();
+        if (milestone === m) return true;
+        // Legacy lesson-one evaluations were saved before milestone was added.
+        return m === 'lesson_1'
+          && (!milestone || milestone === 'manual_feedback')
+          && (e?.type === 'admin_feedback' || e?.criteria?.satisfied || e?.criteria?.lessonClear);
+      });
+      return hasMatchingEvaluation
+        || submittedMilestones.has(`${studentId}::${courseName}::${m}`)
+        // lesson_1 is a one-time student milestone; older local keys may use
+        // the profile id instead of the authenticated account id.
+        || (m === 'lesson_1' && [...submittedMilestones].some((key) => (
+          key.endsWith('::lesson_1') && key.includes(`::${courseName}::`)
+        )));
+    };
     let next = null;
     if (Number(viewStudent.completedSessions) === 1 && !done('lesson_1')) {
       next = 'lesson_1';
