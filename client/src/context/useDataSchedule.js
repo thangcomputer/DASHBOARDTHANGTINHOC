@@ -365,7 +365,6 @@ export function useDataSchedule({
           `⚠️ Buổi học ngày ${formatScheduleDateVi(cancelled.date)} đã bị hủy. Lý do: ${reason || 'Không rõ'}`);
         addNotification(cancelled.teacherId, 'teacher',
           `Đã hủy buổi học với ${cancelled.studentName} ngày ${formatScheduleDateVi(cancelled.date)}`);
-        triggerBackgroundSync();
         return res;
       } catch (err) {
         setSchedules(previousSchedules);
