@@ -4,7 +4,7 @@
  * - Mỗi người = 1 chat-head tròn; bấm head → mở cửa sổ, người trước thu thành head
  * - Gửi text / link / ảnh (không thay Inbox)
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
   ImagePlus, Link2, Loader2, MoreVertical, Edit3, RotateCcw, Bot, UserRound, Check,
