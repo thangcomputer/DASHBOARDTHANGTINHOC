@@ -332,6 +332,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
   if (resultData) {
     const isForfeit = !!resultData.forfeit;
     const isPassed = !isForfeit && (resultData.status === 'passed' || resultData.score >= 70);
+    const detailedReview = Array.isArray(resultData.detailedReview) ? resultData.detailedReview : [];
     return (
       <ExamOverlay>
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center">
@@ -393,8 +394,65 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                 </span>
               </div>
             </div>
-            <p className="text-[11px] text-slate-500 mt-4">Học viên không xem được đáp án chi tiết.</p>
           </div>
+
+          {!isForfeit && detailedReview.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-black text-white">Chi tiết đáp án bài làm</h2>
+              {detailedReview.map((review, index) => {
+                const selectedAnswer = Number.isInteger(review.selectedAnswer)
+                  ? review.selectedAnswer
+                  : null;
+                const isCorrect = selectedAnswer === review.correctAnswer;
+                return (
+                  <article key={`${index}-${review.questionText}`} className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <p className="text-xs sm:text-sm font-bold leading-relaxed">
+                        <span className="text-emerald-400 mr-2">Câu {index + 1}:</span>
+                        {review.questionText}
+                      </p>
+                      <span className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-black ${
+                        isCorrect
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-red-500/15 text-red-300 border border-red-500/30'
+                      }`}>
+                        {isCorrect ? '✓ Đúng' : '✕ Sai'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {(review.options || []).map((option, optionIndex) => {
+                        const isAnswer = optionIndex === selectedAnswer;
+                        const isCorrectOption = optionIndex === review.correctAnswer;
+                        return (
+                          <div
+                            key={`${optionIndex}-${option}`}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold ${
+                              isCorrectOption
+                                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                                : isAnswer
+                                ? 'bg-red-500/15 border-red-500/40 text-red-300'
+                                : 'bg-white/5 border-white/10 text-slate-400'
+                            }`}
+                          >
+                            <span className="font-black mr-2">{String.fromCharCode(65 + optionIndex)}.</span>
+                            {option}
+                            {isCorrectOption && <span className="float-right">Đáp án đúng</span>}
+                            {!isCorrectOption && isAnswer && <span className="float-right">Bạn chọn</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {review.explanation && (
+                      <p className="mt-3 rounded-xl bg-indigo-500/10 border border-indigo-400/20 px-3 py-2 text-[11px] text-indigo-200 leading-relaxed">
+                        <span className="font-black mr-1">Giải thích từ GV:</span>
+                        {review.explanation}
+                      </p>
+                    )}
+                  </article>
+                );
+              })}
+            </section>
+          )}
         </div>
         </div>
       </ExamOverlay>

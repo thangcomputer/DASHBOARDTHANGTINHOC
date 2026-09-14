@@ -303,7 +303,8 @@ async function createTuitionInvoice({ student, courseName, amount, note = '' }) 
 // Lấy danh sách học viên (Admin+MANAGE_STUDENTS / Teacher ownership) — pagination
 router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), dataScopeObserve('student'), requireManageStudentsUnlessTeacher], async (req, res) => {
   try {
-    const { teacherId, paid, status, course, search, page, limit, branch_id } = req.query;
+    const { teacherId, paid, status, course, search, page, limit, branch_id, summary } = req.query;
+    const isTeacherSummary = req.user.role === 'teacher' && summary === 'teacher';
     const andConditions = [];
 
     if (req.branchFilter && Object.keys(req.branchFilter).length > 0) {
@@ -415,12 +416,24 @@ router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), 
       return doc;
     });
 
-    const enrichedStudents = await Promise.all(
-      studentsWithRealSessions.map((doc) => applyEnrollmentStats(doc, doc._id, Schedule))
-    );
+    const enrichedStudents = isTeacherSummary
+      ? studentsWithRealSessions
+      : await Promise.all(
+        studentsWithRealSessions.map((doc) => applyEnrollmentStats(doc, doc._id, Schedule))
+      );
 
     // Heal: khóa cancelled thiếu refundedAmount trên DTO → lấy từ ledger refund
     try {
+      if (isTeacherSummary) {
+        return res.json({
+          success: true,
+          count: enrichedStudents.length,
+          totalRecords,
+          totalPages,
+          currentPage: pageNum,
+          data: enrichedStudents,
+        });
+      }
       const needHealIds = [];
       enrichedStudents.forEach((s) => {
         const list = Array.isArray(s.courses) && s.courses.length

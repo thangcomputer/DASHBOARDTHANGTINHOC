@@ -28,6 +28,17 @@ function quizzesAdminGuard() {
   return [policyShadowQuizAdminRead(), quizzesCutoverGate('admin_read')];
 }
 
+function buildDetailedReview(questions, submission) {
+  if (!submission || submission.forfeit) return [];
+  return (questions || []).map((question, index) => ({
+    questionText: question.questionText,
+    options: question.options,
+    correctAnswer: question.correctAnswer,
+    selectedAnswer: Array.isArray(submission.answers) ? submission.answers[index] : null,
+    explanation: question.explanation || '',
+  }));
+}
+
 // ── GET /api/quizzes/teacher: Lấy danh sách trắc nghiệm do giảng viên tạo ─────
 router.get('/teacher', [authMiddleware, ...quizzesGuard('teacher_list')], async (req, res) => {
   try {
@@ -212,6 +223,8 @@ router.get('/:id', [authMiddleware, ...quizzesGuard('get')], async (req, res) =>
       }
     }
 
+    const detailedReview = buildDetailedReview(quiz.questions, mySub);
+
     return res.json({
       success: true,
       data: {
@@ -222,7 +235,7 @@ router.get('/:id', [authMiddleware, ...quizzesGuard('get')], async (req, res) =>
         timeLimitMinutes: quiz.timeLimitMinutes,
         questions: safeQuestions,
         mySubmission: mySub || null,
-        detailedReview: [],
+        detailedReview,
       },
     });
   } catch (err) {
@@ -431,7 +444,7 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
         forfeit: isForfeit,
         exitReason: reason,
         submittedAt: submissionData.submittedAt,
-        detailedReview: [],
+        detailedReview: buildDetailedReview(quiz.questions, submissionData),
       },
     });
   } catch (err) {
