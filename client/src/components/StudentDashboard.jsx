@@ -527,6 +527,19 @@ const StudentDashboard = ({ onNavigate }) => {
       if (cancelled) return;
       if (res?.success && Array.isArray(res.data)) {
         setServerMilestoneEvals(res.data);
+        setSubmittedMilestones((prev) => {
+          const next = new Set(prev);
+          res.data.forEach((evaluation) => {
+            const milestone = String(evaluation?.milestone || '').trim();
+            if (!milestone) return;
+            const evaluationStudentId = String(evaluation?.studentId || STUDENT_ID || '');
+            const evaluationCourse = String(evaluation?.courseName || '').trim().replace(/\s+/g, ' ').toLowerCase();
+            if (evaluationStudentId && evaluationCourse) {
+              next.add(`${evaluationStudentId}::${evaluationCourse}::${milestone}`);
+            }
+          });
+          return next;
+        });
       }
     }).catch(() => {}).finally(() => {
       if (!cancelled) setMilestoneEvalsReady(true);
@@ -547,7 +560,9 @@ const StudentDashboard = ({ onNavigate }) => {
     const idSet = new Set(
       [viewStudent.id, viewStudent._id, STUDENT_ID].filter(Boolean).map((v) => String(v)),
     );
-    const matchesStudent = (e) => idSet.has(String(e?.studentId || ''));
+    // `/evaluations/mine` is already scoped to the authenticated student. Some
+    // legacy records may omit studentId, so don't reject those records here.
+    const matchesStudent = (e) => !e?.studentId || idSet.has(String(e.studentId));
     const matchesCourse = (e) => {
       const saved = normalizeCourse(e?.courseName);
       if (!courseName || !saved) return true;
