@@ -814,6 +814,9 @@ export const StudentCard = ({
 
     socket.on('submission:new', onSubmissionForStudent);
     socket.on('submission:graded', onSubmissionForStudent);
+    socket.on('assignment:new', onSubmissionForStudent);
+    socket.on('assignment:updated', onSubmissionForStudent);
+    socket.on('assignment:deleted', onSubmissionForStudent);
 
     const unsubRefresh = onDataRefresh((data) => {
       if (shouldRefresh(data)) fetchStudentAssignments();
@@ -822,6 +825,9 @@ export const StudentCard = ({
     return () => {
       socket.off('submission:new', onSubmissionForStudent);
       socket.off('submission:graded', onSubmissionForStudent);
+      socket.off('assignment:new', onSubmissionForStudent);
+      socket.off('assignment:updated', onSubmissionForStudent);
+      socket.off('assignment:deleted', onSubmissionForStudent);
       unsubRefresh?.();
     };
   }, [socket, student.id, student._id, onDataRefresh, fetchStudentAssignments]);

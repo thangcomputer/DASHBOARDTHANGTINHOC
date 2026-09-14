@@ -50,15 +50,7 @@ export function useDataSync({
 
       const promises = [];
 
-      if (isAdmin) {
-        const perms = currentUser.permissions || [];
-        const isSuper = currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN';
-        const hasPerm = (p) => isSuper || perms.includes(p);
-        const dummyRes = { success: true, data: [] };
-
-        // Admin: students handled by StudentsContext.fetchStudentsPaginated, skip here
-        promises.push(hasPerm('manage_schedule') ? api.schedules.getAll({ limit: 500 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
-      } else if (isTeacher) {
+      if (isTeacher) {
         // Teacher students: StudentsContext (SWR) owns list — tránh double-fetch
         // Use the scoped endpoint instead of loading every schedule in the system.
         promises.push(api.schedules.getByTeacher(currentUser.id || currentUser._id).catch(() => ({ success: false })));
@@ -70,16 +62,9 @@ export function useDataSync({
         const hasPerm = (p) => isSuper || perms.includes(p);
         const dummyRes = { success: true, data: [] };
 
-        const teacherBranchParams = (
-          currentUser.adminRole === 'SUPER_ADMIN'
-          || currentUser.adminRole === 'HIGH_ADMIN'
-          || currentUser.id === 'admin'
-        ) ? { branch_id: 'all' } : {};
-        promises.push(hasPerm('view_teachers')
-          ? api.teachers.getAll(teacherBranchParams).catch(() => ({ success: false }))
-          : Promise.resolve(dummyRes));
+        // Admin TeachersContext and FinanceContext already own these SWR requests.
+        // Do not fetch the same large lists again during the initial background sync.
         promises.push((hasPerm('manage_staff') || hasPerm('manage_hr') || isSuper) ? api.staff.getAll().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
-        promises.push(hasPerm('manage_finance') ? api.transactions.getAll({ limit: 200 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
         promises.push((hasPerm('manage_training') || hasPerm('manage_students')) ? api.examResults.getAll({ limit: 200 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
         promises.push(hasPerm('view_evaluations') ? api.evaluations.getPrivate().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
       } else if (isTeacher) {
@@ -112,21 +97,14 @@ export function useDataSync({
       const results = await Promise.all(promises);
       let idx = 0;
 
-      if (isAdmin) {
-        const schedulesRes = results[idx++];
-        if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
-      } else if (isTeacher) {
+      if (isTeacher) {
         const schedulesRes = results[idx++];
         if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
       }
 
       if (isAdmin) {
-        const teachersRes = results[idx++];
-        if (teachersRes?.success) setTeachers(teachersRes.data.map(mapTeacher));
         const staffRes = results[idx++];
         if (staffRes?.success) setStaffs(staffRes.data.map(st => ({ ...st, id: st._id })));
-        const transactionsRes = results[idx++];
-        if (transactionsRes?.success) setTransactions(transactionsRes.data.map(mapTransaction));
         const examResultsRes = results[idx++];
         if (Array.isArray(examResultsRes)) setExamResultsRef.current(examResultsRes.map(r => ({ ...r, id: r._id || r.id })));
         const evalsRes = results[idx++];

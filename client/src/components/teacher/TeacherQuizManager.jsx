@@ -5,6 +5,7 @@ import {
   X, HelpCircle, Eye, AlertCircle, RefreshCw, Send, Check, Sparkles, Copy
 } from 'lucide-react';
 import api from '../../services/api';
+import { useSocket } from '../../context/SocketContext';
 import { useToast } from '../../utils/toast';
 import {
   downloadTeacherQuestionsExcelTemplate,
@@ -28,6 +29,7 @@ export default function TeacherQuizManager({
   onCreateClose = null,
 }) {
   const toast = useToast();
+  const { socket } = useSocket();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(!createOnly);
   const [showCreateModal, setShowCreateModal] = useState(Boolean(autoOpenCreate));
@@ -110,6 +112,15 @@ export default function TeacherQuizManager({
     window.addEventListener('open-teacher-quiz-detail', onOpen);
     return () => window.removeEventListener('open-teacher-quiz-detail', onOpen);
   }, [createOnly, openTeacherQuizDetailByNotification]);
+
+  useEffect(() => {
+    if (createOnly || !socket) return undefined;
+    const onQuizSubmitted = () => {
+      fetchQuizzes();
+    };
+    socket.on('quiz:submitted', onQuizSubmitted);
+    return () => socket.off('quiz:submitted', onQuizSubmitted);
+  }, [createOnly, socket]);
 
   useEffect(() => {
     if (!createOnly) fetchQuizzes();

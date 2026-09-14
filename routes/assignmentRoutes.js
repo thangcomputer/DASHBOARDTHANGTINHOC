@@ -30,6 +30,34 @@ async function assignmentHasGradedSubmission(assignmentId) {
   return n > 0;
 }
 
+async function emitAssignmentRealtime(io, assignment, eventName, payload = assignment) {
+  if (!io || !assignment) return;
+
+  const studentIds = assignment.studentId
+    ? [String(assignment.studentId)]
+    : (await Student.find({ course: assignment.courseId }).select('_id enrollments teacherId').lean())
+      .flatMap((student) => [String(student._id)]);
+
+  [...new Set(studentIds.filter(Boolean))].forEach((studentId) => {
+    io.to(studentId).to(`student_${studentId}`).emit(eventName, payload);
+  });
+
+  const teacherIds = new Set();
+  if (assignment.teacherId) teacherIds.add(String(assignment.teacherId));
+  if (!assignment.studentId) {
+    const students = await Student.find({ course: assignment.courseId })
+      .select('enrollments teacherId')
+      .lean();
+    students.forEach((student) => {
+      resolveTeacherIdsForStudentCourse(student, assignment.courseId)
+        .forEach((teacherId) => teacherIds.add(String(teacherId)));
+    });
+  }
+  [...teacherIds].filter(Boolean).forEach((teacherId) => {
+    io.to(teacherId).to(`teacher_${teacherId}`).emit(eventName, payload);
+  });
+}
+
 function normCourseLabel(s) {
   return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -298,11 +326,7 @@ router.post('/', [authMiddleware, branchFilter, ...assignmentsGuard('create')], 
 
     const io = req.app.get('io');
     if (io) {
-      if (newAssignment.studentId) {
-        io.to(`student_${String(newAssignment.studentId)}`).emit('assignment:new', newAssignment);
-      } else {
-        io.to(`course_${newAssignment.courseId}`).emit('assignment:new', newAssignment);
-      }
+      await emitAssignmentRealtime(io, newAssignment, 'assignment:new');
 
       try {
         const NotificationService = require('../services/NotificationService');
@@ -363,9 +387,6 @@ router.post('/', [authMiddleware, branchFilter, ...assignmentsGuard('create')], 
                 type: 'assignment',
               },
               link: '/teacher#students',
-            });
-            teacherIds.forEach((tid) => {
-              io.to(`teacher_${tid}`).emit('assignment:new', newAssignment);
             });
           }
         }
@@ -466,7 +487,7 @@ router.put('/:id', [authMiddleware, branchFilter, ...assignmentsGuard('update')]
     if (!updated) return res.status(404).json({ success: false, message: 'Không tìm thấy bài tập' });
 
     const io = req.app.get('io');
-    if (io) io.to(`course_${updated.courseId}`).emit('assignment:updated', updated);
+    if (io) await emitAssignmentRealtime(io, updated, 'assignment:updated');
 
     return res.json({ success: true, data: updated });
   } catch (err) {
@@ -494,7 +515,7 @@ router.delete('/:id', [authMiddleware, ...assignmentsGuard('delete')], async (re
     await Submission.deleteMany({ assignmentId: req.params.id });
     
     const io = req.app.get('io');
-    if (io) io.to(`course_${deleted.courseId}`).emit('assignment:deleted', deleted._id);
+    if (io) await emitAssignmentRealtime(io, deleted, 'assignment:deleted', deleted._id);
     
     return res.json({ success: true });
   } catch (err) {
