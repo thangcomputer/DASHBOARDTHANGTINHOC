@@ -32,7 +32,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
         {orderedCourses.map((c) => {
           const name = c.courseName || c.name;
           const completed = isEnrollmentCompleted(c);
-          const active = !completed && name === activeCourseName;
+          const active = name === activeCourseName;
           const total = c.totalSessions ?? 12;
           const done = c.completedSessions ?? 0;
           const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
@@ -40,22 +40,19 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
             <button
               key={c.enrollmentId || c.id || name}
               type="button"
-              onClick={() => {
-                if (!completed) onChange(name);
-              }}
-              disabled={completed}
+              onClick={() => onChange(name)}
               title={name}
               className={`snap-start shrink-0 w-[min(calc(100vw-40px),20rem)] sm:w-[17rem] text-left p-4 rounded-[16px] border transition-all duration-200 active:scale-[0.98] min-h-[44px] ${
                 active
                   ? 'border-blue-500 bg-blue-50/80 shadow-[0_6px_20px_rgba(0,0,0,0.06)] ring-1 ring-blue-100'
                   : completed
-                    ? 'border-slate-100 bg-slate-50/70 opacity-75 cursor-not-allowed shadow-[0_6px_20px_rgba(0,0,0,0.04)]'
+                    ? 'border-slate-200 bg-white hover:border-blue-300 shadow-[0_6px_20px_rgba(0,0,0,0.06)]'
                     : 'border-slate-100 bg-white hover:border-slate-200 shadow-[0_6px_20px_rgba(0,0,0,0.06)]'
               }`}
             >
               <p
                 className={`cms-sd-card-title line-clamp-2 ${
-                  active ? 'text-blue-800' : completed ? 'text-slate-700' : 'text-slate-800'
+                  active ? 'text-blue-800' : 'text-slate-800'
                 }`}
               >
                 {name}
@@ -72,7 +69,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
-                      active ? 'bg-blue-500' : 'bg-red-500'
+                      active ? 'bg-blue-500' : completed ? 'bg-emerald-500' : 'bg-red-500'
                     }`}
                     style={{ width: `${pct}%` }}
                   />

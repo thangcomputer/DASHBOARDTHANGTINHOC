@@ -16,7 +16,6 @@ import {
   enrichEnrollmentsWithTeachers,
   uniqueTeacherNames,
   formatTeacherDisplay,
-  isEnrollmentCompleted,
 } from '../utils/enrollments';
 import { getSubjectIdsForCourseFilter, getSubjectIdsForStudent } from '../utils/examSubjects';
 import { getScheduleDisplayKind } from '../utils/scheduleTime';
@@ -222,14 +221,13 @@ const StudentDashboard = ({ onNavigate }) => {
 
   const enrollments = useMemo(() => studentData?.courses || [], [studentData?.courses]);
   const selectableEnrollments = useMemo(
-    () => enrollments.filter((enrollment) => !isEnrollmentCompleted(enrollment)),
+    () => enrollments,
     [enrollments],
   );
 
   useEffect(() => {
     const activeExists = enrollments.some(
-      (enrollment) => !isEnrollmentCompleted(enrollment)
-        && (enrollment.courseName || enrollment.name) === activeCourseName,
+      (enrollment) => (enrollment.courseName || enrollment.name) === activeCourseName,
     );
     if (selectableEnrollments.length && (!activeCourseName || !activeExists)) {
       setActiveCourseName(selectableEnrollments[0].courseName || selectableEnrollments[0].name);
