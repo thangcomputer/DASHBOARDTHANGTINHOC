@@ -10,6 +10,10 @@ import { useLocation } from 'react-router-dom';
 import { useModal } from '../utils/Modal.jsx';
 import api, { getRolePrefix } from '../services/api';
 import { sanitizeCsvField } from '../utils/csvSanitizer';
+import {
+  getSyntheticPendingCommissionAmount,
+  sortFinanceMonths,
+} from '../utils/teacherFinance';
 
 const isPaidTxStatus = (status) => ['completed', 'paid', 'confirmed'].includes(String(status || ''));
 const isPendingTxStatus = (status) => !isPaidTxStatus(status);
@@ -219,7 +223,7 @@ const TeacherFinanceAndTraining = () => {
       id: p.id || p._id,
     }));
 
-    const unpaid = Number(financeStats.unpaidAmount) || 0;
+    const unpaid = getSyntheticPendingCommissionAmount(financeStats.unpaidAmount, list);
     if (unpaid > 0) {
       const rate = Number(financeStats.salaryPerSession) || 0;
       const sessions = rate > 0 ? Math.round(unpaid / rate) : 0;
@@ -254,7 +258,7 @@ const TeacherFinanceAndTraining = () => {
         dataObj[key] = (dataObj[key] || 0) + (p.amount || 0);
     });
     const arr = Object.entries(dataObj).map(([month, amount]) => ({ month, amount }));
-    return arr.sort((a,b) => a.month.localeCompare(b.month));
+    return arr.sort((a, b) => sortFinanceMonths(a.month, b.month));
   }, [myPayments]);
 
   const maxAmount = Math.max(...chartData.map(d => d.amount), 1); // Avoid division by zero

@@ -464,12 +464,13 @@ const StudentDashboard = ({ onNavigate }) => {
   }, [fetchMyQuizzes]);
 
   const activeAssignments = useMemo(() => {
-    const activeCourse = String(viewStudent?.course || '').trim().toLowerCase();
+    const normalizeCourse = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const activeCourse = normalizeCourse(viewStudent?.course);
     if (!activeCourse) return myAssignments || [];
     return (myAssignments || []).filter((assignment) => {
-      const assignmentCourse = String(
+      const assignmentCourse = normalizeCourse(
         assignment?.courseName || assignment?.course || assignment?.courseId || '',
-      ).trim().toLowerCase();
+      );
       return !assignmentCourse || assignmentCourse === activeCourse;
     });
   }, [myAssignments, viewStudent?.course]);
@@ -502,6 +503,7 @@ const StudentDashboard = ({ onNavigate }) => {
   const [activeMilestone, setActiveMilestone] = useState(null);
   const [serverMilestoneEvals, setServerMilestoneEvals] = useState([]);
   const [milestoneEvalsReady, setMilestoneEvalsReady] = useState(false);
+  const [submittedMilestones, setSubmittedMilestones] = useState(() => new Set());
 
   useEffect(() => {
     if (!STUDENT_ID) {
@@ -528,20 +530,20 @@ const StudentDashboard = ({ onNavigate }) => {
     if (activeMilestone) return undefined;
 
     const studentId = String(viewStudent.id);
-    const courseName = String(viewStudent.course || '').trim();
+    const courseName = String(viewStudent.course || '').trim().replace(/\s+/g, ' ').toLowerCase();
     const idSet = new Set(
       [viewStudent.id, viewStudent._id, STUDENT_ID].filter(Boolean).map((v) => String(v)),
     );
     const matchesStudent = (e) => idSet.has(String(e?.studentId || ''));
     const matchesCourse = (e) => {
-      const saved = String(e?.courseName || '').trim();
+      const saved = String(e?.courseName || '').trim().replace(/\s+/g, ' ').toLowerCase();
       if (!courseName || !saved) return true;
       return saved === courseName;
     };
     const pool = [...(privateEvaluations || []), ...serverMilestoneEvals];
     const done = (m) => pool.some(
       (e) => matchesStudent(e) && e.milestone === m && matchesCourse(e),
-    );
+    ) || submittedMilestones.has(`${studentId}::${courseName}::${m}`);
     let next = null;
     if (Number(viewStudent.completedSessions) === 1 && !done('lesson_1')) {
       next = 'lesson_1';
@@ -571,6 +573,7 @@ const StudentDashboard = ({ onNavigate }) => {
     viewStudent?.course,
     privateEvaluations,
     serverMilestoneEvals,
+    submittedMilestones,
     STUDENT_ID,
   ]);
 
@@ -588,12 +591,12 @@ const StudentDashboard = ({ onNavigate }) => {
     const idSet = new Set(
       [viewStudent.id, viewStudent._id, STUDENT_ID].filter(Boolean).map((v) => String(v)),
     );
-    const courseName = String(viewStudent.course || '').trim();
+    const courseName = String(viewStudent.course || '').trim().replace(/\s+/g, ' ').toLowerCase();
     const pool = [...(privateEvaluations || []), ...serverMilestoneEvals];
     const hasMilestone = (m) => pool.some((e) => {
       if (!idSet.has(String(e?.studentId || '')) && String(e?.studentId || '') !== sid) return false;
       if (e.milestone !== m) return false;
-      const saved = String(e?.courseName || '').trim();
+      const saved = String(e?.courseName || '').trim().replace(/\s+/g, ' ').toLowerCase();
       if (!courseName || !saved) return true;
       return saved === courseName;
     });
@@ -841,6 +844,12 @@ const StudentDashboard = ({ onNavigate }) => {
           onClose={() => setActiveMilestone(null)}
           onSubmit={async (payload) => {
             await submitPrivateEvaluation(payload);
+            const normalizedCourse = String(payload.courseName || '').trim().replace(/\s+/g, ' ').toLowerCase();
+            setSubmittedMilestones((prev) => {
+              const next = new Set(prev);
+              next.add(`${payload.studentId}::${normalizedCourse}::${payload.milestone}`);
+              return next;
+            });
             setServerMilestoneEvals((prev) => {
               const rest = (prev || []).filter((e) => !(
                 String(e.studentId) === String(payload.studentId)

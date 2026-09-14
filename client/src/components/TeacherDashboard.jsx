@@ -263,7 +263,7 @@ const TeacherDashboard = ({ onNavigate }) => {
     setShowScheduleModal(true);
   };
 
-  const students = getStudentsByTeacher(TEACHER_ID).map(s => {
+  const students = useMemo(() => getStudentsByTeacher(TEACHER_ID).map(s => {
     const studentId = s._id || s.id;
     return {
       ...s,
@@ -271,7 +271,7 @@ const TeacherDashboard = ({ onNavigate }) => {
       // Giữ avatar upload từ API — không ghi đè bằng initials (tránh fallback cartoon mặc định)
       color: (typeof studentId === 'number' ? studentId : (String(studentId).charCodeAt(0) || 0)) % 2 === 1 ? 'bg-purple-500' : 'bg-red-500',
     };
-  });
+  }), [getStudentsByTeacher, TEACHER_ID]);
   const teacherName = (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name)) 
     ? currentTeacher.name 
     : currentTeacher?.email || currentTeacher?.phone || session.name || 'Giảng viên';
@@ -385,7 +385,7 @@ const TeacherDashboard = ({ onNavigate }) => {
     updateStudent(id, { notes });
   };
 
-  const stats = getTeacherStats(TEACHER_ID);
+  const stats = useMemo(() => getTeacherStats(TEACHER_ID), [getTeacherStats, TEACHER_ID]);
   const totalDone = stats.totalSessions;
   const totalSess = students.reduce((sum, s) => sum + s.totalSessions, 0);
   const avgGrade = stats.avgGrade;
@@ -825,6 +825,5 @@ const TeacherDashboard = ({ onNavigate }) => {
 };
 
 export default TeacherDashboard;
-
 
 

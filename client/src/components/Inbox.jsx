@@ -15,7 +15,11 @@ import { displayFileName } from '../utils/validators';
 import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
 import { Megaphone, Loader2 } from 'lucide-react';
 import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE, isAliveMessagingPeer, isSpecialMessagingPeerId } from '../lib/messagingIdentity';
-import { mergeConversationsById } from '../lib/conversationList';
+import {
+  mergeConversationsById,
+  mergeDirectConversationsByPeer,
+  conversationPeerKey,
+} from '../lib/conversationList';
 import { getMessagingRole } from '../lib/messagingRoles';
 import {
   resolveMessagingDeepLink,
@@ -635,9 +639,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     const seenContacts = new Set();
     const uniqueContacts = (contacts || []).filter((c) => {
       if (!c?.id) return false;
-      const idStr = String(c.id);
-      if (seenContacts.has(idStr)) return false;
-      seenContacts.add(idStr);
+      const contactKey = conversationPeerKey(c);
+      if (seenContacts.has(contactKey)) return false;
+      seenContacts.add(contactKey);
       return true;
     });
 
@@ -810,7 +814,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     });
 
     // Canonical id merge + newest lastTime first (immutable)
-    return mergeConversationsById(entries);
+    return mergeDirectConversationsByPeer(mergeConversationsById(entries));
   }, [contacts, contactsLoaded, dataContextConvs, hiddenList, currentUserRole, currentUserId, onlineUsers, seedContact, isHighAdmin, isSuperAdmin, isSupportAgent, handoffUserIds, students, teachers, staffs]);
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);

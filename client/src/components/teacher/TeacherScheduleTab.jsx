@@ -6,6 +6,7 @@ import TeacherWeeklySlotGrid from './TeacherWeeklySlotGrid';
 import TeacherTeachingLog from './TeacherTeachingLog';
 import AttendanceMakeupRequestModal from './AttendanceMakeupRequestModal';
 import { getScheduleDisplayKind, isScheduleDateBeforeToday } from '../../utils/scheduleTime';
+import { isDateInCalendarMonth } from '../../utils/teacherFinance';
 import { TEACHER_WEEKLY_SLOT_GRID_EXPERIMENT, SHOW_TEACHER_MONTHLY_CALENDAR } from '../../utils/weeklySlotGrid';
 import { useToast } from '../../utils/toast';
 
@@ -35,9 +36,12 @@ export default function TeacherScheduleTab({
 }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const today = new Date();
-  const currentMonth = today.getMonth();
+  const today = useMemo(() => new Date(), []);
   const [makeupTarget, setMakeupTarget] = useState(null);
+
+  const isCurrentMonth = useCallback((schedule) => {
+    return isDateInCalendarMonth(schedule?.date, today);
+  }, [today]);
 
   const teacherSession = useMemo(() => {
     try {
@@ -48,16 +52,16 @@ export default function TeacherScheduleTab({
   }, []);
 
   const completedCount = useMemo(() => {
-    return (mySchedules || []).filter(s => s.status === 'completed' && new Date(s.date).getMonth() === currentMonth).length;
-  }, [mySchedules, currentMonth]);
+    return (mySchedules || []).filter(s => s.status === 'completed' && isCurrentMonth(s)).length;
+  }, [mySchedules, isCurrentMonth]);
 
   const upcomingCount = useMemo(() => {
-    return (mySchedules || []).filter(s => s.status === 'scheduled' && new Date(s.date).getMonth() === currentMonth).length;
-  }, [mySchedules, currentMonth]);
+    return (mySchedules || []).filter(s => s.status === 'scheduled' && isCurrentMonth(s)).length;
+  }, [mySchedules, isCurrentMonth]);
 
   const cancelledCount = useMemo(() => {
-    return (mySchedules || []).filter(s => s.status === 'cancelled' && new Date(s.date).getMonth() === currentMonth).length;
-  }, [mySchedules, currentMonth]);
+    return (mySchedules || []).filter(s => s.status === 'cancelled' && isCurrentMonth(s)).length;
+  }, [mySchedules, isCurrentMonth]);
 
   const openStudentProfile = useCallback((sch) => {
     const sid = resolveStudentId(sch);

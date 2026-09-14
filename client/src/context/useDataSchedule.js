@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import api from '../services/api';
 import { normalizeScheduleDate, formatScheduleDateVi } from '../utils/scheduleTime';
+import { normalizeCourseName } from '../utils/teacherFinance';
 
 /** enrollment.status enum trên server */
 function attendanceStatusForApi(remaining) {
@@ -37,7 +38,10 @@ export function useDataSchedule({
 
     let targetStudentSync = root;
     if (courseName) {
-      const enr = (root.enrollments || []).find((e) => e.courseName === courseName);
+      const normalizedCourse = normalizeCourseName(courseName);
+      const enr = (root.enrollments || []).find(
+        (e) => normalizeCourseName(e.courseName) === normalizedCourse,
+      );
       if (enr) {
         targetStudentSync = {
           ...root,
@@ -50,7 +54,7 @@ export function useDataSchedule({
           can_check_in: enr.can_check_in ?? root.can_check_in,
           remaining_cooldown_hours: enr.remaining_cooldown_hours ?? root.remaining_cooldown_hours,
         };
-      } else if (root.course === courseName) {
+      } else if (normalizeCourseName(root.course) === normalizedCourse) {
         targetStudentSync = root;
       }
     } else {
@@ -83,7 +87,7 @@ export function useDataSchedule({
       setStudents(prev => prev.map(s => {
         if (String(s._id || s.id) !== String(studentId)) return s;
         const patchEnrollment = (enrollment) => {
-          if (!courseName || enrollment?.courseName !== courseName) return enrollment;
+          if (!courseName || normalizeCourseName(enrollment?.courseName) !== normalizeCourseName(courseName)) return enrollment;
           return {
             ...enrollment,
             can_check_in: false,
@@ -111,7 +115,9 @@ export function useDataSchedule({
       if (!existSch) {
         existSch = schedules.find((sch) => {
           const schDate = normalizeScheduleDate(sch.date);
-          const courseOk = !courseName || !sch.course || sch.course === courseName;
+          const courseOk = !courseName
+            || !sch.course
+            || normalizeCourseName(sch.course) === normalizeCourseName(courseName);
           const sidOk = scheduleStudentId(sch) === String(studentId);
           return sidOk && schDate === todayISO && sch.status !== 'cancelled' && courseOk;
         });
@@ -161,7 +167,9 @@ export function useDataSchedule({
             ? freshSchedules
             : [];
         const serverMatch = serverSchedules.find((sch) => {
-          const courseOk = !courseName || !sch.course || sch.course === courseName;
+          const courseOk = !courseName
+            || !sch.course
+            || normalizeCourseName(sch.course) === normalizeCourseName(courseName);
           return scheduleStudentId(sch) === String(studentId)
             && normalizeScheduleDate(sch.date) === todayISO
             && sch.status !== 'cancelled'

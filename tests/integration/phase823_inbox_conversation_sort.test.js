@@ -16,7 +16,7 @@ function loadConversationList() {
   const src = read('client/src/lib/conversationList.js')
     .replace(/export function /g, 'function ')
     .replace(/export \{[^}]+\};?/g, '');
-  const wrapped = `${src}\nmodule.exports = { conversationActivityTime, sortConversationsByLastMessageAt, mergeConversationsById };`;
+  const wrapped = `${src}\nmodule.exports = { conversationActivityTime, sortConversationsByLastMessageAt, mergeConversationsById, mergeDirectConversationsByPeer, conversationPeerKey };`;
   const mod = { exports: {} };
   vm.runInNewContext(wrapped, { module: mod, exports: mod.exports });
   return mod.exports;
@@ -26,6 +26,8 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
   const {
     sortConversationsByLastMessageAt,
     mergeConversationsById,
+    mergeDirectConversationsByPeer,
+    conversationPeerKey,
     conversationActivityTime,
   } = loadConversationList();
 
@@ -107,5 +109,35 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
       { id: 'B', lastTime: '2026-01-01T10:05:00Z' },
     ]);
     assert.equal(list[0].id, 'B');
+  });
+
+  it('10 legacy direct threads for one peer collapse while groups stay separate', () => {
+    const merged = mergeDirectConversationsByPeer([
+      { id: 'old_admin_high__teacher_t', lastTime: '2026-01-01T10:00:00Z', lastMessage: 'old', unread: 1, user: { id: 'high-1', adminRole: 'HIGH_ADMIN' } },
+      { id: 'admin_admin__teacher_t', lastTime: '2026-01-01T10:05:00Z', lastMessage: 'new', unread: 0, user: { id: 'high-1', adminRole: 'HIGH_ADMIN' } },
+      { id: 'group_g1', isGroup: true, lastTime: '2026-01-01T10:10:00Z', user: { id: 'high-1' } },
+    ]);
+    assert.equal(merged.length, 2);
+    assert.equal(merged.find((c) => !c.isGroup).lastMessage, 'new');
+    assert.equal(merged.find((c) => !c.isGroup).unread, 1);
+    assert.equal(merged.find((c) => c.isGroup).id, 'group_g1');
+  });
+
+  it('11 default-named High Admin contacts collapse across legacy IDs', () => {
+    assert.equal(conversationPeerKey({
+      id: 'high-a',
+      name: 'High Admin',
+      adminRole: 'HIGH_ADMIN',
+    }), 'admin:high_admin');
+    assert.equal(conversationPeerKey({
+      id: 'high-b',
+      name: 'Admin cấp cao',
+      adminRole: 'HIGH_ADMIN',
+    }), 'admin:high_admin');
+    assert.equal(conversationPeerKey({
+      id: 'high-c',
+      name: 'Nguyễn Văn A',
+      adminRole: 'HIGH_ADMIN',
+    }), 'high-c');
   });
 });

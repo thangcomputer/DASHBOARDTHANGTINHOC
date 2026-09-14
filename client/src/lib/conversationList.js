@@ -12,6 +12,19 @@ export function conversationActivityTime(conv) {
   return t;
 }
 
+export function conversationPeerKey(entry) {
+  const user = entry?.user || entry;
+  const adminRole = String(user?.adminRole || '').toUpperCase();
+  const name = String(user?.name || user?.displayName || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (
+    adminRole === 'HIGH_ADMIN'
+    && (!name || name === 'high admin' || name === 'admin cấp cao')
+  ) {
+    return 'admin:high_admin';
+  }
+  return user?.id == null ? '' : String(user.id);
+}
+
 /** Immutable sort: newest activity first. */
 export function sortConversationsByLastMessageAt(conversations = []) {
   return [...conversations].sort(
@@ -54,4 +67,40 @@ export function mergeConversationsById(entries = []) {
         });
   }
   return sortConversationsByLastMessageAt([...byId.values()]);
+}
+
+/**
+ * Merge legacy direct-message threads that use different conversation IDs
+ * for the same peer. Group conversations remain independent.
+ */
+export function mergeDirectConversationsByPeer(entries = []) {
+  const byPeer = new Map();
+  const groups = [];
+
+  for (const entry of entries) {
+    if (!entry?.isGroup && entry?.user?.id != null) {
+      const peerId = conversationPeerKey(entry);
+      const previous = byPeer.get(peerId);
+      if (!previous) {
+        byPeer.set(peerId, entry);
+        continue;
+      }
+
+      const preferNext = conversationActivityTime(entry) >= conversationActivityTime(previous);
+      const newer = preferNext ? entry : previous;
+      const older = preferNext ? previous : entry;
+      byPeer.set(peerId, {
+        ...older,
+        ...newer,
+        user: { ...(older.user || {}), ...(newer.user || {}) },
+        lastMessage: newer.lastMessage ?? older.lastMessage,
+        lastTime: newer.lastTime ?? older.lastTime,
+        unread: Math.max(Number(older.unread) || 0, Number(newer.unread) || 0),
+      });
+      continue;
+    }
+    groups.push(entry);
+  }
+
+  return sortConversationsByLastMessageAt([...byPeer.values(), ...groups]);
 }
