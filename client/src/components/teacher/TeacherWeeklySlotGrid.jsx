@@ -8,7 +8,7 @@ import {
   isScheduleDateBeforeToday,
   parseTimeToMinutes,
 } from '../../utils/scheduleTime';
-import { getStudentScheduleGate, resolveEnrollmentProgress } from '../../utils/schedulingLimits';
+import { getStudentScheduleGate } from '../../utils/schedulingLimits';
 import {
   WEEKDAY_LABELS,
   WEEK_SLOT_OPTIONS,
@@ -162,6 +162,55 @@ export default function TeacherWeeklySlotGrid({
     if (rosterExpanded || rows.length <= ROSTER_PAGE_SIZE) return rows;
     return rows.slice(0, ROSTER_PAGE_SIZE);
   }, [rows, rosterExpanded]);
+
+  const studentScheduleIndex = useMemo(() => {
+    const byStudent = new Map();
+    const byStudentDay = new Map();
+    for (const schedule of schedules || []) {
+      const sid = studentIdOf(schedule);
+      if (!sid) continue;
+      if (!byStudent.has(sid)) byStudent.set(sid, []);
+      byStudent.get(sid).push(schedule);
+      const dayKey = normalizeScheduleDate(schedule.date);
+      if (dayKey) byStudentDay.set(`${sid}|${dayKey}`, schedule);
+    }
+    return { byStudent, byStudentDay };
+  }, [schedules]);
+
+  const otherTeacherRangesByDate = useMemo(() => {
+    const map = new Map();
+    for (const dateKey of dateKeys) {
+      const ranges = [];
+      for (const student of rosterRows) {
+        const rowKey = studentRowKey(student);
+        const hold = slotHolds?.[`${rowKey}|${dateKey}`];
+        if (hold?.start) {
+          ranges.push({
+            rowKey,
+            start: hold.start,
+            end: hold.end || slotEndForStart(hold.start),
+            studentName: hold.studentName || studentDisplayName(student),
+          });
+          continue;
+        }
+        const dayOccupying = studentScheduleIndex.byStudentDay.get(
+          `${studentIdOf(student)}|${dateKey}`,
+        );
+        const own = occupyingMatchesCourse(dayOccupying, student.course) ? dayOccupying : null;
+        const start = slotValueFromSchedule(own);
+        if (start) {
+          ranges.push({
+            rowKey,
+            start,
+            end: slotEndForStart(start, own),
+            studentName: studentDisplayName(student),
+          });
+        }
+      }
+      map.set(dateKey, ranges);
+    }
+    return map;
+  }, [dateKeys, rosterRows, studentScheduleIndex, slotHolds]);
 
   const hiddenCount = Math.max(0, rows.length - ROSTER_PAGE_SIZE);
   const showRosterToggle = hiddenCount > 0;
@@ -447,14 +496,19 @@ export default function TeacherWeeklySlotGrid({
               </tr>
             )}
             {visibleRows.map((student) => {
-              const progress = resolveEnrollmentProgress(student, schedules);
+              const totalSessions = Number(student?.totalSessions) > 0
+                ? Number(student.totalSessions)
+                : 12;
+              const displayDone = student?.completedSessions != null
+                ? Math.max(0, Number(student.completedSessions) || 0)
+                : Math.max(0, totalSessions - (Number(student?.remainingSessions) || 0));
               const name = student.displayName || student.name || 'Học viên';
               return (
                 <tr key={studentRowKey(student)} className="border-b border-slate-100 last:border-b-0">
                   <td className="sticky left-0 z-10 bg-white px-3 py-2 align-middle">
                     <p className="text-xs font-bold text-slate-900 truncate" title={name}>{name}</p>
                     <p className="text-[10px] text-slate-400 font-medium truncate">
-                      {student.course || '—'} · {progress.displayDone}/{progress.totalSessions} buổi
+                      {student.course || '—'} · {displayDone}/{totalSessions} buổi
                     </p>
                   </td>
                   {dateKeys.map((dateKey) => (
@@ -463,17 +517,13 @@ export default function TeacherWeeklySlotGrid({
                       student={student}
                       dateKey={dateKey}
                       schedules={schedules}
+                      studentSchedules={studentScheduleIndex.byStudent.get(studentIdOf(student)) || []}
+                      dayOccupying={studentScheduleIndex.byStudentDay.get(`${studentIdOf(student)}|${dateKey}`) || null}
                       teacherId={teacherId}
                       busy={busyKey === `${studentRowKey(student)}|${dateKey}`}
                       isToday={dateKey === todayKey}
                       now={now}
-                      extraTakenRanges={otherTeacherRowRanges({
-                        rows: rosterRows,
-                        schedules,
-                        dateKey,
-                        excludeRowKey: studentRowKey(student),
-                        holds: slotHolds,
-                      })}
+                                      extraTakenRanges={otherTeacherRangesByDate.get(dateKey) || []}
                       onChange={handleSlotChange}
                     />
                   ))}
@@ -505,17 +555,29 @@ export default function TeacherWeeklySlotGrid({
   );
 }
 
-function SlotCell({ student, dateKey, schedules, teacherId, busy, isToday, now, extraTakenRanges, onChange }) {
+function SlotCell({
+  student,
+  dateKey,
+  schedules,
+  studentSchedules,
+  dayOccupying: indexedDayOccupying,
+  teacherId,
+  busy,
+  isToday,
+  now,
+  extraTakenRanges,
+  onChange,
+}) {
   const past = isScheduleDateBeforeToday(dateKey);
   const sid = studentIdOf(student);
-  const dayOccupying = findStudentDayOccupying(schedules, sid, dateKey);
+  const dayOccupying = indexedDayOccupying || findStudentDayOccupying(schedules, sid, dateKey);
   const own = occupyingMatchesCourse(dayOccupying, student.course) ? dayOccupying : null;
   const otherCourse = Boolean(dayOccupying && !own);
   const existingId = own ? scheduleIdOf(own) : '';
   const lockedDone = Boolean(own && LOCKED_STATUSES.has(String(own.status)));
   const extra = extraSlotOption(own);
   const slotValue = slotValueFromSchedule(own);
-  const gate = getStudentScheduleGate(student, schedules, dateKey, existingId || null);
+  const gate = getStudentScheduleGate(student, studentSchedules || schedules, dateKey, existingId || null);
 
   const options = extra ? [extra, ...WEEK_SLOT_OPTIONS] : WEEK_SLOT_OPTIONS;
   const dayTd = `px-1.5 py-1.5 min-w-0 ${isToday ? 'bg-red-50/40' : ''}`;
@@ -551,6 +613,8 @@ function SlotCell({ student, dateKey, schedules, teacherId, busy, isToday, now, 
     );
   }
 
+  const rowKey = studentRowKey(student);
+  const otherRanges = (extraTakenRanges || []).filter((range) => range.rowKey !== rowKey);
   const canCreate = !own && gate.canSchedule;
   const disabledAll = busy || (!own && !canCreate);
 
@@ -575,7 +639,7 @@ function SlotCell({ student, dateKey, schedules, teacherId, busy, isToday, now, 
             excludeScheduleId: existingId,
             now,
             currentValue: slotValue,
-            extraTakenRanges,
+            extraTakenRanges: otherRanges,
           });
           if (meta.hidden) return null;
           return (
