@@ -22,3 +22,8 @@ test('student sync skips teacher training payload', () => {
   assert.equal(plan.fetchTeacherTraining, false);
   assert.equal(plan.fetchStudentTraining, true);
 });
+
+test('teacher schedule context must use teacher-scoped endpoint', () => {
+  const plan = syncPlan('teacher');
+  assert.equal(plan.scheduleEndpoint, 'teacher-scoped');
+});

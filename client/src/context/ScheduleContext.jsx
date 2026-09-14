@@ -26,6 +26,10 @@ async function fetchSchedules([, role, userId]) {
     const res = await api.schedules.getByStudent(userId);
     return res?.success ? res.data.map(mapSchedule) : [];
   }
+  if (role === 'teacher') {
+    const res = await api.schedules.getByTeacher(userId);
+    return res?.success ? res.data.map(mapSchedule) : [];
+  }
   const res = await api.schedules.getAll({ limit: 500 });
   return res?.success ? res.data.map(mapSchedule) : [];
 }
