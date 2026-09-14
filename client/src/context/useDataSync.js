@@ -102,12 +102,12 @@ export function useDataSync({
             comment: e.content || e.comment || '',
           })));
         }
+      }
       if (isStudent) {
         const studentRes = results[idx++];
         if (studentRes?.success) setStudents([mapStudent(studentRes.data)]);
         const schedulesRes = results[idx++];
         if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
-      }
       }
 
       // Groups
