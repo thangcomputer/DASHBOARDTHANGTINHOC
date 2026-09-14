@@ -503,7 +503,19 @@ const StudentDashboard = ({ onNavigate }) => {
   const [activeMilestone, setActiveMilestone] = useState(null);
   const [serverMilestoneEvals, setServerMilestoneEvals] = useState([]);
   const [milestoneEvalsReady, setMilestoneEvalsReady] = useState(false);
-  const [submittedMilestones, setSubmittedMilestones] = useState(() => new Set());
+  const submittedMilestonesStorageKey = `thvp_submittedMilestones_${String(STUDENT_ID || 'unknown')}`;
+  const [submittedMilestones, setSubmittedMilestones] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(submittedMilestonesStorageKey) || '[]');
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(submittedMilestonesStorageKey, JSON.stringify([...submittedMilestones]));
+  }, [submittedMilestones, submittedMilestonesStorageKey]);
 
   useEffect(() => {
     if (!STUDENT_ID) {
@@ -529,20 +541,21 @@ const StudentDashboard = ({ onNavigate }) => {
     // Đang mở modal — không schedule mở thêm (tránh popup GV trùng sau khi gửi bước trung tâm)
     if (activeMilestone) return undefined;
 
-    const studentId = String(viewStudent.id);
-    const courseName = String(viewStudent.course || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const studentId = String(STUDENT_ID || viewStudent.id || viewStudent._id);
+    const normalizeCourse = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const courseName = normalizeCourse(viewStudent.course);
     const idSet = new Set(
       [viewStudent.id, viewStudent._id, STUDENT_ID].filter(Boolean).map((v) => String(v)),
     );
     const matchesStudent = (e) => idSet.has(String(e?.studentId || ''));
     const matchesCourse = (e) => {
-      const saved = String(e?.courseName || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const saved = normalizeCourse(e?.courseName);
       if (!courseName || !saved) return true;
       return saved === courseName;
     };
     const pool = [...(privateEvaluations || []), ...serverMilestoneEvals];
     const done = (m) => pool.some(
-      (e) => matchesStudent(e) && e.milestone === m && matchesCourse(e),
+      (e) => matchesStudent(e) && String(e?.milestone || '').trim() === m && matchesCourse(e),
     ) || submittedMilestones.has(`${studentId}::${courseName}::${m}`);
     let next = null;
     if (Number(viewStudent.completedSessions) === 1 && !done('lesson_1')) {
@@ -845,9 +858,10 @@ const StudentDashboard = ({ onNavigate }) => {
           onSubmit={async (payload) => {
             await submitPrivateEvaluation(payload);
             const normalizedCourse = String(payload.courseName || '').trim().replace(/\s+/g, ' ').toLowerCase();
+            const submittedStudentId = String(payload.studentId || STUDENT_ID || viewStudent?.id || viewStudent?._id);
             setSubmittedMilestones((prev) => {
               const next = new Set(prev);
-              next.add(`${payload.studentId}::${normalizedCourse}::${payload.milestone}`);
+              next.add(`${submittedStudentId}::${normalizedCourse}::${payload.milestone}`);
               return next;
             });
             setServerMilestoneEvals((prev) => {
