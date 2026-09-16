@@ -23,6 +23,7 @@ const Course = require('../models/Course');
 const { emitSystemWide } = require('../utils/realtimeEmit');
 const { policyShadowSettings } = require('../middleware/policyShadowSettings');
 const { settingsCutoverGate } = require('../middleware/settingsCutoverGate');
+const { destructiveResetGuard, isDestructiveResetAllowed } = require('../middleware/destructiveResetGuard');
 const { resolveExamBankAccess } = require('../services/examAttemptService');
 const {
   sanitizeStudentExamFilesPayload,
@@ -50,6 +51,7 @@ async function settingsResponseFor(req, settings) {
   ]);
   if (!canManageStudentBank) delete data.studentExamBankRawData;
   if (!canManageTeacherBank) delete data.teacherExamBankRawData;
+  data.destructiveResetEnabled = isDestructiveResetAllowed(process.env);
   return data;
 }
 
@@ -1217,7 +1219,7 @@ const PayrollLog = require('../models/PayrollLog');
 const Employee = require('../models/Employee');
 const mongoose = require('mongoose');
 
-router.post('/reset-data', authMiddleware, ...settingsGuard('reset'), async (req, res) => {
+router.post('/reset-data', authMiddleware, destructiveResetGuard, ...settingsGuard('reset'), async (req, res) => {
   const { phrase, password, options = { all: true } } = req.body;
   const userId = req.user.id;
 

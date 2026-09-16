@@ -99,6 +99,7 @@ export default function SystemSettingsTab() {
     invoiceLogoUrl: '',
     invoiceSignatureUrl: '',
     invoiceStampText: 'ĐÃ THANH TOÁN',
+    destructiveResetEnabled: true,
   });
 
   // Fetch current settings
@@ -379,13 +380,27 @@ export default function SystemSettingsTab() {
         </div>
         
         {/* DANGER ZONE BUTTON */}
-        <button 
+        <button
           onClick={() => setShowResetModal(true)}
-          className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white transition font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm relative group overflow-hidden w-full sm:w-auto"
+          disabled={settings.destructiveResetEnabled === false}
+          title={settings.destructiveResetEnabled === false
+            ? 'Đã bị vô hiệu hóa trên production (ALLOW_DESTRUCTIVE_RESET=false)'
+            : 'Danger Zone: xóa toàn bộ dữ liệu hệ thống'}
+          className={`font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm relative group overflow-hidden w-full sm:w-auto transition ${
+            settings.destructiveResetEnabled === false
+              ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+              : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white'
+          }`}
         >
-           <span className="absolute inset-0 bg-red-600 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300"></span>
-           <AlertOctagon size={16} className="relative z-10" /> 
-           <span className="relative z-10">Làm mới dữ liệu hệ thống</span>
+           {settings.destructiveResetEnabled !== false && (
+             <span className="absolute inset-0 bg-red-600 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300"></span>
+           )}
+           <AlertOctagon size={16} className="relative z-10" />
+           <span className="relative z-10">
+             {settings.destructiveResetEnabled === false
+               ? 'Danger Zone: Đã khóa (production)'
+               : 'Làm mới dữ liệu hệ thống'}
+           </span>
         </button>
       </div>
 
