@@ -42,6 +42,17 @@ function isEnrollmentPaidFlag(e) {
   return e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
 }
 
+function formatLastSeenLabel(lastSeenAt) {
+  if (!lastSeenAt) return 'Ngoại tuyến';
+  const timestamp = new Date(lastSeenAt).getTime();
+  if (!Number.isFinite(timestamp)) return 'Ngoại tuyến';
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSeconds < 60) return 'Truy cập chưa đầy 1 phút trước';
+  if (diffSeconds < 3600) return `Truy cập ${Math.floor(diffSeconds / 60)} phút trước`;
+  if (diffSeconds < 86400) return `Truy cập ${Math.floor(diffSeconds / 3600)} giờ trước`;
+  return `Truy cập ${Math.floor(diffSeconds / 86400)} ngày trước`;
+}
+
 /** Khóa active đã đóng phí — ưu tiên primary. */
 function getRefundableEnrollment(student) {
   const paid = getActiveClientEnrollments(student).filter(isEnrollmentPaidFlag);
@@ -435,7 +446,7 @@ function ModeBranchBadges({ s, safeBranches }) {
 }
 
 export default function AdminStudentsTab() {
-  const { onlineUsers = [] } = useSocket() || {};
+  const { onlineUsers = [], lastSeenUsers = {} } = useSocket() || {};
   const [submittingAction, setSubmittingAction] = useState(null);
   const {
     search,
@@ -1164,7 +1175,9 @@ export default function AdminStudentsTab() {
                         <p className="font-semibold text-slate-900 text-base leading-snug truncate max-w-[200px]">{s.name}</p>
                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                          {isOnline ? 'Đang online' : 'Ngoại tuyến'}
+                          {isOnline
+                            ? 'Đang online'
+                            : formatLastSeenLabel(lastSeenUsers[String(s.id || s._id)])}
                         </span>
                         <DeviceAccountBadges student={s} />
                         <p className="text-xs text-slate-500 mt-0.5">{regDate}{s.phone ? ` · ${s.phone}` : ''}</p>
