@@ -6,6 +6,7 @@ const commentSchema = new mongoose.Schema({
   authorId:   { type: String, required: true },
   authorName: { type: String, required: true },
   authorAvatar: { type: String, default: '' },
+  authorGender: { type: String, default: '' },
   authorRole: {
     type: String,
     enum: ['admin', 'teacher', 'student', 'staff'],
@@ -22,12 +23,14 @@ const reactionSchema = new mongoose.Schema({
   userId:   { type: String, required: true },
   userName: { type: String, default: '' },
   role:     { type: String, default: '' },
+  gender:   { type: String, default: '' },
   type:     { type: String, enum: REACTION_TYPES, default: 'heart' },
 }, { _id: false });
 
 const feedPostSchema = new mongoose.Schema({
   authorId:   { type: String, required: true, index: true },
   authorName: { type: String, required: true },
+  authorGender: { type: String, default: '' },
   authorRole: {
     type: String,
     enum: ['admin', 'teacher', 'student', 'staff'],

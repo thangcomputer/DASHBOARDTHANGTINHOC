@@ -127,6 +127,13 @@ function formatTime(iso) {
   return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
+function fallbackFeedAvatar(event, person) {
+  const image = event.currentTarget;
+  if (image.dataset.fallbackApplied) return;
+  image.dataset.fallbackApplied = '1';
+  image.src = resolveAvatarUrl({ ...person, avatar: '' });
+}
+
 export default function FeedBoard({ session, role }) {
   const toast = useToast();
   const { socket, onlineUsers } = useSocket() || {};
@@ -147,6 +154,7 @@ export default function FeedBoard({ session, role }) {
         ? currentAvatar
         : presenceAvatar || person.authorAvatar || person.avatar,
       role: person.authorRole || person.role || meRole,
+      gender: person.authorGender || person.gender || (isCurrentUser ? session?.gender : ''),
       name: person.authorName || person.userName || session?.name,
       id: personId,
       adminRole: person.authorAdminRole || person.adminRole || (isCurrentUser ? session?.adminRole : null),
@@ -851,6 +859,7 @@ export default function FeedBoard({ session, role }) {
                   <div className="cms-feed-card__head flex items-start gap-3">
                     <img
                       src={resolveFeedAvatar(post)}
+                      onError={(event) => fallbackFeedAvatar(event, post)}
                       alt=""
                       width={44}
                       height={44}
@@ -1035,6 +1044,7 @@ export default function FeedBoard({ session, role }) {
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <img
                                     src={resolveFeedAvatar(c)}
+                                    onError={(event) => fallbackFeedAvatar(event, c)}
                                     alt=""
                                     className="w-6 h-6 rounded-full object-cover shrink-0 border border-slate-100"
                                   />
@@ -1147,6 +1157,7 @@ export default function FeedBoard({ session, role }) {
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       <img
                                         src={resolveFeedAvatar(r)}
+                                        onError={(event) => fallbackFeedAvatar(event, r)}
                                         alt=""
                                         className="w-5 h-5 rounded-full object-cover shrink-0 border border-slate-100"
                                       />
@@ -1474,7 +1485,7 @@ export default function FeedBoard({ session, role }) {
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <img
-                            src={resolveAvatarUrl({ role: item.role, name: item.userName, id: item.userId })}
+                            src={resolveAvatarUrl({ role: item.role, gender: item.gender, name: item.userName, id: item.userId })}
                             alt=""
                             className="w-10 h-10 rounded-full object-cover border border-slate-200"
                           />

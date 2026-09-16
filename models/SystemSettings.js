@@ -85,6 +85,7 @@ const systemSettingsSchema = new mongoose.Schema({
 
   // ── Admin Profile (cho tài khoản hardcoded) ─────────────────────────────
   adminName:         { type: String, default: '' },   // Nếu empty → fallback 'Admin Thắng Tin Học'
+  adminAvatar:       { type: String, default: '' },
   adminPasswordHash: { type: String, default: '' },   // Nếu empty → dùng MASTER_ADMIN_PASSWORD hoặc dev fallback
 
   // ── Super Admin MFA (TOTP) ─────────────────────────────────────────────

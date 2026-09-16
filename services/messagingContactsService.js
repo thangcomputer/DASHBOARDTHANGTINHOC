@@ -118,16 +118,21 @@ async function loadSuperAdminDocs() {
 }
 
 /** Read-only display name for root SUPER (id=admin). Never creates/updates settings. */
-async function resolveRootSuperAdminDisplayName() {
+async function resolveRootSuperAdminProfile() {
   try {
     const SystemSettings = require('../models/SystemSettings');
-    const s = await SystemSettings.findOne({ _key: 'main' }).select('adminName').lean();
-    if (s?.adminName && String(s.adminName).trim()) return String(s.adminName).trim();
+    const s = await SystemSettings.findOne({ _key: 'main' }).select('adminName adminAvatar').lean();
+    return {
+      name: s?.adminName && String(s.adminName).trim() ? String(s.adminName).trim() : '',
+      avatar: s?.adminAvatar || '',
+    };
   } catch (_) { /* ignore */ }
-  if (process.env.ADMIN_NAME && String(process.env.ADMIN_NAME).trim()) {
-    return String(process.env.ADMIN_NAME).trim();
-  }
-  return 'Super Admin';
+  return {
+    name: process.env.ADMIN_NAME && String(process.env.ADMIN_NAME).trim()
+      ? String(process.env.ADMIN_NAME).trim()
+      : 'Super Admin',
+    avatar: '',
+  };
 }
 
 function isRootSuperAdminDoc(doc) {
@@ -142,11 +147,12 @@ function isRootSuperAdminDoc(doc) {
 async function ensureRootSuperAdminAmongDocs(superDocs) {
   const list = Array.isArray(superDocs) ? [...superDocs] : [];
   if (list.some(isRootSuperAdminDoc)) return list;
-  const name = await resolveRootSuperAdminDisplayName();
+  const profile = await resolveRootSuperAdminProfile();
   list.push({
     _id: 'admin',
     id: 'admin',
-    name,
+    name: profile.name || 'Super Admin',
+    avatar: profile.avatar,
     phone: 'admin',
     role: 'admin',
     adminRole: 'SUPER_ADMIN',

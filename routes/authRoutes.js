@@ -261,6 +261,7 @@ async function completeInternalLogin(user, userRole, deviceFingerprint) {
 
 async function issueAdminTokens(sysSettings, audience = 'public') {
   const dbAdminName = (sysSettings?.adminName && sysSettings.adminName.trim()) ? sysSettings.adminName.trim() : 'Admin';
+  const dbAdminAvatar = sysSettings?.adminAvatar || '';
   const { accessToken, refreshToken } = generateTokens(
     {
       id: 'admin',
@@ -283,6 +284,7 @@ async function issueAdminTokens(sysSettings, audience = 'public') {
       phone: normalizeVNPhone(process.env.MASTER_ADMIN_PHONE),
       role: 'admin',
       adminRole: 'SUPER_ADMIN',
+      avatar: dbAdminAvatar,
       accessToken,
       refreshToken,
       user: {
@@ -294,7 +296,7 @@ async function issueAdminTokens(sysSettings, audience = 'public') {
         adminRole: 'SUPER_ADMIN',
         permissions: [],
         status: 'active',
-        avatar: '',
+        avatar: dbAdminAvatar,
         gender: '',
       },
     },
@@ -1321,7 +1323,7 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
           phone:  normalizeVNPhone(process.env.MASTER_ADMIN_PHONE),
           role:   'admin',
           status: 'active',
-          avatar: '',
+          avatar: sysSettings?.adminAvatar || '',
           gender: '',
         },
       });
@@ -1403,7 +1405,13 @@ router.post('/avatar', authMiddleware, policyShadowAuth('avatar'), async (req, r
     const userId = req.user.id || req.user._id;
     const role = req.user.role;
 
-    if (role === 'student') {
+    if (String(userId) === 'admin' || req.user.adminRole === 'SUPER_ADMIN') {
+      await SystemSettings.findOneAndUpdate(
+        { _key: 'main' },
+        { $set: { adminAvatar: String(avatar).trim() } },
+        { upsert: true },
+      );
+    } else if (role === 'student') {
       await Student.findByIdAndUpdate(userId, { avatar });
     } else {
       await Teacher.findByIdAndUpdate(userId, { avatar });

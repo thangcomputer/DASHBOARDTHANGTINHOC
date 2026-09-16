@@ -182,6 +182,13 @@ function normalizeReactions(o) {
   return reactions;
 }
 
+function existingFeedAvatar(value) {
+  const avatar = String(value || '').trim();
+  if (!avatar || !avatar.startsWith('/uploads/')) return avatar;
+  const diskPath = path.join(__dirname, '..', avatar.replace(/^\/+/, ''));
+  return fs.existsSync(diskPath) ? avatar : '';
+}
+
 function serializePost(doc, currentUserId) {
   const o = doc.toObject ? doc.toObject() : doc;
   const reactions = normalizeReactions(o);
@@ -201,7 +208,8 @@ function serializePost(doc, currentUserId) {
     authorName: o.authorName,
     authorRole: o.authorRole,
     authorAdminRole: o.authorAdminRole || (String(o.authorId) === 'admin' ? 'SUPER_ADMIN' : null),
-    authorAvatar: o.authorAvatar || '',
+    authorAvatar: existingFeedAvatar(o.authorAvatar),
+    authorGender: o.authorGender || '',
     content: o.content || '',
     images: o.images || [],
     visibility: o.visibility || 'public',
@@ -213,6 +221,7 @@ function serializePost(doc, currentUserId) {
       userId: String(r.userId || ''),
       userName: r.userName || 'Người dùng',
       role: r.role || 'student',
+      gender: r.gender || '',
       type: r.type || 'heart',
     })),
     myReaction,
@@ -224,7 +233,8 @@ function serializePost(doc, currentUserId) {
       authorName: c.authorName,
       authorRole: c.authorRole,
       authorAdminRole: c.authorAdminRole || (String(c.authorId) === 'admin' ? 'SUPER_ADMIN' : null),
-      authorAvatar: c.authorAvatar || '',
+      authorAvatar: existingFeedAvatar(c.authorAvatar),
+      authorGender: c.authorGender || '',
       content: c.content || '',
       images: Array.isArray(c.images) ? c.images : [],
       parentId: c.parentId ? String(c.parentId) : null,
@@ -290,7 +300,7 @@ router.get('/', authMiddleware, ...feedGuard('list'), async (req, res) => {
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 },
     });
   } catch (err) {
-    logger.error('[FEED] list error', err);
+    logger.error({ err }, '[FEED] list error');
     return res.status(500).json({ success: false, message: 'Loi server' });
   }
 });
@@ -318,6 +328,7 @@ router.post('/', authMiddleware, ...feedGuard('create'), async (req, res) => {
       authorName: req.user.name || 'Nguoi dung',
       authorRole: normalizeRole(req.user.role),
       authorAdminRole: (req.user.id === 'admin' || req.user.adminRole === 'SUPER_ADMIN') ? 'SUPER_ADMIN' : (req.user.adminRole || null),
+        authorGender: req.user.gender || '',
       authorAvatar: req.body?.authorAvatar || req.user.avatar || '',
       content,
       images,
@@ -417,6 +428,7 @@ async function applyReaction(req, res, typeIn) {
       userId: uid,
       userName: req.user.name || '',
       role: normalizeRole(req.user.role),
+      gender: req.user.gender || '',
       type,
     });
   }
@@ -499,6 +511,7 @@ router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req
       authorId: req.user.id,
       authorName: req.user.name || 'Nguoi dung',
       authorAvatar: req.user.avatar || '',
+        authorGender: req.user.gender || '',
       authorRole: normalizeRole(req.user.role),
       authorAdminRole: (req.user.id === 'admin' || req.user.adminRole === 'SUPER_ADMIN') ? 'SUPER_ADMIN' : (req.user.adminRole || null),
       content,

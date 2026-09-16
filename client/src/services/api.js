@@ -2322,8 +2322,13 @@ export const financeAPI = {
 
 // ─── BANG TIN (hoi bai / trao doi) ───────────────────────────────────────────
 export const feedAPI = {
-  list: async (page = 1, limit = 20) => {
-    const res = await apiFetch(`/feed?page=${page}&limit=${limit}`);
+  list: async (options = {}, legacyLimit = 20) => {
+    const { page = 1, limit = 20 } = typeof options === 'object'
+      ? options
+      : { page: options, limit: legacyLimit };
+    const safePage = Number.isFinite(Number(page)) && Number(page) > 0 ? Number(page) : 1;
+    const safeLimit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 20;
+    const res = await apiFetch(`/feed?page=${safePage}&limit=${safeLimit}`);
     return res.json();
   },
   create: async (payload) => {
