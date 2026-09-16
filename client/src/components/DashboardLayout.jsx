@@ -33,6 +33,7 @@ import TeacherAttendanceConfirmedModal from './teacher/TeacherAttendanceConfirme
 import TeacherStudentNoteModal, {
   isStudentScheduleNoteNotif,
 } from './teacher/TeacherStudentNoteModal';
+import TeacherPaymentCelebration from './teacher/TeacherPaymentCelebration';
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
@@ -492,6 +493,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [courseCelebration, setCourseCelebration] = useState(null);
   const courseCelebrationTimerRef = React.useRef(null);
   const [starBonusCelebration, setStarBonusCelebration] = useState(null);
+  const [teacherPaymentCelebration, setTeacherPaymentCelebration] = useState(null);
   const starBonusShownRef = React.useRef(new Set());
   const [attendanceConfirm, setAttendanceConfirm] = useState(null);
   const [attendanceConfirmBusy, setAttendanceConfirmBusy] = useState(false);
@@ -667,6 +669,25 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     socket.on('teacher:star-bonus-celebration', onStarBonus);
     return () => { socket.off('teacher:star-bonus-celebration', onStarBonus); };
   }, [socket, role, queueStarBonusCelebration]);
+
+  useEffect(() => {
+    if (!socket || role !== 'teacher' || !myId) return undefined;
+    const onTeacherPayment = (transaction) => {
+      if (!transaction) return;
+      const transactionTeacherId = transaction.teacherId?._id || transaction.teacherId?.id || transaction.teacherId;
+      if (transactionTeacherId && String(transactionTeacherId) !== String(myId)) return;
+      const details = Array.isArray(transaction.paymentSessionDetails)
+        ? transaction.paymentSessionDetails
+        : [];
+      setTeacherPaymentCelebration({
+        amount: Number(transaction.amount) || 0,
+        sessions: Number(transaction.sessions || transaction.sessionsCount || details.length) || 0,
+        starBonusAmount: Number(transaction.starBonusAmount) || 0,
+      });
+    };
+    socket.on('transactions:new', onTeacherPayment);
+    return () => socket.off('transactions:new', onTeacherPayment);
+  }, [socket, role, myId]);
 
   // HV: modal xác nhận điểm danh (blocking)
   useEffect(() => {
@@ -1153,6 +1174,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     setLoginOverlay('star-bonus-celebration', Boolean(starBonusCelebration));
   }, [starBonusCelebration]);
   useEffect(() => {
+    setLoginOverlay('teacher-payment-celebration', role === 'teacher' && Boolean(teacherPaymentCelebration));
+  }, [role, teacherPaymentCelebration]);
+  useEffect(() => {
     setLoginOverlay('attendance-confirm', role === 'student' && Boolean(attendanceConfirm));
   }, [role, attendanceConfirm]);
   useEffect(() => {
@@ -1569,6 +1593,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           showWelcomeCelebration
           || !!courseCelebration
           || !!starBonusCelebration
+          || (role === 'teacher' && !!teacherPaymentCelebration)
           || (role === 'student' && !!attendanceConfirm)
           || (role === 'student' && assignedTeacherModal.open)
           || (canManageAttendanceAdminPopups && !!attendanceDispute)
@@ -1599,6 +1624,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         variant="star_bonus"
         starBonus={starBonusCelebration}
         onClose={dismissStarBonusCelebration}
+      />
+      <TeacherPaymentCelebration
+        payment={teacherPaymentCelebration}
+        onClose={() => setTeacherPaymentCelebration(null)}
+        onViewDetail={() => {
+          setTeacherPaymentCelebration(null);
+          navigate('/teacher/finance');
+        }}
       />
       <StudentAttendanceConfirmModal
         open={role === 'student' && !!attendanceConfirm}

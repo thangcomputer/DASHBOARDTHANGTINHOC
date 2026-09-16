@@ -1,1 +1,38 @@
 /* App-level styles - minimal, most styling via Tailwind */
+
+@keyframes moneyDrop {
+	0% {
+		opacity: 0;
+		transform: translate(-50%, -18px) scale(0.7) rotate(0deg);
+	}
+	15% {
+		opacity: 1;
+	}
+	30% {
+		transform: translate(-50%, 14px) scale(1) rotate(8deg);
+	}
+	60% {
+		transform: translate(-50%, 48px) scale(1.08) rotate(-8deg);
+	}
+	100% {
+		opacity: 0;
+		transform: translate(-50%, 82px) scale(0.9) rotate(12deg);
+	}
+}
+
+.teacher-payment-success .money-drop {
+	position: absolute;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: linear-gradient(135deg, #fef3c7, #facc15);
+	color: #915200;
+	font-size: 12px;
+	font-weight: 900;
+	box-shadow: 0 12px 18px rgba(251, 191, 36, 0.25);
+	animation: moneyDrop 1.6s ease-in forwards;
+	opacity: 0;
+}

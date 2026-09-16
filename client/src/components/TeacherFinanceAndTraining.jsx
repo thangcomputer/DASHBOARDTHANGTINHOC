@@ -3,7 +3,8 @@ import {
   DollarSign, PlayCircle, Download, Calendar as CalendarIcon,
   Clock, TrendingUp, CreditCard,
   CheckCircle2, FileText, Video,
-  BookOpen, AlertCircle, BarChart, FileSpreadsheet, FileBox
+  BookOpen, AlertCircle, BarChart, FileSpreadsheet, FileBox,
+  ChevronDown, ChevronUp, Users
 } from 'lucide-react';
 import NavArrow from './ui/NavArrow';
 import { useLocation } from 'react-router-dom';
@@ -85,11 +86,12 @@ function buildFinanceStatementNode({
     rows.forEach((p, idx) => {
       const tr = document.createElement('tr');
       tr.style.background = idx % 2 ? '#f8fafc' : '#fff';
+      const sessionCount = Number(p.sessions || p.paymentSessionDetails?.length || 0);
       const cells = [
         [p.month || '', 'left'],
         [paymentDateLabel(p), 'left'],
         [`${Number(p.amount || 0).toLocaleString('vi-VN')}`, 'right'],
-        [String(p.sessions || 0), 'right'],
+        [String(sessionCount), 'right'],
         [paymentStatusLabel(p), 'left'],
         [p.note || p.description || '', 'left'],
       ];
@@ -106,6 +108,67 @@ function buildFinanceStatementNode({
   const foot = el('div', 'display:flex;justify-content:space-between;margin-top:14px;font-size:12px;');
   foot.appendChild(el('span', 'color:#64748b;', `${rows.length} dòng`));
   foot.appendChild(el('span', 'font-weight:800;', `Tổng (theo bộ lọc): ${filteredSum.toLocaleString('vi-VN')}đ`));
+  wrap.appendChild(foot);
+
+  return wrap;
+}
+
+function buildDetailFinanceStatementNode({ teacherName, generatedAt, rows }) {
+  const wrap = el('div', `
+    width:1000px;background:#fff;padding:28px 28px 20px;box-sizing:border-box;
+    font-family:Arial,Helvetica,sans-serif;color:#0f172a;
+  `);
+
+  wrap.appendChild(el('div', 'font-size:11px;letter-spacing:.12em;font-weight:700;color:#64748b;text-transform:uppercase;', 'CHI TIẾT PHÂN BỔ HỌC VIÊN'));
+  wrap.appendChild(el('div', 'font-size:22px;font-weight:800;margin:4px 0 2px;', teacherName || 'Giảng viên'));
+  wrap.appendChild(el('div', 'font-size:12px;color:#64748b;margin-bottom:16px;', `Xuất ngày ${generatedAt}`));
+
+  const table = el('table', 'width:100%;border-collapse:collapse;font-size:12px;');
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  ['Tháng', 'Ngày chuyển', 'Học viên', 'Số buổi', 'Phân bổ', 'Tổng giao dịch', 'Trạng thái'].forEach((h, i) => {
+    const th = el('th', `
+      text-align:${i === 3 || i === 4 || i === 5 ? 'right' : 'left'};padding:8px 8px;background:#0f172a;color:#fff;
+      font-size:11px;font-weight:700;border:1px solid #0f172a;
+    `, h);
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  if (!rows.length) {
+    const tr = document.createElement('tr');
+    const td = el('td', 'padding:16px 8px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;', 'Không có dữ liệu chi tiết học viên');
+    td.colSpan = 7;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  } else {
+    rows.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      tr.style.background = idx % 2 ? '#f8fafc' : '#fff';
+      const cells = [
+        [row.month || '', 'left'],
+        [row.date || '', 'left'],
+        [row.studentName || '—', 'left'],
+        [String(row.studentSessions || 0), 'right'],
+        [`${Number(row.studentAmount || 0).toLocaleString('vi-VN')}`, 'right'],
+        [`${Number(row.paymentAmount || 0).toLocaleString('vi-VN')}`, 'right'],
+        [row.status || '—', 'left'],
+      ];
+      cells.forEach(([text, align]) => {
+        tr.appendChild(el('td', `padding:8px;border:1px solid #e2e8f0;text-align:${align};vertical-align:top;`, text));
+      });
+      tbody.appendChild(tr);
+    });
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+
+  const total = rows.reduce((sum, row) => sum + (Number(row.studentAmount) || 0), 0);
+  const foot = el('div', 'display:flex;justify-content:space-between;margin-top:14px;font-size:12px;');
+  foot.appendChild(el('span', 'color:#64748b;', `${rows.length} dòng chi tiết`));
+  foot.appendChild(el('span', 'font-weight:800;', `Tổng phân bổ: ${total.toLocaleString('vi-VN')}đ`));
   wrap.appendChild(foot);
 
   return wrap;
@@ -268,7 +331,8 @@ const TeacherFinanceAndTraining = () => {
       let csvContent = "\uFEFF";
       csvContent += "Tháng,Ngày chuyển,Số tiền (VNĐ),Số buổi,Trạng thái,Ghi chú\n";
       filteredPayments.filter((p) => !p._synthetic).forEach(p => {
-          const row = `"${sanitizeCsvField(p.month)}","${sanitizeCsvField(paymentDateLabel(p))}","${p.amount}","${p.sessions || 0}","${paymentStatusLabel(p)}","${sanitizeCsvField(p.note || '').replace(/"/g, '""')}"`;
+          const sessionCount = Number(p.sessions || p.paymentSessionDetails?.length || 0);
+          const row = `"${sanitizeCsvField(p.month)}","${sanitizeCsvField(paymentDateLabel(p))}","${p.amount}","${sessionCount}","${paymentStatusLabel(p)}","${sanitizeCsvField(p.note || '').replace(/"/g, '""')}"`;
           csvContent += row + "\n";
       });
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -285,6 +349,75 @@ const TeacherFinanceAndTraining = () => {
           title: 'Lỗi xuất file', 
           content: 'Không thể khởi tạo file CSV: ' + e.message, 
           type: 'error' 
+      });
+    }
+  };
+
+  const handleExportDetailCSV = () => {
+    try {
+      const rows = [];
+      filteredPayments.filter((p) => !p._synthetic).forEach((p) => {
+        const details = Array.isArray(p.paymentSessionDetails) ? p.paymentSessionDetails : [];
+        if (!details.length) {
+          rows.push({
+            month: p.month || '',
+            date: paymentDateLabel(p),
+            studentName: '—',
+            studentSessions: Number(p.sessions || 0),
+            studentAmount: Number(p.amount || 0),
+            paymentAmount: Number(p.amount || 0),
+            status: paymentStatusLabel(p),
+          });
+          return;
+        }
+
+        const groups = {};
+        details.forEach((session) => {
+          const key = String(session.studentId || session.studentName || 'unknown');
+          if (!groups[key]) {
+            groups[key] = {
+              name: session.studentName || 'Học viên',
+              count: 0,
+              amount: 0,
+            };
+          }
+          groups[key].count += 1;
+          groups[key].amount += Number(session.allocatedAmount) || 0;
+        });
+
+        Object.values(groups).forEach((student) => {
+          rows.push({
+            month: p.month || '',
+            date: paymentDateLabel(p),
+            studentName: student.name,
+            studentSessions: Number(student.count || 0),
+            studentAmount: Number(student.amount || 0),
+            paymentAmount: Number(p.amount || 0),
+            status: paymentStatusLabel(p),
+          });
+        });
+      });
+
+      let csvContent = '\uFEFF';
+      csvContent += 'Tháng,Ngày chuyển,Học viên,Số buổi,Phân bổ (VNĐ),Tổng giao dịch (VNĐ),Trạng thái\n';
+      rows.forEach((row) => {
+        csvContent += `"${sanitizeCsvField(row.month)}","${sanitizeCsvField(row.date)}","${sanitizeCsvField(row.studentName)}","${row.studentSessions}","${Number(row.studentAmount || 0)}","${Number(row.paymentAmount || 0)}","${sanitizeCsvField(row.status)}"\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const encodedUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = encodedUrl;
+      link.download = `ThuNhap_${teacherName.replace(/\s+/g, '_')}_ChiTietHocVien.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(encodedUrl), 10000);
+    } catch (e) {
+      showModal({
+        title: 'Lỗi xuất file chi tiết',
+        content: 'Không thể khởi tạo file CSV chi tiết: ' + (e?.message || 'lỗi không xác định'),
+        type: 'error',
       });
     }
   };
@@ -327,6 +460,86 @@ const TeacherFinanceAndTraining = () => {
       showModal({
         title: 'Lỗi xuất file',
         content: 'Không thể xuất PDF: ' + (e?.message || 'lỗi không xác định'),
+        type: 'error',
+      });
+    } finally {
+      if (mount && mount.parentNode) mount.parentNode.removeChild(mount);
+    }
+  };
+
+  const handleExportDetailPDF = async () => {
+    let mount = null;
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      const rows = [];
+      filteredPayments.filter((p) => !p._synthetic).forEach((p) => {
+        const details = Array.isArray(p.paymentSessionDetails) ? p.paymentSessionDetails : [];
+        if (!details.length) {
+          rows.push({
+            month: p.month || '',
+            date: paymentDateLabel(p),
+            studentName: '—',
+            studentSessions: Number(p.sessions || 0),
+            studentAmount: Number(p.amount || 0),
+            paymentAmount: Number(p.amount || 0),
+            status: paymentStatusLabel(p),
+          });
+          return;
+        }
+
+        const groups = {};
+        details.forEach((session) => {
+          const key = String(session.studentId || session.studentName || 'unknown');
+          if (!groups[key]) {
+            groups[key] = {
+              name: session.studentName || 'Học viên',
+              count: 0,
+              amount: 0,
+            };
+          }
+          groups[key].count += 1;
+          groups[key].amount += Number(session.allocatedAmount) || 0;
+        });
+
+        Object.values(groups).forEach((student) => {
+          rows.push({
+            month: p.month || '',
+            date: paymentDateLabel(p),
+            studentName: student.name,
+            studentSessions: Number(student.count || 0),
+            studentAmount: Number(student.amount || 0),
+            paymentAmount: Number(p.amount || 0),
+            status: paymentStatusLabel(p),
+          });
+        });
+      });
+
+      mount = buildDetailFinanceStatementNode({
+        teacherName,
+        generatedAt: new Date().toLocaleDateString('vi-VN'),
+        rows,
+      });
+      mount.style.position = 'fixed';
+      mount.style.left = '-12000px';
+      mount.style.top = '0';
+      document.body.appendChild(mount);
+
+      const canvas = await html2canvas(mount, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+      });
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      addCanvasPagesToPdf(pdf, canvas);
+      pdf.save(`ThuNhap_${teacherName.replace(/\s+/g, '_')}_ChiTietHocVien.pdf`);
+    } catch (e) {
+      showModal({
+        title: 'Lỗi xuất PDF chi tiết',
+        content: 'Không thể xuất PDF chi tiết: ' + (e?.message || 'lỗi không xác định'),
         type: 'error',
       });
     } finally {
@@ -418,15 +631,34 @@ const TeacherFinanceAndTraining = () => {
                     <Download size={18} className="text-slate-600 shrink-0" aria-hidden="true" /> Xuất Báo Cáo
                   </h3>
                   <p className="text-slate-500 text-xs font-medium mb-4">Tải xuống sao kê thu nhập của bạn</p>
-                  <div className="grid grid-cols-2 gap-2">
-                      <button type="button" onClick={handleExportPDF} className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium text-xs py-2.5 px-2 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all min-h-11">
-                          <FileBox size={16} className="text-rose-500 shrink-0" aria-hidden="true" />
-                          <span className="truncate">PDF</span>
-                      </button>
-                      <button type="button" onClick={handleExportCSV} className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium text-xs py-2.5 px-2 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all min-h-11">
-                          <FileSpreadsheet size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
-                          <span className="truncate">CSV</span>
-                      </button>
+                  <div className="space-y-3">
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Tổng hợp</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" onClick={handleExportPDF} className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium text-xs py-2.5 px-2 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all min-h-11">
+                              <FileBox size={16} className="text-rose-500 shrink-0" aria-hidden="true" />
+                              <span className="truncate">PDF</span>
+                          </button>
+                          <button type="button" onClick={handleExportCSV} className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium text-xs py-2.5 px-2 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all min-h-11">
+                              <FileSpreadsheet size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
+                              <span className="truncate">CSV</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-600">Chi tiết theo học viên</p>
+                        <div className="grid grid-cols-1 gap-2">
+                          <button type="button" onClick={handleExportDetailPDF} className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-medium text-xs py-2.5 px-2 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all min-h-11">
+                              <FileBox size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
+                              <span className="truncate">PDF chi tiết</span>
+                          </button>
+                          <button type="button" onClick={handleExportDetailCSV} className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-medium text-xs py-2.5 px-2 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all min-h-11">
+                              <FileSpreadsheet size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
+                              <span className="truncate">CSV chi tiết</span>
+                          </button>
+                        </div>
+                      </div>
                   </div>
                </div>
             </div>
@@ -455,100 +687,151 @@ const TeacherFinanceAndTraining = () => {
                 </div>
               </div>
 
-              <div className="divide-y divide-slate-50">
-                {filteredPayments.map(p => (
-                  <div key={p.id || p._id} className={`px-4 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition ${isPendingTxStatus(p.status) ? 'bg-amber-50/30' : ''}`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${
-                          isPaidTxStatus(p.status) ? 'bg-emerald-100' : 'bg-amber-100'
-                        }`}>
-                          {isPaidTxStatus(p.status)
-                            ? <CheckCircle2 size={18} className="text-emerald-600" />
-                            : <Clock size={18} className="text-amber-600" />
-                          }
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-800 text-sm sm:text-base tabular-nums">{Number(p.amount || 0).toLocaleString('vi-VN')}đ</p>
-                          <p className="text-xs text-slate-500 mt-0.5 truncate">
-                            {p._synthetic ? 'Tạm tính · ' : ''}{p.note || p.description}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                            <CalendarIcon size={10} /> {p.month} · {paymentDateLabel(p)}
-                          </p>
-                          {!p._synthetic && (
-                            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                              Người chuyển: {p.confirmedBy || 'Admin'} · {p.sessions || p.paymentSessionDetails?.length || 0} buổi
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                      {p._synthetic ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full">
-                          <Clock size={12} /> Tạm tính
-                        </span>
-                      ) : isPaidTxStatus(p.status) ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full">
-                          <CheckCircle2 size={12} /> Đã nhận
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full">
-                          <Clock size={12} /> Đang chờ
-                        </span>
-                      )}
-                      {(p.sessions > 0 || p.paymentSessionDetails?.length > 0) && (
-                        <p className="text-[10px] text-slate-400 mt-1">{p.sessions || p.paymentSessionDetails.length} buổi</p>
-                      )}
-                      </div>
-                    </div>
-                    {!p._synthetic && p.paymentSessionDetails?.length > 0 && (
-                      <button
-                        type="button"
-                        className="mt-2 text-[11px] font-bold text-emerald-700 hover:text-emerald-900"
-                        onClick={() => setExpandedPaymentId((id) => (id === (p.id || p._id) ? null : (p.id || p._id)))}
-                      >
-                        {expandedPaymentId === (p.id || p._id) ? 'Thu gọn chi tiết' : `Xem ${new Set(p.paymentSessionDetails.map((s) => s.studentId || s.studentName)).size} học viên`}
-                      </button>
-                    )}
-                    {expandedPaymentId === (p.id || p._id) && p.paymentSessionDetails?.length > 0 && (
-                      <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 space-y-2">
-                        <p className="text-[10px] text-slate-400">Phân bổ tiền buổi dạy theo số buổi; thưởng sao hiển thị riêng.</p>
-                        {Object.values(p.paymentSessionDetails.reduce((groups, session) => {
-                          const key = String(session.studentId || session.studentName || 'unknown');
-                          if (!groups[key]) groups[key] = {
-                            name: session.studentName || 'Học viên', count: 0, amount: 0, dates: [],
-                          };
-                          groups[key].count += 1;
-                          groups[key].amount += Number(session.allocatedAmount) || 0;
-                          if (session.date) groups[key].dates.push(new Date(session.date).toLocaleDateString('vi-VN'));
-                          return groups;
-                        }, {})).map((student) => (
-                          <div key={student.name} className="flex items-start justify-between gap-3 text-xs">
-                            <span className="font-semibold text-slate-700 truncate">{student.name}</span>
-                            <span className="shrink-0 text-right text-slate-500">
-                              {student.count} buổi · {student.amount.toLocaleString('vi-VN')}đ
-                              {student.dates.length ? ` · ${student.dates.join(', ')}` : ''}
-                            </span>
-                          </div>
-                        ))}
-                        <div className="border-t border-slate-200 pt-2 text-[11px] text-slate-500">
-                          <span>Người chuyển: {p.confirmedBy || 'Admin'}</span>
-                          {Number(p.starBonusAmount) > 0 && (
-                            <span className="ml-3 text-amber-700">⭐ Thưởng sao: {Number(p.starBonusAmount).toLocaleString('vi-VN')}đ</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
+              <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
                 {filteredPayments.length === 0 && (
-                  <div className="px-4 sm:px-6 py-10 sm:py-12 text-center text-slate-400">
+                  <div className="px-0 py-10 text-center text-slate-400">
                     <DollarSign size={36} className="mx-auto mb-3 text-slate-300" />
                     <p className="text-sm">Không có giao dịch nào</p>
                   </div>
                 )}
+
+                {(() => {
+                  const groups = new Map();
+                  filteredPayments.forEach((payment) => {
+                    const key = payment.month || 'Không rõ';
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(payment);
+                  });
+
+                  return [...groups.entries()].map(([monthLabel, items]) => (
+                    <div key={monthLabel} className="space-y-3">
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
+                        <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                          <CalendarIcon size={12} className="text-slate-400" />
+                          {monthLabel}
+                        </div>
+                        <span className="text-[11px] text-slate-400">{items.length} giao dịch</span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {items.map((p) => {
+                          const paymentId = p.id || p._id;
+                          const isExpanded = expandedPaymentId === paymentId;
+                          const studentCount = new Set((p.paymentSessionDetails || []).map((s) => s.studentId || s.studentName || 'unknown')).size;
+
+                          return (
+                            <div
+                              key={paymentId}
+                              className={`rounded-2xl border transition-all ${
+                                isPendingTxStatus(p.status)
+                                  ? 'border-amber-200 bg-amber-50/40'
+                                  : 'border-emerald-200 bg-emerald-50/30'
+                              }`}
+                            >
+                              <div className="px-4 py-4 sm:px-5 sm:py-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="font-black text-lg sm:text-xl text-slate-800 tabular-nums">{Number(p.amount || 0).toLocaleString('vi-VN')}đ</p>
+                                      {p._synthetic ? (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                                          <Clock size={11} /> Tạm tính
+                                        </span>
+                                      ) : isPaidTxStatus(p.status) ? (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">
+                                          <CheckCircle2 size={11} /> Đã nhận
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                                          <Clock size={11} /> Chưa nhận
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <p className="mt-2 text-sm text-slate-600 line-clamp-2">
+                                      {p._synthetic ? 'Tạm tính · ' : ''}{p.note || p.description || 'Thanh toán hoa hồng'}
+                                    </p>
+
+                                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                                      <span className="inline-flex items-center gap-1">
+                                        <CalendarIcon size={11} /> {paymentDateLabel(p)}
+                                      </span>
+                                      <span className="inline-flex items-center gap-1">
+                                        <Users size={11} /> {p.sessions || p.paymentSessionDetails?.length || 0} buổi
+                                      </span>
+                                      <span className="inline-flex items-center gap-1">
+                                        <CreditCard size={11} /> {p.confirmedBy || 'Admin'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {!p._synthetic && p.paymentSessionDetails?.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedPaymentId((id) => (id === paymentId ? null : paymentId))}
+                                      className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:text-slate-800 hover:border-slate-300 transition"
+                                    >
+                                      {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                      {isExpanded ? 'Thu gọn' : `Chi tiết (${studentCount})`}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {!p._synthetic && isExpanded && p.paymentSessionDetails?.length > 0 && (
+                                <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
+                                  <div className="mb-2 flex items-center justify-between gap-2">
+                                    <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-500">Phân bổ theo học viên</p>
+                                    <span className="text-[10px] text-slate-400">{studentCount} học viên</span>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    {Object.values(p.paymentSessionDetails.reduce((groups, session) => {
+                                      const key = String(session.studentId || session.studentName || 'unknown');
+                                      if (!groups[key]) groups[key] = {
+                                        name: session.studentName || 'Học viên',
+                                        count: 0,
+                                        amount: 0,
+                                        dates: [],
+                                      };
+                                      groups[key].count += 1;
+                                      groups[key].amount += Number(session.allocatedAmount) || 0;
+                                      if (session.date) groups[key].dates.push(new Date(session.date).toLocaleDateString('vi-VN'));
+                                      return groups;
+                                    }, {})).map((student) => (
+                                      <div
+                                        key={student.name}
+                                        className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                                      >
+                                        <div className="min-w-0">
+                                          <div className="font-semibold text-slate-700 truncate">{student.name}</div>
+                                          <div className="mt-1 text-[10px] text-slate-500">
+                                            {student.dates.length ? student.dates.join(', ') : 'Không có ngày'}
+                                          </div>
+                                        </div>
+                                        <div className="shrink-0 text-right text-slate-600">
+                                          <div className="font-bold text-slate-700">{student.count} buổi</div>
+                                          <div className="text-[10px] text-slate-500">{student.amount.toLocaleString('vi-VN')}đ</div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <div className="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">
+                                    <span>Người chuyển: {p.confirmedBy || 'Admin'}</span>
+                                    {Number(p.starBonusAmount) > 0 && (
+                                      <span className="ml-3 text-amber-700">⭐ Thưởng sao: {Number(p.starBonusAmount).toLocaleString('vi-VN')}đ</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
 
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-dashed border-slate-200 pt-3">

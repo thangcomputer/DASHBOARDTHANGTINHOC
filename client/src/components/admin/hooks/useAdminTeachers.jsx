@@ -260,12 +260,15 @@ export function useAdminTeachers({
         setPayoutModal(null);
         mutate(['admin_finance', selectedBranchId]);
         triggerBackgroundSync?.();
+        return true;
       } else {
         toast.error(res.message || 'Thanh toán thất bại');
+        return false;
       }
     } catch (err) {
       toast.dismiss(loadingId);
       toast.error('Lỗi kết nối: ' + (err.message || 'Không rõ nguyên nhân'));
+      return false;
     }
   };
 
