@@ -12,6 +12,40 @@ const CQRS_FLAG_KEYS = [
   'ENABLE_CQRS_FINANCE',
 ];
 
+// Known public/default secret values seen in docs, examples, or old configs.
+// Rejected outright regardless of length so a "long enough" placeholder can't slip through.
+const KNOWN_INSECURE_SECRET_VALUES = new Set([
+  'secret',
+  'refresh_secret',
+  'session_secret',
+  'admin',
+  'admin123',
+  'password',
+  'changeme',
+  'change-me',
+  'your-secret',
+  'your-secret-here',
+  '123456',
+]);
+
+function isKnownInsecureSecretValue(value) {
+  return KNOWN_INSECURE_SECRET_VALUES.has(String(value || '').trim().toLowerCase());
+}
+
+/** Throws if the secret is missing, whitespace-only, a known insecure default, or too short. */
+function assertStrongSecret(name, rawValue, minLen) {
+  const value = String(rawValue || '').trim();
+  if (isKnownInsecureSecretValue(value)) {
+    throw new Error(`${name} must not use a known insecure/default value`);
+  }
+  if (value.length < minLen) {
+    throw new Error(
+      `${name} must be at least ${minLen} characters (use: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")`,
+    );
+  }
+  return value;
+}
+
 function envFlagOn(name) {
   const v = String(process.env[name] || '').toLowerCase();
   return v === 'true' || v === '1';
@@ -61,20 +95,25 @@ function validateEnv() {
     assertTestDatabaseEnvironment(process.env);
   }
 
-  const jwt = process.env.JWT_SECRET || '';
-  const jwr = process.env.JWT_REFRESH_SECRET || '';
-  if (jwt.length < minLen) {
-    throw new Error(
-      `JWT_SECRET must be at least ${minLen} characters (use: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")`,
-    );
-  }
-  if (jwr.length < minLen) {
-    throw new Error(
-      `JWT_REFRESH_SECRET must be at least ${minLen} characters and MUST differ from JWT_SECRET`,
-    );
-  }
+  const jwt = assertStrongSecret('JWT_SECRET', process.env.JWT_SECRET, minLen);
+  const jwr = assertStrongSecret('JWT_REFRESH_SECRET', process.env.JWT_REFRESH_SECRET, minLen);
   if (jwt === jwr) {
     throw new Error('JWT_REFRESH_SECRET must not equal JWT_SECRET');
+  }
+
+  // SESSION_SECRET: required and validated in production only (not yet wired into
+  // server.js session middleware — see REMEDIATION_PROGRESS.md Phase 2 deferred findings).
+  // Outside production, only reject it if someone explicitly sets a known-insecure value.
+  if (isProd) {
+    assertStrongSecret('SESSION_SECRET', process.env.SESSION_SECRET, minLen);
+  } else if (isKnownInsecureSecretValue(process.env.SESSION_SECRET)) {
+    throw new Error('SESSION_SECRET must not use a known insecure/default value');
+  }
+
+  // MASTER_ADMIN_PASSWORD is not required (utils/adminPassword.js already fails closed
+  // when unset). Only block it when someone actually sets it to a known-insecure value.
+  if (isKnownInsecureSecretValue(process.env.MASTER_ADMIN_PASSWORD)) {
+    throw new Error('MASTER_ADMIN_PASSWORD must not use a known insecure/default value');
   }
 
   if (isProd && !(process.env.CLIENT_URL || '').trim()) {

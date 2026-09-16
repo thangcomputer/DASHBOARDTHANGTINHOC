@@ -11,6 +11,7 @@ const STRONG2 = 'b'.repeat(40);
 
 test.beforeEach(() => {
   process.env.MASTER_ADMIN_PHONE = '0900000001';
+  process.env.SESSION_SECRET = 's'.repeat(40);
 });
 
 test('validateEnv: rejects short JWT_SECRET', () => {

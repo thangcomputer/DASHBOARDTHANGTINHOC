@@ -11,10 +11,10 @@ const config = {
   },
 
   security: {
-    jwtSecret: process.env.JWT_SECRET || 'secret',
-    jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'refresh_secret',
-    masterAdminPassword: process.env.MASTER_ADMIN_PASSWORD || 'admin',
-    sessionSecret: process.env.SESSION_SECRET || 'session_secret',
+    jwtSecret: process.env.JWT_SECRET,
+    jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
+    masterAdminPassword: process.env.MASTER_ADMIN_PASSWORD,
+    sessionSecret: process.env.SESSION_SECRET,
   },
 
   redis: {
