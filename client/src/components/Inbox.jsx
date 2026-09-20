@@ -350,9 +350,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     try {
       const lastSeenDate = new Date(lastSeenTime);
       if (Number.isNaN(lastSeenDate.getTime())) return <span className="text-slate-400">Chưa có dữ liệu truy cập</span>;
+      const now = new Date();
+      const dateLabel = lastSeenDate.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        ...(lastSeenDate.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+      });
+      const timeLabel = lastSeenDate.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
       return (
         <span className="text-slate-500 font-medium">
-          Truy cập lần cuối: {lastSeenDate.toLocaleString('vi-VN')}
+          Truy cập lần cuối: {dateLabel}, {timeLabel}
         </span>
       );
     } catch {
@@ -536,8 +546,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             receiverId: activeConv.user.id,
             receiverName: activeConv.user.name,
             receiverRole: sendIsGroup ? 'group' : activeConv.user.role,
-            content: !isCurrentlyPinned 
-              ? `${currentUserName || 'Người dùng'} đã ghim ${pinLabel}.` 
+            content: !isCurrentlyPinned
+              ? `${currentUserName || 'Người dùng'} đã ghim ${pinLabel}.`
               : `${currentUserName || 'Người dùng'} đã bỏ ghim ${pinLabel}.`,
             messageType: 'system',
             isGroup: sendIsGroup,
@@ -967,7 +977,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       fileUrl: m.fileUrl,
       fileExpired: m.fileExpired || false,
       reactions: m.reactions || [],
-        isPinned: m.isPinned || false,
+      isPinned: m.isPinned || false,
       payload: m.payload && typeof m.payload === 'object' ? m.payload : null,
     };
   }, [resolveSenderMeta, currentUserId, currentUserName, activeConv?.user?.role]);
@@ -1073,7 +1083,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   // ─── Socket real-time listeners ──────────────────────────────────────────────
   useEffect(() => {
     let unsubRecall, unsubReaction, unsubMsg, unsubPinned, unsubGroupDelete;
-      
+
     if (onMessagePinned) {
       unsubPinned = onMessagePinned((data) => {
         if (activeConv && String(data.conversationId) === String(activeConv.id)) {
@@ -1916,12 +1926,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 >
                   <div className="relative shrink-0">
                     <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md relative z-10 overflow-hidden ${isGroup ? 'bg-red-500' : 'bg-white ring-2 ' + (
-                        conv.user.role === 'teacher' ? 'ring-amber-400/80'
-                          : conv.user.role === 'student' ? 'ring-sky-400/80'
-                            : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'ring-blue-400/80'
-                              : conv.user.role === 'admin' ? 'ring-rose-400/80'
-                                : 'ring-slate-300'
-                      )
+                      conv.user.role === 'teacher' ? 'ring-amber-400/80'
+                        : conv.user.role === 'student' ? 'ring-sky-400/80'
+                          : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'ring-blue-400/80'
+                            : conv.user.role === 'admin' ? 'ring-rose-400/80'
+                              : 'ring-slate-300'
+                    )
                       }`}>
                       {isGroup ? (
                         <Users size={20} />
@@ -1942,11 +1952,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     {!isGroup && (
                       <span
                         className={`absolute -bottom-0.5 -right-0.5 z-20 text-[8px] px-1 min-w-[18px] h-4 rounded-md font-black leading-none flex items-center justify-center shadow-sm border border-white ${conv.user.role === 'teacher' ? 'bg-amber-500 text-white'
-                            : conv.user.role === 'student' ? 'bg-sky-500 text-white'
-                              : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'bg-blue-600 text-white'
-                                : String(conv.user.adminRole || '').toUpperCase() === 'STAFF' || conv.user.role === 'staff' ? 'bg-slate-600 text-white'
-                                  : conv.user.role === 'admin' ? 'bg-rose-600 text-white'
-                                    : 'bg-slate-600 text-white'
+                          : conv.user.role === 'student' ? 'bg-sky-500 text-white'
+                            : String(conv.user.adminRole || '').toUpperCase() === 'SUPPORT' ? 'bg-blue-600 text-white'
+                              : String(conv.user.adminRole || '').toUpperCase() === 'STAFF' || conv.user.role === 'staff' ? 'bg-slate-600 text-white'
+                                : conv.user.role === 'admin' ? 'bg-rose-600 text-white'
+                                  : 'bg-slate-600 text-white'
                           }`}
                       >
                         {conv.user.role === 'teacher' ? 'GV' : conv.user.role === 'student' ? 'HV' : (
@@ -2007,30 +2017,30 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <div className="relative">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowConvOptions(showConvOptions === conv.id ? null : conv.id);
-                              }}
-                              className="text-slate-400 hover:text-slate-700 bg-white shadow-sm border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-slate-50"
-                              title="Tùy chọn"
-                            >
-                              <MoreHorizontal size={14} />
-                            </button>
-                            {showConvOptions === conv.id && (
-                              <div className="absolute right-0 top-full mt-1 z-[100] animate-in fade-in zoom-in-95 duration-100 flex flex-col">
-                                <button
-                                  onClick={(e) => {
-                                    setShowConvOptions(null);
-                                    handleHideConversation(e, conv.id);
-                                  }}
-                                  className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
-                                >
-                                  <EyeOff size={12} /> Ẩn trò chuyện
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowConvOptions(showConvOptions === conv.id ? null : conv.id);
+                            }}
+                            className="text-slate-400 hover:text-slate-700 bg-white shadow-sm border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-slate-50"
+                            title="Tùy chọn"
+                          >
+                            <MoreHorizontal size={14} />
+                          </button>
+                          {showConvOptions === conv.id && (
+                            <div className="absolute right-0 top-full mt-1 z-[100] animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                              <button
+                                onClick={(e) => {
+                                  setShowConvOptions(null);
+                                  handleHideConversation(e, conv.id);
+                                }}
+                                className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                <EyeOff size={12} /> Ẩn trò chuyện
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         <span className="text-xs text-slate-400 font-medium tabular-nums">
                           {formatTime(
                             toValidActivityDate(conv.lastTime)
@@ -2259,79 +2269,75 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   (() => {
                     const isResolved = aiHandoffSession?.status === 'SUPPORT_RESOLVED';
                     return (
-                  <button
-                    type="button"
-                    disabled={isResolved}
-                    onClick={async () => {
-                      if (isResolved) return;
-                      try {
-                        const res = await aiSupportAPI.resolve(activeConv.id);
-                        if (!res?.success) throw new Error(res?.message || 'Không đóng được');
-                        setAiHandoffSession(res.data?.session || null);
-                        toast.success('Đã đánh dấu xử lý xong');
-                        // Đã kết thúc yêu cầu hỗ trợ: quay về danh bạ thay vì giữ
-                        // người dùng trong cuộc hội thoại AI đã đóng.
-                        setActiveConv(null);
-                        setPinnedMessageObj(null);
-                      } catch (err) {
-                        toast.error(err.message || 'Không đóng được yêu cầu');
-                      }
-                    }}
-                    className={`flex shrink-0 items-center justify-center px-3 h-9 rounded-xl text-[10px] font-black uppercase tracking-wide ${
-                      isResolved
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    }`}
-                    title={isResolved ? 'Yêu cầu đã được xử lý' : 'Xử lý xong yêu cầu'}
-                  >
-                    {isResolved ? 'Đã xử lý' : 'Xử lý xong'}
-                    </button>
+                      <button
+                        type="button"
+                        disabled={isResolved}
+                        onClick={async () => {
+                          if (isResolved) return;
+                          try {
+                            const res = await aiSupportAPI.resolve(activeConv.id);
+                            if (!res?.success) throw new Error(res?.message || 'Không đóng được');
+                            setAiHandoffSession(res.data?.session || null);
+                            toast.success('Đã đánh dấu xử lý xong');
+                            // Đã kết thúc yêu cầu hỗ trợ: quay về danh bạ thay vì giữ
+                            // người dùng trong cuộc hội thoại AI đã đóng.
+                            setActiveConv(null);
+                            setPinnedMessageObj(null);
+                          } catch (err) {
+                            toast.error(err.message || 'Không đóng được yêu cầu');
+                          }
+                        }}
+                        className={`flex shrink-0 items-center justify-center px-3 h-9 rounded-xl text-[10px] font-black uppercase tracking-wide ${isResolved
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        title={isResolved ? 'Yêu cầu đã được xử lý' : 'Xử lý xong yêu cầu'}
+                      >
+                        {isResolved ? 'Đã xử lý' : 'Xử lý xong'}
+                      </button>
                     );
                   })()
-                  ) : null}
-                  
-                  
-                </div>
+                ) : null}
 
-                {pinnedMessageObj && (() => {
-                  const pinnedSchedule = resolveScheduleMessagePayload(pinnedMessageObj);
-                  return (
-                  <div 
-                      onClick={() => {
-                        const el = document.getElementById(`msg-${pinnedMessageObj.id || pinnedMessageObj._id}`);
-                        if (el) {
-                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          el.classList.add('animate-pulse', 'bg-blue-50/50');
-                          setTimeout(() => el.classList.remove('animate-pulse', 'bg-blue-50/50'), 2000);
-                        }
-                      }}
-                      className={`mx-3 mt-2 px-4 py-2.5 cursor-pointer transition-colors rounded-xl flex items-center justify-between gap-3 shadow-sm relative group overflow-hidden shrink-0 ${
-                        pinnedSchedule
-                          ? 'bg-violet-50/70 hover:bg-violet-50 border border-violet-100/80'
-                          : 'bg-blue-50/50 hover:bg-blue-50 border border-blue-100/50'
+
+              </div>
+
+              {pinnedMessageObj && (() => {
+                const pinnedSchedule = resolveScheduleMessagePayload(pinnedMessageObj);
+                return (
+                  <div
+                    onClick={() => {
+                      const el = document.getElementById(`msg-${pinnedMessageObj.id || pinnedMessageObj._id}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.classList.add('animate-pulse', 'bg-blue-50/50');
+                        setTimeout(() => el.classList.remove('animate-pulse', 'bg-blue-50/50'), 2000);
+                      }
+                    }}
+                    className={`mx-3 mt-2 px-4 py-2.5 cursor-pointer transition-colors rounded-xl flex items-center justify-between gap-3 shadow-sm relative group overflow-hidden shrink-0 ${pinnedSchedule
+                      ? 'bg-violet-50/70 hover:bg-violet-50 border border-violet-100/80'
+                      : 'bg-blue-50/50 hover:bg-blue-50 border border-blue-100/50'
                       }`}>
                     <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${pinnedSchedule ? 'bg-violet-500' : 'bg-blue-400'}`}></div>
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                        pinnedSchedule ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-600'
-                      }`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${pinnedSchedule ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-600'
+                        }`}>
                         {pinnedSchedule ? <Calendar size={12} /> : <Pin size={12} className="rotate-45" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${
-                          pinnedSchedule ? 'text-violet-800' : 'text-blue-800'
-                        }`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${pinnedSchedule ? 'text-violet-800' : 'text-blue-800'
+                          }`}>
                           {pinnedSchedule ? 'Lịch học đã ghim' : 'Tin nhắn đã ghim'}
                         </p>
                         <p className="text-xs text-slate-700 font-medium truncate">
                           {pinnedSchedule
                             ? [
-                                [pinnedSchedule.weekday, pinnedSchedule.dateLabel].filter(Boolean).join(' · '),
-                                pinnedSchedule.startTime && pinnedSchedule.endTime
-                                  ? `${pinnedSchedule.startTime}–${pinnedSchedule.endTime}`
-                                  : '',
-                                pinnedSchedule.course,
-                              ].filter(Boolean).join(' · ') || pinnedMessageObj.content
+                              [pinnedSchedule.weekday, pinnedSchedule.dateLabel].filter(Boolean).join(' · '),
+                              pinnedSchedule.startTime && pinnedSchedule.endTime
+                                ? `${pinnedSchedule.startTime}–${pinnedSchedule.endTime}`
+                                : '',
+                              pinnedSchedule.course,
+                            ].filter(Boolean).join(' · ') || pinnedMessageObj.content
                             : (pinnedMessageObj.messageType === 'system' ? pinnedMessageObj.content
                               : (isImageMessage(pinnedMessageObj) ? '[Hình ảnh] ' + attachmentCaption(pinnedMessageObj)
                                 : pinnedMessageObj.messageType === 'file' ? '[Tệp đính kèm]' : pinnedMessageObj.content))}
@@ -2353,7 +2359,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <Calendar size={14} />
                         </button>
                       ) : null}
-                      <button 
+                      <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -2366,10 +2372,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       </button>
                     </div>
                   </div>
-                  );
-                })()}
+                );
+              })()}
 
-                {showHandoffSummaryPanel ? (
+              {showHandoffSummaryPanel ? (
                 <div className="mx-3 mt-2 mb-0 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-950 leading-snug">
                   <p className="font-black uppercase tracking-wide text-amber-800 mb-1">Tóm tắt cho Support (nội bộ)</p>
                   {handoffSummaryParts.head ? (
@@ -2468,11 +2474,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     const canPinSchedule = scheduleInfo && !String(msg.id).startsWith('temp_');
                     return (
                       <div id={`msg-${msg.id}`} key={msg.id} className="flex justify-center my-3 group/sysmsg">
-                        <span className={`inline-flex items-center gap-1.5 max-w-[92%] px-3 py-1.5 text-xs font-medium rounded-full shadow-sm ${
-                          isSchedulePinned
-                            ? 'bg-violet-50 text-violet-800 border border-violet-200'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}>
+                        <span className={`inline-flex items-center gap-1.5 max-w-[92%] px-3 py-1.5 text-xs font-medium rounded-full shadow-sm ${isSchedulePinned
+                          ? 'bg-violet-50 text-violet-800 border border-violet-200'
+                          : 'bg-slate-100 text-slate-500'
+                          }`}>
                           {isSchedulePinned ? (
                             <Pin size={11} className="shrink-0 rotate-45 text-violet-600" aria-hidden="true" />
                           ) : null}
@@ -2492,11 +2497,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 <button
                                   type="button"
                                   onClick={() => handlePinMessage(msg.id)}
-                                  className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition ${
-                                    isSchedulePinned
-                                      ? 'bg-violet-200 text-violet-800'
-                                      : 'bg-white/80 text-slate-400 hover:bg-violet-100 hover:text-violet-700 opacity-100 sm:opacity-0 sm:group-hover/sysmsg:opacity-100'
-                                  }`}
+                                  className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition ${isSchedulePinned
+                                    ? 'bg-violet-200 text-violet-800'
+                                    : 'bg-white/80 text-slate-400 hover:bg-violet-100 hover:text-violet-700 opacity-100 sm:opacity-0 sm:group-hover/sysmsg:opacity-100'
+                                    }`}
                                   title={isSchedulePinned ? 'Bỏ ghim lịch này' : 'Ghim lịch này'}
                                   aria-label={isSchedulePinned ? 'Bỏ ghim lịch này' : 'Ghim lịch này'}
                                 >
@@ -2517,8 +2521,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <div className="flex items-center gap-2 mb-1 ml-1">
                             <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
                             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
-                                role === 'staff' ? 'bg-amber-600 text-white' :
-                                  role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+                              role === 'staff' ? 'bg-amber-600 text-white' :
+                                role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
                               }`}>
                               {badgeLabel}
                             </span>
@@ -2617,102 +2621,102 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                           {/* Reaction picker button */}
                           {!msg.isRecalled && (
-                              <div className={`opacity-0 group-hover/msg:opacity-100 absolute flex items-center gap-1 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2`}>
-                                <ReactionPicker
-                                  msgId={msg.id}
-                                  isMine={isMine}
-                                  onReact={handleReaction}
-                                  myReactions={myReactions}
-                                />
-                                <button
-                                  onClick={() => handlePinMessage(msg.id)}
-                                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
-                                  title={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-                                >
-                                  <Pin size={14} className={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "text-blue-500" : ""} />
-                                </button>
-                              </div>
-                            )}
+                            <div className={`opacity-0 group-hover/msg:opacity-100 absolute flex items-center gap-1 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2`}>
+                              <ReactionPicker
+                                msgId={msg.id}
+                                isMine={isMine}
+                                onReact={handleReaction}
+                                myReactions={myReactions}
+                              />
+                              <button
+                                onClick={() => handlePinMessage(msg.id)}
+                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
+                                title={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+                              >
+                                <Pin size={14} className={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "text-blue-500" : ""} />
+                              </button>
+                            </div>
+                          )}
 
                           {/* Options/Menu button for Soft Delete */}
                           <ChatFlipWrap open={showMessageOptions === msg.id} estimatedHeight={180} className="relative">
                             {(placeBelow) => (
-                            <>
-                            <button
-                              onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
-                              className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-slate-600 hover:bg-slate-100 transition-all shadow-sm border border-slate-100 active:scale-90"
-                              title="Tùy chọn"
-                            >
-                              <MoreHorizontal size={14} />
-                            </button>
-                            {showMessageOptions === msg.id && (
-                              <div className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
-                                {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
-                                  <button
-                                    onClick={() => {
-                                      handleDownload(msg.fileUrl, msg.fileName);
-                                      setShowMessageOptions(null);
-                                    }}
-                                    className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors"
-                                  >
-                                    <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
-                                  </button>
-                                )}
-                                {!msg.isRecalled && msg.messageType !== 'image' && (
-                                  <button
-                                    onClick={() => {
-                                      handleCopyText(msg.content);
-                                      setShowMessageOptions(null);
-                                    }}
-                                    className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-green-600 hover:bg-green-50 transition-colors"
-                                  >
-                                    <Copy size={12} /> Sao chép
-                                  </button>
-                                )}
-                                {!msg.isRecalled && msg.messageType !== 'image' && (
-                                  <button
-                                    onClick={() => {
-                                      setNewMsg(msg.content);
-                                      setTimeout(() => inputRef.current?.focus(), 100);
-                                      setShowMessageOptions(null);
-                                    }}
-                                    className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-colors"
-                                  >
-                                    <Edit3 size={12} /> Chỉnh sửa / Viết lại
-                                  </button>
-                                )}
-                                {isMine && !msg.isRecalled && (() => {
-                                  const now = new Date();
-                                  const sentAt = new Date(msg.time);
-                                  const diffHours = (now - sentAt) / (1000 * 60 * 60);
-                                  return diffHours <= 24;
-                                })() && (
-                                  <button
-                                    onClick={() => {
-                                      handleRecall(msg.id);
-                                      setShowMessageOptions(null);
-                                    }}
-                                    disabled={recallingId === msg.id}
-                                    className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
-                                  >
-                                    {recallingId === msg.id
-                                      ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
-                                      : <RotateCcw size={12} />
-                                    } Thu hồi tin nhắn
-                                  </button>
-                                )}
+                              <>
                                 <button
-                                  onClick={() => {
-                                    handleDeleteHistory(msg.id);
-                                    setShowMessageOptions(null);
-                                  }}
-                                  className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
+                                  onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
+                                  className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-slate-600 hover:bg-slate-100 transition-all shadow-sm border border-slate-100 active:scale-90"
+                                  title="Tùy chọn"
                                 >
-                                  <Trash2 size={12} /> Xóa lịch sử
+                                  <MoreHorizontal size={14} />
                                 </button>
-                              </div>
-                            )}
-                            </>
+                                {showMessageOptions === msg.id && (
+                                  <div className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
+                                    {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
+                                      <button
+                                        onClick={() => {
+                                          handleDownload(msg.fileUrl, msg.fileName);
+                                          setShowMessageOptions(null);
+                                        }}
+                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors"
+                                      >
+                                        <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
+                                      </button>
+                                    )}
+                                    {!msg.isRecalled && msg.messageType !== 'image' && (
+                                      <button
+                                        onClick={() => {
+                                          handleCopyText(msg.content);
+                                          setShowMessageOptions(null);
+                                        }}
+                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-green-600 hover:bg-green-50 transition-colors"
+                                      >
+                                        <Copy size={12} /> Sao chép
+                                      </button>
+                                    )}
+                                    {!msg.isRecalled && msg.messageType !== 'image' && (
+                                      <button
+                                        onClick={() => {
+                                          setNewMsg(msg.content);
+                                          setTimeout(() => inputRef.current?.focus(), 100);
+                                          setShowMessageOptions(null);
+                                        }}
+                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-colors"
+                                      >
+                                        <Edit3 size={12} /> Chỉnh sửa / Viết lại
+                                      </button>
+                                    )}
+                                    {isMine && !msg.isRecalled && (() => {
+                                      const now = new Date();
+                                      const sentAt = new Date(msg.time);
+                                      const diffHours = (now - sentAt) / (1000 * 60 * 60);
+                                      return diffHours <= 24;
+                                    })() && (
+                                        <button
+                                          onClick={() => {
+                                            handleRecall(msg.id);
+                                            setShowMessageOptions(null);
+                                          }}
+                                          disabled={recallingId === msg.id}
+                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                                        >
+                                          {recallingId === msg.id
+                                            ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
+                                            : <RotateCcw size={12} />
+                                          } Thu hồi tin nhắn
+                                        </button>
+                                      )}
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteHistory(msg.id);
+                                        setShowMessageOptions(null);
+                                      }}
+                                      className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
+                                    >
+                                      <Trash2 size={12} /> Xóa lịch sử
+                                    </button>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </ChatFlipWrap>
                         </div>
@@ -2720,20 +2724,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         {/* Time & read status */}
                         <div className={`flex items-center gap-1.5 mt-1.5 ${isMine ? 'justify-end' : ''}`}>
                           {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
-                              <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
-                                <Pin size={10} className="rotate-45" />
-                              </span>
-                            )}
-                            <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
+                            <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
+                              <Pin size={10} className="rotate-45" />
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
                           {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
                             <span title="Chưa gửi được (Kết nối yếu)">
                               <AlertCircle size={10} className="text-red-500 animate-pulse" />
                             </span>
                           ) : isMine && !msg.isRecalled && !isAiSupportConversationId(activeConv?.id) && (
                             <span
-                              className={`inline-flex items-center gap-0.5 font-semibold ${
-                                msg.isRead ? 'text-emerald-600' : 'text-slate-400'
-                              }`}
+                              className={`inline-flex items-center gap-0.5 font-semibold ${msg.isRead ? 'text-emerald-600' : 'text-slate-400'
+                                }`}
                               title={msg.isRead ? 'Đã đọc' : 'Chưa đọc'}
                             >
                               {msg.isRead ? (
@@ -2931,7 +2934,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             />
                           </div>
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${u.role === 'admin' ? 'bg-red-500' :
-                              u.role === 'teacher' ? 'bg-amber-600' : 'bg-emerald-600'
+                            u.role === 'teacher' ? 'bg-amber-600' : 'bg-emerald-600'
                             }`}>
                             {(u.name || '?')[0].toUpperCase()}
                           </div>
@@ -3279,12 +3282,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           const preferred = enrollments.find((s) => String(s.course || '').trim().toLowerCase() === convCourse)
             || enrollments[0]
             || {
-              id: activeConv.user.id,
-              _id: activeConv.user.id,
-              name: activeConv.user.name || 'Học viên',
-              course: activeConv.user.course || '',
-              branchCode: activeConv.user.branchCode || '',
-            };
+            id: activeConv.user.id,
+            _id: activeConv.user.id,
+            name: activeConv.user.name || 'Học viên',
+            course: activeConv.user.course || '',
+            branchCode: activeConv.user.branchCode || '',
+          };
           return (
             <TeacherStudentWeekSlotSheet
               student={preferred}
@@ -3296,13 +3299,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               cancelSchedule={cancelSchedule}
               onClose={() => setShowScheduleModal(false)}
               onCreated={(payload) => {
-                notifyInboxScheduleEvent(payload, 'created').catch(() => {});
+                notifyInboxScheduleEvent(payload, 'created').catch(() => { });
               }}
               onUpdated={(payload) => {
-                notifyInboxScheduleEvent(payload, 'changed').catch(() => {});
+                notifyInboxScheduleEvent(payload, 'changed').catch(() => { });
               }}
               onCancelled={(payload) => {
-                notifyInboxScheduleEvent(payload, 'cancelled').catch(() => {});
+                notifyInboxScheduleEvent(payload, 'cancelled').catch(() => { });
               }}
             />
           );
