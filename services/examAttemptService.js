@@ -132,6 +132,15 @@ function questionMatchesSubject(section, subjectId) {
   return expandSubjectMatchIds(subjectId).includes(actual);
 }
 
+function selectQuestionsForSubject(normalized, subjectId) {
+  const exactId = normalizeSubjectSection(subjectId);
+  const exact = normalized.filter((question) => (
+    normalizeSubjectSection(question.section) === exactId
+  ));
+  if (exact.length > 0) return exact;
+  return normalized.filter((question) => questionMatchesSubject(question.section, subjectId));
+}
+
 function resolveExamBankAccess(kind, role, canManage) {
   const normalizedRole = String(role || '').toLowerCase();
   if (canManage && ['admin', 'staff'].includes(normalizedRole)) {
@@ -258,9 +267,7 @@ function deterministicOrder(items, seed, idOf) {
 function buildAttemptSet(bank, { kind, subjectIds, attemptId }) {
   const normalized = normalizeBank(bank, kind);
   const wanted = [...new Set((subjectIds || []).map((id) => String(id).trim().toLowerCase()).filter(Boolean))];
-  const assigned = normalized.filter((question) => (
-    wanted.some((subjectId) => questionMatchesSubject(question.section, subjectId))
-  ));
+  const assigned = wanted.flatMap((subjectId) => selectQuestionsForSubject(normalized, subjectId));
   const mc = assigned.filter((question) => (
     question.type === 'multiple'
     && question.options.length >= 2
