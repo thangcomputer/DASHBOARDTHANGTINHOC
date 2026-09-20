@@ -29,7 +29,23 @@ function quizWindow(quiz, now = Date.now()) {
   };
 }
 
-function existingSubmissionPayload(existing) {
+function buildQuizDetailedReview(questions, answers) {
+  const submitted = Array.isArray(answers) ? answers : [];
+  return (questions || []).map((question, index) => {
+    const userAnswer = submitted[index] ?? null;
+    return {
+      _id: question._id,
+      questionText: question.questionText,
+      options: question.options || [],
+      correctAnswer: question.correctAnswer,
+      userAnswer,
+      isCorrect: userAnswer !== null && userAnswer === question.correctAnswer,
+      explanation: question.explanation || '',
+    };
+  });
+}
+
+function existingSubmissionPayload(existing, questions = []) {
   if (!existing) return null;
   return {
     score: existing.score,
@@ -39,7 +55,9 @@ function existingSubmissionPayload(existing) {
     forfeit: !!existing.forfeit,
     exitReason: existing.exitReason || '',
     submittedAt: existing.submittedAt,
-    detailedReview: [],
+    detailedReview: existing.forfeit
+      ? []
+      : buildQuizDetailedReview(questions, existing.answers),
   };
 }
 
@@ -69,6 +87,7 @@ module.exports = {
   studentCourseNames,
   studentAssignedToQuiz,
   quizWindow,
+  buildQuizDetailedReview,
   existingSubmissionPayload,
   claimQuizSubmission,
 };

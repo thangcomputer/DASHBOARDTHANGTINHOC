@@ -12,6 +12,7 @@ import exportPDF, { printInvoice, captureAndSendZalo } from '../../../utils/expo
 import { parseQuestionBankExcel } from '../../../utils/studentQuestionsExcel';
 import { studentToExcelRow } from '../../../utils/studentImportExportColumns';
 import api from '../../../services/api';
+import { questionMatchesExamSubject } from '../../../utils/htmlContent';
 import { EXAM_RESULTS_STUDENTS_FETCH_CAP } from './adminConstants';
 
 const PAGE_SIZE = 10;
@@ -29,6 +30,12 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
     approveStudentExam,
     revokeStudentExam,
     failStudentExam,
+    studentQuestions,
+    studentExamMinutes,
+    studentEssayExamMinutes,
+    studentEssayRequired,
+    studentExamFiles,
+    examWarningSoundUrl,
     replaceStudentQuestionsForSubject,
     studentsPagination,
     fetchStudentsPaginated,
@@ -272,7 +279,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
           type: 'info',
           confirmText: null,
           size: '3xl',
-          onConfirm: () => {},
+          onConfirm: () => { },
         });
       }
 
@@ -401,6 +408,19 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
           return;
         }
         const normalized = questions.map((q) => ({ ...q, section: subjectId }));
+        const kept = (studentQuestions || []).filter(
+          (q) => !questionMatchesExamSubject(q.section, subjectId),
+        );
+        const nextQuestions = [...kept, ...normalized];
+        const saved = await api.settings.updateStudentExamConfig({
+          studentQuestions: nextQuestions,
+          studentExamMinutes,
+          studentEssayExamMinutes,
+          studentEssayRequired,
+          studentExamFiles,
+          examWarningSoundUrl,
+        });
+        if (!saved?.success) throw new Error(saved?.message || 'Lưu ngân hàng câu hỏi thất bại');
         replaceStudentQuestionsForSubject(subjectId, normalized);
         toast.success(
           `Đã nhập ${normalized.length} câu cho môn đã chọn (thay thế câu cũ cùng môn).${skipped ? ` (${skipped} dòng trống)` : ''}`,

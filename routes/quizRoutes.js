@@ -13,6 +13,7 @@ const { scheduleQuizAssignedNotify } = require('../services/quizAssignedNotifier
 const {
   studentAssignedToQuiz,
   quizWindow,
+  buildQuizDetailedReview,
   existingSubmissionPayload,
   studentCourseNames,
   claimQuizSubmission,
@@ -222,7 +223,9 @@ router.get('/:id', [authMiddleware, ...quizzesGuard('get')], async (req, res) =>
         timeLimitMinutes: quiz.timeLimitMinutes,
         questions: safeQuestions,
         mySubmission: mySub || null,
-        detailedReview: [],
+        detailedReview: mySub?.forfeit
+          ? []
+          : buildQuizDetailedReview(quiz.questions, mySub?.answers),
       },
     });
   } catch (err) {
@@ -283,7 +286,7 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
       return res.json({
         success: true,
         message: 'Bài đã nộp trước đó',
-        data: existingSubmissionPayload(existing),
+        data: existingSubmissionPayload(existing, quiz.questions),
       });
     }
 
@@ -337,7 +340,7 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
           success: false,
           message: 'Bạn đã bị tính RỚT do thoát giữa giờ. Không thể làm lại bài này.',
           code: 'QUIZ_FORFEITED',
-          data: existingSubmissionPayload(concurrentExisting),
+          data: existingSubmissionPayload(concurrentExisting, quiz.questions),
         });
       }
       if (concurrentExisting) {
@@ -345,7 +348,7 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
           success: true,
           message: 'Bài đã được ghi nhận trước đó',
           data: {
-            ...existingSubmissionPayload(concurrentExisting),
+            ...existingSubmissionPayload(concurrentExisting, quiz.questions),
             idempotent: true,
           },
         });
@@ -407,7 +410,7 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
       const stuContent = isForfeit
         ? `Bạn đã bị tính rớt do thoát giữa giờ bài thi "${quiz.title}".`
         : `Bạn đã nộp bài "${quiz.title}". Điểm: ${score}% (${correctCount}/${totalQuestions}) · ${status === 'passed' ? 'ĐẠT' : 'CHƯA ĐẠT'}.`;
-      
+
       await NotificationService.send(io, {
         type: 'EXAM',
         title: stuTitle,
@@ -431,7 +434,7 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
         forfeit: isForfeit,
         exitReason: reason,
         submittedAt: submissionData.submittedAt,
-        detailedReview: [],
+        detailedReview: isForfeit ? [] : buildQuizDetailedReview(quiz.questions, userAnswers),
       },
     });
   } catch (err) {

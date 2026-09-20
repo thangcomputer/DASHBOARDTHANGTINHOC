@@ -335,67 +335,110 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
     return (
       <ExamOverlay>
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center">
-        <div className="w-full max-w-4xl space-y-6">
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
-            <button
-              type="button"
-              onClick={handleLeaveExamRoom}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold transition"
-            >
-              <ArrowLeft size={16} /> Quay lại danh sách
-            </button>
-            <span className="text-xs font-bold text-slate-400">Kết quả bài trắc nghiệm</span>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
-            <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${
-              isPassed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
-            }`}>
-              <Award size={40} />
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black mb-1">{quizData?.title || 'Bài trắc nghiệm'}</h1>
-            <p className="text-xs text-slate-400 mb-6">Giảng viên: {quizData?.teacherName || '—'}</p>
-
-            <div className="inline-flex flex-col items-center justify-center px-8 py-4 rounded-2xl bg-white/5 border border-white/10 mb-6">
-              <span className="text-4xl sm:text-5xl font-black text-amber-400 tabular-nums">
-                {resultData.score}%
-              </span>
-              <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
-                {isForfeit ? 'RỚT · THOÁT GIỮA GIỜ' : (isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT')}
-              </span>
+          <div className="w-full max-w-4xl space-y-6">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <button
+                type="button"
+                onClick={handleLeaveExamRoom}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold transition"
+              >
+                <ArrowLeft size={16} /> Quay lại danh sách
+              </button>
+              <span className="text-xs font-bold text-slate-400">Kết quả bài trắc nghiệm</span>
             </div>
 
-            {isForfeit && (
-              <p className="text-xs text-red-300/90 mb-6 max-w-md mx-auto leading-relaxed">
-                {resultData.exitReason || 'Bạn đã thoát phòng thi khi đang làm bài nên bị tính RỚT.'}
-              </p>
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
+              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${isPassed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                }`}>
+                <Award size={40} />
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black mb-1">{quizData?.title || 'Bài trắc nghiệm'}</h1>
+              <p className="text-xs text-slate-400 mb-6">Giảng viên: {quizData?.teacherName || '—'}</p>
+
+              <div className="inline-flex flex-col items-center justify-center px-8 py-4 rounded-2xl bg-white/5 border border-white/10 mb-6">
+                <span className="text-4xl sm:text-5xl font-black text-amber-400 tabular-nums">
+                  {resultData.score}%
+                </span>
+                <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {isForfeit ? 'RỚT · THOÁT GIỮA GIỜ' : (isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT')}
+                </span>
+              </div>
+
+              {isForfeit && (
+                <p className="text-xs text-red-300/90 mb-6 max-w-md mx-auto leading-relaxed">
+                  {resultData.exitReason || 'Bạn đã thoát phòng thi khi đang làm bài nên bị tính RỚT.'}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg mx-auto text-left text-xs font-semibold">
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                  <span className="text-slate-400 block text-[10px]">Số câu đúng</span>
+                  <span className="text-emerald-400 font-bold text-sm">{resultData.correctCount ?? 0}/{resultData.totalQuestions ?? 0}</span>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                  <span className="text-slate-400 block text-[10px]">Số câu sai</span>
+                  <span className="text-red-400 font-bold text-sm">
+                    {Math.max(0, (resultData.totalQuestions || 0) - (resultData.correctCount || 0))}
+                  </span>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                  <span className="text-slate-400 block text-[10px]">Thời gian làm</span>
+                  <span className="text-white font-bold text-sm">{quizData?.timeLimitMinutes != null ? `${quizData.timeLimitMinutes} phút` : '—'}</span>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                  <span className="text-slate-400 block text-[10px]">Trạng thái</span>
+                  <span className={`font-bold text-sm ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {isForfeit ? 'Rớt do thoát' : (isPassed ? 'Đã hoàn thành' : 'Cần học lại')}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {!isForfeit && Array.isArray(resultData.detailedReview) && resultData.detailedReview.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-base font-black text-slate-200">Xem lại đáp án</h2>
+                {resultData.detailedReview.map((question, index) => (
+                  <article key={question._id || index} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-left space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-bold text-slate-100">
+                        <span className="mr-2 text-sky-400">Câu {index + 1}:</span>
+                        {question.questionText}
+                      </p>
+                      <span className={question.isCorrect ? 'shrink-0 text-xs font-black text-emerald-400' : 'shrink-0 text-xs font-black text-red-400'}>
+                        {question.isCorrect ? 'Đúng' : 'Sai'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {(question.options || []).map((option, optionIndex) => {
+                        const picked = Number(question.userAnswer) === optionIndex;
+                        const correct = Number(question.correctAnswer) === optionIndex;
+                        return (
+                          <div
+                            key={optionIndex}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold ${correct
+                                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                                : picked
+                                  ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                                  : 'border-white/10 bg-black/10 text-slate-300'
+                              }`}
+                          >
+                            <span className="mr-1 font-black">{String.fromCharCode(65 + optionIndex)}.</span>
+                            {option}
+                            {picked ? <span className="ml-2 text-[10px]">(Bạn chọn)</span> : null}
+                            {correct ? <span className="ml-2 text-[10px]">(Đáp án đúng)</span> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {question.explanation ? (
+                      <p className="rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-xs text-sky-100">
+                        <span className="font-black">Giải thích:</span> {question.explanation}
+                      </p>
+                    ) : null}
+                  </article>
+                ))}
+              </section>
             )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg mx-auto text-left text-xs font-semibold">
-              <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                <span className="text-slate-400 block text-[10px]">Số câu đúng</span>
-                <span className="text-emerald-400 font-bold text-sm">{resultData.correctCount ?? 0}/{resultData.totalQuestions ?? 0}</span>
-              </div>
-              <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                <span className="text-slate-400 block text-[10px]">Số câu sai</span>
-                <span className="text-red-400 font-bold text-sm">
-                  {Math.max(0, (resultData.totalQuestions || 0) - (resultData.correctCount || 0))}
-                </span>
-              </div>
-              <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                <span className="text-slate-400 block text-[10px]">Thời gian làm</span>
-                <span className="text-white font-bold text-sm">{quizData?.timeLimitMinutes != null ? `${quizData.timeLimitMinutes} phút` : '—'}</span>
-              </div>
-              <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                <span className="text-slate-400 block text-[10px]">Trạng thái</span>
-                <span className={`font-bold text-sm ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {isForfeit ? 'Rớt do thoát' : (isPassed ? 'Đã hoàn thành' : 'Cần học lại')}
-                </span>
-              </div>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-4">Học viên không xem được đáp án chi tiết.</p>
           </div>
-        </div>
         </div>
       </ExamOverlay>
     );
@@ -404,228 +447,226 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
   // ── 5. MÀN HÌNH THI TRẮC NGHIỆM (TOÀN MÀN HÌNH) ─────────────────────────────
   return (
     <ExamOverlay>
-    <ExamClickOutsideGuard
-      enabled={!resultData && !loading && !!quizData}
-      soundUrl={examWarningSoundUrl}
-      watchVisibility
-      maxStrikes={2}
-      onMaxStrikes={() => { void submitForfeit('Bấm ra ngoài vùng làm bài khi đang thi'); }}
-      className="flex-1 min-h-0 flex flex-col select-none overflow-x-hidden"
-    >
-      {/* ── TOPBAR PHÒNG THI ── */}
-      <header className="h-14 bg-[#0e1420] border-b border-white/10 px-4 sm:px-6 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            type="button"
-            onClick={requestExit}
-            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <div className="min-w-0">
-            <h1 className="font-bold text-sm sm:text-base text-slate-100 truncate">{quizData.title}</h1>
-            <p className="text-[11px] text-slate-400 truncate">Lớp: {quizData.courseName || 'Bài thi trắc nghiệm'}</p>
+      <ExamClickOutsideGuard
+        enabled={!resultData && !loading && !!quizData}
+        soundUrl={examWarningSoundUrl}
+        watchVisibility
+        maxStrikes={2}
+        onMaxStrikes={() => { void submitForfeit('Bấm ra ngoài vùng làm bài khi đang thi'); }}
+        className="flex-1 min-h-0 flex flex-col select-none overflow-x-hidden"
+      >
+        {/* ── TOPBAR PHÒNG THI ── */}
+        <header className="h-14 bg-[#0e1420] border-b border-white/10 px-4 sm:px-6 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={requestExit}
+              className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="font-bold text-sm sm:text-base text-slate-100 truncate">{quizData.title}</h1>
+              <p className="text-[11px] text-slate-400 truncate">Lớp: {quizData.courseName || 'Bài thi trắc nghiệm'}</p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl text-amber-300 font-black text-sm tabular-nums">
-            <Clock size={16} className="text-amber-400 animate-pulse" />
-            <span>{formatTime(timeLeft)}</span>
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl text-amber-300 font-black text-sm tabular-nums">
+              <Clock size={16} className="text-amber-400 animate-pulse" />
+              <span>{formatTime(timeLeft)}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowConfirmModal(true)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-red-900/30 flex items-center gap-1.5"
+            >
+              <Send size={14} /> Nộp bài
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowConfirmModal(true)}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-red-900/30 flex items-center gap-1.5"
-          >
-            <Send size={14} /> Nộp bài
-          </button>
-        </div>
-      </header>
+        </header>
 
-      {/* ── NỘI DUNG CHÍNH (2 CỘT PADDING CHUẨN) ── */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
-        {/* Cột trái: Câu hỏi hiện tại */}
-        <div className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          {currentQ ? (
-            <div className="max-w-3xl mx-auto w-full space-y-4">
-              <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-400 border-b border-white/10 pb-3">
-                <span className="text-sky-400 uppercase tracking-widest text-[11px]">
-                  Câu hỏi {currentIndex + 1} / {questions.length}
-                </span>
-                <span>Đã chọn: {answeredCount}/{questions.length}</span>
-              </div>
+        {/* ── NỘI DUNG CHÍNH (2 CỘT PADDING CHUẨN) ── */}
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
+          {/* Cột trái: Câu hỏi hiện tại */}
+          <div className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 overflow-y-auto">
+            {currentQ ? (
+              <div className="max-w-3xl mx-auto w-full space-y-4">
+                <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-400 border-b border-white/10 pb-3">
+                  <span className="text-sky-400 uppercase tracking-widest text-[11px]">
+                    Câu hỏi {currentIndex + 1} / {questions.length}
+                  </span>
+                  <span>Đã chọn: {answeredCount}/{questions.length}</span>
+                </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 shadow-xl">
-                <h2 className="text-base sm:text-lg font-bold text-slate-100 leading-relaxed mb-4">
-                  {currentQ.questionText}
-                </h2>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 shadow-xl">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-100 leading-relaxed mb-4">
+                    {currentQ.questionText}
+                  </h2>
 
-                <div className="space-y-2.5">
-                  {(currentQ.options || []).map((opt, optIdx) => {
-                    const isSelected = selectedAnswers[currentIndex] === optIdx;
-                    return (
-                      <button
-                        key={optIdx}
-                        type="button"
-                        onClick={() => {
-                          setSelectedAnswers(prev => ({ ...prev, [currentIndex]: optIdx }));
-                        }}
-                        className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 ${
-                          isSelected
-                            ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-900/20'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300'
-                        }`}
-                      >
-                        <span className={`w-7 h-7 rounded-full border text-xs font-black flex items-center justify-center shrink-0 transition-all ${
-                          isSelected
-                            ? 'bg-emerald-500 border-emerald-400 text-slate-950'
-                            : 'border-white/20 text-slate-400'
-                        }`}>
-                          {String.fromCharCode(65 + optIdx)}
-                        </span>
-                        <span className="text-sm font-semibold flex-1 leading-snug">{opt}</span>
-                      </button>
-                    );
-                  })}
+                  <div className="space-y-2.5">
+                    {(currentQ.options || []).map((opt, optIdx) => {
+                      const isSelected = selectedAnswers[currentIndex] === optIdx;
+                      return (
+                        <button
+                          key={optIdx}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAnswers(prev => ({ ...prev, [currentIndex]: optIdx }));
+                          }}
+                          className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 ${isSelected
+                              ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-900/20'
+                              : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300'
+                            }`}
+                        >
+                          <span className={`w-7 h-7 rounded-full border text-xs font-black flex items-center justify-center shrink-0 transition-all ${isSelected
+                              ? 'bg-emerald-500 border-emerald-400 text-slate-950'
+                              : 'border-white/20 text-slate-400'
+                            }`}>
+                            {String.fromCharCode(65 + optIdx)}
+                          </span>
+                          <span className="text-sm font-semibold flex-1 leading-snug">{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Điều hướng Trước / Sau */}
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <button
+                    type="button"
+                    disabled={currentIndex <= 0}
+                    onClick={() => setCurrentIndex(prev => prev - 1)}
+                    className="px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1.5 transition text-slate-200"
+                  >
+                    <ChevronLeft size={16} /> Câu trước
+                  </button>
+                  <button
+                    type="button"
+                    disabled={currentIndex >= questions.length - 1}
+                    onClick={() => setCurrentIndex(prev => prev + 1)}
+                    className="px-4 py-2.5 rounded-xl border border-sky-500/40 bg-sky-500/20 hover:bg-sky-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1.5 transition text-sky-100"
+                  >
+                    Câu tiếp <ChevronRight size={16} />
+                  </button>
                 </div>
               </div>
+            ) : (
+              <p className="text-center py-10 text-slate-400 text-sm">Chưa có câu hỏi</p>
+            )}
+          </div>
 
-              {/* Điều hướng Trước / Sau */}
-              <div className="flex items-center justify-between gap-3 pt-1">
+          {/* Cột phải: Ma trận số câu hỏi (Sidebar) */}
+          <div className="lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-white/10 p-4 sm:p-5 bg-[#0e1420] flex flex-col shrink-0 lg:overflow-y-auto">
+            <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-300">
+              <LayoutGrid size={16} className="text-sky-400" />
+              <span>Danh sách câu hỏi</span>
+            </div>
+
+            <div className="grid grid-cols-5 gap-2 content-start self-start w-full max-h-[min(40vh,280px)] lg:max-h-none overflow-y-auto pr-0.5">
+              {questions.map((_, idx) => {
+                const isAnswered = selectedAnswers[idx] !== undefined;
+                const isCurrent = idx === currentIndex;
+                let btnStyle = 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10';
+                if (isCurrent) {
+                  btnStyle = 'bg-sky-500 text-slate-950 font-black border-sky-300 ring-2 ring-sky-400/40';
+                } else if (isAnswered) {
+                  btnStyle = 'bg-emerald-500/30 border-emerald-500/60 text-emerald-200 font-bold';
+                }
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setCurrentIndex(idx)}
+                    className={`h-10 rounded-xl border text-xs font-bold flex items-center justify-center transition-all ${btnStyle}`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-white/10 space-y-1.5 text-[11px] text-slate-400 font-semibold shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-md bg-sky-500 border border-sky-300" />
+                <span>Đang xem</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-md bg-emerald-500/30 border border-emerald-500/60" />
+                <span>Đã làm ({answeredCount})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-md bg-white/5 border border-white/10" />
+                <span>Chưa làm ({questions.length - answeredCount})</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── MODAL XÁC NHẬN NỘP BÀI ── */}
+        {showConfirmModal && (
+          <div data-exam-modal className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-[#161d2a] border border-white/10 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
+              <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <AlertTriangle className="text-amber-400" size={20} /> Xác nhận nộp bài?
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Bạn đã hoàn thành <strong>{answeredCount}/{questions.length}</strong> câu hỏi. Bạn có chắc chắn muốn nộp bài thi ngay bây giờ?
+              </p>
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  disabled={currentIndex <= 0}
-                  onClick={() => setCurrentIndex(prev => prev - 1)}
-                  className="px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1.5 transition text-slate-200"
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold transition"
                 >
-                  <ChevronLeft size={16} /> Câu trước
+                  Làm tiếp
                 </button>
                 <button
                   type="button"
-                  disabled={currentIndex >= questions.length - 1}
-                  onClick={() => setCurrentIndex(prev => prev + 1)}
-                  className="px-4 py-2.5 rounded-xl border border-sky-500/40 bg-sky-500/20 hover:bg-sky-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1.5 transition text-sky-100"
+                  disabled={submitting}
+                  onClick={submitAnswers}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md"
                 >
-                  Câu tiếp <ChevronRight size={16} />
+                  {submitting ? 'Đang nộp...' : 'Nộp bài ngay'}
                 </button>
               </div>
             </div>
-          ) : (
-            <p className="text-center py-10 text-slate-400 text-sm">Chưa có câu hỏi</p>
-          )}
-        </div>
-
-        {/* Cột phải: Ma trận số câu hỏi (Sidebar) */}
-        <div className="lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-white/10 p-4 sm:p-5 bg-[#0e1420] flex flex-col shrink-0 lg:overflow-y-auto">
-          <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-300">
-            <LayoutGrid size={16} className="text-sky-400" />
-            <span>Danh sách câu hỏi</span>
           </div>
+        )}
 
-          <div className="grid grid-cols-5 gap-2 content-start self-start w-full max-h-[min(40vh,280px)] lg:max-h-none overflow-y-auto pr-0.5">
-            {questions.map((_, idx) => {
-              const isAnswered = selectedAnswers[idx] !== undefined;
-              const isCurrent = idx === currentIndex;
-              let btnStyle = 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10';
-              if (isCurrent) {
-                btnStyle = 'bg-sky-500 text-slate-950 font-black border-sky-300 ring-2 ring-sky-400/40';
-              } else if (isAnswered) {
-                btnStyle = 'bg-emerald-500/30 border-emerald-500/60 text-emerald-200 font-bold';
-              }
-
-              return (
+        {/* ── MODAL THOÁT = RỚT ── */}
+        {showExitModal && (
+          <div data-exam-modal className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-[#161d2a] border border-red-500/30 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
+              <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <AlertTriangle className="text-red-400" size={20} /> Thoát sẽ bị RỚT
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Bạn đang trong giờ làm bài. Nếu thoát hoặc tải lại trang, bài sẽ được ghi nhận <strong className="text-red-300">RỚT (0 điểm)</strong> và gửi cho giảng viên.
+              </p>
+              <div className="flex gap-3 pt-2">
                 <button
-                  key={idx}
                   type="button"
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`h-10 rounded-xl border text-xs font-bold flex items-center justify-center transition-all ${btnStyle}`}
+                  onClick={stayInExam}
+                  className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold transition"
                 >
-                  {idx + 1}
+                  Ở lại làm tiếp
                 </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-white/10 space-y-1.5 text-[11px] text-slate-400 font-semibold shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-md bg-sky-500 border border-sky-300" />
-              <span>Đang xem</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-md bg-emerald-500/30 border border-emerald-500/60" />
-              <span>Đã làm ({answeredCount})</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-md bg-white/5 border border-white/10" />
-              <span>Chưa làm ({questions.length - answeredCount})</span>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={confirmExitForfeit}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md"
+                >
+                  {submitting ? 'Đang ghi nhận...' : 'Đồng ý thoát (Rớt)'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* ── MODAL XÁC NHẬN NỘP BÀI ── */}
-      {showConfirmModal && (
-        <div data-exam-modal className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161d2a] border border-white/10 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <AlertTriangle className="text-amber-400" size={20} /> Xác nhận nộp bài?
-            </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Bạn đã hoàn thành <strong>{answeredCount}/{questions.length}</strong> câu hỏi. Bạn có chắc chắn muốn nộp bài thi ngay bây giờ?
-            </p>
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowConfirmModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold transition"
-              >
-                Làm tiếp
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={submitAnswers}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md"
-              >
-                {submitting ? 'Đang nộp...' : 'Nộp bài ngay'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL THOÁT = RỚT ── */}
-      {showExitModal && (
-        <div data-exam-modal className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161d2a] border border-red-500/30 rounded-2xl max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <AlertTriangle className="text-red-400" size={20} /> Thoát sẽ bị RỚT
-            </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Bạn đang trong giờ làm bài. Nếu thoát hoặc tải lại trang, bài sẽ được ghi nhận <strong className="text-red-300">RỚT (0 điểm)</strong> và gửi cho giảng viên.
-            </p>
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={stayInExam}
-                className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold transition"
-              >
-                Ở lại làm tiếp
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={confirmExitForfeit}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md"
-              >
-                {submitting ? 'Đang ghi nhận...' : 'Đồng ý thoát (Rớt)'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </ExamClickOutsideGuard>
+        )}
+      </ExamClickOutsideGuard>
     </ExamOverlay>
   );
 }

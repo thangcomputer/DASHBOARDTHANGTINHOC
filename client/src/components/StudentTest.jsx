@@ -30,11 +30,11 @@ import {
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../services/api';
 
 const SUBJECT_META = {
-  coban:       { label: 'Máy vi tính (Cơ bản)', short: 'Cơ bản',     examFile: 'De_thi_Co_ban.docx', time: 90 * 60 },
-  word:        { label: 'Word',       short: 'Word',       examFile: 'De_thi_Word.docx',   time: 90 * 60 },
-  excel:       { label: 'Excel',      short: 'Excel',      examFile: 'De_thi_Excel.xlsx',  time: 90 * 60 },
-  powerpoint:  { label: 'PowerPoint', short: 'PowerPoint', examFile: 'De_thi_PPT.pptx',   time: 90 * 60 },
-  canva:       { label: 'Canva',                  short: 'Canva',      examFile: 'De_thi_Canva.pdf',  time: 90 * 60 },
+  coban: { label: 'Máy vi tính (Cơ bản)', short: 'Cơ bản', examFile: 'De_thi_Co_ban.docx', time: 90 * 60 },
+  word: { label: 'Word', short: 'Word', examFile: 'De_thi_Word.docx', time: 90 * 60 },
+  excel: { label: 'Excel', short: 'Excel', examFile: 'De_thi_Excel.xlsx', time: 90 * 60 },
+  powerpoint: { label: 'PowerPoint', short: 'PowerPoint', examFile: 'De_thi_PPT.pptx', time: 90 * 60 },
+  canva: { label: 'Canva', short: 'Canva', examFile: 'De_thi_Canva.pdf', time: 90 * 60 },
 };
 
 /** Logo từ cấu hình web (đồng bộ sidebar); fallback SVG chỉnh tông cho nền tối */
@@ -89,8 +89,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     studentEssayRequired: { coban: true, word: true, excel: true, powerpoint: true, canva: true },
     studentExamFiles: {},
     examWarningSoundUrl: '',
-    updateStudent: () => {},
-    addNotification: () => {},
+    updateStudent: () => { },
+    addNotification: () => { },
     applyStudentExamConfigFromServer: null,
   };
 
@@ -206,12 +206,12 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           setWebLogoUrl(u.startsWith('http') ? u : `${API_BASE}${u}`);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Modals
-  const [showSubmitConfirm, setShowSubmitConfirm]   = useState(false);
-  const [showNoFileConfirm, setShowNoFileConfirm]   = useState(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [showNoFileConfirm, setShowNoFileConfirm] = useState(false);
 
   useEffect(() => {
     if (phase !== 'test') return;
@@ -232,9 +232,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const tuLuanSubmittingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  const timerRef   = useRef(null);
+  const timerRef = useRef(null);
   const monitorRef = useRef(null);
-  const fileRef    = useRef(null);
+  const fileRef = useRef(null);
   const examPhaseRef = useRef('mc');
   const startingExamRef = useRef(false);
 
@@ -257,7 +257,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         subjectId,
         soft: true,
         reason: 'Thoát ở bước kiểm tra camera',
-      }).catch(() => {});
+      }).catch(() => { });
     }
     clearCertificationAttempt(attemptKey);
     onBack?.();
@@ -583,7 +583,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         previewStreamRef.current = s;
         if (previewRef.current) {
           previewRef.current.srcObject = s;
-          previewRef.current.play().catch(() => {});
+          previewRef.current.play().catch(() => { });
         }
         setCameraReady(true);
         setCameraError('');
@@ -606,12 +606,12 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     const stream = previewStreamRef.current;
     if (!video || !stream || !cameraReady) return;
     video.srcObject = stream;
-    video.play().catch(() => {});
+    video.play().catch(() => { });
   }, [cameraReady, phase]);
 
   // ── Timer ──
-  const handleSubmitFinalRef = useRef(() => {});
-  const handleFinalTuLuanRef = useRef(async () => {});
+  const handleSubmitFinalRef = useRef(() => { });
+  const handleFinalTuLuanRef = useRef(async () => { });
 
   useEffect(() => {
     if (phase !== 'test' || TOTAL < 1) return;
@@ -630,7 +630,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [phase, TOTAL]);
+  }, [phase, TOTAL, tab]);
 
   // ── Browser Trap (Chống F5, Ctrl+R, Back) ──
   const failAndExitRef = useRef();
@@ -666,7 +666,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
 
     // Chỉ push trạng thái MỘT LẦN duy nhất khi mount Test Phase
     window.history.pushState(null, '', window.location.href);
-    
+
     const handlePopState = () => {
       window.history.pushState(null, '', window.location.href);
       confirmExit('quay lại trạng thái trước đó');
@@ -920,11 +920,11 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     if (file) setUploadFile(file);
   };
 
-  const score  = Number(serverResult?.score) || 0;
-  const pct    = Number(serverResult?.percentage) || 0;
+  const score = Number(serverResult?.score) || 0;
+  const pct = Number(serverResult?.percentage) || 0;
   const passed = serverResult?.passed === true;
-  const mins   = Math.floor(timeLeft / 60);
-  const secs   = timeLeft % 60;
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
 
   // ══════════════════════════════════════════════════════
   // HARDWARE CHECK (thi chứng nhận)
@@ -960,118 +960,117 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         )}
       </div>
 
-        <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-          <div className="absolute inset-0 border-[12px] border-blue-500/30 pointer-events-none rounded-[32px] m-4 animate-pulse" />
-          <div className="bg-white rounded-[28px] p-5 sm:p-6 max-w-[320px] sm:max-w-2xl w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-blue-600 animate-in zoom-in duration-500 overflow-y-auto max-h-[90vh] no-scrollbar">
+      <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 border-[12px] border-blue-500/30 pointer-events-none rounded-[32px] m-4 animate-pulse" />
+        <div className="bg-white rounded-[28px] p-5 sm:p-6 max-w-[320px] sm:max-w-2xl w-full text-center shadow-[0_0_80px_rgba(32,61,181,0.4)] z-10 border-t-[6px] border-blue-600 animate-in zoom-in duration-500 overflow-y-auto max-h-[90vh] no-scrollbar">
           <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-5 sm:items-start">
             <div className="min-w-0 sm:text-left">
-             <h2 className="text-lg font-black text-slate-900 tracking-tight mt-0">Yêu cầu bật Camera</h2>
-         {questionsLoading && (
-           <div className="mb-3 px-2 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold">
-             Đang tải đề thi từ hệ thống...
-           </div>
-         )}
-         {!questionsLoading && examLoadError && (
-           <div className="mb-3 px-2 py-2 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-bold leading-relaxed">
-             {examLoadError}
-           </div>
-         )}
-         {!questionsLoading && !examLoadError && TOTAL === 0 && (
-           <div className="mb-3 px-2 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold leading-relaxed">
-             Chưa có câu hỏi trắc nghiệm cho môn <span className="text-amber-950">{meta.short}</span> trong ngân hàng. Vui lòng liên hệ Admin.
-           </div>
-         )}
-         <p className="text-slate-500 font-bold mt-1 mb-3 px-2 sm:px-0 text-xs leading-relaxed">
-             Để đảm bảo tính công bằng, bạn <span className="text-red-500">bắt buộc phải bật camera</span> xuyên suốt quá trình làm bài thi.
-         </p>
+              <h2 className="text-lg font-black text-slate-900 tracking-tight mt-0">Yêu cầu bật Camera</h2>
+              {questionsLoading && (
+                <div className="mb-3 px-2 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold">
+                  Đang tải đề thi từ hệ thống...
+                </div>
+              )}
+              {!questionsLoading && examLoadError && (
+                <div className="mb-3 px-2 py-2 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-bold leading-relaxed">
+                  {examLoadError}
+                </div>
+              )}
+              {!questionsLoading && !examLoadError && TOTAL === 0 && (
+                <div className="mb-3 px-2 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold leading-relaxed">
+                  Chưa có câu hỏi trắc nghiệm cho môn <span className="text-amber-950">{meta.short}</span> trong ngân hàng. Vui lòng liên hệ Admin.
+                </div>
+              )}
+              <p className="text-slate-500 font-bold mt-1 mb-3 px-2 sm:px-0 text-xs leading-relaxed">
+                Để đảm bảo tính công bằng, bạn <span className="text-red-500">bắt buộc phải bật camera</span> xuyên suốt quá trình làm bài thi.
+              </p>
             </div>
 
-         {/* Hướng dẫn Box (Mô phỏng Dialog Chrome) */}
-         <div className="border-[1.5px] border-slate-200 rounded-[20px] p-3 mb-3 sm:mb-0 relative text-left bg-slate-50 shadow-inner select-none pointer-events-none sm:row-span-2 sm:col-start-2 sm:row-start-1">
-            <div className="flex items-center justify-between mb-2">
-               <div>
+            {/* Hướng dẫn Box (Mô phỏng Dialog Chrome) */}
+            <div className="border-[1.5px] border-slate-200 rounded-[20px] p-3 mb-3 sm:mb-0 relative text-left bg-slate-50 shadow-inner select-none pointer-events-none sm:row-span-2 sm:col-start-2 sm:row-start-1">
+              <div className="flex items-center justify-between mb-2">
+                <div>
                   <p className="font-bold text-slate-700 text-[13px]">{EXAM_CAMERA_PERMISSION_LABEL} muốn</p>
-                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-1 font-semibold"><Monitor size={12}/> Sử dụng camera có sẵn</p>
-               </div>
-               <XCircle size={16} className="text-slate-400" />
-            </div>
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-1 font-semibold"><Monitor size={12} /> Sử dụng camera có sẵn</p>
+                </div>
+                <XCircle size={16} className="text-slate-400" />
+              </div>
 
-            {/* Khung Camera Xem trước */}
-            <div className="bg-slate-900 rounded-xl h-20 sm:h-auto sm:aspect-video mb-2 relative overflow-hidden flex items-center justify-center border-[3px] border-white shadow-md">
-               {cameraReady ? (
-                   <video ref={previewRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
-               ) : (
-                   <div className="text-white/50 text-xs flex flex-col items-center gap-2 font-bold">
-                      <Monitor size={24} className="animate-pulse" />
-                      {cameraError ? 'Lỗi Camera: Bị từ chối' : 'Đang chờ cấp quyền...'}
-                   </div>
-               )}
-               <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-md px-2 py-1 rounded-lg text-xs text-white flex items-center gap-1 font-bold">
-                 <CheckCircle size={10} /> Xem trước
-               </div>
-            </div>
+              {/* Khung Camera Xem trước */}
+              <div className="bg-slate-900 rounded-xl h-20 sm:h-auto sm:aspect-video mb-2 relative overflow-hidden flex items-center justify-center border-[3px] border-white shadow-md">
+                {cameraReady ? (
+                  <video ref={previewRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                ) : (
+                  <div className="text-white/50 text-xs flex flex-col items-center gap-2 font-bold">
+                    <Monitor size={24} className="animate-pulse" />
+                    {cameraError ? 'Lỗi Camera: Bị từ chối' : 'Đang chờ cấp quyền...'}
+                  </div>
+                )}
+                <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-md px-2 py-1 rounded-lg text-xs text-white flex items-center gap-1 font-bold">
+                  <CheckCircle size={10} /> Xem trước
+                </div>
+              </div>
 
-            {/* Fake Dropdown */}
-            <div className="border border-slate-200/80 rounded-[10px] px-3 py-1.5 text-xs cms-min-text-xs font-bold text-slate-600 mb-2 flex justify-between bg-white shadow-sm">
-               <span>HD WEB CAMERA</span>
-               <span className="text-slate-400">▼</span>
-            </div>
+              {/* Fake Dropdown */}
+              <div className="border border-slate-200/80 rounded-[10px] px-3 py-1.5 text-xs cms-min-text-xs font-bold text-slate-600 mb-2 flex justify-between bg-white shadow-sm">
+                <span>HD WEB CAMERA</span>
+                <span className="text-slate-400">▼</span>
+              </div>
 
-            {/* Fake Buttons Hướng dẫn */}
-            <div className="space-y-1.5 relative mt-3">
-               {/* Nút số 1 được đóng khung đỏ */}
-               <div className="relative">
+              {/* Fake Buttons Hướng dẫn */}
+              <div className="space-y-1.5 relative mt-3">
+                {/* Nút số 1 được đóng khung đỏ */}
+                <div className="relative">
                   <div className="absolute -left-[5px] -right-[5px] -top-[5px] -bottom-[5px] border-2 border-red-500 rounded-[14px] pointer-events-none" />
                   <div className="bg-green-200/50 text-green-800 text-center py-1.5 rounded-[10px] font-bold text-xs">Cho phép mỗi khi truy cập...</div>
                   {/* SVG Arrow Pointing UP-LEFT */}
-                  <svg className="absolute -right-[20px] -bottom-[20px] w-6 h-6 text-red-500 animate-bounce pointer-events-none" 
-                       fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
-                     <path d="M6 6L20 20" />
-                     <path d="M6 6v8" />
-                     <path d="M6 6h8" />
+                  <svg className="absolute -right-[20px] -bottom-[20px] w-6 h-6 text-red-500 animate-bounce pointer-events-none"
+                    fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 6L20 20" />
+                    <path d="M6 6v8" />
+                    <path d="M6 6h8" />
                   </svg>
-               </div>
+                </div>
 
-               <div className="bg-green-100/50 text-green-700 text-center py-1.5 rounded-[10px] font-bold text-xs opacity-40 mix-blend-luminosity">Cho phép lần này</div>
-               <div className="bg-green-100/50 text-green-700 text-center py-1.5 rounded-[10px] font-bold text-xs opacity-40 mix-blend-luminosity">Không bao giờ cho phép</div>
+                <div className="bg-green-100/50 text-green-700 text-center py-1.5 rounded-[10px] font-bold text-xs opacity-40 mix-blend-luminosity">Cho phép lần này</div>
+                <div className="bg-green-100/50 text-green-700 text-center py-1.5 rounded-[10px] font-bold text-xs opacity-40 mix-blend-luminosity">Không bao giờ cho phép</div>
+              </div>
             </div>
-         </div>
 
             <div className="min-w-0 sm:col-start-1 sm:row-start-2 sm:text-left">
-         {/* Trạng thái Sẵn sàng */}
-         <div className={`py-2 rounded-[14px] font-black text-xs mb-3 flex items-center justify-center gap-1.5 transition-all duration-300 ${cameraReady ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400 opacity-60'}`}>
-            <CheckCircle size={13} className={cameraReady ? '' : 'grayscale'}/> Camera đã sẵn sàng!
-         </div>
+              {/* Trạng thái Sẵn sàng */}
+              <div className={`py-2 rounded-[14px] font-black text-xs mb-3 flex items-center justify-center gap-1.5 transition-all duration-300 ${cameraReady ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400 opacity-60'}`}>
+                <CheckCircle size={13} className={cameraReady ? '' : 'grayscale'} /> Camera đã sẵn sàng!
+              </div>
 
-         {/* Nút Vào thi */}
-         <button 
-             type="button"
-             disabled={!canStartExam}
-             onClick={() => beginOrResumeExam()} 
-             className={`w-full py-3 font-black rounded-[14px] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${
-                 canStartExam
-                 ? 'bg-red-500 text-white shadow-xl shadow-red-500/30 hover:bg-red-600 hover:scale-[1.02] active:scale-95' 
-                 : 'bg-red-50 text-red-400 border-2 border-red-200 cursor-not-allowed'
-             }`}>
-             {questionsLoading
-               ? 'ĐANG TẢI ĐỀ THI...'
-               : canStartExam
-                 ? 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'
-                 : 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'}
-         </button>
-         {!canStartExam && cameraReady && !questionsLoading && bankTotal === 0 && (
-           <p className="text-[10px] text-amber-700 font-bold mt-2 px-1">Admin cần thêm câu hỏi môn {meta.short} tại Đào tạo HV › Ngân hàng câu hỏi.</p>
-         )}
-         {!cameraReady && !cameraError && (
-           <p className="text-[10px] text-slate-400 font-bold mt-2">Bấm &quot;Cho phép mỗi khi truy cập&quot; để bật camera.</p>
-         )}
-         <button type="button" onClick={leaveBeforeStart} className="w-full mt-3 py-2 font-bold rounded-[14px] text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center gap-1">
-           <NavArrow size={14} direction="back" className="text-slate-600" />
-           Quay lại
-         </button>
+              {/* Nút Vào thi */}
+              <button
+                type="button"
+                disabled={!canStartExam}
+                onClick={() => beginOrResumeExam()}
+                className={`w-full py-3 font-black rounded-[14px] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${canStartExam
+                    ? 'bg-red-500 text-white shadow-xl shadow-red-500/30 hover:bg-red-600 hover:scale-[1.02] active:scale-95'
+                    : 'bg-red-50 text-red-400 border-2 border-red-200 cursor-not-allowed'
+                  }`}>
+                {questionsLoading
+                  ? 'ĐANG TẢI ĐỀ THI...'
+                  : canStartExam
+                    ? 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'
+                    : 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'}
+              </button>
+              {!canStartExam && cameraReady && !questionsLoading && bankTotal === 0 && (
+                <p className="text-[10px] text-amber-700 font-bold mt-2 px-1">Admin cần thêm câu hỏi môn {meta.short} tại Đào tạo HV › Ngân hàng câu hỏi.</p>
+              )}
+              {!cameraReady && !cameraError && (
+                <p className="text-[10px] text-slate-400 font-bold mt-2">Bấm &quot;Cho phép mỗi khi truy cập&quot; để bật camera.</p>
+              )}
+              <button type="button" onClick={leaveBeforeStart} className="w-full mt-3 py-2 font-bold rounded-[14px] text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center gap-1">
+                <NavArrow size={14} direction="back" className="text-slate-600" />
+                Quay lại
+              </button>
             </div>
           </div>
-       </div>
+        </div>
       </div>
     </div>
   );;
@@ -1093,7 +1092,7 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           </div>
           <p className="text-gray-600 text-sm leading-relaxed">
             Hành vi vi phạm đã được báo cáo lập tức tới <strong className="text-gray-800">Giảng viên phụ trách</strong> và <strong className="text-gray-800">Ban quản trị</strong>.
-            <br/><br/>
+            <br /><br />
             Quyền thi của bạn bị khóa tạm thời. Vui lòng liên hệ giảng viên để giải trình.
           </p>
           <button onClick={() => onBack?.()} className="w-full mt-4 py-3 bg-gray-900 shadow-xl hover:bg-black text-white font-bold rounded-xl active:scale-95 transition-all">
@@ -1131,17 +1130,17 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
         {/* Nếu đậu trắc nghiệm và còn bắt TL thì hiện upload (fallback UI) */}
         {passed && meta.essayRequired && (
           <div className="bg-white rounded-2xl border p-5">
-            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm"><Paperclip size={15}/> Nộp bài tự luận</h3>
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm"><Paperclip size={15} /> Nộp bài tự luận</h3>
             {uploadDone ? (
               <div className="flex items-center gap-2 text-green-600 font-semibold p-3 bg-green-50 rounded-xl text-sm">
-                <CheckCircle size={16}/> Đã nộp! File đã được gửi đến giám khảo.
+                <CheckCircle size={16} /> Đã nộp! File đã được gửi đến giám khảo.
               </div>
             ) : (
               <>
                 <input ref={fileRef} type="file" accept=".xlsx,.xls,.docx,.pptx" className="hidden" onChange={e => setUploadFile(e.target.files[0])} />
                 {uploadFile
                   ? <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 mb-3 text-sm"><span className="text-blue-700 font-medium truncate">{uploadFile.name}</span><button onClick={() => setUploadFile(null)} className="text-gray-400 hover:text-red-500 ml-2 flex-shrink-0">×</button></div>
-                  : <button onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 text-gray-400 hover:border-blue-300 hover:text-blue-500 text-sm flex flex-col items-center gap-1 mb-3"><Upload size={20}/> Chọn file</button>
+                  : <button onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 text-gray-400 hover:border-blue-300 hover:text-blue-500 text-sm flex flex-col items-center gap-1 mb-3"><Upload size={20} /> Chọn file</button>
                 }
                 <button
                   type="button"
@@ -1192,9 +1191,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
     );
   }
 
-  const q              = questions[currentQ];
-  const answeredCount  = answers.filter(a => a !== null).length;
-  const unanswered     = TOTAL - answeredCount;
+  const q = questions[currentQ];
+  const answeredCount = answers.filter(a => a !== null).length;
+  const unanswered = TOTAL - answeredCount;
 
   return (
     <ExamClickOutsideGuard
@@ -1219,24 +1218,24 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
           <div className="absolute inset-0 opacity-[0.07] bg-[linear-gradient(rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.06)_1px,transparent_1px)] bg-[size:24px_24px]" />
           <div className="relative grid grid-cols-1 gap-2 p-2.5 sm:p-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5 lg:justify-start">
-                <button
-                  type="button"
-                  onClick={() => {
-                    showModal({
-                      title: 'CẢNH BÁO TỪ HỆ THỐNG',
-                      content: 'Nếu bạn quay lại bây giờ, bài thi sẽ lập tức BỊ HỦY và hệ thống sẽ hiển thị RỚT. Bạn có chắc chắn muốn thoát?',
-                      type: 'warning',
-                      confirmText: 'ĐỒNG Ý HỦY BÀI',
-                      cancelText: 'Làm bài tiếp',
-                      onConfirm: () => {
-                        void applyFailAndLock().then(() => onBack?.());
-                      },
-                    });
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-black/20 backdrop-blur-sm transition hover:bg-white/15"
-                >
-                  <ArrowLeft size={14} /> Thoát phòng thi
-                </button>
+              <button
+                type="button"
+                onClick={() => {
+                  showModal({
+                    title: 'CẢNH BÁO TỪ HỆ THỐNG',
+                    content: 'Nếu bạn quay lại bây giờ, bài thi sẽ lập tức BỊ HỦY và hệ thống sẽ hiển thị RỚT. Bạn có chắc chắn muốn thoát?',
+                    type: 'warning',
+                    confirmText: 'ĐỒNG Ý HỦY BÀI',
+                    cancelText: 'Làm bài tiếp',
+                    onConfirm: () => {
+                      void applyFailAndLock().then(() => onBack?.());
+                    },
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-black/20 backdrop-blur-sm transition hover:bg-white/15"
+              >
+                <ArrowLeft size={14} /> Thoát phòng thi
+              </button>
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 font-mono text-xs text-slate-100 shadow-inner">
                 <Shield size={12} className="shrink-0 text-sky-400" />
                 <span className="text-slate-400">SBD:</span>
@@ -1248,11 +1247,10 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                 <span className="text-slate-400">câu TN</span>
               </span>
               <span
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-inner transition-all ${
-                  timeLeft < 300
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-inner transition-all ${timeLeft < 300
                     ? 'border-red-500/45 bg-red-950/60 text-red-200 animate-pulse'
                     : 'border-white/15 bg-black/35 text-white'
-                }`}
+                  }`}
               >
                 <Clock size={12} className="shrink-0 text-sky-400" />
                 <span>{tab === 'tu_luan' ? 'TL' : 'TN'}:</span>
@@ -1290,11 +1288,10 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                 <button
                   type="button"
                   onClick={() => setTab('trac_nghiem')}
-                  className={`relative flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold transition md:py-3 ${
-                    tab === 'trac_nghiem'
+                  className={`relative flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold transition md:py-3 ${tab === 'trac_nghiem'
                       ? 'text-indigo-900'
                       : 'text-slate-400 hover:text-slate-600'
-                  }`}
+                    }`}
                 >
                   {tab === 'trac_nghiem' && (
                     <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-red-600" />
@@ -1308,13 +1305,12 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                     if (isTracNghiemSubmitted) setTab('tu_luan');
                   }}
                   disabled={!isTracNghiemSubmitted || !meta.essayRequired}
-                  className={`relative flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold transition md:py-3 ${
-                    !isTracNghiemSubmitted || !meta.essayRequired
+                  className={`relative flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold transition md:py-3 ${!isTracNghiemSubmitted || !meta.essayRequired
                       ? 'cursor-not-allowed text-slate-300'
                       : tab === 'tu_luan'
                         ? 'text-indigo-900'
                         : 'text-slate-400 hover:text-slate-600'
-                  }`}
+                    }`}
                 >
                   {tab === 'tu_luan' && isTracNghiemSubmitted && meta.essayRequired && (
                     <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-red-600" />
@@ -1335,196 +1331,192 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
               </div>
 
               <div className="min-h-0 flex-1 overflow-hidden">
-              {tab === 'trac_nghiem' && (
-                <div className="flex h-full min-h-0 flex-col p-2.5 md:p-3 lg:p-4">
-                  <div className="shrink-0 border-b border-slate-100 pb-2 md:pb-2.5">
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 md:text-xs">
-                      Câu hỏi {currentQ + 1} / {TOTAL}
-                    </p>
-                    <h2 className="mt-1 text-sm font-bold leading-snug text-slate-900 md:text-base lg:text-lg">
-                      {q.text}
-                    </h2>
-                    {q.imageUrl && (
-                      <img
-                        src={resolveMediaUrl(q.imageUrl)}
-                        alt=""
-                        className="mt-2 max-h-56 w-full rounded-xl border border-slate-200 object-contain bg-white"
-                      />
-                    )}
-                    <p className="mt-1 text-xs font-medium text-slate-500 md:text-xs">
-                      Chọn một đáp án · Có thể sửa trước khi nộp
-                    </p>
-                  </div>
-                  <div className="min-h-0 flex-1 space-y-1 overflow-y-auto py-1 pr-0.5 md:space-y-1.5 md:py-1.5">
-                    {q.options.map((opt, i) => (
+                {tab === 'trac_nghiem' && (
+                  <div className="flex h-full min-h-0 flex-col p-2.5 md:p-3 lg:p-4">
+                    <div className="shrink-0 border-b border-slate-100 pb-2 md:pb-2.5">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 md:text-xs">
+                        Câu hỏi {currentQ + 1} / {TOTAL}
+                      </p>
+                      <h2 className="mt-1 text-sm font-bold leading-snug text-slate-900 md:text-base lg:text-lg">
+                        {q.text}
+                      </h2>
+                      {q.imageUrl && (
+                        <img
+                          src={resolveMediaUrl(q.imageUrl)}
+                          alt=""
+                          className="mt-2 max-h-56 w-full rounded-xl border border-slate-200 object-contain bg-white"
+                        />
+                      )}
+                      <p className="mt-1 text-xs font-medium text-slate-500 md:text-xs">
+                        Chọn một đáp án · Có thể sửa trước khi nộp
+                      </p>
+                    </div>
+                    <div className="min-h-0 flex-1 space-y-1 overflow-y-auto py-1 pr-0.5 md:space-y-1.5 md:py-1.5">
+                      {q.options.map((opt, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            if (!isTracNghiemSubmitted) handleAnswer(currentQ, i);
+                          }}
+                          disabled={isTracNghiemSubmitted}
+                          className={`group flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all md:gap-2.5 md:px-3 md:py-2 ${answers[currentQ] === i
+                              ? 'border-indigo-600 bg-indigo-50 shadow-sm shadow-indigo-500/10'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                            } ${isTracNghiemSubmitted ? 'cursor-not-allowed opacity-65' : ''}`}
+                        >
+                          <span
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black md:h-8 md:w-8 md:text-xs ${answers[currentQ] === i
+                                ? 'bg-red-600 text-white'
+                                : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
+                              }`}
+                          >
+                            {['A', 'B', 'C', 'D', 'E', 'F'][i] ?? i + 1}
+                          </span>
+                          <span
+                            className={`min-w-0 flex-1 text-[13px] leading-snug md:text-sm ${answers[currentQ] === i ? 'font-semibold text-indigo-950' : 'font-medium text-slate-700'
+                              }`}
+                          >
+                            {opt}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex shrink-0 items-center justify-between border-t border-slate-100 pt-2 md:pt-2.5">
                       <button
-                        key={i}
                         type="button"
-                        onClick={() => {
-                          if (!isTracNghiemSubmitted) handleAnswer(currentQ, i);
-                        }}
-                        disabled={isTracNghiemSubmitted}
-                        className={`group flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all md:gap-2.5 md:px-3 md:py-2 ${
-                          answers[currentQ] === i
-                            ? 'border-indigo-600 bg-indigo-50 shadow-sm shadow-indigo-500/10'
-                            : 'border-slate-200 bg-white hover:border-slate-300'
-                        } ${isTracNghiemSubmitted ? 'cursor-not-allowed opacity-65' : ''}`}
+                        onClick={() => setCurrentQ((p) => Math.max(0, p - 1))}
+                        disabled={currentQ === 0}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 md:px-3.5 md:py-2.5 md:text-sm"
                       >
-                        <span
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black md:h-8 md:w-8 md:text-xs ${
-                            answers[currentQ] === i
-                              ? 'bg-red-600 text-white'
-                              : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
-                          }`}
-                        >
-                          {['A', 'B', 'C', 'D', 'E', 'F'][i] ?? i + 1}
-                        </span>
-                        <span
-                          className={`min-w-0 flex-1 text-[13px] leading-snug md:text-sm ${
-                            answers[currentQ] === i ? 'font-semibold text-indigo-950' : 'font-medium text-slate-700'
-                          }`}
-                        >
-                          {opt}
-                        </span>
+                        <ChevronLeft size={18} /> Câu trước
                       </button>
-                    ))}
-                  </div>
-                  <div className="flex shrink-0 items-center justify-between border-t border-slate-100 pt-2 md:pt-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentQ((p) => Math.max(0, p - 1))}
-                      disabled={currentQ === 0}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 md:px-3.5 md:py-2.5 md:text-sm"
-                    >
-                      <ChevronLeft size={18} /> Câu trước
-                    </button>
-                    <span className="font-mono text-xs font-semibold text-slate-500 md:text-sm">
-                      {currentQ + 1} / {TOTAL}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentQ((p) => Math.min(TOTAL - 1, p + 1))}
-                      disabled={currentQ === TOTAL - 1}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 md:px-3.5 md:py-2.5 md:text-sm"
-                    >
-                      Câu sau <ChevronRight size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {tab === 'tu_luan' && (
-                <div className="p-4 md:p-6 lg:p-7">
-                  {uploadDone ? (
-                    <div className="py-12 text-center">
-                      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
-                        <CheckCircle size={36} />
-                      </div>
-                      <h3 className="text-xl font-black text-slate-900">Đã nộp bài thực hành</h3>
-                      <p className="mt-2 text-sm text-slate-500">Hồ sơ đã được ghi nhận trên hệ thống.</p>
+                      <span className="font-mono text-xs font-semibold text-slate-500 md:text-sm">
+                        {currentQ + 1} / {TOTAL}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => onBack?.()}
-                        className="mt-8 rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+                        onClick={() => setCurrentQ((p) => Math.min(TOTAL - 1, p + 1))}
+                        disabled={currentQ === TOTAL - 1}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 md:px-3.5 md:py-2.5 md:text-sm"
                       >
-                        Về phòng thi
+                        Câu sau <ChevronRight size={18} />
                       </button>
                     </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 md:flex md:gap-6">
-                        <div className="mb-4 flex w-full shrink-0 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 md:mb-0 md:w-48">
-                          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đề thi</p>
-                          {meta.hasPracticeFile ? (
-                            <div className="mt-2 w-full space-y-2">
-                              {meta.practiceFiles.map((f, i) => (
-                                <a
-                                  key={`${f.fileUrl}-${i}`}
-                                  href={buildMediaDownloadUrl(f.fileUrl, f.fileName)}
-                                  download={f.fileName}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:underline break-all"
-                                >
-                                  <Download size={14} className="shrink-0" />
-                                  <span>{f.fileName || `Đề ${i + 1}`}</span>
-                                </a>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="mt-3 text-center text-[11px] font-semibold text-amber-600">
-                              Chưa có đề — liên hệ giáo viên
+                  </div>
+                )}
+
+                {tab === 'tu_luan' && (
+                  <div className="p-4 md:p-6 lg:p-7">
+                    {uploadDone ? (
+                      <div className="py-12 text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                          <CheckCircle size={36} />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-900">Đã nộp bài thực hành</h3>
+                        <p className="mt-2 text-sm text-slate-500">Hồ sơ đã được ghi nhận trên hệ thống.</p>
+                        <button
+                          type="button"
+                          onClick={() => onBack?.()}
+                          className="mt-8 rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+                        >
+                          Về phòng thi
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 md:flex md:gap-6">
+                          <div className="mb-4 flex w-full shrink-0 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 md:mb-0 md:w-48">
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đề thi</p>
+                            {meta.hasPracticeFile ? (
+                              <div className="mt-2 w-full space-y-2">
+                                {meta.practiceFiles.map((f, i) => (
+                                  <a
+                                    key={`${f.fileUrl}-${i}`}
+                                    href={buildMediaDownloadUrl(f.fileUrl, f.fileName)}
+                                    download={f.fileName}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:underline break-all"
+                                  >
+                                    <Download size={14} className="shrink-0" />
+                                    <span>{f.fileName || `Đề ${i + 1}`}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-center text-[11px] font-semibold text-amber-600">
+                                Chưa có đề — liên hệ giáo viên
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-900">Hướng dẫn nộp bài</h3>
+                            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                              Tải đề về máy, làm bài theo yêu cầu, sau đó nộp đúng định dạng file quy định. Kiểm tra lại tên file trước khi gửi.
                             </p>
-                          )}
+                          </div>
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-900">Hướng dẫn nộp bài</h3>
-                          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                            Tải đề về máy, làm bài theo yêu cầu, sau đó nộp đúng định dạng file quy định. Kiểm tra lại tên file trước khi gửi.
+                          <p className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
+                            <Paperclip size={16} className="text-indigo-500" />
+                            Tải lên bài làm
                           </p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
-                          <Paperclip size={16} className="text-indigo-500" />
-                          Tải lên bài làm
-                        </p>
-                        <input
-                          ref={fileRef}
-                          type="file"
-                          accept=".xlsx,.xls,.docx,.pptx"
-                          className="hidden"
-                          onChange={(e) => setUploadFile(e.target.files[0])}
-                        />
-                        {uploadFile ? (
-                          <div className="flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
-                            <span className="truncate text-sm font-semibold text-indigo-900">{uploadFile.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => setUploadFile(null)}
-                              className="ml-2 text-slate-400 hover:text-red-500"
+                          <input
+                            ref={fileRef}
+                            type="file"
+                            accept=".xlsx,.xls,.docx,.pptx"
+                            className="hidden"
+                            onChange={(e) => setUploadFile(e.target.files[0])}
+                          />
+                          {uploadFile ? (
+                            <div className="flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
+                              <span className="truncate text-sm font-semibold text-indigo-900">{uploadFile.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => setUploadFile(null)}
+                                className="ml-2 text-slate-400 hover:text-red-500"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => e.key === 'Enter' && fileRef.current?.click()}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                setIsDragging(true);
+                              }}
+                              onDragLeave={() => setIsDragging(false)}
+                              onDrop={handleDrop}
+                              onClick={() => fileRef.current?.click()}
+                              className={`cursor-pointer rounded-2xl border-2 border-dashed py-12 text-center transition ${isDragging
+                                  ? 'border-indigo-400 bg-indigo-50'
+                                  : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
+                                }`}
                             >
-                              ×
-                            </button>
-                          </div>
-                        ) : (
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && fileRef.current?.click()}
-                            onDragOver={(e) => {
-                              e.preventDefault();
-                              setIsDragging(true);
-                            }}
-                            onDragLeave={() => setIsDragging(false)}
-                            onDrop={handleDrop}
-                            onClick={() => fileRef.current?.click()}
-                            className={`cursor-pointer rounded-2xl border-2 border-dashed py-12 text-center transition ${
-                              isDragging
-                                ? 'border-indigo-400 bg-indigo-50'
-                                : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
-                            }`}
-                          >
-                            <Upload size={32} className="mx-auto text-slate-300" />
-                            <p className="mt-2 text-sm text-slate-600">
-                              Kéo thả hoặc <span className="font-bold text-indigo-600">chọn file</span>
-                            </p>
-                            <p className="mt-1 text-xs text-slate-400">Word, Excel, PowerPoint · tối đa 3MB</p>
-                          </div>
-                        )}
+                              <Upload size={32} className="mx-auto text-slate-300" />
+                              <p className="mt-2 text-sm text-slate-600">
+                                Kéo thả hoặc <span className="font-bold text-indigo-600">chọn file</span>
+                              </p>
+                              <p className="mt-1 text-xs text-slate-400">Word, Excel, PowerPoint · tối đa 3MB</p>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={tuLuanSubmitting || !uploadFile}
+                          onClick={trySubmitTuLuan}
+                          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 py-4 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <Send size={18} /> {tuLuanSubmitting ? 'ĐANG TẢI LÊN…' : uploadFile ? 'NỘP BÀI THỰC HÀNH' : 'CHỌN FILE ĐỂ NỘP BÀI'}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        disabled={tuLuanSubmitting || !uploadFile}
-                        onClick={trySubmitTuLuan}
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 py-4 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        <Send size={18} /> {tuLuanSubmitting ? 'ĐANG TẢI LÊN…' : uploadFile ? 'NỘP BÀI THỰC HÀNH' : 'CHỌN FILE ĐỂ NỘP BÀI'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </main>
@@ -1551,13 +1543,12 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                         type="button"
                         disabled={isTracNghiemSubmitted || tab !== 'trac_nghiem'}
                         onClick={() => setCurrentQ(i)}
-                        className={`flex aspect-square items-center justify-center rounded-lg text-xs font-black transition sm:rounded-xl sm:text-sm md:text-[0.95rem] ${
-                          active
+                        className={`flex aspect-square items-center justify-center rounded-lg text-xs font-black transition sm:rounded-xl sm:text-sm md:text-[0.95rem] ${active
                             ? 'bg-red-600 text-white shadow-md shadow-indigo-500/30 ring-2 ring-indigo-300 ring-offset-1 ring-offset-white'
                             : done
                               ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
                               : 'border border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white'
-                        } ${isTracNghiemSubmitted || tab !== 'trac_nghiem' ? 'cursor-default opacity-60' : ''}`}
+                          } ${isTracNghiemSubmitted || tab !== 'trac_nghiem' ? 'cursor-default opacity-60' : ''}`}
                       >
                         {i + 1}
                       </button>

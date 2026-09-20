@@ -3,7 +3,10 @@ const { lessonQuizRepository } = require('./../repositories');
 const Student = require('./../../student/models/Student');
 const logger = require('./../../../config/logger');
 const { scheduleQuizAssignedNotify } = require('./../../../services/quizAssignedNotifier');
-const { studentCourseNames } = require('./../../../services/quizAccess');
+const {
+  studentCourseNames,
+  buildQuizDetailedReview,
+} = require('./../../../services/quizAccess');
 
 class QuizApplicationService {
   async get_teacher(data) {
@@ -134,7 +137,9 @@ class QuizApplicationService {
             timeLimitMinutes: quiz.timeLimitMinutes,
             questions: safeQuestions,
             mySubmission: mySub || null,
-            detailedReview: [],
+            detailedReview: mySub?.forfeit
+              ? []
+              : buildQuizDetailedReview(quiz.questions, mySub?.answers),
           },
         },
       };
@@ -198,7 +203,7 @@ class QuizApplicationService {
               forfeit: false,
               exitReason: '',
               submittedAt: existing.submittedAt,
-              detailedReview: [],
+              detailedReview: buildQuizDetailedReview(quiz.questions, existing.answers),
             },
           },
         };
@@ -302,7 +307,7 @@ class QuizApplicationService {
             forfeit: isForfeit,
             exitReason: reason,
             submittedAt: submissionData.submittedAt,
-            detailedReview: [],
+            detailedReview: isForfeit ? [] : buildQuizDetailedReview(quiz.questions, userAnswers),
           },
         },
       };
