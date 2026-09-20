@@ -1,19 +1,19 @@
-const express    = require('express');
-const path       = require('path');
-const http       = require('http');
-const mongoose   = require('mongoose');
-const cors       = require('cors');
+const express = require('express');
+const path = require('path');
+const http = require('http');
+const mongoose = require('mongoose');
+const cors = require('cors');
 const compression = require('compression');
-const helmet     = require('helmet');
-const hpp        = require('hpp');
+const helmet = require('helmet');
+const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
-const session    = require('express-session');
-const dotenv     = require('dotenv');
+const session = require('express-session');
+const dotenv = require('dotenv');
 const mongoSanitize = require('./middleware/mongoSanitize');
 const { Server } = require('socket.io');
-const cron       = require('node-cron');
-const pinoHttp   = require('pino-http');
-const connectDB  = require('./config/db');
+const cron = require('node-cron');
+const pinoHttp = require('pino-http');
+const connectDB = require('./config/db');
 
 if (process.env.NODE_ENV !== 'test') dotenv.config();
 require('./config/validateEnv')();
@@ -23,7 +23,7 @@ const { buildConversationId } = require('./utils/chatConversationId');
 const { getMessagingRole } = require('./utils/messagingRoles');
 const { logDelivery } = require('./services/messagingObservability');
 
-const app    = express();
+const app = express();
 const server = http.createServer(app);
 
 const trustProxy = process.env.TRUST_PROXY === '0' ? false : (parseInt(process.env.TRUST_PROXY, 10) || 1);
@@ -378,8 +378,8 @@ io.on('connection', (socket) => {
 
     const userId = socketUserId(socket.user);
     const messagingRole = getMessagingRole(socket.user);
-    const name   = socket.user.name || 'User';
-    const key    = `${messagingRole}_${userId}`;
+    const name = socket.user.name || 'User';
+    const key = `${messagingRole}_${userId}`;
     // Branch chỉ từ JWT — không tin client (chống spoof room)
     const resolvedBranchId = socket.user.branchId || null;
     const resolvedBranchCode = socket.user.branchCode || '';
@@ -441,7 +441,7 @@ io.on('connection', (socket) => {
       } else if (!getsFullPresence) {
         socket.join('presence_none');
       }
-      
+
       if (resolvedBranchCode) {
         const bcode = resolvedBranchCode;
         socket.join(`ALL_${uRole}_${bcode}`);
@@ -466,11 +466,13 @@ io.on('connection', (socket) => {
         (userGroups || []).forEach((g) => {
           if (g?._id) socket.join(`group_${g._id}`);
         });
-      }).catch(() => {});
+      }).catch(() => { });
     } catch (_) { /* ignore */ }
 
     // Broadcast danh sách online (scoped)
     broadcastOnlinePresence();
+    // Gửi lại lịch sử truy cập gần nhất cho socket mới sau khi reload trang.
+    socket.emit('users:lastSeen', Object.fromEntries(lastSeenMap));
   });
 
   // ── Nhắn tin 1-1 — luôn lấy người gửi từ JWT (socket.user), không tin client ──
@@ -527,78 +529,78 @@ io.on('connection', (socket) => {
       correlationId: newCorrelationId('sock'),
       channel: 'socket',
     }, async () => {
-    // Broadcast stays on role/global rooms (admin/staff only) — not private DM path
-    if (isBroadcast) {
-      if (!isAdminSocketUser(u)) return;
-      const senderMessagingRole = getMessagingRole(u);
-      const convId = buildConversationId(
-        senderMessagingRole,
-        senderId,
-        'system',
-        String(data.receiverId).replace(/[^a-zA-Z0-9_]/g, '_'),
-      );
-      const msgPayload = {
-        _id: `msg_${Date.now()}`,
-        content: rawContent,
-        senderId,
-        senderName: u.name || 'User',
-        senderRole: senderMessagingRole,
-        receiverId: data.receiverId,
-        receiverRole: 'system',
-        conversationId: convId,
-        messageType: data.messageType || 'text',
-        createdAt: new Date().toISOString(),
-        isRead: false,
-      };
-      if (data.receiverId === 'ALL_USERS') io.emit('message:receive', msgPayload);
-      else if (data.receiverId === 'ALL_STUDENTS') io.to('ALL_STUDENT').emit('message:receive', msgPayload);
-      else if (data.receiverId === 'ALL_TEACHERS') io.to('ALL_TEACHER').emit('message:receive', msgPayload);
-      else if (String(data.receiverId).startsWith('ALL_BRANCH_')) {
-        const bCode = String(data.receiverId).replace('ALL_BRANCH_', '');
-        io.to(`ALL_STUDENT_${bCode}`).to(`ALL_TEACHER_${bCode}`).to(`ALL_STAFF_${bCode}`).to(`ALL_SUPPORT_${bCode}`).emit('message:receive', msgPayload);
-      }
-      socket.emit('message:sent', msgPayload);
-      return;
-    }
-
-    try {
-      const { sendCanonicalMessage } = require('./services/directMessageService');
-      const result = await sendCanonicalMessage({
-        sender: u,
-        receiverId: data.receiverId,
-        receiverName: data.receiverName,
-        receiverRole: data.receiverRole,
-        content: rawContent,
-        messageType: data.messageType || 'text',
-        fileUrl: data.fileUrl || '',
-        fileName: data.fileName || '',
-        isGroup: Boolean(data.isGroup),
-        groupId: data.groupId || null,
-        conversationId: data.conversationId || null,
-        payload: data.payload && typeof data.payload === 'object' ? data.payload : null,
-        notifyUser: app.notifyUser,
-        io,
-      });
-      if (!result.ok) {
-        logMessagingEvent('warn', 'messaging.socket.send_denied', {
+      // Broadcast stays on role/global rooms (admin/staff only) — not private DM path
+      if (isBroadcast) {
+        if (!isAdminSocketUser(u)) return;
+        const senderMessagingRole = getMessagingRole(u);
+        const convId = buildConversationId(
+          senderMessagingRole,
           senderId,
-          receiverId: data.receiverId ? String(data.receiverId) : null,
-          code: result.code || null,
-          policy: result.policy || null,
-          reason: result.message || null,
+          'system',
+          String(data.receiverId).replace(/[^a-zA-Z0-9_]/g, '_'),
+        );
+        const msgPayload = {
+          _id: `msg_${Date.now()}`,
+          content: rawContent,
+          senderId,
+          senderName: u.name || 'User',
+          senderRole: senderMessagingRole,
+          receiverId: data.receiverId,
+          receiverRole: 'system',
+          conversationId: convId,
+          messageType: data.messageType || 'text',
+          createdAt: new Date().toISOString(),
+          isRead: false,
+        };
+        if (data.receiverId === 'ALL_USERS') io.emit('message:receive', msgPayload);
+        else if (data.receiverId === 'ALL_STUDENTS') io.to('ALL_STUDENT').emit('message:receive', msgPayload);
+        else if (data.receiverId === 'ALL_TEACHERS') io.to('ALL_TEACHER').emit('message:receive', msgPayload);
+        else if (String(data.receiverId).startsWith('ALL_BRANCH_')) {
+          const bCode = String(data.receiverId).replace('ALL_BRANCH_', '');
+          io.to(`ALL_STUDENT_${bCode}`).to(`ALL_TEACHER_${bCode}`).to(`ALL_STAFF_${bCode}`).to(`ALL_SUPPORT_${bCode}`).emit('message:receive', msgPayload);
+        }
+        socket.emit('message:sent', msgPayload);
+        return;
+      }
+
+      try {
+        const { sendCanonicalMessage } = require('./services/directMessageService');
+        const result = await sendCanonicalMessage({
+          sender: u,
+          receiverId: data.receiverId,
+          receiverName: data.receiverName,
+          receiverRole: data.receiverRole,
+          content: rawContent,
+          messageType: data.messageType || 'text',
+          fileUrl: data.fileUrl || '',
+          fileName: data.fileName || '',
+          isGroup: Boolean(data.isGroup),
+          groupId: data.groupId || null,
+          conversationId: data.conversationId || null,
+          payload: data.payload && typeof data.payload === 'object' ? data.payload : null,
+          notifyUser: app.notifyUser,
+          io,
+        });
+        if (!result.ok) {
+          logMessagingEvent('warn', 'messaging.socket.send_denied', {
+            senderId,
+            receiverId: data.receiverId ? String(data.receiverId) : null,
+            code: result.code || null,
+            policy: result.policy || null,
+            reason: result.message || null,
+            socketId: socket.id,
+          });
+          return;
+        }
+        socket.emit('message:sent', result.clientMessage);
+      } catch (err) {
+        logMessagingEvent('error', 'messaging.socket.send_error', {
+          senderId,
           socketId: socket.id,
+          err: err?.message || 'unknown',
         });
         return;
       }
-      socket.emit('message:sent', result.clientMessage);
-    } catch (err) {
-      logMessagingEvent('error', 'messaging.socket.send_error', {
-        senderId,
-        socketId: socket.id,
-        err: err?.message || 'unknown',
-      });
-      return;
-    }
     });
   });
 
@@ -735,7 +737,7 @@ io.on('connection', (socket) => {
         link: '/student/exam'
       });
     }
-     // (Removed io.emit('exam:locked') to prevent INFINITE LOOP with StudentTest resolving 'exam:locked' by emitting 'exam:violation')
+    // (Removed io.emit('exam:locked') to prevent INFINITE LOOP with StudentTest resolving 'exam:locked' by emitting 'exam:violation')
   });
 
   // ── Giảng viên join room riêng để nhận notify ──
@@ -855,81 +857,81 @@ app.broadcastToRole = (role, eventName, data) => {
   io.to(`ALL_${String(role || '').toUpperCase()}`).emit(eventName, data);
 };
 
-const studentRoutes      = require('./routes/studentRoutes');
-const invoiceRoutes      = require('./routes/invoiceRoutes');
-const authRoutes         = require('./routes/authRoutes');
-const messageRoutes      = require('./routes/messageRoutes');
-const scheduleRoutes     = require('./routes/scheduleRoutes');
-const courseRoutes       = require('./routes/courseRoutes');
-const teacherRoutes      = require('./routes/teacherRoutes');
-const assignmentRoutes   = require('./routes/assignmentRoutes');
-const evaluationRoutes   = require('./routes/evaluationRoutes');
-const transactionRoutes  = require('./routes/transactionRoutes');
-const systemLogRoutes    = require('./routes/systemLogRoutes');
+const studentRoutes = require('./routes/studentRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
+const authRoutes = require('./routes/authRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const scheduleRoutes = require('./routes/scheduleRoutes');
+const courseRoutes = require('./routes/courseRoutes');
+const teacherRoutes = require('./routes/teacherRoutes');
+const assignmentRoutes = require('./routes/assignmentRoutes');
+const evaluationRoutes = require('./routes/evaluationRoutes');
+const transactionRoutes = require('./routes/transactionRoutes');
+const systemLogRoutes = require('./routes/systemLogRoutes');
 const teachingGuideRoutes = require('./routes/teachingGuideRoutes');
 const trainingRoutes = require('./routes/trainingRoutes');
-const examResultRoutes   = require('./routes/examResultRoutes');
-const settingsRoutes     = require('./routes/settingsRoutes');
-const webhookRoutes      = require('./routes/webhookRoutes');
-const staffRoutes        = require('./routes/staffRoutes');
-const branchRoutes       = require('./routes/branchRoutes');
-const analyticsRoutes    = require('./routes/analyticsRoutes');  // ← Revenue Analytics
-const employeeRoutes     = require('./routes/employeeRoutes');   // ← HR & Payroll
+const examResultRoutes = require('./routes/examResultRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
+const staffRoutes = require('./routes/staffRoutes');
+const branchRoutes = require('./routes/branchRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');  // ← Revenue Analytics
+const employeeRoutes = require('./routes/employeeRoutes');   // ← HR & Payroll
 const notificationRoutes = require('./routes/notificationRoutes');
-const fileRoutes         = require('./routes/fileRoutes');
-const backupRoutes       = require('./routes/backupRoutes');
-const monitoringRoutes   = require('./routes/monitoringRoutes');
-const proctorRoutes      = require('./routes/proctorRoutes');
-const aiRoutes           = require('./routes/aiRoutes');
-const aiSupportRoutes    = require('./routes/aiSupportRoutes');
-const biRoutes           = require('./routes/biRoutes');
-const financeRoutes      = require('./routes/financeRoutes');
-const workflowRoutes     = require('./routes/workflowRoutes');
-const builderRoutes      = require('./routes/builderRoutes');
-const tenantRoutes       = require('./routes/tenantRoutes');
-const feedRoutes         = require('./routes/feedRoutes');
-const blogRoutes         = require('./routes/blogRoutes');
-const centerInfoRoutes   = require('./routes/centerInfoRoutes');
-const certPrepRoutes     = require('./routes/certPrepRoutes');
-const quizRoutes         = require('./routes/quizRoutes');
+const fileRoutes = require('./routes/fileRoutes');
+const backupRoutes = require('./routes/backupRoutes');
+const monitoringRoutes = require('./routes/monitoringRoutes');
+const proctorRoutes = require('./routes/proctorRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const aiSupportRoutes = require('./routes/aiSupportRoutes');
+const biRoutes = require('./routes/biRoutes');
+const financeRoutes = require('./routes/financeRoutes');
+const workflowRoutes = require('./routes/workflowRoutes');
+const builderRoutes = require('./routes/builderRoutes');
+const tenantRoutes = require('./routes/tenantRoutes');
+const feedRoutes = require('./routes/feedRoutes');
+const blogRoutes = require('./routes/blogRoutes');
+const centerInfoRoutes = require('./routes/centerInfoRoutes');
+const certPrepRoutes = require('./routes/certPrepRoutes');
+const quizRoutes = require('./routes/quizRoutes');
 
-app.use('/api/auth',         authRoutes);
-app.use('/api/students',     studentRoutes);
-app.use('/api/invoices',     invoiceRoutes);
-app.use('/api/messages',     messageRoutes);
-app.use('/api/schedules',    scheduleRoutes);
-app.use('/api/courses',      courseRoutes);
-app.use('/api/teachers',     teacherRoutes);
-app.use('/api/assignments',  assignmentRoutes);
-app.use('/api/quizzes',      quizRoutes);
-app.use('/api/evaluations',  evaluationRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/schedules', scheduleRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/assignments', assignmentRoutes);
+app.use('/api/quizzes', quizRoutes);
+app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/exam-results', examResultRoutes);
-app.use('/api/system-logs',  systemLogRoutes);
-app.use('/api/training',     teachingGuideRoutes);
+app.use('/api/system-logs', systemLogRoutes);
+app.use('/api/training', teachingGuideRoutes);
 app.use('/api/training-lms', trainingRoutes);
 app.use('/api/transactions', transactionRoutes);
-app.use('/api/settings',     settingsRoutes);
-app.use('/api/webhooks',     webhookRoutes);
-app.use('/api/staff',        staffRoutes);
-app.use('/api/branches',     branchRoutes);
-app.use('/api/analytics',    analyticsRoutes);    // ← Revenue Analytics
-app.use('/api/employees',    employeeRoutes);     // ← HR & Payroll
-app.use('/api/notifications',notificationRoutes);
-app.use('/api/files',        fileRoutes);
-app.use('/api/backups',      backupRoutes);
-app.use('/api/monitoring',  monitoringRoutes);
-app.use('/api/proctor',      proctorRoutes);
-app.use('/api/ai',           aiRoutes);
-app.use('/api/ai-support',   aiSupportRoutes);
-app.use('/api/bi',           biRoutes);
-app.use('/api/finance',      financeRoutes);
-app.use('/api/workflows',    workflowRoutes);
-app.use('/api/builder',      builderRoutes);
-app.use('/api/tenants',      tenantRoutes);
-app.use('/api/feed',         feedRoutes);
-app.use('/api/blog',         blogRoutes);
-app.use('/api/center-info',  centerInfoRoutes);
-app.use('/api/cert-prep',    certPrepRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/branches', branchRoutes);
+app.use('/api/analytics', analyticsRoutes);    // ← Revenue Analytics
+app.use('/api/employees', employeeRoutes);     // ← HR & Payroll
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/files', fileRoutes);
+app.use('/api/backups', backupRoutes);
+app.use('/api/monitoring', monitoringRoutes);
+app.use('/api/proctor', proctorRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/ai-support', aiSupportRoutes);
+app.use('/api/bi', biRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/workflows', workflowRoutes);
+app.use('/api/builder', builderRoutes);
+app.use('/api/tenants', tenantRoutes);
+app.use('/api/feed', feedRoutes);
+app.use('/api/blog', blogRoutes);
+app.use('/api/center-info', centerInfoRoutes);
+app.use('/api/cert-prep', certPrepRoutes);
 
 // Route mặc định
 app.get('/', (req, res) => {
@@ -945,15 +947,15 @@ app.get('/', (req, res) => {
       'Student Evaluation (Workflow 5)',
     ],
     endpoints: {
-      auth:         '/api/auth',
-      students:     '/api/students',
-      teachers:     '/api/teachers',
-      invoices:     '/api/invoices',
-      messages:     '/api/messages',
-      schedules:    '/api/schedules',
-      courses:      '/api/courses',
-      assignments:  '/api/assignments',
-      evaluations:  '/api/evaluations',
+      auth: '/api/auth',
+      students: '/api/students',
+      teachers: '/api/teachers',
+      invoices: '/api/invoices',
+      messages: '/api/messages',
+      schedules: '/api/schedules',
+      courses: '/api/courses',
+      assignments: '/api/assignments',
+      evaluations: '/api/evaluations',
       transactions: '/api/transactions',
     },
     socketIO: 'Connected',
